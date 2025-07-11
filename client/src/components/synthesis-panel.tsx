@@ -29,6 +29,7 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMe
   const { createSynthesis, isSynthesizing } = useSolutionGeneration();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [quotaError, setQuotaError] = useState<string | null>(null);
   
   // Save to project mutation
   const saveToProject = useMutation({
@@ -61,7 +62,7 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMe
     }
   });
 
-  const [synthesisSteps, setSynthesisSteps] = useState<SynthesisStep[]>([
+  const [synthesisSteps, setSynthesisSteps] = useState<MergeStep[]>([
     {
       id: 1,
       title: "Voice Convergence Analysis",
@@ -100,6 +101,7 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMe
     ));
 
     try {
+      setQuotaError(null);
       const synthesis = await createSynthesis.mutateAsync(sessionId);
       
       // Update all steps to completed
@@ -114,12 +116,26 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMe
 
       console.log('OpenAI synthesis completed:', synthesis.id);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('OpenAI synthesis failed:', error);
+      
+      // Handle quota exceeded error specifically
+      if (error.message?.includes("quota") || error.message?.includes("limit") || error.message?.includes("403")) {
+        setQuotaError("Daily generation limit reached. Upgrade to Pro for unlimited synthesis.");
+      } else {
+        setQuotaError("Synthesis failed. Please try again.");
+      }
+      
       setSynthesisSteps(prev => prev.map(step => ({ 
         ...step, 
         status: "pending" 
       })));
+      
+      toast({
+        title: "Synthesis Failed",
+        description: error.message?.includes("quota") ? "Daily generation limit reached. Upgrade to Pro for unlimited synthesis." : "Unable to synthesize solutions. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 

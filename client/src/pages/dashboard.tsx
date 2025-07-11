@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useVoiceRecommendations } from "@/hooks/use-voice-recommendations";
 import { usePlanGuard } from "@/hooks/usePlanGuard";
-import { QUICK_PROMPTS } from "@/types/voices";
+
 import type { Solution, VoiceProfile } from "@shared/schema";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -200,9 +200,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleQuickPrompt = (prompt: string) => {
-    handlePromptChange(prompt);
-  };
+
 
   return (
     <div className="min-h-screen flex bg-gray-900 text-gray-100">
@@ -287,22 +285,7 @@ export default function Dashboard() {
 
         {/* Chat Area */}
         <div className="flex-1 flex flex-col p-6 space-y-6">
-          {/* Quick Prompts */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Quick Prompts</h3>
-            <div className="grid grid-cols-1 gap-2">
-              {QUICK_PROMPTS.slice(0, 4).map((prompt, index) => (
-                <Button
-                  key={index}
-                  variant="ghost"
-                  className="text-left justify-start p-3 h-auto bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 hover:text-gray-100 border border-gray-700"
-                  onClick={() => handleQuickPrompt(prompt)}
-                >
-                  <div className="text-sm">{prompt}</div>
-                </Button>
-              ))}
-            </div>
-          </div>
+
 
           {/* Voice Recommendations */}
           {recommendations && (

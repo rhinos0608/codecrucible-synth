@@ -144,7 +144,7 @@ class AnalyticsService {
         recentEvents
       ] = await Promise.all([
         storage.getVoiceUsageStats(userId),
-        storage.getDailyMetrics(
+        storage.getDailyUsageMetrics(
           userId, 
           startDate.toISOString().split('T')[0],
           endDate.toISOString().split('T')[0]

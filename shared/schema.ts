@@ -20,8 +20,36 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  subscriptionTier: varchar("subscription_tier").default("free"), // free, pro, team
+  subscriptionStatus: varchar("subscription_status").default("active"), // active, canceled, past_due
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  subscriptionStartDate: timestamp("subscription_start_date"),
+  subscriptionEndDate: timestamp("subscription_end_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Teams table for team collaboration
+export const teams = pgTable("teams", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  subscriptionStatus: varchar("subscription_status").default("active"),
+  maxMembers: integer("max_members").default(5),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Team membership table
+export const teamMembers = pgTable("team_members", {
+  id: serial("id").primaryKey(),
+  teamId: integer("team_id").references(() => teams.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  role: varchar("role").default("member"), // admin, member
+  joinedAt: timestamp("joined_at").defaultNow(),
 });
 
 // Voice preference profiles for users
@@ -150,6 +178,77 @@ export const dailyUsageMetrics = pgTable("daily_usage_metrics", {
 }, (table) => [
   index("daily_metrics_user_date_idx").on(table.userId, table.date),
 ]);
+
+// Usage limits tracking
+export const usageLimits = pgTable("usage_limits", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: date("date").notNull(),
+  generationsUsed: integer("generations_used").default(0),
+  generationsLimit: integer("generations_limit").notNull(), // Based on subscription tier
+  lastResetAt: timestamp("last_reset_at").defaultNow(),
+}, (table) => [
+  index("usage_limits_user_date_idx").on(table.userId, table.date),
+]);
+
+// Subscription history
+export const subscriptionHistory = pgTable("subscription_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  tier: varchar("tier").notNull(), // free, pro, team
+  action: varchar("action").notNull(), // created, upgraded, downgraded, canceled, reactivated
+  previousTier: varchar("previous_tier"),
+  amount: integer("amount"), // In cents
+  currency: varchar("currency").default("usd"),
+  teamId: integer("team_id").references(() => teams.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Voice preference learning
+export const voicePreferences = pgTable("voice_preferences", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  promptPattern: text("prompt_pattern").notNull(), // Detected pattern type (e.g., "react_component", "api_endpoint")
+  preferredPerspectives: text("preferred_perspectives").array(),
+  preferredRoles: text("preferred_roles").array(),
+  acceptanceRate: real("acceptance_rate").default(0), // How often user accepts recommendations
+  successRate: real("success_rate").default(0), // How often these combinations succeed
+  sampleCount: integer("sample_count").default(0),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+}, (table) => [
+  index("voice_prefs_user_pattern_idx").on(table.userId, table.promptPattern),
+]);
+
+// Team shared voice profiles
+export const teamVoiceProfiles = pgTable("team_voice_profiles", {
+  id: serial("id").primaryKey(),
+  teamId: integer("team_id").references(() => teams.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  selectedPerspectives: jsonb("selected_perspectives").notNull(),
+  selectedRoles: jsonb("selected_roles").notNull(),
+  analysisDepth: integer("analysis_depth").default(2),
+  mergeStrategy: text("merge_strategy").default("competitive"),
+  qualityFiltering: boolean("quality_filtering").default(true),
+  isShared: boolean("is_shared").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Payment methods for tracking
+export const paymentMethods = pgTable("payment_methods", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  stripePaymentMethodId: varchar("stripe_payment_method_id").notNull(),
+  last4: varchar("last4"),
+  brand: varchar("brand"),
+  expiryMonth: integer("expiry_month"),
+  expiryYear: integer("expiry_year"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 // Insert schemas  
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -299,6 +398,89 @@ export const insertDailyUsageMetricsSchema = createInsertSchema(dailyUsageMetric
   averageSessionRating: true,
 });
 
+// New table schemas for subscription management
+export const insertTeamSchema = createInsertSchema(teams).pick({
+  name: true,
+  description: true,
+  ownerId: true,
+  maxMembers: true,
+}).extend({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  maxMembers: z.number().int().min(1).max(50).default(5),
+});
+
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).pick({
+  teamId: true,
+  userId: true,
+  role: true,
+}).extend({
+  role: z.enum(["admin", "member"]).default("member"),
+});
+
+export const insertUsageLimitsSchema = createInsertSchema(usageLimits).pick({
+  userId: true,
+  date: true,
+  generationsUsed: true,
+  generationsLimit: true,
+});
+
+export const insertSubscriptionHistorySchema = createInsertSchema(subscriptionHistory).pick({
+  userId: true,
+  stripeSubscriptionId: true,
+  tier: true,
+  action: true,
+  previousTier: true,
+  amount: true,
+  currency: true,
+  teamId: true,
+}).extend({
+  tier: z.enum(["free", "pro", "team"]),
+  action: z.enum(["created", "upgraded", "downgraded", "canceled", "reactivated"]),
+  previousTier: z.enum(["free", "pro", "team"]).optional(),
+  currency: z.string().default("usd"),
+});
+
+export const insertVoicePreferencesSchema = createInsertSchema(voicePreferences).pick({
+  userId: true,
+  promptPattern: true,
+  preferredPerspectives: true,
+  preferredRoles: true,
+  acceptanceRate: true,
+  successRate: true,
+  sampleCount: true,
+}).extend({
+  promptPattern: z.string().min(1).max(100),
+  preferredPerspectives: z.array(z.string()).optional(),
+  preferredRoles: z.array(z.string()).optional(),
+  acceptanceRate: z.number().min(0).max(1).default(0),
+  successRate: z.number().min(0).max(1).default(0),
+  sampleCount: z.number().int().min(0).default(0),
+});
+
+export const insertTeamVoiceProfileSchema = createInsertSchema(teamVoiceProfiles).pick({
+  teamId: true,
+  createdBy: true,
+  name: true,
+  description: true,
+  selectedPerspectives: true,
+  selectedRoles: true,
+  analysisDepth: true,
+  mergeStrategy: true,
+  qualityFiltering: true,
+  isShared: true,
+});
+
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).pick({
+  userId: true,
+  stripePaymentMethodId: true,
+  last4: true,
+  brand: true,
+  expiryMonth: true,
+  expiryYear: true,
+  isDefault: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -333,3 +515,25 @@ export type SessionAnalytics = typeof sessionAnalytics.$inferSelect;
 
 export type InsertDailyUsageMetrics = z.infer<typeof insertDailyUsageMetricsSchema>;
 export type DailyUsageMetrics = typeof dailyUsageMetrics.$inferSelect;
+
+// New types for subscription management
+export type Team = typeof teams.$inferSelect;
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+
+export type UsageLimits = typeof usageLimits.$inferSelect;
+export type InsertUsageLimits = z.infer<typeof insertUsageLimitsSchema>;
+
+export type SubscriptionHistory = typeof subscriptionHistory.$inferSelect;
+export type InsertSubscriptionHistory = z.infer<typeof insertSubscriptionHistorySchema>;
+
+export type VoicePreference = typeof voicePreferences.$inferSelect;
+export type InsertVoicePreference = z.infer<typeof insertVoicePreferencesSchema>;
+
+export type TeamVoiceProfile = typeof teamVoiceProfiles.$inferSelect;
+export type InsertTeamVoiceProfile = z.infer<typeof insertTeamVoiceProfileSchema>;
+
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;

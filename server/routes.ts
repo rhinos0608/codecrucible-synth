@@ -4,15 +4,20 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { openaiService } from "./openai-service";
 import { analyticsService } from "./analytics-service";
+import { subscriptionService } from "./subscription-service";
+import { preferenceLearningService } from "./preference-learning-service";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import Stripe from "stripe";
 import { 
   insertVoiceSessionSchema, 
   insertSolutionSchema, 
   insertSynthesisSchema,
   insertPhantomLedgerEntrySchema,
   insertProjectSchema,
-  insertVoiceProfileSchema
+  insertVoiceProfileSchema,
+  insertTeamSchema,
+  insertTeamVoiceProfileSchema
 } from "@shared/schema";
 
 // Request validation schemas following AI_INSTRUCTIONS.md patterns
@@ -143,6 +148,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         throw new APIError(401, 'User authentication required');
       }
+      
+      // Check usage limits
+      const canGenerate = await subscriptionService.checkUsageLimit(userId);
+      if (!canGenerate) {
+        const subscriptionInfo = await subscriptionService.getUserSubscriptionInfo(userId);
+        throw new APIError(403, `Daily generation limit reached (${subscriptionInfo.usage.used}/${subscriptionInfo.usage.limit}). Upgrade to Pro for unlimited generations.`);
+      }
+      
+      // Check voice combination limits based on subscription tier
+      const subscriptionInfo = await subscriptionService.getUserSubscriptionInfo(userId);
+      const totalVoices = requestData.selectedVoices.perspectives.length + requestData.selectedVoices.roles.length;
+      if (totalVoices > subscriptionInfo.tier.maxVoiceCombinations) {
+        throw new APIError(403, `Your ${subscriptionInfo.tier.name} plan allows maximum ${subscriptionInfo.tier.maxVoiceCombinations} voice combinations. Upgrade to use more voices.`);
+      }
 
       logger.info('Creating voice session', { 
         userId, 
@@ -162,6 +181,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const session = await storage.createVoiceSession(sessionData);
+      
+      // Increment usage count
+      await subscriptionService.incrementUsage(userId);
       
       // Track analytics: session created event
       await analyticsService.trackEvent(
@@ -643,6 +665,338 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Subscription Management Routes
+  app.get("/api/subscription/info", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const info = await subscriptionService.getUserSubscriptionInfo(userId);
+      res.json(info);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/subscription/tiers", async (req, res) => {
+    const tiers = subscriptionService.getAllTiers();
+    res.json(tiers);
+  });
+  
+  app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const { tier } = req.body;
+      
+      if (!['pro', 'team'].includes(tier)) {
+        throw new APIError(400, 'Invalid subscription tier');
+      }
+      
+      const successUrl = `${req.protocol}://${req.get('host')}/subscription/success`;
+      const cancelUrl = `${req.protocol}://${req.get('host')}/subscription/cancel`;
+      
+      const session = await subscriptionService.createCheckoutSession(
+        userId,
+        tier as 'pro' | 'team',
+        successUrl,
+        cancelUrl
+      );
+      
+      res.json({ checkoutUrl: session.url });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Stripe webhook endpoint
+  app.post("/api/subscription/webhook", async (req, res, next) => {
+    try {
+      const sig = req.headers['stripe-signature'];
+      
+      if (!sig) {
+        throw new APIError(400, 'Missing Stripe signature');
+      }
+      
+      if (!process.env.STRIPE_WEBHOOK_SECRET) {
+        throw new APIError(500, 'Stripe webhook secret not configured');
+      }
+      
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2023-10-16" });
+      const event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+      
+      await subscriptionService.handleWebhook(event);
+      res.json({ received: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/subscription/history", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const history = await storage.getSubscriptionHistory(userId);
+      res.json(history);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Team Management Routes
+  app.post("/api/teams", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const teamData = insertTeamSchema.parse({ ...req.body, ownerId: userId });
+      const team = await subscriptionService.createTeam(userId, teamData);
+      res.json(team);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/teams", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const teams = await storage.getTeamsByUser(userId);
+      res.json(teams);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/teams/:id", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const teamId = parseInt(req.params.id);
+      
+      if (isNaN(teamId)) {
+        throw new APIError(400, 'Invalid team ID');
+      }
+      
+      const team = await storage.getTeam(teamId);
+      if (!team) {
+        throw new APIError(404, 'Team not found');
+      }
+      
+      // Verify user is member of team
+      const members = await storage.getTeamMembers(teamId);
+      const isMember = members.some(m => m.userId === userId);
+      if (!isMember) {
+        throw new APIError(403, 'Access denied');
+      }
+      
+      res.json({ team, members });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/teams/:id/members", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const teamId = parseInt(req.params.id);
+      const { email, role = 'member' } = req.body;
+      
+      if (isNaN(teamId)) {
+        throw new APIError(400, 'Invalid team ID');
+      }
+      
+      // Verify user is admin of team
+      const members = await storage.getTeamMembers(teamId);
+      const userMember = members.find(m => m.userId === userId);
+      if (!userMember || userMember.role !== 'admin') {
+        throw new APIError(403, 'Only team admins can add members');
+      }
+      
+      // Find user by email
+      const userToAdd = await storage.getUserByEmail(email);
+      if (!userToAdd) {
+        throw new APIError(404, 'User not found');
+      }
+      
+      await subscriptionService.addTeamMember(teamId, userToAdd.id, role as 'admin' | 'member');
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.delete("/api/teams/:id/members/:userId", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const currentUserId = req.user?.claims?.sub;
+      const teamId = parseInt(req.params.id);
+      const userIdToRemove = req.params.userId;
+      
+      if (isNaN(teamId)) {
+        throw new APIError(400, 'Invalid team ID');
+      }
+      
+      // Verify user is admin of team
+      const members = await storage.getTeamMembers(teamId);
+      const userMember = members.find(m => m.userId === currentUserId);
+      if (!userMember || userMember.role !== 'admin') {
+        throw new APIError(403, 'Only team admins can remove members');
+      }
+      
+      const removed = await storage.removeTeamMember(teamId, userIdToRemove);
+      if (!removed) {
+        throw new APIError(404, 'Member not found');
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Team Voice Profiles
+  app.get("/api/teams/:id/voice-profiles", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const teamId = parseInt(req.params.id);
+      
+      if (isNaN(teamId)) {
+        throw new APIError(400, 'Invalid team ID');
+      }
+      
+      // Verify user is member of team
+      const members = await storage.getTeamMembers(teamId);
+      const isMember = members.some(m => m.userId === userId);
+      if (!isMember) {
+        throw new APIError(403, 'Access denied');
+      }
+      
+      const profiles = await storage.getTeamVoiceProfiles(teamId);
+      res.json(profiles);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/teams/:id/voice-profiles", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const teamId = parseInt(req.params.id);
+      
+      if (isNaN(teamId)) {
+        throw new APIError(400, 'Invalid team ID');
+      }
+      
+      // Verify user is member of team
+      const members = await storage.getTeamMembers(teamId);
+      const isMember = members.some(m => m.userId === userId);
+      if (!isMember) {
+        throw new APIError(403, 'Access denied');
+      }
+      
+      const profileData = insertTeamVoiceProfileSchema.parse({
+        ...req.body,
+        teamId,
+        createdBy: userId
+      });
+      
+      const profile = await storage.createTeamVoiceProfile(profileData);
+      res.json(profile);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Voice Preference Learning Routes
+  app.get("/api/preferences/recommendations", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const { prompt } = req.query;
+      if (!prompt || typeof prompt !== 'string') {
+        throw new APIError(400, 'Prompt is required');
+      }
+      
+      const recommendations = await preferenceLearningService.getImprovedRecommendations(userId, prompt);
+      res.json(recommendations);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/preferences/track-outcome", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const { sessionId, recommended, accepted, actualSelection } = req.body;
+      
+      await preferenceLearningService.trackRecommendationOutcome(
+        userId,
+        sessionId,
+        recommended,
+        accepted,
+        actualSelection
+      );
+      
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/preferences/track-success", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { sessionId, rating } = req.body;
+      
+      if (!sessionId || !['excellent', 'good', 'bad'].includes(rating)) {
+        throw new APIError(400, 'Invalid session ID or rating');
+      }
+      
+      await preferenceLearningService.trackSessionSuccess(sessionId, rating);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/preferences/profile", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const profile = await preferenceLearningService.getUserLearningProfile(userId);
+      res.json(profile);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+
 
   const httpServer = createServer(app);
   return httpServer;

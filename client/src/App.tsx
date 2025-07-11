@@ -8,6 +8,8 @@ import Dashboard from "@/pages/dashboard";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import Analytics from "@/pages/analytics";
+import Pricing from "@/pages/pricing";
+import Teams from "@/pages/teams";
 import { VoiceSelectionProvider } from "@/contexts/voice-selection-context";
 
 function Router() {
@@ -21,6 +23,8 @@ function Router() {
         <>
           <Route path="/" component={Dashboard} />
           <Route path="/analytics" component={Analytics} />
+          <Route path="/pricing" component={Pricing} />
+          <Route path="/teams" component={Teams} />
         </>
       )}
       <Route component={NotFound} />

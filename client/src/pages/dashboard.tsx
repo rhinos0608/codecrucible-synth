@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3 } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import type { Solution, VoiceProfile } from "@shared/schema";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { SubscriptionStatus } from "@/components/subscription/subscription-status";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -182,6 +183,15 @@ export default function Dashboard() {
                 Analytics
               </Button>
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/teams'}
+                className="text-blue-300 hover:text-blue-100 border-blue-600"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Teams
+              </Button>
+              <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => window.location.href = '/api/logout'}
@@ -331,7 +341,13 @@ export default function Dashboard() {
             <p className="text-sm text-gray-400">Select code engines and configure generation settings</p>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <PerspectiveSelector />
+            {/* Subscription Status */}
+            <div className="p-4">
+              <SubscriptionStatus />
+            </div>
+            <div className="border-t border-gray-700">
+              <PerspectiveSelector />
+            </div>
           </div>
         </div>
       )}

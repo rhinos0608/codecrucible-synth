@@ -1,29 +1,50 @@
-import { 
-  users, 
-  voiceSessions, 
-  solutions, 
-  syntheses, 
+import {
+  users,
+  voiceProfiles,
+  voiceSessions,
+  solutions,
+  syntheses,
   phantomLedgerEntries,
   projects,
-  voiceProfiles,
+  teams,
+  teamMembers,
+  usageLimits,
+  subscriptionHistory,
+  voicePreferences,
+  teamVoiceProfiles,
+  paymentMethods,
   userAnalytics,
   voiceUsageStats,
   sessionAnalytics,
   dailyUsageMetrics,
-  type User, 
+  type User,
   type UpsertUser,
-  type VoiceSession,
-  type InsertVoiceSession,
-  type Solution,
-  type InsertSolution,
-  type Synthesis,
-  type InsertSynthesis,
-  type PhantomLedgerEntry,
-  type InsertPhantomLedgerEntry,
-  type Project,
-  type InsertProject,
-  type VoiceProfile,
   type InsertVoiceProfile,
+  type VoiceProfile,
+  type InsertVoiceSession,
+  type VoiceSession,
+  type InsertSolution,
+  type Solution,
+  type InsertSynthesis,
+  type Synthesis,
+  type InsertPhantomLedgerEntry,
+  type PhantomLedgerEntry,
+  type InsertProject,
+  type Project,
+  type Team,
+  type InsertTeam,
+  type TeamMember,
+  type InsertTeamMember,
+  type UsageLimits,
+  type InsertUsageLimits,
+  type SubscriptionHistory,
+  type InsertSubscriptionHistory,
+  type VoicePreference,
+  type InsertVoicePreference,
+  type TeamVoiceProfile,
+  type InsertTeamVoiceProfile,
+  type PaymentMethod,
+  type InsertPaymentMethod,
   type UserAnalytics,
   type InsertUserAnalytics,
   type VoiceUsageStats,
@@ -31,14 +52,16 @@ import {
   type SessionAnalytics,
   type InsertSessionAnalytics,
   type DailyUsageMetrics,
-  type InsertDailyUsageMetrics
+  type InsertDailyUsageMetrics,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, sql } from "drizzle-orm";
 
+// Interface for storage operations
 export interface IStorage {
   // User operations for Replit Auth
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Voice profile operations
@@ -49,42 +72,90 @@ export interface IStorage {
   deleteVoiceProfile(id: number): Promise<boolean>;
   setDefaultVoiceProfile(userId: string, profileId: number): Promise<boolean>;
   
+  // Session operations
   createVoiceSession(session: InsertVoiceSession): Promise<VoiceSession>;
   getVoiceSession(id: number): Promise<VoiceSession | undefined>;
   getVoiceSessionsByUser(userId: string): Promise<VoiceSession[]>;
   
+  // Solution operations
   createSolution(solution: InsertSolution): Promise<Solution>;
   getSolutionsBySession(sessionId: number): Promise<Solution[]>;
   
+  // Synthesis operations
   createSynthesis(synthesis: InsertSynthesis): Promise<Synthesis>;
   getSynthesisBySession(sessionId: number): Promise<Synthesis | undefined>;
   
+  // Phantom ledger operations
   createPhantomLedgerEntry(entry: InsertPhantomLedgerEntry): Promise<PhantomLedgerEntry>;
   getPhantomLedgerEntries(limit?: number): Promise<PhantomLedgerEntry[]>;
   getPhantomLedgerEntriesByUser(userId: string): Promise<PhantomLedgerEntry[]>;
   
+  // Project operations
   createProject(project: InsertProject): Promise<Project>;
   getProjects(limit?: number): Promise<Project[]>;
   getProject(id: number): Promise<Project | undefined>;
   updateProject(id: number, updates: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: number): Promise<boolean>;
   
+  // Team operations
+  createTeam(team: InsertTeam): Promise<Team>;
+  getTeam(id: number): Promise<Team | undefined>;
+  getTeamsByUser(userId: string): Promise<Team[]>;
+  updateTeam(id: number, updates: Partial<InsertTeam>): Promise<Team | undefined>;
+  deleteTeam(id: number): Promise<boolean>;
+  
+  // Team member operations
+  addTeamMember(member: InsertTeamMember): Promise<TeamMember>;
+  getTeamMembers(teamId: number): Promise<TeamMember[]>;
+  removeTeamMember(teamId: number, userId: string): Promise<boolean>;
+  updateTeamMemberRole(teamId: number, userId: string, role: "admin" | "member"): Promise<boolean>;
+  
+  // Usage limit operations
+  getOrCreateUsageLimit(userId: string, date: string): Promise<UsageLimits>;
+  updateUsageLimit(userId: string, date: string, updates: Partial<InsertUsageLimits>): Promise<UsageLimits | undefined>;
+  
+  // Subscription history operations
+  createSubscriptionHistory(history: InsertSubscriptionHistory): Promise<SubscriptionHistory>;
+  getSubscriptionHistory(userId: string): Promise<SubscriptionHistory[]>;
+  
+  // Voice preference operations
+  upsertVoicePreference(preference: InsertVoicePreference): Promise<VoicePreference>;
+  getVoicePreferences(userId: string): Promise<VoicePreference[]>;
+  
+  // Team voice profile operations
+  createTeamVoiceProfile(profile: InsertTeamVoiceProfile): Promise<TeamVoiceProfile>;
+  getTeamVoiceProfiles(teamId: number): Promise<TeamVoiceProfile[]>;
+  deleteTeamVoiceProfile(id: number): Promise<boolean>;
+  
+  // Payment method operations
+  createPaymentMethod(method: InsertPaymentMethod): Promise<PaymentMethod>;
+  getPaymentMethods(userId: string): Promise<PaymentMethod[]>;
+  setDefaultPaymentMethod(userId: string, methodId: number): Promise<boolean>;
+  
   // Analytics operations
-  trackAnalyticsEvent(event: InsertUserAnalytics): Promise<UserAnalytics>;
-  updateVoiceUsageStats(userId: string, voiceType: string, voiceName: string, success: boolean, rating?: number): Promise<void>;
-  createSessionAnalytics(analytics: InsertSessionAnalytics): Promise<SessionAnalytics>;
-  updateDailyMetrics(userId: string, date: string, metrics: Partial<InsertDailyUsageMetrics>): Promise<void>;
-  getUserAnalytics(userId: string, limit?: number): Promise<UserAnalytics[]>;
+  createUserAnalytics(analytics: InsertUserAnalytics): Promise<UserAnalytics>;
+  getUserAnalytics(userId: string, eventType?: string): Promise<UserAnalytics[]>;
+  
+  upsertVoiceUsageStats(stats: InsertVoiceUsageStats): Promise<VoiceUsageStats>;
   getVoiceUsageStats(userId: string): Promise<VoiceUsageStats[]>;
-  getDailyMetrics(userId: string, startDate: string, endDate: string): Promise<DailyUsageMetrics[]>;
+  
+  createSessionAnalytics(analytics: InsertSessionAnalytics): Promise<SessionAnalytics>;
   getSessionAnalytics(sessionId: number): Promise<SessionAnalytics | undefined>;
+  
+  upsertDailyUsageMetrics(metrics: InsertDailyUsageMetrics): Promise<DailyUsageMetrics>;
+  getDailyUsageMetrics(userId: string, startDate?: string, endDate?: string): Promise<DailyUsageMetrics[]>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // User operations for Replit Auth
+  // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
@@ -101,299 +172,438 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return user;
   }
-
+  
   // Voice profile operations
   async createVoiceProfile(profile: InsertVoiceProfile): Promise<VoiceProfile> {
-    const [voiceProfile] = await db
-      .insert(voiceProfiles)
-      .values(profile)
-      .returning();
-    return voiceProfile;
+    const [created] = await db.insert(voiceProfiles).values(profile).returning();
+    return created;
   }
-
+  
   async getVoiceProfiles(userId: string): Promise<VoiceProfile[]> {
-    return db.select().from(voiceProfiles).where(eq(voiceProfiles.userId, userId)).orderBy(desc(voiceProfiles.updatedAt));
+    return await db.select().from(voiceProfiles).where(eq(voiceProfiles.userId, userId));
   }
-
+  
   async getVoiceProfile(id: number): Promise<VoiceProfile | undefined> {
     const [profile] = await db.select().from(voiceProfiles).where(eq(voiceProfiles.id, id));
-    return profile || undefined;
+    return profile;
   }
-
+  
   async updateVoiceProfile(id: number, updates: Partial<InsertVoiceProfile>): Promise<VoiceProfile | undefined> {
-    const [profile] = await db
+    const [updated] = await db
       .update(voiceProfiles)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
       .where(eq(voiceProfiles.id, id))
       .returning();
-    return profile || undefined;
+    return updated;
   }
-
+  
   async deleteVoiceProfile(id: number): Promise<boolean> {
     const result = await db.delete(voiceProfiles).where(eq(voiceProfiles.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.rowCount > 0;
   }
-
+  
   async setDefaultVoiceProfile(userId: string, profileId: number): Promise<boolean> {
-    try {
-      // First, unset all default profiles for the user
-      await db
-        .update(voiceProfiles)
-        .set({ isDefault: false })
-        .where(eq(voiceProfiles.userId, userId));
-
-      // Then set the new default
-      const [profile] = await db
-        .update(voiceProfiles)
-        .set({ isDefault: true })
-        .where(eq(voiceProfiles.id, profileId))
-        .returning();
-
-      return !!profile;
-    } catch (error) {
-      console.error('Error setting default voice profile:', error);
-      return false;
-    }
-  }
-
-  // Voice session operations
-  async createVoiceSession(insertSession: InsertVoiceSession): Promise<VoiceSession> {
-    const [session] = await db
-      .insert(voiceSessions)
-      .values(insertSession)
+    // Reset all profiles to non-default
+    await db
+      .update(voiceProfiles)
+      .set({ isDefault: false })
+      .where(eq(voiceProfiles.userId, userId));
+    
+    // Set selected profile as default
+    const [updated] = await db
+      .update(voiceProfiles)
+      .set({ isDefault: true })
+      .where(and(eq(voiceProfiles.id, profileId), eq(voiceProfiles.userId, userId)))
       .returning();
-    return session;
+    
+    return !!updated;
   }
-
+  
+  // Session operations
+  async createVoiceSession(session: InsertVoiceSession): Promise<VoiceSession> {
+    const [created] = await db.insert(voiceSessions).values(session).returning();
+    return created;
+  }
+  
   async getVoiceSession(id: number): Promise<VoiceSession | undefined> {
     const [session] = await db.select().from(voiceSessions).where(eq(voiceSessions.id, id));
-    return session || undefined;
+    return session;
   }
-
+  
   async getVoiceSessionsByUser(userId: string): Promise<VoiceSession[]> {
-    return db.select().from(voiceSessions).where(eq(voiceSessions.userId, userId)).orderBy(desc(voiceSessions.createdAt));
+    return await db
+      .select()
+      .from(voiceSessions)
+      .where(eq(voiceSessions.userId, userId))
+      .orderBy(desc(voiceSessions.createdAt))
+      .limit(50);
   }
-
+  
   // Solution operations
-  async createSolution(insertSolution: InsertSolution): Promise<Solution> {
-    const [solution] = await db
-      .insert(solutions)
-      .values(insertSolution)
-      .returning();
-    return solution;
+  async createSolution(solution: InsertSolution): Promise<Solution> {
+    const [created] = await db.insert(solutions).values(solution).returning();
+    return created;
   }
-
+  
   async getSolutionsBySession(sessionId: number): Promise<Solution[]> {
-    return db.select().from(solutions).where(eq(solutions.sessionId, sessionId));
+    return await db.select().from(solutions).where(eq(solutions.sessionId, sessionId));
   }
-
+  
   // Synthesis operations
-  async createSynthesis(insertSynthesis: InsertSynthesis): Promise<Synthesis> {
-    const [synthesis] = await db
-      .insert(syntheses)
-      .values(insertSynthesis)
-      .returning();
-    return synthesis;
+  async createSynthesis(synthesis: InsertSynthesis): Promise<Synthesis> {
+    const [created] = await db.insert(syntheses).values(synthesis).returning();
+    return created;
   }
-
+  
   async getSynthesisBySession(sessionId: number): Promise<Synthesis | undefined> {
     const [synthesis] = await db.select().from(syntheses).where(eq(syntheses.sessionId, sessionId));
-    return synthesis || undefined;
+    return synthesis;
   }
-
+  
   // Phantom ledger operations
-  async createPhantomLedgerEntry(insertEntry: InsertPhantomLedgerEntry): Promise<PhantomLedgerEntry> {
-    const [entry] = await db
-      .insert(phantomLedgerEntries)
-      .values(insertEntry)
-      .returning();
-    return entry;
+  async createPhantomLedgerEntry(entry: InsertPhantomLedgerEntry): Promise<PhantomLedgerEntry> {
+    const [created] = await db.insert(phantomLedgerEntries).values(entry).returning();
+    return created;
   }
-
+  
   async getPhantomLedgerEntries(limit = 10): Promise<PhantomLedgerEntry[]> {
-    return db.select().from(phantomLedgerEntries).orderBy(desc(phantomLedgerEntries.createdAt)).limit(limit);
-  }
-
-  async getPhantomLedgerEntriesByUser(userId: string): Promise<PhantomLedgerEntry[]> {
-    return db
+    return await db
       .select()
       .from(phantomLedgerEntries)
-      .innerJoin(voiceSessions, eq(phantomLedgerEntries.sessionId, voiceSessions.id))
-      .where(eq(voiceSessions.userId, userId))
       .orderBy(desc(phantomLedgerEntries.createdAt))
-      .then(results => results.map(r => r.phantom_ledger_entries));
+      .limit(limit);
   }
-
+  
+  async getPhantomLedgerEntriesByUser(userId: string): Promise<PhantomLedgerEntry[]> {
+    return await db
+      .select()
+      .from(phantomLedgerEntries)
+      .where(eq(phantomLedgerEntries.userId, userId))
+      .orderBy(desc(phantomLedgerEntries.createdAt))
+      .limit(20);
+  }
+  
   // Project operations
-  async createProject(insertProject: InsertProject): Promise<Project> {
-    const [project] = await db
-      .insert(projects)
-      .values(insertProject)
-      .returning();
-    return project;
+  async createProject(project: InsertProject): Promise<Project> {
+    const [created] = await db.insert(projects).values(project).returning();
+    return created;
   }
-
+  
   async getProjects(limit = 20): Promise<Project[]> {
-    return db.select().from(projects).orderBy(desc(projects.updatedAt)).limit(limit);
+    return await db
+      .select()
+      .from(projects)
+      .orderBy(desc(projects.createdAt))
+      .limit(limit);
   }
-
+  
   async getProject(id: number): Promise<Project | undefined> {
     const [project] = await db.select().from(projects).where(eq(projects.id, id));
-    return project || undefined;
+    return project;
   }
-
+  
   async updateProject(id: number, updates: Partial<InsertProject>): Promise<Project | undefined> {
-    const [project] = await db
+    const [updated] = await db
       .update(projects)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
       .where(eq(projects.id, id))
       .returning();
-    return project || undefined;
+    return updated;
   }
-
+  
   async deleteProject(id: number): Promise<boolean> {
     const result = await db.delete(projects).where(eq(projects.id, id));
-    return (result.rowCount ?? 0) > 0;
+    return result.rowCount > 0;
   }
-
-  // Analytics operations
-  async trackAnalyticsEvent(event: InsertUserAnalytics): Promise<UserAnalytics> {
-    const [analytics] = await db
-      .insert(userAnalytics)
-      .values(event)
+  
+  // Team operations
+  async createTeam(team: InsertTeam): Promise<Team> {
+    const [created] = await db.insert(teams).values(team).returning();
+    return created;
+  }
+  
+  async getTeam(id: number): Promise<Team | undefined> {
+    const [team] = await db.select().from(teams).where(eq(teams.id, id));
+    return team;
+  }
+  
+  async getTeamsByUser(userId: string): Promise<Team[]> {
+    const userTeams = await db
+      .select({ team: teams })
+      .from(teamMembers)
+      .innerJoin(teams, eq(teamMembers.teamId, teams.id))
+      .where(eq(teamMembers.userId, userId));
+    
+    return userTeams.map(t => t.team);
+  }
+  
+  async updateTeam(id: number, updates: Partial<InsertTeam>): Promise<Team | undefined> {
+    const [updated] = await db
+      .update(teams)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(teams.id, id))
       .returning();
-    return analytics;
+    return updated;
   }
-
-  async updateVoiceUsageStats(userId: string, voiceType: string, voiceName: string, success: boolean, rating?: number): Promise<void> {
-    // Check if stats already exist
+  
+  async deleteTeam(id: number): Promise<boolean> {
+    const result = await db.delete(teams).where(eq(teams.id, id));
+    return result.rowCount > 0;
+  }
+  
+  // Team member operations
+  async addTeamMember(member: InsertTeamMember): Promise<TeamMember> {
+    const [created] = await db.insert(teamMembers).values(member).returning();
+    return created;
+  }
+  
+  async getTeamMembers(teamId: number): Promise<TeamMember[]> {
+    return await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
+  }
+  
+  async removeTeamMember(teamId: number, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(teamMembers)
+      .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
+    return result.rowCount > 0;
+  }
+  
+  async updateTeamMemberRole(teamId: number, userId: string, role: "admin" | "member"): Promise<boolean> {
+    const [updated] = await db
+      .update(teamMembers)
+      .set({ role })
+      .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
+      .returning();
+    return !!updated;
+  }
+  
+  // Usage limit operations
+  async getOrCreateUsageLimit(userId: string, date: string): Promise<UsageLimits> {
+    let [limit] = await db
+      .select()
+      .from(usageLimits)
+      .where(and(eq(usageLimits.userId, userId), eq(usageLimits.date, date)));
+    
+    if (!limit) {
+      // Determine limit based on user's subscription
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      const tierLimits = {
+        free: 3,
+        pro: -1, // unlimited
+        team: -1, // unlimited
+      };
+      
+      [limit] = await db.insert(usageLimits).values({
+        userId,
+        date,
+        generationsUsed: 0,
+        generationsLimit: tierLimits[user?.subscriptionTier as keyof typeof tierLimits] || 3,
+      }).returning();
+    }
+    
+    return limit;
+  }
+  
+  async updateUsageLimit(userId: string, date: string, updates: Partial<InsertUsageLimits>): Promise<UsageLimits | undefined> {
+    const [updated] = await db
+      .update(usageLimits)
+      .set(updates)
+      .where(and(eq(usageLimits.userId, userId), eq(usageLimits.date, date)))
+      .returning();
+    return updated;
+  }
+  
+  // Subscription history operations
+  async createSubscriptionHistory(history: InsertSubscriptionHistory): Promise<SubscriptionHistory> {
+    const [created] = await db.insert(subscriptionHistory).values(history).returning();
+    return created;
+  }
+  
+  async getSubscriptionHistory(userId: string): Promise<SubscriptionHistory[]> {
+    return await db
+      .select()
+      .from(subscriptionHistory)
+      .where(eq(subscriptionHistory.userId, userId))
+      .orderBy(desc(subscriptionHistory.createdAt));
+  }
+  
+  // Voice preference operations
+  async upsertVoicePreference(preference: InsertVoicePreference): Promise<VoicePreference> {
+    const [existing] = await db
+      .select()
+      .from(voicePreferences)
+      .where(and(
+        eq(voicePreferences.userId, preference.userId),
+        eq(voicePreferences.promptPattern, preference.promptPattern)
+      ));
+    
+    if (existing) {
+      const [updated] = await db
+        .update(voicePreferences)
+        .set({
+          ...preference,
+          lastUpdated: new Date(),
+        })
+        .where(eq(voicePreferences.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(voicePreferences).values(preference).returning();
+      return created;
+    }
+  }
+  
+  async getVoicePreferences(userId: string): Promise<VoicePreference[]> {
+    return await db.select().from(voicePreferences).where(eq(voicePreferences.userId, userId));
+  }
+  
+  // Team voice profile operations
+  async createTeamVoiceProfile(profile: InsertTeamVoiceProfile): Promise<TeamVoiceProfile> {
+    const [created] = await db.insert(teamVoiceProfiles).values(profile).returning();
+    return created;
+  }
+  
+  async getTeamVoiceProfiles(teamId: number): Promise<TeamVoiceProfile[]> {
+    return await db.select().from(teamVoiceProfiles).where(eq(teamVoiceProfiles.teamId, teamId));
+  }
+  
+  async deleteTeamVoiceProfile(id: number): Promise<boolean> {
+    const result = await db.delete(teamVoiceProfiles).where(eq(teamVoiceProfiles.id, id));
+    return result.rowCount > 0;
+  }
+  
+  // Payment method operations
+  async createPaymentMethod(method: InsertPaymentMethod): Promise<PaymentMethod> {
+    const [created] = await db.insert(paymentMethods).values(method).returning();
+    return created;
+  }
+  
+  async getPaymentMethods(userId: string): Promise<PaymentMethod[]> {
+    return await db.select().from(paymentMethods).where(eq(paymentMethods.userId, userId));
+  }
+  
+  async setDefaultPaymentMethod(userId: string, methodId: number): Promise<boolean> {
+    // Reset all methods to non-default
+    await db
+      .update(paymentMethods)
+      .set({ isDefault: false })
+      .where(eq(paymentMethods.userId, userId));
+    
+    // Set selected method as default
+    const [updated] = await db
+      .update(paymentMethods)
+      .set({ isDefault: true })
+      .where(and(eq(paymentMethods.id, methodId), eq(paymentMethods.userId, userId)))
+      .returning();
+    
+    return !!updated;
+  }
+  
+  // Analytics operations
+  async createUserAnalytics(analytics: InsertUserAnalytics): Promise<UserAnalytics> {
+    const [created] = await db.insert(userAnalytics).values(analytics).returning();
+    return created;
+  }
+  
+  async getUserAnalytics(userId: string, eventType?: string): Promise<UserAnalytics[]> {
+    let query = db.select().from(userAnalytics).where(eq(userAnalytics.userId, userId));
+    
+    if (eventType) {
+      query = query.where(and(
+        eq(userAnalytics.userId, userId),
+        eq(userAnalytics.eventType, eventType)
+      ));
+    }
+    
+    return await query.orderBy(desc(userAnalytics.timestamp)).limit(100);
+  }
+  
+  async upsertVoiceUsageStats(stats: InsertVoiceUsageStats): Promise<VoiceUsageStats> {
     const [existing] = await db
       .select()
       .from(voiceUsageStats)
-      .where(
-        and(
-          eq(voiceUsageStats.userId, userId),
-          eq(voiceUsageStats.voiceType, voiceType),
-          eq(voiceUsageStats.voiceName, voiceName)
-        )
-      );
-
+      .where(and(
+        eq(voiceUsageStats.userId, stats.userId),
+        eq(voiceUsageStats.voiceType, stats.voiceType),
+        eq(voiceUsageStats.voiceName, stats.voiceName)
+      ));
+    
     if (existing) {
-      // Update existing stats
-      const newUsageCount = existing.usageCount + 1;
-      const newSuccessCount = existing.successCount + (success ? 1 : 0);
-      const newAverageRating = rating 
-        ? (existing.averageRating 
-          ? (existing.averageRating * existing.usageCount + rating) / newUsageCount 
-          : rating)
-        : existing.averageRating;
-
-      await db
+      const [updated] = await db
         .update(voiceUsageStats)
         .set({
-          usageCount: newUsageCount,
-          successCount: newSuccessCount,
-          averageRating: newAverageRating,
-          lastUsed: new Date()
+          ...stats,
+          lastUsed: new Date(),
         })
-        .where(eq(voiceUsageStats.id, existing.id));
+        .where(eq(voiceUsageStats.id, existing.id))
+        .returning();
+      return updated;
     } else {
-      // Create new stats
-      await db
-        .insert(voiceUsageStats)
-        .values({
-          userId,
-          voiceType,
-          voiceName,
-          usageCount: 1,
-          successCount: success ? 1 : 0,
-          averageRating: rating,
-          lastUsed: new Date()
-        });
+      const [created] = await db.insert(voiceUsageStats).values(stats).returning();
+      return created;
     }
   }
-
-  async createSessionAnalytics(analytics: InsertSessionAnalytics): Promise<SessionAnalytics> {
-    const [sessionAnalytic] = await db
-      .insert(sessionAnalytics)
-      .values(analytics)
-      .returning();
-    return sessionAnalytic;
-  }
-
-  async updateDailyMetrics(userId: string, date: string, metrics: Partial<InsertDailyUsageMetrics>): Promise<void> {
-    // Check if metrics for this date already exist
-    const [existing] = await db
-      .select()
-      .from(dailyUsageMetrics)
-      .where(
-        and(
-          eq(dailyUsageMetrics.userId, userId),
-          eq(dailyUsageMetrics.date, date)
-        )
-      );
-
-    if (existing) {
-      // Update existing metrics
-      await db
-        .update(dailyUsageMetrics)
-        .set({
-          generationCount: sql`${dailyUsageMetrics.generationCount} + ${metrics.generationCount || 0}`,
-          synthesisCount: sql`${dailyUsageMetrics.synthesisCount} + ${metrics.synthesisCount || 0}`,
-          uniqueVoiceCombinations: metrics.uniqueVoiceCombinations || existing.uniqueVoiceCombinations,
-          totalGenerationTime: sql`${dailyUsageMetrics.totalGenerationTime} + ${metrics.totalGenerationTime || 0}`,
-          averageSessionRating: metrics.averageSessionRating || existing.averageSessionRating
-        })
-        .where(eq(dailyUsageMetrics.id, existing.id));
-    } else {
-      // Create new metrics entry
-      await db
-        .insert(dailyUsageMetrics)
-        .values({
-          userId,
-          date,
-          ...metrics
-        });
-    }
-  }
-
-  async getUserAnalytics(userId: string, limit = 100): Promise<UserAnalytics[]> {
-    return db
-      .select()
-      .from(userAnalytics)
-      .where(eq(userAnalytics.userId, userId))
-      .orderBy(desc(userAnalytics.timestamp))
-      .limit(limit);
-  }
-
+  
   async getVoiceUsageStats(userId: string): Promise<VoiceUsageStats[]> {
-    return db
+    return await db
       .select()
       .from(voiceUsageStats)
       .where(eq(voiceUsageStats.userId, userId))
       .orderBy(desc(voiceUsageStats.usageCount));
   }
-
-  async getDailyMetrics(userId: string, startDate: string, endDate: string): Promise<DailyUsageMetrics[]> {
-    return db
-      .select()
-      .from(dailyUsageMetrics)
-      .where(
-        and(
-          eq(dailyUsageMetrics.userId, userId),
-          gte(dailyUsageMetrics.date, startDate),
-          lte(dailyUsageMetrics.date, endDate)
-        )
-      )
-      .orderBy(dailyUsageMetrics.date);
+  
+  async createSessionAnalytics(analytics: InsertSessionAnalytics): Promise<SessionAnalytics> {
+    const [created] = await db.insert(sessionAnalytics).values(analytics).returning();
+    return created;
   }
-
+  
   async getSessionAnalytics(sessionId: number): Promise<SessionAnalytics | undefined> {
     const [analytics] = await db
       .select()
       .from(sessionAnalytics)
       .where(eq(sessionAnalytics.sessionId, sessionId));
-    return analytics || undefined;
+    return analytics;
+  }
+  
+  async upsertDailyUsageMetrics(metrics: InsertDailyUsageMetrics): Promise<DailyUsageMetrics> {
+    const [existing] = await db
+      .select()
+      .from(dailyUsageMetrics)
+      .where(and(
+        eq(dailyUsageMetrics.userId, metrics.userId),
+        eq(dailyUsageMetrics.date, metrics.date)
+      ));
+    
+    if (existing) {
+      const [updated] = await db
+        .update(dailyUsageMetrics)
+        .set(metrics)
+        .where(eq(dailyUsageMetrics.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(dailyUsageMetrics).values(metrics).returning();
+      return created;
+    }
+  }
+  
+  async getDailyUsageMetrics(userId: string, startDate?: string, endDate?: string): Promise<DailyUsageMetrics[]> {
+    let query = db.select().from(dailyUsageMetrics).where(eq(dailyUsageMetrics.userId, userId));
+    
+    if (startDate) {
+      query = query.where(gte(dailyUsageMetrics.date, startDate));
+    }
+    
+    return await query.orderBy(desc(dailyUsageMetrics.date)).limit(30);
   }
 }
 

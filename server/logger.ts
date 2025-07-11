@@ -20,6 +20,19 @@ class Logger {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  private safeStringify(obj: any): string {
+    const seen = new WeakSet();
+    return JSON.stringify(obj, (key, value) => {
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) {
+          return "[Circular]";
+        }
+        seen.add(value);
+      }
+      return value;
+    }, 2);
+  }
+
   private addLog(level: LogEntry['level'], message: string, context?: Record<string, any>, error?: Error) {
     const logEntry: LogEntry = {
       id: this.generateId(),
@@ -47,7 +60,7 @@ class Logger {
       if (error) {
         console.error(prefix, message, error);
       } else {
-        console.log(prefix, message, context ? JSON.stringify(context, null, 2) : '');
+        console.log(prefix, message, context ? this.safeStringify(context) : '');
       }
     }
   }

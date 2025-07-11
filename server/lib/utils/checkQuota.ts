@@ -144,16 +144,24 @@ export async function checkGenerationQuota(
 export async function incrementUsageQuota(userId: string): Promise<void> {
   const today = new Date().toISOString().split('T')[0];
   
-  await db
-    .update(usageLimits)
-    .set({
-      generationsUsed: db.select().from(usageLimits).where(and(
-        eq(usageLimits.userId, userId),
-        eq(usageLimits.date, today)
-      )).then(rows => (rows[0]?.generationsUsed || 0) + 1)
-    })
+  // First get the current usage
+  const [currentUsage] = await db.select()
+    .from(usageLimits)
     .where(and(
       eq(usageLimits.userId, userId),
       eq(usageLimits.date, today)
     ));
+  
+  if (currentUsage) {
+    // Update existing record
+    await db
+      .update(usageLimits)
+      .set({
+        generationsUsed: currentUsage.generationsUsed + 1
+      })
+      .where(and(
+        eq(usageLimits.userId, userId),
+        eq(usageLimits.date, today)
+      ));
+  }
 }

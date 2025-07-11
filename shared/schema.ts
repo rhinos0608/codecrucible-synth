@@ -478,10 +478,9 @@ export const usageLimits = pgTable("usage_limits", {
   date: varchar("date").notNull(), // YYYY-MM-DD format
   generationsUsed: integer("generations_used").default(0).notNull(),
   generationsLimit: integer("generations_limit").default(3).notNull(),
+  lastResetAt: timestamp("last_reset_at").defaultNow(),
   synthesisUsed: integer("synthesis_used").default(0).notNull(),
   synthesisLimit: integer("synthesis_limit").default(0).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("usage_limits_user_date_idx").on(table.userId, table.date),
 ]);

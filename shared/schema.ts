@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar, index, date, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -99,6 +99,58 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Analytics tables for tracking user behavior and preferences
+export const userAnalytics = pgTable("user_analytics", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  eventType: varchar("event_type").notNull(), // "session_created", "synthesis_completed", "voice_selected", etc.
+  eventData: jsonb("event_data").notNull(),
+  voiceCombination: text("voice_combination").array(),
+  sessionId: integer("session_id").references(() => voiceSessions.id),
+  timestamp: timestamp("timestamp").defaultNow(),
+}, (table) => [index("user_analytics_user_idx").on(table.userId)]);
+
+export const voiceUsageStats = pgTable("voice_usage_stats", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  voiceType: varchar("voice_type").notNull(), // "perspective" or "role"
+  voiceName: varchar("voice_name").notNull(),
+  usageCount: integer("usage_count").default(0),
+  successCount: integer("success_count").default(0),
+  lastUsed: timestamp("last_used").defaultNow(),
+  averageRating: real("average_rating"),
+}, (table) => [
+  index("voice_usage_user_idx").on(table.userId),
+  index("voice_usage_composite_idx").on(table.userId, table.voiceType, table.voiceName),
+]);
+
+export const sessionAnalytics = pgTable("session_analytics", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => voiceSessions.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  generationTime: integer("generation_time"), // milliseconds
+  synthesisTime: integer("synthesis_time"), // milliseconds
+  solutionCount: integer("solution_count").default(0),
+  userRating: varchar("user_rating"), // 'excellent', 'good', 'bad', 'none'
+  voicesUsed: text("voices_used").array(),
+  promptLength: integer("prompt_length"),
+  promptComplexity: integer("prompt_complexity"), // 1, 2, or 3
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const dailyUsageMetrics = pgTable("daily_usage_metrics", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: date("date").notNull(),
+  generationCount: integer("generation_count").default(0),
+  synthesisCount: integer("synthesis_count").default(0),
+  uniqueVoiceCombinations: integer("unique_voice_combinations").default(0),
+  totalGenerationTime: integer("total_generation_time").default(0), // milliseconds
+  averageSessionRating: real("average_session_rating"),
+}, (table) => [
+  index("daily_metrics_user_date_idx").on(table.userId, table.date),
+]);
+
 // Insert schemas  
 export const insertUserSchema = createInsertSchema(users).pick({
   id: true,
@@ -186,6 +238,67 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
   isPublic: z.boolean().default(false)
 });
 
+// Analytics insert schemas with security validation
+export const insertUserAnalyticsSchema = createInsertSchema(userAnalytics).pick({
+  userId: true,
+  eventType: true,
+  eventData: true,
+  voiceCombination: true,
+  sessionId: true,
+}).extend({
+  eventType: z.enum([
+    "session_created",
+    "synthesis_completed", 
+    "voice_selected",
+    "recommendation_applied",
+    "recommendation_rejected",
+    "rating_submitted"
+  ]),
+  eventData: z.record(z.any()),
+  voiceCombination: z.array(z.string()).optional(),
+});
+
+export const insertVoiceUsageStatsSchema = createInsertSchema(voiceUsageStats).pick({
+  userId: true,
+  voiceType: true,
+  voiceName: true,
+  usageCount: true,
+  successCount: true,
+  averageRating: true,
+}).extend({
+  voiceType: z.enum(["perspective", "role"]),
+  voiceName: z.string().min(1).max(50),
+  usageCount: z.number().int().min(0).default(0),
+  successCount: z.number().int().min(0).default(0),
+  averageRating: z.number().min(0).max(5).optional(),
+});
+
+export const insertSessionAnalyticsSchema = createInsertSchema(sessionAnalytics).pick({
+  sessionId: true,
+  userId: true,
+  generationTime: true,
+  synthesisTime: true,
+  solutionCount: true,
+  userRating: true,
+  voicesUsed: true,
+  promptLength: true,
+  promptComplexity: true,
+}).extend({
+  userRating: z.enum(["excellent", "good", "bad", "none"]).optional(),
+  voicesUsed: z.array(z.string()),
+  promptComplexity: z.number().int().min(1).max(3),
+});
+
+export const insertDailyUsageMetricsSchema = createInsertSchema(dailyUsageMetrics).pick({
+  userId: true,
+  date: true,
+  generationCount: true,
+  synthesisCount: true,
+  uniqueVoiceCombinations: true,
+  totalGenerationTime: true,
+  averageSessionRating: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -208,3 +321,15 @@ export type PhantomLedgerEntry = typeof phantomLedgerEntries.$inferSelect;
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
+
+export type InsertUserAnalytics = z.infer<typeof insertUserAnalyticsSchema>;
+export type UserAnalytics = typeof userAnalytics.$inferSelect;
+
+export type InsertVoiceUsageStats = z.infer<typeof insertVoiceUsageStatsSchema>;
+export type VoiceUsageStats = typeof voiceUsageStats.$inferSelect;
+
+export type InsertSessionAnalytics = z.infer<typeof insertSessionAnalyticsSchema>;
+export type SessionAnalytics = typeof sessionAnalytics.$inferSelect;
+
+export type InsertDailyUsageMetrics = z.infer<typeof insertDailyUsageMetricsSchema>;
+export type DailyUsageMetrics = typeof dailyUsageMetrics.$inferSelect;

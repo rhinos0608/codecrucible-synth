@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -16,6 +16,8 @@ import { useVoiceRecommendations } from "@/hooks/use-voice-recommendations";
 import { QUICK_PROMPTS } from "@/types/voices";
 import type { Solution, VoiceProfile } from "@shared/schema";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -60,10 +62,32 @@ export default function Dashboard() {
     }
   };
 
+  const trackRecommendation = useMutation({
+    mutationFn: async (data: { sessionId: number; recommendedVoices: string[]; action: 'applied' | 'rejected' }) => {
+      await apiRequest(`/api/analytics/recommendations/${data.action}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId: data.sessionId,
+          recommendedVoices: data.recommendedVoices
+        })
+      });
+    }
+  });
+
   const handleApplyRecommendations = () => {
-    if (recommendations?.suggested) {
+    if (recommendations?.suggested && sessionResponse?.session?.id) {
       selectPerspectives(recommendations.suggested.perspectives);
       selectRoles(recommendations.suggested.roles);
+      
+      // Track analytics event
+      trackRecommendation.mutate({
+        sessionId: sessionResponse.session.id,
+        recommendedVoices: [
+          ...recommendations.suggested.perspectives,
+          ...recommendations.suggested.roles
+        ],
+        action: 'applied'
+      });
     }
   };
 
@@ -147,6 +171,15 @@ export default function Dashboard() {
               >
                 <FolderOpen className="w-4 h-4 mr-2" />
                 Projects
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/analytics'}
+                className="text-green-300 hover:text-green-100 border-green-600"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Analytics
               </Button>
               <Button
                 variant="ghost"

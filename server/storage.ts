@@ -6,6 +6,10 @@ import {
   phantomLedgerEntries,
   projects,
   voiceProfiles,
+  userAnalytics,
+  voiceUsageStats,
+  sessionAnalytics,
+  dailyUsageMetrics,
   type User, 
   type UpsertUser,
   type VoiceSession,
@@ -19,10 +23,18 @@ import {
   type Project,
   type InsertProject,
   type VoiceProfile,
-  type InsertVoiceProfile
+  type InsertVoiceProfile,
+  type UserAnalytics,
+  type InsertUserAnalytics,
+  type VoiceUsageStats,
+  type InsertVoiceUsageStats,
+  type SessionAnalytics,
+  type InsertSessionAnalytics,
+  type DailyUsageMetrics,
+  type InsertDailyUsageMetrics
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations for Replit Auth
@@ -56,6 +68,16 @@ export interface IStorage {
   getProject(id: number): Promise<Project | undefined>;
   updateProject(id: number, updates: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: number): Promise<boolean>;
+  
+  // Analytics operations
+  trackAnalyticsEvent(event: InsertUserAnalytics): Promise<UserAnalytics>;
+  updateVoiceUsageStats(userId: string, voiceType: string, voiceName: string, success: boolean, rating?: number): Promise<void>;
+  createSessionAnalytics(analytics: InsertSessionAnalytics): Promise<SessionAnalytics>;
+  updateDailyMetrics(userId: string, date: string, metrics: Partial<InsertDailyUsageMetrics>): Promise<void>;
+  getUserAnalytics(userId: string, limit?: number): Promise<UserAnalytics[]>;
+  getVoiceUsageStats(userId: string): Promise<VoiceUsageStats[]>;
+  getDailyMetrics(userId: string, startDate: string, endDate: string): Promise<DailyUsageMetrics[]>;
+  getSessionAnalytics(sessionId: number): Promise<SessionAnalytics | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -232,6 +254,146 @@ export class DatabaseStorage implements IStorage {
   async deleteProject(id: number): Promise<boolean> {
     const result = await db.delete(projects).where(eq(projects.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // Analytics operations
+  async trackAnalyticsEvent(event: InsertUserAnalytics): Promise<UserAnalytics> {
+    const [analytics] = await db
+      .insert(userAnalytics)
+      .values(event)
+      .returning();
+    return analytics;
+  }
+
+  async updateVoiceUsageStats(userId: string, voiceType: string, voiceName: string, success: boolean, rating?: number): Promise<void> {
+    // Check if stats already exist
+    const [existing] = await db
+      .select()
+      .from(voiceUsageStats)
+      .where(
+        and(
+          eq(voiceUsageStats.userId, userId),
+          eq(voiceUsageStats.voiceType, voiceType),
+          eq(voiceUsageStats.voiceName, voiceName)
+        )
+      );
+
+    if (existing) {
+      // Update existing stats
+      const newUsageCount = existing.usageCount + 1;
+      const newSuccessCount = existing.successCount + (success ? 1 : 0);
+      const newAverageRating = rating 
+        ? (existing.averageRating 
+          ? (existing.averageRating * existing.usageCount + rating) / newUsageCount 
+          : rating)
+        : existing.averageRating;
+
+      await db
+        .update(voiceUsageStats)
+        .set({
+          usageCount: newUsageCount,
+          successCount: newSuccessCount,
+          averageRating: newAverageRating,
+          lastUsed: new Date()
+        })
+        .where(eq(voiceUsageStats.id, existing.id));
+    } else {
+      // Create new stats
+      await db
+        .insert(voiceUsageStats)
+        .values({
+          userId,
+          voiceType,
+          voiceName,
+          usageCount: 1,
+          successCount: success ? 1 : 0,
+          averageRating: rating,
+          lastUsed: new Date()
+        });
+    }
+  }
+
+  async createSessionAnalytics(analytics: InsertSessionAnalytics): Promise<SessionAnalytics> {
+    const [sessionAnalytic] = await db
+      .insert(sessionAnalytics)
+      .values(analytics)
+      .returning();
+    return sessionAnalytic;
+  }
+
+  async updateDailyMetrics(userId: string, date: string, metrics: Partial<InsertDailyUsageMetrics>): Promise<void> {
+    // Check if metrics for this date already exist
+    const [existing] = await db
+      .select()
+      .from(dailyUsageMetrics)
+      .where(
+        and(
+          eq(dailyUsageMetrics.userId, userId),
+          eq(dailyUsageMetrics.date, date)
+        )
+      );
+
+    if (existing) {
+      // Update existing metrics
+      await db
+        .update(dailyUsageMetrics)
+        .set({
+          generationCount: sql`${dailyUsageMetrics.generationCount} + ${metrics.generationCount || 0}`,
+          synthesisCount: sql`${dailyUsageMetrics.synthesisCount} + ${metrics.synthesisCount || 0}`,
+          uniqueVoiceCombinations: metrics.uniqueVoiceCombinations || existing.uniqueVoiceCombinations,
+          totalGenerationTime: sql`${dailyUsageMetrics.totalGenerationTime} + ${metrics.totalGenerationTime || 0}`,
+          averageSessionRating: metrics.averageSessionRating || existing.averageSessionRating
+        })
+        .where(eq(dailyUsageMetrics.id, existing.id));
+    } else {
+      // Create new metrics entry
+      await db
+        .insert(dailyUsageMetrics)
+        .values({
+          userId,
+          date,
+          ...metrics
+        });
+    }
+  }
+
+  async getUserAnalytics(userId: string, limit = 100): Promise<UserAnalytics[]> {
+    return db
+      .select()
+      .from(userAnalytics)
+      .where(eq(userAnalytics.userId, userId))
+      .orderBy(desc(userAnalytics.timestamp))
+      .limit(limit);
+  }
+
+  async getVoiceUsageStats(userId: string): Promise<VoiceUsageStats[]> {
+    return db
+      .select()
+      .from(voiceUsageStats)
+      .where(eq(voiceUsageStats.userId, userId))
+      .orderBy(desc(voiceUsageStats.usageCount));
+  }
+
+  async getDailyMetrics(userId: string, startDate: string, endDate: string): Promise<DailyUsageMetrics[]> {
+    return db
+      .select()
+      .from(dailyUsageMetrics)
+      .where(
+        and(
+          eq(dailyUsageMetrics.userId, userId),
+          gte(dailyUsageMetrics.date, startDate),
+          lte(dailyUsageMetrics.date, endDate)
+        )
+      )
+      .orderBy(dailyUsageMetrics.date);
+  }
+
+  async getSessionAnalytics(sessionId: number): Promise<SessionAnalytics | undefined> {
+    const [analytics] = await db
+      .select()
+      .from(sessionAnalytics)
+      .where(eq(sessionAnalytics.sessionId, sessionId));
+    return analytics || undefined;
   }
 }
 

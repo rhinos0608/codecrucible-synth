@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
 import { openaiService } from "./openai-service";
+import { analyticsService } from "./analytics-service";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { 
@@ -162,8 +163,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const session = await storage.createVoiceSession(sessionData);
       
+      // Track analytics: session created event
+      await analyticsService.trackEvent(
+        userId,
+        "session_created",
+        {
+          sessionId: session.id,
+          perspectiveCount: requestData.selectedVoices.perspectives.length,
+          roleCount: requestData.selectedVoices.roles.length,
+          promptLength: requestData.prompt.length,
+          recursionDepth: requestData.recursionDepth,
+          synthesisMode: requestData.synthesisMode
+        },
+        session.id,
+        [...requestData.selectedVoices.perspectives, ...requestData.selectedVoices.roles]
+      );
+      
+      // Track voice usage
+      await analyticsService.trackVoiceUsage(
+        userId,
+        requestData.selectedVoices.perspectives,
+        requestData.selectedVoices.roles,
+        true
+      );
+      
+      const startTime = Date.now();
+      
       // Generate real solutions using OpenAI with dual-transmission protocols
       const solutions = await generateRealSolutions(session.id, requestData);
+      
+      const generationTime = Date.now() - startTime;
+      
+      // Track session analytics
+      await analyticsService.trackSessionGeneration(
+        session,
+        solutions,
+        generationTime
+      );
       
       logger.info('Session generation completed', {
         sessionId: session.id,
@@ -223,6 +259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(404, 'No solutions found for this session');
       }
       
+      const synthesisStartTime = Date.now();
+      
       // Use OpenAI to synthesize solutions
       const synthesizedCode = await openaiService.synthesizeSolutions(
         solutions.map(sol => ({
@@ -238,6 +276,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId
       );
       
+      const synthesisTime = Date.now() - synthesisStartTime;
+      
       // Create synthesis record
       const synthesis = await storage.createSynthesis({
         sessionId,
@@ -246,6 +286,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         qualityScore: Math.round(solutions.reduce((sum, sol) => sum + sol.confidence, 0) / solutions.length),
         ethicalScore: 85 // Default high ethical score for AI-generated content
       });
+      
+      // Track synthesis completion
+      await analyticsService.trackEvent(
+        req.user.claims.sub,
+        "synthesis_completed",
+        {
+          sessionId,
+          synthesisId: synthesis.id,
+          synthesisTime,
+          qualityScore: synthesis.qualityScore,
+          solutionCount: solutions.length
+        },
+        sessionId
+      );
       
       // Create decision history entry using the session we already fetched
       if (session) {
@@ -450,6 +504,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(analytics);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  // Analytics API Routes
+  app.get("/api/analytics/dashboard", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      logger.debug('Fetching analytics dashboard', { userId });
+      
+      const dashboard = await analyticsService.getAnalyticsDashboard(userId);
+      res.json(dashboard);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/analytics/events", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      
+      if (isNaN(limit) || limit < 1 || limit > 100) {
+        throw new APIError(400, 'Invalid limit parameter. Must be between 1 and 100.');
+      }
+      
+      logger.debug('Fetching user analytics events', { userId, limit });
+      
+      const events = await storage.getUserAnalytics(userId, limit);
+      res.json(events);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.get("/api/analytics/voice-stats", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      logger.debug('Fetching voice usage stats', { userId });
+      
+      const stats = await storage.getVoiceUsageStats(userId);
+      res.json(stats);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/analytics/recommendations/:action", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const action = req.params.action;
+      const { sessionId, recommendedVoices } = req.body;
+      
+      if (!['applied', 'rejected'].includes(action)) {
+        throw new APIError(400, 'Invalid action. Must be "applied" or "rejected".');
+      }
+      
+      if (!sessionId || !recommendedVoices || !Array.isArray(recommendedVoices)) {
+        throw new APIError(400, 'Session ID and recommended voices are required.');
+      }
+      
+      logger.info('Tracking recommendation action', { userId, action, sessionId });
+      
+      await analyticsService.trackRecommendation(
+        userId,
+        sessionId,
+        recommendedVoices,
+        action === 'applied'
+      );
+      
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  app.post("/api/analytics/session/:id/rating", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const sessionId = parseInt(req.params.id);
+      const { rating } = req.body;
+      
+      if (isNaN(sessionId) || sessionId <= 0) {
+        throw new APIError(400, 'Invalid session ID');
+      }
+      
+      if (!rating || rating < 1 || rating > 5) {
+        throw new APIError(400, 'Rating must be between 1 and 5');
+      }
+      
+      // Verify session ownership
+      const session = await storage.getVoiceSession(sessionId);
+      if (!session || session.userId !== userId) {
+        throw new APIError(404, 'Session not found or access denied');
+      }
+      
+      logger.info('Rating session', { userId, sessionId, rating });
+      
+      // Update session analytics with rating
+      const sessionAnalytics = await storage.getSessionAnalytics(sessionId);
+      if (!sessionAnalytics) {
+        throw new APIError(404, 'Session analytics not found');
+      }
+      
+      await analyticsService.trackEvent(
+        userId,
+        "session_rated",
+        {
+          sessionId,
+          rating,
+          previousRating: sessionAnalytics.userRating
+        },
+        sessionId
+      );
+      
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
     }
   });
 

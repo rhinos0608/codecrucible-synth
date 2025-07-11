@@ -119,7 +119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Generate real solutions using OpenAI following AI_INSTRUCTIONS.md
-  app.post("/api/sessions", async (req, res, next) => {
+  app.post("/api/sessions", isAuthenticated, async (req: any, res, next) => {
     try {
       logger.info('Received session generation request', { 
         body: req.body,
@@ -137,8 +137,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(400, 'At least one perspective and one role must be selected');
       }
 
+      // Get authenticated user ID from session
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+
       logger.info('Creating voice session', { 
-        userId: 1, 
+        userId, 
         prompt: requestData.prompt.substring(0, 50) + '...',
         perspectiveCount: requestData.selectedVoices.perspectives.length,
         roleCount: requestData.selectedVoices.roles.length
@@ -151,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recursionDepth: requestData.recursionDepth,
         synthesisMode: requestData.synthesisMode,
         ethicalFiltering: requestData.ethicalFiltering,
-        userId: 1 // Default user for now
+        userId: userId
       };
 
       const session = await storage.createVoiceSession(sessionData);
@@ -171,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get solutions for a session with security validation
-  app.get("/api/sessions/:id/solutions", async (req, res, next) => {
+  app.get("/api/sessions/:id/solutions", isAuthenticated, async (req: any, res, next) => {
     try {
       const sessionId = parseInt(req.params.id);
       
@@ -179,7 +185,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(400, 'Invalid session ID');
       }
       
-      logger.debug('Fetching solutions for session', { sessionId });
+      // Verify session ownership
+      const session = await storage.getVoiceSession(sessionId);
+      if (!session || session.userId !== req.user?.claims?.sub) {
+        throw new APIError(404, 'Session not found or access denied');
+      }
+      
+      logger.debug('Fetching solutions for session', { sessionId, userId: req.user.claims.sub });
       
       const solutions = await storage.getSolutionsBySession(sessionId);
       res.json(solutions);
@@ -189,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create real synthesis using OpenAI
-  app.post("/api/sessions/:id/synthesis", async (req, res, next) => {
+  app.post("/api/sessions/:id/synthesis", isAuthenticated, async (req: any, res, next) => {
     try {
       const sessionId = parseInt(req.params.id);
       
@@ -197,7 +209,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(400, 'Invalid session ID');
       }
       
-      logger.info('Starting solution synthesis', { sessionId });
+      // Verify session ownership
+      const session = await storage.getVoiceSession(sessionId);
+      if (!session || session.userId !== req.user?.claims?.sub) {
+        throw new APIError(404, 'Session not found or access denied');
+      }
+      
+      logger.info('Starting solution synthesis', { sessionId, userId: req.user.claims.sub });
       
       // Get solutions for the session
       const solutions = await storage.getSolutionsBySession(sessionId);
@@ -229,8 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ethicalScore: 85 // Default high ethical score for AI-generated content
       });
       
-      // Create decision history entry
-      const session = await storage.getVoiceSession(sessionId);
+      // Create decision history entry using the session we already fetched
       if (session) {
         await storage.createPhantomLedgerEntry({
           sessionId,

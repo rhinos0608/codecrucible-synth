@@ -11,10 +11,10 @@ export default function LegalSection() {
   return (
     <Card className="bg-gray-800/50 border-gray-700/50 mt-6">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center text-white text-sm font-medium">
-          <Scale className="h-4 w-4 mr-2 text-blue-400" />
+        <CardTitle className="flex items-center text-gray-200 text-sm font-medium">
+          <Scale className="h-4 w-4 mr-2 text-gray-400" />
           Legal Information
-          <Badge variant="secondary" className="ml-2 bg-blue-900/30 text-blue-300 text-xs">
+          <Badge variant="secondary" className="ml-2 bg-gray-700/30 text-gray-400 text-xs">
             Updated July 11, 2025
           </Badge>
         </CardTitle>
@@ -25,17 +25,17 @@ export default function LegalSection() {
       
       <CardContent className="pt-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-700/50 mb-4">
+          <TabsList className="grid w-full grid-cols-2 bg-gray-800/30 border border-gray-600/30 mb-4">
             <TabsTrigger 
               value="terms" 
-              className="data-[state=active]:bg-blue-600/80 data-[state=active]:text-white text-gray-300 text-xs"
+              className="data-[state=active]:bg-gray-700/50 data-[state=active]:text-gray-200 text-gray-400 text-xs hover:text-gray-300 transition-colors"
             >
               <FileText className="h-3 w-3 mr-1" />
               Terms of Service
             </TabsTrigger>
             <TabsTrigger 
               value="privacy" 
-              className="data-[state=active]:bg-purple-600/80 data-[state=active]:text-white text-gray-300 text-xs"
+              className="data-[state=active]:bg-gray-700/50 data-[state=active]:text-gray-200 text-gray-400 text-xs hover:text-gray-300 transition-colors"
             >
               <Shield className="h-3 w-3 mr-1" />
               Privacy Policy
@@ -46,9 +46,9 @@ export default function LegalSection() {
             <ScrollArea className="h-64 w-full rounded-md border border-gray-600/50 bg-gray-900/30 p-4">
               <div className="space-y-4 text-sm text-gray-300">
                 <div className="flex items-center mb-3">
-                  <FileText className="h-4 w-4 mr-2 text-blue-400" />
-                  <h3 className="font-semibold text-white">Terms of Service</h3>
-                  <div className="flex items-center ml-auto text-xs text-gray-400">
+                  <FileText className="h-4 w-4 mr-2 text-gray-400" />
+                  <h3 className="font-semibold text-gray-200">Terms of Service</h3>
+                  <div className="flex items-center ml-auto text-xs text-gray-500">
                     <Calendar className="h-3 w-3 mr-1" />
                     Effective: July 11, 2025
                   </div>
@@ -56,7 +56,7 @@ export default function LegalSection() {
                 
                 <div className="space-y-4">
                   <section>
-                    <h4 className="font-medium text-blue-200 mb-2">1. Overview</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">1. Overview</h4>
                     <p className="text-gray-300 leading-relaxed">
                       CodeCrucible is a web-based multi-voice AI development platform created by Rhythm Chamber. 
                       These Terms govern your access to and use of the service. By using the platform, you agree to these Terms.
@@ -64,7 +64,7 @@ export default function LegalSection() {
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-blue-200 mb-2">2. Subscriptions and Payments</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">2. Subscriptions and Payments</h4>
                     <p className="text-gray-300 leading-relaxed mb-2">
                       We offer Free, Pro ($15/month), and Team ($50/month) plans.
                     </p>
@@ -76,7 +76,7 @@ export default function LegalSection() {
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-blue-200 mb-2">3. Acceptable Use</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">3. Acceptable Use</h4>
                     <p className="text-gray-300 leading-relaxed mb-2">You agree not to:</p>
                     <ul className="text-gray-400 text-xs space-y-1 ml-4">
                       <li>• Abuse or attempt to bypass system limits</li>
@@ -89,7 +89,7 @@ export default function LegalSection() {
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-blue-200 mb-2">4. Intellectual Property</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">4. Intellectual Property</h4>
                     <p className="text-gray-300 leading-relaxed">
                       All generated code belongs to the user. The platform logic, architecture, and voice framework 
                       remain the property of Rhythm Chamber.
@@ -97,33 +97,33 @@ export default function LegalSection() {
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-blue-200 mb-2">5. Availability</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">5. Availability</h4>
                     <p className="text-gray-300 leading-relaxed">
                       We strive for high uptime but do not guarantee uninterrupted access.
                     </p>
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-blue-200 mb-2">6. Limitation of Liability</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">6. Limitation of Liability</h4>
                     <p className="text-gray-300 leading-relaxed">
                       We are not liable for damages from misuse, code bugs, or outages. Use is at your own risk.
                     </p>
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-blue-200 mb-2">7. Privacy</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">7. Privacy</h4>
                     <p className="text-gray-300 leading-relaxed">
                       Your use of the service is governed by our Privacy Policy.
                     </p>
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-blue-200 mb-2">8. Contact</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">8. Contact</h4>
                     <div className="flex items-center">
-                      <Mail className="h-3 w-3 mr-2 text-blue-400" />
+                      <Mail className="h-3 w-3 mr-2 text-gray-400" />
                       <a 
                         href="mailto:support@rhythmchamber.app" 
-                        className="text-blue-300 hover:text-blue-200 text-sm underline"
+                        className="text-gray-300 hover:text-gray-200 text-sm underline"
                       >
                         support@rhythmchamber.app
                       </a>
@@ -138,9 +138,9 @@ export default function LegalSection() {
             <ScrollArea className="h-64 w-full rounded-md border border-gray-600/50 bg-gray-900/30 p-4">
               <div className="space-y-4 text-sm text-gray-300">
                 <div className="flex items-center mb-3">
-                  <Shield className="h-4 w-4 mr-2 text-purple-400" />
-                  <h3 className="font-semibold text-white">Privacy Policy</h3>
-                  <div className="flex items-center ml-auto text-xs text-gray-400">
+                  <Shield className="h-4 w-4 mr-2 text-gray-400" />
+                  <h3 className="font-semibold text-gray-200">Privacy Policy</h3>
+                  <div className="flex items-center ml-auto text-xs text-gray-500">
                     <Calendar className="h-3 w-3 mr-1" />
                     Effective: July 11, 2025
                   </div>
@@ -148,7 +148,7 @@ export default function LegalSection() {
                 
                 <div className="space-y-4">
                   <section>
-                    <h4 className="font-medium text-purple-200 mb-2">1. What We Collect</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">1. What We Collect</h4>
                     <ul className="text-gray-400 text-xs space-y-1 ml-4">
                       <li>• Email, usage logs, and Stripe billing info</li>
                       <li>• Generation patterns (not code contents)</li>
@@ -156,7 +156,7 @@ export default function LegalSection() {
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-purple-200 mb-2">2. How We Use Data</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">2. How We Use Data</h4>
                     <ul className="text-gray-400 text-xs space-y-1 ml-4">
                       <li>• Enforce subscription limits</li>
                       <li>• Improve model behavior</li>
@@ -165,7 +165,7 @@ export default function LegalSection() {
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-purple-200 mb-2">3. Sharing</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">3. Sharing</h4>
                     <p className="text-gray-300 leading-relaxed mb-2">
                       We never sell your data. Shared only with:
                     </p>
@@ -176,7 +176,7 @@ export default function LegalSection() {
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-purple-200 mb-2">4. Security</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">4. Security</h4>
                     <p className="text-gray-300 leading-relaxed">
                       Strict quota enforcement, session rate-limiting, and audit logging are implemented 
                       following AI_INSTRUCTIONS.md security patterns.
@@ -184,29 +184,29 @@ export default function LegalSection() {
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-purple-200 mb-2">5. Cookies & Tracking</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">5. Cookies & Tracking</h4>
                     <p className="text-gray-300 leading-relaxed">
                       Cookies are used for session and analytics only.
                     </p>
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-purple-200 mb-2">6. Data Retention</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">6. Data Retention</h4>
                     <p className="text-gray-300 leading-relaxed">
                       Plan status and generation logs are kept for 30 days. No generation contents are retained.
                     </p>
                   </section>
                   
                   <section>
-                    <h4 className="font-medium text-purple-200 mb-2">7. Your Rights</h4>
+                    <h4 className="font-medium text-gray-300 mb-2">7. Your Rights</h4>
                     <p className="text-gray-300 leading-relaxed">
                       You can request, correct, or delete your data by contacting support.
                     </p>
                     <div className="flex items-center mt-2">
-                      <Mail className="h-3 w-3 mr-2 text-purple-400" />
+                      <Mail className="h-3 w-3 mr-2 text-gray-400" />
                       <a 
                         href="mailto:support@rhythmchamber.app" 
-                        className="text-purple-300 hover:text-purple-200 text-sm underline"
+                        className="text-gray-300 hover:text-gray-200 text-sm underline"
                       >
                         support@rhythmchamber.app
                       </a>

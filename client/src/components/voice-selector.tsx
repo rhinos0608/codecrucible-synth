@@ -27,6 +27,17 @@ export function PerspectiveSelector() {
         <div className="space-y-2">
           {CODE_PERSPECTIVES.map((perspective) => {
             const isSelected = state.selectedPerspectives.includes(perspective.id);
+            
+            const handlePerspectiveClick = () => {
+              console.log("Perspective Toggle Debug:", {
+                id: perspective.id,
+                currentlySelected: isSelected,
+                currentPerspectives: state.selectedPerspectives,
+                willBecome: isSelected ? "deselected" : "selected"
+              });
+              togglePerspective(perspective.id);
+            };
+            
             return (
               <Card
                 key={perspective.id}
@@ -35,7 +46,7 @@ export function PerspectiveSelector() {
                     ? `border-blue-500/40 bg-blue-500/10` 
                     : `border-gray-600 bg-gray-700/50 hover:border-gray-500`
                 }`}
-                onClick={() => togglePerspective(perspective.id)}
+                onClick={handlePerspectiveClick}
               >
                 <div className="flex items-center space-x-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
@@ -70,6 +81,17 @@ export function PerspectiveSelector() {
         <div className="space-y-2">
           {DEVELOPMENT_ROLES.map((role) => {
             const isSelected = state.selectedRoles.includes(role.id);
+            
+            const handleRoleClick = () => {
+              console.log("Role Toggle Debug:", {
+                id: role.id,
+                currentlySelected: isSelected,
+                currentRoles: state.selectedRoles,
+                willBecome: isSelected ? "deselected" : "selected"
+              });
+              toggleRole(role.id);
+            };
+            
             return (
               <Card
                 key={role.id}
@@ -78,7 +100,7 @@ export function PerspectiveSelector() {
                     ? `border-green-500/40 bg-green-500/10`
                     : `border-gray-600 bg-gray-700/50 hover:border-gray-500`
                 }`}
-                onClick={() => toggleRole(role.id)}
+                onClick={handleRoleClick}
               >
                 <div className="flex items-center space-x-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${

@@ -188,7 +188,7 @@ export default function Dashboard() {
                 <Button
                   onClick={handleGenerateSolutions}
                   disabled={isGenerating || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Play className="w-4 h-4 mr-2" />
                   {isGenerating ? "Generating..." : "Generate Solutions"}
@@ -203,6 +203,23 @@ export default function Dashboard() {
               {state.prompt.trim() && state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0 && (
                 <div className="px-4 pb-3">
                   <p className="text-xs text-red-400">Please select at least one voice from the configuration panel</p>
+                </div>
+              )}
+              
+              {/* Debug State Display - Following AI_INSTRUCTIONS.md security pattern */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="px-4 pb-3 border-t border-gray-600 pt-3">
+                  <details className="text-xs">
+                    <summary className="text-gray-400 cursor-pointer">Debug Voice State</summary>
+                    <div className="mt-2 text-gray-500 font-mono space-y-1">
+                      <div>Perspectives: [{state.selectedPerspectives.join(', ')}] ({state.selectedPerspectives.length})</div>
+                      <div>Roles: [{state.selectedRoles.join(', ')}] ({state.selectedRoles.length})</div>
+                      <div>Button disabled: {(isGenerating || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)).toString()}</div>
+                      <div>Generating: {isGenerating.toString()}</div>
+                      <div>Prompt valid: {state.prompt.trim().length > 0 ? 'true' : 'false'}</div>
+                      <div>Voices valid: {(state.selectedPerspectives.length > 0 || state.selectedRoles.length > 0) ? 'true' : 'false'}</div>
+                    </div>
+                  </details>
                 </div>
               )}
             </Card>

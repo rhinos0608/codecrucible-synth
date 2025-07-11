@@ -22,6 +22,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { SubscriptionStatus } from "@/components/subscription/subscription-status";
 import PaywallTest from "@/components/paywall-test";
 import UpgradeModal from "@/components/UpgradeModal";
+import LegalSection from "@/components/legal-section";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -370,6 +371,9 @@ export default function Dashboard() {
                 </div>
               )}
             </Card>
+
+            {/* Legal Information Section - Following AI_INSTRUCTIONS.md */}
+            <LegalSection />
           </div>
         </div>
       </div>

@@ -9,6 +9,14 @@ import { preferenceLearningService } from "./preference-learning-service";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import Stripe from "stripe";
+
+// Initialize Stripe with secret key following AI_INSTRUCTIONS.md security patterns
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required environment variable: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16",
+});
 import { 
   insertVoiceSessionSchema, 
   insertSolutionSchema, 

@@ -2,11 +2,14 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Check, Crown, Users, Sparkles, Loader2 } from "lucide-react";
+import { Check, Crown, Users, Sparkles, Loader2, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useState } from "react";
+import StripeCheckout from "@/components/stripe-checkout";
 
 interface SubscriptionTier {
   name: string;
@@ -21,6 +24,8 @@ interface SubscriptionTier {
 export default function Pricing() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<{ name: string; price: number } | null>(null);
   
   const { data: tiers = [], isLoading: tiersLoading } = useQuery<SubscriptionTier[]>({
     queryKey: ["/api/subscription/tiers"],
@@ -60,6 +65,49 @@ export default function Pricing() {
       });
     },
   });
+
+  const handleUpgrade = (tier: SubscriptionTier) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to upgrade your subscription.",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+
+    if (tier.name === "free") {
+      toast({
+        title: "Already Free",
+        description: "You're already on the free tier.",
+      });
+      return;
+    }
+
+    // Use direct Stripe checkout redirect
+    checkoutMutation.mutate(tier.name);
+  };
+
+  const handleCheckoutSuccess = () => {
+    setShowCheckout(false);
+    setSelectedTier(null);
+    toast({
+      title: "Subscription Activated",
+      description: "Your subscription has been successfully activated!",
+    });
+    // Redirect to dashboard or refresh page
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 1000);
+  };
+
+  const handleCheckoutCancel = () => {
+    setShowCheckout(false);
+    setSelectedTier(null);
+  };
 
   const currentTier = subscriptionInfo?.tier?.name || "free";
 

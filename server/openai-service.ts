@@ -159,11 +159,11 @@ Provide a JSON response with:
       
       const solution: GeneratedSolution = {
         voiceCombination: `${perspective} + ${role}`,
-        code: parsedResponse.code || '',
-        explanation: parsedResponse.explanation || '',
+        code: parsedResponse.code || '// No code generated',
+        explanation: parsedResponse.explanation || 'No explanation provided',
         confidence: Math.max(1, Math.min(100, parsedResponse.confidence || 75)),
-        strengths: Array.isArray(parsedResponse.strengths) ? parsedResponse.strengths : [],
-        considerations: Array.isArray(parsedResponse.considerations) ? parsedResponse.considerations : [],
+        strengths: Array.isArray(parsedResponse.strengths) ? parsedResponse.strengths : ['AI-generated solution'],
+        considerations: Array.isArray(parsedResponse.considerations) ? parsedResponse.considerations : ['Review implementation'],
         perspective,
         role
       };
@@ -189,7 +189,7 @@ Provide a JSON response with:
         throw error;
       }
 
-      // Handle OpenAI API errors
+      // Handle OpenAI API errors following AI_INSTRUCTIONS.md error patterns
       if (error instanceof Error && error.message.includes('API key')) {
         throw new APIError(401, 'Invalid OpenAI API key configuration');
       }

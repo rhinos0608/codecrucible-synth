@@ -1,9 +1,5 @@
-# RHYTHM CHAMBER - PRODUCTION AI INSTRUCTIONS
 
-## PROJECT CONTEXT
-<context>
-Rhythm Chamber is a sophisticated music consciousness analysis platform combining Spotify integration with AI-powered archetypal insights. Built with React 18, TypeScript, Express.js, and PostgreSQL. Uses OpenAI for consciousness analysis and Framer Motion for interactions.
-</context>
+
 
 <goal>
 Create production-ready, secure, performant code that follows Apple design principles and implements recursive consciousness patterns. Every component must be maintainable, testable, and follow established architectural patterns.

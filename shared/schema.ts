@@ -13,7 +13,7 @@ export const voiceSessions = pgTable("voice_sessions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id),
   prompt: text("prompt").notNull(),
-  selectedVoices: jsonb("selected_voices").notNull(), // Array of voice IDs
+  selectedVoices: jsonb("selected_voices").notNull(), // Object with perspectives and roles arrays
   recursionDepth: integer("recursion_depth").default(2),
   synthesisMode: text("synthesis_mode").default("competitive"),
   ethicalFiltering: boolean("ethical_filtering").default(true),
@@ -59,12 +59,24 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
+// Security-first validation schema following AI_INSTRUCTIONS.md
 export const insertVoiceSessionSchema = createInsertSchema(voiceSessions).pick({
   prompt: true,
   selectedVoices: true,
   recursionDepth: true,
   synthesisMode: true,
   ethicalFiltering: true,
+}).extend({
+  // Secure validation of selectedVoices structure
+  selectedVoices: z.object({
+    perspectives: z.array(z.string().min(1).max(50)).min(1).max(10),
+    roles: z.array(z.string().min(1).max(50)).min(1).max(10)
+  }),
+  // Input validation following AI_INSTRUCTIONS.md security patterns
+  prompt: z.string().min(1).max(2000),
+  recursionDepth: z.number().int().min(1).max(5),
+  synthesisMode: z.enum(["consensus", "competitive", "collaborative"]),
+  ethicalFiltering: z.boolean()
 });
 
 export const insertSolutionSchema = createInsertSchema(solutions).pick({

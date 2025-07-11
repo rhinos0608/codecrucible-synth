@@ -19,7 +19,7 @@ const generateSessionRequestSchema = z.object({
     roles: z.array(z.string()).min(1)
   }),
   recursionDepth: z.number().int().min(1).max(3),
-  synthesisMode: z.string(),
+  synthesisMode: z.enum(["consensus", "competitive", "collaborative"]),
   ethicalFiltering: z.boolean()
 });
 
@@ -39,6 +39,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const requestData = generateSessionRequestSchema.parse(req.body);
+      
+      // Security validation following AI_INSTRUCTIONS.md patterns
+      if (!requestData.prompt || requestData.prompt.trim().length === 0) {
+        throw new APIError(400, 'Prompt is required and cannot be empty');
+      }
+      
+      if (!requestData.selectedVoices?.perspectives?.length || !requestData.selectedVoices?.roles?.length) {
+        throw new APIError(400, 'At least one perspective and one role must be selected');
+      }
+
+      logger.info('Creating voice session', { 
+        userId: 1, 
+        prompt: requestData.prompt.substring(0, 50) + '...',
+        perspectiveCount: requestData.selectedVoices.perspectives.length,
+        roleCount: requestData.selectedVoices.roles.length
+      });
       
       // Create session following security patterns
       const sessionData = {

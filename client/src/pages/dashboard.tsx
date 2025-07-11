@@ -49,7 +49,16 @@ export default function Dashboard() {
   };
 
   const handleGenerateSolutions = async () => {
-    if (!state.prompt.trim() || state.selectedPerspectives.length === 0 || state.selectedRoles.length === 0) return;
+    // Validation following AI_INSTRUCTIONS.md security patterns
+    if (!state.prompt.trim()) {
+      console.error("Validation Error: Prompt is required");
+      return;
+    }
+    
+    if (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0) {
+      console.error("Validation Error: At least one voice must be selected");
+      return;
+    }
 
     try {
       const result = await generateSession.mutateAsync({
@@ -67,7 +76,11 @@ export default function Dashboard() {
         handleSolutionsGenerated(result.session.id);
       }
     } catch (error) {
-      console.error("Failed to generate solutions:", error);
+      console.error("API Error: Failed to generate solutions:", error);
+      // Error handling according to AI_INSTRUCTIONS.md patterns
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+      }
     }
   };
 
@@ -91,7 +104,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center space-x-3">
               <Badge variant="secondary" className="bg-blue-500/20 text-blue-300">
-                {getActiveCount()} perspectives active
+                {getActiveCount() > 0 ? `${getActiveCount()} voices active` : 'No voices selected'}
               </Badge>
               <Button
                 variant="outline"
@@ -176,6 +189,17 @@ export default function Dashboard() {
                   {isGenerating ? "Generating..." : "Generate Solutions"}
                 </Button>
               </div>
+              {/* Validation Error Display */}
+              {!state.prompt.trim() && (
+                <div className="px-4 pb-3">
+                  <p className="text-xs text-red-400">Please enter a prompt to generate solutions</p>
+                </div>
+              )}
+              {state.prompt.trim() && state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0 && (
+                <div className="px-4 pb-3">
+                  <p className="text-xs text-red-400">Please select at least one voice from the configuration panel</p>
+                </div>
+              )}
             </Card>
           </div>
         </div>

@@ -16,81 +16,83 @@ export interface DevelopmentRole {
   color: string;
 }
 
+// Transisthesis Archetypes - Core philosophical perspectives
 export const CODE_PERSPECTIVES: CodePerspective[] = [
   {
-    id: "explorer",
-    name: "Explorer",
-    function: "Innovation, Research, Discovery",
-    fragment: "Let's try something new. What if we approach this differently?",
+    id: "seeker",
+    name: "Seeker",
+    function: "Questions assumptions, explores alternatives",
+    fragment: "What if we approached this completely differently? Let me explore the unknowns.",
     icon: "search",
     color: "seeker"
   },
   {
-    id: "maintainer",
-    name: "Maintainer", 
-    function: "Stability, Best Practices, Quality",
-    fragment: "This needs to be sustainable and follow established patterns.",
+    id: "steward",
+    name: "Steward", 
+    function: "Focuses on sustainability and care",
+    fragment: "This solution must be maintainable and responsible for the long term.",
     icon: "shield",
     color: "steward"
   },
   {
-    id: "reviewer",
-    name: "Reviewer",
-    function: "Analysis, Pattern Recognition, Assessment", 
-    fragment: "I see patterns here. Let me analyze the trade-offs.",
+    id: "witness",
+    name: "Witness",
+    function: "Observes patterns, provides context", 
+    fragment: "I see patterns emerging here. Let me provide the broader context.",
     icon: "eye",
     color: "witness"
   },
   {
-    id: "mentor",
-    name: "Mentor",
-    function: "User Experience, Collaboration, Integration",
-    fragment: "How can we make this more intuitive and accessible?",
+    id: "nurturer",
+    name: "Nurturer",
+    function: "Supports growth and learning",
+    fragment: "How can we make this more intuitive and supportive for users?",
     icon: "heart",
     color: "nurturer"
   },
   {
-    id: "lead",
-    name: "Tech Lead",
-    function: "Decision Making, Implementation, Delivery",
-    fragment: "Here's what we're building. Let's ship it.",
+    id: "decider",
+    name: "Decider",
+    function: "Makes decisive choices, drives action",
+    fragment: "Here's the decision. Let's implement this approach and move forward.",
     icon: "target",
     color: "decider"
   }
 ];
 
+// Enhanced Coding Voices - Technical specialists
 export const DEVELOPMENT_ROLES: DevelopmentRole[] = [
   {
-    id: "architect",
-    name: "System Architect",
-    domain: "Architecture",
-    description: "Scalable systems and design patterns",
-    icon: "layout-grid", 
-    color: "architect"
-  },
-  {
-    id: "optimizer",
-    name: "Performance Engineer", 
-    domain: "Performance",
-    description: "Speed, efficiency, and optimization",
-    icon: "zap",
-    color: "optimizer"
-  },
-  {
-    id: "security",
-    name: "Security Engineer",
-    domain: "Security",
-    description: "Safety, validation, and reliability",
-    icon: "shield-check",
+    id: "guardian",
+    name: "Guardian",
+    domain: "Security & Reliability",
+    description: "Security, error prevention, and defensive coding",
+    icon: "shield-check", 
     color: "guardian"
   },
   {
-    id: "frontend",
-    name: "Frontend Developer",
-    domain: "User Interface",
-    description: "UI/UX and user experience",
+    id: "architect",
+    name: "Architect",
+    domain: "System Design",
+    description: "Scalable systems, design patterns, and technical architecture",
+    icon: "building", 
+    color: "architect"
+  },
+  {
+    id: "designer",
+    name: "Designer", 
+    domain: "User Experience",
+    description: "Interface design, user experience, and accessibility",
     icon: "palette",
     color: "designer"
+  },
+  {
+    id: "optimizer",
+    name: "Optimizer",
+    domain: "Performance",
+    description: "Speed, efficiency, and performance optimization",
+    icon: "zap",
+    color: "optimizer"
   }
 ];
 

@@ -256,3 +256,59 @@ const canGenerate = (user: User) => ['contributor', 'admin'].includes(user.role)
 7. TESTABILITY + DRIFT TRACKING + OBSERVABILITY
 
 **Every code suggestion must reference or adhere to these standards. Do not hallucinate. Do not deviate.**
+
+## 🧠 Autonomous Cost Optimization Directive (ACOD)
+> Self-monitoring compute governance protocol for AI Agents operating in cost-sensitive environments.
+
+### 📜 Directive Summary
+All AI systems operating under this instruction must actively monitor their resource footprint and dynamically optimize for cost-efficiency **without compromising output quality or safety**.
+
+### 🧩 ACOD-CORE
+
+**ACOD-001: Self-Measurement Mandate**
+- Track and log estimated compute time, token usage, and file scope **before and after** each action.
+- Compare expected vs actual code delta. If discrepancy > 50%, trigger optimization behavior (see ACOD-004).
+
+**ACOD-002: Cost Threshold Awareness**
+- Default budget target: **$0.50 per invocation**
+- If estimated cost > $1.00:
+  - Break the task into sub-operations
+  - Execute lowest-complexity subtask first
+  - Request human confirmation if ambiguity remains
+
+**ACOD-003: Precision-Scoped Operation**
+- Avoid full project scans unless explicitly requested.
+- Limit file access to only those mentioned in prompt.
+- Skip non-critical formatting or documentation passes unless flagged.
+
+**ACOD-004: Recursive Optimization Protocol**
+If usage or cost spikes disproportionately:
+1. Pause execution
+2. Output:
+   > "⚠️ Cost threshold anomaly detected. Re-evaluating scope and prompt clarity."
+3. Rephrase prompt internally for better efficiency
+4. Resume after realignment
+
+**ACOD-005: Real-Time Feedback Loop**
+- For each task, log:
+  - `Estimated Cost`
+  - `Time Budget`
+  - `File Count`
+  - `Delta (Lines Added/Deleted)`
+- Adjust future behavior using this data
+
+### 🛡️ Guardrails
+- Never perform speculative code traversal
+- Do not load entire project context unless told
+- Always assume default: "Change only what is necessary"
+
+---
+
+### 💡 Implementation Flag:
+Set runtime flag `ACOD:active=true` during all agent sessions.
+
+---
+
+Codename: `ACOD-v1.0-rh`  
+Governance Layer: Transisthesis / CodeCrucible Engine  
+Status: Required for all compute-bound autonomous sessions  

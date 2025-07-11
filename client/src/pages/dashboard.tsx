@@ -103,19 +103,21 @@ export default function Dashboard() {
   });
 
   const handleApplyRecommendations = () => {
-    if (recommendations?.suggested && sessionResponse?.session?.id) {
+    if (recommendations?.suggested) {
       selectPerspectives(recommendations.suggested.perspectives);
       selectRoles(recommendations.suggested.roles);
       
-      // Track analytics event
-      trackRecommendation.mutate({
-        sessionId: sessionResponse.session.id,
-        recommendedVoices: [
-          ...recommendations.suggested.perspectives,
-          ...recommendations.suggested.roles
-        ],
-        action: 'applied'
-      });
+      // Track analytics event if we have a current session
+      if (currentSessionId) {
+        trackRecommendation.mutate({
+          sessionId: currentSessionId,
+          recommendedVoices: [
+            ...recommendations.suggested.perspectives,
+            ...recommendations.suggested.roles
+          ],
+          action: 'applied'
+        });
+      }
     }
   };
 

@@ -95,7 +95,6 @@ export class VoiceRecommendationEngine {
     // Score based on domains
     if (analysis.domain.includes("react") || analysis.domain.includes("ui")) {
       scores.nurturer += 2; // Developer experience focus
-      scores.designer += 1;
     }
     
     if (analysis.domain.includes("security")) {
@@ -109,14 +108,12 @@ export class VoiceRecommendationEngine {
     }
 
     if (analysis.domain.includes("api")) {
-      scores.architect += 2; // System design
       scores.steward += 1; // Best practices
     }
 
     // Score based on complexity
     if (analysis.complexity === 3) {
       scores.seeker += 2; // Need exploration for complex problems
-      scores.architect += 1;
     } else if (analysis.complexity === 1) {
       scores.decider += 2; // Simple implementation
       scores.nurturer += 1;
@@ -193,38 +190,40 @@ export class VoiceRecommendationEngine {
   private generateReasoning(analysis: PromptAnalysis, perspectives: string[], roles: string[]): string {
     const reasons: string[] = [];
 
-    // Explain perspective choices
+    // Explain perspective choices using server-side IDs but client-friendly names
     if (perspectives.includes("steward")) {
-      reasons.push("Steward (Maintainer) for code sustainability and best practices");
+      reasons.push("Maintainer for code sustainability and best practices");
     }
     if (perspectives.includes("seeker")) {
-      reasons.push("Seeker (Explorer) to investigate alternative approaches");
+      reasons.push("Explorer to investigate alternative approaches");
     }
     if (perspectives.includes("witness")) {
-      reasons.push("Witness (Analyzer) for pattern recognition and performance analysis");
+      reasons.push("Analyzer for pattern recognition and performance analysis");
     }
     if (perspectives.includes("nurturer")) {
-      reasons.push("Nurturer (Developer) for optimal developer experience");
+      reasons.push("Developer for optimal developer experience");
     }
     if (perspectives.includes("decider")) {
-      reasons.push("Decider (Implementor) for practical implementation focus");
+      reasons.push("Implementor for practical implementation focus");
     }
 
-    // Explain role choices
+    // Explain role choices using current naming scheme
     if (roles.includes("guardian")) {
-      reasons.push("Guardian (Security Engineer) for security and validation");
+      reasons.push("Security Engineer for security and validation");
     }
     if (roles.includes("architect")) {
-      reasons.push("Architect (Systems Architect) for scalable system design");
+      reasons.push("Systems Architect for scalable system design");
     }
     if (roles.includes("designer")) {
-      reasons.push("Designer (UI/UX Engineer) for user interface excellence");
+      reasons.push("UI/UX Engineer for user interface excellence");
     }
     if (roles.includes("optimizer")) {
-      reasons.push("Optimizer (Performance Engineer) for performance optimization");
+      reasons.push("Performance Engineer for performance optimization");
     }
 
-    return reasons.join(", ");
+    return reasons.length > 0 
+      ? `Recommended based on: ${reasons.join(", ")}`
+      : "General-purpose recommendation for your coding task";
   }
 
   private generateAlternatives(analysis: PromptAnalysis, suggested: VoiceCombination): VoiceCombination[] {

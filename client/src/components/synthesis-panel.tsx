@@ -3,6 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useState, useEffect } from "react";
 import type { Solution } from "@shared/schema";
@@ -24,6 +27,40 @@ interface MergeStep {
 
 export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMergePanelProps) {
   const { createSynthesis, isSynthesizing } = useSolutionGeneration();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Save to project mutation
+  const saveToProject = useMutation({
+    mutationFn: async (projectData: { name: string; description?: string }) => {
+      const response = await apiRequest("POST", "/api/projects", {
+        name: projectData.name,
+        description: projectData.description,
+        code: synthesizedCode,
+        language: "javascript",
+        sessionId: sessionId,
+        tags: ["synthesis", "multi-voice"],
+        isPublic: false
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Project Saved",
+        description: "Your synthesized solution has been saved successfully."
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Save Failed", 
+        description: "Failed to save project. Please try again.",
+        variant: "destructive"
+      });
+      console.error("Failed to save project:", error);
+    }
+  });
+
   const [synthesisSteps, setSynthesisSteps] = useState<SynthesisStep[]>([
     {
       id: 1,
@@ -91,8 +128,28 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMe
     try {
       await navigator.clipboard.writeText(synthesizedCode);
       console.log('Synthesized code copied to clipboard');
+      toast({
+        title: "Code Copied",
+        description: "Synthesized code copied to clipboard successfully."
+      });
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy code to clipboard.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle save to project with name prompt
+  const handleSaveToProject = async () => {
+    const projectName = prompt("Enter a name for your project:");
+    if (projectName && projectName.trim()) {
+      saveToProject.mutate({
+        name: projectName.trim(),
+        description: `Multi-voice synthesized solution from session ${sessionId}`
+      });
     }
   };
 
@@ -220,9 +277,13 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMe
                     <Copy className="w-4 h-4" />
                     <span>Copy Code</span>
                   </Button>
-                  <Button className="bg-gradient-to-r from-purple-600 to-pink-600 text-white flex items-center space-x-2">
+                  <Button 
+                    onClick={handleSaveToProject}
+                    disabled={saveToProject.isPending}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 text-white flex items-center space-x-2"
+                  >
                     <Save className="w-4 h-4" />
-                    <span>Save to Project</span>
+                    <span>{saveToProject.isPending ? "Saving..." : "Save to Project"}</span>
                   </Button>
                 </div>
               </div>

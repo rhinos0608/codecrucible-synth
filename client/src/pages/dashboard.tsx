@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { PerspectiveSelector } from "@/components/voice-selector";
 import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
+import { ProjectsPanel } from "@/components/projects-panel";
 import { usePerspectiveSelection } from "@/hooks/use-voice-selection";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { QUICK_PROMPTS } from "@/types/voices";
@@ -15,6 +16,7 @@ import type { Solution } from "@shared/schema";
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
   const [showSynthesisPanel, setShowSynthesisPanel] = useState(false);
+  const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
   const [showRightPanel, setShowRightPanel] = useState(true);
@@ -83,6 +85,15 @@ export default function Dashboard() {
               <Badge variant="secondary" className="bg-blue-500/20 text-blue-300">
                 {getActiveCount()} perspectives active
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowProjectsPanel(true)}
+                className="text-gray-300 hover:text-gray-100 border-gray-600"
+              >
+                <FolderOpen className="w-4 h-4 mr-2" />
+                Projects
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -170,6 +181,11 @@ export default function Dashboard() {
         onClose={() => setShowSynthesisPanel(false)}
         solutions={currentSolutions}
         sessionId={currentSessionId || 0}
+      />
+
+      <ProjectsPanel
+        isOpen={showProjectsPanel}
+        onClose={() => setShowProjectsPanel(false)}
       />
     </div>
   );

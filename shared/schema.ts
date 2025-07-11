@@ -53,6 +53,20 @@ export const phantomLedgerEntries = pgTable("phantom_ledger_entries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const projects = pgTable("projects", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  code: text("code").notNull(),
+  language: text("language").notNull().default("javascript"),
+  sessionId: integer("session_id").references(() => voiceSessions.id),
+  synthesisId: integer("synthesis_id").references(() => syntheses.id),
+  tags: jsonb("tags").notNull().default([]),
+  isPublic: boolean("is_public").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -106,6 +120,25 @@ export const insertPhantomLedgerEntrySchema = createInsertSchema(phantomLedgerEn
   ethicalScore: true,
 });
 
+export const insertProjectSchema = createInsertSchema(projects).pick({
+  name: true,
+  description: true,
+  code: true,
+  language: true,
+  sessionId: true,
+  synthesisId: true,
+  tags: true,
+  isPublic: true,
+}).extend({
+  // Security validation following AI_INSTRUCTIONS.md patterns
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  code: z.string().min(1).max(50000),
+  language: z.string().min(1).max(50),
+  tags: z.array(z.string().min(1).max(30)).max(10).default([]),
+  isPublic: z.boolean().default(false)
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -121,3 +154,6 @@ export type Synthesis = typeof syntheses.$inferSelect;
 
 export type InsertPhantomLedgerEntry = z.infer<typeof insertPhantomLedgerEntrySchema>;
 export type PhantomLedgerEntry = typeof phantomLedgerEntries.$inferSelect;
+
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type Project = typeof projects.$inferSelect;

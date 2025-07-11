@@ -4,6 +4,7 @@ import {
   solutions, 
   syntheses, 
   phantomLedgerEntries,
+  projects,
   type User, 
   type InsertUser, 
   type VoiceSession,
@@ -13,7 +14,9 @@ import {
   type Synthesis,
   type InsertSynthesis,
   type PhantomLedgerEntry,
-  type InsertPhantomLedgerEntry
+  type InsertPhantomLedgerEntry,
+  type Project,
+  type InsertProject
 } from "@shared/schema";
 
 export interface IStorage {
@@ -34,6 +37,12 @@ export interface IStorage {
   createPhantomLedgerEntry(entry: InsertPhantomLedgerEntry): Promise<PhantomLedgerEntry>;
   getPhantomLedgerEntries(limit?: number): Promise<PhantomLedgerEntry[]>;
   getPhantomLedgerEntriesByUser(userId: number): Promise<PhantomLedgerEntry[]>;
+  
+  createProject(project: InsertProject): Promise<Project>;
+  getProjects(limit?: number): Promise<Project[]>;
+  getProject(id: number): Promise<Project | undefined>;
+  updateProject(id: number, updates: Partial<InsertProject>): Promise<Project | undefined>;
+  deleteProject(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -42,11 +51,13 @@ export class MemStorage implements IStorage {
   private solutions: Map<number, Solution>;
   private syntheses: Map<number, Synthesis>;
   private phantomLedgerEntries: Map<number, PhantomLedgerEntry>;
+  private projects: Map<number, Project>;
   private currentUserId: number;
   private currentSessionId: number;
   private currentSolutionId: number;
   private currentSynthesisId: number;
   private currentLedgerId: number;
+  private currentProjectId: number;
 
   constructor() {
     this.users = new Map();
@@ -54,11 +65,13 @@ export class MemStorage implements IStorage {
     this.solutions = new Map();
     this.syntheses = new Map();
     this.phantomLedgerEntries = new Map();
+    this.projects = new Map();
     this.currentUserId = 1;
     this.currentSessionId = 1;
     this.currentSolutionId = 1;
     this.currentSynthesisId = 1;
     this.currentLedgerId = 1;
+    this.currentProjectId = 1;
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -168,6 +181,54 @@ export class MemStorage implements IStorage {
     return Array.from(this.phantomLedgerEntries.values())
       .filter(entry => sessionIds.includes(entry.sessionId!))
       .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime());
+  }
+
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const id = this.currentProjectId++;
+    const project: Project = {
+      ...insertProject,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      description: insertProject.description || null,
+      sessionId: insertProject.sessionId || null,
+      synthesisId: insertProject.synthesisId || null,
+      tags: insertProject.tags || [],
+      isPublic: insertProject.isPublic || false,
+      language: insertProject.language || "javascript"
+    };
+    this.projects.set(id, project);
+    return project;
+  }
+
+  async getProjects(limit = 20): Promise<Project[]> {
+    const projects = Array.from(this.projects.values())
+      .sort((a, b) => b.updatedAt!.getTime() - a.updatedAt!.getTime());
+    return projects.slice(0, limit);
+  }
+
+  async getProject(id: number): Promise<Project | undefined> {
+    return this.projects.get(id);
+  }
+
+  async updateProject(id: number, updates: Partial<InsertProject>): Promise<Project | undefined> {
+    const existingProject = this.projects.get(id);
+    if (!existingProject) {
+      return undefined;
+    }
+    
+    const updatedProject: Project = {
+      ...existingProject,
+      ...updates,
+      id,
+      updatedAt: new Date()
+    };
+    this.projects.set(id, updatedProject);
+    return updatedProject;
+  }
+
+  async deleteProject(id: number): Promise<boolean> {
+    return this.projects.delete(id);
   }
 }
 

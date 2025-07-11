@@ -8,7 +8,8 @@ import {
   insertVoiceSessionSchema, 
   insertSolutionSchema, 
   insertSynthesisSchema,
-  insertPhantomLedgerEntrySchema 
+  insertPhantomLedgerEntrySchema,
+  insertProjectSchema
 } from "@shared/schema";
 
 // Request validation schemas following AI_INSTRUCTIONS.md patterns
@@ -229,6 +230,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
         count: logs.length,
         timestamp: new Date().toISOString()
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Project management routes
+  app.post("/api/projects", async (req, res, next) => {
+    try {
+      const projectData = insertProjectSchema.parse(req.body);
+      
+      logger.info('Creating new project', {
+        name: projectData.name,
+        language: projectData.language,
+        sessionId: projectData.sessionId
+      });
+      
+      const project = await storage.createProject(projectData);
+      res.json(project);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects", async (req, res, next) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+      
+      if (isNaN(limit) || limit < 1 || limit > 100) {
+        throw new APIError(400, 'Invalid limit parameter. Must be between 1 and 100.');
+      }
+      
+      const projects = await storage.getProjects(limit);
+      res.json(projects);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects/:id", async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        throw new APIError(400, 'Invalid project ID');
+      }
+      
+      const project = await storage.getProject(id);
+      
+      if (!project) {
+        throw new APIError(404, 'Project not found');
+      }
+      
+      res.json(project);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/projects/:id", async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        throw new APIError(400, 'Invalid project ID');
+      }
+      
+      const updates = insertProjectSchema.partial().parse(req.body);
+      const project = await storage.updateProject(id, updates);
+      
+      if (!project) {
+        throw new APIError(404, 'Project not found');
+      }
+      
+      res.json(project);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/projects/:id", async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        throw new APIError(400, 'Invalid project ID');
+      }
+      
+      const deleted = await storage.deleteProject(id);
+      
+      if (!deleted) {
+        throw new APIError(404, 'Project not found');
+      }
+      
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }

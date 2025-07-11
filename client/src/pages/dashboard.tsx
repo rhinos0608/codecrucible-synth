@@ -103,9 +103,30 @@ export default function Dashboard() {
   });
 
   const handleApplyRecommendations = () => {
-    if (recommendations?.suggested) {
+    console.log("[Dashboard] Apply Recommendations clicked", {
+      hasRecommendations: !!recommendations?.suggested,
+      perspectives: recommendations?.suggested?.perspectives,
+      roles: recommendations?.suggested?.roles,
+      currentState: {
+        selectedPerspectives: state.selectedPerspectives,
+        selectedRoles: state.selectedRoles
+      }
+    });
+
+    if (!recommendations?.suggested) {
+      console.error("[Dashboard] No recommendations available to apply");
+      return;
+    }
+
+    try {
+      // Apply recommendations using the context functions
       selectPerspectives(recommendations.suggested.perspectives);
       selectRoles(recommendations.suggested.roles);
+      
+      console.log("[Dashboard] Recommendations applied successfully", {
+        appliedPerspectives: recommendations.suggested.perspectives,
+        appliedRoles: recommendations.suggested.roles
+      });
       
       // Track analytics event if we have a current session
       if (currentSessionId) {
@@ -118,6 +139,8 @@ export default function Dashboard() {
           action: 'applied'
         });
       }
+    } catch (error) {
+      console.error("[Dashboard] Failed to apply recommendations", error);
     }
   };
 

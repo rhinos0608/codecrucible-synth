@@ -167,20 +167,27 @@ function selectRoles(analysis: PromptAnalysis): string[] {
 function generateReasoning(analysis: PromptAnalysis, perspectives: string[], roles: string[]): string {
   const reasons: string[] = [];
 
+  // Reference the right sidebar elements
   if (analysis.domain.includes("security")) {
-    reasons.push("security focus detected");
+    reasons.push("selecting Security Engineer from Code Specialization Engines");
   }
   if (analysis.domain.includes("ui")) {
-    reasons.push("UI/UX requirements identified");
+    reasons.push("selecting UI/UX Engineer from Code Specialization Engines");
   }
-  if (analysis.complexity === 3) {
-    reasons.push("complex problem requiring exploration");
+  if (analysis.domain.includes("api")) {
+    reasons.push("selecting Systems Architect from Code Specialization Engines");
   }
   if (analysis.domain.includes("performance")) {
-    reasons.push("performance optimization needed");
+    reasons.push("selecting Performance Engineer from Code Specialization Engines");
+  }
+  if (analysis.complexity === 3) {
+    reasons.push("selecting Explorer from Code Analysis Engines for complex exploration");
+  }
+  if (analysis.domain.includes("react")) {
+    reasons.push("selecting Developer from Code Analysis Engines for React expertise");
   }
 
   return reasons.length > 0 
-    ? `Recommended based on: ${reasons.join(", ")}`
-    : "General-purpose recommendation for your coding task";
+    ? `Recommended based on your prompt analysis: ${reasons.join(", ")}`
+    : "General recommendation from Code Analysis and Specialization Engines";
 }

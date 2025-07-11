@@ -103,9 +103,6 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <Badge variant="secondary" className="bg-blue-500/20 text-blue-300">
-                {getActiveCount() > 0 ? `${getActiveCount()} voices active` : 'No voices selected'}
-              </Badge>
               <Button
                 variant="outline"
                 size="sm"

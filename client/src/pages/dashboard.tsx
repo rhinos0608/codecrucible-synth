@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Users } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Users, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -13,18 +13,23 @@ import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useAuth } from "@/hooks/useAuth";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useVoiceRecommendations } from "@/hooks/use-voice-recommendations";
+import { usePlanGuard } from "@/hooks/usePlanGuard";
 import { QUICK_PROMPTS } from "@/types/voices";
 import type { Solution, VoiceProfile } from "@shared/schema";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { SubscriptionStatus } from "@/components/subscription/subscription-status";
+import PaywallTest from "@/components/paywall-test";
+import UpgradeModal from "@/components/UpgradeModal";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
   const [showSynthesisPanel, setShowSynthesisPanel] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
+  const [showPaywallTest, setShowPaywallTest] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
@@ -33,6 +38,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { profiles } = useVoiceProfiles();
   const { recommendations, isAnalyzing, analyzePrompt } = useVoiceRecommendations();
+  const planGuard = usePlanGuard();
   
   const { 
     state, 
@@ -44,6 +50,26 @@ export default function Dashboard() {
   } = useVoiceSelection();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
+
+  // Enhanced generation with quota enforcement
+  const handleSecureGeneration = async () => {
+    if (!planGuard.canGenerate) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    const result = await planGuard.attemptGeneration(async () => {
+      return generateSession(
+        state.prompt,
+        getSelectedItems(),
+        state.prompt
+      );
+    });
+
+    if (result.success && result.data) {
+      handleSolutionsGenerated(result.data);
+    }
+  };
 
   const handleSolutionsGenerated = (sessionId: number) => {
     setCurrentSessionId(sessionId);
@@ -93,6 +119,12 @@ export default function Dashboard() {
   };
 
   const handleGenerateSolutions = async () => {
+    // Check quota before proceeding
+    if (!planGuard.canGenerate) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
     // Validation following AI_INSTRUCTIONS.md security patterns
     console.log("Voice Selection Debug:", {
       perspectives: state.selectedPerspectives,
@@ -112,8 +144,9 @@ export default function Dashboard() {
       return;
     }
 
-    try {
-      const result = await generateSession.mutateAsync({
+    // Use plan guard to enforce quotas
+    const result = await planGuard.attemptGeneration(async () => {
+      return generateSession.mutateAsync({
         prompt: state.prompt,
         selectedVoices: {
           perspectives: state.selectedPerspectives,
@@ -123,16 +156,12 @@ export default function Dashboard() {
         synthesisMode: state.mergeStrategy,
         ethicalFiltering: state.qualityFiltering
       });
-      
-      if (result?.session?.id) {
-        handleSolutionsGenerated(result.session.id);
-      }
-    } catch (error) {
-      console.error("API Error: Failed to generate solutions:", error);
-      // Error handling according to AI_INSTRUCTIONS.md patterns
-      if (error instanceof Error) {
-        console.error("Error details:", error.message);
-      }
+    });
+
+    if (result.success && result.data?.session?.id) {
+      handleSolutionsGenerated(result.data.session.id);
+    } else if (!result.success && result.reason === 'quota_exceeded') {
+      setShowUpgradeModal(true);
     }
   };
 
@@ -172,6 +201,15 @@ export default function Dashboard() {
               >
                 <FolderOpen className="w-4 h-4 mr-2" />
                 Projects
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPaywallTest(true)}
+                className="text-orange-300 hover:text-orange-100 border-orange-600"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Security Test
               </Button>
               <Button
                 variant="outline"
@@ -293,11 +331,14 @@ export default function Dashboard() {
                 </div>
                 <Button
                   onClick={handleGenerateSolutions}
-                  disabled={isGenerating || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
+                  disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
                   className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Play className="w-4 h-4 mr-2" />
-                  {isGenerating ? "Generating..." : "Generate Solutions"}
+                  {isGenerating ? "Generating..." : 
+                   planGuard.planTier === 'free' ? 
+                     `Generate Solutions (${planGuard.quotaUsed}/${planGuard.quotaLimit})` : 
+                     "Generate Solutions"}
                 </Button>
               </div>
               {/* Validation Error Display */}
@@ -379,6 +420,19 @@ export default function Dashboard() {
           setEditingProfile(null);
         }}
         editingProfile={editingProfile}
+      />
+
+      <PaywallTest
+        isOpen={showPaywallTest}
+        onClose={() => setShowPaywallTest(false)}
+      />
+
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        trigger="quota_exceeded"
+        currentQuota={planGuard.quotaUsed}
+        quotaLimit={planGuard.quotaLimit}
       />
     </div>
   );

@@ -179,17 +179,7 @@ export const dailyUsageMetrics = pgTable("daily_usage_metrics", {
   index("daily_metrics_user_date_idx").on(table.userId, table.date),
 ]);
 
-// Usage limits tracking
-export const usageLimits = pgTable("usage_limits", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  date: date("date").notNull(),
-  generationsUsed: integer("generations_used").default(0),
-  generationsLimit: integer("generations_limit").notNull(), // Based on subscription tier
-  lastResetAt: timestamp("last_reset_at").defaultNow(),
-}, (table) => [
-  index("usage_limits_user_date_idx").on(table.userId, table.date),
-]);
+
 
 // Subscription history
 export const subscriptionHistory = pgTable("subscription_history", {
@@ -418,12 +408,7 @@ export const insertTeamMemberSchema = createInsertSchema(teamMembers).pick({
   role: z.enum(["admin", "member"]).default("member"),
 });
 
-export const insertUsageLimitsSchema = createInsertSchema(usageLimits).pick({
-  userId: true,
-  date: true,
-  generationsUsed: true,
-  generationsLimit: true,
-});
+// Will be defined later after usageLimits table
 
 export const insertSubscriptionHistorySchema = createInsertSchema(subscriptionHistory).pick({
   userId: true,
@@ -485,6 +470,37 @@ export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).pick
 export type UpsertUser = typeof users.$inferInsert;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Usage limits table for quota enforcement following AI_INSTRUCTIONS.md
+export const usageLimits = pgTable("usage_limits", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: varchar("date").notNull(), // YYYY-MM-DD format
+  generationsUsed: integer("generations_used").default(0).notNull(),
+  generationsLimit: integer("generations_limit").default(3).notNull(),
+  synthesisUsed: integer("synthesis_used").default(0).notNull(),
+  synthesisLimit: integer("synthesis_limit").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("usage_limits_user_date_idx").on(table.userId, table.date),
+]);
+
+export const insertUsageLimitSchema = createInsertSchema(usageLimits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUsageLimitsSchema = createInsertSchema(usageLimits).pick({
+  userId: true,
+  date: true,
+  generationsUsed: true,
+  generationsLimit: true,
+});
+
+export type InsertUsageLimit = z.infer<typeof insertUsageLimitSchema>;
+export type UsageLimit = typeof usageLimits.$inferSelect;
 
 export type InsertVoiceProfile = z.infer<typeof insertVoiceProfileSchema>;
 export type VoiceProfile = typeof voiceProfiles.$inferSelect;

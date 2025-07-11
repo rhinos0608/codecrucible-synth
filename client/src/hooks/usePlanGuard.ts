@@ -1,0 +1,236 @@
+import { useState, useEffect } from "react";
+import { useAuth } from "./useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { useToast } from "./use-toast";
+import { apiRequest } from "@/lib/queryClient";
+
+export interface PlanGuardState {
+  canGenerate: boolean;
+  canSynthesize: boolean;
+  canAccessAnalytics: boolean;
+  quotaUsed: number;
+  quotaLimit: number;
+  planTier: string;
+  isLoading: boolean;
+  error: string | null;
+}
+
+export interface QuotaCheckResponse {
+  allowed: boolean;
+  reason?: string;
+  quotaUsed: number;
+  quotaLimit: number;
+  planTier: string;
+  daysUntilReset?: number;
+}
+
+/**
+ * Hook to guard plan-restricted features with real-time validation
+ * Following AI_INSTRUCTIONS.md security patterns
+ */
+export function usePlanGuard() {
+  const { user, isAuthenticated } = useAuth();
+  const { data: subscription } = useQuery({
+    queryKey: ["/api/subscription/info"],
+    enabled: isAuthenticated,
+  });
+  const { toast } = useToast();
+  
+  const [state, setState] = useState<PlanGuardState>({
+    canGenerate: false,
+    canSynthesize: false,
+    canAccessAnalytics: false,
+    quotaUsed: 0,
+    quotaLimit: 0,
+    planTier: 'free',
+    isLoading: true,
+    error: null
+  });
+
+  // Check quota in real-time
+  const checkQuota = async (): Promise<QuotaCheckResponse | null> => {
+    if (!isAuthenticated || !user) return null;
+    
+    try {
+      const response = await apiRequest("GET", "/api/quota/check");
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Failed to check quota:', error);
+      return null;
+    }
+  };
+
+  // Update plan guard state based on quota check
+  useEffect(() => {
+    const updatePlanState = async () => {
+      if (!isAuthenticated) {
+        setState({
+          canGenerate: false,
+          canSynthesize: false,
+          canAccessAnalytics: false,
+          quotaUsed: 0,
+          quotaLimit: 0,
+          planTier: 'none',
+          isLoading: false,
+          error: null
+        });
+        return;
+      }
+
+      setState(prev => ({ ...prev, isLoading: true }));
+
+      const quotaCheck = await checkQuota();
+      
+      if (!quotaCheck) {
+        setState({
+          canGenerate: false,
+          canSynthesize: false,
+          canAccessAnalytics: false,
+          quotaUsed: 0,
+          quotaLimit: 0,
+          planTier: 'error',
+          isLoading: false,
+          error: 'Unable to verify subscription status'
+        });
+        return;
+      }
+
+      const planTier = quotaCheck.planTier;
+      
+      setState({
+        canGenerate: quotaCheck.allowed,
+        canSynthesize: planTier === 'pro' || planTier === 'team',
+        canAccessAnalytics: planTier === 'pro' || planTier === 'team',
+        quotaUsed: quotaCheck.quotaUsed,
+        quotaLimit: quotaCheck.quotaLimit,
+        planTier,
+        isLoading: false,
+        error: null
+      });
+    };
+
+    updatePlanState();
+  }, [isAuthenticated, user, subscription]);
+
+  // Handle generation attempt with error handling
+  const attemptGeneration = async (generationFn: () => Promise<any>) => {
+    // Pre-check quota
+    const quotaCheck = await checkQuota();
+    
+    if (!quotaCheck?.allowed) {
+      const message = quotaCheck?.reason === 'quota_exceeded' 
+        ? 'Your daily generation quota has been reached.'
+        : 'Unable to generate code at this time.';
+      
+      toast({
+        title: "Generation Blocked",
+        description: message,
+        variant: "destructive",
+      });
+      
+      return { success: false, error: message };
+    }
+
+    try {
+      const result = await generationFn();
+      
+      // Update quota state after successful generation
+      setState(prev => ({
+        ...prev,
+        quotaUsed: prev.quotaUsed + 1,
+        canGenerate: prev.quotaUsed + 1 < prev.quotaLimit || prev.quotaLimit === -1
+      }));
+      
+      return { success: true, data: result };
+    } catch (error: any) {
+      // Handle specific error types from server
+      if (error.message?.includes('403')) {
+        const errorData = JSON.parse(error.message.split('403: ')[1] || '{}');
+        
+        let userMessage = 'Access restricted.';
+        if (errorData.symbolic) {
+          userMessage = errorData.symbolic;
+        } else if (errorData.upgradeRequired) {
+          userMessage = 'Upgrade to continue generating code.';
+        }
+        
+        toast({
+          title: "Access Restricted",
+          description: userMessage,
+          variant: "destructive",
+        });
+        
+        // Update state to reflect restriction
+        setState(prev => ({
+          ...prev,
+          canGenerate: false,
+          error: userMessage
+        }));
+        
+        return { success: false, error: userMessage };
+      }
+      
+      // Handle other errors
+      const genericError = 'Generation failed. Please try again.';
+      toast({
+        title: "Generation Failed",
+        description: genericError,
+        variant: "destructive",
+      });
+      
+      return { success: false, error: genericError };
+    }
+  };
+
+  // Handle synthesis attempt
+  const attemptSynthesis = async (synthesisFn: () => Promise<any>) => {
+    if (!state.canSynthesize) {
+      const message = 'Synthesis feature requires Pro or Team subscription.';
+      toast({
+        title: "Feature Restricted",
+        description: message,
+        variant: "destructive",
+      });
+      return { success: false, error: message };
+    }
+
+    try {
+      const result = await synthesisFn();
+      return { success: true, data: result };
+    } catch (error: any) {
+      if (error.message?.includes('403')) {
+        const errorData = JSON.parse(error.message.split('403: ')[1] || '{}');
+        const userMessage = errorData.symbolic || 'Upgrade to continue using synthesis.';
+        
+        toast({
+          title: "Feature Restricted",
+          description: userMessage,
+          variant: "destructive",
+        });
+        
+        return { success: false, error: userMessage };
+      }
+      
+      const genericError = 'Synthesis failed. Please try again.';
+      toast({
+        title: "Synthesis Failed",
+        description: genericError,
+        variant: "destructive",
+      });
+      
+      return { success: false, error: genericError };
+    }
+  };
+
+  return {
+    ...state,
+    checkQuota,
+    attemptGeneration,
+    attemptSynthesis,
+    refreshState: () => {
+      // Trigger re-check
+      setState(prev => ({ ...prev, isLoading: true }));
+    }
+  };
+}

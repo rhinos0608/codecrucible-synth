@@ -8,7 +8,27 @@ import { subscriptionService } from "./subscription-service";
 import { preferenceLearningService } from "./preference-learning-service";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { securityMiddleware } from "./security-middleware";
+import { enforcePlanRestrictions, validateFeatureAccess } from "./middleware/enforcePlan";
+import { processStripeWebhook } from "./lib/stripe/updateUserPlan";
+import { incrementUsageQuota, checkGenerationQuota } from "./lib/utils/checkQuota";
+import { logSecurityEvent } from "./lib/security/logSecurityEvent";
 import Stripe from "stripe";
+
+// Helper function to check user plan
+async function checkUserPlan(userId: string) {
+  try {
+    const user = await storage.getUser(userId);
+    return { 
+      data: { 
+        tier: user?.planTier || 'free',
+        stripeSubscriptionId: user?.stripeSubscriptionId 
+      } 
+    };
+  } catch (error) {
+    return { data: { tier: 'free', stripeSubscriptionId: null } };
+  }
+}
 
 // Initialize Stripe with secret key following AI_INSTRUCTIONS.md security patterns
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -46,6 +66,10 @@ const synthesisRequestSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Security middleware setup following AI_INSTRUCTIONS.md
+  app.use(securityMiddleware.securityHeaders());
+  app.use(securityMiddleware.monitorAuthentication());
+  
   // Auth middleware
   await setupAuth(app);
 
@@ -133,7 +157,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Generate real solutions using OpenAI following AI_INSTRUCTIONS.md
-  app.post("/api/sessions", isAuthenticated, async (req: any, res, next) => {
+  app.post("/api/sessions", 
+    isAuthenticated,
+    enforcePlanRestrictions(), // CRITICAL: Enforce subscription limits
+    securityMiddleware.createRateLimit(60 * 1000, 10, 'sessions'), // 10 requests per minute
+    securityMiddleware.validateInput(generateSessionRequestSchema),
+    async (req: any, res, next) => {
     try {
       logger.info('Received session generation request', { 
         body: req.body,
@@ -157,18 +186,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(401, 'User authentication required');
       }
       
-      // Check usage limits
+      // SECURITY: Comprehensive paywall protection following AI_INSTRUCTIONS.md
+      const subscriptionInfo = await subscriptionService.getUserSubscriptionInfo(userId);
+      
+      // Check usage limits with detailed logging for potential abuse
       const canGenerate = await subscriptionService.checkUsageLimit(userId);
       if (!canGenerate) {
-        const subscriptionInfo = await subscriptionService.getUserSubscriptionInfo(userId);
-        throw new APIError(403, `Daily generation limit reached (${subscriptionInfo.usage.used}/${subscriptionInfo.usage.limit}). Upgrade to Pro for unlimited generations.`);
+        logger.warn('Usage limit exceeded - potential abuse attempt', {
+          userId,
+          attemptedUsage: subscriptionInfo.usage.used + 1,
+          limit: subscriptionInfo.usage.limit,
+          tier: subscriptionInfo.tier.name,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+        
+        throw new APIError(403, `Daily generation limit reached (${subscriptionInfo.usage.used}/${subscriptionInfo.usage.limit}). Upgrade to Pro for unlimited generations.`, {
+          code: 'GENERATION_LIMIT_EXCEEDED',
+          tier: subscriptionInfo.tier.name,
+          upgradeRequired: true
+        });
       }
       
-      // Check voice combination limits based on subscription tier
-      const subscriptionInfo = await subscriptionService.getUserSubscriptionInfo(userId);
+      // Check voice combination limits with security logging
       const totalVoices = requestData.selectedVoices.perspectives.length + requestData.selectedVoices.roles.length;
       if (totalVoices > subscriptionInfo.tier.maxVoiceCombinations) {
-        throw new APIError(403, `Your ${subscriptionInfo.tier.name} plan allows maximum ${subscriptionInfo.tier.maxVoiceCombinations} voice combinations. Upgrade to use more voices.`);
+        logger.warn('Voice combination limit exceeded - potential bypass attempt', {
+          userId,
+          requestedVoices: totalVoices,
+          allowedVoices: subscriptionInfo.tier.maxVoiceCombinations,
+          tier: subscriptionInfo.tier.name,
+          perspectives: requestData.selectedVoices.perspectives,
+          roles: requestData.selectedVoices.roles,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+        
+        throw new APIError(403, `Your ${subscriptionInfo.tier.name} plan allows maximum ${subscriptionInfo.tier.maxVoiceCombinations} voice combinations. Upgrade to use more voices.`, {
+          code: 'VOICE_LIMIT_EXCEEDED',
+          requested: totalVoices,
+          allowed: subscriptionInfo.tier.maxVoiceCombinations,
+          upgradeRequired: true
+        });
+      }
+      
+      // Additional security checks for potential abuse
+      if (requestData.prompt.length > 5000) {
+        logger.warn('Excessively long prompt detected - potential abuse', {
+          userId,
+          promptLength: requestData.prompt.length,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+        throw new APIError(400, 'Prompt exceeds maximum length of 5000 characters');
+      }
+      
+      if (requestData.recursionDepth > 5) {
+        logger.warn('Excessive recursion depth - potential resource abuse', {
+          userId,
+          recursionDepth: requestData.recursionDepth,
+          ip: req.ip
+        });
+        throw new APIError(400, 'Recursion depth cannot exceed 5 levels');
       }
 
       logger.info('Creating voice session', { 
@@ -190,8 +269,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const session = await storage.createVoiceSession(sessionData);
       
-      // Increment usage count
-      await subscriptionService.incrementUsage(userId);
+      // Increment usage count using new quota system
+      await incrementUsageQuota(userId);
       
       // Track analytics: session created event
       await analyticsService.trackEvent(
@@ -266,19 +345,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create real synthesis using OpenAI
-  app.post("/api/sessions/:id/synthesis", isAuthenticated, async (req: any, res, next) => {
+  // Create real synthesis using OpenAI with enhanced security
+  app.post("/api/sessions/:id/synthesis", 
+    isAuthenticated,
+    enforcePlanRestrictions(), // CRITICAL: Enforce subscription limits
+    validateFeatureAccess('synthesis'), // CRITICAL: Synthesis requires Pro/Team
+    securityMiddleware.createRateLimit(5 * 60 * 1000, 5, 'synthesis'), // 5 requests per 5 minutes
+    async (req: any, res, next) => {
     try {
       const sessionId = parseInt(req.params.id);
+      const userId = req.user?.claims?.sub;
       
       if (isNaN(sessionId) || sessionId <= 0) {
         throw new APIError(400, 'Invalid session ID');
       }
       
-      // Verify session ownership
+      // SECURITY: Verify session ownership with detailed logging
       const session = await storage.getVoiceSession(sessionId);
-      if (!session || session.userId !== req.user?.claims?.sub) {
+      if (!session || session.userId !== userId) {
+        logger.warn('Unauthorized synthesis attempt detected', {
+          sessionId,
+          attemptedBy: userId,
+          sessionOwner: session?.userId,
+          ip: req.ip,
+          userAgent: req.get('User-Agent')
+        });
         throw new APIError(404, 'Session not found or access denied');
+      }
+      
+      // SECURITY: Check subscription tier for synthesis access
+      const subscriptionInfo = await subscriptionService.getUserSubscriptionInfo(userId);
+      if (subscriptionInfo.tier.name === 'free') {
+        logger.warn('Free tier synthesis attempt - potential bypass', {
+          userId,
+          sessionId,
+          tier: subscriptionInfo.tier.name,
+          ip: req.ip
+        });
+        throw new APIError(403, 'Synthesis feature requires Pro or Team subscription. Upgrade to access this feature.', {
+          code: 'SYNTHESIS_FEATURE_LOCKED',
+          upgradeRequired: true
+        });
       }
       
       logger.info('Starting solution synthesis', { sessionId, userId: req.user.claims.sub });
@@ -553,6 +660,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Security test endpoints
+  app.post("/api/test/generation", isAuthenticated, securityMiddleware.createRateLimit(60000, 10, 'test-generation'), checkGenerationQuota, async (req: any, res, next) => {
+    try {
+      logSecurityEvent('test_generation_attempt', req.user.claims.sub, {
+        prompt: req.body.prompt,
+        endpoint: '/api/test/generation'
+      });
+
+      // Simulate generation logic
+      const result = {
+        success: true,
+        message: "Test generation completed successfully",
+        quotaUsed: req.user.quotaCheck.quotaUsed,
+        timestamp: new Date().toISOString()
+      };
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/test/synthesis", isAuthenticated, securityMiddleware.createRateLimit(60000, 5, 'test-synthesis'), async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Check if user can synthesize (synthesis requires Pro/Team plan)
+      const { data: subscription } = await checkUserPlan(userId);
+      
+      if (!subscription || subscription.tier === 'free') {
+        logSecurityEvent('synthesis_blocked_free_plan', userId, {
+          plan: subscription?.tier || 'free',
+          endpoint: '/api/test/synthesis'
+        });
+        return res.status(403).json({ 
+          message: "Synthesis feature requires Pro or Team plan. Please upgrade to continue.",
+          currentPlan: subscription?.tier || 'free',
+          requiredPlan: 'pro'
+        });
+      }
+
+      logSecurityEvent('test_synthesis_attempt', userId, {
+        sessionId: req.body.sessionId,
+        endpoint: '/api/test/synthesis',
+        plan: subscription.tier
+      });
+
+      const result = {
+        success: true,
+        message: "Test synthesis completed successfully",
+        plan: subscription.tier,
+        timestamp: new Date().toISOString()
+      };
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
   
   app.get("/api/analytics/events", isAuthenticated, async (req: any, res, next) => {
     try {
@@ -723,7 +890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Stripe webhook endpoint
+  // Enhanced Stripe webhook endpoint with real-time sync
   app.post("/api/subscription/webhook", async (req, res, next) => {
     try {
       const sig = req.headers['stripe-signature'];
@@ -736,16 +903,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(500, 'Stripe webhook secret not configured');
       }
       
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2023-10-16" });
       const event = stripe.webhooks.constructEvent(
         req.body,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET
       );
       
-      await subscriptionService.handleWebhook(event);
-      res.json({ received: true });
+      // Process webhook with enhanced real-time sync
+      await processStripeWebhook(event);
+      
+      logger.info('Stripe webhook processed successfully', {
+        eventType: event.type,
+        eventId: event.id
+      });
+      
+      res.json({ 
+        received: true,
+        eventType: event.type,
+        processed: true
+      });
     } catch (error) {
+      logger.error('Stripe webhook processing failed', error as Error, {
+        signature: !!req.headers['stripe-signature'],
+        hasSecret: !!process.env.STRIPE_WEBHOOK_SECRET
+      });
       next(error);
     }
   });
@@ -1004,7 +1185,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-
+  // Quota check endpoint for real-time validation
+  app.get("/api/quota/check", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const quotaCheck = await checkGenerationQuota(
+        userId,
+        req.ip,
+        req.get('User-Agent')
+      );
+      
+      res.json(quotaCheck);
+    } catch (error) {
+      next(error);
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

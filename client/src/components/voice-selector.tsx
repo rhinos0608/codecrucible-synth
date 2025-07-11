@@ -22,7 +22,7 @@ export function PerspectiveSelector() {
       <div>
         <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center uppercase tracking-wider">
           <Brain className="w-4 h-4 mr-2 text-blue-400" />
-          Transisthesis Archetypes
+          Code Analysis Engines
         </h3>
         <div className="space-y-2">
           {CODE_PERSPECTIVES.map((perspective) => {
@@ -76,7 +76,7 @@ export function PerspectiveSelector() {
       <div>
         <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center uppercase tracking-wider">
           <Code className="w-4 h-4 mr-2 text-green-400" />
-          Enhanced Coding Voices
+          Code Specialization Engines
         </h3>
         <div className="space-y-2">
           {DEVELOPMENT_ROLES.map((role) => {

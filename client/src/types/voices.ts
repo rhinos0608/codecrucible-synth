@@ -16,81 +16,81 @@ export interface DevelopmentRole {
   color: string;
 }
 
-// Transisthesis Archetypes - Core philosophical perspectives
+// Code Analysis Engines - Core programming perspectives
 export const CODE_PERSPECTIVES: CodePerspective[] = [
   {
     id: "seeker",
-    name: "Seeker",
-    function: "Questions assumptions, explores alternatives",
-    fragment: "What if we approached this completely differently? Let me explore the unknowns.",
+    name: "Explorer",
+    function: "Investigates edge cases, alternative algorithms",
+    fragment: "What if we refactored this with a completely different data structure? Let me explore the algorithmic space.",
     icon: "search",
     color: "seeker"
   },
   {
     id: "steward",
-    name: "Steward", 
-    function: "Focuses on sustainability and care",
-    fragment: "This solution must be maintainable and responsible for the long term.",
+    name: "Maintainer", 
+    function: "Focuses on code sustainability and technical debt",
+    fragment: "This implementation must be maintainable, testable, and follow SOLID principles.",
     icon: "shield",
     color: "steward"
   },
   {
     id: "witness",
-    name: "Witness",
-    function: "Observes patterns, provides context", 
-    fragment: "I see patterns emerging here. Let me provide the broader context.",
+    name: "Analyzer",
+    function: "Identifies patterns, performance bottlenecks, code smells", 
+    fragment: "I'm detecting anti-patterns here. Let me provide performance and architectural analysis.",
     icon: "eye",
     color: "witness"
   },
   {
     id: "nurturer",
-    name: "Nurturer",
-    function: "Supports growth and learning",
-    fragment: "How can we make this more intuitive and supportive for users?",
+    name: "Developer",
+    function: "Prioritizes developer experience and API usability",
+    fragment: "How can we make this API more intuitive and developer-friendly?",
     icon: "heart",
     color: "nurturer"
   },
   {
     id: "decider",
-    name: "Decider",
-    function: "Makes decisive choices, drives action",
-    fragment: "Here's the decision. Let's implement this approach and move forward.",
+    name: "Implementor",
+    function: "Makes technical decisions, ships production code",
+    fragment: "Here's the implementation strategy. Let's commit this solution and deploy.",
     icon: "target",
     color: "decider"
   }
 ];
 
-// Enhanced Coding Voices - Technical specialists
+// Code Specialization Engines - Technical specialists
 export const DEVELOPMENT_ROLES: DevelopmentRole[] = [
   {
     id: "guardian",
-    name: "Guardian",
+    name: "Security Engineer",
     domain: "Security & Reliability",
-    description: "Security, error prevention, and defensive coding",
+    description: "Vulnerability analysis, input validation, and secure coding practices",
     icon: "shield-check", 
     color: "guardian"
   },
   {
     id: "architect",
-    name: "Architect",
+    name: "Systems Architect",
     domain: "System Design",
-    description: "Scalable systems, design patterns, and technical architecture",
+    description: "Scalable architecture, design patterns, and microservices",
     icon: "building", 
     color: "architect"
   },
   {
     id: "designer",
-    name: "Designer", 
-    domain: "User Experience",
-    description: "Interface design, user experience, and accessibility",
+    name: "UI/UX Engineer", 
+    domain: "Frontend Engineering",
+    description: "Component design, responsive layouts, and accessibility standards",
     icon: "palette",
     color: "designer"
   },
   {
     id: "optimizer",
-    name: "Optimizer",
-    domain: "Performance",
-    description: "Speed, efficiency, and performance optimization",
+    name: "Performance Engineer",
+    domain: "Optimization",
+    description: "Algorithm optimization, caching strategies, and performance monitoring",
     icon: "zap",
     color: "optimizer"
   }
@@ -98,13 +98,26 @@ export const DEVELOPMENT_ROLES: DevelopmentRole[] = [
 
 export const QUICK_PROMPTS = [
   "Create a React component for a modern dashboard with real-time updates",
-  "Build a TypeScript utility for handling async operations with proper error boundaries",
+  "Build a TypeScript utility for handling async operations with proper error boundaries", 
   "Design a responsive layout system with Tailwind CSS and dark mode support",
-  "Implement a state management solution with React Query and Zustand"
+  "Implement a state management solution with React Query and Zustand",
+  "Build a REST API with Express.js, authentication, and database integration",
+  "Create a GraphQL schema with resolvers and type-safe queries",
+  "Design a microservices architecture with Docker and Kubernetes",
+  "Implement a CI/CD pipeline with automated testing and deployment"
 ];
 
 export type MergeStrategy = "consensus" | "competitive" | "collaborative";
 export type AnalysisDepth = 1 | 2 | 3;
+
+// Code generation configuration
+export interface CodeGenerationConfig {
+  codeStyle: "functional" | "object-oriented" | "hybrid";
+  testCoverage: boolean;
+  documentation: boolean;
+  errorHandling: "basic" | "comprehensive" | "enterprise";
+  optimizationLevel: "minimal" | "balanced" | "aggressive";
+}
 
 export interface PerspectiveState {
   selectedPerspectives: string[];

@@ -68,18 +68,18 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
   });
 
   const perspectives = [
-    { value: "seeker", label: "Seeker", description: "Questions assumptions, explores alternatives" },
-    { value: "steward", label: "Steward", description: "Focuses on sustainability and care" },
-    { value: "witness", label: "Witness", description: "Observes patterns, provides context" },
-    { value: "nurturer", label: "Nurturer", description: "Supports growth and learning" },
-    { value: "decider", label: "Decider", description: "Makes decisive choices, drives action" },
+    { value: "seeker", label: "Explorer", description: "Investigates edge cases, alternative algorithms" },
+    { value: "steward", label: "Maintainer", description: "Focuses on code sustainability and technical debt" },
+    { value: "witness", label: "Analyzer", description: "Identifies patterns, performance bottlenecks, code smells" },
+    { value: "nurturer", label: "Developer", description: "Prioritizes developer experience and API usability" },
+    { value: "decider", label: "Implementor", description: "Makes technical decisions, ships production code" },
   ];
 
   const roles = [
-    { value: "guardian", label: "Guardian", description: "Security and error prevention specialist" },
-    { value: "architect", label: "Architect", description: "System design and scalability expert" },
-    { value: "designer", label: "Designer", description: "User experience and interface specialist" },
-    { value: "optimizer", label: "Optimizer", description: "Performance and efficiency expert" },
+    { value: "guardian", label: "Security Engineer", description: "Vulnerability analysis, input validation, secure coding" },
+    { value: "architect", label: "Systems Architect", description: "Scalable architecture, design patterns, microservices" },
+    { value: "designer", label: "UI/UX Engineer", description: "Component design, responsive layouts, accessibility" },
+    { value: "optimizer", label: "Performance Engineer", description: "Algorithm optimization, caching, performance monitoring" },
   ];
 
   const avatarOptions = ["🤖", "👨‍💻", "👩‍💻", "🧠", "⚡", "🔮", "🎯", "🌟", "🛡️", "🏗️", "🎨", "⚙️"];
@@ -124,7 +124,7 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="w-5 h-5" />
-            {editingProfile ? "Edit Voice Profile" : "Create Custom Voice Profile"}
+            {editingProfile ? "Edit Code Engine Profile" : "Create Custom Code Engine Profile"}
           </DialogTitle>
         </DialogHeader>
 
@@ -158,9 +158,9 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Profile Name</FormLabel>
+                          <FormLabel>Engine Profile Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., My Senior Developer" {...field} />
+                            <Input placeholder="e.g., My Senior Full-Stack Engine" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

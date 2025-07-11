@@ -107,7 +107,7 @@ export default function Dashboard() {
               <Terminal className="w-6 h-6 text-blue-400" />
               <div>
                 <h1 className="text-xl font-semibold">CodeCrucible</h1>
-                <p className="text-sm text-gray-400">Multi-Perspective AI Coding Assistant</p>
+                <p className="text-sm text-gray-400">Multi-Engine AI Code Generator</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -232,7 +232,7 @@ export default function Dashboard() {
         <div className="w-96 bg-gray-800 border-l border-gray-700 flex flex-col">
           <div className="p-4 border-b border-gray-700">
             <h2 className="text-lg font-semibold text-gray-100">Configuration</h2>
-            <p className="text-sm text-gray-400">Select perspectives and configure generation settings</p>
+            <p className="text-sm text-gray-400">Select code engines and configure generation settings</p>
           </div>
           <div className="flex-1 overflow-y-auto">
             <PerspectiveSelector />

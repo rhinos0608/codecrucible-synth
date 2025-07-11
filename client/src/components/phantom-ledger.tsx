@@ -5,12 +5,12 @@ import { Card } from "@/components/ui/card";
 import { usePhantomLedger, useAnalytics } from "@/hooks/use-solution-generation";
 import { format } from "date-fns";
 
-interface PhantomLedgerProps {
+interface DecisionHistoryProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function PhantomLedger({ isOpen, onClose }: PhantomLedgerProps) {
+export function DecisionHistory({ isOpen, onClose }: DecisionHistoryProps) {
   const { data: entries = [], isLoading } = usePhantomLedger();
   const { data: analytics } = useAnalytics();
 
@@ -22,8 +22,8 @@ export function PhantomLedger({ isOpen, onClose }: PhantomLedgerProps) {
         <DialogHeader>
           <DialogTitle>
             <div>
-              <h3 className="text-xl font-semibold">Phantom Ledger</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Ethical decision tracking and voice convergence analysis</p>
+              <h3 className="text-xl font-semibold">Decision History</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Code generation decisions and AI engine convergence analysis</p>
             </div>
           </DialogTitle>
         </DialogHeader>

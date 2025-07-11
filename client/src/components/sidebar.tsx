@@ -25,7 +25,7 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
           </div>
           <div>
             <h1 className="text-lg font-bold">CodeCrucible</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Multi-Voice AI Assistant</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Multi-Engine Code Generator</p>
           </div>
         </div>
       </div>
@@ -42,7 +42,7 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
             onClick={() => onViewChange("voices")}
           >
             <Users className="w-4 h-4 mr-3" />
-            Voice Selection
+            Code Engine Selection
           </Button>
           
           <Button
@@ -51,7 +51,7 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
             onClick={() => onViewChange("synthesis")}
           >
             <Layers3 className="w-4 h-4 mr-3" />
-            Synthesis
+            Code Synthesis
           </Button>
           
           <Button
@@ -69,7 +69,7 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
             onClick={onLedgerOpen}
           >
             <BookOpen className="w-4 h-4 mr-3" />
-            Phantom Ledger
+            Decision History
           </Button>
         </div>
 

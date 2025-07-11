@@ -189,7 +189,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowAvatarCustomizer(true)}
-                className="text-purple-300 hover:text-purple-100 border-purple-600"
+                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
               >
                 <User className="w-4 h-4 mr-2" />
                 Voice Profiles
@@ -198,7 +198,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowProjectsPanel(true)}
-                className="text-gray-300 hover:text-gray-100 border-gray-600"
+                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
               >
                 <FolderOpen className="w-4 h-4 mr-2" />
                 Projects
@@ -207,7 +207,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowPaywallTest(true)}
-                className="text-orange-300 hover:text-orange-100 border-orange-600"
+                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
               >
                 <Shield className="w-4 h-4 mr-2" />
                 Security Test
@@ -216,7 +216,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={() => window.location.href = '/analytics'}
-                className="text-green-300 hover:text-green-100 border-green-600"
+                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Analytics
@@ -225,7 +225,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={() => window.location.href = '/teams'}
-                className="text-blue-300 hover:text-blue-100 border-blue-600"
+                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Teams

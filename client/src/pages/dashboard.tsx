@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Users, Shield } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { SubscriptionStatus } from "@/components/subscription/subscription-status";
-import PaywallTest from "@/components/paywall-test";
+
 import UpgradeModal from "@/components/UpgradeModal";
 import LegalSection from "@/components/legal-section";
 import ErrorMonitor from "@/components/error-monitor";
@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [showSynthesisPanel, setShowSynthesisPanel] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
-  const [showPaywallTest, setShowPaywallTest] = useState(false);
+
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
@@ -235,15 +235,7 @@ export default function Dashboard() {
                 <FolderOpen className="w-4 h-4 mr-2" />
                 Projects
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowPaywallTest(true)}
-                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
-              >
-                <Shield className="w-4 h-4 mr-2" />
-                Security Test
-              </Button>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -443,10 +435,7 @@ export default function Dashboard() {
         editingProfile={editingProfile}
       />
 
-      <PaywallTest
-        isOpen={showPaywallTest}
-        onClose={() => setShowPaywallTest(false)}
-      />
+
 
       <UpgradeModal
         isOpen={showUpgradeModal}

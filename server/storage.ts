@@ -88,7 +88,10 @@ export class MemStorage implements IStorage {
       ...insertSession,
       id,
       userId: 1, // Default user for MVP
-      createdAt: new Date()
+      createdAt: new Date(),
+      recursionDepth: insertSession.recursionDepth ?? 2,
+      synthesisMode: insertSession.synthesisMode ?? "competitive",
+      ethicalFiltering: insertSession.ethicalFiltering ?? true
     };
     this.voiceSessions.set(id, session);
     return session;
@@ -109,7 +112,8 @@ export class MemStorage implements IStorage {
     const solution: Solution = {
       ...insertSolution,
       id,
-      createdAt: new Date()
+      createdAt: new Date(),
+      sessionId: insertSolution.sessionId!
     };
     this.solutions.set(id, solution);
     return solution;
@@ -126,7 +130,8 @@ export class MemStorage implements IStorage {
     const synthesis: Synthesis = {
       ...insertSynthesis,
       id,
-      createdAt: new Date()
+      createdAt: new Date(),
+      sessionId: insertSynthesis.sessionId!
     };
     this.syntheses.set(id, synthesis);
     return synthesis;
@@ -143,7 +148,8 @@ export class MemStorage implements IStorage {
     const entry: PhantomLedgerEntry = {
       ...insertEntry,
       id,
-      createdAt: new Date()
+      createdAt: new Date(),
+      sessionId: insertEntry.sessionId!
     };
     this.phantomLedgerEntries.set(id, entry);
     return entry;

@@ -7,14 +7,14 @@ import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useState, useEffect } from "react";
 import type { Solution } from "@shared/schema";
 
-interface SynthesisPanelProps {
+interface CodeMergePanelProps {
   isOpen: boolean;
   onClose: () => void;
   solutions: Solution[];
   sessionId: number;
 }
 
-interface SynthesisStep {
+interface MergeStep {
   id: number;
   title: string;
   description: string;
@@ -22,7 +22,7 @@ interface SynthesisStep {
   result?: string;
 }
 
-export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: SynthesisPanelProps) {
+export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMergePanelProps) {
   const { createSynthesis, isSynthesizing } = useSolutionGeneration();
   const [synthesisSteps, setSynthesisSteps] = useState<SynthesisStep[]>([
     {

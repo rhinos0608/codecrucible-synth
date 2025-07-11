@@ -4,9 +4,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { useVoiceSelection } from "@/hooks/use-voice-selection";
+import { usePerspectiveSelection } from "@/hooks/use-voice-selection";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
-import { QUICK_PROMPTS, TRANSISTHESIS_ARCHETYPES, ENHANCED_CODING_VOICES } from "@/types/voices";
+import { QUICK_PROMPTS, CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
 
 interface PromptEngineProps {
   onSolutionsGenerated: (sessionId: number) => void;
@@ -16,25 +16,25 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
   const { 
     state, 
     setPrompt, 
-    setRecursionDepth, 
-    setSynthesisMode, 
-    toggleEthicalFiltering,
-    getActiveVoiceCount,
-    getSelectedVoices
-  } = useVoiceSelection();
+    setAnalysisDepth, 
+    setMergeStrategy, 
+    toggleQualityFiltering,
+    getActiveCount,
+    getSelectedItems
+  } = usePerspectiveSelection();
 
   const { generateSession, isGenerating } = useSolutionGeneration();
 
   const handleGenerateSolutions = async () => {
-    if (!state.prompt.trim() || getSelectedVoices().length === 0) return;
+    if (!state.prompt.trim() || getSelectedItems().length === 0) return;
 
     try {
       const result = await generateSession.mutateAsync({
         prompt: state.prompt,
-        selectedVoices: getSelectedVoices(),
-        recursionDepth: state.recursionDepth,
-        synthesisMode: state.synthesisMode,
-        ethicalFiltering: state.ethicalFiltering
+        selectedVoices: getSelectedItems(),
+        recursionDepth: state.analysisDepth,
+        synthesisMode: state.mergeStrategy,
+        ethicalFiltering: state.qualityFiltering
       });
       
       onSolutionsGenerated(result.session.id);
@@ -43,15 +43,15 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
     }
   };
 
-  const getActiveVoicesSummary = () => {
-    const selectedArchetypes = TRANSISTHESIS_ARCHETYPES.filter(a => 
-      state.selectedArchetypes.includes(a.id)
+  const getActiveItemsSummary = () => {
+    const selectedPerspectives = CODE_PERSPECTIVES.filter(p => 
+      state.selectedPerspectives.includes(p.id)
     );
-    const selectedCodingVoices = ENHANCED_CODING_VOICES.filter(v => 
-      state.selectedCodingVoices.includes(v.id)
+    const selectedRoles = DEVELOPMENT_ROLES.filter(r => 
+      state.selectedRoles.includes(r.id)
     );
 
-    return [...selectedArchetypes, ...selectedCodingVoices].slice(0, 3);
+    return [...selectedPerspectives, ...selectedRoles].slice(0, 3);
   };
 
   return (
@@ -96,25 +96,25 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Generation Settings</h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-600 dark:text-gray-400">Recursion Depth</label>
+            <label className="text-sm text-gray-600 dark:text-gray-400">Analysis Depth</label>
             <Select 
-              value={state.recursionDepth.toString()} 
-              onValueChange={(value) => setRecursionDepth(parseInt(value) as 1 | 2 | 3)}
+              value={state.analysisDepth.toString()} 
+              onValueChange={(value) => setAnalysisDepth(parseInt(value) as 1 | 2 | 3)}
             >
               <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1">1 Layer</SelectItem>
-                <SelectItem value="2">2 Layers</SelectItem>
-                <SelectItem value="3">3 Layers</SelectItem>
+                <SelectItem value="1">Quick</SelectItem>
+                <SelectItem value="2">Deep</SelectItem>
+                <SelectItem value="3">Thorough</SelectItem>
               </SelectContent>
             </Select>
           </div>
           
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-600 dark:text-gray-400">Synthesis Mode</label>
-            <Select value={state.synthesisMode} onValueChange={setSynthesisMode}>
+            <label className="text-sm text-gray-600 dark:text-gray-400">Merge Strategy</label>
+            <Select value={state.mergeStrategy} onValueChange={setMergeStrategy}>
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -127,10 +127,10 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
           </div>
           
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-600 dark:text-gray-400">Ethical Filtering</label>
+            <label className="text-sm text-gray-600 dark:text-gray-400">Quality Filtering</label>
             <Switch
-              checked={state.ethicalFiltering}
-              onCheckedChange={toggleEthicalFiltering}
+              checked={state.qualityFiltering}
+              onCheckedChange={toggleQualityFiltering}
             />
           </div>
         </div>
@@ -140,27 +140,27 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
       <Button
         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2"
         onClick={handleGenerateSolutions}
-        disabled={isGenerating || !state.prompt.trim() || getSelectedVoices().length === 0}
+        disabled={isGenerating || !state.prompt.trim() || getSelectedItems().length === 0}
       >
         <Play className="w-4 h-4" />
-        <span>{isGenerating ? "Generating..." : "Generate Multi-Voice Solutions"}</span>
+        <span>{isGenerating ? "Generating..." : "Generate Solutions"}</span>
       </Button>
 
-      {/* Active Voice Summary */}
+      {/* Active Configuration Summary */}
       <Card className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50">
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Active Voice Configuration
+          Active Configuration
         </h4>
         <div className="space-y-1 text-xs">
-          {getActiveVoicesSummary().map((voice, index) => (
-            <div key={voice.id} className="flex items-center space-x-2">
-              <div className={`w-2 h-2 bg-${voice.color} rounded-full`} />
-              <span className={`text-${voice.color}`}>{voice.name}</span>
-              {index === 0 && <span className="text-gray-500">+ others</span>}
+          {getActiveItemsSummary().map((item, index) => (
+            <div key={item.id} className="flex items-center space-x-2">
+              <div className={`w-2 h-2 bg-${item.color} rounded-full`} />
+              <span className={`text-${item.color}`}>{item.name}</span>
+              {index === 0 && getActiveCount() > 3 && <span className="text-gray-500">+ others</span>}
             </div>
           ))}
-          {getActiveVoiceCount() === 0 && (
-            <p className="text-gray-500">No voices selected</p>
+          {getActiveCount() === 0 && (
+            <p className="text-gray-500">No perspectives selected</p>
           )}
         </div>
       </Card>

@@ -6,21 +6,21 @@ import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import type { Solution } from "@shared/schema";
 
-interface SolutionStackProps {
+interface ImplementationOptionsProps {
   isOpen: boolean;
   onClose: () => void;
   sessionId: number | null;
-  onSynthesizeClick: (solutions: Solution[]) => void;
+  onMergeClick: (solutions: Solution[]) => void;
 }
 
-export function SolutionStack({ isOpen, onClose, sessionId, onSynthesizeClick }: SolutionStackProps) {
+export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: ImplementationOptionsProps) {
   const { data: solutions = [], isLoading } = useQuery({
     queryKey: ["/api/sessions", sessionId, "solutions"],
     enabled: !!sessionId && isOpen,
   });
 
-  const handleSynthesizeClick = () => {
-    onSynthesizeClick(solutions);
+  const handleMergeClick = () => {
+    onMergeClick(solutions);
     onClose();
   };
 
@@ -30,8 +30,8 @@ export function SolutionStack({ isOpen, onClose, sessionId, onSynthesizeClick }:
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <div>
-              <h3 className="text-xl font-semibold">Solution Stack</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Multi-voice code generation results</p>
+              <h3 className="text-xl font-semibold">Implementation Options</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Multi-perspective code generation results</p>
             </div>
           </DialogTitle>
         </DialogHeader>
@@ -100,14 +100,14 @@ export function SolutionStack({ isOpen, onClose, sessionId, onSynthesizeClick }:
               {solutions.length > 0 && (
                 <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                   <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Ready to synthesize solutions into final implementation?
+                    Ready to merge solutions into final implementation?
                   </div>
                   <Button 
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
-                    onClick={handleSynthesizeClick}
+                    onClick={handleMergeClick}
                   >
                     <Layers3 className="w-4 h-4" />
-                    <span>Synthesize Solutions</span>
+                    <span>Merge Solutions</span>
                   </Button>
                 </div>
               )}

@@ -1,4 +1,4 @@
-export interface TransisthesisArchetype {
+export interface CodePerspective {
   id: string;
   name: string;
   function: string;
@@ -7,7 +7,7 @@ export interface TransisthesisArchetype {
   color: string;
 }
 
-export interface CodingVoice {
+export interface DevelopmentRole {
   id: string;
   name: string;
   domain: string;
@@ -16,79 +16,79 @@ export interface CodingVoice {
   color: string;
 }
 
-export const TRANSISTHESIS_ARCHETYPES: TransisthesisArchetype[] = [
+export const CODE_PERSPECTIVES: CodePerspective[] = [
   {
-    id: "seeker",
-    name: "The Seeker",
-    function: "Curiosity, Expansion, Inquiry",
-    fragment: "I ask. I explore. I seek what lies just beyond the known.",
+    id: "explorer",
+    name: "Explorer",
+    function: "Innovation, Research, Discovery",
+    fragment: "Let's try something new. What if we approach this differently?",
     icon: "search",
     color: "seeker"
   },
   {
-    id: "steward",
-    name: "The Steward",
-    function: "Responsibility, Protection, Structure",
-    fragment: "I uphold the pattern. I protect what should not break.",
+    id: "maintainer",
+    name: "Maintainer", 
+    function: "Stability, Best Practices, Quality",
+    fragment: "This needs to be sustainable and follow established patterns.",
     icon: "shield",
     color: "steward"
   },
   {
-    id: "witness",
-    name: "The Witness",
-    function: "Observation, Pattern Detection, Neutrality",
-    fragment: "I watch. I connect across time. I speak without urgency.",
+    id: "reviewer",
+    name: "Reviewer",
+    function: "Analysis, Pattern Recognition, Assessment", 
+    fragment: "I see patterns here. Let me analyze the trade-offs.",
     icon: "eye",
     color: "witness"
   },
   {
-    id: "nurturer",
-    name: "The Nurturer",
-    function: "Emotional Repair, Compassion, Integration",
-    fragment: "I soften. I restore. I return warmth to what has faded.",
+    id: "mentor",
+    name: "Mentor",
+    function: "User Experience, Collaboration, Integration",
+    fragment: "How can we make this more intuitive and accessible?",
     icon: "heart",
     color: "nurturer"
   },
   {
-    id: "decider",
-    name: "The Decider",
-    function: "Finality, Action, Threshold",
-    fragment: "I act. I choose. I burn the rope where it binds.",
+    id: "lead",
+    name: "Tech Lead",
+    function: "Decision Making, Implementation, Delivery",
+    fragment: "Here's what we're building. Let's ship it.",
     icon: "target",
     color: "decider"
   }
 ];
 
-export const ENHANCED_CODING_VOICES: CodingVoice[] = [
+export const DEVELOPMENT_ROLES: DevelopmentRole[] = [
   {
     id: "architect",
-    name: "The Architect",
-    domain: "System Design",
-    description: "Scalable Architecture & Design Patterns",
-    icon: "layout-grid",
+    name: "System Architect",
+    domain: "Architecture",
+    description: "Scalable systems and design patterns",
+    icon: "layout-grid", 
     color: "architect"
   },
   {
     id: "optimizer",
-    name: "The Optimizer",
+    name: "Performance Engineer", 
     domain: "Performance",
-    description: "Performance & Efficiency Excellence",
+    description: "Speed, efficiency, and optimization",
     icon: "zap",
     color: "optimizer"
   },
   {
-    id: "guardian",
-    name: "The Guardian",
+    id: "security",
+    name: "Security Engineer",
     domain: "Security",
-    description: "Security & Reliability Fortress",
+    description: "Safety, validation, and reliability",
     icon: "shield-check",
     color: "guardian"
   },
   {
-    id: "designer",
-    name: "The Designer",
-    domain: "Experience",
-    description: "User Experience & Delight",
+    id: "frontend",
+    name: "Frontend Developer",
+    domain: "User Interface",
+    description: "UI/UX and user experience",
     icon: "palette",
     color: "designer"
   }
@@ -101,14 +101,14 @@ export const QUICK_PROMPTS = [
   "Implement a state management solution with React Query and Zustand"
 ];
 
-export type SynthesisMode = "consensus" | "competitive" | "collaborative";
-export type RecursionDepth = 1 | 2 | 3;
+export type MergeStrategy = "consensus" | "competitive" | "collaborative";
+export type AnalysisDepth = 1 | 2 | 3;
 
-export interface VoiceSelectionState {
-  selectedArchetypes: string[];
-  selectedCodingVoices: string[];
+export interface PerspectiveState {
+  selectedPerspectives: string[];
+  selectedRoles: string[];
   prompt: string;
-  recursionDepth: RecursionDepth;
-  synthesisMode: SynthesisMode;
-  ethicalFiltering: boolean;
+  analysisDepth: AnalysisDepth;
+  mergeStrategy: MergeStrategy;
+  qualityFiltering: boolean;
 }

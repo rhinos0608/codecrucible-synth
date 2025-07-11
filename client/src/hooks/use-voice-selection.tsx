@@ -1,31 +1,31 @@
 import { useState, useCallback } from "react";
-import type { VoiceSelectionState, RecursionDepth, SynthesisMode } from "@/types/voices";
+import type { PerspectiveState, AnalysisDepth, MergeStrategy } from "@/types/voices";
 
-export function useVoiceSelection() {
-  const [state, setState] = useState<VoiceSelectionState>({
-    selectedArchetypes: ["steward", "witness", "nurturer"],
-    selectedCodingVoices: ["guardian", "architect", "designer"],
+export function usePerspectiveSelection() {
+  const [state, setState] = useState<PerspectiveState>({
+    selectedPerspectives: ["maintainer", "reviewer", "mentor"],
+    selectedRoles: ["security", "architect", "frontend"],
     prompt: "",
-    recursionDepth: 2,
-    synthesisMode: "competitive",
-    ethicalFiltering: true,
+    analysisDepth: 2,
+    mergeStrategy: "competitive",
+    qualityFiltering: true,
   });
 
-  const toggleArchetype = useCallback((archetypeId: string) => {
+  const togglePerspective = useCallback((perspectiveId: string) => {
     setState(prev => ({
       ...prev,
-      selectedArchetypes: prev.selectedArchetypes.includes(archetypeId)
-        ? prev.selectedArchetypes.filter(id => id !== archetypeId)
-        : [...prev.selectedArchetypes, archetypeId]
+      selectedPerspectives: prev.selectedPerspectives.includes(perspectiveId)
+        ? prev.selectedPerspectives.filter(id => id !== perspectiveId)
+        : [...prev.selectedPerspectives, perspectiveId]
     }));
   }, []);
 
-  const toggleCodingVoice = useCallback((voiceId: string) => {
+  const toggleRole = useCallback((roleId: string) => {
     setState(prev => ({
       ...prev,
-      selectedCodingVoices: prev.selectedCodingVoices.includes(voiceId)
-        ? prev.selectedCodingVoices.filter(id => id !== voiceId)
-        : [...prev.selectedCodingVoices, voiceId]
+      selectedRoles: prev.selectedRoles.includes(roleId)
+        ? prev.selectedRoles.filter(id => id !== roleId)
+        : [...prev.selectedRoles, roleId]
     }));
   }, []);
 
@@ -33,35 +33,35 @@ export function useVoiceSelection() {
     setState(prev => ({ ...prev, prompt }));
   }, []);
 
-  const setRecursionDepth = useCallback((depth: RecursionDepth) => {
-    setState(prev => ({ ...prev, recursionDepth: depth }));
+  const setAnalysisDepth = useCallback((depth: AnalysisDepth) => {
+    setState(prev => ({ ...prev, analysisDepth: depth }));
   }, []);
 
-  const setSynthesisMode = useCallback((mode: SynthesisMode) => {
-    setState(prev => ({ ...prev, synthesisMode: mode }));
+  const setMergeStrategy = useCallback((strategy: MergeStrategy) => {
+    setState(prev => ({ ...prev, mergeStrategy: strategy }));
   }, []);
 
-  const toggleEthicalFiltering = useCallback(() => {
-    setState(prev => ({ ...prev, ethicalFiltering: !prev.ethicalFiltering }));
+  const toggleQualityFiltering = useCallback(() => {
+    setState(prev => ({ ...prev, qualityFiltering: !prev.qualityFiltering }));
   }, []);
 
-  const getActiveVoiceCount = useCallback(() => {
-    return state.selectedArchetypes.length + state.selectedCodingVoices.length;
-  }, [state.selectedArchetypes.length, state.selectedCodingVoices.length]);
+  const getActiveCount = useCallback(() => {
+    return state.selectedPerspectives.length + state.selectedRoles.length;
+  }, [state.selectedPerspectives.length, state.selectedRoles.length]);
 
-  const getSelectedVoices = useCallback(() => {
-    return [...state.selectedArchetypes, ...state.selectedCodingVoices];
-  }, [state.selectedArchetypes, state.selectedCodingVoices]);
+  const getSelectedItems = useCallback(() => {
+    return [...state.selectedPerspectives, ...state.selectedRoles];
+  }, [state.selectedPerspectives, state.selectedRoles]);
 
   return {
     state,
-    toggleArchetype,
-    toggleCodingVoice,
+    togglePerspective,
+    toggleRole,
     setPrompt,
-    setRecursionDepth,
-    setSynthesisMode,
-    toggleEthicalFiltering,
-    getActiveVoiceCount,
-    getSelectedVoices,
+    setAnalysisDepth,
+    setMergeStrategy,
+    toggleQualityFiltering,
+    getActiveCount,
+    getSelectedItems,
   };
 }

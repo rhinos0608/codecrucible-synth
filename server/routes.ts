@@ -53,10 +53,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (session) {
         await storage.createPhantomLedgerEntry({
           sessionId,
-          title: `Synthesis: ${session.prompt.substring(0, 50)}...`,
-          voicesEngaged: session.selectedVoices,
+          title: `Code Merge: ${session.prompt.substring(0, 50)}...`,
+          voicesEngaged: session.selectedVoices as any,
           decisionOutcome: synthesisData.combinedCode.substring(0, 100) + "...",
-          keyLearnings: ["Successful voice convergence", "Effective synthesis achieved"],
+          keyLearnings: ["Successful perspective convergence", "Effective code synthesis achieved"] as any,
           ethicalScore: synthesisData.ethicalScore
         });
       }

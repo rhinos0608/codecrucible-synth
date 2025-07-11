@@ -1,15 +1,15 @@
 import { Brain, Code } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { TRANSISTHESIS_ARCHETYPES, ENHANCED_CODING_VOICES } from "@/types/voices";
-import { useVoiceSelection } from "@/hooks/use-voice-selection";
+import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
+import { usePerspectiveSelection } from "@/hooks/use-voice-selection";
 import * as LucideIcons from "lucide-react";
 
-export function VoiceSelector() {
+export function PerspectiveSelector() {
   const { 
     state, 
-    toggleArchetype, 
-    toggleCodingVoice 
-  } = useVoiceSelection();
+    togglePerspective, 
+    toggleRole 
+  } = usePerspectiveSelection();
 
   const renderIcon = (iconName: string, className: string) => {
     const IconComponent = (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())];
@@ -17,39 +17,42 @@ export function VoiceSelector() {
   };
 
   return (
-    <div className="w-1/2 p-6 border-r border-gray-200 dark:border-gray-700">
-      {/* Transisthesis Archetypes */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Brain className="w-5 h-5 mr-2 text-witness" />
-          Transisthesis Archetypes
+    <div className="p-4 space-y-6">
+      {/* Code Perspectives */}
+      <div>
+        <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center uppercase tracking-wider">
+          <Brain className="w-4 h-4 mr-2 text-blue-400" />
+          Code Perspectives
         </h3>
-        <div className="grid grid-cols-1 gap-3">
-          {TRANSISTHESIS_ARCHETYPES.map((archetype) => {
-            const isSelected = state.selectedArchetypes.includes(archetype.id);
+        <div className="space-y-2">
+          {CODE_PERSPECTIVES.map((perspective) => {
+            const isSelected = state.selectedPerspectives.includes(perspective.id);
             return (
               <Card
-                key={archetype.id}
-                className={`p-4 border-2 cursor-pointer transition-all group ${
+                key={perspective.id}
+                className={`p-3 cursor-pointer transition-all group border ${
                   isSelected 
-                    ? `border-${archetype.color}/40 bg-${archetype.color}/5` 
-                    : `border-${archetype.color}/20 bg-${archetype.color}/5 hover:border-${archetype.color}/40`
+                    ? `border-blue-500/40 bg-blue-500/10` 
+                    : `border-gray-600 bg-gray-700/50 hover:border-gray-500`
                 }`}
-                onClick={() => toggleArchetype(archetype.id)}
+                onClick={() => togglePerspective(perspective.id)}
               >
-                <div className="flex items-start space-x-3">
-                  <div className={`w-10 h-10 bg-${archetype.color}/10 rounded-lg flex items-center justify-center group-hover:bg-${archetype.color}/20 transition-colors`}>
-                    {renderIcon(archetype.icon, `w-5 h-5 text-${archetype.color}`)}
+                <div className="flex items-center space-x-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    isSelected ? 'bg-blue-500/20' : 'bg-gray-600/50'
+                  }`}>
+                    {renderIcon(perspective.icon, `w-4 h-4 ${isSelected ? 'text-blue-400' : 'text-gray-400'}`)}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h4 className={`font-semibold text-${archetype.color}`}>{archetype.name}</h4>
-                      <div className={`w-4 h-4 border-2 border-${archetype.color} rounded transition-colors ${
-                        isSelected ? `bg-${archetype.color}` : ""
+                      <h4 className={`font-medium text-sm ${isSelected ? 'text-blue-300' : 'text-gray-200'}`}>
+                        {perspective.name}
+                      </h4>
+                      <div className={`w-3 h-3 border rounded-sm transition-colors ${
+                        isSelected ? 'border-blue-400 bg-blue-400' : 'border-gray-500'
                       }`} />
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{archetype.function}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 italic">"{archetype.fragment}"</p>
+                    <p className="text-xs text-gray-400 mt-1">{perspective.function}</p>
                   </div>
                 </div>
               </Card>
@@ -58,38 +61,43 @@ export function VoiceSelector() {
         </div>
       </div>
 
-      {/* Enhanced Coding Voices */}
+      {/* Development Roles */}
       <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Code className="w-5 h-5 mr-2 text-architect" />
-          Enhanced Coding Voices
+        <h3 className="text-sm font-medium text-gray-300 mb-3 flex items-center uppercase tracking-wider">
+          <Code className="w-4 h-4 mr-2 text-green-400" />
+          Development Roles
         </h3>
-        <div className="grid grid-cols-2 gap-3">
-          {ENHANCED_CODING_VOICES.map((voice) => {
-            const isSelected = state.selectedCodingVoices.includes(voice.id);
+        <div className="space-y-2">
+          {DEVELOPMENT_ROLES.map((role) => {
+            const isSelected = state.selectedRoles.includes(role.id);
             return (
               <Card
-                key={voice.id}
-                className={`p-3 border cursor-pointer transition-all group ${
+                key={role.id}
+                className={`p-3 cursor-pointer transition-all group border ${
                   isSelected
-                    ? `border-${voice.color}/40 bg-${voice.color}/5`
-                    : `border-${voice.color}/20 bg-${voice.color}/5 hover:border-${voice.color}/40`
+                    ? `border-green-500/40 bg-green-500/10`
+                    : `border-gray-600 bg-gray-700/50 hover:border-gray-500`
                 }`}
-                onClick={() => toggleCodingVoice(voice.id)}
+                onClick={() => toggleRole(role.id)}
               >
-                <div className="flex items-center space-x-2 mb-2">
-                  <div className={`w-8 h-8 bg-${voice.color}/10 rounded-md flex items-center justify-center`}>
-                    {renderIcon(voice.icon, `w-4 h-4 text-${voice.color}`)}
+                <div className="flex items-center space-x-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    isSelected ? 'bg-green-500/20' : 'bg-gray-600/50'
+                  }`}>
+                    {renderIcon(role.icon, `w-4 h-4 ${isSelected ? 'text-green-400' : 'text-gray-400'}`)}
                   </div>
-                  <div className="flex-1">
-                    <h5 className={`font-medium text-${voice.color} text-sm`}>{voice.name}</h5>
-                    <p className="text-xs text-gray-500">{voice.domain}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h5 className={`font-medium text-sm ${isSelected ? 'text-green-300' : 'text-gray-200'}`}>
+                        {role.name}
+                      </h5>
+                      <div className={`w-3 h-3 border rounded-sm transition-colors ${
+                        isSelected ? 'border-green-400 bg-green-400' : 'border-gray-500'
+                      }`} />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">{role.domain}</p>
                   </div>
-                  <div className={`w-3 h-3 border border-${voice.color} rounded-sm transition-colors ${
-                    isSelected ? `bg-${voice.color}` : ""
-                  }`} />
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">{voice.description}</p>
               </Card>
             );
           })}

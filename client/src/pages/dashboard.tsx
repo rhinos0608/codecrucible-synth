@@ -9,12 +9,12 @@ import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
 import { AvatarCustomizer } from "@/components/avatar-customizer";
-import { usePerspectiveSelection } from "@/hooks/use-voice-selection";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useAuth } from "@/hooks/useAuth";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { QUICK_PROMPTS } from "@/types/voices";
 import type { Solution, VoiceProfile } from "@shared/schema";
+import { useVoiceSelection } from "@/contexts/voice-selection-context";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -34,7 +34,7 @@ export default function Dashboard() {
     setPrompt, 
     getActiveCount,
     getSelectedItems
-  } = usePerspectiveSelection();
+  } = useVoiceSelection();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
 

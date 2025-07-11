@@ -1,7 +1,7 @@
 import { Brain, Code } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
-import { usePerspectiveSelection } from "@/hooks/use-voice-selection";
+import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import * as LucideIcons from "lucide-react";
 
 export function PerspectiveSelector() {
@@ -9,7 +9,7 @@ export function PerspectiveSelector() {
     state, 
     togglePerspective, 
     toggleRole 
-  } = usePerspectiveSelection();
+  } = useVoiceSelection();
 
   const renderIcon = (iconName: string, className: string) => {
     const IconComponent = (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())];

@@ -64,6 +64,14 @@ export const voiceProfiles = pgTable("voice_profiles", {
   mergeStrategy: text("merge_strategy").default("competitive"),
   qualityFiltering: boolean("quality_filtering").default(true),
   isDefault: boolean("is_default").default(false),
+  // Additional fields for avatar customizer
+  avatar: text("avatar").default("🤖"),
+  personality: text("personality"),
+  chatStyle: text("chat_style").default("analytical"),
+  specialization: text("specialization"),
+  ethicalStance: text("ethical_stance"),
+  perspective: text("perspective"), // Primary perspective name
+  role: text("role"), // Primary role name
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -259,6 +267,13 @@ export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).pick({
   mergeStrategy: true,
   qualityFiltering: true,
   isDefault: true,
+  avatar: true,
+  personality: true,
+  chatStyle: true,
+  specialization: true,
+  ethicalStance: true,
+  perspective: true,
+  role: true,
 });
 
 // Security-first validation schema following AI_INSTRUCTIONS.md

@@ -1,5 +1,6 @@
 import { createContext, useContext, ReactNode, useEffect } from "react";
 import { usePerspectiveSelection } from "@/hooks/use-voice-selection";
+import type { VoiceProfile } from "@shared/schema";
 
 // Following AI_INSTRUCTIONS.md: Single source of truth state management
 interface VoiceSelectionContextType {
@@ -16,6 +17,7 @@ interface VoiceSelectionContextType {
   getSelectedItems: () => string[];
   isValidState: boolean;
   getValidationErrors: () => string[];
+  applyVoiceProfile?: (profile: VoiceProfile) => void;
 }
 
 const VoiceSelectionContext = createContext<VoiceSelectionContextType | undefined>(undefined);

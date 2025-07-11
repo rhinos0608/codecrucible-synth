@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import type { PerspectiveState, AnalysisDepth, MergeStrategy } from "@/types/voices";
+import type { VoiceProfile } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 // Validation patterns following AI_INSTRUCTIONS.md security standards
 const validateVoiceSelection = (perspectives: string[], roles: string[]): boolean => {
@@ -11,6 +13,8 @@ const validatePrompt = (prompt: string): boolean => {
 };
 
 export function usePerspectiveSelection() {
+  const { toast } = useToast();
+  
   const [state, setState] = useState<PerspectiveState>({
     selectedPerspectives: [],
     selectedRoles: [],
@@ -75,6 +79,29 @@ export function usePerspectiveSelection() {
            validatePrompt(state.prompt);
   }, [state.selectedPerspectives, state.selectedRoles, state.prompt]);
 
+  const applyVoiceProfile = useCallback((profile: VoiceProfile) => {
+    console.log("[VoiceSelection] Applying voice profile:", {
+      profileId: profile.id,
+      profileName: profile.name,
+      perspectives: profile.selectedPerspectives,
+      roles: profile.selectedRoles
+    });
+
+    setState(prev => ({
+      ...prev,
+      selectedPerspectives: Array.isArray(profile.selectedPerspectives) ? profile.selectedPerspectives : [],
+      selectedRoles: Array.isArray(profile.selectedRoles) ? profile.selectedRoles : [],
+      analysisDepth: profile.analysisDepth || 2,
+      mergeStrategy: (profile.mergeStrategy as MergeStrategy) || "competitive",
+      qualityFiltering: profile.qualityFiltering !== false,
+    }));
+
+    toast({
+      title: "Profile Applied",
+      description: `Applied voice profile: ${profile.name}`,
+    });
+  }, [toast]);
+
   const getValidationErrors = useCallback(() => {
     const errors: string[] = [];
     if (!validatePrompt(state.prompt)) {
@@ -104,5 +131,6 @@ export function usePerspectiveSelection() {
     getSelectedItems,
     isValidState,
     getValidationErrors,
+    applyVoiceProfile,
   };
 }

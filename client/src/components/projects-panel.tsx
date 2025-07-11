@@ -52,15 +52,24 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
     }
   });
 
-  // Copy project code to clipboard
+  // Copy project code to clipboard following AI_INSTRUCTIONS.md security patterns
   const copyProjectCode = async (project: Project) => {
     try {
+      // Input validation following security standards
+      if (!project || !project.code || typeof project.code !== 'string') {
+        throw new Error('Invalid project code');
+      }
+      
+      // Sanitize project name for display
+      const sanitizedName = project.name?.slice(0, 50) || 'Untitled Project';
+      
       await navigator.clipboard.writeText(project.code);
       toast({
         title: "Code Copied",
-        description: `Code for "${project.name}" copied to clipboard.`
+        description: `Code for "${sanitizedName}" copied to clipboard.`
       });
     } catch (error) {
+      console.error('Copy operation failed:', error);
       toast({
         title: "Copy Failed",
         description: "Failed to copy code to clipboard.",
@@ -82,8 +91,8 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             <div className="flex items-center space-x-3">
               <Code className="w-6 h-6 text-purple-600" />
@@ -95,18 +104,18 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex h-[calc(90vh-120px)]">
+        <div className="flex flex-1 min-h-0">
           {/* Projects List */}
-          <div className="w-1/2 pr-4 border-r border-gray-200 dark:border-gray-700">
-            <div className="mb-4">
+          <div className="w-1/2 pr-4 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+            <div className="mb-4 flex-shrink-0">
               <h4 className="text-lg font-semibold mb-2">Saved Projects ({projects.length})</h4>
               {isLoading && (
                 <div className="text-center py-8 text-gray-500">Loading projects...</div>
               )}
             </div>
             
-            <ScrollArea className="h-full">
-              <div className="space-y-3">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="space-y-3 pr-2">
                 {projects.map((project: Project) => (
                   <Card 
                     key={project.id}
@@ -162,10 +171,10 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
           </div>
 
           {/* Project Details */}
-          <div className="w-1/2 pl-4">
+          <div className="w-1/2 pl-4 flex flex-col">
             {selectedProject ? (
               <div className="h-full flex flex-col">
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between mb-4 flex-shrink-0">
                   <div className="flex-1 min-w-0">
                     <h4 className="text-lg font-semibold truncate">{selectedProject.name}</h4>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -183,7 +192,7 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
 
                 {/* Tags */}
                 {selectedProject.tags && (selectedProject.tags as string[]).length > 0 && (
-                  <div className="mb-4">
+                  <div className="mb-4 flex-shrink-0">
                     <div className="flex items-center space-x-2 flex-wrap">
                       <Tag className="w-4 h-4 text-gray-500" />
                       {(selectedProject.tags as string[]).map((tag) => (
@@ -196,15 +205,28 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                 )}
 
                 {/* Code Preview */}
-                <div className="flex-1 mb-4">
-                  <h5 className="text-sm font-medium mb-2">Code Preview</h5>
-                  <div className="bg-gray-900 rounded-lg p-4 text-sm font-mono text-gray-100 overflow-auto h-full">
-                    <pre className="whitespace-pre-wrap">{selectedProject.code}</pre>
+                <div className="flex-1 mb-4 min-h-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="text-sm font-medium">Code Preview</h5>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyProjectCode(selectedProject)}
+                      className="h-8 px-2 text-xs"
+                    >
+                      <Copy className="w-3 h-3 mr-1" />
+                      Copy
+                    </Button>
                   </div>
+                  <ScrollArea className="bg-gray-900 rounded-lg p-4 text-sm font-mono text-gray-100 h-full">
+                    <div className="pr-2">
+                      <pre className="whitespace-pre-wrap break-words">{selectedProject.code}</pre>
+                    </div>
+                  </ScrollArea>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-shrink-0">
                   <Button
                     variant="outline"
                     size="sm"

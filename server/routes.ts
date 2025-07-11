@@ -4,12 +4,14 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { openaiService } from "./openai-service";
 import { logger, APIError } from "./logger";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { 
   insertVoiceSessionSchema, 
   insertSolutionSchema, 
   insertSynthesisSchema,
   insertPhantomLedgerEntrySchema,
-  insertProjectSchema
+  insertProjectSchema,
+  insertVoiceProfileSchema
 } from "@shared/schema";
 
 // Request validation schemas following AI_INSTRUCTIONS.md patterns
@@ -30,6 +32,91 @@ const synthesisRequestSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth middleware
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Voice Profile Management Routes
+  app.get('/api/voice-profiles', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profiles = await storage.getVoiceProfiles(userId);
+      res.json(profiles);
+    } catch (error) {
+      console.error("Error fetching voice profiles:", error);
+      res.status(500).json({ message: "Failed to fetch voice profiles" });
+    }
+  });
+
+  app.post('/api/voice-profiles', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profileData = insertVoiceProfileSchema.parse({ ...req.body, userId });
+      const profile = await storage.createVoiceProfile(profileData);
+      res.json(profile);
+    } catch (error) {
+      console.error("Error creating voice profile:", error);
+      res.status(500).json({ message: "Failed to create voice profile" });
+    }
+  });
+
+  app.patch('/api/voice-profiles/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid profile ID" });
+      }
+
+      // Verify ownership
+      const existingProfile = await storage.getVoiceProfile(id);
+      if (!existingProfile || existingProfile.userId !== userId) {
+        return res.status(404).json({ message: "Voice profile not found" });
+      }
+
+      const updates = req.body;
+      const profile = await storage.updateVoiceProfile(id, updates);
+      res.json(profile);
+    } catch (error) {
+      console.error("Error updating voice profile:", error);
+      res.status(500).json({ message: "Failed to update voice profile" });
+    }
+  });
+
+  app.delete('/api/voice-profiles/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid profile ID" });
+      }
+
+      // Verify ownership
+      const existingProfile = await storage.getVoiceProfile(id);
+      if (!existingProfile || existingProfile.userId !== userId) {
+        return res.status(404).json({ message: "Voice profile not found" });
+      }
+
+      const deleted = await storage.deleteVoiceProfile(id);
+      res.json({ success: deleted });
+    } catch (error) {
+      console.error("Error deleting voice profile:", error);
+      res.status(500).json({ message: "Failed to delete voice profile" });
+    }
+  });
   
   // Generate real solutions using OpenAI following AI_INSTRUCTIONS.md
   app.post("/api/sessions", async (req, res, next) => {
@@ -330,9 +417,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user sessions for analytics
-  app.get("/api/analytics", async (req, res) => {
+  app.get("/api/analytics", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = 1; // Default user for MVP
+      const userId = req.user?.claims?.sub || "1"; // Use authenticated user ID
       const sessions = await storage.getVoiceSessionsByUser(userId);
       const ledgerEntries = await storage.getPhantomLedgerEntriesByUser(userId);
       

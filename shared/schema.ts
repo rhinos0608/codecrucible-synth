@@ -1,17 +1,48 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table for Replit Auth
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  id: varchar("id").primaryKey().notNull(), // Replit user ID
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Voice preference profiles for users
+export const voiceProfiles = pgTable("voice_profiles", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  selectedPerspectives: jsonb("selected_perspectives").notNull(), // Array of perspective IDs
+  selectedRoles: jsonb("selected_roles").notNull(), // Array of role IDs
+  analysisDepth: integer("analysis_depth").default(2),
+  mergeStrategy: text("merge_strategy").default("competitive"),
+  qualityFiltering: boolean("quality_filtering").default(true),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const voiceSessions = pgTable("voice_sessions", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id),
+  userId: varchar("user_id").references(() => users.id),
   prompt: text("prompt").notNull(),
   selectedVoices: jsonb("selected_voices").notNull(), // Object with perspectives and roles arrays
   recursionDepth: integer("recursion_depth").default(2),
@@ -55,6 +86,7 @@ export const phantomLedgerEntries = pgTable("phantom_ledger_entries", {
 
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
   name: text("name").notNull(),
   description: text("description"),
   code: text("code").notNull(),
@@ -67,10 +99,25 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Insert schemas
+// Insert schemas  
 export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  profileImageUrl: true,
+});
+
+export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).pick({
+  userId: true,
+  name: true,
+  description: true,
+  selectedPerspectives: true,
+  selectedRoles: true,
+  analysisDepth: true,
+  mergeStrategy: true,
+  qualityFiltering: true,
+  isDefault: true,
 });
 
 // Security-first validation schema following AI_INSTRUCTIONS.md
@@ -140,8 +187,12 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
 });
 
 // Types
+export type UpsertUser = typeof users.$inferInsert;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertVoiceProfile = z.infer<typeof insertVoiceProfileSchema>;
+export type VoiceProfile = typeof voiceProfiles.$inferSelect;
 
 export type InsertVoiceSession = z.infer<typeof insertVoiceSessionSchema>;
 export type VoiceSession = typeof voiceSessions.$inferSelect;

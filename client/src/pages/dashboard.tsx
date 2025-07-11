@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -8,18 +8,26 @@ import { PerspectiveSelector } from "@/components/voice-selector";
 import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
+import { AvatarCustomizer } from "@/components/avatar-customizer";
 import { usePerspectiveSelection } from "@/hooks/use-voice-selection";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
+import { useAuth } from "@/hooks/useAuth";
+import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { QUICK_PROMPTS } from "@/types/voices";
-import type { Solution } from "@shared/schema";
+import type { Solution, VoiceProfile } from "@shared/schema";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
   const [showSynthesisPanel, setShowSynthesisPanel] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
   const [showRightPanel, setShowRightPanel] = useState(true);
+
+  const { user } = useAuth();
+  const { profiles } = useVoiceProfiles();
   
   const { 
     state, 
@@ -88,11 +96,29 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowAvatarCustomizer(true)}
+                className="text-purple-300 hover:text-purple-100 border-purple-600"
+              >
+                <User className="w-4 h-4 mr-2" />
+                Voice Profiles
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowProjectsPanel(true)}
                 className="text-gray-300 hover:text-gray-100 border-gray-600"
               >
                 <FolderOpen className="w-4 h-4 mr-2" />
                 Projects
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.location.href = '/api/logout'}
+                className="text-red-300 hover:text-red-100 border-red-600"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
               </Button>
               <Button
                 variant="ghost"
@@ -186,6 +212,15 @@ export default function Dashboard() {
       <ProjectsPanel
         isOpen={showProjectsPanel}
         onClose={() => setShowProjectsPanel(false)}
+      />
+
+      <AvatarCustomizer
+        isOpen={showAvatarCustomizer}
+        onClose={() => {
+          setShowAvatarCustomizer(false);
+          setEditingProfile(null);
+        }}
+        editingProfile={editingProfile}
       />
     </div>
   );

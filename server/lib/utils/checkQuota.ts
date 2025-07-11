@@ -125,8 +125,7 @@ export async function checkGenerationQuota(
       userAgent,
       requestDetails: { 
         error: error.message,
-        endpoint: req.path,
-        method: req.method
+        context: 'quota_check_failed'
       },
       severity: 'high'
     });

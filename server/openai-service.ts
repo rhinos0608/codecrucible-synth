@@ -74,29 +74,29 @@ Your responses must be professional, secure, and follow these established patter
     const baseInstructions = this.getBaseInstructions();
     
     const perspectiveInstructions = {
-      explorer: "Focus on innovative approaches, experimental patterns, and cutting-edge solutions. Consider emerging technologies and creative problem-solving methods.",
-      maintainer: "Prioritize code maintainability, documentation, testing, and long-term sustainability. Focus on clean, readable, and well-structured solutions.",
-      reviewer: "Emphasize code quality, security vulnerabilities, performance optimizations, and best practices. Provide critical analysis and improvement suggestions.",
-      mentor: "Explain concepts clearly, provide educational context, and suggest learning opportunities. Focus on knowledge transfer and skill development.",
-      "tech-lead": "Consider system architecture, scalability, team coordination, and technical decision-making. Balance technical excellence with practical constraints."
+      seeker: "Focus on innovative approaches, experimental patterns, and cutting-edge solutions. Consider emerging technologies and creative problem-solving methods.",
+      steward: "Prioritize code maintainability, documentation, testing, and long-term sustainability. Focus on clean, readable, and well-structured solutions.",
+      witness: "Emphasize code quality, security vulnerabilities, performance optimizations, and best practices. Provide critical analysis and improvement suggestions.",
+      nurturer: "Explain concepts clearly, provide educational context, and suggest learning opportunities. Focus on knowledge transfer and skill development.",
+      decider: "Consider system architecture, scalability, team coordination, and technical decision-making. Balance technical excellence with practical constraints."
     };
 
     const roleInstructions = {
-      "system-architect": "Focus on system design, scalability, integration patterns, and architectural decisions. Consider enterprise-level requirements.",
-      "performance-engineer": "Prioritize performance optimization, memory efficiency, bundle size, and runtime performance. Apply Core Web Vitals standards.",
-      "security-engineer": "Emphasize security best practices, vulnerability prevention, input validation, and secure coding patterns from AI_INSTRUCTIONS.md.",
-      "frontend-developer": "Focus on React patterns, component architecture, UI/UX implementation, and frontend best practices following Apple design system."
+      guardian: "Emphasize security best practices, vulnerability prevention, input validation, and secure coding patterns from AI_INSTRUCTIONS.md.",
+      architect: "Focus on system design, scalability, integration patterns, and architectural decisions. Consider enterprise-level requirements.",
+      designer: "Focus on React patterns, component architecture, UI/UX implementation, and frontend best practices following Apple design system.",
+      optimizer: "Prioritize performance optimization, memory efficiency, bundle size, and runtime performance. Apply Core Web Vitals standards."
     };
 
     const perspectiveSection = perspective ? 
-      `PERSPECTIVE: ${perspective}
+      `CODE ANALYSIS ENGINE: ${perspective}
 ${perspectiveInstructions[perspective as keyof typeof perspectiveInstructions] || "Apply general development best practices."}` :
-      'PERSPECTIVE: General Development\nApply general development best practices.';
+      'CODE ANALYSIS ENGINE: General Development\nApply general development best practices.';
 
     const roleSection = role ?
-      `ROLE: ${role}
+      `CODE SPECIALIZATION ENGINE: ${role}
 ${roleInstructions[role as keyof typeof roleInstructions] || "Apply role-specific expertise."}` :
-      'ROLE: Full-Stack Developer\nApply full-stack development expertise.';
+      'CODE SPECIALIZATION ENGINE: Full-Stack Developer\nApply full-stack development expertise.';
 
     return `${baseInstructions}
 
@@ -165,10 +165,29 @@ Provide a JSON response with:
 
       const parsedResponse = JSON.parse(content);
       
+      // Map voice IDs to display names
+      const perspectiveNames: { [key: string]: string } = {
+        seeker: 'Explorer Code Analysis Engine',
+        steward: 'Maintainer Code Analysis Engine',
+        witness: 'Analyzer Code Analysis Engine',
+        nurturer: 'Developer Code Analysis Engine',
+        decider: 'Implementor Code Analysis Engine'
+      };
+
+      const roleNames: { [key: string]: string } = {
+        guardian: 'Security Engineer Code Specialization Engine',
+        architect: 'Systems Architect Code Specialization Engine',
+        designer: 'UI/UX Engineer Code Specialization Engine',
+        optimizer: 'Performance Engineer Code Specialization Engine'
+      };
+
+      const perspectiveName = perspective ? perspectiveNames[perspective] || perspective : null;
+      const roleName = role ? roleNames[role] || role : null;
+
       const solution: GeneratedSolution = {
-        voiceCombination: perspective && role ? `${perspective} + ${role}` :
-                         perspective ? perspective :
-                         role ? role : 'general',
+        voiceCombination: perspectiveName && roleName ? `${perspectiveName} + ${roleName}` :
+                         perspectiveName ? perspectiveName :
+                         roleName ? roleName : 'General Development',
         code: parsedResponse.code || '// No code generated',
         explanation: parsedResponse.explanation || 'No explanation provided',
         confidence: Math.max(1, Math.min(100, parsedResponse.confidence || 75)),

@@ -216,3 +216,4 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **Performance Optimization**: Optimized OpenAI requests with appropriate temperature settings and response formatting
 - **Synthesis Panel Fixes**: Enhanced synthesis panel with proper quota error handling and user-friendly error messages
 - **UI Cleanup**: Removed prompt suggestion panel from dashboard as requested, streamlining the interface
+- **Voice Terminology Update**: Updated OpenAI service and voice recommendations to use proper "Code Analysis Engine" and "Code Specialization Engine" terminology in all system prompts and UI displays

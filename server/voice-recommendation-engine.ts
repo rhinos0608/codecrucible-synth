@@ -192,33 +192,33 @@ export class VoiceRecommendationEngine {
 
     // Explain perspective choices using server-side IDs but client-friendly names
     if (perspectives.includes("steward")) {
-      reasons.push("Maintainer for code sustainability and best practices");
+      reasons.push("Maintainer Code Analysis Engine for code sustainability and best practices");
     }
     if (perspectives.includes("seeker")) {
-      reasons.push("Explorer to investigate alternative approaches");
+      reasons.push("Explorer Code Analysis Engine to investigate alternative approaches");
     }
     if (perspectives.includes("witness")) {
-      reasons.push("Analyzer for pattern recognition and performance analysis");
+      reasons.push("Analyzer Code Analysis Engine for pattern recognition and performance analysis");
     }
     if (perspectives.includes("nurturer")) {
-      reasons.push("Developer for optimal developer experience");
+      reasons.push("Developer Code Analysis Engine for optimal developer experience");
     }
     if (perspectives.includes("decider")) {
-      reasons.push("Implementor for practical implementation focus");
+      reasons.push("Implementor Code Analysis Engine for practical implementation focus");
     }
 
     // Explain role choices using current naming scheme
     if (roles.includes("guardian")) {
-      reasons.push("Security Engineer for security and validation");
+      reasons.push("Security Engineer Code Specialization Engine for security and validation");
     }
     if (roles.includes("architect")) {
-      reasons.push("Systems Architect for scalable system design");
+      reasons.push("Systems Architect Code Specialization Engine for scalable system design");
     }
     if (roles.includes("designer")) {
-      reasons.push("UI/UX Engineer for user interface excellence");
+      reasons.push("UI/UX Engineer Code Specialization Engine for user interface excellence");
     }
     if (roles.includes("optimizer")) {
-      reasons.push("Performance Engineer for performance optimization");
+      reasons.push("Performance Engineer Code Specialization Engine for performance optimization");
     }
 
     return reasons.length > 0 

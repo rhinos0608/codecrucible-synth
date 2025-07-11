@@ -13,9 +13,10 @@ import type { Project } from "@shared/schema";
 interface ProjectsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  onUseAsContext?: (project: Project) => void;
 }
 
-export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
+export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -73,6 +74,35 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
       toast({
         title: "Copy Failed",
         description: "Failed to copy code to clipboard.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Use project as context for AI generation following AI_INSTRUCTIONS.md patterns
+  const useProjectAsContext = (project: Project) => {
+    try {
+      // Input validation following security standards
+      if (!project || !project.code || typeof project.code !== 'string') {
+        throw new Error('Invalid project data');
+      }
+      
+      // Sanitize project name for display
+      const sanitizedName = project.name?.slice(0, 50) || 'Untitled Project';
+      
+      if (onUseAsContext) {
+        onUseAsContext(project);
+        onClose(); // Close the panel after using as context
+        toast({
+          title: "Context Applied",
+          description: `"${sanitizedName}" will be used as context for AI generation.`
+        });
+      }
+    } catch (error) {
+      console.error('Use as context failed:', error);
+      toast({
+        title: "Context Failed",
+        description: "Failed to use project as context.",
         variant: "destructive"
       });
     }
@@ -226,30 +256,33 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyProjectCode(selectedProject)}
-                    className="flex items-center space-x-2"
-                  >
-                    <Copy className="w-4 h-4" />
-                    <span>Copy Code</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center space-x-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>Open in Editor</span>
-                  </Button>
+                <div className="flex items-center justify-between flex-shrink-0 gap-3">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyProjectCode(selectedProject)}
+                      className="flex items-center space-x-1.5"
+                    >
+                      <Copy className="w-4 h-4" />
+                      <span>Copy Code</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => useProjectAsContext(selectedProject)}
+                      className="flex items-center space-x-1.5"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Use as Context</span>
+                    </Button>
+                  </div>
                   <Button
                     variant="destructive"
                     size="sm"
                     onClick={() => deleteProject.mutate(selectedProject.id)}
                     disabled={deleteProject.isPending}
-                    className="flex items-center space-x-2"
+                    className="flex items-center space-x-1.5"
                   >
                     <Trash2 className="w-4 h-4" />
                     <span>{deleteProject.isPending ? "Deleting..." : "Delete"}</span>

@@ -13,6 +13,14 @@ const openai = new OpenAI({
   apiKey: OPENAI_API_KEY 
 });
 
+interface ProjectContext {
+  name: string;
+  description?: string;
+  code: string;
+  language: string;
+  tags?: string[];
+}
+
 interface CodeGenerationRequest {
   prompt: string;
   perspectives: string[];
@@ -21,6 +29,7 @@ interface CodeGenerationRequest {
   mergeStrategy: string;
   qualityFiltering: boolean;
   sessionId: number;
+  projectContext?: ProjectContext;
 }
 
 interface GeneratedSolution {
@@ -70,8 +79,36 @@ Your responses must be professional, secure, and follow these established patter
   }
 
   // Generate perspective-specific system prompt
-  private getPerspectivePrompt(perspective?: string, role?: string): string {
+  private getPerspectivePrompt(perspective?: string, role?: string, projectContext?: ProjectContext): string {
     const baseInstructions = this.getBaseInstructions();
+    
+    // Add project context if provided - following AI_INSTRUCTIONS.md security patterns
+    let contextSection = '';
+    if (projectContext) {
+      contextSection = `
+=== PROJECT CONTEXT INTEGRATION ===
+You are working with an existing project as context. Use this information to inform your code generation and ensure compatibility.
+
+PROJECT DETAILS:
+- Name: ${projectContext.name}
+- Language: ${projectContext.language}
+- Description: ${projectContext.description || 'No description provided'}
+- Tags: ${Array.isArray(projectContext.tags) ? projectContext.tags.join(', ') : 'None'}
+
+EXISTING CODE CONTEXT:
+\`\`\`${projectContext.language}
+${projectContext.code}
+\`\`\`
+
+CONTEXT INTEGRATION REQUIREMENTS:
+- Ensure new code is compatible with the existing project structure
+- Follow the same coding patterns and architectural style
+- Consider how new functionality integrates with existing code
+- Maintain consistency with the project's technology stack
+- Build upon existing functions and modules where appropriate
+
+`;
+    }
     
     const perspectiveInstructions = {
       seeker: "Focus on innovative approaches, experimental patterns, and cutting-edge solutions. Consider emerging technologies and creative problem-solving methods.",
@@ -99,7 +136,7 @@ ${roleInstructions[role as keyof typeof roleInstructions] || "Apply role-specifi
       'CODE SPECIALIZATION ENGINE: Full-Stack Developer\nApply full-stack development expertise.';
 
     return `${baseInstructions}
-
+${contextSection}
 ${perspectiveSection}
 
 ${roleSection}
@@ -123,7 +160,7 @@ You must generate code that follows AI_INSTRUCTIONS.md patterns and maintains co
     });
 
     try {
-      const systemPrompt = this.getPerspectivePrompt(perspective, role);
+      const systemPrompt = this.getPerspectivePrompt(perspective, role, request.projectContext);
       
       const userPrompt = `
 CODING REQUEST: ${request.prompt}

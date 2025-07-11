@@ -15,7 +15,7 @@ import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useVoiceRecommendations } from "@/hooks/use-voice-recommendations";
 import { usePlanGuard } from "@/hooks/usePlanGuard";
 
-import type { Solution, VoiceProfile } from "@shared/schema";
+import type { Solution, VoiceProfile, Project } from "@shared/schema";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -37,6 +37,7 @@ export default function Dashboard() {
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [showErrorMonitor, setShowErrorMonitor] = useState(false);
+  const [projectContext, setProjectContext] = useState<Project | null>(null);
 
   const { user } = useAuth();
   const { profiles } = useVoiceProfiles();
@@ -186,7 +187,14 @@ export default function Dashboard() {
           },
           recursionDepth: 2,
           synthesisMode: "competitive",
-          ethicalFiltering: true
+          ethicalFiltering: true,
+          projectContext: projectContext ? {
+            name: projectContext.name,
+            description: projectContext.description,
+            code: projectContext.code,
+            language: projectContext.language,
+            tags: projectContext.tags
+          } : undefined
         });
       });
 
@@ -278,6 +286,37 @@ export default function Dashboard() {
         {/* Chat Area */}
         <div className="flex-1 flex flex-col p-6 space-y-6">
 
+          {/* Project Context */}
+          {projectContext && (
+            <Card className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-green-500/30">
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-green-200">Project Context Applied</h3>
+                  <Button
+                    onClick={() => setProjectContext(null)}
+                    size="sm"
+                    variant="ghost"
+                    className="text-green-300 hover:text-green-100"
+                  >
+                    ✕ Clear
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-300 mb-2">
+                  Using "{projectContext.name}" as context for AI generation
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="border-green-500/50 text-green-200">
+                    {projectContext.language}
+                  </Badge>
+                  {(projectContext.tags as string[])?.slice(0, 3).map(tag => (
+                    <Badge key={tag} variant="outline" className="border-green-500/50 text-green-200">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
 
           {/* Voice Recommendations */}
           {recommendations && (
@@ -424,6 +463,11 @@ export default function Dashboard() {
       <ProjectsPanel
         isOpen={showProjectsPanel}
         onClose={() => setShowProjectsPanel(false)}
+        onUseAsContext={(project) => {
+          setProjectContext(project);
+          // Clear the prompt and add context information
+          setPrompt(`Using project "${project.name}" as context:\n\n${project.description || 'No description provided'}\n\n`);
+        }}
       />
 
       <AvatarCustomizer

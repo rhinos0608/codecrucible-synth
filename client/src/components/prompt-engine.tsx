@@ -26,20 +26,30 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
   const { generateSession, isGenerating } = useSolutionGeneration();
 
   const handleGenerateSolutions = async () => {
-    if (!state.prompt.trim() || getSelectedItems().length === 0) return;
+    if (!state.prompt.trim() || state.selectedPerspectives.length === 0 || state.selectedRoles.length === 0) return;
 
     try {
+      console.log('Starting OpenAI solution generation with:', {
+        perspectives: state.selectedPerspectives,
+        roles: state.selectedRoles,
+        prompt: state.prompt.substring(0, 100) + '...'
+      });
+
       const result = await generateSession.mutateAsync({
         prompt: state.prompt,
-        selectedVoices: getSelectedItems(),
+        selectedVoices: {
+          perspectives: state.selectedPerspectives,
+          roles: state.selectedRoles
+        },
         recursionDepth: state.analysisDepth,
         synthesisMode: state.mergeStrategy,
         ethicalFiltering: state.qualityFiltering
       });
       
+      console.log('OpenAI generation completed, session:', result.session.id);
       onSolutionsGenerated(result.session.id);
     } catch (error) {
-      console.error("Failed to generate solutions:", error);
+      console.error("OpenAI generation failed:", error);
     }
   };
 

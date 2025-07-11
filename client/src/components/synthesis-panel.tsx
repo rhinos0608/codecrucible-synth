@@ -55,101 +55,42 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMe
   }, [isOpen, solutions]);
 
   const startSynthesis = async () => {
-    // Simulate synthesis process
-    for (let i = 0; i < synthesisSteps.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setSynthesisSteps(prev => prev.map((step, index) => {
-        if (index === i) {
-          return { ...step, status: "processing" };
-        } else if (index < i) {
-          return { ...step, status: "completed" };
-        }
-        return step;
-      }));
+    // Real OpenAI synthesis process
+    console.log('Starting real OpenAI synthesis for session:', sessionId);
+    
+    setSynthesisSteps(prev => prev.map(step => 
+      step.id === 1 ? { ...step, status: "processing" } : step
+    ));
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSynthesisSteps(prev => prev.map((step, index) => 
-        index === i ? { ...step, status: "completed" } : step
-      ));
-    }
-
-    // Generate synthesized code
-    const combinedCode = `// Synthesized form hook combining all voice insights
-import { useState, useCallback, useMemo } from 'react';
-import { z } from 'zod';
-import { debounce } from 'lodash';
-
-export function useUnifiedForm<T>(schema: z.ZodSchema<T>) {
-  const [values, setValues] = useState<Partial<T>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // Security: Input sanitization layer
-  const sanitizeInput = useCallback((value: any) => {
-    if (typeof value === 'string') {
-      return value.replace(/<script[^>]*>.*?<\\/script>/gi, '');
-    }
-    return value;
-  }, []);
-  
-  // Performance: Memoized validation
-  const debouncedValidation = useMemo(
-    () => debounce((data: Partial<T>) => {
-      try {
-        schema.parse(data);
-        setErrors({});
-        return true;
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          const newErrors: Record<string, string> = {};
-          error.errors.forEach(err => {
-            newErrors[err.path.join('.')] = err.message;
-          });
-          setErrors(newErrors);
-        }
-        return false;
-      }
-    }, 300),
-    [schema]
-  );
-  
-  // UX: Accessible error messages and smooth interactions
-  const updateValue = useCallback((field: keyof T, value: any) => {
-    const sanitizedValue = sanitizeInput(value);
-    setValues(prev => ({ ...prev, [field]: sanitizedValue }));
-    debouncedValidation({ ...values, [field]: sanitizedValue });
-  }, [values, sanitizeInput, debouncedValidation]);
-  
-  return { 
-    values, 
-    errors, 
-    updateValue,
-    isValid: Object.keys(errors).length === 0,
-    reset: () => setValues({})
-  };
-}`;
-
-    setSynthesizedCode(combinedCode);
-    setSynthesisComplete(true);
-
-    // Save synthesis to backend
     try {
-      await createSynthesis.mutateAsync({
-        sessionId,
-        combinedCode,
-        synthesisSteps: synthesisSteps,
-        qualityScore: 98,
-        ethicalScore: 96
-      });
+      const synthesis = await createSynthesis.mutateAsync(sessionId);
+      
+      // Update all steps to completed
+      setSynthesisSteps(prev => prev.map(step => ({ 
+        ...step, 
+        status: "completed" 
+      })));
+
+      // Use the real OpenAI generated code
+      setSynthesizedCode(synthesis.combinedCode);
+      setSynthesisComplete(true);
+
+      console.log('OpenAI synthesis completed:', synthesis.id);
+
     } catch (error) {
-      console.error("Failed to save synthesis:", error);
+      console.error('OpenAI synthesis failed:', error);
+      setSynthesisSteps(prev => prev.map(step => ({ 
+        ...step, 
+        status: "pending" 
+      })));
     }
   };
 
+  // Copy to clipboard functionality
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(synthesizedCode);
+      console.log('Synthesized code copied to clipboard');
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);
     }

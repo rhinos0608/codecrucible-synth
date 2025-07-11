@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  
+  /* Voice-specific colors */
+  --seeker: hsl(214, 95%, 55%);
+  --steward: hsl(151, 83%, 43%);
+  --witness: hsl(262, 83%, 58%);
+  --nurturer: hsl(322, 84%, 57%);
+  --decider: hsl(0, 84%, 60%);
+  --architect: hsl(214, 95%, 55%);
+  --optimizer: hsl(45, 93%, 50%);
+  --guardian: hsl(151, 83%, 43%);
+  --designer: hsl(262, 83%, 58%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-seeker {
+    color: hsl(var(--seeker));
+  }
+  .text-steward {
+    color: hsl(var(--steward));
+  }
+  .text-witness {
+    color: hsl(var(--witness));
+  }
+  .text-nurturer {
+    color: hsl(var(--nurturer));
+  }
+  .text-decider {
+    color: hsl(var(--decider));
+  }
+  .text-architect {
+    color: hsl(var(--architect));
+  }
+  .text-optimizer {
+    color: hsl(var(--optimizer));
+  }
+  .text-guardian {
+    color: hsl(var(--guardian));
+  }
+  .text-designer {
+    color: hsl(var(--designer));
+  }
+  
+  .bg-seeker {
+    background-color: hsl(var(--seeker));
+  }
+  .bg-steward {
+    background-color: hsl(var(--steward));
+  }
+  .bg-witness {
+    background-color: hsl(var(--witness));
+  }
+  .bg-nurturer {
+    background-color: hsl(var(--nurturer));
+  }
+  .bg-decider {
+    background-color: hsl(var(--decider));
+  }
+  .bg-architect {
+    background-color: hsl(var(--architect));
+  }
+  .bg-optimizer {
+    background-color: hsl(var(--optimizer));
+  }
+  .bg-guardian {
+    background-color: hsl(var(--guardian));
+  }
+  .bg-designer {
+    background-color: hsl(var(--designer));
+  }
+  
+  .border-seeker {
+    border-color: hsl(var(--seeker));
+  }
+  .border-steward {
+    border-color: hsl(var(--steward));
+  }
+  .border-witness {
+    border-color: hsl(var(--witness));
+  }
+  .border-nurturer {
+    border-color: hsl(var(--nurturer));
+  }
+  .border-decider {
+    border-color: hsl(var(--decider));
+  }
+  .border-architect {
+    border-color: hsl(var(--architect));
+  }
+  .border-optimizer {
+    border-color: hsl(var(--optimizer));
+  }
+  .border-guardian {
+    border-color: hsl(var(--guardian));
+  }
+  .border-designer {
+    border-color: hsl(var(--designer));
+  }
+}

@@ -12,6 +12,7 @@ import { AvatarCustomizer } from "@/components/avatar-customizer";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useAuth } from "@/hooks/useAuth";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
+import { useVoiceRecommendations } from "@/hooks/use-voice-recommendations";
 import { QUICK_PROMPTS } from "@/types/voices";
 import type { Solution, VoiceProfile } from "@shared/schema";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
@@ -28,12 +29,15 @@ export default function Dashboard() {
 
   const { user } = useAuth();
   const { profiles } = useVoiceProfiles();
+  const { recommendations, isAnalyzing, analyzePrompt } = useVoiceRecommendations();
   
   const { 
     state, 
     setPrompt, 
     getActiveCount,
-    getSelectedItems
+    getSelectedItems,
+    selectPerspectives,
+    selectRoles
   } = useVoiceSelection();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
@@ -46,6 +50,21 @@ export default function Dashboard() {
   const handleMergeClick = (solutions: Solution[]) => {
     setCurrentSolutions(solutions);
     setShowSynthesisPanel(true);
+  };
+
+  const handlePromptChange = (newPrompt: string) => {
+    setPrompt(newPrompt);
+    // Trigger voice recommendations when prompt changes
+    if (newPrompt.trim().length > 10) {
+      analyzePrompt(newPrompt);
+    }
+  };
+
+  const handleApplyRecommendations = () => {
+    if (recommendations?.suggested) {
+      selectPerspectives(recommendations.suggested.perspectives);
+      selectRoles(recommendations.suggested.roles);
+    }
   };
 
   const handleGenerateSolutions = async () => {
@@ -93,7 +112,7 @@ export default function Dashboard() {
   };
 
   const handleQuickPrompt = (prompt: string) => {
-    setPrompt(prompt);
+    handlePromptChange(prompt);
   };
 
   return (
@@ -169,6 +188,44 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Voice Recommendations */}
+          {recommendations && (
+            <Card className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border-purple-500/30">
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-purple-200">Smart Voice Recommendations</h3>
+                  <Badge variant="secondary" className="bg-purple-800/50 text-purple-200">
+                    {Math.round(recommendations.suggested.confidence * 100)}% confidence
+                  </Badge>
+                </div>
+                <p className="text-sm text-gray-300 mb-3">
+                  {recommendations.suggested.reasoning}
+                </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {recommendations.suggested.perspectives.map(p => (
+                      <Badge key={p} variant="outline" className="border-purple-500/50 text-purple-200">
+                        {p}
+                      </Badge>
+                    ))}
+                    {recommendations.suggested.roles.map(r => (
+                      <Badge key={r} variant="outline" className="border-blue-500/50 text-blue-200">
+                        {r}
+                      </Badge>
+                    ))}
+                  </div>
+                  <Button 
+                    size="sm" 
+                    onClick={handleApplyRecommendations}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    Apply Suggestions
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Current Prompt */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Your Request</h3>
@@ -177,9 +234,15 @@ export default function Dashboard() {
                 <Textarea
                   placeholder="Describe what you want to build or the problem you need to solve..."
                   value={state.prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  onChange={(e) => handlePromptChange(e.target.value)}
                   className="min-h-[120px] bg-transparent border-none resize-none text-gray-100 placeholder-gray-500 focus:ring-0"
                 />
+                {isAnalyzing && (
+                  <div className="flex items-center space-x-2 mt-2 text-sm text-purple-300">
+                    <div className="animate-pulse w-2 h-2 bg-purple-400 rounded-full"></div>
+                    <span>Analyzing prompt for voice recommendations...</span>
+                  </div>
+                )}
               </div>
               <div className="border-t border-gray-700 p-4 flex items-center justify-between">
                 <div className="text-sm text-gray-400">

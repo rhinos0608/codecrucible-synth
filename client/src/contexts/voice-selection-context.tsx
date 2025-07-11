@@ -6,6 +6,8 @@ interface VoiceSelectionContextType {
   state: ReturnType<typeof usePerspectiveSelection>['state'];
   togglePerspective: (id: string) => void;
   toggleRole: (id: string) => void;
+  selectPerspectives: (perspectives: string[]) => void;
+  selectRoles: (roles: string[]) => void;
   setPrompt: (prompt: string) => void;
   setAnalysisDepth: (depth: number) => void;
   setMergeStrategy: (strategy: string) => void;

@@ -54,6 +54,14 @@ export function usePerspectiveSelection() {
     setState(prev => ({ ...prev, qualityFiltering: !prev.qualityFiltering }));
   }, []);
 
+  const selectPerspectives = useCallback((perspectives: string[]) => {
+    setState(prev => ({ ...prev, selectedPerspectives: perspectives }));
+  }, []);
+
+  const selectRoles = useCallback((roles: string[]) => {
+    setState(prev => ({ ...prev, selectedRoles: roles }));
+  }, []);
+
   const getActiveCount = useCallback(() => {
     return state.selectedPerspectives.length + state.selectedRoles.length;
   }, [state.selectedPerspectives.length, state.selectedRoles.length]);
@@ -86,6 +94,8 @@ export function usePerspectiveSelection() {
     state,
     togglePerspective,
     toggleRole,
+    selectPerspectives,
+    selectRoles,
     setPrompt,
     setAnalysisDepth,
     setMergeStrategy,

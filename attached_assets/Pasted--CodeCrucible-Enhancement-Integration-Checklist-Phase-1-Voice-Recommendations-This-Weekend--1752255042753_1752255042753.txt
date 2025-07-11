@@ -1,0 +1,124 @@
+# CodeCrucible Enhancement Integration Checklist
+
+## Phase 1: Voice Recommendations (This Weekend)
+
+### Step 1: Add the Engine (30 minutes)
+```bash
+# Create new file
+touch server/voice-recommendation-engine.ts
+```
+Copy the `VoiceRecommendationEngine` class from the artifact above.
+
+### Step 2: Update Dashboard (45 minutes)
+```typescript
+// In dashboard.tsx, add these imports:
+import { VoiceRecommendationEngine } from '../server/voice-recommendation-engine';
+
+// Add these state variables:
+const [voiceRecommendations, setVoiceRecommendations] = useState(null);
+const voiceEngine = useMemo(() => new VoiceRecommendationEngine(), []);
+```
+
+### Step 3: Add Recommendation UI (30 minutes)
+Add the recommendation Card component (shown in artifact) to your prompt area.
+
+### Step 4: Test It! (15 minutes)
+- Type "create a secure login form" 
+- Should recommend Steward + Guardian
+- Click "Apply Suggestions" to auto-select voices
+
+---
+
+## Phase 2: Memory & Learning (Next Weekend)
+
+### Step 1: Create Memory Hook (45 minutes)
+```bash
+touch client/src/hooks/use-conversation-memory.tsx
+```
+Copy the `useConversationMemory` hook from artifact.
+
+### Step 2: Add Rating Buttons (30 minutes)
+Update `synthesis-panel.tsx` with the rating UI from the artifact.
+
+### Step 3: Show Preferences (15 minutes) 
+Add the "Successful Voice Combinations" card to dashboard.
+
+---
+
+## Phase 3: Advanced Features (Later)
+
+These can wait until you have user feedback:
+- Real-time voice debates
+- Project context awareness  
+- Enhanced synthesis intelligence
+- Advanced analytics
+
+---
+
+## Files You'll Need to Modify
+
+### New Files:
+- `server/voice-recommendation-engine.ts`
+- `client/src/hooks/use-conversation-memory.tsx`
+
+### Existing Files to Update:
+- `client/src/pages/dashboard.tsx` (add recommendation UI)
+- `client/src/components/synthesis-panel.tsx` (add rating buttons)
+
+### Database Changes (Optional):
+You can start with localStorage for memory. Later, add these tables:
+```sql
+-- For storing user voice preferences
+CREATE TABLE voice_preferences (
+  user_id VARCHAR,
+  voice_combination TEXT,
+  success_count INTEGER,
+  total_uses INTEGER
+);
+
+-- For storing session ratings
+ALTER TABLE voice_sessions ADD COLUMN user_rating TEXT;
+```
+
+---
+
+## Testing Your Implementation
+
+### Voice Recommendations Test:
+1. Type: "build a React component for user authentication"
+2. Should suggest: Steward (security-focused) + Guardian (security role)
+3. Click "Apply Suggestions" 
+4. Verify voices are auto-selected
+
+### Memory Test:
+1. Generate a solution with Seeker + Designer
+2. Rate it "excellent" in synthesis panel
+3. Generate another UI-related prompt
+4. Check if Seeker + Designer appears in "Successful Combinations"
+
+### Success Metrics:
+- Users click "Apply Suggestions" >50% of the time
+- Average user rating improves over time
+- Users return to use preferred voice combinations
+
+---
+
+## Quick Wins You'll See Immediately
+
+1. **Reduced Friction**: Users don't have to guess which voices to use
+2. **Better Results**: Recommendations are based on prompt analysis
+3. **Learning Loop**: System gets smarter as users rate outputs
+4. **User Engagement**: People love seeing their preferences tracked
+
+---
+
+## If You Get Stuck
+
+Most likely issues and solutions:
+
+**Import Errors**: Make sure to add proper TypeScript imports
+**State Management**: Use your existing `useVoiceSelection` context
+**UI Integration**: Follow your existing Card/Button patterns
+**localStorage Issues**: Add error handling for JSON parse/stringify
+
+Start small, test each piece, then build up! 🚀

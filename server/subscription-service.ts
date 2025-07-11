@@ -14,6 +14,7 @@ import {
 } from "@shared/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { logger } from "./logger";
+import { isDevModeFeatureEnabled, logDevModeBypass } from "./lib/dev-mode";
 import Stripe from "stripe";
 
 interface SubscriptionTier {
@@ -74,7 +75,22 @@ class SubscriptionService {
         throw new Error("User not found");
       }
 
-      const tier = SUBSCRIPTION_TIERS[user.subscriptionTier || "free"];
+      // Dev mode override: Provide unlimited tier in development
+      let tier = SUBSCRIPTION_TIERS[user.subscriptionTier || "free"];
+      if (isDevModeFeatureEnabled('unlimitedGenerations')) {
+        tier = {
+          ...tier,
+          dailyGenerationLimit: -1,
+          maxVoiceCombinations: 10,
+          allowsAnalytics: true,
+          name: "dev" as any
+        };
+        logDevModeBypass('subscription_tier_overridden', {
+          userId: userId.substring(0, 8) + '...',
+          originalTier: user.subscriptionTier || "free",
+          devTier: "unlimited"
+        });
+      }
       const today = new Date().toISOString().split('T')[0];
       
       // Get or create usage limits for today
@@ -130,6 +146,16 @@ class SubscriptionService {
   }
 
   async checkUsageLimit(userId: string): Promise<boolean> {
+    // Dev mode bypass: Allow unlimited generations in development
+    if (isDevModeFeatureEnabled('unlimitedGenerations')) {
+      logDevModeBypass('subscription_usage_limit_bypassed', {
+        userId: userId.substring(0, 8) + '...',
+        feature: 'unlimitedGenerations',
+        service: 'subscription_service'
+      });
+      return true;
+    }
+
     const info = await this.getUserSubscriptionInfo(userId);
     return info.canGenerate;
   }

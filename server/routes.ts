@@ -14,6 +14,7 @@ import { processStripeWebhook } from "./lib/stripe/updateUserPlan";
 import { incrementUsageQuota, checkGenerationQuota } from "./lib/utils/checkQuota";
 import { logSecurityEvent } from "./lib/security/logSecurityEvent";
 import { isDevModeFeatureEnabled, logDevModeBypass, createDevModeWatermark } from './lib/dev-mode';
+import openaiRouter from './routes/api/openai';
 import Stripe from "stripe";
 
 // Helper function to check user plan
@@ -656,6 +657,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // OpenAI Proxy Routes - Internal development API for unlimited GPT-4/3.5 generations
+  app.use('/api/openai', openaiRouter);
 
   // Get user sessions for analytics
   app.get("/api/analytics", isAuthenticated, async (req: any, res) => {

@@ -664,9 +664,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Security test endpoints
   app.post("/api/test/generation", isAuthenticated, securityMiddleware.createRateLimit(60000, 10, 'test-generation'), checkGenerationQuota, async (req: any, res, next) => {
     try {
-      logSecurityEvent('test_generation_attempt', req.user.claims.sub, {
-        prompt: req.body.prompt,
-        endpoint: '/api/test/generation'
+      const userId = req.user.claims.sub;
+      const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+      
+      // Log security event with proper structure
+      logSecurityEvent({
+        userId,
+        ipAddress,
+        timestamp: new Date(),
+        errorType: 'unauthorized_access', // Using closest available type for test endpoint
+        planState: {
+          currentPlan: req.user.quotaCheck?.currentPlan || 'free',
+          quotaUsed: req.user.quotaCheck?.quotaUsed || 0,
+          quotaLimit: req.user.quotaCheck?.quotaLimit || 0,
+          subscriptionStatus: 'active'
+        },
+        severity: 'low',
+        requestDetails: {
+          endpoint: '/api/test/generation',
+          prompt: req.body.prompt?.substring(0, 100) // Truncate for security
+        },
+        userAgent: req.get('user-agent')
       });
 
       // Simulate generation logic
@@ -686,15 +704,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/test/synthesis", isAuthenticated, securityMiddleware.createRateLimit(60000, 5, 'test-synthesis'), async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
+      const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
       
       // Check if user can synthesize (synthesis requires Pro/Team plan)
       const { data: subscription } = await checkUserPlan(userId);
       
       if (!subscription || subscription.tier === 'free') {
-        logSecurityEvent('synthesis_blocked_free_plan', userId, {
-          plan: subscription?.tier || 'free',
-          endpoint: '/api/test/synthesis'
+        // Log security event for blocked synthesis attempt
+        logSecurityEvent({
+          userId,
+          ipAddress,
+          timestamp: new Date(),
+          errorType: 'invalid_subscription',
+          planState: {
+            currentPlan: subscription?.tier || 'free',
+            quotaUsed: 0,
+            quotaLimit: 0,
+            subscriptionStatus: 'free_plan_limit'
+          },
+          severity: 'medium',
+          requestDetails: {
+            endpoint: '/api/test/synthesis',
+            reason: 'synthesis_blocked_free_plan'
+          },
+          userAgent: req.get('user-agent')
         });
+        
         return res.status(403).json({ 
           message: "Synthesis feature requires Pro or Team plan. Please upgrade to continue.",
           currentPlan: subscription?.tier || 'free',
@@ -702,10 +737,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      logSecurityEvent('test_synthesis_attempt', userId, {
-        sessionId: req.body.sessionId,
-        endpoint: '/api/test/synthesis',
-        plan: subscription.tier
+      // Log successful synthesis attempt
+      logSecurityEvent({
+        userId,
+        ipAddress,
+        timestamp: new Date(),
+        errorType: 'unauthorized_access', // Using closest available type
+        planState: {
+          currentPlan: subscription.tier,
+          quotaUsed: 0,
+          quotaLimit: 100, // Assume unlimited for paid plans
+          subscriptionStatus: 'active'
+        },
+        severity: 'low',
+        requestDetails: {
+          endpoint: '/api/test/synthesis',
+          sessionId: req.body.sessionId,
+          plan: subscription.tier
+        },
+        userAgent: req.get('user-agent')
       });
 
       const result = {

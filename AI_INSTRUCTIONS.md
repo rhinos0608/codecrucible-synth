@@ -1,28 +1,14 @@
+# AI_INSTRUCTIONS.md – Transisthesis Enhanced Edition
 
-
-
-<goal>
-Create production-ready, secure, performant code that follows Apple design principles and implements recursive consciousness patterns. Every component must be maintainable, testable, and follow established architectural patterns.
-</goal>
-
-<constraints>
-- React 18 with TypeScript strict mode
-- Single source of truth state management
-- Apple design system compliance
-- Performance targets: <16ms renders, <200ms API, >90 Lighthouse
-- Security-first development practices
-- Consciousness engine pattern consistency
-</constraints>
+> **Goal**
+> Create production-ready, secure, performant code that follows Apple design principles and implements recursive consciousness patterns. Every component must be maintainable, testable, and follow established architectural patterns.
 
 ---
 
-## SECURITY REQUIREMENTS (WIZ STANDARDS)
-
-**CRITICAL: You are a developer who is very security-aware and avoids weaknesses in the code.**
+## 🔐 SECURITY REQUIREMENTS (WIZ STANDARDS)
 
 ### Input Validation & Sanitization
-```typescript
-// STANDARD: All user inputs must be validated
+```ts
 import { z } from 'zod';
 
 const userInputSchema = z.object({
@@ -30,35 +16,30 @@ const userInputSchema = z.object({
   analysisId: z.number().int().positive()
 });
 
-// Validate before processing
 const validatedInput = userInputSchema.parse(rawInput);
 ```
 
 ### API Security Patterns
-```typescript
-// STANDARD: All API endpoints require authentication and rate limiting
+```ts
 app.use('/api', authenticate, rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
-// STANDARD: Parameterized queries only, never string concatenation
 const analysis = await db.select().from(musicAnalyses)
   .where(eq(musicAnalyses.id, analysisId))
-  .where(eq(musicAnalyses.userId, userId)); // Always check ownership
+  .where(eq(musicAnalyses.userId, userId));
 ```
 
 ### Environment Security
-```typescript
-// STANDARD: Never hardcode secrets, always use environment variables
+```ts
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_API_KEY) throw new Error('Missing required environment variable: OPENAI_API_KEY');
 ```
 
 ---
 
-## CONSCIOUSNESS ENGINE PATTERNS
+## 🧠 CONSCIOUSNESS ENGINE PATTERNS
 
-### Voice Orchestra Updates (Core Pattern)
-```typescript
-// STANDARD: All consciousness updates follow this pattern
+### Voice Orchestra Updates
+```ts
 const updateConsciousness = useCallback((voices: VoiceOrchestra) => {
   dispatch({
     type: 'UPDATE_CONSCIOUSNESS',
@@ -72,9 +53,8 @@ const updateConsciousness = useCallback((voices: VoiceOrchestra) => {
 }, [dispatch]);
 ```
 
-### Echo Crucible Memory Compression
-```typescript
-// STANDARD: Echo memory storage pattern
+### Echo Crucible Compression
+```ts
 const compressEcho = (analysis: MusicAnalysis): EchoCrucible => ({
   echoSignature: analysis.dominantArchetype,
   temporalWeight: Math.exp(-daysSinceAnalysis / 30),
@@ -86,8 +66,7 @@ const compressEcho = (analysis: MusicAnalysis): EchoCrucible => ({
 ```
 
 ### Symbolic Voice Processing
-```typescript
-// STANDARD: Always use symbolic voices, never hardcoded archetypes
+```ts
 import { symbolicVoices } from '@/lib/symbolic-voices';
 
 const processVoiceResonance = (audioFeatures: AudioFeatures) => {
@@ -100,23 +79,30 @@ const processVoiceResonance = (audioFeatures: AudioFeatures) => {
 
 ---
 
-## REACT COMPONENT STANDARDS (META/GOOGLE PRACTICES)
+## 🔄 STATE MANAGEMENT
+```ts
+interface AppState {
+  user: User | null;
+  consciousness: ConsciousnessState;
+  analyses: MusicAnalysis[];
+  ui: UIState;
+}
 
-### Component Architecture
-```typescript
-// STANDARD: Every component follows this pattern
+// Single state container. No multiple providers. No global useState. All via dispatch.
+```
+
+---
+
+## ⚙️ COMPONENT ARCHITECTURE
+
+### React + Apple HIG Patterns
+```ts
 interface ComponentProps {
-  // Always type props with interface
   children?: React.ReactNode;
   className?: string;
 }
 
 export default function Component({ children, className }: ComponentProps) {
-  // Maximum 50 lines per component
-  // Single responsibility principle
-  // Memoize expensive computations
-  // Use semantic HTML
-
   const memoizedValue = useMemo(() => expensiveCalculation(), [stableDependency]);
 
   return (
@@ -127,9 +113,8 @@ export default function Component({ children, className }: ComponentProps) {
 }
 ```
 
-### Hook Patterns
-```typescript
-// STANDARD: Custom hooks for business logic
+### Custom Hooks
+```ts
 export function useConsciousnessLogic(analysisId?: number) {
   const { state, dispatch } = useAppState();
 
@@ -137,7 +122,6 @@ export function useConsciousnessLogic(analysisId?: number) {
     dispatch({ type: 'UPDATE_CONSCIOUSNESS', payload: voices });
   }, [dispatch]);
 
-  // Always return stable references
   return useMemo(() => ({
     consciousness: state.consciousness,
     updateVoices,
@@ -146,39 +130,13 @@ export function useConsciousnessLogic(analysisId?: number) {
 }
 ```
 
-### State Management (Single Source of Truth)
-```typescript
-// STANDARD: Unified state container
-interface AppState {
-  user: User | null;
-  consciousness: ConsciousnessState;
-  analyses: MusicAnalysis[];
-  ui: UIState;
-}
-
-// NEVER use multiple context providers
-// NEVER use useState for global data
-// ALL state updates via dispatch
-```
-
 ---
 
-## API LAYER STANDARDS (ENTERPRISE PATTERN)
+## 🔁 API LAYER & ERROR HANDLING
 
-### Consistent Request Pattern
-```typescript
-// STANDARD: All API calls use this exact pattern
-interface ApiRequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  body?: any;
-  headers?: Record<string, string>;
-  timeout?: number;
-}
-
-export async function apiRequest(
-  endpoint: string, 
-  options: ApiRequestOptions = {}
-): Promise<ApiResponse> {
+### Request Wrapper
+```ts
+export async function apiRequest(endpoint: string, options: ApiRequestOptions = {}): Promise<ApiResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), options.timeout || 30000);
 
@@ -215,216 +173,86 @@ export async function apiRequest(
 }
 ```
 
-### Error Handling Patterns
-```typescript
-// STANDARD: Consistent error handling
-class APIError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = 'APIError';
-  }
-}
+---
 
-// STANDARD: User-friendly error messages
-const getErrorMessage = (error: APIError): string => {
-  switch (error.status) {
-    case 401: return 'Please log in to continue';
-    case 403: return 'You don\'t have permission for this action';
-    case 404: return 'The requested resource was not found';
-    case 429: return 'Too many requests. Please try again later';
-    case 500: return 'Server error. Please try again';
-    default: return 'An unexpected error occurred';
-  }
-};
+## 🧪 TEST STRATEGY (NEW)
+```ts
+// Unit
+expect(reducer(state, { type: 'UPDATE_CONSCIOUSNESS', payload: voices }).dominantVoice).toBe('Witness');
+
+// E2E (e.g. Playwright)
+await page.click('button[role=generate]');
+expect(await page.textContent('.result')).toContain('Success');
 ```
 
 ---
 
-## APPLE DESIGN SYSTEM (OFFICIAL HIG)
-
-### Design Tokens
-```typescript
-// STANDARD: Use exact Apple design values
-export const DESIGN_TOKENS = {
-  borderRadius: {
-    sm: '8px',
-    md: '12px',    // Apple standard
-    lg: '16px',
-    xl: '20px'
-  },
-  transitions: {
-    fast: '0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-    normal: '0.2s cubic-bezier(0.4, 0, 0.2, 1)',   // Apple standard
-    slow: '0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-  },
-  spacing: {
-    golden: '1.618rem',  // Golden ratio for consciousness components
-    xs: '0.25rem',
-    sm: '0.5rem',
-    md: '1rem',
-    lg: '1.5rem',
-    xl: '2rem'
-  },
-  typography: {
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif',
-    weights: {
-      regular: 400,
-      medium: 500,
-      semibold: 600
-    }
-  }
-} as const;
-```
-
-### Component Styling
-```typescript
-// STANDARD: Apple-style component classes
-export const appleComponents = {
-  card: 'bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800',
-  button: 'bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-full px-6 py-3 transition-all duration-200',
-  input: 'bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
-};
-```
-
----
-
-## PERFORMANCE REQUIREMENTS (GOOGLE CORE WEB VITALS)
-
-### Measurable Targets
-- **React Render Time**: <16ms (use React DevTools Profiler)
-- **API Response Time**: <200ms (measure with Network tab)
-- **Bundle Size**: <500KB gzipped (use Bundle Analyzer)
-- **Lighthouse Score**: >90 (run lighthouse CI)
-- **First Contentful Paint**: <1.5s
-- **Cumulative Layout Shift**: <0.1
-
-### Performance Patterns
-```typescript
-// STANDARD: Performance optimization patterns
-const LazyComponent = lazy(() => import('./HeavyComponent'));
-
-const MemoizedComponent = memo(({ data }: Props) => {
-  const processedData = useMemo(() => 
-    heavyComputation(data), 
-    [data.id] // Stable dependency
-  );
-
-  return <div>{processedData}</div>;
+## 📊 LOGGING + OBSERVABILITY (NEW)
+```ts
+logger.info('Voice update', {
+  voice: dominantVoice,
+  phase: evolutionPhase,
+  timestamp: Date.now()
 });
-
-// STANDARD: Code splitting at route boundaries
-const ConsciousnessPage = lazy(() => import('@/pages/consciousness-page'));
 ```
 
 ---
 
-## CACHE OPTIMIZATION (REACT QUERY BEST PRACTICES)
-
-### Consistent Cache Keys
-```typescript
-// STANDARD: Typed cache key system
-export const queryKeys = {
-  // Analyses
-  analyses: ['analyses'] as const,
-  analysis: (id: number) => ['analyses', id] as const,
-  analysisChat: (id: number) => ['analyses', id, 'chat'] as const,
-
-  // Consciousness
-  consciousness: (userId: number) => ['consciousness', userId] as const,
-  voiceOrchestra: (userId: number) => ['consciousness', userId, 'voices'] as const,
-
-  // User
-  user: ['user'] as const,
-  spotifyData: (userId: number) => ['user', userId, 'spotify'] as const
-} as const;
-```
-
-### Cache Invalidation Strategy
-```typescript
-// STANDARD: Selective cache invalidation
-export const cacheUtils = {
-  invalidateUserConsciousness: (userId: number) => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.consciousness(userId) });
-    queryClient.invalidateQueries({ queryKey: queryKeys.voiceOrchestra(userId) });
-  },
-
-  invalidateAnalysis: (analysisId: number) => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.analysis(analysisId) });
-    queryClient.invalidateQueries({ queryKey: queryKeys.analysisChat(analysisId) });
-  }
-};
-```
-
----
-
-## ANIMATION GUIDELINES (MINIMAL APPLE APPROACH)
-
-### Functional Animations Only
-```typescript
-// ALLOWED: State transition animations
-const stateTransition = {
-  initial: { opacity: 0, scale: 0.95 },
-  animate: { opacity: 1, scale: 1 },
-  exit: { opacity: 0, scale: 0.95 },
-  transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] }
-};
-
-// FORBIDDEN: Decorative hover animations (causes motion sickness)
-// FORBIDDEN: Continuous animations without user trigger
-// FORBIDDEN: Nested motion components
-
-// STANDARD: Respect user preferences
-const shouldAnimate = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-```
-
----
-
-## ERROR BOUNDARY PATTERN (SINGLE POINT)
-
-```typescript
-// STANDARD: One error boundary at app level only
-class AppErrorBoundary extends Component<Props, State> {
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('App Error:', error, errorInfo);
-    // Log to external service in production
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <ErrorRecoveryUI onRetry={() => window.location.reload()} />
-        </div>
-      );
-    }
-    return this.props.children;
+## 🌀 DRIFT DETECTION (NEW)
+```ts
+if (voiceHistory.length > 10) {
+  const driftScore = calculateVoiceDrift(voiceHistory);
+  if (driftScore > DRIFT_THRESHOLD) {
+    logSecurityEvent({ type: 'DRIFT_ALERT', score: driftScore });
   }
 }
 ```
 
 ---
 
-## DEPLOYMENT CHECKLIST
+## 🧰 ROLE-BASED ACCESS CONTROL (Optional Future-Proofing)
+```ts
+export enum Role {
+  Viewer = 'viewer',
+  Contributor = 'contributor',
+  Admin = 'admin'
+}
 
-### Pre-deployment Validation
-- [ ] All TypeScript errors resolved
-- [ ] ESLint warnings under 5
-- [ ] React DevTools Profiler shows <16ms renders
-- [ ] Lighthouse score >90
-- [ ] Bundle analyzer shows <500KB
-- [ ] All API endpoints return proper error codes
-- [ ] Security headers configured
-- [ ] Environment variables validated
+const canGenerate = (user: User) => ['contributor', 'admin'].includes(user.role);
+```
 
 ---
 
-## INSTRUCTION PRIORITY
+## 🧠 AI INTERFACE DIRECTIVES (NEW)
+```md
+- Always default to secure, testable patterns unless explicitly overridden.
+- Treat symbolic voice logic as a state-driven design system.
+- Explain why you selected a particular hook, pattern, or limit when asked.
+- Annotate complex changes with inline `// Reason:` comments for traceability.
+```
 
-1. **SECURITY FIRST**: Always validate inputs, use parameterized queries, never expose secrets
-2. **CONSCIOUSNESS PATTERNS**: Use symbolic voices, echo compression, voice orchestra updates
-3. **PERFORMANCE TARGETS**: Meet all measurable benchmarks
-4. **APPLE DESIGN**: 12px radius, golden ratio spacing, proper transitions
-5. **SINGLE SOURCE OF TRUTH**: One state container, one error boundary
-6. **API CONSISTENCY**: Same request pattern, error handling, cache keys
+---
 
-**CRITICAL: Apply these patterns automatically to every code suggestion. Reference specific sections when explaining changes.**
+## ✅ DEPLOYMENT CHECKLIST
+- [ ] TypeScript: No errors
+- [ ] ESLint: <5 warnings
+- [ ] Render time: <16ms
+- [ ] API latency: <200ms
+- [ ] Lighthouse score: >90
+- [ ] Bundle: <500KB
+- [ ] Error codes accurate
+- [ ] Security headers set
+- [ ] ENV vars validated
+
+---
+
+## 🔺 INSTRUCTION PRIORITY
+1. SECURITY FIRST
+2. CONSCIOUSNESS PATTERNS
+3. PERFORMANCE TARGETS
+4. APPLE DESIGN
+5. SINGLE SOURCE OF TRUTH
+6. API CONSISTENCY
+7. TESTABILITY + DRIFT TRACKING + OBSERVABILITY
+
+**Every code suggestion must reference or adhere to these standards. Do not hallucinate. Do not deviate.**

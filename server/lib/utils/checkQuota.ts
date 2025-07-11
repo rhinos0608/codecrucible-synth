@@ -123,7 +123,11 @@ export async function checkGenerationQuota(
         subscriptionStatus: 'check_failed'
       },
       userAgent,
-      requestDetails: { error: error.message },
+      requestDetails: { 
+        error: error.message,
+        endpoint: req.path,
+        method: req.method
+      },
       severity: 'high'
     });
 

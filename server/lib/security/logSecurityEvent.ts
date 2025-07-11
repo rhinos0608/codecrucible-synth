@@ -19,6 +19,42 @@ export interface SecurityLogEntry {
 }
 
 /**
+ * Safely serialize request details to prevent circular reference errors
+ * Following AI_INSTRUCTIONS.md security patterns
+ */
+function safeSerializeRequestDetails(details: any): any {
+  if (!details || typeof details !== 'object') {
+    return details;
+  }
+  
+  try {
+    // Create a safe copy excluding circular references
+    const safeDetails: any = {};
+    
+    for (const [key, value] of Object.entries(details)) {
+      if (typeof value === 'object' && value !== null) {
+        // Skip objects that might have circular references
+        if (key === 'req' || key === 'res' || key === 'request' || key === 'response') {
+          safeDetails[key] = '[Request/Response Object]';
+        } else if (key === 'socket' || key === 'connection') {
+          safeDetails[key] = '[Socket Object]';
+        } else if (Array.isArray(value)) {
+          safeDetails[key] = value.slice(0, 10); // Limit array size
+        } else {
+          safeDetails[key] = String(value).substring(0, 500); // Limit string size
+        }
+      } else {
+        safeDetails[key] = value;
+      }
+    }
+    
+    return safeDetails;
+  } catch (error) {
+    return { error: 'Failed to serialize request details', originalError: error.message };
+  }
+}
+
+/**
  * Central security event logging utility following AI_INSTRUCTIONS.md patterns
  * Logs security violations and abuse attempts with comprehensive context
  */
@@ -26,7 +62,7 @@ export function logSecurityEvent(details: SecurityLogEntry): void {
   const logLevel = details.severity === 'critical' ? 'error' : 
                   details.severity === 'high' ? 'warn' : 'info';
   
-  // Create structured log entry
+  // Create structured log entry with safe serialization
   const logContext = {
     securityEvent: true,
     userId: details.userId,
@@ -36,9 +72,9 @@ export function logSecurityEvent(details: SecurityLogEntry): void {
     planState: details.planState,
     browserFingerprint: details.browserFingerprint,
     userAgent: details.userAgent,
-    requestDetails: details.requestDetails,
+    requestDetails: safeSerializeRequestDetails(details.requestDetails),
     severity: details.severity,
-    timestamp: details.timestamp.toISOString()
+    timestamp: details.timestamp ? details.timestamp.toISOString() : new Date().toISOString()
   };
 
   const message = `Security Event: ${details.errorType} - User ${details.userId || 'unknown'} from ${details.ipAddress}`;
@@ -112,4 +148,29 @@ export function validateSubscriptionIntegrity(subscription: any): boolean {
   
   const requiredFields = ['tier', 'status', 'subscriptionStartDate'];
   return requiredFields.every(field => subscription[field] !== undefined);
+}
+
+/**
+ * Helper function to create security log entries with proper structure
+ * Following AI_INSTRUCTIONS.md security patterns
+ */
+export function createSecurityLogEntry(
+  errorType: SecurityLogEntry['errorType'],
+  userId: string,
+  ipAddress: string,
+  planState: SecurityLogEntry['planState'],
+  severity: SecurityLogEntry['severity'] = 'medium',
+  additionalDetails?: Record<string, any>
+): SecurityLogEntry {
+  return {
+    userId,
+    ipAddress,
+    timestamp: new Date(),
+    errorType,
+    planState,
+    severity,
+    requestDetails: additionalDetails,
+    userAgent: additionalDetails?.userAgent,
+    referrer: additionalDetails?.referrer
+  };
 }

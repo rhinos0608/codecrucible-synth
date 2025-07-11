@@ -13,6 +13,7 @@ import Teams from "@/pages/teams";
 import SubscriptionSuccess from "@/pages/subscription-success";
 import SubscriptionCancel from "@/pages/subscription-cancel";
 import { VoiceSelectionProvider } from "@/contexts/voice-selection-context";
+import ErrorBoundary from "@/components/error-boundary";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -43,14 +44,16 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <VoiceSelectionProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </VoiceSelectionProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <VoiceSelectionProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </VoiceSelectionProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

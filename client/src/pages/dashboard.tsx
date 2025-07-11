@@ -17,12 +17,13 @@ import { usePlanGuard } from "@/hooks/usePlanGuard";
 import { QUICK_PROMPTS } from "@/types/voices";
 import type { Solution, VoiceProfile } from "@shared/schema";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { SubscriptionStatus } from "@/components/subscription/subscription-status";
 import PaywallTest from "@/components/paywall-test";
 import UpgradeModal from "@/components/UpgradeModal";
 import LegalSection from "@/components/legal-section";
+import ErrorMonitor from "@/components/error-monitor";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -35,6 +36,7 @@ export default function Dashboard() {
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [showErrorMonitor, setShowErrorMonitor] = useState(false);
 
   const { user } = useAuth();
   const { profiles } = useVoiceProfiles();
@@ -90,15 +92,18 @@ export default function Dashboard() {
     }
   };
 
+  const queryClient = useQueryClient();
+  
   const trackRecommendation = useMutation({
     mutationFn: async (data: { sessionId: number; recommendedVoices: string[]; action: 'applied' | 'rejected' }) => {
-      await apiRequest(`/api/analytics/recommendations/${data.action}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          sessionId: data.sessionId,
-          recommendedVoices: data.recommendedVoices
-        })
+      const response = await apiRequest('POST', `/api/analytics/recommendations/${data.action}`, {
+        sessionId: data.sessionId,
+        recommendedVoices: data.recommendedVoices
       });
+      return response.json();
+    },
+    onError: (error) => {
+      console.error('Failed to track recommendation:', error);
     }
   });
 
@@ -170,24 +175,28 @@ export default function Dashboard() {
       return;
     }
 
-    // Use plan guard to enforce quotas
-    const result = await planGuard.attemptGeneration(async () => {
-      return generateSession.mutateAsync({
-        prompt: state.prompt,
-        selectedVoices: {
-          perspectives: state.selectedPerspectives,
-          roles: state.selectedRoles
-        },
-        recursionDepth: state.analysisDepth,
-        synthesisMode: state.mergeStrategy,
-        ethicalFiltering: state.qualityFiltering
+    try {
+      // Use plan guard to enforce quotas
+      const result = await planGuard.attemptGeneration(async () => {
+        return generateSession.mutateAsync({
+          prompt: state.prompt,
+          selectedVoices: {
+            perspectives: state.selectedPerspectives,
+            roles: state.selectedRoles
+          },
+          recursionDepth: 2,
+          synthesisMode: "competitive",
+          ethicalFiltering: true
+        });
       });
-    });
 
-    if (result.success && result.data?.session?.id) {
-      handleSolutionsGenerated(result.data.session.id);
-    } else if (!result.success && result.reason === 'quota_exceeded') {
-      setShowUpgradeModal(true);
+      if (result.success && result.data?.session?.id) {
+        handleSolutionsGenerated(result.data.session.id);
+      } else if (!result.success && result.reason === 'quota_exceeded') {
+        setShowUpgradeModal(true);
+      }
+    } catch (error) {
+      console.error("Failed to generate solutions:", error);
     }
   };
 
@@ -462,6 +471,12 @@ export default function Dashboard() {
         trigger="quota_exceeded"
         currentQuota={planGuard.quotaUsed}
         quotaLimit={planGuard.quotaLimit}
+      />
+
+      {/* Error Monitor */}
+      <ErrorMonitor
+        isVisible={showErrorMonitor}
+        onToggle={() => setShowErrorMonitor(!showErrorMonitor)}
       />
     </div>
   );

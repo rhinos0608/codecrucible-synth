@@ -1110,6 +1110,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Decision History API endpoint (phantom ledger)
+  app.get("/api/decision-history", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+      
+      if (isNaN(limit) || limit < 1 || limit > 100) {
+        throw new APIError(400, 'Invalid limit parameter. Must be between 1 and 100.');
+      }
+      
+      logger.debug('Fetching decision history', { userId, limit });
+      
+      const entries = await storage.getPhantomLedgerEntriesByUser(userId);
+      res.json(entries.slice(0, limit));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Logs API endpoints
+  app.get("/api/logs", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const level = req.query.level as string;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      
+      if (isNaN(limit) || limit < 1 || limit > 100) {
+        throw new APIError(400, 'Invalid limit parameter. Must be between 1 and 100.');
+      }
+      
+      logger.debug('Fetching logs', { userId, level, limit });
+      
+      // Get recent logs from logger
+      const logs = logger.getRecentLogs(limit, level as any);
+      res.json(logs);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/sessions/:id/logs", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const sessionId = req.params.id;
+      
+      if (!sessionId) {
+        throw new APIError(400, 'Session ID is required');
+      }
+      
+      logger.debug('Fetching session logs', { userId, sessionId });
+      
+      // Get session-specific logs from logger
+      const logs = logger.getSessionLogs(sessionId);
+      res.json(logs);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Error tracking endpoint
+  app.post("/api/errors/track", async (req, res, next) => {
+    try {
+      const errorData = req.body;
+      
+      // Validate error data
+      if (!errorData.errorType || !errorData.errorMessage) {
+        throw new APIError(400, 'Error type and message are required');
+      }
+      
+      // Log error with appropriate level
+      const logLevel = errorData.severity === 'critical' ? 'error' : 
+                      errorData.severity === 'high' ? 'error' :
+                      errorData.severity === 'medium' ? 'warn' : 'info';
+      
+      logger[logLevel as keyof typeof logger](`Client Error: ${errorData.errorType}`, {
+        message: errorData.errorMessage,
+        stack: errorData.errorStack,
+        url: errorData.url,
+        userAgent: errorData.userAgent,
+        metadata: errorData.metadata,
+        timestamp: errorData.timestamp
+      });
+      
+      res.json({ success: true, tracked: true });
+    } catch (error) {
+      // Don't fail error tracking - just log locally
+      console.error('Failed to track client error:', error);
+      res.status(500).json({ success: false, error: 'Failed to track error' });
+    }
+  });
+
   // Team Voice Profiles
   app.get("/api/teams/:id/voice-profiles", isAuthenticated, async (req: any, res, next) => {
     try {

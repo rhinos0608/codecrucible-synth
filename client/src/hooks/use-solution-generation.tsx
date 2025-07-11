@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { VoiceSession, Solution, Synthesis } from "@shared/schema";
+import { useErrorTracking } from "./use-error-tracking";
 
 interface GenerateSessionRequest {
   prompt: string;
@@ -20,6 +21,7 @@ interface GenerateSessionResponse {
 
 export function useSolutionGeneration() {
   const queryClient = useQueryClient();
+  const { trackApiError } = useErrorTracking();
 
   const generateSession = useMutation({
     mutationFn: async (request: GenerateSessionRequest): Promise<GenerateSessionResponse> => {
@@ -40,6 +42,7 @@ export function useSolutionGeneration() {
     },
     onError: (error) => {
       console.error('Session generation failed:', error);
+      trackApiError(error, '/api/sessions', 'POST');
     }
   });
 
@@ -62,6 +65,7 @@ export function useSolutionGeneration() {
     },
     onError: (error) => {
       console.error('Synthesis failed:', error);
+      trackApiError(error, '/api/sessions/synthesis', 'POST');
     }
   });
 
@@ -74,16 +78,40 @@ export function useSolutionGeneration() {
 }
 
 export function useAnalytics() {
+  const { trackApiError } = useErrorTracking();
+  
   return useQuery({
     queryKey: ["/api/analytics"],
     staleTime: 30000, // 30 seconds
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404s or auth errors
+      if (error?.message?.includes('404') || error?.message?.includes('401')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    onError: (error) => {
+      trackApiError(error, '/api/analytics', 'GET');
+    }
   });
 }
 
 export function useDecisionHistory() {
+  const { trackApiError } = useErrorTracking();
+  
   return useQuery({
     queryKey: ["/api/decision-history"],
     staleTime: 30000, // 30 seconds
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404s or auth errors
+      if (error?.message?.includes('404') || error?.message?.includes('401')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    onError: (error) => {
+      trackApiError(error, '/api/decision-history', 'GET');
+    }
   });
 }
 
@@ -92,6 +120,17 @@ export function useErrorLogs(level?: string, limit?: number) {
   return useQuery({
     queryKey: ["/api/logs", { level, limit }],
     staleTime: 10000, // 10 seconds for logs
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404s or auth errors
+      if (error?.message?.includes('404') || error?.message?.includes('401')) {
+        console.warn('Logs endpoint not available:', error?.message);
+        return false;
+      }
+      return failureCount < 2;
+    },
+    onError: (error) => {
+      console.warn('Error logs unavailable:', error);
+    }
   });
 }
 
@@ -100,6 +139,17 @@ export function useSessionLogs(sessionId: string) {
   return useQuery({
     queryKey: ["/api/sessions", sessionId, "logs"],
     staleTime: 10000, // 10 seconds for logs
-    enabled: !!sessionId
+    enabled: !!sessionId,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404s or auth errors
+      if (error?.message?.includes('404') || error?.message?.includes('401')) {
+        console.warn('Session logs endpoint not available:', error?.message);
+        return false;
+      }
+      return failureCount < 2;
+    },
+    onError: (error) => {
+      console.warn('Session logs unavailable for session:', sessionId, error);
+    }
   });
 }

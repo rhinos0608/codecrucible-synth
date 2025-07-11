@@ -50,6 +50,14 @@ export default function Dashboard() {
 
   const handleGenerateSolutions = async () => {
     // Validation following AI_INSTRUCTIONS.md security patterns
+    console.log("Voice Selection Debug:", {
+      perspectives: state.selectedPerspectives,
+      roles: state.selectedRoles,
+      prompt: state.prompt.substring(0, 50) + "...",
+      perspectiveCount: state.selectedPerspectives.length,
+      roleCount: state.selectedRoles.length
+    });
+    
     if (!state.prompt.trim()) {
       console.error("Validation Error: Prompt is required");
       return;
@@ -179,7 +187,7 @@ export default function Dashboard() {
                 </div>
                 <Button
                   onClick={handleGenerateSolutions}
-                  disabled={isGenerating || !state.prompt.trim() || state.selectedPerspectives.length === 0 || state.selectedRoles.length === 0}
+                  disabled={isGenerating || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <Play className="w-4 h-4 mr-2" />

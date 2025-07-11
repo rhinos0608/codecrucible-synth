@@ -24,6 +24,7 @@ import { SubscriptionStatus } from "@/components/subscription/subscription-statu
 import UpgradeModal from "@/components/UpgradeModal";
 import LegalSection from "@/components/legal-section";
 import ErrorMonitor from "@/components/error-monitor";
+import { isFrontendDevModeEnabled, isFrontendDevModeFeatureEnabled, createDevModeBadge, devLog } from "@/lib/dev-mode";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -388,6 +389,11 @@ export default function Dashboard() {
                    planGuard.planTier === 'free' ? 
                      `Generate Solutions (${planGuard.quotaUsed}/${planGuard.quotaLimit})` : 
                      "Generate Solutions"}
+                  {isFrontendDevModeFeatureEnabled('showDevBadges') && (
+                    <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 text-xs">
+                      {createDevModeBadge()}
+                    </Badge>
+                  )}
                 </Button>
               </div>
               {/* Validation Error Display */}

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { checkGenerationQuota } from '../lib/utils/checkQuota';
 import { logSecurityEvent } from '../lib/security/logSecurityEvent';
+import { isDevModeFeatureEnabled, logDevModeBypass } from '../lib/dev-mode';
 import { APIError } from '../logger';
 
 /**
@@ -117,6 +118,16 @@ export function enforcePlanRestrictions() {
 export function validateFeatureAccess(requiredFeature: 'synthesis' | 'analytics' | 'teams') {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Dev mode bypass: Allow unlimited synthesis access in development
+      if (requiredFeature === 'synthesis' && isDevModeFeatureEnabled('unlimitedSynthesis')) {
+        logDevModeBypass('synthesis_access_bypassed', {
+          userId: (req as any).user?.claims?.sub?.substring(0, 8) + '...' || 'anonymous',
+          ipAddress: req.ip,
+          feature: requiredFeature
+        });
+        return next();
+      }
+
       const quotaInfo = (req as any).quotaInfo;
       const planTier = quotaInfo?.planTier || 'free';
       

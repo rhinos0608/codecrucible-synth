@@ -2,6 +2,7 @@ import { db } from "../../db";
 import { users, usageLimits } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { logSecurityEvent } from "../security/logSecurityEvent";
+import { isDevModeFeatureEnabled, logDevModeBypass, getDevModeMetadata } from "../dev-mode";
 
 export interface QuotaCheckResult {
   allowed: boolean;
@@ -22,6 +23,23 @@ export async function checkGenerationQuota(
   userAgent?: string
 ): Promise<QuotaCheckResult> {
   try {
+    // Dev mode bypass: Enable unlimited generations in development
+    if (isDevModeFeatureEnabled('unlimitedGenerations')) {
+      logDevModeBypass('quota_check_bypassed', {
+        userId: userId.substring(0, 8) + '...',
+        ipAddress,
+        feature: 'unlimitedGenerations'
+      });
+      
+      return {
+        allowed: true,
+        quotaUsed: 0,
+        quotaLimit: -1, // Unlimited in dev mode
+        planTier: 'dev',
+        reason: 'dev_mode_unlimited'
+      };
+    }
+
     // Get user and subscription info
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     

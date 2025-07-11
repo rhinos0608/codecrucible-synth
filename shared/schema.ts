@@ -84,6 +84,7 @@ export const voiceSessions = pgTable("voice_sessions", {
   recursionDepth: integer("recursion_depth").default(2),
   synthesisMode: text("synthesis_mode").default("competitive"),
   ethicalFiltering: boolean("ethical_filtering").default(true),
+  mode: varchar("mode").default("production"), // 'dev' or 'production' for tracking dev mode sessions
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -13,6 +13,7 @@ import { enforcePlanRestrictions, validateFeatureAccess } from "./middleware/enf
 import { processStripeWebhook } from "./lib/stripe/updateUserPlan";
 import { incrementUsageQuota, checkGenerationQuota } from "./lib/utils/checkQuota";
 import { logSecurityEvent } from "./lib/security/logSecurityEvent";
+import { isDevModeFeatureEnabled, logDevModeBypass, createDevModeWatermark } from './lib/dev-mode';
 import Stripe from "stripe";
 
 // Helper function to check user plan
@@ -212,7 +213,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check voice combination limits with security logging
       const totalVoices = requestData.selectedVoices.perspectives.length + requestData.selectedVoices.roles.length;
-      if (totalVoices > subscriptionInfo.tier.maxVoiceCombinations) {
+      
+      // Dev mode bypass: Allow unlimited voice combinations in development
+      const shouldCheckVoiceLimit = !isDevModeFeatureEnabled('unlimitedVoiceCombinations');
+      
+      if (!shouldCheckVoiceLimit && totalVoices > subscriptionInfo.tier.maxVoiceCombinations) {
+        logDevModeBypass('voice_combination_limit_bypassed', {
+          userId: userId.substring(0, 8) + '...',
+          requestedVoices: totalVoices,
+          normalLimit: subscriptionInfo.tier.maxVoiceCombinations,
+          perspectives: requestData.selectedVoices.perspectives,
+          roles: requestData.selectedVoices.roles
+        });
+      }
+      
+      if (shouldCheckVoiceLimit && totalVoices > subscriptionInfo.tier.maxVoiceCombinations) {
         logger.warn('Voice combination limit exceeded - potential bypass attempt', {
           userId,
           requestedVoices: totalVoices,
@@ -232,15 +247,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Additional security checks for potential abuse
-      if (requestData.prompt.length > 5000) {
-        logger.warn('Excessively long prompt detected - potential abuse', {
-          userId,
-          promptLength: requestData.prompt.length,
-          ip: req.ip,
-          userAgent: req.get('User-Agent')
-        });
-        throw new APIError(400, 'Prompt exceeds maximum length of 5000 characters');
+      // Additional security checks for potential abuse with dev mode extensions
+      const maxPromptLength = isDevModeFeatureEnabled('extendedPromptLength') ? 15000 : 5000;
+      
+      if (requestData.prompt.length > maxPromptLength) {
+        if (isDevModeFeatureEnabled('extendedPromptLength') && requestData.prompt.length > 5000) {
+          logDevModeBypass('extended_prompt_length_used', {
+            userId: userId.substring(0, 8) + '...',
+            promptLength: requestData.prompt.length,
+            normalLimit: 5000,
+            devLimit: maxPromptLength
+          });
+        }
+        
+        if (requestData.prompt.length > maxPromptLength) {
+          logger.warn('Excessively long prompt detected - potential abuse', {
+            userId,
+            promptLength: requestData.prompt.length,
+            ip: req.ip,
+            userAgent: req.get('User-Agent'),
+            devMode: isDevModeFeatureEnabled('extendedPromptLength')
+          });
+          throw new APIError(400, `Prompt exceeds maximum length of ${maxPromptLength} characters`);
+        }
       }
       
       if (requestData.recursionDepth > 5) {
@@ -266,7 +295,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recursionDepth: requestData.recursionDepth,
         synthesisMode: requestData.synthesisMode,
         ethicalFiltering: requestData.ethicalFiltering,
-        userId: userId
+        userId: userId,
+        // Add dev mode metadata for session tracking
+        mode: isDevModeFeatureEnabled('unlimitedGenerations') ? 'dev' : 'production'
       };
 
       const session = await storage.createVoiceSession(sessionData);

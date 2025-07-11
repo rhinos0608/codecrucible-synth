@@ -1,6 +1,7 @@
 // OpenAI service following AI_INSTRUCTIONS.md patterns and dual-transmission protocols
 import OpenAI from 'openai';
 import { logger, APIError } from './logger';
+import { createDevModeWatermark, isDevModeFeatureEnabled } from './lib/dev-mode';
 import type { CodePerspective, DevelopmentRole } from '@shared/schema';
 
 // Security validation following AI_INSTRUCTIONS.md
@@ -201,6 +202,14 @@ Provide a JSON response with:
       }
 
       const parsedResponse = JSON.parse(content);
+      
+      // Add dev mode watermark if enabled
+      const devWatermark = createDevModeWatermark();
+      if (devWatermark) {
+        // Prepend watermark to code and explanation
+        parsedResponse.code = `// ${devWatermark}\n${parsedResponse.code}`;
+        parsedResponse.explanation = `${devWatermark} ${parsedResponse.explanation}`;
+      }
       
       // Map voice IDs to display names
       const perspectiveNames: { [key: string]: string } = {

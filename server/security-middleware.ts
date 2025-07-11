@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from './logger';
+import { isDevModeFeatureEnabled, logDevModeBypass } from './lib/dev-mode';
 
 // Rate limiting store for different endpoints
 interface RateLimitEntry {
@@ -14,6 +15,16 @@ class SecurityMiddleware {
   // Rate limiting based on endpoint and user/IP
   createRateLimit(windowMs: number, maxRequests: number, endpoint: string) {
     return (req: Request, res: Response, next: NextFunction) => {
+      // Dev mode bypass: Skip rate limiting in development
+      if (isDevModeFeatureEnabled('bypassRateLimit')) {
+        logDevModeBypass('rate_limit_bypassed', {
+          endpoint,
+          userId: (req as any).user?.claims?.sub?.substring(0, 8) + '...' || 'anonymous',
+          ipAddress: req.ip
+        });
+        return next();
+      }
+
       const userId = (req as any).user?.claims?.sub;
       const identifier = userId || req.ip;
       const key = `${endpoint}:${identifier}`;

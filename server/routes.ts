@@ -52,8 +52,10 @@ import {
 const generateSessionRequestSchema = z.object({
   prompt: z.string().min(1).max(2000),
   selectedVoices: z.object({
-    perspectives: z.array(z.string()).min(1),
-    roles: z.array(z.string()).min(1)
+    perspectives: z.array(z.string()),
+    roles: z.array(z.string())
+  }).refine(data => data.perspectives.length > 0 || data.roles.length > 0, {
+    message: "At least one perspective or role must be selected"
   }),
   recursionDepth: z.number().int().min(1).max(3),
   synthesisMode: z.enum(["consensus", "competitive", "collaborative"]),
@@ -176,8 +178,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(400, 'Prompt is required and cannot be empty');
       }
       
-      if (!requestData.selectedVoices?.perspectives?.length || !requestData.selectedVoices?.roles?.length) {
-        throw new APIError(400, 'At least one perspective and one role must be selected');
+      if (!requestData.selectedVoices?.perspectives?.length && !requestData.selectedVoices?.roles?.length) {
+        throw new APIError(400, 'At least one perspective or role must be selected');
       }
 
       // Get authenticated user ID from session
@@ -1367,15 +1369,38 @@ async function generateRealSolutions(sessionId: number, requestData: any) {
     sessionId,
     perspectiveCount: selectedVoices.perspectives.length,
     roleCount: selectedVoices.roles.length,
-    prompt: prompt.substring(0, 100) + '...'
+    prompt: prompt.substring(0, 100) + '...',
+    hasAPIKey: !!process.env.OPENAI_API_KEY
   });
 
   try {
-    // Generate solutions for each perspective-role combination
-    for (const perspective of selectedVoices.perspectives) {
+    // Create voice combinations - handle cases where perspectives or roles might be empty
+    const voiceCombinations = [];
+    
+    if (selectedVoices.perspectives.length > 0 && selectedVoices.roles.length > 0) {
+      // Both perspectives and roles selected - create combinations
+      for (const perspective of selectedVoices.perspectives) {
+        for (const role of selectedVoices.roles) {
+          voiceCombinations.push({ perspective, role });
+        }
+      }
+    } else if (selectedVoices.perspectives.length > 0) {
+      // Only perspectives selected
+      for (const perspective of selectedVoices.perspectives) {
+        voiceCombinations.push({ perspective, role: null });
+      }
+    } else if (selectedVoices.roles.length > 0) {
+      // Only roles selected
       for (const role of selectedVoices.roles) {
-        logger.debug('Generating solution', { sessionId, perspective, role });
-        
+        voiceCombinations.push({ perspective: null, role });
+      }
+    }
+
+    // Generate solutions for each voice combination using real OpenAI
+    for (const { perspective, role } of voiceCombinations) {
+      logger.debug('Generating solution with OpenAI', { sessionId, perspective, role });
+      
+      try {
         const generatedSolution = await openaiService.generateSolution({
           prompt,
           perspectives: selectedVoices.perspectives,
@@ -1389,7 +1414,9 @@ async function generateRealSolutions(sessionId: number, requestData: any) {
         // Store solution in database following AI_INSTRUCTIONS.md security patterns
         const solution = await storage.createSolution({
           sessionId,
-          voiceCombination: generatedSolution.voiceCombination,
+          voiceCombination: perspective && role ? `${perspective}-${role}` : 
+                           perspective ? `${perspective}` : 
+                           role ? `${role}` : 'default',
           code: generatedSolution.code,
           explanation: generatedSolution.explanation,
           confidence: generatedSolution.confidence,
@@ -1399,17 +1426,33 @@ async function generateRealSolutions(sessionId: number, requestData: any) {
 
         solutions.push(solution);
         
-        logger.debug('Solution generated and stored', {
+        logger.debug('Real solution generated and stored', {
           sessionId,
           solutionId: solution.id,
-          confidence: solution.confidence
+          confidence: solution.confidence,
+          voiceCombination: solution.voiceCombination
         });
+
+      } catch (solutionError) {
+        logger.error('Failed to generate individual solution', solutionError as Error, {
+          sessionId,
+          perspective,
+          role
+        });
+        
+        // Continue with next combination rather than failing entirely
+        continue;
       }
     }
 
-    logger.info('All solutions generated successfully', {
+    if (solutions.length === 0) {
+      throw new APIError(500, 'Failed to generate any solutions');
+    }
+
+    logger.info('Real solutions generated successfully with OpenAI', {
       sessionId,
-      totalSolutions: solutions.length
+      totalSolutions: solutions.length,
+      voiceCombinations: solutions.map(s => s.voiceCombination)
     });
 
     return solutions;
@@ -1421,7 +1464,7 @@ async function generateRealSolutions(sessionId: number, requestData: any) {
       throw error;
     }
     
-    throw new APIError(500, `Solution generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new APIError(500, `OpenAI solution generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

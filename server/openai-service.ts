@@ -70,7 +70,7 @@ Your responses must be professional, secure, and follow these established patter
   }
 
   // Generate perspective-specific system prompt
-  private getPerspectivePrompt(perspective: string, role: string): string {
+  private getPerspectivePrompt(perspective?: string, role?: string): string {
     const baseInstructions = this.getBaseInstructions();
     
     const perspectiveInstructions = {
@@ -88,21 +88,29 @@ Your responses must be professional, secure, and follow these established patter
       "frontend-developer": "Focus on React patterns, component architecture, UI/UX implementation, and frontend best practices following Apple design system."
     };
 
+    const perspectiveSection = perspective ? 
+      `PERSPECTIVE: ${perspective}
+${perspectiveInstructions[perspective as keyof typeof perspectiveInstructions] || "Apply general development best practices."}` :
+      'PERSPECTIVE: General Development\nApply general development best practices.';
+
+    const roleSection = role ?
+      `ROLE: ${role}
+${roleInstructions[role as keyof typeof roleInstructions] || "Apply role-specific expertise."}` :
+      'ROLE: Full-Stack Developer\nApply full-stack development expertise.';
+
     return `${baseInstructions}
 
-PERSPECTIVE: ${perspective}
-${perspectiveInstructions[perspective as keyof typeof perspectiveInstructions] || "Apply general development best practices."}
+${perspectiveSection}
 
-ROLE: ${role}
-${roleInstructions[role as keyof typeof roleInstructions] || "Apply role-specific expertise."}
+${roleSection}
 
 You must generate code that follows AI_INSTRUCTIONS.md patterns and maintains consistency with the CodeCrucible architecture.`;
   }
 
   async generateSolution(
     request: CodeGenerationRequest,
-    perspective: string,
-    role: string
+    perspective?: string,
+    role?: string
   ): Promise<GeneratedSolution> {
     const requestId = `${request.sessionId}-${perspective}-${role}`;
     
@@ -158,14 +166,16 @@ Provide a JSON response with:
       const parsedResponse = JSON.parse(content);
       
       const solution: GeneratedSolution = {
-        voiceCombination: `${perspective} + ${role}`,
+        voiceCombination: perspective && role ? `${perspective} + ${role}` :
+                         perspective ? perspective :
+                         role ? role : 'general',
         code: parsedResponse.code || '// No code generated',
         explanation: parsedResponse.explanation || 'No explanation provided',
         confidence: Math.max(1, Math.min(100, parsedResponse.confidence || 75)),
         strengths: Array.isArray(parsedResponse.strengths) ? parsedResponse.strengths : ['AI-generated solution'],
         considerations: Array.isArray(parsedResponse.considerations) ? parsedResponse.considerations : ['Review implementation'],
-        perspective,
-        role
+        perspective: perspective || 'general',
+        role: role || 'full-stack'
       };
 
       logger.info('OpenAI code generation completed', {

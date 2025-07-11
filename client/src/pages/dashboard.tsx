@@ -39,12 +39,15 @@ export default function Dashboard() {
   };
 
   const handleGenerateSolutions = async () => {
-    if (!state.prompt.trim() || getSelectedItems().length === 0) return;
+    if (!state.prompt.trim() || state.selectedPerspectives.length === 0 || state.selectedRoles.length === 0) return;
 
     try {
       const result = await generateSession.mutateAsync({
         prompt: state.prompt,
-        selectedVoices: getSelectedItems(),
+        selectedVoices: {
+          perspectives: state.selectedPerspectives,
+          roles: state.selectedRoles
+        },
         recursionDepth: state.analysisDepth,
         synthesisMode: state.mergeStrategy,
         ethicalFiltering: state.qualityFiltering
@@ -129,7 +132,7 @@ export default function Dashboard() {
                 </div>
                 <Button
                   onClick={handleGenerateSolutions}
-                  disabled={isGenerating || !state.prompt.trim() || getSelectedItems().length === 0}
+                  disabled={isGenerating || !state.prompt.trim() || state.selectedPerspectives.length === 0 || state.selectedRoles.length === 0}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <Play className="w-4 h-4 mr-2" />

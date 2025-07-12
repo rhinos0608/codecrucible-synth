@@ -152,6 +152,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Additional routes for API completeness
+  app.get('/api/projects', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const projects = await storage.getProjectsByUser(userId);
+      res.json(projects);
+    } catch (error) {
+      logger.error('Error fetching projects', error as Error, { userId: req.user?.claims?.sub });
+      res.status(500).json({ error: 'Failed to fetch projects' });
+    }
+  });
+
+  app.get('/api/subscription/info', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json({ 
+        tier: user?.planTier || 'free',
+        stripeSubscriptionId: user?.stripeSubscriptionId || null
+      });
+    } catch (error) {
+      logger.error('Error fetching subscription info', error as Error, { userId: req.user?.claims?.sub });
+      res.status(500).json({ error: 'Failed to fetch subscription info' });
+    }
+  });
+
+  app.get('/api/quota/check', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json({ 
+        dailyGenerated: 0,
+        dailyLimit: user?.planTier === 'free' ? 3 : 999,
+        remaining: user?.planTier === 'free' ? 3 : 999
+      });
+    } catch (error) {
+      logger.error('Error checking quota', error as Error, { userId: req.user?.claims?.sub });
+      res.status(500).json({ error: 'Failed to check quota' });
+    }
+  });
+
+  app.get('/api/voice-profiles', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profiles = await storage.getVoiceProfiles(userId);
+      res.json(profiles);
+    } catch (error) {
+      logger.error('Error fetching voice profiles', error as Error, { userId: req.user?.claims?.sub });
+      res.status(500).json({ error: 'Failed to fetch voice profiles' });
+    }
+  });
+
+  app.get('/api/onboarding/status', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessions = await storage.getUserSessions(userId);
+      res.json({ 
+        hasCompletedOnboarding: sessions.length > 0,
+        tourCompleted: true,
+        sessionCount: sessions.length
+      });
+    } catch (error) {
+      logger.error('Error fetching onboarding status', error as Error, { userId: req.user?.claims?.sub });
+      res.status(500).json({ error: 'Failed to fetch onboarding status' });
+    }
+  });
+
   const server = app.listen(5000, '0.0.0.0', () => {
     console.log('Server running on port 5000');
   });

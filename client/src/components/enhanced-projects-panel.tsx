@@ -374,12 +374,12 @@ export function EnhancedProjectsPanel({
                   />
                 </div>
               </div>
-              <Select value={complexityFilter?.toString() || ""} onValueChange={(value) => setComplexityFilter(value ? parseInt(value) : null)}>
+              <Select value={complexityFilter?.toString() || "all"} onValueChange={(value) => setComplexityFilter(value === "all" ? null : parseInt(value))}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Complexity" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Levels</SelectItem>
+                  <SelectItem value="all">All Levels</SelectItem>
                   {Object.entries(COMPLEXITY_LABELS).map(([level, label]) => (
                     <SelectItem key={level} value={level}>
                       {label}

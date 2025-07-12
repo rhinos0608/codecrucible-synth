@@ -274,11 +274,6 @@ export class DatabaseStorage implements IStorage {
     return this.getVoiceSessionsByUser(userId);
   }
   
-  // Alias for getUserSessions (for onboarding status API)
-  async getUserSessions(userId: string): Promise<VoiceSession[]> {
-    return this.getVoiceSessionsByUser(userId);
-  }
-  
   // Solution operations
   async createSolution(solution: InsertSolution): Promise<Solution> {
     const [created] = await db.insert(solutions).values(solution).returning();

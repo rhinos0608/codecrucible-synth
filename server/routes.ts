@@ -497,6 +497,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mode: devModeConfig.isEnabled ? 'development' : 'production'
       });
       
+      // Test OpenAI service availability
+      if (!realOpenAIService) {
+        console.error('❌ realOpenAIService is not available');
+        return res.status(503).json({ error: 'OpenAI service not available' });
+      }
+      
+      if (typeof realOpenAIService.generateSolutions !== 'function') {
+        console.error('❌ generateSolutions method not available on service');
+        return res.status(503).json({ error: 'OpenAI service method not available' });
+      }
+      
       const solutions = await realOpenAIService.generateSolutions({
         prompt: prompt,
         perspectives,

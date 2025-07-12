@@ -649,6 +649,7 @@ Following CodingPhilosophy.md consciousness principles:
   }
 }
 
+// Export the service instance following AI_INSTRUCTIONS.md patterns
 export const realOpenAIService = new RealOpenAIService();
 
 // Export service instance for routes.ts import

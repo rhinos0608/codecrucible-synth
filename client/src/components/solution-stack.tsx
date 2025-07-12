@@ -17,7 +17,36 @@ interface ImplementationOptionsProps {
 
 // Map voice combination IDs to display names following AI_INSTRUCTIONS.md patterns
 const getVoiceDisplayName = (voiceCombination: string): string => {
-  // Handle single voice cases
+  // Enhanced voice name mapping following AI_INSTRUCTIONS.md patterns
+  
+  // Handle colon-separated format (e.g., "perspective:seeker" -> "Explorer")
+  if (voiceCombination.includes(':')) {
+    const [type, voiceId] = voiceCombination.split(':');
+    if (type === 'perspective') {
+      const perspective = CODE_PERSPECTIVES.find(p => p.id === voiceId);
+      if (perspective) return perspective.name;
+    }
+    if (type === 'role') {
+      const role = DEVELOPMENT_ROLES.find(r => r.id === voiceId);
+      if (role) return role.name;
+    }
+  }
+  
+  // Handle perspective-prefixed voices (e.g., "perspective-seeker" -> "Explorer")
+  if (voiceCombination.startsWith('perspective-')) {
+    const perspectiveId = voiceCombination.replace('perspective-', '');
+    const perspective = CODE_PERSPECTIVES.find(p => p.id === perspectiveId);
+    if (perspective) return perspective.name;
+  }
+  
+  // Handle role-prefixed voices (e.g., "role-architect" -> "Systems Architect")
+  if (voiceCombination.startsWith('role-')) {
+    const roleId = voiceCombination.replace('role-', '');
+    const role = DEVELOPMENT_ROLES.find(r => r.id === roleId);
+    if (role) return role.name;
+  }
+  
+  // Handle single voice cases (direct ID mapping)
   const perspective = CODE_PERSPECTIVES.find(p => p.id === voiceCombination);
   if (perspective) return perspective.name;
   
@@ -28,13 +57,18 @@ const getVoiceDisplayName = (voiceCombination: string): string => {
   const combinationParts = voiceCombination.split(/[-+]/);
   if (combinationParts.length === 2) {
     const [part1, part2] = combinationParts;
-    const perspective1 = CODE_PERSPECTIVES.find(p => p.id === part1);
-    const role1 = DEVELOPMENT_ROLES.find(r => r.id === part1);
-    const perspective2 = CODE_PERSPECTIVES.find(p => p.id === part2);
-    const role2 = DEVELOPMENT_ROLES.find(r => r.id === part2);
     
-    const name1 = perspective1?.name || role1?.name || part1;
-    const name2 = perspective2?.name || role2?.name || part2;
+    // Remove any prefixes and find the actual voice
+    const cleanPart1 = part1.replace(/^(perspective|role)-/, '');
+    const cleanPart2 = part2.replace(/^(perspective|role)-/, '');
+    
+    const perspective1 = CODE_PERSPECTIVES.find(p => p.id === cleanPart1);
+    const role1 = DEVELOPMENT_ROLES.find(r => r.id === cleanPart1);
+    const perspective2 = CODE_PERSPECTIVES.find(p => p.id === cleanPart2);
+    const role2 = DEVELOPMENT_ROLES.find(r => r.id === cleanPart2);
+    
+    const name1 = perspective1?.name || role1?.name || cleanPart1;
+    const name2 = perspective2?.name || role2?.name || cleanPart2;
     
     return `${name1} + ${name2}`;
   }

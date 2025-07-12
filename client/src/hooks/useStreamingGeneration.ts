@@ -127,9 +127,12 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
 
     console.log(`Starting voice stream for ${voiceId} (${type}) on session ${sessionId}`);
 
-    // Create new EventSource for streaming with proper error handling
+    // Create new EventSource for streaming with proper error handling and credentials
     const eventSource = new EventSource(
-      `/api/sessions/${sessionId}/stream/${voiceId}?type=${type}`
+      `/api/sessions/${sessionId}/stream/${voiceId}?type=${type}`,
+      { 
+        withCredentials: true 
+      }
     );
 
     streamRefs.current[voiceId] = eventSource;
@@ -210,18 +213,37 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
         }
       } catch (error) {
         console.error('Failed to parse streaming data for', voiceId, ':', error);
+        // Handle malformed data by closing the stream
+        eventSource.close();
+        delete streamRefs.current[voiceId];
+        setVoices(prev => prev.map(voice => 
+          voice.id === voiceId 
+            ? { 
+                ...voice, 
+                isTyping: false, 
+                isComplete: true, 
+                error: 'Data parsing failed' 
+              }
+            : voice
+        ));
       }
     };
 
     eventSource.onerror = (error) => {
       console.error('EventSource error for voice:', voiceId, error);
+      
+      // Check if it's an authentication error
+      if (eventSource.readyState === EventSource.CLOSED) {
+        console.error('EventSource closed for', voiceId, '- likely authentication issue');
+      }
+      
       setVoices(prev => prev.map(voice => 
         voice.id === voiceId 
           ? { 
               ...voice, 
               isTyping: false, 
               isComplete: true, 
-              error: 'Streaming connection failed' 
+              error: 'Connection failed - check authentication' 
             }
           : voice
       ));
@@ -230,7 +252,7 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     };
 
     eventSource.onopen = () => {
-      console.log(`EventSource opened for voice ${voiceId}`);
+      console.log(`EventSource opened successfully for voice ${voiceId}`);
     };
   }, [onComplete]);
 

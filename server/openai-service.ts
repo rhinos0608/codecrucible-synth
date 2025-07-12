@@ -169,110 +169,228 @@ class OpenAIService {
   ): Promise<void> {
     logger.info('Starting simulated streaming generation', { voiceId, type });
     
-    // Voice-specific simulated responses
-    const simulatedResponses = {
-      seeker: `// Explorer approach - Investigating innovative solutions
-const innovativeComponent = () => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+    // Voice-specific simulated responses based on prompt context
+    const getSimulatedResponse = (voiceId: string, prompt: string) => {
+      const promptSummary = prompt.substring(0, 30).replace(/[^a-zA-Z0-9 ]/g, '');
+      
+      const baseResponses = {
+        seeker: `// Explorer: Investigating ${promptSummary}...
+function exploratoryImplementation() {
+  // Discovering innovative approaches
+  const [state, setState] = useState(null);
   
-  // Experimental data fetching with advanced caching
   useEffect(() => {
-    const fetchWithCache = async () => {
-      setLoading(true);
+    // Experimental implementation pattern
+    const experiment = async () => {
       try {
-        const cached = localStorage.getItem('data-cache');
-        if (cached) {
-          setData(JSON.parse(cached));
-        }
-        
-        const response = await fetch('/api/data');
-        const newData = await response.json();
-        
-        localStorage.setItem('data-cache', JSON.stringify(newData));
-        setData(newData);
+        const result = await fetch('/api/innovative-endpoint');
+        setState(result);
       } catch (error) {
-        console.error('Data fetch failed:', error);
-      } finally {
-        setLoading(false);
+        console.error('Exploration failed:', error);
       }
     };
-    
-    fetchWithCache();
+    experiment();
   }, []);
   
-  return loading ? <div>Loading...</div> : <div>{JSON.stringify(data)}</div>;
-};`,
-      
-      steward: `// Maintainer approach - Robust and reliable implementation
-const reliableComponent = () => {
+  return <div className="innovative-ui">{state}</div>;
+}`,
+        
+        steward: `// Maintainer: Robust ${promptSummary} implementation
+function reliableImplementation() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   
-  // Comprehensive error handling and validation
   const fetchData = useCallback(async () => {
-    if (!navigator.onLine) {
-      setError('No internet connection');
-      return;
-    }
-    
     setLoading(true);
     setError(null);
     
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
       const response = await fetch('/api/data', {
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' }
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(\`HTTP error! status: \${response.status}\`);
       }
       
       const result = await response.json();
-      
-      // Validate data structure
-      if (!result || typeof result !== 'object') {
-        throw new Error('Invalid data format received');
-      }
-      
       setData(result);
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setError('Request timeout');
-      } else {
-        setError(err.message || 'An unknown error occurred');
-      }
-      console.error('Data fetch error:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   }, []);
   
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  return loading ? <div>Loading...</div> : error ? <div>Error: {error}</div> : <div>{data}</div>;
+}`,
+        
+        witness: `// Analyzer: Deep analysis of ${promptSummary}
+function analyticalImplementation() {
+  // Comprehensive analysis and structured approach
+  const [analysis, setAnalysis] = useState({
+    data: null,
+    metadata: null,
+    insights: []
+  });
   
-  if (loading) return <div className="loading-spinner">Loading...</div>;
-  if (error) return <div className="error-message">Error: {error}</div>;
+  const performAnalysis = useCallback(async () => {
+    const result = await fetch('/api/analyze');
+    const data = await result.json();
+    
+    setAnalysis({
+      data: data.core,
+      metadata: data.meta,
+      insights: data.patterns || []
+    });
+  }, []);
   
   return (
-    <div className="data-container">
-      {data ? <pre>{JSON.stringify(data, null, 2)}</pre> : 'No data available'}
+    <div className="analysis-dashboard">
+      <section className="data-view">{analysis.data}</section>
+      <section className="insights">{analysis.insights.map(i => <div key={i}>{i}</div>)}</section>
     </div>
   );
-};`
+}`,
+        
+        nurturer: `// Developer: User-friendly ${promptSummary} solution
+function userFriendlyImplementation() {
+  const [userState, setUserState] = useState('welcome');
+  
+  const handleUserAction = (action) => {
+    switch(action) {
+      case 'start':
+        setUserState('working');
+        break;
+      case 'complete':
+        setUserState('success');
+        break;
+      default:
+        setUserState('welcome');
+    }
+  };
+  
+  return (
+    <div className="user-centered-design">
+      <h2>Welcome to your solution</h2>
+      <button onClick={() => handleUserAction('start')}>
+        Get Started
+      </button>
+      {userState === 'working' && <div>Processing...</div>}
+      {userState === 'success' && <div>Success!</div>}
+    </div>
+  );
+}`,
+        
+        decider: `// Implementor: Action-oriented ${promptSummary}
+function decisiveImplementation() {
+  // Clear, executable solution
+  const executeAction = async () => {
+    const result = await fetch('/api/action', { method: 'POST' });
+    return result.json();
+  };
+  
+  return (
+    <div className="action-interface">
+      <button onClick={executeAction} className="primary-action">
+        Execute Solution
+      </button>
+    </div>
+  );
+}`,
+        
+        guardian: `// Security Engineer: Secure ${promptSummary} implementation
+function secureImplementation() {
+  const [token, setToken] = useState(null);
+  
+  const authenticatedFetch = async (url) => {
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+    
+    return fetch(url, {
+      headers: {
+        'Authorization': \`Bearer \${token}\`,
+        'Content-Type': 'application/json'
+      }
+    });
+  };
+  
+  return (
+    <div className="secure-component">
+      <input 
+        type="password" 
+        onChange={(e) => setToken(e.target.value)}
+        placeholder="Enter secure token"
+      />
+    </div>
+  );
+}`,
+        
+        architect: `// Systems Architect: Scalable ${promptSummary} architecture
+class SystemArchitecture {
+  constructor() {
+    this.modules = new Map();
+    this.dependencies = new Set();
+  }
+  
+  registerModule(name, module) {
+    this.modules.set(name, module);
+    return this;
+  }
+  
+  async initialize() {
+    for (const [name, module] of this.modules) {
+      await module.init();
+    }
+  }
+}
+
+const system = new SystemArchitecture()
+  .registerModule('data', new DataModule())
+  .registerModule('ui', new UIModule());`,
+        
+        designer: `// UI/UX Engineer: Beautiful ${promptSummary} interface
+function BeautifulInterface() {
+  return (
+    <div className="modern-design bg-gradient-to-r from-blue-500 to-purple-600">
+      <header className="glass-effect p-6">
+        <h1 className="text-white text-2xl font-bold">Beautiful Solution</h1>
+      </header>
+      <main className="container mx-auto p-8">
+        <div className="card shadow-xl bg-white rounded-lg p-6">
+          <p className="text-gray-700">Elegant, user-centered design</p>
+        </div>
+      </main>
+    </div>
+  );
+}`,
+        
+        optimizer: `// Performance Engineer: Optimized ${promptSummary}
+import { memo, useMemo, useCallback } from 'react';
+
+const OptimizedComponent = memo(() => {
+  const memoizedData = useMemo(() => {
+    return expensiveComputation();
+  }, [dependencies]);
+  
+  const optimizedCallback = useCallback((data) => {
+    return processData(data);
+  }, []);
+  
+  return <div>{memoizedData}</div>;
+});
+
+// Lazy loading for better performance
+const LazyComponent = React.lazy(() => import('./HeavyComponent'));`
+      };
+      
+      return baseResponses[voiceId] || baseResponses.seeker;
     };
     
-    const response = simulatedResponses[voiceId] || simulatedResponses.seeker;
+    const response = getSimulatedResponse(voiceId, prompt);
+
     
     // Simulate streaming by sending chunks
     const chunks = response.split('');

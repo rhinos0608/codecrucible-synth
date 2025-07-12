@@ -1108,7 +1108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId: parseInt(sessionId),
         voiceId,
         type,
-        userId: userId.substring(0, 8) + '...'
+        userId: userId.substring(0, 8) + '...',
+        userAgent: req.headers['user-agent']?.substring(0, 50) + '...'
       });
 
       // Validate session ownership
@@ -1122,8 +1123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Cache-Control'
+        'Access-Control-Allow-Origin': req.headers.origin || '*',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Headers': 'Cache-Control, Authorization, Content-Type'
       });
 
       // Import OpenAI service for streaming

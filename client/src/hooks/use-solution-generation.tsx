@@ -28,25 +28,14 @@ export function useSolutionGeneration() {
       console.log('Generating session with real OpenAI integration:', request);
       
       try {
-        const response = await apiRequest("POST", "/api/sessions", request);
+        // apiRequest already handles error checking and returns parsed JSON
+        const data = await apiRequest("/api/sessions", {
+          method: "POST",
+          body: request
+        });
         
-        console.log('API Response status:', response.status, response.statusText);
-        
-        if (!response.ok) {
-          // Enhanced error handling following AI_INSTRUCTIONS.md patterns
-          let errorData;
-          try {
-            errorData = await response.json();
-          } catch (parseError) {
-            // Server returned HTML instead of JSON - critical server error
-            const htmlText = await response.text();
-            console.error('Server returned HTML instead of JSON:', htmlText.substring(0, 200));
-            throw new Error(`Server error (${response.status}): API endpoint returned HTML instead of JSON`);
-          }
-          throw new Error(errorData.error || `API request failed with status ${response.status}`);
-        }
-        
-        return response.json();
+        console.log('✅ Council Generation API Response:', data);
+        return data;
       } catch (networkError) {
         console.error('Network or parsing error in Council Generation:', networkError);
         throw networkError;
@@ -72,14 +61,11 @@ export function useSolutionGeneration() {
   const createSynthesis = useMutation({
     mutationFn: async (sessionId: number): Promise<Synthesis> => {
       console.log('Starting real OpenAI synthesis for session:', sessionId);
-      const response = await apiRequest("POST", `/api/sessions/${sessionId}/synthesis`, {});
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to synthesize solutions');
-      }
-      
-      return response.json();
+      // apiRequest already handles error checking and returns parsed JSON
+      return await apiRequest(`/api/sessions/${sessionId}/synthesis`, {
+        method: "POST",
+        body: {}
+      });
     },
     onSuccess: (data) => {
       console.log('OpenAI synthesis completed:', data.id);

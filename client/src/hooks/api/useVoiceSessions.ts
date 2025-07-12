@@ -36,8 +36,11 @@ export function useCreateVoiceSession() {
 
   return useMutation({
     mutationFn: async (session: InsertVoiceSession) => {
-      const response = await apiRequest("POST", "/api/sessions", session);
-      return response.json();
+      // apiRequest already returns parsed JSON
+      return await apiRequest("/api/sessions", {
+        method: "POST",
+        body: session
+      });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });

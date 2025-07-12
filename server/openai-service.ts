@@ -171,16 +171,40 @@ Requirements:
       userPromptLength: userPrompt.length 
     });
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.4,
-      max_tokens: 2500,
-      presence_penalty: 0.1
-    });
+    // Enhanced OpenAI API call with comprehensive error handling following AI_INSTRUCTIONS.md
+    let response;
+    try {
+      response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.4,
+        max_tokens: 2500,
+        presence_penalty: 0.1
+      });
+      
+      // Validate response structure following AI_INSTRUCTIONS.md defensive programming
+      if (!response || !response.choices || !Array.isArray(response.choices) || response.choices.length === 0) {
+        throw new Error('Invalid OpenAI API response structure');
+      }
+      
+      if (!response.choices[0] || !response.choices[0].message) {
+        throw new Error('OpenAI API response missing message content');
+      }
+      
+    } catch (apiError) {
+      console.error('❌ OpenAI API call failed:', {
+        voiceId,
+        type,
+        error: apiError instanceof Error ? apiError.message : 'Unknown API error',
+        stack: apiError instanceof Error ? apiError.stack : undefined
+      });
+      
+      // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
+      throw new Error(`OpenAI API failed for voice ${voiceId}: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
+    }
 
     logger.info('REAL OpenAI API response received', { 
       voiceId, 
@@ -211,22 +235,12 @@ Requirements:
       logger.error('OpenAI API call failed', { 
         voiceId, 
         type, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
       });
       
-      // Return error solution instead of crashing
-      return {
-        id: solutionId,
-        sessionId,
-        voiceCombination: `${type}:${voiceId}`,
-        code: `// Error generating solution for ${voiceId}\n// ${error instanceof Error ? error.message : 'Unknown error'}`,
-        explanation: `Error: Failed to generate solution using ${voiceId}. ${error instanceof Error ? error.message : 'Please try again.'}`,
-        confidence: 0.1,
-        strengths: ['Error handling'],
-        considerations: ['API service temporarily unavailable'],
-        perspective: type === 'perspective' ? voiceId : '',
-        role: type === 'role' ? voiceId : ''
-      };
+      // Following AI_INSTRUCTIONS.md: Re-throw error instead of returning mock data
+      throw new Error(`Failed to generate solution for ${voiceId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

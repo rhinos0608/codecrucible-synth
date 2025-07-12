@@ -552,13 +552,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/quota/check', isAuthenticated, async (req: any, res, next) => {
     try {
+      const userId = req.user.claims.sub;
+      
+      // Import dev mode utilities
+      const { isDevModeEnabled, getDevModeConfig } = await import('./lib/dev-mode');
+      
+      // Following AI_INSTRUCTIONS.md: Dev mode bypass for unlimited generations
+      if (isDevModeEnabled()) {
+        const devConfig = getDevModeConfig();
+        logger.info('Dev mode quota bypass enabled', {
+          userId: userId.substring(0, 8) + '...',
+          reason: devConfig.reason,
+          features: devConfig.features
+        });
+        
+        return res.json({
+          allowed: true,
+          dailyUsage: 0,
+          dailyLimit: -1, // Unlimited in dev mode
+          quotaLimit: -1,
+          quotaUsed: 0,
+          remaining: -1,
+          planTier: 'development',
+          resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          reason: 'dev_mode_enabled',
+          devMode: true
+        });
+      }
+      
+      // Following CodingPhilosophy.md: Regular quota check for production
+      const dailyUsage = 0; // In real implementation, fetch from database
+      const dailyLimit = 3; // Free tier limit
+      
       res.json({
-        dailyUsage: 0,
-        dailyLimit: 1000,
-        remaining: 1000,
-        resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
+        allowed: dailyUsage < dailyLimit,
+        dailyUsage,
+        dailyLimit,
+        quotaLimit: dailyLimit,
+        quotaUsed: dailyUsage,
+        remaining: dailyLimit - dailyUsage,
+        planTier: 'free',
+        resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        reason: dailyUsage >= dailyLimit ? 'quota_exceeded' : 'quota_available',
+        devMode: false
       });
     } catch (error) {
+      logger.error('Quota check failed', error as Error, {
+        userId: req.user?.claims?.sub
+      });
       next(error);
     }
   });

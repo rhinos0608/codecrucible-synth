@@ -98,13 +98,16 @@ export function usePlanGuard() {
 
       const planTier = quotaCheck.planTier;
       
+      // Following AI_INSTRUCTIONS.md: Dev mode overrides for frontend
+      const isDevMode = quotaCheck.devMode || quotaCheck.planTier === 'development';
+      
       setState({
-        canGenerate: quotaCheck.allowed,
-        canSynthesize: planTier === 'pro' || planTier === 'team',
-        canAccessAnalytics: planTier === 'pro' || planTier === 'team',
-        quotaUsed: quotaCheck.quotaUsed,
-        quotaLimit: quotaCheck.quotaLimit,
-        planTier,
+        canGenerate: quotaCheck.allowed || isDevMode,
+        canSynthesize: planTier === 'pro' || planTier === 'team' || isDevMode,
+        canAccessAnalytics: planTier === 'pro' || planTier === 'team' || isDevMode,
+        quotaUsed: quotaCheck.quotaUsed || 0,
+        quotaLimit: quotaCheck.quotaLimit || (isDevMode ? -1 : 3),
+        planTier: isDevMode ? 'development' : planTier,
         isLoading: false,
         error: null
       });

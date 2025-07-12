@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Code2, Loader2, CheckCircle, AlertTriangle, Brain, Zap } from "lucide-react";
 import { useStreamingGeneration } from "@/hooks/useStreamingGeneration";
+import { useNavigationGuard } from "@/hooks/useNavigationGuard";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
@@ -43,6 +44,19 @@ export function ChatGPTStyleGeneration({
     },
     onError: (error) => {
       console.error('Streaming generation error:', error);
+    }
+  });
+
+  // Navigation guard for active streaming - Following AI_INSTRUCTIONS.md patterns
+  useNavigationGuard({
+    shouldBlock: isStreaming,
+    message: 'Live streaming generation is active. Are you sure you want to stop? All progress will be lost.',
+    onBlock: () => {
+      console.log('Navigation blocked during streaming generation');
+    },
+    onConfirm: () => {
+      stopStreaming();
+      reset();
     }
   });
 

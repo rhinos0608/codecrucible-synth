@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useVoiceRecommendations } from "@/hooks/use-voice-recommendations";
 import { usePlanGuard } from "@/hooks/usePlanGuard";
+import { useNavigationGuard } from "@/hooks/useNavigationGuard";
 
 import type { Solution, VoiceProfile, Project } from "@shared/schema";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
@@ -71,6 +72,21 @@ export default function Dashboard() {
   // } = useNewUserDetection();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
+
+  // Navigation guard to prevent accidental exit during code generation
+  const { navigateWithConfirmation, isBlocking } = useNavigationGuard({
+    shouldBlock: isGenerating || showChatGPTGeneration,
+    message: 'Code generation is in progress. Are you sure you want to leave? Your progress will be lost.',
+    onBlock: () => {
+      console.log('Navigation blocked during code generation');
+    },
+    onConfirm: () => {
+      // Reset generation state when user confirms leaving
+      setShowChatGPTGeneration(false);
+      setCurrentSessionId(null);
+      setCurrentSolutions([]);
+    }
+  });
 
   // Enhanced generation with quota enforcement
   const handleSecureGeneration = async () => {
@@ -290,7 +306,7 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.location.href = '/onboarding'}
+                onClick={() => navigateWithConfirmation('/onboarding')}
                 className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
                 data-tour="learning-button"
               >
@@ -300,7 +316,7 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.location.href = '/analytics'}
+                onClick={() => navigateWithConfirmation('/analytics')}
                 className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
@@ -318,7 +334,7 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.location.href = '/teams'}
+                onClick={() => navigateWithConfirmation('/teams')}
                 className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
                 data-tour="teams-button"
               >
@@ -328,7 +344,16 @@ export default function Dashboard() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => window.location.href = '/api/logout'}
+                onClick={() => {
+                  if (isGenerating || showChatGPTGeneration) {
+                    const confirmed = window.confirm('Code generation is in progress. Are you sure you want to logout? Your progress will be lost.');
+                    if (confirmed) {
+                      window.location.href = '/api/logout';
+                    }
+                  } else {
+                    window.location.href = '/api/logout';
+                  }
+                }}
                 className="text-red-300 hover:text-red-100 border-red-600"
               >
                 <LogOut className="w-4 h-4 mr-2" />

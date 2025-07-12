@@ -47,26 +47,27 @@ export function usePlanGuard() {
     error: null
   });
 
-  // Check quota in real-time
+  // Check quota in real-time - Fixed JSON parsing issue following AI_INSTRUCTIONS.md patterns
   const checkQuota = async (): Promise<QuotaCheckResponse | null> => {
     if (!isAuthenticated || !user) return null;
     
     try {
-      const response = await apiRequest("/api/quota/check", { method: "GET" });
-      const data = await response.json();
+      // apiRequest already returns parsed JSON, no need to call .json() again
+      const data = await apiRequest("/api/quota/check", { method: "GET" });
       
-      console.log('Quota check response:', {
+      console.log('✅ Quota check successful:', {
         allowed: data.allowed,
         devMode: data.devMode,
         planTier: data.planTier,
         quotaUsed: data.quotaUsed,
         quotaLimit: data.quotaLimit,
+        unlimitedGenerations: data.unlimitedGenerations,
         reason: data.reason
       });
       
       return data;
     } catch (error) {
-      console.error('Failed to check quota:', error);
+      console.error('❌ Failed to check quota:', error);
       return null;
     }
   };
@@ -143,12 +144,16 @@ export function usePlanGuard() {
     
     console.log('Attempt Generation - Quota Check:', quotaCheck);
     
-    // Dev mode bypass - following AI_INSTRUCTIONS.md patterns
-    if (quotaCheck?.devMode || quotaCheck?.planTier === 'development' || quotaCheck?.unlimitedGenerations) {
-      console.log('✅ Dev mode/unlimited access detected - bypassing ALL quota restrictions:', {
+    // Critical dev mode bypass - following AI_INSTRUCTIONS.md patterns  
+    const isDevModeActive = quotaCheck?.devMode || quotaCheck?.planTier === 'development' || quotaCheck?.unlimitedGenerations || quotaCheck?.quotaLimit === 999;
+    
+    if (isDevModeActive) {
+      console.log('✅ Dev mode DETECTED - bypassing ALL quota restrictions in attemptGeneration:', {
         devMode: quotaCheck?.devMode,
         planTier: quotaCheck?.planTier,
-        unlimitedGenerations: quotaCheck?.unlimitedGenerations
+        unlimitedGenerations: quotaCheck?.unlimitedGenerations,
+        quotaLimit: quotaCheck?.quotaLimit,
+        bypassReason: 'dev_mode_unlimited_access'
       });
       try {
         const result = await generationFn();

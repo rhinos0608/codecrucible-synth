@@ -60,22 +60,42 @@ export function ChatGPTStyleGeneration({
   }, [isOpen, prompt, selectedVoices, startStreaming, reset]);
 
   // Voice color mapping following CodingPhilosophy.md consciousness visualization
+  // Voice color mapping following CodingPhilosophy.md consciousness visualization
   const getVoiceColor = (voiceId: string) => {
     const colors = {
-      // Code Analysis Engines (Perspectives)
-      seeker: 'from-blue-500 to-cyan-500',
-      steward: 'from-green-500 to-emerald-500', 
-      witness: 'from-purple-500 to-violet-500',
-      nurturer: 'from-pink-500 to-rose-500',
-      decider: 'from-orange-500 to-amber-500',
+      // Code Analysis Engines (Perspectives) - Cool colors for analytical thinking
+      seeker: 'from-blue-500 to-cyan-400',      // Explorer - Blue for discovery
+      steward: 'from-green-500 to-emerald-400', // Maintainer - Green for stability  
+      witness: 'from-purple-500 to-violet-400', // Analyzer - Purple for deep analysis
+      nurturer: 'from-pink-500 to-rose-400',    // Developer - Pink for nurturing
+      decider: 'from-orange-500 to-amber-400',  // Implementor - Orange for action
       
-      // Code Specialization Engines (Roles)
-      guardian: 'from-red-500 to-rose-500',
-      architect: 'from-indigo-500 to-blue-500',
-      designer: 'from-teal-500 to-cyan-500',
-      optimizer: 'from-yellow-500 to-orange-500'
+      // Code Specialization Engines (Roles) - Warm colors for specialized action
+      guardian: 'from-red-500 to-rose-400',     // Security Engineer - Red for protection
+      architect: 'from-indigo-600 to-blue-400', // Systems Architect - Indigo for structure
+      designer: 'from-teal-500 to-cyan-400',    // UI/UX Engineer - Teal for creativity
+      optimizer: 'from-yellow-500 to-orange-400' // Performance Engineer - Yellow for speed
     };
-    return colors[voiceId] || 'from-gray-500 to-slate-500';
+    return colors[voiceId] || 'from-gray-500 to-slate-400';
+  };
+
+  // Enhanced typing speed simulation per voice personality
+  const getTypingSpeed = (voiceId: string) => {
+    const speeds = {
+      // Perspectives - Different analytical speeds
+      seeker: 80,    // Explorer - Fast, experimental
+      steward: 60,   // Maintainer - Steady, careful
+      witness: 40,   // Analyzer - Slow, thorough
+      nurturer: 70,  // Developer - Moderate, thoughtful
+      decider: 90,   // Implementor - Very fast, decisive
+      
+      // Roles - Specialized working speeds
+      guardian: 50,  // Security Engineer - Methodical
+      architect: 45, // Systems Architect - Deliberate
+      designer: 85,  // UI/UX Engineer - Creative bursts
+      optimizer: 95  // Performance Engineer - Rapid optimization
+    };
+    return speeds[voiceId] || 65;
   };
 
   const getVoiceIcon = (voiceId: string) => {
@@ -153,39 +173,74 @@ export function ChatGPTStyleGeneration({
                   </div>
                 </div>
 
-                {/* Real-time content display */}
+                {/* Real-time content display with enhanced visual effects */}
                 <div className="space-y-3">
                   {voice.content ? (
-                    <div className="bg-gray-900 rounded-lg p-3 relative">
-                      <SyntaxHighlighter
-                        language="typescript"
-                        style={oneDark}
-                        className="!bg-transparent !text-sm"
-                        customStyle={{ 
-                          margin: 0, 
-                          padding: 0,
-                          background: 'transparent'
-                        }}
-                      >
-                        {voice.content}
-                      </SyntaxHighlighter>
-                      
-                      {/* Typing cursor effect */}
+                    <div className="relative">
+                      {/* Voice-specific header with streaming indicator */}
                       {voice.isTyping && (
-                        <span className="inline-block w-2 h-4 bg-purple-400 animate-pulse ml-1" />
+                        <div className={`absolute -top-2 -right-2 w-3 h-3 rounded-full bg-gradient-to-r ${getVoiceColor(voice.id)} animate-pulse`} />
+                      )}
+                      
+                      {/* Code content with syntax highlighting */}
+                      <div className="bg-gray-900 rounded-lg p-3 relative border border-gray-700">
+                        <SyntaxHighlighter
+                          language="typescript"
+                          style={oneDark}
+                          className="!bg-transparent !text-sm"
+                          customStyle={{ 
+                            margin: 0, 
+                            padding: 0,
+                            background: 'transparent',
+                            fontSize: '13px',
+                            lineHeight: '1.4'
+                          }}
+                        >
+                          {voice.content}
+                        </SyntaxHighlighter>
+                        
+                        {/* Enhanced typing cursor with voice-specific color */}
+                        {voice.isTyping && (
+                          <div className="flex items-center gap-1 mt-2">
+                            <span className={`inline-block w-2 h-4 bg-gradient-to-r ${getVoiceColor(voice.id)} animate-pulse`} />
+                            <span className="text-xs text-gray-400">
+                              {voice.name} is thinking...
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Council dialogue bubble - Following CodingPhilosophy.md */}
+                      {voice.isTyping && (
+                        <div className={`mt-2 p-2 rounded-lg bg-gradient-to-r ${getVoiceColor(voice.id)} bg-opacity-10 border border-gray-600`}>
+                          <div className="text-xs text-gray-300">
+                            <span className="font-semibold">{voice.name}:</span>
+                            <span className="ml-2 italic">
+                              {voice.id === 'seeker' && "Exploring innovative approaches..."}
+                              {voice.id === 'steward' && "Ensuring code maintainability..."}
+                              {voice.id === 'witness' && "Analyzing architecture deeply..."}
+                              {voice.id === 'nurturer' && "Focusing on user experience..."}
+                              {voice.id === 'decider' && "Making implementation decisions..."}
+                              {voice.id === 'guardian' && "Adding security measures..."}
+                              {voice.id === 'architect' && "Structuring system design..."}
+                              {voice.id === 'designer' && "Crafting beautiful interfaces..."}
+                              {voice.id === 'optimizer' && "Optimizing for performance..."}
+                            </span>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ) : (
-                    <div className="bg-gray-900 rounded-lg p-4 flex items-center justify-center text-gray-500">
+                    <div className="bg-gray-900 rounded-lg p-4 flex items-center justify-center text-gray-500 border border-gray-700">
                       {voice.isTyping ? (
                         <div className="flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Initializing {voice.name}...
+                          <div className={`w-4 h-4 rounded-full bg-gradient-to-r ${getVoiceColor(voice.id)} animate-pulse`} />
+                          <span>Connecting to {voice.name}...</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
                           <Code2 className="w-4 h-4" />
-                          Waiting to start...
+                          <span>Ready to stream...</span>
                         </div>
                       )}
                     </div>

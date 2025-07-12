@@ -117,14 +117,17 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     }
   }, [user, initializeVoices, onError]);
 
-  // Start individual voice stream
+  // Start individual voice stream with enhanced error handling
   const startVoiceStream = useCallback((voiceId: string, sessionId: number, type: 'perspective' | 'role') => {
     // Close existing stream if any
     if (streamRefs.current[voiceId]) {
       streamRefs.current[voiceId].close();
+      delete streamRefs.current[voiceId];
     }
 
-    // Create new EventSource for streaming
+    console.log(`Starting voice stream for ${voiceId} (${type}) on session ${sessionId}`);
+
+    // Create new EventSource for streaming with proper error handling
     const eventSource = new EventSource(
       `/api/sessions/${sessionId}/stream/${voiceId}?type=${type}`
     );
@@ -141,6 +144,7 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log(`Received ${data.type} from ${voiceId}:`, data.content?.substring(0, 50) + '...');
         
         if (data.type === 'chunk') {
           // Append new content with ChatGPT-style typing effect
@@ -150,6 +154,8 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
               : voice
           ));
         } else if (data.type === 'complete') {
+          console.log(`Voice ${voiceId} completed generation`);
+          
           // Mark voice as complete
           setVoices(prev => prev.map(voice => 
             voice.id === voiceId 
@@ -168,14 +174,20 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
 
           // Check if all voices are complete
           setVoices(currentVoices => {
-            const allComplete = currentVoices.every(v => v.id === voiceId ? true : v.isComplete);
+            const updatedVoices = currentVoices.map(v => 
+              v.id === voiceId ? { ...v, isTyping: false, isComplete: true } : v
+            );
+            const allComplete = updatedVoices.every(v => v.isComplete);
+            
             if (allComplete) {
+              console.log('All voices completed - streaming finished');
               setIsStreaming(false);
               onComplete?.(sessionId);
             }
-            return currentVoices;
+            return updatedVoices;
           });
         } else if (data.type === 'error') {
+          console.error(`Voice ${voiceId} encountered error:`, data.error);
           setVoices(prev => prev.map(voice => 
             voice.id === voiceId 
               ? { 
@@ -190,24 +202,28 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
           delete streamRefs.current[voiceId];
         }
       } catch (error) {
-        console.error('Failed to parse streaming data:', error);
+        console.error('Failed to parse streaming data for', voiceId, ':', error);
       }
     };
 
     eventSource.onerror = (error) => {
-      console.error('Streaming error for voice:', voiceId, error);
+      console.error('EventSource error for voice:', voiceId, error);
       setVoices(prev => prev.map(voice => 
         voice.id === voiceId 
           ? { 
               ...voice, 
               isTyping: false, 
               isComplete: true, 
-              error: 'Connection error' 
+              error: 'Streaming connection failed' 
             }
           : voice
       ));
       eventSource.close();
       delete streamRefs.current[voiceId];
+    };
+
+    eventSource.onopen = () => {
+      console.log(`EventSource opened for voice ${voiceId}`);
     };
   }, [onComplete]);
 

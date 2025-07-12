@@ -1097,6 +1097,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ChatGPT-style streaming endpoint - Following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+  app.get('/api/sessions/:sessionId/stream/:voiceId', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { sessionId, voiceId } = req.params;
+      const { type } = req.query; // 'perspective' or 'role'
+      const userId = req.user.claims.sub;
+
+      logger.info('Starting ChatGPT-style streaming for voice', {
+        sessionId: parseInt(sessionId),
+        voiceId,
+        type,
+        userId: userId.substring(0, 8) + '...'
+      });
+
+      // Validate session ownership
+      const session = await storage.getVoiceSession(parseInt(sessionId));
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      // Set up Server-Sent Events headers
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
+
+      // Import OpenAI service for streaming
+      const { openaiService } = await import('./openai-service');
+
+      // Start streaming generation
+      await openaiService.generateSolutionStream({
+        prompt: session.prompt,
+        perspectives: session.selectedVoices.perspectives || [],
+        roles: session.selectedVoices.roles || [],
+        sessionId: parseInt(sessionId),
+        voiceId,
+        type: type as 'perspective' | 'role',
+        onChunk: (chunk: string) => {
+          // Send chunk to client with proper SSE format
+          res.write(`data: ${JSON.stringify({ 
+            type: 'chunk', 
+            content: chunk,
+            voiceId,
+            timestamp: Date.now()
+          })}\n\n`);
+        },
+        onComplete: async (solution: any) => {
+          // Store solution in database
+          await storage.createSolution({
+            sessionId: parseInt(sessionId),
+            voiceCombination: solution.voiceCombination,
+            code: solution.code,
+            explanation: solution.explanation,
+            confidence: solution.confidence,
+            strengths: solution.strengths,
+            considerations: solution.considerations
+          });
+
+          // Send completion message
+          res.write(`data: ${JSON.stringify({ 
+            type: 'complete', 
+            voiceId,
+            confidence: solution.confidence,
+            timestamp: Date.now()
+          })}\n\n`);
+          
+          res.end();
+        }
+      });
+
+    } catch (error) {
+      logger.error('Streaming generation failed', error as Error, {
+        sessionId: req.params.sessionId,
+        voiceId: req.params.voiceId
+      });
+      
+      // Send error message via SSE
+      res.write(`data: ${JSON.stringify({ 
+        type: 'error', 
+        error: 'Generation failed',
+        voiceId: req.params.voiceId
+      })}\n\n`);
+      res.end();
+    }
+  });
+
+  // Create streaming session endpoint
+  app.post('/api/sessions/stream', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { prompt, selectedVoices, mode = 'streaming' } = req.body;
+      
+      // Following AI_INSTRUCTIONS.md: Input validation
+      if (!prompt?.trim()) {
+        return res.status(400).json({ error: 'Prompt is required' });
+      }
+      
+      if (!selectedVoices.perspectives?.length && !selectedVoices.roles?.length) {
+        return res.status(400).json({ error: 'At least one voice must be selected' });
+      }
+
+      // Create session for streaming
+      const session = await storage.createVoiceSession({
+        userId,
+        prompt: prompt.trim(),
+        selectedVoices: {
+          perspectives: selectedVoices.perspectives || [],
+          roles: selectedVoices.roles || []
+        },
+        recursionDepth: 2,
+        synthesisMode: 'competitive',
+        ethicalFiltering: true,
+        mode: 'streaming'
+      });
+
+      logger.info('ChatGPT-style streaming session created', {
+        sessionId: session.id,
+        userId: userId.substring(0, 8) + '...',
+        voiceCount: (selectedVoices.perspectives?.length || 0) + (selectedVoices.roles?.length || 0),
+        mode: 'streaming'
+      });
+
+      res.json({ sessionId: session.id });
+    } catch (error) {
+      logger.error('Failed to create streaming session', error as Error, {
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
   // Following CodingPhilosophy.md: Real-time voice streaming endpoint
   app.get('/api/sessions/:sessionId/stream/:voiceId', isAuthenticated, async (req: any, res, next) => {
     try {

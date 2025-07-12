@@ -549,6 +549,184 @@ Production Readiness:
 - Fallback mechanisms for API failures
 - Security audit logging with sanitized data`;
   }
+
+  // Following CodingPhilosophy.md: Real-time streaming generation method
+  async generateSolutionStream(
+    request: CodeGenerationRequest & {
+      voiceId: string;
+      type: 'perspective' | 'role';
+      onChunk: (chunk: string) => void;
+      onComplete: (solution: GeneratedSolution) => void;
+    }
+  ): Promise<void> {
+    const { voiceId, type, onChunk, onComplete, ...baseRequest } = request;
+    
+    try {
+      if (!openai) {
+        // Fallback for development without OpenAI key
+        await this.simulateStreamGeneration(voiceId, type, baseRequest, onChunk, onComplete);
+        return;
+      }
+
+      // Get system prompt for specific voice
+      const systemPrompt = type === 'perspective' 
+        ? this.getPerspectiveSystemPrompt(voiceId as CodePerspective)
+        : this.getRoleSystemPrompt(voiceId as DevelopmentRole);
+
+      const userPrompt = `${baseRequest.prompt}
+
+Please provide a complete, production-ready solution following AI_INSTRUCTIONS.md patterns.`;
+
+      logger.info('Starting streaming OpenAI generation', {
+        requestId: `${baseRequest.sessionId}-${voiceId}-stream`,
+        voiceId,
+        type
+      });
+
+      // Create streaming completion
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        stream: true
+      });
+
+      let fullContent = '';
+      
+      // Process stream chunks
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          fullContent += content;
+          onChunk(content);
+          
+          // Add realistic typing delay following CodingPhilosophy.md flow
+          await new Promise(resolve => setTimeout(resolve, 20 + Math.random() * 30));
+        }
+      }
+
+      // Parse and validate final response
+      const solution = this.parseOpenAIResponse(fullContent, voiceId, type);
+      onComplete(solution);
+
+    } catch (error) {
+      logger.error('Streaming generation failed', error as Error, {
+        voiceId,
+        type,
+        sessionId: baseRequest.sessionId
+      });
+      
+      // Fallback to simulated generation
+      await this.simulateStreamGeneration(voiceId, type, baseRequest, onChunk, onComplete);
+    }
+  }
+
+  // Following AI_INSTRUCTIONS.md: Secure fallback simulation for development
+  private async simulateStreamGeneration(
+    voiceId: string,
+    type: 'perspective' | 'role',
+    request: CodeGenerationRequest,
+    onChunk: (chunk: string) => void,
+    onComplete: (solution: GeneratedSolution) => void
+  ): Promise<void> {
+    const sampleCode = this.generateFallbackSolution(request.prompt, voiceId, type);
+    
+    // Simulate realistic typing with chunks
+    const chunks = sampleCode.split(' ');
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = i === 0 ? chunks[i] : ' ' + chunks[i];
+      onChunk(chunk);
+      
+      // Realistic typing speed
+      await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
+    }
+
+    // Create solution object
+    const solution: GeneratedSolution = {
+      voiceCombination: voiceId,
+      code: sampleCode,
+      explanation: `Simulated solution from ${voiceId} (${type}) for development mode`,
+      confidence: 75 + Math.floor(Math.random() * 20),
+      strengths: ['Development mode simulation', 'Quick iteration', 'No API costs'],
+      considerations: ['Replace with real OpenAI integration', 'Add proper validation'],
+      perspective: type === 'perspective' ? voiceId : '',
+      role: type === 'role' ? voiceId : ''
+    };
+
+    onComplete(solution);
+  }
+
+  // Generate realistic fallback code for development
+  private generateFallbackSolution(prompt: string, voiceId: string, type: string): string {
+    const watermark = createDevModeWatermark();
+    
+    return `${watermark}
+// ${voiceId.charAt(0).toUpperCase() + voiceId.slice(1)} ${type} Solution
+// Prompt: ${prompt.substring(0, 100)}...
+
+import React, { useState, useEffect } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+
+interface SolutionProps {
+  data: any[];
+  onUpdate: (data: any) => void;
+}
+
+export function ${voiceId.charAt(0).toUpperCase() + voiceId.slice(1)}Solution({ data, onUpdate }: SolutionProps) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleProcess = async () => {
+    setLoading(true);
+    try {
+      // ${voiceId} specific implementation
+      const processed = data.map(item => ({
+        ...item,
+        processed: true,
+        timestamp: new Date().toISOString()
+      }));
+      
+      setResult(processed);
+      onUpdate(processed);
+    } catch (error) {
+      console.error('Processing failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-semibold mb-4">
+        ${voiceId.charAt(0).toUpperCase() + voiceId.slice(1)} Implementation
+      </h3>
+      
+      <div className="space-y-4">
+        <Button 
+          onClick={handleProcess} 
+          disabled={loading}
+          className="w-full"
+        >
+          {loading ? 'Processing...' : 'Execute Solution'}
+        </Button>
+        
+        {result && (
+          <div className="mt-4 p-3 bg-gray-100 rounded">
+            <pre className="text-sm">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}`;
+  }
 }
 
 export const openaiService = new OpenAIService();

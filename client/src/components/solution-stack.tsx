@@ -127,17 +127,28 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
               </div>
 
               {solutions.length > 0 && (
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Ready to merge solutions into final implementation?
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Ready to merge solutions into final implementation?
+                    </div>
+                    <Button 
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+                      onClick={handleMergeClick}
+                    >
+                      <Layers3 className="w-4 h-4" />
+                      <span>Synthesize Solutions</span>
+                    </Button>
                   </div>
-                  <Button 
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
-                    onClick={handleMergeClick}
-                  >
-                    <Layers3 className="w-4 h-4" />
-                    <span>Merge Solutions</span>
-                  </Button>
+                  
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h6 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Next Steps</h6>
+                    <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                      <li>• Click "Synthesize Solutions" to merge all approaches with AI</li>
+                      <li>• Review and edit the synthesized code</li>
+                      <li>• Save the final solution to your Projects for future use</li>
+                    </ul>
+                  </div>
                 </div>
               )}
             </>

@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Check, Zap, Users, BarChart, Sparkles } from "lucide-react";
+import { Check, Zap, Users, BarChart, Sparkles, Loader2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { usePlanGuard } from "@/hooks/usePlanGuard";
 
 interface UpgradeModalProps {
@@ -93,12 +95,41 @@ export default function UpgradeModal({
     }
   ];
 
+  const upgradeMutation = useMutation({
+    mutationFn: async (tier: string) => {
+      const response = await apiRequest("POST", "/api/subscription/checkout", { tier });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.checkoutUrl) {
+        // Redirect directly to Stripe checkout
+        window.location.href = data.checkoutUrl;
+      } else {
+        console.error('No checkout URL received from server');
+      }
+    },
+    onError: (error: any) => {
+      console.error('Checkout error:', error);
+      // Fallback to subscribe page if direct checkout fails
+      window.location.href = `/subscribe?plan=${selectedPlan}`;
+    },
+  });
+
   const handleUpgrade = async (planType: 'pro' | 'team' | 'enterprise') => {
     try {
-      // Redirect to Stripe checkout or subscription page
-      window.location.href = `/subscribe?plan=${planType}`;
+      if (planType === 'enterprise') {
+        // For enterprise, redirect to subscribe page for now
+        window.location.href = `/subscribe?plan=${planType}`;
+        return;
+      }
+      
+      upgradeMutation.mutate(planType);
     } catch (error) {
       console.error('Failed to initiate upgrade:', error);
+      window.location.href = `/subscribe?plan=${planType}`;
     }
   };
 
@@ -183,9 +214,17 @@ export default function UpgradeModal({
           </Button>
           <Button 
             onClick={() => handleUpgrade(selectedPlan)}
+            disabled={upgradeMutation.isPending}
             className="px-8"
           >
-            Upgrade to {selectedPlan === 'pro' ? 'Pro' : 'Team'} - {plans.find(p => p.id === selectedPlan)?.price}/month
+            {upgradeMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Starting Checkout...
+              </>
+            ) : (
+              `Upgrade to ${plans.find(p => p.id === selectedPlan)?.name} - ${plans.find(p => p.id === selectedPlan)?.price}/month`
+            )}
           </Button>
         </div>
       </DialogContent>

@@ -45,23 +45,28 @@ export default function Subscribe() {
   const checkoutMutation = useMutation({
     mutationFn: async (tier: string) => {
       const response = await apiRequest("POST", "/api/subscription/checkout", { tier });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       return response.json();
     },
     onSuccess: (data) => {
       if (data.checkoutUrl) {
+        // Redirect to Stripe checkout page
         window.location.href = data.checkoutUrl;
       } else {
         toast({
-          title: "Error",
-          description: "Unable to create checkout session. Please try again.",
+          title: "Checkout Error",
+          description: "Unable to create Stripe checkout session. Please try again.",
           variant: "destructive",
         });
       }
     },
     onError: (error: any) => {
+      console.error('Checkout error:', error);
       toast({
-        title: "Checkout Error",
-        description: error.message || "Failed to start checkout process",
+        title: "Checkout Failed",
+        description: error.message || "Failed to start Stripe checkout process. Please try again.",
         variant: "destructive",
       });
     },

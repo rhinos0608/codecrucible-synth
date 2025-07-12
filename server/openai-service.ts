@@ -551,6 +551,9 @@ Following CodingPhilosophy.md consciousness principles:
 
 export const realOpenAIService = new RealOpenAIService();
 
+// Export service instance for routes.ts import
+export { realOpenAIService as default };
+
 // Export for compatibility
 export const optimizedOpenAIService = realOpenAIService;
 export const openaiService = realOpenAIService;

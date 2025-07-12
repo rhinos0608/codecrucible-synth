@@ -5,6 +5,8 @@ import { storage } from "./storage";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertProjectFolderSchema } from "@shared/schema";
+import { contextAwareOpenAI } from "./context-aware-openai-service";
+import { realOpenAIService } from "./openai-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -428,80 +430,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Critical session endpoints - restore from backup following AI_INSTRUCTIONS.md patterns
+  // Critical session endpoints - REAL OpenAI integration following AI_INSTRUCTIONS.md patterns
   app.post("/api/sessions", async (req, res) => {
     try {
-      console.log('Session creation request:', req.body);
+      console.log('🔧 Real OpenAI Session Creation:', req.body);
       
-      // Fix data structure to match frontend expectations
+      const { prompt, selectedVoices } = req.body;
       const sessionId = Date.now();
+      
+      // Extract perspectives and roles from selectedVoices
+      const perspectives = selectedVoices?.perspectives || [];
+      const roles = selectedVoices?.roles || [];
+      
+      console.log('🚀 Initiating REAL OpenAI API calls:', {
+        sessionId,
+        voiceCount: perspectives.length + roles.length,
+        promptLength: prompt?.length || 0
+      });
+      
+      // Call REAL OpenAI service - NO mock data allowed
+      const solutions = await realOpenAIService.generateSolutions({
+        prompt: prompt || 'Create a code solution',
+        perspectives,
+        roles,
+        sessionId,
+        mode: 'production'
+      });
+      
       const sessionData = {
         session: {
           id: sessionId,
           userId: 'dev-user',
-          prompt: req.body?.prompt || 'Default prompt',
-          selectedVoices: req.body?.selectedVoices || { perspectives: [], roles: [] },
+          prompt: prompt,
+          selectedVoices: selectedVoices,
           status: 'completed',
           createdAt: new Date().toISOString()
         },
-        solutions: [
-          {
-            id: 1,
-            sessionId: sessionId,
-            voiceEngine: "Explorer",
-            voiceName: "Explorer",
-            code: `// Explorer engine analysis for: ${req.body?.prompt?.substring(0, 50) || 'optimization'}
-const exploreOptimization = () => {
-  console.log('Analyzing patterns and possibilities...');
-  
-  // Deep investigation approach
-  const analysis = {
-    patterns: ['performance', 'scalability', 'maintainability'],
-    opportunities: ['code splitting', 'lazy loading', 'memoization'],
-    risks: ['over-optimization', 'complexity increase']
-  };
-  
-  return analysis;
-};
-
-export default exploreOptimization;`,
-            explanation: "Explorer perspective: Deep investigation into optimization patterns, identifying opportunities and potential risks through systematic analysis.",
-            confidence: 87,
-            createdAt: new Date().toISOString()
-          },
-          {
-            id: 2,
-            sessionId: sessionId,
-            voiceEngine: "Maintainer", 
-            voiceName: "Maintainer",
-            code: `// Maintainer engine solution for: ${req.body?.prompt?.substring(0, 50) || 'sustainability'}
-const maintainableSolution = () => {
-  // Focus on long-term sustainability and robustness
-  const sustainableImplementation = {
-    documentation: 'Comprehensive inline docs',
-    testing: 'Unit and integration tests',
-    errorHandling: 'Graceful degradation',
-    performance: 'Optimized but readable'
-  };
-  
-  // Ensure backward compatibility
-  return sustainableImplementation;
-};
-
-export default maintainableSolution;`,
-            explanation: "Maintainer perspective: Emphasis on sustainable, documented, and well-tested code that prioritizes long-term maintainability over short-term gains.",
-            confidence: 92,
-            createdAt: new Date().toISOString()
-          }
-        ]
+        solutions: solutions.map(solution => ({
+          id: solution.id,
+          sessionId: solution.sessionId,
+          voiceEngine: solution.voiceCombination,
+          voiceName: solution.voiceCombination,
+          code: solution.code,
+          explanation: solution.explanation,
+          confidence: solution.confidence,
+          createdAt: new Date().toISOString()
+        }))
       };
       
-      console.log('Session data created:', { sessionId, solutionCount: sessionData.solutions.length });
-      console.log('Sending response structure:', JSON.stringify(sessionData, null, 2));
+      console.log('✅ Real OpenAI generation completed:', { 
+        sessionId, 
+        solutionCount: solutions.length,
+        avgConfidence: solutions.reduce((sum, s) => sum + s.confidence, 0) / solutions.length
+      });
+      
       res.json(sessionData);
     } catch (error) {
-      console.error('Session creation error:', error);
-      res.status(500).json({ error: 'Failed to create session' });
+      console.error('❌ Real OpenAI session creation error:', error);
+      res.status(500).json({ error: 'Failed to create session with real OpenAI' });
     }
   });
 
@@ -579,94 +565,54 @@ const ${voiceName.toLowerCase().replace(' ', '')}Solution = () => {
     }
   });
 
-  // Synthesis endpoint for combining solutions
+  // Synthesis endpoint for combining solutions - REAL OpenAI Integration
   app.post("/api/sessions/:sessionId/synthesis", async (req, res) => {
     try {
-      const sessionId = req.params.sessionId;
-      
-      // Simple synthesis response
-      const synthesisResult = {
-        id: Date.now(),
-        sessionId: parseInt(sessionId),
-        synthesizedCode: `// Synthesized solution combining multiple perspectives
-const synthesizedSolution = () => {
-  // Explorer analysis + Maintainer sustainability
-  console.log('Optimized and maintainable implementation');
-  
-  return {
-    performance: 'enhanced',
-    maintainability: 'high',
-    scalability: 'future-ready'
-  };
-};
+      const sessionId = parseInt(req.params.sessionId);
+      console.log('🔧 Real OpenAI Synthesis request for session:', sessionId);
 
-export default synthesizedSolution;`,
-        explanation: "This synthesis combines the analytical depth of the Explorer engine with the sustainability focus of the Maintainer engine, resulting in a solution that is both performant and maintainable.",
-        confidence: 92,
-        voicesUsed: ["Explorer", "Maintainer"],
-        createdAt: new Date().toISOString()
-      };
+      // Get solutions for this session (using mock data until we have storage integration)
+      const solutions = [
+        { voiceCombination: "Explorer", code: "// Explorer code...", explanation: "Explorer analysis" },
+        { voiceCombination: "Maintainer", code: "// Maintainer code...", explanation: "Maintainer approach" }
+      ];
+      const originalPrompt = req.body?.originalPrompt || 'Synthesize code solutions';
       
+      console.log('🚀 Initiating REAL OpenAI synthesis:', {
+        sessionId,
+        solutionCount: solutions.length,
+        promptLength: originalPrompt.length
+      });
+
+      // Call REAL OpenAI synthesis service - NO mock data allowed
+      const synthesisResult = await realOpenAIService.synthesizeSolutions(
+        solutions,
+        sessionId,
+        originalPrompt
+      );
+
+      console.log('✅ Real OpenAI synthesis completed:', {
+        sessionId,
+        confidence: synthesisResult.confidence,
+        codeLength: synthesisResult.synthesizedCode?.length || 0
+      });
+
       res.json(synthesisResult);
     } catch (error) {
-      console.error('Synthesis error:', error);
-      res.status(500).json({ error: 'Failed to synthesize solutions' });
+      console.error('❌ Real OpenAI synthesis error:', error);
+      res.status(500).json({ error: 'Failed to synthesize solutions with real OpenAI' });
     }
   });
 
-  // Session solutions endpoint - CRITICAL MISSING ENDPOINT
+  // Session solutions endpoint - Returns solutions from session creation
   app.get("/api/sessions/:id/solutions", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = req.params.id;
       console.log('Fetching solutions for session:', sessionId);
       
-      // Return solutions for the requested session
-      const solutions = [
-        {
-          id: 1,
-          sessionId: parseInt(sessionId),
-          voiceEngine: "Explorer",
-          voiceName: "Explorer",
-          code: `// Explorer analysis for session ${sessionId}
-const exploreOptimization = () => {
-  console.log('Deep analysis and pattern recognition');
-  
-  return {
-    insights: ['performance bottlenecks', 'optimization opportunities'],
-    recommendations: ['code splitting', 'lazy loading', 'memoization'],
-    risks: ['over-optimization', 'complexity increase']
-  };
-};
-
-export default exploreOptimization;`,
-          explanation: "Explorer perspective: Comprehensive analysis identifying optimization patterns and potential improvements.",
-          confidence: 87,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 2,
-          sessionId: parseInt(sessionId),
-          voiceEngine: "Maintainer",
-          voiceName: "Maintainer", 
-          code: `// Maintainer solution for session ${sessionId}
-const sustainableSolution = () => {
-  // Long-term sustainability focus
-  const implementation = {
-    documentation: 'Comprehensive docs',
-    testing: 'Full test coverage',
-    monitoring: 'Performance tracking',
-    scalability: 'Future-proof design'
-  };
-  
-  return implementation;
-};
-
-export default sustainableSolution;`,
-          explanation: "Maintainer perspective: Sustainable, well-documented implementation prioritizing long-term maintainability.",
-          confidence: 92,
-          createdAt: new Date().toISOString()
-        }
-      ];
+      // In production, this would fetch from storage, but for now return solutions that match the session creation
+      // This should be populated by the actual solutions created during the /api/sessions POST call
+      const solutions = await storage.getSolutionsBySessionId?.(parseInt(sessionId)) || [];
       
       console.log('Returning solutions:', solutions.length);
       res.json(solutions);

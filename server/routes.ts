@@ -957,7 +957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { tier } = req.body;
       
-      if (!['pro', 'team'].includes(tier)) {
+      if (!['pro', 'team', 'enterprise'].includes(tier)) {
         throw new APIError(400, 'Invalid subscription tier');
       }
       
@@ -966,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const session = await subscriptionService.createCheckoutSession(
         userId,
-        tier as 'pro' | 'team',
+        tier as 'pro' | 'team' | 'enterprise',
         successUrl,
         cancelUrl
       );

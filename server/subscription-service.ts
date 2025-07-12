@@ -18,7 +18,7 @@ import { isDevModeFeatureEnabled, logDevModeBypass } from "./lib/dev-mode";
 import Stripe from "stripe";
 
 interface SubscriptionTier {
-  name: "free" | "pro" | "team";
+  name: "free" | "pro" | "team" | "enterprise";
   price: number; // in cents
   dailyGenerationLimit: number;
   features: string[];
@@ -39,7 +39,7 @@ const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
   },
   pro: {
     name: "pro",
-    price: 1500, // $15/month
+    price: 1900, // $19/month
     dailyGenerationLimit: -1, // unlimited
     features: ["All voice combinations", "Unlimited generations", "Analytics dashboard", "Voice preference learning"],
     maxVoiceCombinations: 10,
@@ -48,10 +48,19 @@ const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
   },
   team: {
     name: "team",
-    price: 5000, // $50/month
+    price: 4900, // $49/month
     dailyGenerationLimit: -1, // unlimited
     features: ["Everything in Pro", "Team collaboration", "Shared voice profiles", "Team analytics", "Priority support"],
     maxVoiceCombinations: 10,
+    allowsAnalytics: true,
+    allowsTeams: true,
+  },
+  enterprise: {
+    name: "enterprise",
+    price: 9900, // $99/month
+    dailyGenerationLimit: -1, // unlimited
+    features: ["Everything in Team", "Custom AI training", "On-premise deployment", "SSO integration", "Dedicated support", "Custom integrations", "SLA guarantees", "Compliance features"],
+    maxVoiceCombinations: 20,
     allowsAnalytics: true,
     allowsTeams: true,
   },
@@ -181,7 +190,7 @@ class SubscriptionService {
     }
   }
 
-  async createCheckoutSession(userId: string, tier: "pro" | "team", successUrl: string, cancelUrl: string) {
+  async createCheckoutSession(userId: string, tier: "pro" | "team" | "enterprise", successUrl: string, cancelUrl: string) {
     if (!this.stripe) {
       throw new Error("Stripe not configured");
     }

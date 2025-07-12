@@ -10,6 +10,7 @@ import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
 
 import { AvatarCustomizer } from "@/components/avatar-customizer";
+import { ChatGPTStyleGeneration } from "@/components/chatgpt-style-generation";
 
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
 
   const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
+  const [showChatGPTGeneration, setShowChatGPTGeneration] = useState(false);
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
@@ -464,30 +466,44 @@ export default function Dashboard() {
                 <div className="text-sm text-gray-400">
                   {state.prompt.length > 0 ? `${state.prompt.length} characters` : "Start typing your request..."}
                 </div>
-                <Button
-                  onClick={handleGenerateSolutions}
-                  disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-                  data-tour="generate-button"
-                >
-                  <Brain className="w-4 h-4 mr-2" />
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Live Council Generation...
-                    </>
-                  ) : (
-                    "Live Council Generation"
-                  )}
-                  <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800 text-xs">
-                    {planGuard.planTier === 'free' ? `${planGuard.quotaUsed}/${planGuard.quotaLimit}` : 'UNLIMITED'}
-                  </Badge>
-                  {isFrontendDevModeFeatureEnabled('showDevBadges') && (
-                    <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 text-xs">
-                      {createDevModeBadge()}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <Button
+                    onClick={handleGenerateSolutions}
+                    disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                    data-tour="generate-button"
+                  >
+                    <Brain className="w-4 h-4 mr-2" />
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Council Generation...
+                      </>
+                    ) : (
+                      "Council Generation"
+                    )}
+                    <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 text-xs">
+                      {planGuard.planTier === 'free' ? `${planGuard.quotaUsed}/${planGuard.quotaLimit}` : 'UNLIMITED'}
                     </Badge>
-                  )}
-                </Button>
+                  </Button>
+
+                  <Button
+                    onClick={() => setShowChatGPTGeneration(true)}
+                    disabled={!state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                  >
+                    <Brain className="w-4 h-4 mr-2" />
+                    Live Streaming
+                    <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800 text-xs">
+                      REAL-TIME
+                    </Badge>
+                    {isFrontendDevModeFeatureEnabled('showDevBadges') && (
+                      <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 text-xs">
+                        {createDevModeBadge()}
+                      </Badge>
+                    )}
+                  </Button>
+                </div>
               </div>
               {/* Validation Error Display */}
               {!state.prompt.trim() && (
@@ -576,6 +592,20 @@ export default function Dashboard() {
           setEditingProfile(null);
         }}
         editingProfile={editingProfile}
+      />
+
+      <ChatGPTStyleGeneration
+        isOpen={showChatGPTGeneration}
+        onClose={() => setShowChatGPTGeneration(false)}
+        prompt={state.prompt}
+        selectedVoices={{
+          perspectives: state.selectedPerspectives,
+          roles: state.selectedRoles
+        }}
+        onComplete={(sessionId) => {
+          setCurrentSessionId(sessionId);
+          setShowSolutionStack(true);
+        }}
       />
 
 

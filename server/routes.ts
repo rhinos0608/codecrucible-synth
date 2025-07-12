@@ -1056,80 +1056,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Following AI_INSTRUCTIONS.md: Streaming session creation endpoint
-  app.post('/api/sessions/stream', isAuthenticated, async (req: any, res, next) => {
+
+
+  // Fix synthesis endpoint that was returning HTML
+  app.post('/api/sessions/:sessionId/synthesis', isAuthenticated, async (req: any, res, next) => {
     try {
+      const sessionId = parseInt(req.params.sessionId);
       const userId = req.user.claims.sub;
-      const { prompt, selectedVoices, mode = 'streaming' } = req.body;
       
-      // Following AI_INSTRUCTIONS.md: Input validation with Zod
-      const streamSessionSchema = z.object({
-        prompt: z.string().min(1).max(15000),
-        selectedVoices: z.object({
-          perspectives: z.array(z.string()).optional().default([]),
-          roles: z.array(z.string()).optional().default([])
-        }),
-        mode: z.literal('streaming').optional()
-      });
+      logger.info('Starting real OpenAI synthesis for session:', sessionId);
       
-      const validatedData = streamSessionSchema.parse({ prompt, selectedVoices, mode });
-      
-      if (!selectedVoices.perspectives?.length && !selectedVoices.roles?.length) {
-        return res.status(400).json({ error: 'At least one voice must be selected' });
+      // Validate session ownership
+      const session = await storage.getVoiceSession(sessionId);
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: 'Session not found' });
       }
 
-      // Create session for streaming
-      const session = await storage.createVoiceSession({
-        userId,
-        prompt: validatedData.prompt,
-        selectedVoices: {
-          perspectives: validatedData.selectedVoices.perspectives || [],
-          roles: validatedData.selectedVoices.roles || []
-        },
-        recursionDepth: 2,
-        synthesisMode: 'competitive',
-        ethicalFiltering: true,
-        mode: 'streaming'
-      });
+      // Get solutions for synthesis
+      const solutions = await storage.getSolutionsBySession(sessionId);
+      if (solutions.length === 0) {
+        return res.status(400).json({ error: 'No solutions available for synthesis' });
+      }
 
-      logger.info('Streaming session created', {
-        sessionId: session.id,
-        userId: userId.substring(0, 8) + '...',
-        voiceCount: (selectedVoices.perspectives?.length || 0) + (selectedVoices.roles?.length || 0)
-      });
-
-      res.json({ sessionId: session.id });
-    } catch (error) {
-      logger.error('Failed to create streaming session', error as Error, {
-        userId: req.user?.claims?.sub
-      });
-      next(error);
-    }
-  });
-
-  // Create streaming session endpoint for live generation
-  app.post('/api/sessions/stream', isAuthenticated, async (req: any, res, next) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { prompt, selectedVoices, mode = 'streaming' } = req.body;
+      // Import OpenAI service dynamically for synthesis
+      const { openaiService } = await import('./openai-service');
       
-      // Create voice session first
-      const session = await storage.createVoiceSession({
-        userId,
-        prompt,
-        selectedVoices,
-        recursionDepth: 2,
-        synthesisMode: 'competitive',
-        ethicalFiltering: true,
-        mode
+      // Perform synthesis with real OpenAI
+      const synthesizedSolution = await openaiService.synthesizeSolutions({
+        sessionId,
+        solutions,
+        mode: 'advanced'
       });
-      
-      logger.info('Live streaming session created', { sessionId: session.id, userId });
-      res.json({ sessionId: session.id });
+
+      logger.info('OpenAI synthesis completed successfully', { sessionId });
+      res.json(synthesizedSolution);
       
     } catch (error) {
-      logger.error('Failed to create streaming session', error as Error);
-      res.status(500).json({ error: 'Failed to create session' });
+      logger.error('OpenAI synthesis failed', error as Error, { sessionId: req.params.sessionId });
+      res.status(500).json({ error: 'Synthesis failed', details: error.message });
     }
   });
 

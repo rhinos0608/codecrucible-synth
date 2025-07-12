@@ -57,7 +57,221 @@ interface GeneratedSolution {
   role: string;
 }
 
+// Streaming interface for real-time ChatGPT-style generation
+interface StreamGenerationOptions {
+  prompt: string;
+  perspectives: string[];
+  roles: string[];
+  sessionId: number;
+  voiceId: string;
+  type: 'perspective' | 'role';
+  onChunk: (chunk: string) => void;
+  onComplete: (solution: any) => Promise<void>;
+}
+
 class OpenAIService {
+  // ChatGPT-style streaming generation following CodingPhilosophy.md consciousness principles
+  async generateSolutionStream(options: StreamGenerationOptions): Promise<void> {
+    if (!openai) {
+      throw new APIError(500, 'OpenAI service not available');
+    }
+
+    const { prompt, sessionId, voiceId, type, onChunk, onComplete } = options;
+    
+    try {
+      logger.info('Starting ChatGPT-style streaming generation', {
+        requestId: `${sessionId}-${voiceId}`,
+        type,
+        promptLength: prompt.length
+      });
+
+      // Get voice-specific system prompt
+      const systemPrompt = this.getVoiceSystemPrompt(voiceId, type);
+      const userPrompt = `Generate code for the following request: ${prompt}`;
+
+      // Create streaming completion
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o", // Latest model following blueprint instructions
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 3000
+      });
+
+      let accumulatedCode = '';
+      let accumulatedExplanation = '';
+      let isInCodeBlock = false;
+
+      // Process streaming chunks
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        
+        if (content) {
+          // Detect code blocks for proper formatting
+          if (content.includes('```')) {
+            isInCodeBlock = !isInCodeBlock;
+          }
+          
+          if (isInCodeBlock) {
+            accumulatedCode += content;
+          } else {
+            accumulatedExplanation += content;
+          }
+
+          // Send chunk to client via onChunk callback
+          onChunk(content);
+        }
+      }
+
+      // Generate final solution object
+      const finalSolution = {
+        voiceCombination: voiceId,
+        code: this.extractCodeFromResponse(accumulatedCode + accumulatedExplanation),
+        explanation: accumulatedExplanation.trim(),
+        confidence: 85,
+        strengths: this.extractStrengths(accumulatedExplanation),
+        considerations: this.extractConsiderations(accumulatedExplanation),
+        perspective: type === 'perspective' ? voiceId : '',
+        role: type === 'role' ? voiceId : ''
+      };
+
+      // Call completion callback
+      await onComplete(finalSolution);
+      
+    } catch (error) {
+      logger.error('Streaming generation failed', error as Error, {
+        requestId: `${sessionId}-${voiceId}`
+      });
+      throw error;
+    }
+  }
+
+  // Enhanced synthesis with real OpenAI integration
+  async synthesizeSolutions(options: { sessionId: number; solutions: any[]; mode: string }) {
+    if (!openai) {
+      throw new APIError(500, 'OpenAI service not available');
+    }
+
+    try {
+      const { sessionId, solutions } = options;
+      
+      // Prepare synthesis prompt
+      const synthesisPrompt = this.buildSynthesisPrompt(solutions);
+      
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a senior software architect synthesizing multiple AI perspectives into a unified solution. 
+            Following CodingPhilosophy.md principles, create a comprehensive solution that integrates the best aspects of all provided solutions.
+            
+            Return a JSON object with:
+            - synthesizedCode: Complete working code
+            - explanation: Comprehensive explanation
+            - confidence: Number 0-100
+            - integratedApproaches: Array of approaches used`
+          },
+          {
+            role: "user", 
+            content: synthesisPrompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3
+      });
+
+      const synthesisResult = JSON.parse(response.choices[0].message.content || '{}');
+      
+      return {
+        id: Date.now(),
+        sessionId,
+        synthesizedCode: synthesisResult.synthesizedCode || '',
+        explanation: synthesisResult.explanation || '',
+        confidence: synthesisResult.confidence || 85,
+        integratedApproaches: synthesisResult.integratedApproaches || [],
+        createdAt: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      logger.error('Synthesis failed', error as Error, { sessionId: options.sessionId });
+      throw error;
+    }
+  }
+
+  private buildSynthesisPrompt(solutions: any[]): string {
+    let prompt = "Synthesize these AI-generated solutions into one optimal implementation:\n\n";
+    
+    solutions.forEach((solution, index) => {
+      prompt += `## Solution ${index + 1} (${solution.voiceCombination})\n`;
+      prompt += `Code:\n${solution.code}\n\n`;
+      prompt += `Explanation: ${solution.explanation}\n\n`;
+      prompt += `Strengths: ${solution.strengths?.join(', ') || 'N/A'}\n\n`;
+      prompt += `---\n\n`;
+    });
+    
+    prompt += "Create a unified solution that combines the best aspects of all approaches.";
+    return prompt;
+  }
+
+  // Get voice-specific system prompt for streaming
+  private getVoiceSystemPrompt(voiceId: string, type: 'perspective' | 'role'): string {
+    const baseInstructions = this.getBaseInstructions();
+    
+    if (type === 'perspective') {
+      const perspectivePrompts = {
+        seeker: `${baseInstructions}\n\nAs the Explorer perspective, focus on discovering innovative solutions, exploring new approaches, and questioning assumptions. Generate code that demonstrates curiosity and investigation.`,
+        steward: `${baseInstructions}\n\nAs the Maintainer perspective, focus on code maintainability, reliability, and long-term sustainability. Generate robust, well-documented code with proper error handling.`,
+        witness: `${baseInstructions}\n\nAs the Analyzer perspective, focus on understanding the problem deeply and providing analytical insights. Generate code with detailed analysis and comprehensive documentation.`,
+        nurturer: `${baseInstructions}\n\nAs the Developer perspective, focus on user experience and creating supportive, intuitive solutions. Generate code that prioritizes usability and accessibility.`,
+        decider: `${baseInstructions}\n\nAs the Implementor perspective, focus on making clear decisions and creating practical, actionable solutions. Generate efficient, production-ready code.`
+      };
+      return perspectivePrompts[voiceId] || baseInstructions;
+    } else {
+      const rolePrompts = {
+        guardian: `${baseInstructions}\n\nAs the Security Engineer role, focus on security best practices, input validation, and secure coding patterns. Generate code with comprehensive security measures.`,
+        architect: `${baseInstructions}\n\nAs the Systems Architect role, focus on scalable design patterns, proper architecture, and system integration. Generate well-structured, scalable code.`,
+        designer: `${baseInstructions}\n\nAs the UI/UX Engineer role, focus on user interface design, responsive layouts, and user experience. Generate code with excellent visual design and usability.`,
+        optimizer: `${baseInstructions}\n\nAs the Performance Engineer role, focus on optimization, efficiency, and performance best practices. Generate highly optimized, fast-executing code.`
+      };
+      return rolePrompts[voiceId] || baseInstructions;
+    }
+  }
+
+  // Extract code from mixed response content
+  private extractCodeFromResponse(content: string): string {
+    const codeBlockRegex = /```(?:\w+)?\n?([\s\S]*?)```/g;
+    const matches = [];
+    let match;
+    
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      matches.push(match[1]);
+    }
+    
+    return matches.join('\n\n') || content;
+  }
+
+  // Extract strengths from explanation
+  private extractStrengths(explanation: string): string[] {
+    const strengthsMatch = explanation.match(/(?:strengths?|benefits?|advantages?):\s*(.+?)(?:\n|$)/i);
+    if (strengthsMatch) {
+      return strengthsMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return ['Comprehensive implementation', 'Following best practices'];
+  }
+
+  // Extract considerations from explanation
+  private extractConsiderations(explanation: string): string[] {
+    const considerationsMatch = explanation.match(/(?:considerations?|limitations?|notes?):\s*(.+?)(?:\n|$)/i);
+    if (considerationsMatch) {
+      return considerationsMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return ['Consider performance implications', 'Review security measures'];
+  }
+
   // Core instruction template following AI_INSTRUCTIONS.md
   private getBaseInstructions(): string {
     return `You are a professional software developer working on CodeCrucible, a multi-perspective coding assistant.

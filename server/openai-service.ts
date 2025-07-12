@@ -129,14 +129,14 @@ Requirements:
         userPromptLength: userPrompt.length 
       });
 
-      // Enhanced OpenAI API call with proper error handling following AI_INSTRUCTIONS.md
-      if (!openai) {
-        logger.error('OpenAI service not initialized - API key missing');
-        if (isDevMode()) {
-          logger.info('Using dev fallback for missing OpenAI service');
-          return this.createDevFallback(options);
-        }
-        throw new APIError(500, 'OpenAI API service unavailable');
+      // CRITICAL: Force real OpenAI integration only - following AI_INSTRUCTIONS.md patterns
+      if (!openai || !OPENAI_API_KEY) {
+        logger.error('CRITICAL: OpenAI service initialization failed', { 
+          hasClient: !!openai,
+          hasApiKey: !!OPENAI_API_KEY,
+          keyLength: OPENAI_API_KEY?.length || 0
+        });
+        throw new APIError(500, 'OpenAI API service required - no fallbacks allowed');
       }
 
       const response = await openai.chat.completions.create({
@@ -175,15 +175,8 @@ Requirements:
       };
       
     } catch (error) {
-      logger.error('Voice generation failed', error as Error, { voiceId, type });
-      
-      // Development fallback for speed testing
-      // Only use dev fallback if OpenAI completely unavailable
-      if (isDevMode() && !openai) {
-        return this.createDevFallback(options);
-      }
-      
-      throw error;
+      logger.error('REAL OpenAI generation failed - NO FALLBACKS', error as Error, { voiceId, type });
+      throw new APIError(500, `OpenAI generation failed: ${error.message}`);
     }
   }
 
@@ -200,35 +193,39 @@ Requirements:
   }): Promise<void> {
     const { prompt, sessionId, voiceId, type, onChunk, onComplete } = options;
     
-    try {
-      if (!openai) {
-        logger.warn('OpenAI not available, using dev fallback', { voiceId, sessionId });
-        if (isDevMode()) {
-          return this.simulateStreaming(options);
-        }
-        throw new APIError(500, 'OpenAI API key required');
-      }
+    // CRITICAL: Force real OpenAI integration only - following AI_INSTRUCTIONS.md patterns
+    if (!openai || !OPENAI_API_KEY) {
+      logger.error('CRITICAL: OpenAI service initialization failed', { 
+        hasClient: !!openai,
+        hasApiKey: !!OPENAI_API_KEY,
+        keyLength: OPENAI_API_KEY?.length || 0
+      });
+      throw new APIError(500, 'OpenAI API service required - no fallbacks allowed');
+    }
 
-      const systemPrompt = this.getFastSystemPrompt(voiceId, type);
-      const userPrompt = `Generate complete, production-ready code for: ${prompt}
+    const systemPrompt = this.getFastSystemPrompt(voiceId, type);
+    const userPrompt = `Generate complete, production-ready code for: ${prompt}
 
 Requirements:
-- Minimum 800 characters of functional code
-- Include error handling and validation
-- Add comprehensive comments
-- Follow modern best practices
-- Provide working implementation
+- Minimum 1200 characters of functional code
+- Include comprehensive error handling and validation  
+- Add detailed comments explaining the approach
+- Follow modern best practices and patterns
+- Provide complete working implementation
+- Focus on ${type === 'perspective' ? 'analytical perspective' : 'technical specialization'} as ${voiceId}
 
-Focus on ${type === 'perspective' ? 'analytical perspective' : 'technical specialization'} as ${voiceId}.`;
+Generate real, functional code that can be executed immediately.`;
 
-      logger.info('Starting OpenAI streaming generation', { 
-        sessionId, 
-        voiceId, 
-        type,
-        promptLength: prompt.length 
-      });
+    logger.info('REAL OpenAI streaming generation starting', { 
+      sessionId, 
+      voiceId, 
+      type,
+      promptLength: prompt.length,
+      systemPromptLength: systemPrompt.length
+    });
 
-      // Real OpenAI streaming with optimal settings
+    try {
+      // REAL OpenAI API call - no simulation allowed
       const stream = await openai.chat.completions.create({
         model: "gpt-4o", // Latest model for best performance
         messages: [
@@ -237,34 +234,45 @@ Focus on ${type === 'perspective' ? 'analytical perspective' : 'technical specia
         ],
         stream: true,
         temperature: 0.7,
-        max_tokens: 2500,
+        max_tokens: 3000, // Increased for more comprehensive code
         presence_penalty: 0.1
       });
 
       let content = '';
       let chunkCount = 0;
       
-      // Ultra-fast chunk processing with real OpenAI
+      // Process real OpenAI streaming chunks
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content || '';
         if (delta) {
           content += delta;
           chunkCount++;
           
-          // Send chunk to client
+          // Send real chunk to client
           onChunk(delta);
           
-          // Minimal delay for smooth visual effect (Apple-level UX)
-          await new Promise(resolve => setTimeout(resolve, 15));
+          // Minimal delay for smooth visual effect
+          await new Promise(resolve => setTimeout(resolve, 12));
         }
       }
 
-      logger.info('OpenAI streaming completed', { 
+      logger.info('REAL OpenAI streaming completed successfully', { 
         sessionId, 
         voiceId, 
         contentLength: content.length,
-        chunkCount 
+        chunkCount,
+        realOpenAI: true
       });
+
+      // Ensure we have substantial content
+      if (content.length < 500) {
+        logger.error('OpenAI returned insufficient content', { 
+          contentLength: content.length,
+          voiceId,
+          sessionId
+        });
+        throw new APIError(500, 'OpenAI response too short - regeneration required');
+      }
 
       // Extract and complete the solution
       const code = this.extractCode(content);
@@ -282,67 +290,12 @@ Focus on ${type === 'perspective' ? 'analytical perspective' : 'technical specia
       });
       
     } catch (error) {
-      logger.error('OpenAI streaming failed', error as Error, { voiceId, sessionId });
-      
-      // Development fallback only
-      if (isDevMode()) {
-        logger.info('Using dev fallback for streaming', { voiceId });
-        return this.simulateStreaming(options);
-      }
-      
-      throw error;
+      logger.error('REAL OpenAI streaming failed - NO FALLBACKS', error as Error, { voiceId, sessionId });
+      throw new APIError(500, `OpenAI streaming failed: ${error.message}`);
     }
   }
 
-  // Development simulation for testing
-  private async simulateStreaming(options: any): Promise<void> {
-    const { voiceId, type, onChunk, onComplete } = options;
-    
-    const devCode = `// DEV-GEN 🔧 Real-time streaming for ${voiceId}
-function ${voiceId}Solution() {
-  // Production-ready implementation
-  const result = performOptimizedOperation();
-  
-  if (!result) {
-    throw new Error('Operation failed');
-  }
-  
-  return {
-    success: true,
-    data: result,
-    timestamp: new Date()
-  };
-}
-
-// Helper function with error handling
-function performOptimizedOperation() {
-  try {
-    // Advanced logic here
-    return 'Optimized result';
-  } catch (error) {
-    console.error('Operation failed:', error);
-    return null;
-  }
-}`;
-
-    // Simulate streaming chunks
-    const chunks = devCode.split(' ');
-    for (const chunk of chunks) {
-      onChunk(chunk + ' ');
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-    
-    await onComplete({
-      voiceCombination: `${type}:${voiceId}`,
-      code: devCode,
-      explanation: `Fast development solution for ${voiceId} ${type}.`,
-      confidence: 85,
-      strengths: this.extractStrengths(voiceId, type),
-      considerations: this.extractConsiderations(voiceId, type),
-      voiceId,
-      type
-    });
-  }
+  // REMOVED: No simulation methods allowed - only real OpenAI integration
 
   // Enhanced synthesis with comprehensive error handling following AI_INSTRUCTIONS.md patterns
   async synthesizeSolutions(options: {
@@ -364,13 +317,14 @@ function performOptimizedOperation() {
         throw new APIError(400, 'No solutions provided for synthesis');
       }
 
-      if (!openai) {
-        logger.warn('OpenAI not available for synthesis', { sessionId });
-        if (isDevMode()) {
-          logger.info('Using development fallback for synthesis');
-          return this.createSynthesisFallback(solutions);
-        }
-        throw new APIError(500, 'OpenAI API required for synthesis');
+      // CRITICAL: Force real OpenAI integration only
+      if (!openai || !OPENAI_API_KEY) {
+        logger.error('CRITICAL: OpenAI service unavailable for synthesis', { 
+          hasClient: !!openai,
+          hasApiKey: !!OPENAI_API_KEY,
+          sessionId 
+        });
+        throw new APIError(500, 'OpenAI API required for synthesis - no fallbacks allowed');
       }
 
       // Enhanced synthesis prompt with better structure
@@ -417,11 +371,11 @@ Return valid JSON format.`;
         result = JSON.parse(response.choices[0].message.content || '{}');
       } catch (parseError) {
         logger.error('Failed to parse synthesis JSON response', parseError as Error, { sessionId });
-        return this.createSynthesisFallback(solutions);
+        throw new APIError(500, 'Invalid JSON response from OpenAI synthesis');
       }
       
       const synthesisResult = {
-        synthesizedCode: result.synthesizedCode || this.createFallbackCode(solutions),
+        synthesizedCode: result.synthesizedCode || 'OpenAI synthesis response missing',
         explanation: result.explanation || 'Multiple AI solutions successfully synthesized into optimal implementation',
         confidence: result.confidence || 88,
         integratedApproaches: result.integratedApproaches || solutions.map(s => s.voiceCombination),
@@ -438,41 +392,12 @@ Return valid JSON format.`;
       return synthesisResult;
       
     } catch (error) {
-      logger.error('Synthesis process failed', error as Error, { sessionId });
-      
-      // Provide fallback synthesis in development mode
-      if (isDevMode()) {
-        logger.info('Using development fallback for failed synthesis');
-        return this.createSynthesisFallback(solutions);
-      }
-      
-      throw new APIError(500, `Synthesis failed: ${error.message}`);
+      logger.error('REAL OpenAI synthesis failed - NO FALLBACKS', error as Error, { sessionId });
+      throw new APIError(500, `OpenAI synthesis failed: ${error.message}`);
     }
   }
 
-  // Fallback synthesis for development and error scenarios
-  private createSynthesisFallback(solutions: any[]) {
-    const combinedCode = solutions.map(sol => 
-      `// From ${sol.voiceCombination}:\n${sol.code.substring(0, 500)}...\n`
-    ).join('\n');
-
-    return {
-      synthesizedCode: `// DEV-SYNTHESIS 🔧 Combined from ${solutions.length} solutions\n\n${combinedCode}\n\n// Synthesis complete - development fallback`,
-      explanation: `Development synthesis combining ${solutions.length} AI solutions with fallback processing`,
-      confidence: 85,
-      integratedApproaches: solutions.map(s => s.voiceCombination),
-      securityConsiderations: ['Input validation', 'Error handling', 'Development mode'],
-      performanceOptimizations: ['Code combination', 'Fallback processing']
-    };
-  }
-
-  // Create fallback code from solutions
-  private createFallbackCode(solutions: any[]): string {
-    if (!solutions.length) return '// No solutions available for synthesis';
-    
-    const primarySolution = solutions[0];
-    return primarySolution.code || '// Primary solution code unavailable';
-  }
+  // REMOVED: No fallback methods allowed - only real OpenAI integration
 
   // Enhanced system prompts with proper voice mapping following AI_INSTRUCTIONS.md patterns  
   private getFastSystemPrompt(voiceId: string, type: 'perspective' | 'role'): string {
@@ -1154,21 +1079,7 @@ export default CompleteProductionImplementation;`,
     });
   }
 
-  // Development fallback for testing
-  private createDevFallback(options: any): FastSolution {
-    return {
-      id: options.solutionId,
-      sessionId: options.sessionId,
-      voiceCombination: `${options.type}:${options.voiceId}`,
-      code: `// DEV-GEN 🔧 Fast solution for: ${options.prompt.substring(0, 50)}...\n\nfunction optimizedSolution() {\n  // Production-ready implementation\n  return 'Fast development solution';\n}`,
-      explanation: `Fast development solution generated for ${options.voiceId} ${options.type}.`,
-      confidence: 85,
-      strengths: this.extractStrengths(options.voiceId, options.type),
-      considerations: this.extractConsiderations(options.voiceId, options.type),
-      perspective: options.type === 'perspective' ? options.voiceId : '',
-      role: options.type === 'role' ? options.voiceId : ''
-    };
-  }
+  // REMOVED: No development fallbacks allowed - only real OpenAI integration
 }
 
 export const optimizedOpenAIService = new OptimizedOpenAIService();

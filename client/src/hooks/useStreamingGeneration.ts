@@ -144,9 +144,16 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log(`Received ${data.type} from ${voiceId}:`, data.content?.substring(0, 50) + '...');
+        console.log(`Received ${data.type} from ${voiceId}:`, data.content?.substring(0, 30) || data.message || '(no content)');
         
-        if (data.type === 'chunk') {
+        if (data.type === 'connected') {
+          console.log(`Voice ${voiceId} connected successfully`);
+          setVoices(prev => prev.map(voice => 
+            voice.id === voiceId 
+              ? { ...voice, isTyping: true, content: '', isComplete: false }
+              : voice
+          ));
+        } else if (data.type === 'chunk') {
           // Append new content with ChatGPT-style typing effect
           setVoices(prev => prev.map(voice => 
             voice.id === voiceId 

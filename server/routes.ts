@@ -1129,46 +1129,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import OpenAI service for streaming
       const { openaiService } = await import('./openai-service');
 
-      // Start streaming generation
-      await openaiService.generateSolutionStream({
-        prompt: session.prompt,
-        perspectives: session.selectedVoices.perspectives || [],
-        roles: session.selectedVoices.roles || [],
-        sessionId: parseInt(sessionId),
-        voiceId,
-        type: type as 'perspective' | 'role',
-        onChunk: (chunk: string) => {
-          // Send chunk to client with proper SSE format
-          res.write(`data: ${JSON.stringify({ 
-            type: 'chunk', 
-            content: chunk,
-            voiceId,
-            timestamp: Date.now()
-          })}\n\n`);
-        },
-        onComplete: async (solution: any) => {
-          // Store solution in database
-          await storage.createSolution({
-            sessionId: parseInt(sessionId),
-            voiceCombination: solution.voiceCombination,
-            code: solution.code,
-            explanation: solution.explanation,
-            confidence: solution.confidence,
-            strengths: solution.strengths,
-            considerations: solution.considerations
-          });
+      // Handle request/response close properly for SSE
+      req.on('close', () => {
+        logger.info('Client disconnected from streaming', { sessionId, voiceId });
+      });
 
-          // Send completion message
+      // Send initial connection message
+      res.write(`data: ${JSON.stringify({ 
+        type: 'connected', 
+        voiceId,
+        message: 'Stream connected successfully'
+      })}\n\n`);
+
+      // Start streaming generation with error handling
+      try {
+        await openaiService.generateSolutionStream({
+          prompt: session.prompt,
+          perspectives: session.selectedVoices.perspectives || [],
+          roles: session.selectedVoices.roles || [],
+          sessionId: parseInt(sessionId),
+          voiceId,
+          type: type as 'perspective' | 'role',
+          onChunk: (chunk: string) => {
+            // Check if response is still writable
+            if (!res.writableEnded && !res.destroyed) {
+              // Send chunk to client with proper SSE format
+              res.write(`data: ${JSON.stringify({ 
+                type: 'chunk', 
+                content: chunk,
+                voiceId,
+                timestamp: Date.now()
+              })}\n\n`);
+            }
+          },
+          onComplete: async (solution: any) => {
+            try {
+              // Store solution in database
+              await storage.createSolution({
+                sessionId: parseInt(sessionId),
+                voiceCombination: solution.voiceCombination,
+                code: solution.code,
+                explanation: solution.explanation,
+                confidence: solution.confidence,
+                strengths: solution.strengths,
+                considerations: solution.considerations
+              });
+
+              // Send completion message if response still open
+              if (!res.writableEnded && !res.destroyed) {
+                res.write(`data: ${JSON.stringify({ 
+                  type: 'complete', 
+                  voiceId,
+                  confidence: solution.confidence,
+                  timestamp: Date.now()
+                })}\n\n`);
+                
+                res.end();
+              }
+            } catch (error) {
+              logger.error('Failed to store streaming solution', error as Error, { sessionId, voiceId });
+              if (!res.writableEnded && !res.destroyed) {
+                res.write(`data: ${JSON.stringify({ 
+                  type: 'error', 
+                  error: 'Failed to store solution',
+                  voiceId
+                })}\n\n`);
+                res.end();
+              }
+            }
+          }
+        });
+      } catch (streamError) {
+        logger.error('Stream generation failed', streamError as Error, { sessionId, voiceId });
+        if (!res.writableEnded && !res.destroyed) {
           res.write(`data: ${JSON.stringify({ 
-            type: 'complete', 
+            type: 'error', 
+            error: 'Stream generation failed',
             voiceId,
-            confidence: solution.confidence,
-            timestamp: Date.now()
+            details: streamError.message
           })}\n\n`);
-          
           res.end();
         }
-      });
+      }
 
     } catch (error) {
       logger.error('Streaming generation failed', error as Error, {

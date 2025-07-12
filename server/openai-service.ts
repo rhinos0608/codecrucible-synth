@@ -4,6 +4,14 @@ import { logger, APIError } from './logger';
 import { isDevMode } from './lib/dev-mode';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+if (!OPENAI_API_KEY) {
+  logger.error('Critical: OPENAI_API_KEY environment variable not found');
+} else {
+  logger.info('OpenAI API key loaded', { 
+    keyLength: OPENAI_API_KEY.length,
+    keyPrefix: OPENAI_API_KEY.substring(0, 7) + '...'
+  });
+}
 const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 // Performance-optimized interfaces
@@ -113,6 +121,14 @@ Requirements:
 - Follow modern best practices
 - Provide clear explanation`;
 
+      logger.info('Making OpenAI API call', { 
+        voiceId, 
+        type, 
+        model: 'gpt-4o',
+        systemPromptLength: systemPrompt.length,
+        userPromptLength: userPrompt.length 
+      });
+
       // OpenAI API call with performance settings
       const response = await openai!.chat.completions.create({
         model: "gpt-4o", // Latest, fastest model
@@ -123,6 +139,13 @@ Requirements:
         temperature: 0.4, // Balance creativity and consistency
         max_tokens: 2500, // Sufficient for comprehensive solutions
         presence_penalty: 0.1 // Encourage diverse solutions
+      });
+
+      logger.info('OpenAI API response received', { 
+        voiceId, 
+        type,
+        responseLength: response.choices[0].message.content?.length || 0,
+        finishReason: response.choices[0].finish_reason 
       });
 
       const content = response.choices[0].message.content || '';
@@ -146,7 +169,8 @@ Requirements:
       logger.error('Voice generation failed', error as Error, { voiceId, type });
       
       // Development fallback for speed testing
-      if (isDevMode()) {
+      // Only use dev fallback if OpenAI completely unavailable
+      if (isDevMode() && !openai) {
         return this.createDevFallback(options);
       }
       
@@ -154,57 +178,161 @@ Requirements:
     }
   }
 
-  // Lightning-fast streaming generation
-  async generateSolutionStream(options: StreamOptions): Promise<void> {
+  // Lightning-fast streaming generation with corrected signature
+  async generateSolutionStream(options: {
+    prompt: string;
+    perspectives: string[];
+    roles: string[];
+    sessionId: number;
+    voiceId: string;
+    type: 'perspective' | 'role';
+    onChunk: (chunk: string) => void;
+    onComplete: (solution: any) => Promise<void>;
+  }): Promise<void> {
     const { prompt, sessionId, voiceId, type, onChunk, onComplete } = options;
     
     try {
       if (!openai) {
+        logger.warn('OpenAI not available, using dev fallback', { voiceId, sessionId });
+        if (isDevMode()) {
+          return this.simulateStreaming(options);
+        }
         throw new APIError(500, 'OpenAI API key required');
       }
 
       const systemPrompt = this.getFastSystemPrompt(voiceId, type);
-      const userPrompt = `Generate code for: ${prompt}\n\nProvide a complete, efficient solution.`;
+      const userPrompt = `Generate complete, production-ready code for: ${prompt}
 
-      // Streaming with optimal settings
+Requirements:
+- Minimum 800 characters of functional code
+- Include error handling and validation
+- Add comprehensive comments
+- Follow modern best practices
+- Provide working implementation
+
+Focus on ${type === 'perspective' ? 'analytical perspective' : 'technical specialization'} as ${voiceId}.`;
+
+      logger.info('Starting OpenAI streaming generation', { 
+        sessionId, 
+        voiceId, 
+        type,
+        promptLength: prompt.length 
+      });
+
+      // Real OpenAI streaming with optimal settings
       const stream = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o", // Latest model for best performance
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
         stream: true,
-        temperature: 0.6,
-        max_tokens: 2000
+        temperature: 0.7,
+        max_tokens: 2500,
+        presence_penalty: 0.1
       });
 
       let content = '';
+      let chunkCount = 0;
       
-      // Ultra-fast chunk processing
+      // Ultra-fast chunk processing with real OpenAI
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content || '';
         if (delta) {
           content += delta;
+          chunkCount++;
+          
+          // Send chunk to client
           onChunk(delta);
           
-          // Minimal delay for smooth visual effect
-          await new Promise(resolve => setTimeout(resolve, 20));
+          // Minimal delay for smooth visual effect (Apple-level UX)
+          await new Promise(resolve => setTimeout(resolve, 15));
         }
       }
 
-      // Complete the solution
+      logger.info('OpenAI streaming completed', { 
+        sessionId, 
+        voiceId, 
+        contentLength: content.length,
+        chunkCount 
+      });
+
+      // Extract and complete the solution
+      const code = this.extractCode(content);
+      const explanation = this.extractExplanation(content);
+      
       await onComplete({
-        code: this.extractCode(content),
-        explanation: this.extractExplanation(content),
-        confidence: this.calculateConfidence(content, ''),
+        voiceCombination: `${type}:${voiceId}`,
+        code,
+        explanation,
+        confidence: this.calculateConfidence(code, explanation),
+        strengths: this.extractStrengths(voiceId, type),
+        considerations: this.extractConsiderations(voiceId, type),
         voiceId,
         type
       });
       
     } catch (error) {
-      logger.error('Streaming failed', error as Error, { voiceId });
+      logger.error('OpenAI streaming failed', error as Error, { voiceId, sessionId });
+      
+      // Development fallback only
+      if (isDevMode()) {
+        logger.info('Using dev fallback for streaming', { voiceId });
+        return this.simulateStreaming(options);
+      }
+      
       throw error;
     }
+  }
+
+  // Development simulation for testing
+  private async simulateStreaming(options: any): Promise<void> {
+    const { voiceId, type, onChunk, onComplete } = options;
+    
+    const devCode = `// DEV-GEN 🔧 Real-time streaming for ${voiceId}
+function ${voiceId}Solution() {
+  // Production-ready implementation
+  const result = performOptimizedOperation();
+  
+  if (!result) {
+    throw new Error('Operation failed');
+  }
+  
+  return {
+    success: true,
+    data: result,
+    timestamp: new Date()
+  };
+}
+
+// Helper function with error handling
+function performOptimizedOperation() {
+  try {
+    // Advanced logic here
+    return 'Optimized result';
+  } catch (error) {
+    console.error('Operation failed:', error);
+    return null;
+  }
+}`;
+
+    // Simulate streaming chunks
+    const chunks = devCode.split(' ');
+    for (const chunk of chunks) {
+      onChunk(chunk + ' ');
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    await onComplete({
+      voiceCombination: `${type}:${voiceId}`,
+      code: devCode,
+      explanation: `Fast development solution for ${voiceId} ${type}.`,
+      confidence: 85,
+      strengths: this.extractStrengths(voiceId, type),
+      considerations: this.extractConsiderations(voiceId, type),
+      voiceId,
+      type
+    });
   }
 
   // Ultra-fast synthesis with real OpenAI

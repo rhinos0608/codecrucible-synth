@@ -431,27 +431,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Critical session endpoints - restore from backup following AI_INSTRUCTIONS.md patterns
   app.post("/api/sessions", async (req, res) => {
     try {
-      // Simple session creation for Council Generation
+      console.log('Session creation request:', req.body);
+      
+      // Fix data structure to match frontend expectations
+      const sessionId = Date.now();
       const sessionData = {
-        id: Date.now(),
+        session: {
+          id: sessionId,
+          userId: 'dev-user',
+          prompt: req.body?.prompt || 'Default prompt',
+          selectedVoices: req.body?.selectedVoices || { perspectives: [], roles: [] },
+          status: 'completed',
+          createdAt: new Date().toISOString()
+        },
         solutions: [
           {
             id: 1,
+            sessionId: sessionId,
             voiceEngine: "Explorer",
-            code: "// Explorer engine analysis\nconst optimizeReact = () => {\n  console.log('Analyzing React patterns...');\n};",
-            explanation: "Explorer perspective: Investigating React optimization patterns",
-            confidence: 85
+            voiceName: "Explorer",
+            code: `// Explorer engine analysis for: ${req.body?.prompt?.substring(0, 50) || 'optimization'}
+const exploreOptimization = () => {
+  console.log('Analyzing patterns and possibilities...');
+  
+  // Deep investigation approach
+  const analysis = {
+    patterns: ['performance', 'scalability', 'maintainability'],
+    opportunities: ['code splitting', 'lazy loading', 'memoization'],
+    risks: ['over-optimization', 'complexity increase']
+  };
+  
+  return analysis;
+};
+
+export default exploreOptimization;`,
+            explanation: "Explorer perspective: Deep investigation into optimization patterns, identifying opportunities and potential risks through systematic analysis.",
+            confidence: 87,
+            createdAt: new Date().toISOString()
           },
           {
             id: 2,
+            sessionId: sessionId,
             voiceEngine: "Maintainer", 
-            code: "// Maintainer engine solution\nconst maintainableCode = () => {\n  // Sustainable implementation\n  return 'Robust solution';\n};",
-            explanation: "Maintainer perspective: Focus on long-term sustainability",
-            confidence: 90
+            voiceName: "Maintainer",
+            code: `// Maintainer engine solution for: ${req.body?.prompt?.substring(0, 50) || 'sustainability'}
+const maintainableSolution = () => {
+  // Focus on long-term sustainability and robustness
+  const sustainableImplementation = {
+    documentation: 'Comprehensive inline docs',
+    testing: 'Unit and integration tests',
+    errorHandling: 'Graceful degradation',
+    performance: 'Optimized but readable'
+  };
+  
+  // Ensure backward compatibility
+  return sustainableImplementation;
+};
+
+export default maintainableSolution;`,
+            explanation: "Maintainer perspective: Emphasis on sustainable, documented, and well-tested code that prioritizes long-term maintainability over short-term gains.",
+            confidence: 92,
+            createdAt: new Date().toISOString()
           }
         ]
       };
       
+      console.log('Session data created:', { sessionId, solutionCount: sessionData.solutions.length });
+      console.log('Sending response structure:', JSON.stringify(sessionData, null, 2));
       res.json(sessionData);
     } catch (error) {
       console.error('Session creation error:', error);
@@ -459,23 +505,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Streaming endpoint for Live Streaming
+  // Streaming endpoint for Live Streaming - Enhanced SSE with voice simulation
   app.post("/api/sessions/stream", async (req, res) => {
     try {
+      console.log('Live streaming request:', req.body);
+      
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type'
       });
 
-      // Simple streaming simulation
-      res.write('data: {"status": "starting"}\n\n');
+      // Enhanced streaming with voice simulation
+      const voices = ['Explorer', 'Maintainer', 'Security Engineer', 'Systems Architect'];
+      const sessionId = Date.now();
       
-      setTimeout(() => {
-        res.write('data: {"status": "complete", "result": "Generated successfully"}\n\n');
-        res.end();
-      }, 1000);
+      // Start streaming message
+      res.write(`data: ${JSON.stringify({ 
+        type: 'session_start', 
+        sessionId: sessionId,
+        voices: voices 
+      })}\n\n`);
+      
+      // Simulate voice streaming with delays
+      let voiceIndex = 0;
+      const streamInterval = setInterval(() => {
+        if (voiceIndex < voices.length) {
+          const voiceName = voices[voiceIndex];
+          const codeContent = `// ${voiceName} analysis
+const ${voiceName.toLowerCase().replace(' ', '')}Solution = () => {
+  console.log('${voiceName} perspective on: ${req.body?.prompt?.substring(0, 30) || 'optimization'}');
+  
+  return {
+    approach: '${voiceName} methodology',
+    implementation: 'Streaming generation',
+    confidence: ${85 + Math.floor(Math.random() * 10)}
+  };
+};`;
+
+          res.write(`data: ${JSON.stringify({
+            type: 'voice_update',
+            voiceId: voiceName.toLowerCase().replace(' ', '_'),
+            voiceName: voiceName,
+            content: codeContent,
+            isComplete: false
+          })}\n\n`);
+          
+          voiceIndex++;
+        } else {
+          // Complete streaming
+          res.write(`data: ${JSON.stringify({
+            type: 'session_complete',
+            sessionId: sessionId,
+            message: 'All voices have completed generation'
+          })}\n\n`);
+          
+          clearInterval(streamInterval);
+          res.end();
+        }
+      }, 800); // 800ms between voice updates
+      
+      // Cleanup on client disconnect
+      req.on('close', () => {
+        clearInterval(streamInterval);
+        console.log('Streaming client disconnected');
+      });
       
     } catch (error) {
       console.error('Streaming error:', error);

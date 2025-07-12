@@ -36,9 +36,15 @@ export function useSolutionGeneration() {
       return response.json();
     },
     onSuccess: (data) => {
-      console.log('Session generation completed:', data.session.id);
+      console.log('Session generation completed:', data);
+      // Enhanced defensive programming following AI_INSTRUCTIONS.md patterns
+      const sessionId = data?.session?.id || data?.id || 'unknown';
+      console.log('Extracted session ID:', sessionId);
+      
       queryClient.invalidateQueries({ queryKey: ["/api/analytics"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", data.session.id, "solutions"] });
+      if (sessionId !== 'unknown') {
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId, "solutions"] });
+      }
     },
     onError: (error) => {
       console.error('Session generation failed:', error);

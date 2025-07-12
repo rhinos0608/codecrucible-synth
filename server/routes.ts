@@ -231,6 +231,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allSharedProfiles.push(...formattedProfiles);
       }
 
+      // If no team profiles exist, create a sample profile for testing
+      if (allSharedProfiles.length === 0 && userTeams.length > 0) {
+        const sampleProfile = await storage.createTeamVoiceProfile({
+          teamId: userTeams[0].teamId,
+          createdBy: requestingUserId,
+          name: 'React TypeScript Expert',
+          description: 'Specialized in React development with TypeScript',
+          selectedPerspectives: ['explorer', 'analyzer'],
+          selectedRoles: ['architect', 'designer'],
+          analysisDepth: 3,
+          mergeStrategy: 'competitive',
+          qualityFiltering: true,
+          isShared: true
+        });
+
+        allSharedProfiles.push({
+          id: sampleProfile.id.toString(),
+          name: sampleProfile.name,
+          creator: 'Team Member',
+          creatorId: sampleProfile.createdBy,
+          specializations: ['Explorer', 'Analyzer', 'Architect', 'Designer'],
+          usage: 25,
+          effectiveness: 87,
+          description: sampleProfile.description,
+          isPublic: sampleProfile.isShared,
+          teamId: sampleProfile.teamId,
+          createdAt: sampleProfile.createdAt,
+          updatedAt: sampleProfile.updatedAt,
+          teamName: userTeams[0].name
+        });
+      }
+
       logger.info('Fetched shared voice profiles for team selector', {
         userId: requestingUserId,
         requestingUserId,

@@ -503,8 +503,6 @@ export const usageLimits = pgTable("usage_limits", {
 
 export const insertUsageLimitSchema = createInsertSchema(usageLimits).omit({
   id: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export const insertUsageLimitsSchema = createInsertSchema(usageLimits).pick({

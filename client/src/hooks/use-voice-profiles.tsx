@@ -35,11 +35,7 @@ export function useCreateVoiceProfile() {
 
   return useMutation({
     mutationFn: async (profile: InsertVoiceProfile) => {
-      return apiRequest("/api/voice-profiles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
-      });
+      return apiRequest("POST", "/api/voice-profiles", profile);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });
@@ -75,11 +71,7 @@ export function useUpdateVoiceProfile() {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<InsertVoiceProfile> }) => {
-      return apiRequest(`/api/voice-profiles/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
+      return apiRequest("PATCH", `/api/voice-profiles/${id}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });
@@ -115,9 +107,7 @@ export function useDeleteVoiceProfile() {
 
   return useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/voice-profiles/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/voice-profiles/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });

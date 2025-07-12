@@ -224,14 +224,36 @@ export function EnhancedProjectsPanel({
       return response.json();
     },
     onSuccess: () => {
+      // Force immediate cache invalidation and refresh - Alexander's Pattern Language
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
+      
+      // Expand the target folder automatically to show moved project
+      if (movingProject?.folderId) {
+        console.log('Auto-expanding folder:', movingProject.folderId);
+        setExpandedFolders(prev => {
+          const newSet = new Set(prev);
+          newSet.add(movingProject.folderId!);
+          console.log('Expanded folders after move:', Array.from(newSet));
+          return newSet;
+        });
+      }
+      
       setShowMoveProject(false);
       setMovingProject(null);
+      
+      // Enhanced success notification with folder context
       toast({
         title: "Success",
-        description: "Project moved successfully",
+        description: `Project "${movingProject?.name}" moved successfully`,
       });
+      
+      console.log('Project move completed, cache invalidated');
+      
+      // Force a small delay to ensure backend has processed the move
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ['/api/projects'] });
+      }, 100);
     },
     onError: (error) => {
       console.error('Project move failed - engaging error council:', error);
@@ -311,7 +333,9 @@ export function EnhancedProjectsPanel({
   };
 
   const getProjectsInFolder = (folderId: number): Project[] => {
-    return projects.filter(project => project.folderId === folderId);
+    const folderProjects = projects.filter(project => project.folderId === folderId);
+    console.log(`Projects in folder ${folderId}:`, folderProjects.map(p => ({ id: p.id, name: p.name, folderId: p.folderId })));
+    return folderProjects;
   };
 
   const toggleFolder = (folderId: number) => {
@@ -396,6 +420,10 @@ export function EnhancedProjectsPanel({
   const confirmMoveProject = (folderId: number | null) => {
     if (movingProject) {
       console.log('Confirming move for project:', movingProject.id, 'to folder:', folderId);
+      
+      // Store the target folderId in the moving project for later use
+      setMovingProject(prev => prev ? { ...prev, folderId } : null);
+      
       moveProjectMutation.mutate({
         projectId: movingProject.id,
         folderId
@@ -484,6 +512,13 @@ export function EnhancedProjectsPanel({
         const folderProjects = getProjectsInFolder(folder.id);
         const childFolders = buildFolderTree(folders, folder.id);
         const isExpanded = expandedFolders.has(folder.id);
+        
+        // Debug folder state
+        console.log(`Rendering folder "${folder.name}" (ID: ${folder.id}):`, {
+          projectCount: folderProjects.length,
+          isExpanded,
+          expandedFolders: Array.from(expandedFolders)
+        });
 
         return (
           <div key={folder.id} className="mb-2">
@@ -534,7 +569,13 @@ export function EnhancedProjectsPanel({
             
             {isExpanded && (
               <div className="ml-6">
-                {folderProjects.map(renderProjectCard)}
+                {folderProjects.length > 0 ? (
+                  folderProjects.map(renderProjectCard)
+                ) : (
+                  <div className="p-2 text-sm text-gray-500 dark:text-gray-400 italic">
+                    No projects in this folder
+                  </div>
+                )}
                 {childFolders.length > 0 && renderFolderTree(childFolders, depth + 1)}
               </div>
             )}

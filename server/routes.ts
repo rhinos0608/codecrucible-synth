@@ -122,52 +122,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teamId } = req.params;
       const userId = req.user.claims.sub;
 
-      // Get real shared voice profiles from database  
-      const userProfiles = await storage.getVoiceProfiles(userId);
+      // Get real team voice profiles from database following AI_INSTRUCTIONS.md patterns
+      const teamProfiles = await storage.getTeamVoiceProfiles(parseInt(teamId));
       
-      // Transform to team profile format
-      const transformedProfiles = userProfiles.slice(0, 3).map((profile, index) => ({
+      // Transform to shared profile format for UI consistency
+      const sharedProfiles = teamProfiles.map((profile) => ({
         id: profile.id.toString(), 
-        name: profile.name || 'Custom Voice Profile',
+        name: profile.name,
         creator: 'Team Member',
-        creatorId: userId,
-        specializations: Array.isArray(profile.specialization) ? profile.specialization.split(',') : [profile.specialization || 'General'],
+        creatorId: profile.createdBy,
+        specializations: Array.isArray(profile.selectedPerspectives) 
+          ? (profile.selectedPerspectives as string[]).concat(profile.selectedRoles as string[])
+          : ['General'],
         usage: Math.floor(Math.random() * 50) + 10,
         effectiveness: Math.floor(Math.random() * 30) + 70,
-        description: profile.description || 'Custom voice profile for team collaboration',
-        isPublic: true,
-        teamId: parseInt(teamId),
+        description: profile.description || 'Team collaboration voice profile',
+        isPublic: profile.isShared,
+        teamId: profile.teamId,
         createdAt: profile.createdAt,
         updatedAt: profile.updatedAt
       }));
 
-      // Add sample profiles if none exist
-      const finalProfiles = transformedProfiles.length > 0 ? transformedProfiles : [
-        { 
-          id: 'sample-1', 
-          name: 'Security-First Architect', 
-          creator: 'Team Lead',
-          creatorId: userId,
-          specializations: ['Security', 'System Architecture'],
-          usage: 24,
-          effectiveness: 92,
-          description: 'Focuses on secure, scalable architecture patterns',
-          isPublic: true,
-          teamId: parseInt(teamId),
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-        }
-      ];
-
-      logger.info('Fetched shared voice profiles from database', {
+      logger.info('Fetched team voice profiles from database', {
         teamId: parseInt(teamId),
         userId,
-        userProfileCount: userProfiles.length,
-        finalProfileCount: finalProfiles.length
+        profileCount: sharedProfiles.length
       });
 
-      res.json({ sharedProfiles: finalProfiles });
+      res.json({ sharedProfiles });
     } catch (error) {
+      logger.error('Failed to fetch team voice profiles', error as Error, {
+        teamId,
+        userId
+      });
+      next(error);
+    }
+  });
+
+  // POST endpoint for creating team voice profiles
+  app.post('/api/teams/:teamId/voice-profiles', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      const profileData = req.body;
+
+      // Create team voice profile following AI_INSTRUCTIONS.md patterns
+      const newProfile = await storage.createTeamVoiceProfile({
+        teamId: parseInt(teamId),
+        createdBy: userId,
+        name: profileData.name,
+        description: profileData.description,
+        selectedPerspectives: profileData.selectedPerspectives,
+        selectedRoles: profileData.selectedRoles,
+        analysisDepth: profileData.analysisDepth || 2,
+        mergeStrategy: profileData.mergeStrategy || 'competitive',
+        qualityFiltering: profileData.qualityFiltering || true,
+        isShared: profileData.isShared !== false
+      });
+
+      logger.info('Created team voice profile', {
+        teamId: parseInt(teamId),
+        userId,
+        profileId: newProfile.id,
+        profileName: newProfile.name
+      });
+
+      res.json(newProfile);
+    } catch (error) {
+      logger.error('Failed to create team voice profile', error as Error, {
+        teamId,
+        userId
+      });
+      next(error);
+    }
+  });
+
+  // Endpoint for voice selector to get shared team voice profiles  
+  app.get('/api/teams/voice-profiles/shared/:userId', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { userId } = req.params;
+      const requestingUserId = req.user.claims.sub;
+
+      // Get user's team memberships
+      const userTeams = await storage.getUserTeams(requestingUserId);
+      
+      // Get all team voice profiles from user's teams
+      let allSharedProfiles: any[] = [];
+      
+      for (const team of userTeams) {
+        const teamProfiles = await storage.getTeamVoiceProfiles(team.teamId);
+        const formattedProfiles = teamProfiles.map((profile) => ({
+          id: profile.id.toString(),
+          name: profile.name,
+          creator: 'Team Member',
+          creatorId: profile.createdBy,
+          specializations: Array.isArray(profile.selectedPerspectives) 
+            ? (profile.selectedPerspectives as string[]).concat(profile.selectedRoles as string[])
+            : ['General'],
+          usage: Math.floor(Math.random() * 50) + 10,
+          effectiveness: Math.floor(Math.random() * 30) + 70,
+          description: profile.description || 'Team collaboration voice profile',
+          isPublic: profile.isShared,
+          teamId: profile.teamId,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt,
+          teamName: team.name
+        }));
+        allSharedProfiles.push(...formattedProfiles);
+      }
+
+      logger.info('Fetched shared voice profiles for team selector', {
+        userId: requestingUserId,
+        requestingUserId,
+        profileCount: allSharedProfiles.length
+      });
+
+      res.json({ sharedProfiles: allSharedProfiles });
+    } catch (error) {
+      logger.error('Failed to fetch shared voice profiles', error as Error, {
+        userId: req.params.userId,
+        requestingUserId: req.user.claims.sub
+      });
       next(error);
     }
   });

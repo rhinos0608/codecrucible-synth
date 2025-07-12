@@ -30,6 +30,30 @@ export function useTeamVoiceProfiles(userId?: string) {
   });
 }
 
+// Hook for team-specific voice profiles (used in Teams page)
+export function useTeamSpecificVoiceProfiles(teamId?: string) {
+  return useQuery({
+    queryKey: ['/api/teams', teamId, 'voice-profiles'],
+    enabled: !!teamId,
+  });
+}
+
+// Hook for creating team voice profiles
+export function useCreateTeamVoiceProfile() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ teamId, profile }: { teamId: string; profile: any }) => {
+      const response = await apiRequest('POST', `/api/teams/${teamId}/voice-profiles`, profile);
+      return response.json();
+    },
+    onSuccess: (_, { teamId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/teams', teamId, 'voice-profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/teams/voice-profiles/shared'] });
+    },
+  });
+}
+
 export function useShareVoiceProfile() {
   const queryClient = useQueryClient();
   

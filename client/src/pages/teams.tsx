@@ -13,7 +13,7 @@ import RealTimeCollaborationPanel from "@/components/real-time-collaboration-pan
 import AdvancedAvatarCustomizer from "@/components/advanced-avatar-customizer";
 import { useTeamSessions, useCreateSession, useJoinSession } from "@/hooks/use-team-sessions";
 import { useTeamMembers } from "@/hooks/use-team-members";
-import { useSharedVoiceProfiles } from "@/hooks/use-shared-voices";
+import { useSharedVoiceProfiles, useTeamSpecificVoiceProfiles, useCreateTeamVoiceProfile } from "@/hooks/use-shared-voices";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -29,10 +29,12 @@ export default function Teams() {
   // Use real team ID - in production this would come from user's current team
   const teamId = user?.id || 'default-team';
 
-  // Real API hooks replacing mock data
+  // Real API hooks replacing mock data - using team-specific voice profiles for Teams page
   const { data: sessionsData, isLoading: sessionsLoading, error: sessionsError } = useTeamSessions(teamId);
   const { data: membersData, isLoading: membersLoading, error: membersError } = useTeamMembers(teamId);
-  const { data: voicesData, isLoading: voicesLoading, error: voicesError } = useSharedVoiceProfiles(teamId);
+  const { data: voicesData, isLoading: voicesLoading, error: voicesError } = useTeamSpecificVoiceProfiles(teamId);
+  
+  const createTeamVoiceProfileMutation = useCreateTeamVoiceProfile();
   
   const createSessionMutation = useCreateSession();
   const joinSessionMutation = useJoinSession();

@@ -355,6 +355,24 @@ export class DatabaseStorage implements IStorage {
     
     return userTeams.map(t => t.team);
   }
+
+  async getUserTeams(userId: string): Promise<{ teamId: number; name: string; role: string }[]> {
+    const userTeams = await db
+      .select({
+        teamId: teams.id,
+        name: teams.name,
+        role: teamMembers.role
+      })
+      .from(teamMembers)
+      .innerJoin(teams, eq(teamMembers.teamId, teams.id))
+      .where(eq(teamMembers.userId, userId));
+    
+    return userTeams.map(team => ({
+      teamId: team.teamId,
+      name: team.name,
+      role: team.role || 'member'
+    }));
+  }
   
   async updateTeam(id: number, updates: Partial<InsertTeam>): Promise<Team | undefined> {
     const [updated] = await db

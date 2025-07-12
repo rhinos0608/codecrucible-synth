@@ -441,9 +441,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Critical session endpoints - REAL OpenAI integration following AI_INSTRUCTIONS.md patterns
-  app.post("/api/sessions", async (req, res) => {
+  app.post("/api/sessions", isAuthenticated, async (req: any, res) => {
     try {
-      console.log('🔧 Real OpenAI Session Creation:', req.body);
+      const userId = req.user.claims.sub;
+      console.log('🔧 Real OpenAI Session Creation:', { ...req.body, userId });
+      
+      // Dev mode check following AI_INSTRUCTIONS.md patterns
+      const { getDevModeConfig } = await import('./lib/dev-mode');
+      const devModeConfig = getDevModeConfig();
       
       const { prompt, selectedVoices } = req.body;
       const sessionId = Date.now();
@@ -454,6 +459,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('🚀 Initiating REAL OpenAI API calls:', {
         sessionId,
+        userId,
+        devMode: devModeConfig.isEnabled,
         voiceCount: perspectives.length + roles.length,
         promptLength: prompt?.length || 0
       });
@@ -464,7 +471,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         perspectives,
         roles,
         sessionId,
-        mode: 'production'
+        userId,
+        mode: devModeConfig.isEnabled ? 'development' : 'production'
       });
       
       // Store solutions for later retrieval
@@ -488,10 +496,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionData = {
         session: {
           id: sessionId,
-          userId: 'dev-user',
+          userId: userId,
           prompt: prompt,
           selectedVoices: selectedVoices,
           status: 'completed',
+          devMode: devModeConfig.isEnabled,
           createdAt: new Date().toISOString()
         },
         solutions: formattedSolutions
@@ -542,68 +551,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })}\n\n`);
       
       try {
-        // Generate REAL OpenAI solutions with streaming response
-        const solutions = await realOpenAIService.generateSolutions({
-          prompt,
-          selectedVoices,
-          userId,
-          sessionId,
-          mode: 'streaming'
-        });
-
-        // Stream each solution in real-time following CodingPhilosophy.md living spiral
-        for (let i = 0; i < solutions.length; i++) {
-          const solution = solutions[i];
+        // Real-time streaming generation following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+        const perspectives = selectedVoices?.perspectives || [];
+        const roles = selectedVoices?.roles || [];
+        const allVoices = [
+          ...perspectives.map(p => ({ id: p, type: 'perspective' as const })),
+          ...roles.map(r => ({ id: r, type: 'role' as const }))
+        ];
+        
+        const completedSolutions: any[] = [];
+        
+        // Stream each voice in parallel with real OpenAI streaming
+        for (let i = 0; i < allVoices.length; i++) {
+          const voice = allVoices[i];
           
           // Voice arrival notification
           res.write(`data: ${JSON.stringify({
             type: 'voice_connected',
-            voiceId: solution.voiceCombination || `voice_${i}`,
-            voiceName: solution.voiceCombination || 'AI Voice',
-            message: 'Voice joined the council...'
+            voiceId: voice.id,
+            voiceName: voice.id,
+            message: `${voice.id} voice joining the council...`
           })}\n\n`);
           
-          // Stream the actual OpenAI-generated code in chunks for ChatGPT effect
-          const codeChunks = solution.code.match(/.{1,50}/g) || [solution.code];
-          
-          for (let j = 0; j < codeChunks.length; j++) {
-            res.write(`data: ${JSON.stringify({
-              type: 'voice_chunk',
-              voiceId: solution.voiceCombination || `voice_${i}`,
-              voiceName: solution.voiceCombination || 'AI Voice',
-              chunk: codeChunks[j],
-              isComplete: j === codeChunks.length - 1,
-              confidence: solution.confidence
-            })}\n\n`);
-            
-            // Real-time delay for ChatGPT typing effect
-            await new Promise(resolve => setTimeout(resolve, 50));
-          }
-          
-          // Voice completion with explanation
-          res.write(`data: ${JSON.stringify({
-            type: 'voice_complete',
-            voiceId: solution.voiceCombination || `voice_${i}`,
-            voiceName: solution.voiceCombination || 'AI Voice',
-            fullCode: solution.code,
-            explanation: solution.explanation,
-            confidence: solution.confidence
-          })}\n\n`);
+          // Real-time OpenAI streaming for this voice
+          await realOpenAIService.generateSolutionStream({
+            prompt,
+            perspectives,
+            roles,
+            sessionId,
+            voiceId: voice.id,
+            type: voice.type,
+            onChunk: (chunk: string) => {
+              res.write(`data: ${JSON.stringify({
+                type: 'voice_chunk',
+                voiceId: voice.id,
+                voiceName: voice.id,
+                chunk: chunk,
+                isComplete: false
+              })}\n\n`);
+            },
+            onComplete: async (solution: any) => {
+              completedSolutions.push(solution);
+              
+              res.write(`data: ${JSON.stringify({
+                type: 'voice_complete',
+                voiceId: voice.id,
+                voiceName: voice.id,
+                fullCode: solution.code,
+                explanation: solution.explanation,
+                confidence: solution.confidence
+              })}\n\n`);
+            }
+          });
         }
 
         // Store solutions for synthesis
         global.sessionSolutions = global.sessionSolutions || new Map();
-        global.sessionSolutions.set(sessionId, solutions);
+        global.sessionSolutions.set(sessionId, completedSolutions);
         
         // Complete streaming with council synthesis invitation
         res.write(`data: ${JSON.stringify({
           type: 'session_complete',
           sessionId: sessionId,
-          solutionCount: solutions.length,
+          solutionCount: completedSolutions.length,
           message: 'Council assembly complete. Ready for synthesis...'
         })}\n\n`);
         
-        console.log('✅ Real OpenAI streaming completed:', { sessionId, solutionCount: solutions.length });
+        console.log('✅ Real OpenAI streaming completed:', { sessionId, solutionCount: completedSolutions.length });
         
       } catch (openaiError) {
         console.error('❌ Real OpenAI streaming error:', openaiError);
@@ -621,6 +635,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Streaming endpoint error:', error);
       res.status(500).json({ error: 'Real OpenAI streaming failed', details: error.message });
+    }
+  });
+
+  // Solutions endpoint for Implementation Options modal
+  app.get("/api/sessions/:id/solutions", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const sessionId = parseInt(id);
+      
+      // Retrieve solutions from global storage
+      const solutions = global.sessionSolutions?.get(sessionId) || [];
+      
+      console.log('📊 Fetching solutions for session:', { sessionId, solutionCount: solutions.length });
+      
+      if (solutions.length === 0) {
+        res.json([]);
+        return;
+      }
+      
+      res.json(solutions);
+    } catch (error) {
+      console.error('Error fetching solutions:', error);
+      res.status(500).json({ error: 'Failed to fetch solutions' });
+    }
+  });
+
+  // Synthesis endpoint for combining voice solutions
+  app.post("/api/sessions/:sessionId/synthesis", isAuthenticated, async (req: any, res) => {
+    try {
+      const { sessionId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      console.log('🔬 Synthesis request:', { sessionId, userId });
+      
+      // Retrieve solutions for synthesis
+      const solutions = global.sessionSolutions?.get(parseInt(sessionId)) || [];
+      
+      if (solutions.length === 0) {
+        res.status(404).json({ error: 'No solutions found for synthesis' });
+        return;
+      }
+      
+      // Call REAL OpenAI synthesis service
+      const synthesisResult = await realOpenAIService.synthesizeSolutions(
+        solutions, 
+        parseInt(sessionId),
+        req.body.prompt || 'Synthesize the voice solutions'
+      );
+      
+      console.log('✅ Synthesis completed:', { sessionId, resultLength: synthesisResult.code?.length || 0 });
+      
+      res.json(synthesisResult);
+    } catch (error) {
+      console.error('Synthesis error:', error);
+      res.status(500).json({ error: 'Failed to synthesize solutions', details: error.message });
     }
   });
 

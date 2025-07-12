@@ -1,6 +1,7 @@
 import { Express } from 'express';
 import { Server } from 'http';
 import { z } from 'zod';
+import { setupAuth, isAuthenticated } from './replitAuth';
 
 // Simple logger implementation
 const logger = {
@@ -15,20 +16,33 @@ const logger = {
   }
 };
 
-// Authentication middleware
-const isAuthenticated = (req: any, res: any, next: any) => {
-  if (req.user?.claims?.sub) {
-    next();
-  } else {
-    res.status(401).json({ error: 'Authentication required' });
-  }
-};
-
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Setup authentication first
+  await setupAuth(app);
   
   // Test endpoint
   app.get('/api/test', (req, res) => {
     res.json({ status: 'Real-Time Multiplayer CodeCrucible Server Running!' });
+  });
+
+  // Auth routes are now handled by setupAuth
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      // Mock user data for now - in production this would come from database
+      const user = {
+        id: userId,
+        email: req.user.claims.email,
+        name: req.user.claims.name,
+        planTier: 'free',
+        createdAt: new Date()
+      };
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
   });
 
   // Create collaborative session

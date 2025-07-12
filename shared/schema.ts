@@ -279,22 +279,28 @@ export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).pick({
 
 // Security-first validation schema following AI_INSTRUCTIONS.md
 export const insertVoiceSessionSchema = createInsertSchema(voiceSessions).pick({
+  userId: true,
   prompt: true,
   selectedVoices: true,
   recursionDepth: true,
   synthesisMode: true,
   ethicalFiltering: true,
+  mode: true,
 }).extend({
   // Secure validation of selectedVoices structure
   selectedVoices: z.object({
-    perspectives: z.array(z.string().min(1).max(50)).min(1).max(10),
-    roles: z.array(z.string().min(1).max(50)).min(1).max(10)
+    perspectives: z.array(z.string().min(1).max(50)).default([]),
+    roles: z.array(z.string().min(1).max(50)).default([])
+  }).refine(data => data.perspectives.length > 0 || data.roles.length > 0, {
+    message: "At least one perspective or role must be selected"
   }),
   // Input validation following AI_INSTRUCTIONS.md security patterns
-  prompt: z.string().min(1).max(2000),
+  userId: z.string().min(1),
+  prompt: z.string().min(1).max(15000), // Extended for dev mode
   recursionDepth: z.number().int().min(1).max(5),
   synthesisMode: z.enum(["consensus", "competitive", "collaborative"]),
-  ethicalFiltering: z.boolean()
+  ethicalFiltering: z.boolean(),
+  mode: z.enum(["production", "development"]).default("production")
 });
 
 export const insertSolutionSchema = createInsertSchema(solutions).pick({

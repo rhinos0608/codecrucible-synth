@@ -907,15 +907,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         devModeEnabled: isDevModeEnabled()
       });
 
-      // Create session in storage
+      // Create session in storage with proper voice selection format
       const session = await storage.createVoiceSession({
         userId,
         prompt,
-        selectedPerspectives: selectedVoices.perspectives || [],
-        selectedRoles: selectedVoices.roles || [],
-        analysisDepth,
-        mergeStrategy,
-        qualityFiltering,
+        selectedVoices: {
+          perspectives: selectedVoices.perspectives || [],
+          roles: selectedVoices.roles || []
+        },
+        recursionDepth: analysisDepth,
+        synthesisMode: mergeStrategy,
+        ethicalFiltering: qualityFiltering,
         mode: 'development'
       });
 

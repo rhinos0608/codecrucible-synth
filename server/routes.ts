@@ -1098,30 +1098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ChatGPT-style streaming endpoint - Following AI_INSTRUCTIONS.md and CodingPhilosophy.md
-  app.get('/api/sessions/:sessionId/stream/:voiceId', async (req: any, res, next) => {
-    // Enhanced authentication check for SSE requests
-    if (!req.isAuthenticated() || !req.user) {
-      logger.warn('Unauthorized streaming request', {
-        url: req.url,
-        authenticated: req.isAuthenticated(),
-        userPresent: !!req.user,
-        cookies: Object.keys(req.cookies || {}).join(','),
-        sessionId: req.session?.id
-      });
-      
-      // For EventSource, we need to send proper SSE error format
-      res.writeHead(401, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      });
-      res.write(`data: ${JSON.stringify({ 
-        type: 'error', 
-        error: 'Authentication required for streaming' 
-      })}\n\n`);
-      res.end();
-      return;
-    }
+  app.get('/api/sessions/:sessionId/stream/:voiceId', isAuthenticated, async (req: any, res, next) => {
     try {
       const { sessionId, voiceId } = req.params;
       const { type } = req.query; // 'perspective' or 'role'
@@ -1300,96 +1277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Following CodingPhilosophy.md: Real-time voice streaming endpoint
-  app.get('/api/sessions/:sessionId/stream/:voiceId', isAuthenticated, async (req: any, res, next) => {
-    try {
-      const { sessionId, voiceId } = req.params;
-      const { type } = req.query; // 'perspective' or 'role'
-      const userId = req.user.claims.sub;
-      
-      // Validate session ownership
-      const session = await storage.getVoiceSession(parseInt(sessionId));
-      if (!session || session.userId !== userId) {
-        return res.status(404).json({ error: 'Session not found' });
-      }
-
-      // Set up Server-Sent Events
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Cache-Control'
-      });
-
-      // Following CodingPhilosophy.md: Consciousness-based streaming generation
-      const streamVoiceGeneration = async () => {
-        try {
-          const { openaiService } = await import('./openai-service');
-          
-          // Generate solution with streaming
-          const solution = await openaiService.generateSolutionStream({
-            prompt: session.prompt,
-            perspectives: session.selectedVoices.perspectives || [],
-            roles: session.selectedVoices.roles || [],
-            sessionId: parseInt(sessionId),
-            voiceId,
-            type: type as 'perspective' | 'role',
-            onChunk: (chunk: string) => {
-              // Send chunk to client
-              res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
-            },
-            onComplete: async (finalSolution: any) => {
-              // Store complete solution
-              await storage.createSolution({
-                sessionId: parseInt(sessionId),
-                voiceCombination: voiceId,
-                code: finalSolution.code,
-                explanation: finalSolution.explanation,
-                confidence: finalSolution.confidence,
-                strengths: finalSolution.strengths,
-                considerations: finalSolution.considerations
-              });
-              
-              // Send completion
-              res.write(`data: ${JSON.stringify({ 
-                type: 'complete', 
-                confidence: finalSolution.confidence 
-              })}\n\n`);
-              res.end();
-            }
-          });
-          
-        } catch (error) {
-          logger.error('Streaming generation failed', error as Error, {
-            sessionId, voiceId, userId
-          });
-          
-          res.write(`data: ${JSON.stringify({ 
-            type: 'error', 
-            error: 'Generation failed' 
-          })}\n\n`);
-          res.end();
-        }
-      };
-
-      // Start streaming
-      streamVoiceGeneration();
-      
-      // Cleanup on client disconnect
-      req.on('close', () => {
-        res.end();
-      });
-      
-    } catch (error) {
-      logger.error('Failed to start voice stream', error as Error, {
-        sessionId: req.params.sessionId,
-        voiceId: req.params.voiceId,
-        userId: req.user?.claims?.sub
-      });
-      next(error);
-    }
-  });
-
+  // End of streaming functionality
+  
   return server;
 }

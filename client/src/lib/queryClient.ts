@@ -25,6 +25,30 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
+  url: string,
+  options?: {
+    method?: string;
+    body?: unknown;
+    headers?: Record<string, string>;
+  }
+): Promise<any> {
+  const method = options?.method || 'GET';
+  const res = await fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers
+    },
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+    credentials: "include",
+  });
+
+  await throwIfResNotOk(res);
+  return res.json();
+}
+
+// Legacy overload for backward compatibility
+export async function apiRequestLegacy(
   method: string,
   url: string,
   data?: unknown | undefined,

@@ -85,7 +85,7 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     retryDelay: 1000,
   });
 
-  // Debug logging following AI_INSTRUCTIONS.md patterns
+  // Enhanced debug logging following AI_INSTRUCTIONS.md patterns
   useEffect(() => {
     if (isOpen && sessionId) {
       console.log('SolutionStack Debug:', {
@@ -93,9 +93,25 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
         isOpen,
         isLoading,
         solutionCount: solutions?.length || 0,
-        solutions: solutions?.map(s => ({ id: s.id, voiceCombination: s.voiceCombination })) || [],
-        error: error?.message || null
+        solutions: solutions?.map(s => ({ 
+          id: s.id, 
+          voiceEngine: s.voiceEngine,
+          voiceName: s.voiceName,
+          voiceCombination: s.voiceCombination || 'N/A'
+        })) || [],
+        error: error?.message || null,
+        rawError: error
       });
+      
+      // Enhanced error tracking for HTML responses
+      if (error?.message?.includes('Unexpected token')) {
+        console.error('🔴 JSON Parsing Error - Likely receiving HTML instead of JSON:', {
+          errorMessage: error.message,
+          sessionId: sessionId,
+          endpoint: `/api/sessions/${sessionId}/solutions`,
+          suggestion: 'Check if endpoint returns proper JSON'
+        });
+      }
     }
   }, [isOpen, sessionId, isLoading, solutions, error]);
 

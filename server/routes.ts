@@ -519,33 +519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // REAL OpenAI Streaming endpoint - GET and POST support for EventSource
-  app.get("/api/sessions/stream", isAuthenticated, async (req: any, res) => {
-    // Handle EventSource GET requests by treating them as streaming requests
-    const { prompt, selectedVoices, sessionId } = req.query;
-    
-    if (!prompt || !selectedVoices) {
-      res.status(400).json({ error: 'Missing required parameters' });
-      return;
-    }
-    
-    // Parse selectedVoices from query string
-    let parsedVoices;
-    try {
-      parsedVoices = JSON.parse(selectedVoices as string);
-    } catch (error) {
-      res.status(400).json({ error: 'Invalid selectedVoices format' });
-      return;
-    }
-    
-    // Handle the streaming with the same logic as POST
-    await handleStreamingRequest(req, res, {
-      prompt: prompt as string,
-      selectedVoices: parsedVoices,
-      sessionId: parseInt(sessionId as string) || Date.now()
-    });
-  });
-
+  // REAL OpenAI Streaming endpoint - POST only for live streaming
   app.post("/api/sessions/stream", isAuthenticated, async (req: any, res) => {
     await handleStreamingRequest(req, res, req.body);
   });

@@ -94,13 +94,8 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     setCurrentSessionId(sessionId);
 
     try {
-      // Connect to the streaming endpoint using EventSource directly
-      const eventSource = new EventSource(`/api/sessions/stream`, {
-        withCredentials: true
-      });
-
-      // Send the streaming request via POST to trigger generation
-      fetch('/api/sessions/stream', {
+      // Use POST method for streaming instead of EventSource - Following AI_INSTRUCTIONS.md patterns
+      const response = await fetch('/api/sessions/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,67 +106,86 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
           selectedVoices,
           sessionId
         })
-      }).catch(error => {
-        console.error('Failed to initiate streaming:', error);
-        onError?.('Failed to start streaming');
-        setIsStreaming(false);
       });
 
-      // Handle streaming messages
-      eventSource.onmessage = (event) => {
+      if (!response.ok) {
+        throw new Error(`Streaming failed: ${response.status}`);
+      }
+
+      if (!response.body) {
+        throw new Error('Response body is null');
+      }
+
+      // Process Server-Sent Events from the response stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      const processStream = async () => {
         try {
-          const data = JSON.parse(event.data);
-          console.log('📡 Streaming data received:', data.type, data.voiceId);
-          
-          if (data.type === 'voice_content') {
-            // Update specific voice content
-            setVoices(prev => prev.map(voice => 
-              voice.id === data.voiceId 
-                ? { 
-                    ...voice, 
-                    content: voice.content + (data.content || ''),
-                    isTyping: true,
-                    isComplete: false
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              console.log('✅ Streaming completed');
+              setIsStreaming(false);
+              break;
+            }
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  console.log('📡 Streaming data received:', data.type, data.voiceId);
+                  
+                  if (data.type === 'voice_content') {
+                    // Update specific voice content
+                    setVoices(prev => prev.map(voice => 
+                      voice.id === data.voiceId 
+                        ? { 
+                            ...voice, 
+                            content: voice.content + (data.content || ''),
+                            isTyping: true,
+                            isComplete: false
+                          }
+                        : voice
+                    ));
+                  } else if (data.type === 'voice_complete') {
+                    // Mark voice as complete
+                    setVoices(prev => prev.map(voice => 
+                      voice.id === data.voiceId 
+                        ? { 
+                            ...voice, 
+                            isTyping: false,
+                            isComplete: true,
+                            confidence: data.confidence || 85
+                          }
+                        : voice
+                    ));
+                  } else if (data.type === 'session_complete') {
+                    // All voices completed
+                    console.log('✅ All voices completed streaming');
+                    setIsStreaming(false);
+                    onComplete?.(sessionId);
+                    return; // Exit the stream processing
                   }
-                : voice
-            ));
-          } else if (data.type === 'voice_complete') {
-            // Mark voice as complete
-            setVoices(prev => prev.map(voice => 
-              voice.id === data.voiceId 
-                ? { 
-                    ...voice, 
-                    isTyping: false,
-                    isComplete: true,
-                    confidence: data.confidence || 85
-                  }
-                : voice
-            ));
-          } else if (data.type === 'session_complete') {
-            // All voices completed
-            console.log('✅ All voices completed streaming');
-            setIsStreaming(false);
-            onComplete?.(sessionId);
-            eventSource.close();
+                } catch (parseError) {
+                  console.error('Failed to parse streaming data:', parseError);
+                }
+              }
+            }
           }
-        } catch (parseError) {
-          console.error('Failed to parse streaming data:', parseError);
+        } catch (streamError) {
+          console.error('Stream processing error:', streamError);
+          setIsStreaming(false);
+          onError?.('Stream processing failed');
         }
       };
 
-      eventSource.onerror = (error) => {
-        console.error('Streaming connection error:', error);
-        setIsStreaming(false);
-        onError?.('Streaming connection failed');
-        eventSource.close();
-      };
-
-      eventSource.onopen = () => {
-        console.log('✅ Streaming connection opened successfully');
-      };
-
-      // Store eventSource for cleanup
-      streamRefs.current['main'] = eventSource;
+      // Start processing the stream
+      processStream();
 
     } catch (error) {
       console.error('❌ Failed to start streaming:', error);

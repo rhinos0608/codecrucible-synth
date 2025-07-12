@@ -21,25 +21,26 @@ function Router() {
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <>
-          <Route path="/" component={Landing} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/subscribe" component={Subscribe} />
-          <Route path="/subscription/success" component={SubscriptionSuccess} />
-          <Route path="/subscription/cancel" component={SubscriptionCancel} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/analytics" component={Analytics} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/teams" component={Teams} />
-          <Route path="/subscribe" component={Subscribe} />
-          <Route path="/subscription/success" component={SubscriptionSuccess} />
-          <Route path="/subscription/cancel" component={SubscriptionCancel} />
-        </>
-      )}
+      {/* Public routes available to all users */}
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/subscribe" component={Subscribe} />
+      <Route path="/subscription/success" component={SubscriptionSuccess} />
+      <Route path="/subscription/cancel" component={SubscriptionCancel} />
+      
+      {/* Protected routes - redirect to landing if not authenticated */}
+      <Route path="/analytics">
+        {isAuthenticated ? <Analytics /> : <Landing />}
+      </Route>
+      <Route path="/teams">
+        {isAuthenticated ? <Teams /> : <Landing />}
+      </Route>
+      
+      {/* Main route */}
+      <Route path="/">
+        {isLoading ? <div>Loading...</div> : (isAuthenticated ? <Dashboard /> : <Landing />)}
+      </Route>
+      
+      {/* 404 fallback */}
       <Route component={NotFound} />
     </Switch>
   );

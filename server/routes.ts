@@ -1097,6 +1097,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test authentication endpoint for debugging
+  app.get('/api/test-auth', isAuthenticated, (req: any, res) => {
+    res.json({ 
+      authenticated: true, 
+      user: req.user?.claims?.sub?.substring(0, 8) + '...',
+      sessionId: req.session?.id,
+      cookies: Object.keys(req.cookies || {})
+    });
+  });
+
   // ChatGPT-style streaming endpoint - Following AI_INSTRUCTIONS.md and CodingPhilosophy.md
   app.get('/api/sessions/:sessionId/stream/:voiceId', isAuthenticated, async (req: any, res, next) => {
     try {
@@ -1125,9 +1135,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': req.headers.origin || 'http://localhost:5000',
+        'Access-Control-Allow-Origin': req.headers.origin || '*',
         'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Allow-Headers': 'Cache-Control, Authorization, Content-Type, Cookie'
+        'Access-Control-Allow-Headers': 'Cache-Control, Authorization, Content-Type, Cookie, Accept',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
       });
 
       // Import OpenAI service for streaming

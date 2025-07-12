@@ -1082,78 +1082,47 @@ Production Readiness:
 - Security audit logging with sanitized data`;
   }
 
-  // Following CodingPhilosophy.md: Real-time streaming generation method
-  async generateSolutionStream(
-    request: CodeGenerationRequest & {
-      voiceId: string;
-      type: 'perspective' | 'role';
-      onChunk: (chunk: string) => void;
-      onComplete: (solution: GeneratedSolution) => void;
-    }
+  // Parse OpenAI response into solution format following AI_INSTRUCTIONS.md patterns
+  private parseOpenAIResponse(content: string, voiceId: string, type: 'perspective' | 'role'): GeneratedSolution {
+    return {
+      voiceCombination: voiceId,
+      code: this.extractCodeFromResponse(content),
+      explanation: this.extractExplanationFromResponse(content),
+      confidence: 85,
+      strengths: this.extractStrengths(content),
+      considerations: this.extractConsiderations(content),
+      perspective: type === 'perspective' ? voiceId : '',
+      role: type === 'role' ? voiceId : ''
+    };
+  }
+
+  // Simulation for fallback scenarios following CodingPhilosophy.md consciousness principles
+  private async simulateStreamGeneration(
+    voiceId: string, 
+    type: 'perspective' | 'role', 
+    prompt: string, 
+    onChunk: (chunk: string) => void, 
+    onComplete: (solution: any) => Promise<void>
   ): Promise<void> {
-    const { voiceId, type, onChunk, onComplete, ...baseRequest } = request;
+    const mockSolution = this.generateMockSolution(voiceId, prompt);
+    const chunks = mockSolution.code.split(' ');
     
-    try {
-      if (!openai) {
-        // Fallback for development without OpenAI key
-        await this.simulateStreamGeneration(voiceId, type, baseRequest, onChunk, onComplete);
-        return;
-      }
-
-      // Get system prompt for specific voice
-      const systemPrompt = type === 'perspective' 
-        ? this.getPerspectiveSystemPrompt(voiceId as CodePerspective)
-        : this.getRoleSystemPrompt(voiceId as DevelopmentRole);
-
-      const userPrompt = `${baseRequest.prompt}
-
-Please provide a complete, production-ready solution following AI_INSTRUCTIONS.md patterns.`;
-
-      logger.info('Starting streaming OpenAI generation', {
-        requestId: `${baseRequest.sessionId}-${voiceId}-stream`,
-        voiceId,
-        type
-      });
-
-      // Create streaming completion
-      const stream = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.7,
-        stream: true
-      });
-
-      let fullContent = '';
-      
-      // Process stream chunks
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          fullContent += content;
-          onChunk(content);
-          
-          // Add realistic typing delay following CodingPhilosophy.md flow
-          await new Promise(resolve => setTimeout(resolve, 20 + Math.random() * 30));
-        }
-      }
-
-      // Parse and validate final response
-      const solution = this.parseOpenAIResponse(fullContent, voiceId, type);
-      onComplete(solution);
-
-    } catch (error) {
-      logger.error('Streaming generation failed', error as Error, {
-        voiceId,
-        type,
-        sessionId: baseRequest.sessionId
-      });
-      
-      // Fallback to simulated generation
-      await this.simulateStreamGeneration(voiceId, type, baseRequest, onChunk, onComplete);
+    // Simulate typing with realistic delays
+    for (const chunk of chunks) {
+      onChunk(chunk + ' ');
+      await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
     }
+    
+    await onComplete({
+      voiceCombination: voiceId,
+      code: mockSolution.code,
+      explanation: mockSolution.explanation,
+      confidence: mockSolution.confidence,
+      strengths: mockSolution.strengths,
+      considerations: mockSolution.considerations,
+      perspective: type === 'perspective' ? voiceId : '',
+      role: type === 'role' ? voiceId : ''
+    });
   }
 
   // Following AI_INSTRUCTIONS.md: Secure fallback simulation for development

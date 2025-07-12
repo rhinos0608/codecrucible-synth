@@ -128,9 +128,11 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     console.log(`Starting voice stream for ${voiceId} (${type}) on session ${sessionId}`);
 
     // Create new EventSource for streaming with proper error handling
-    // Note: EventSource doesn't support withCredentials in all browsers, cookies are sent automatically
+    // EventSource sends cookies automatically for same-origin requests
+    // Following AI_INSTRUCTIONS.md authentication patterns
     const eventSource = new EventSource(
-      `/api/sessions/${sessionId}/stream/${voiceId}?type=${type}`
+      `/api/sessions/${sessionId}/stream/${voiceId}?type=${type}`,
+      { withCredentials: true }
     );
 
     streamRefs.current[voiceId] = eventSource;

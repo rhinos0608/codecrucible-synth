@@ -6,6 +6,7 @@ import {
   syntheses,
   phantomLedgerEntries,
   projects,
+  projectFolders,
   teams,
   teamMembers,
   usageLimits,
@@ -31,6 +32,8 @@ import {
   type PhantomLedgerEntry,
   type InsertProject,
   type Project,
+  type InsertProjectFolder,
+  type ProjectFolder,
   type Team,
   type InsertTeam,
   type TeamMember,
@@ -99,6 +102,15 @@ export interface IStorage {
   getProject(id: number): Promise<Project | undefined>;
   updateProject(id: number, updates: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: number): Promise<boolean>;
+  
+  // Project folder operations - Pro tier gated following AI_INSTRUCTIONS.md
+  createProjectFolder(folder: InsertProjectFolder): Promise<ProjectFolder>;
+  getProjectFolders(userId: string): Promise<ProjectFolder[]>;
+  getProjectFolder(id: number): Promise<ProjectFolder | undefined>;
+  updateProjectFolder(id: number, updates: Partial<InsertProjectFolder>): Promise<ProjectFolder | undefined>;
+  deleteProjectFolder(id: number): Promise<boolean>;
+  getFolderProjects(folderId: number): Promise<Project[]>;
+  moveProjectToFolder(projectId: number, folderId: number | null): Promise<boolean>;
   
   // Team operations
   createTeam(team: InsertTeam): Promise<Team>;
@@ -360,7 +372,101 @@ export class DatabaseStorage implements IStorage {
   
   async deleteProject(id: number): Promise<boolean> {
     const result = await db.delete(projects).where(eq(projects.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Project folder operations - Pro tier gated following AI_INSTRUCTIONS.md
+  async createProjectFolder(folder: InsertProjectFolder): Promise<ProjectFolder> {
+    const [newFolder] = await db
+      .insert(projectFolders)
+      .values({
+        ...folder,
+        userId: folder.userId || '',
+      })
+      .returning();
+    return newFolder;
+  }
+
+  async getProjectFolders(userId: string): Promise<ProjectFolder[]> {
+    return await db
+      .select()
+      .from(projectFolders)
+      .where(eq(projectFolders.userId, userId))
+      .orderBy(projectFolders.sortOrder, projectFolders.name);
+  }
+
+  async getProjectFolder(id: number): Promise<ProjectFolder | undefined> {
+    const [folder] = await db
+      .select()
+      .from(projectFolders)
+      .where(eq(projectFolders.id, id));
+    return folder;
+  }
+
+  async updateProjectFolder(id: number, updates: Partial<InsertProjectFolder>): Promise<ProjectFolder | undefined> {
+    const [updatedFolder] = await db
+      .update(projectFolders)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(projectFolders.id, id))
+      .returning();
+    return updatedFolder;
+  }
+
+  async deleteProjectFolder(id: number): Promise<boolean> {
+    // First, check if folder has child folders or projects
+    const childFolders = await db
+      .select()
+      .from(projectFolders)
+      .where(eq(projectFolders.parentId, id));
+    
+    const folderProjects = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.folderId, id));
+    
+    if (childFolders.length > 0 || folderProjects.length > 0) {
+      // Move child folders and projects to parent folder or root
+      const folderToDelete = await this.getProjectFolder(id);
+      const parentId = folderToDelete?.parentId || null;
+      
+      // Update child folders
+      if (childFolders.length > 0) {
+        await db
+          .update(projectFolders)
+          .set({ parentId })
+          .where(eq(projectFolders.parentId, id));
+      }
+      
+      // Update projects in this folder
+      if (folderProjects.length > 0) {
+        await db
+          .update(projects)
+          .set({ folderId: parentId })
+          .where(eq(projects.folderId, id));
+      }
+    }
+    
+    const result = await db.delete(projectFolders).where(eq(projectFolders.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getFolderProjects(folderId: number): Promise<Project[]> {
+    return await db
+      .select()
+      .from(projects)
+      .where(eq(projects.folderId, folderId))
+      .orderBy(projects.name);
+  }
+
+  async moveProjectToFolder(projectId: number, folderId: number | null): Promise<boolean> {
+    const result = await db
+      .update(projects)
+      .set({ folderId })
+      .where(eq(projects.id, projectId));
+    return (result.rowCount ?? 0) > 0;
   }
   
   // Team operations

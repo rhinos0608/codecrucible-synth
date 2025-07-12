@@ -9,6 +9,7 @@ import { PerspectiveSelector } from "@/components/voice-selector";
 import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
+import { EnhancedProjectsPanel } from "@/components/enhanced-projects-panel";
 import { AnalyticsPanel } from "@/components/analytics-panel";
 import { TeamsPanel } from "@/components/teams-panel";
 
@@ -65,6 +66,8 @@ export default function Dashboard() {
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [showErrorMonitor, setShowErrorMonitor] = useState(false);
   const [projectContext, setProjectContext] = useState<Project | null>(null);
+  const [selectedContextProjects, setSelectedContextProjects] = useState<Project[]>([]);
+  const [showEnhancedProjectsPanel, setShowEnhancedProjectsPanel] = useState(false);
 
   const { user } = useAuth();
   const { profiles } = useVoiceProfiles();
@@ -165,6 +168,24 @@ export default function Dashboard() {
 
   const queryClient = useQueryClient();
   
+  // Context-aware generation mutation
+  const contextAwareGenerationMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('/api/sessions/context-aware', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    onSuccess: (data) => {
+      setCurrentSolutions(data.solutions || []);
+      setCurrentSessionId(data.sessionId || Date.now());
+      setShowSolutionStack(true);
+    },
+    onError: (error: any) => {
+      console.error('Context-aware generation failed:', error);
+    }
+  });
+  
   const trackRecommendation = useMutation({
     mutationFn: async (data: { sessionId: number; recommendedVoices: string[]; action: 'applied' | 'rejected' }) => {
       const response = await apiRequest('POST', `/api/analytics/recommendations/${data.action}`, {
@@ -177,6 +198,12 @@ export default function Dashboard() {
       console.error('Failed to track recommendation:', error);
     }
   });
+
+  // Handle using projects as context
+  const handleUseAsContext = (projects: Project[]) => {
+    setSelectedContextProjects(projects);
+    console.log('Projects selected for context:', projects.length);
+  };
 
 
 
@@ -345,8 +372,8 @@ export default function Dashboard() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    console.log("🎯 Projects button clicked, setting showProjectsPanel to true");
-                    setShowProjectsPanel(true);
+                    console.log("🎯 Enhanced Projects button clicked, setting showEnhancedProjectsPanel to true");
+                    setShowEnhancedProjectsPanel(true);
                   }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                 >
@@ -718,6 +745,14 @@ export default function Dashboard() {
           }}
         />
       )}
+
+      {/* Enhanced Projects Panel with Context-Aware Features */}
+      <EnhancedProjectsPanel
+        isOpen={showEnhancedProjectsPanel}
+        onClose={() => setShowEnhancedProjectsPanel(false)}
+        onUseAsContext={handleUseAsContext}
+        selectedContextProjects={selectedContextProjects}
+      />
 
 
 

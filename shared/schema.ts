@@ -122,6 +122,23 @@ export const phantomLedgerEntries = pgTable("phantom_ledger_entries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Project folders table - Following AI_INSTRUCTIONS.md Pro tier gating and CodingPhilosophy.md pattern language
+export const projectFolders = pgTable("project_folders", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }).default("#3b82f6"), // Hex color for Alexander's visual patterns
+  icon: varchar("icon", { length: 50 }).default("folder"), // Lucide icon name
+  userId: varchar("user_id").notNull().references(() => users.id),
+  parentId: integer("parent_id"), // Recursive nesting following Bateson's patterns
+  isShared: boolean("is_shared").default(false),
+  visibility: varchar("visibility", { length: 20 }).default("private"), // private, team, public
+  sortOrder: integer("sort_order").default(0), // User-defined ordering
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Enhanced project storage with folder organization - Following consciousness principles
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id),
@@ -131,8 +148,13 @@ export const projects = pgTable("projects", {
   language: text("language").notNull().default("javascript"),
   sessionId: integer("session_id").references(() => voiceSessions.id),
   synthesisId: integer("synthesis_id").references(() => syntheses.id),
+  folderId: integer("folder_id").references(() => projectFolders.id), // Living organizational structure
   tags: jsonb("tags").notNull().default([]),
   isPublic: boolean("is_public").notNull().default(false),
+  isTemplate: boolean("is_template").default(false), // Generative patterns from CodingPhilosophy.md
+  visibility: varchar("visibility", { length: 20 }).default("private"), // private, team, public
+  voiceConfiguration: jsonb("voice_configuration"), // Store voice synthesis metadata
+  qualityScore: real("quality_score"), // QWAN scoring from CodingPhilosophy.md
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -331,6 +353,29 @@ export const insertPhantomLedgerEntrySchema = createInsertSchema(phantomLedgerEn
   ethicalScore: true,
 });
 
+// Project folder insert schema with Pro tier validation
+export const insertProjectFolderSchema = createInsertSchema(projectFolders).pick({
+  name: true,
+  description: true,
+  color: true,
+  icon: true,
+  parentId: true,
+  isShared: true,
+  visibility: true,
+  sortOrder: true,
+}).extend({
+  // Security validation following AI_INSTRUCTIONS.md patterns
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  icon: z.string().min(1).max(50).optional(),
+  parentId: z.number().int().positive().optional(),
+  isShared: z.boolean().default(false),
+  visibility: z.enum(['private', 'team', 'public']).default('private'),
+  sortOrder: z.number().int().min(0).default(0)
+});
+
+// Enhanced project insert schema with folder organization
 export const insertProjectSchema = createInsertSchema(projects).pick({
   name: true,
   description: true,
@@ -338,16 +383,26 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
   language: true,
   sessionId: true,
   synthesisId: true,
+  folderId: true,
   tags: true,
   isPublic: true,
+  isTemplate: true,
+  visibility: true,
+  voiceConfiguration: true,
+  qualityScore: true,
 }).extend({
   // Security validation following AI_INSTRUCTIONS.md patterns
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   code: z.string().min(1).max(50000),
   language: z.string().min(1).max(50),
+  folderId: z.number().int().positive().optional(),
   tags: z.array(z.string().min(1).max(30)).max(10).default([]),
-  isPublic: z.boolean().default(false)
+  isPublic: z.boolean().default(false),
+  isTemplate: z.boolean().default(false),
+  visibility: z.enum(['private', 'team', 'public']).default('private'),
+  voiceConfiguration: z.record(z.any()).optional(),
+  qualityScore: z.number().min(0).max(100).optional()
 });
 
 // Analytics insert schemas with security validation
@@ -573,3 +628,7 @@ export type InsertTeamVoiceProfile = z.infer<typeof insertTeamVoiceProfileSchema
 
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+
+// Project folder types following AI_INSTRUCTIONS.md patterns
+export type ProjectFolder = typeof projectFolders.$inferSelect;
+export type InsertProjectFolder = z.infer<typeof insertProjectFolderSchema>;

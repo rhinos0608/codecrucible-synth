@@ -1443,7 +1443,335 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Project folder routes - Pro tier gated following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+  app.post('/api/project-folders', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { insertProjectFolderSchema } = await import('@shared/schema');
+      const { checkFeatureAccess } = await import('./feature-access');
+      
+      const { hasFeatureAccess } = await checkFeatureAccess(req.user.claims.sub, 'project_folders');
+      if (!hasFeatureAccess) {
+        return res.status(403).json({ 
+          error: 'Project folders require Pro subscription',
+          upgradeRequired: true 
+        });
+      }
+
+      const validatedData = insertProjectFolderSchema.parse({
+        ...req.body,
+        userId: req.user.claims.sub
+      });
+
+      const folder = await storage.createProjectFolder(validatedData);
+      
+      logger.info('Created project folder', {
+        folderId: folder.id,
+        name: folder.name,
+        userId: req.user.claims.sub.substring(0, 8) + '...'
+      });
+
+      res.json(folder);
+    } catch (error) {
+      logger.error('Failed to create project folder', error as Error, {
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
+  app.get('/api/project-folders', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const folders = await storage.getProjectFolders(req.user.claims.sub);
+      res.json(folders);
+    } catch (error) {
+      logger.error('Failed to fetch project folders', error as Error, {
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
+  app.get('/api/project-folders/:id', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const folder = await storage.getProjectFolder(parseInt(req.params.id));
+      if (!folder) {
+        return res.status(404).json({ error: 'Project folder not found' });
+      }
+      if (folder.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      res.json(folder);
+    } catch (error) {
+      logger.error('Failed to fetch project folder', error as Error, {
+        folderId: req.params.id,
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
+  app.put('/api/project-folders/:id', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { insertProjectFolderSchema } = await import('@shared/schema');
+      const { checkFeatureAccess } = await import('./feature-access');
+      
+      const { hasFeatureAccess } = await checkFeatureAccess(req.user.claims.sub, 'project_folders');
+      if (!hasFeatureAccess) {
+        return res.status(403).json({ 
+          error: 'Project folders require Pro subscription',
+          upgradeRequired: true 
+        });
+      }
+
+      const folder = await storage.getProjectFolder(parseInt(req.params.id));
+      if (!folder || folder.userId !== req.user.claims.sub) {
+        return res.status(404).json({ error: 'Project folder not found' });
+      }
+
+      const validatedData = insertProjectFolderSchema.partial().parse(req.body);
+      const updatedFolder = await storage.updateProjectFolder(parseInt(req.params.id), validatedData);
+      
+      logger.info('Updated project folder', {
+        folderId: parseInt(req.params.id),
+        userId: req.user.claims.sub.substring(0, 8) + '...'
+      });
+
+      res.json(updatedFolder);
+    } catch (error) {
+      logger.error('Failed to update project folder', error as Error, {
+        folderId: req.params.id,
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
+  app.delete('/api/project-folders/:id', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { checkFeatureAccess } = await import('./feature-access');
+      
+      const { hasFeatureAccess } = await checkFeatureAccess(req.user.claims.sub, 'project_folders');
+      if (!hasFeatureAccess) {
+        return res.status(403).json({ 
+          error: 'Project folders require Pro subscription',
+          upgradeRequired: true 
+        });
+      }
+
+      const folder = await storage.getProjectFolder(parseInt(req.params.id));
+      if (!folder || folder.userId !== req.user.claims.sub) {
+        return res.status(404).json({ error: 'Project folder not found' });
+      }
+
+      const success = await storage.deleteProjectFolder(parseInt(req.params.id));
+      
+      logger.info('Deleted project folder', {
+        folderId: parseInt(req.params.id),
+        success,
+        userId: req.user.claims.sub.substring(0, 8) + '...'
+      });
+
+      res.json({ success });
+    } catch (error) {
+      logger.error('Failed to delete project folder', error as Error, {
+        folderId: req.params.id,
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
+  app.get('/api/project-folders/:id/projects', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const folder = await storage.getProjectFolder(parseInt(req.params.id));
+      if (!folder || folder.userId !== req.user.claims.sub) {
+        return res.status(404).json({ error: 'Project folder not found' });
+      }
+
+      const projects = await storage.getFolderProjects(parseInt(req.params.id));
+      res.json(projects);
+    } catch (error) {
+      logger.error('Failed to fetch folder projects', error as Error, {
+        folderId: req.params.id,
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
+  app.post('/api/projects/:id/move', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { checkFeatureAccess } = await import('./feature-access');
+      
+      const { hasFeatureAccess } = await checkFeatureAccess(req.user.claims.sub, 'project_folders');
+      if (!hasFeatureAccess) {
+        return res.status(403).json({ 
+          error: 'Project folders require Pro subscription',
+          upgradeRequired: true 
+        });
+      }
+
+      const { folderId } = req.body;
+      const projectId = parseInt(req.params.id);
+
+      // Verify project ownership
+      const project = await storage.getProject(projectId);
+      if (!project || project.userId !== req.user.claims.sub) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      // If moving to a folder, verify folder ownership
+      if (folderId) {
+        const folder = await storage.getProjectFolder(folderId);
+        if (!folder || folder.userId !== req.user.claims.sub) {
+          return res.status(404).json({ error: 'Folder not found' });
+        }
+      }
+
+      const success = await storage.moveProjectToFolder(projectId, folderId);
+      
+      logger.info('Moved project to folder', {
+        projectId,
+        folderId,
+        success,
+        userId: req.user.claims.sub.substring(0, 8) + '...'
+      });
+
+      res.json({ success });
+    } catch (error) {
+      logger.error('Failed to move project', error as Error, {
+        projectId: req.params.id,
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
   
+  // Context-aware generation endpoint - Following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+  app.post('/api/sessions/context-aware', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { contextAwareOpenAI } = await import('./context-aware-openai-service');
+      const { checkFeatureAccess } = await import('./feature-access');
+      
+      const userId = req.user.claims.sub;
+      const { prompt, selectedVoices, contextProjectIds, sessionId } = req.body;
+      
+      // Validate request
+      if (!prompt || !selectedVoices) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      // Check feature access for context-aware generation
+      const { hasFeatureAccess } = await checkFeatureAccess(userId, 'context_generation');
+      
+      // Fetch context projects
+      const contextProjects = [];
+      if (contextProjectIds && contextProjectIds.length > 0) {
+        for (const projectId of contextProjectIds) {
+          const project = await storage.getProject(projectId);
+          if (project && project.userId === userId) {
+            contextProjects.push(project);
+          }
+        }
+      }
+      
+      // Fetch user's custom voice profiles
+      const userVoiceProfiles = await storage.getVoiceProfiles(userId);
+      
+      // Generate context-aware solutions
+      const solutions = await contextAwareOpenAI.generateContextAwareSolutions({
+        prompt,
+        selectedVoices,
+        contextProjects,
+        userVoiceProfiles,
+        userId,
+        sessionId
+      });
+      
+      logger.info('Context-aware generation completed', {
+        userId: userId.substring(0, 8) + '...',
+        solutionCount: solutions.length,
+        contextProjectCount: contextProjects.length,
+        hasFeatureAccess
+      });
+      
+      res.json({
+        success: true,
+        solutions,
+        contextAnalysis: {
+          projectCount: contextProjects.length,
+          hasCustomProfiles: userVoiceProfiles.length > 0,
+          featureAccess: hasFeatureAccess
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Context-aware generation failed', error as Error, {
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
+  // Context-aware synthesis endpoint
+  app.post('/api/sessions/context-synthesis', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { contextAwareOpenAI } = await import('./context-aware-openai-service');
+      const { checkFeatureAccess } = await import('./feature-access');
+      
+      const userId = req.user.claims.sub;
+      const { solutions, contextProjectIds } = req.body;
+      
+      // Check Pro tier access for synthesis
+      const { hasFeatureAccess } = await checkFeatureAccess(userId, 'synthesis');
+      if (!hasFeatureAccess) {
+        return res.status(403).json({ 
+          error: 'Context-aware synthesis requires Pro subscription',
+          upgradeRequired: true 
+        });
+      }
+      
+      // Fetch context projects for analysis
+      const contextProjects = [];
+      if (contextProjectIds && contextProjectIds.length > 0) {
+        for (const projectId of contextProjectIds) {
+          const project = await storage.getProject(projectId);
+          if (project && project.userId === userId) {
+            contextProjects.push(project);
+          }
+        }
+      }
+      
+      // Analyze context
+      const contextAnalysis = await contextAwareOpenAI.analyzeContext(contextProjects, userId);
+      
+      // Generate synthesis
+      const synthesis = await contextAwareOpenAI.synthesizeContextAwareSolutions(
+        solutions,
+        contextAnalysis,
+        userId
+      );
+      
+      logger.info('Context-aware synthesis completed', {
+        userId: userId.substring(0, 8) + '...',
+        voiceCount: solutions.length,
+        contextProjectCount: contextProjects.length
+      });
+      
+      res.json({
+        success: true,
+        synthesis,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Context-aware synthesis failed', error as Error, {
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
   // OpenAI Integration Audit Route - Following AI_INSTRUCTIONS.md patterns
   app.get('/api/audit/openai-integration', isAuthenticated, async (req: any, res, next) => {
     try {

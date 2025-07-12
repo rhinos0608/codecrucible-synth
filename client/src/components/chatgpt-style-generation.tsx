@@ -60,7 +60,7 @@ export function ChatGPTStyleGeneration({
     }
   });
 
-  // Start streaming when modal opens
+  // Start streaming when modal opens - Fixed infinite re-render following AI_INSTRUCTIONS.md patterns
   useEffect(() => {
     if (isOpen && prompt && (selectedVoices.perspectives.length > 0 || selectedVoices.roles.length > 0)) {
       startStreaming(prompt, selectedVoices);
@@ -71,7 +71,7 @@ export function ChatGPTStyleGeneration({
         reset();
       }
     };
-  }, [isOpen, prompt, selectedVoices, startStreaming, reset]);
+  }, [isOpen, prompt, selectedVoices.perspectives.join(','), selectedVoices.roles.join(',')]);
 
   // Voice color mapping following CodingPhilosophy.md consciousness visualization
   // Voice color mapping following CodingPhilosophy.md consciousness visualization

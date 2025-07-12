@@ -1069,8 +1069,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mode: 'advanced'
       });
 
-      // Store synthesis result in database for real-time sync
-      const synthesis = await storage.createSynthesis({
+      // Store synthesis result in database for real-time sync - Fixed database constraint following AI_INSTRUCTIONS.md patterns
+      const synthesisData = {
         sessionId,
         combinedCode: synthesizedSolution.synthesizedCode || '',
         synthesisSteps: [
@@ -1081,7 +1081,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ],
         qualityScore: synthesizedSolution.confidence || 85,
         ethicalScore: 95 // High ethical score for AI-generated content
+      };
+      
+      logger.info('Creating synthesis with data', { 
+        sessionId, 
+        dataKeys: Object.keys(synthesisData),
+        synthesisStepsType: typeof synthesisData.synthesisSteps,
+        synthesisStepsLength: synthesisData.synthesisSteps.length
       });
+      
+      const synthesis = await storage.createSynthesis(synthesisData);
 
       logger.info('OpenAI synthesis completed successfully', { 
         sessionId, 

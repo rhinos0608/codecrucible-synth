@@ -82,11 +82,23 @@ class OpenAIService {
         hasOpenAI: !!openai
       });
 
-      // If OpenAI is not available, use fallback streaming simulation
-      if (!openai) {
-        logger.warn('OpenAI not available, using fallback streaming simulation', { voiceId, type });
-        await this.simulateStreamGeneration(voiceId, type, prompt, onChunk, onComplete);
-        return;
+      // Enhanced OpenAI availability check following AI_INSTRUCTIONS.md patterns
+      if (!openai || !OPENAI_API_KEY) {
+        logger.error('OpenAI API key required for real-time streaming', { 
+          voiceId, 
+          type,
+          hasClient: !!openai,
+          hasKey: !!OPENAI_API_KEY 
+        });
+        
+        // Use simulation only in development mode
+        if (process.env.NODE_ENV === 'development') {
+          logger.warn('Development mode: Using streaming simulation fallback', { voiceId, type });
+          await this.simulateStreamGeneration(voiceId, type, prompt, onChunk, onComplete);
+          return;
+        } else {
+          throw new APIError(500, 'OpenAI API configuration required for streaming generation');
+        }
       }
 
       // Get voice-specific system prompt
@@ -419,31 +431,49 @@ const LazyComponent = React.lazy(() => import('./HeavyComponent'));`
     return withoutCode.trim() || 'Implementation completed successfully.';
   }
 
-  // Enhanced synthesis with real OpenAI integration
+  // Enhanced synthesis with real OpenAI integration - Following AI_INSTRUCTIONS.md patterns
   async synthesizeSolutions(options: { sessionId: number; solutions: any[]; mode: string }) {
-    if (!openai) {
-      throw new APIError(500, 'OpenAI service not available');
-    }
-
     try {
       const { sessionId, solutions } = options;
       
-      // Prepare synthesis prompt
+      logger.info('Starting OpenAI-powered synthesis', { 
+        sessionId, 
+        solutionCount: solutions.length,
+        hasApiKey: !!OPENAI_API_KEY 
+      });
+
+      // REAL OpenAI integration (no fallbacks unless explicitly no API key)
+      if (!openai || !OPENAI_API_KEY) {
+        throw new APIError(500, 'OpenAI API key required for synthesis. Please configure OPENAI_API_KEY environment variable.');
+      }
+      
+      // Prepare comprehensive synthesis prompt
       const synthesisPrompt = this.buildSynthesisPrompt(solutions);
       
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o", // Latest model following blueprint guidelines
         messages: [
           {
             role: "system",
             content: `You are a senior software architect synthesizing multiple AI perspectives into a unified solution. 
-            Following CodingPhilosophy.md principles, create a comprehensive solution that integrates the best aspects of all provided solutions.
-            
-            Return a JSON object with:
-            - synthesizedCode: Complete working code
-            - explanation: Comprehensive explanation
-            - confidence: Number 0-100
-            - integratedApproaches: Array of approaches used`
+
+Following CodingPhilosophy.md principles:
+- Apply living spiral methodology for consciousness-driven development
+- Integrate Jung's archetypal perspectives and Alexander's pattern language
+- Create synthesis that transcends individual voice limitations
+
+Following AI_INSTRUCTIONS.md patterns:
+- Maintain security and input validation standards
+- Apply single source of truth architectural principles
+- Ensure production-ready implementation
+
+Return a JSON object with:
+- synthesizedCode: Complete, production-ready code implementation
+- explanation: Comprehensive explanation of synthesis decisions
+- confidence: Number 0-100 representing solution quality
+- integratedApproaches: Array of specific approaches integrated
+- securityConsiderations: Array of security measures implemented
+- performanceOptimizations: Array of performance enhancements applied`
           },
           {
             role: "user", 
@@ -451,10 +481,17 @@ const LazyComponent = React.lazy(() => import('./HeavyComponent'));`
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.3
+        temperature: 0.3, // Consistent synthesis output
+        max_tokens: 4000 // Allow comprehensive responses
       });
 
       const synthesisResult = JSON.parse(response.choices[0].message.content || '{}');
+      
+      logger.info('OpenAI synthesis completed successfully', { 
+        sessionId,
+        outputLength: synthesisResult.synthesizedCode?.length || 0,
+        confidence: synthesisResult.confidence
+      });
       
       return {
         id: Date.now(),
@@ -463,12 +500,23 @@ const LazyComponent = React.lazy(() => import('./HeavyComponent'));`
         explanation: synthesisResult.explanation || '',
         confidence: synthesisResult.confidence || 85,
         integratedApproaches: synthesisResult.integratedApproaches || [],
+        securityConsiderations: synthesisResult.securityConsiderations || [],
+        performanceOptimizations: synthesisResult.performanceOptimizations || [],
         createdAt: new Date().toISOString()
       };
       
     } catch (error) {
-      logger.error('Synthesis failed', error as Error, { sessionId: options.sessionId });
-      throw error;
+      logger.error('Real-time OpenAI synthesis failed', error as Error, { sessionId: options.sessionId });
+      
+      // Enhanced error handling following AI_INSTRUCTIONS.md
+      if (error.message?.includes('API key')) {
+        throw new APIError(500, 'OpenAI API configuration required for synthesis');
+      }
+      if (error.message?.includes('quota') || error.message?.includes('rate limit')) {
+        throw new APIError(429, 'OpenAI API rate limit exceeded. Please try again shortly.');
+      }
+      
+      throw new APIError(500, `Synthesis generation failed: ${error.message}`);
     }
   }
 

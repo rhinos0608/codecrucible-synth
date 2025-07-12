@@ -127,12 +127,10 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
 
     console.log(`Starting voice stream for ${voiceId} (${type}) on session ${sessionId}`);
 
-    // Create new EventSource for streaming with proper error handling and credentials
+    // Create new EventSource for streaming with proper error handling
+    // Note: EventSource doesn't support withCredentials in all browsers, cookies are sent automatically
     const eventSource = new EventSource(
-      `/api/sessions/${sessionId}/stream/${voiceId}?type=${type}`,
-      { 
-        withCredentials: true 
-      }
+      `/api/sessions/${sessionId}/stream/${voiceId}?type=${type}`
     );
 
     streamRefs.current[voiceId] = eventSource;
@@ -156,6 +154,20 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
               ? { ...voice, isTyping: true, content: '', isComplete: false }
               : voice
           ));
+        } else if (data.type === 'error') {
+          console.error(`Voice ${voiceId} streaming error:`, data.error);
+          setVoices(prev => prev.map(voice => 
+            voice.id === voiceId 
+              ? { 
+                  ...voice, 
+                  isTyping: false, 
+                  isComplete: true, 
+                  error: data.error 
+                }
+              : voice
+          ));
+          eventSource.close();
+          delete streamRefs.current[voiceId];
         } else if (data.type === 'chunk') {
           // Append new content with ChatGPT-style typing effect
           setVoices(prev => prev.map(voice => 
@@ -230,11 +242,21 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     };
 
     eventSource.onerror = (error) => {
-      console.error('EventSource error for voice:', voiceId, error);
+      console.error('EventSource error for voice:', voiceId, {
+        error,
+        readyState: eventSource.readyState,
+        url: eventSource.url
+      });
       
-      // Check if it's an authentication error
-      if (eventSource.readyState === EventSource.CLOSED) {
-        console.error('EventSource closed for', voiceId, '- likely authentication issue');
+      // Detailed error handling for different states
+      let errorMessage = 'Connection failed';
+      if (eventSource.readyState === EventSource.CONNECTING) {
+        errorMessage = 'Connection in progress...';
+        console.log('EventSource still connecting for', voiceId);
+        return; // Don't close if still connecting
+      } else if (eventSource.readyState === EventSource.CLOSED) {
+        errorMessage = 'Connection closed - authentication issue';
+        console.error('EventSource closed for', voiceId, '- likely 401 Unauthorized');
       }
       
       setVoices(prev => prev.map(voice => 
@@ -243,12 +265,14 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
               ...voice, 
               isTyping: false, 
               isComplete: true, 
-              error: 'Connection failed - check authentication' 
+              error: errorMessage
             }
           : voice
       ));
-      eventSource.close();
-      delete streamRefs.current[voiceId];
+      
+      if (eventSource.readyState === EventSource.CLOSED) {
+        delete streamRefs.current[voiceId];
+      }
     };
 
     eventSource.onopen = () => {

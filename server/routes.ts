@@ -1098,18 +1098,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ChatGPT-style streaming endpoint - Following AI_INSTRUCTIONS.md and CodingPhilosophy.md
-  app.get('/api/sessions/:sessionId/stream/:voiceId', isAuthenticated, async (req: any, res, next) => {
+  app.get('/api/sessions/:sessionId/stream/:voiceId', async (req: any, res, next) => {
+    // Enhanced authentication check for SSE requests
+    if (!req.isAuthenticated() || !req.user) {
+      logger.warn('Unauthorized streaming request', {
+        url: req.url,
+        authenticated: req.isAuthenticated(),
+        userPresent: !!req.user,
+        cookies: Object.keys(req.cookies || {}).join(','),
+        sessionId: req.session?.id
+      });
+      
+      // For EventSource, we need to send proper SSE error format
+      res.writeHead(401, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      });
+      res.write(`data: ${JSON.stringify({ 
+        type: 'error', 
+        error: 'Authentication required for streaming' 
+      })}\n\n`);
+      res.end();
+      return;
+    }
     try {
       const { sessionId, voiceId } = req.params;
       const { type } = req.query; // 'perspective' or 'role'
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub;
 
       logger.info('Starting ChatGPT-style streaming for voice', {
         sessionId: parseInt(sessionId),
         voiceId,
         type,
         userId: userId.substring(0, 8) + '...',
-        userAgent: req.headers['user-agent']?.substring(0, 50) + '...'
+        userAgent: req.headers['user-agent']?.substring(0, 50) + '...',
+        cookies: Object.keys(req.cookies || {}).join(','),
+        sessionInfo: req.session ? 'present' : 'missing'
       });
 
       // Validate session ownership
@@ -1118,14 +1143,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Session not found' });
       }
 
-      // Set up Server-Sent Events headers
+      // Set up Server-Sent Events headers with proper authentication support
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': req.headers.origin || '*',
+        'Access-Control-Allow-Origin': req.headers.origin || 'http://localhost:5000',
         'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Allow-Headers': 'Cache-Control, Authorization, Content-Type'
+        'Access-Control-Allow-Headers': 'Cache-Control, Authorization, Content-Type, Cookie'
       });
 
       // Import OpenAI service for streaming

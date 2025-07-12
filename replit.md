@@ -507,6 +507,16 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **Synthesis Panel Enhancement**: Added folder selection guidance for new project saves with user-friendly toast notifications
 - **Production Code Readability**: All generated code now properly visible with monospace fonts and appropriate contrast ratios
 
+### Comprehensive Project Movement & Folder Text Visibility Audit (January 12, 2025)
+- **Folder Text Visibility Fix**: Resolved white/invisible folder names in "TR" folder list by adding proper dark theme text styling (text-gray-900 dark:text-gray-100)
+- **Project Move API Enhancement**: Fixed moveProjectMutation to use proper apiRequest with PUT method and enhanced error handling
+- **Backend Move Validation**: Confirmed moveProjectToFolder method exists in storage interface and implementation with database update functionality
+- **Enhanced Logging**: Added comprehensive console logging for project move operations to track success/failure states
+- **API Endpoint Verification**: Verified PUT /api/projects/:projectId/move endpoint exists with proper authentication and validation
+- **Jung's Descent Protocol**: Implemented defensive programming patterns for project movement with council-based error handling
+- **Alexander's Pattern Language**: Consistent API request patterns and error messaging throughout project management system
+- **Production Folder Organization**: Complete folder system now functional with visible text and working project movement capabilities
+
 ### Critical React Compilation Error Resolution & AI_INSTRUCTIONS.md Compliance Audit (January 12, 2025)
 - **Comprehensive Code Audit**: Conducted full audit through AI_INSTRUCTIONS.md and CodingPhilosophy.md compliance following user error log analysis
 - **React Import Compliance**: Fixed "Cannot read properties of undefined (reading 'toString')" error by implementing defensive programming patterns

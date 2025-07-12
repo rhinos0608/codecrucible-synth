@@ -213,14 +213,15 @@ export function EnhancedProjectsPanel({
   // Move project mutation following Alexander's Pattern Language
   const moveProjectMutation = useMutation({
     mutationFn: async ({ projectId, folderId }: { projectId: number; folderId: number | null }) => {
-      console.log('Moving project:', { projectId, folderId });
-      return apiRequest(`/api/projects/${projectId}/move`, {
-        method: 'PUT',
-        body: JSON.stringify({ folderId }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      console.log('Moving project via PUT request:', { projectId, folderId });
+      
+      // Enhanced PUT request following AI_INSTRUCTIONS.md patterns
+      const response = await apiRequest('PUT', `/api/projects/${projectId}/move`, {
+        folderId
       });
+      
+      console.log('Move project response:', response.status);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
@@ -496,7 +497,7 @@ export function EnhancedProjectsPanel({
                 {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </Button>
               <Folder className="w-4 h-4" style={{ color: folder.color }} />
-              <span className="text-sm font-medium">{folder.name}</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{folder.name}</span>
               <Badge variant="outline" className="text-xs">
                 {folderProjects.length}
               </Badge>

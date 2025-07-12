@@ -7,6 +7,7 @@ import {
   phantomLedgerEntries,
   projects,
   projectFolders,
+  folderFiles,
   teams,
   teamMembers,
   usageLimits,
@@ -34,6 +35,8 @@ import {
   type Project,
   type InsertProjectFolder,
   type ProjectFolder,
+  type FolderFile,
+  type InsertFolderFile,
   type Team,
   type InsertTeam,
   type TeamMember,
@@ -111,6 +114,13 @@ export interface IStorage {
   deleteProjectFolder(id: number): Promise<boolean>;
   getFolderProjects(folderId: number): Promise<Project[]>;
   moveProjectToFolder(projectId: number, folderId: number | null): Promise<boolean>;
+
+  // Folder file operations - Following Alexander's Pattern Language and CodingPhilosophy.md
+  createFolderFile(file: InsertFolderFile): Promise<FolderFile>;
+  getFolderFiles(folderId: number): Promise<FolderFile[]>;
+  updateFolderFile(id: number, file: Partial<InsertFolderFile>, userId: string): Promise<FolderFile>;
+  deleteFolderFile(id: number, userId: string): Promise<void>;
+  getContextEnabledFiles(userId: string): Promise<FolderFile[]>;
   
   // Team operations
   createTeam(team: InsertTeam): Promise<Team>;
@@ -701,6 +711,63 @@ export class DatabaseStorage implements IStorage {
     return !!updated;
   }
   
+  // Folder file operations - Following Alexander's Pattern Language and CodingPhilosophy.md
+  async createFolderFile(file: InsertFolderFile): Promise<FolderFile> {
+    const fileData = {
+      ...file,
+      userId: file.userId || '', // Ensure userId is provided
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const [created] = await db.insert(folderFiles).values(fileData).returning();
+    return created;
+  }
+
+  async getFolderFiles(folderId: number): Promise<FolderFile[]> {
+    return await db
+      .select()
+      .from(folderFiles)
+      .where(eq(folderFiles.folderId, folderId))
+      .orderBy(folderFiles.name);
+  }
+
+  async updateFolderFile(id: number, file: Partial<InsertFolderFile>, userId: string): Promise<FolderFile> {
+    const [updated] = await db
+      .update(folderFiles)
+      .set({
+        ...file,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(folderFiles.id, id), eq(folderFiles.userId, userId)))
+      .returning();
+    
+    if (!updated) {
+      throw new Error('File not found or access denied');
+    }
+    return updated;
+  }
+
+  async deleteFolderFile(id: number, userId: string): Promise<void> {
+    const result = await db
+      .delete(folderFiles)
+      .where(and(eq(folderFiles.id, id), eq(folderFiles.userId, userId)));
+    
+    if (result.rowCount === 0) {
+      throw new Error('File not found or access denied');
+    }
+  }
+
+  async getContextEnabledFiles(userId: string): Promise<FolderFile[]> {
+    return await db
+      .select()
+      .from(folderFiles)
+      .where(and(
+        eq(folderFiles.userId, userId),
+        eq(folderFiles.isContextEnabled, true)
+      ))
+      .orderBy(folderFiles.updatedAt);
+  }
+
   // Analytics operations
   async createUserAnalytics(analytics: InsertUserAnalytics): Promise<UserAnalytics> {
     const [created] = await db.insert(userAnalytics).values(analytics).returning();

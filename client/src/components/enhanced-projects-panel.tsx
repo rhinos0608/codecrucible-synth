@@ -37,8 +37,10 @@ import {
   Code,
   Layers,
   TreePine,
-  Sparkles
+  Sparkles,
+  ArrowLeft
 } from 'lucide-react';
+import { FolderFileManager } from './folder-file-manager';
 
 interface ProjectFolder {
   id: number;
@@ -112,6 +114,8 @@ export function EnhancedProjectsPanel({
   const [complexityFilter, setComplexityFilter] = useState<number | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
+  const [showFolderManager, setShowFolderManager] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<ProjectFolder | null>(null);
   
   // New folder data
   const [newFolderData, setNewFolderData] = useState({
@@ -270,6 +274,16 @@ export function EnhancedProjectsPanel({
     });
   };
 
+  const handleOpenFolder = (folder: ProjectFolder) => {
+    setSelectedFolder(folder);
+    setShowFolderManager(true);
+  };
+
+  const handleBackToFolders = () => {
+    setShowFolderManager(false);
+    setSelectedFolder(null);
+  };
+
   // Render project card
   const renderProjectCard = (project: Project) => (
     <Card key={project.id} className="mb-2">
@@ -322,20 +336,31 @@ export function EnhancedProjectsPanel({
         
         return (
           <div key={folder.id} className="mb-2">
-            <div 
-              className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer"
-              onClick={() => toggleFolder(folder.id)}
-            >
-              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            <div className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
               <div 
-                className="w-3 h-3 rounded" 
-                style={{ backgroundColor: folder.color }}
-              />
-              <FolderOpen className="w-4 h-4" />
-              <span className="text-sm font-medium">{folder.name}</span>
-              <Badge variant="outline" className="text-xs">
-                {folderProjects.length}
-              </Badge>
+                className="flex items-center gap-2 flex-1 cursor-pointer"
+                onClick={() => toggleFolder(folder.id)}
+              >
+                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                <div 
+                  className="w-3 h-3 rounded" 
+                  style={{ backgroundColor: folder.color }}
+                />
+                <FolderOpen className="w-4 h-4" />
+                <span className="text-sm font-medium">{folder.name}</span>
+                <Badge variant="outline" className="text-xs">
+                  {folderProjects.length}
+                </Badge>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleOpenFolder(folder)}
+                className="h-6 px-2 text-xs"
+              >
+                <File className="w-3 h-3 mr-1" />
+                Files
+              </Button>
             </div>
             
             {isExpanded && (
@@ -349,6 +374,40 @@ export function EnhancedProjectsPanel({
       })}
     </div>
   );
+
+  // Show folder file manager if a folder is selected
+  if (showFolderManager && selectedFolder) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-6xl w-[90vw] h-[80vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-3 text-xl">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBackToFolders}
+                  className="mr-2"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back
+                </Button>
+                <FolderOpen className="w-6 h-6" />
+                {selectedFolder.name} - File Manager
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-hidden">
+            <FolderFileManager
+              folderId={selectedFolder.id}
+              folderName={selectedFolder.name}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

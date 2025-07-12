@@ -136,6 +136,9 @@ export class ContextAwareOpenAIService {
     try {
       const contextAnalysis = await this.analyzeContext(request.contextProjects, request.userId);
       
+      // Get context files from folders for enhanced generation
+      const contextFiles = await this.getContextFiles(request.userId);
+      
       // Enhanced voice personalities with consciousness integration
       const voicePersonalities = this.getEnhancedVoicePersonalities(contextAnalysis, request.userVoiceProfiles);
       
@@ -143,17 +146,18 @@ export class ContextAwareOpenAIService {
       const solutions = await Promise.all(
         this.buildVoiceCombinations(request.selectedVoices, voicePersonalities)
           .map(async (voice) => {
-            const contextualPrompt = this.buildContextualPrompt(
+            const contextualPrompt = this.buildContextualPromptWithFiles(
               request.prompt,
               voice,
               contextAnalysis,
-              request.contextProjects
+              request.contextProjects,
+              contextFiles
             );
 
             const solution = await this.generateSingleVoiceSolution(contextualPrompt, voice);
             
-            // Track analytics for context usage
-            await this.trackContextUsage(request.userId, request.contextProjects, voice.name);
+            // Track analytics for context usage including folder files
+            await this.trackContextUsage(request.userId, request.contextProjects, voice.name, contextFiles.length);
             
             return solution;
           })
@@ -174,6 +178,33 @@ export class ContextAwareOpenAIService {
       });
       throw error;
     }
+  }
+
+  // Get context files for enhanced generation
+  async getContextFiles(userId: string): Promise<any[]> {
+    try {
+      return await storage.getContextEnabledFiles(userId);
+    } catch (error) {
+      logger.error('Error fetching context files:', error as Error);
+      return [];
+    }
+  }
+
+  // Generate context string from folder files
+  private buildFolderContextString(contextFiles: any[]): string {
+    if (contextFiles.length === 0) return '';
+    
+    let contextString = '\n\n### Available Context Files from Project Folders:\n';
+    contextFiles.forEach((file) => {
+      contextString += `\n#### ${file.name} (${file.language})\n`;
+      if (file.description) {
+        contextString += `Description: ${file.description}\n`;
+      }
+      contextString += '```' + file.language + '\n' + file.content + '\n```\n';
+    });
+    contextString += '\n### End Context Files\n\n';
+    
+    return contextString;
   }
 
   // Build contextual prompt that includes relevant project context
@@ -220,6 +251,58 @@ Generate a solution that:
 4. Advances their coding evolution naturally
 
 Provide your response as a ${voice.consciousness.jungianArchetype} would, incorporating the living spiral methodology.`;
+  }
+
+  // Enhanced contextual prompt that includes both projects and folder files
+  private buildContextualPromptWithFiles(
+    userPrompt: string,
+    voice: VoicePersonality,
+    contextAnalysis: ContextAnalysis,
+    contextProjects: Project[],
+    contextFiles: any[]
+  ): string {
+    const contextSummary = this.buildContextSummary(contextAnalysis, contextProjects);
+    const folderContext = this.buildFolderContextString(contextFiles);
+    
+    return `${voice.systemPrompt}
+
+## ENHANCED CONTEXTUAL INTELLIGENCE INTEGRATION
+
+### User's Code Context:
+${contextSummary}
+
+${folderContext}
+
+### Living Spiral Analysis:
+- **Jung's Descent**: Embrace the shadow of existing code complexity from both projects and files
+- **Alexander's Pattern**: Identify timeless patterns in user's context across all available sources
+- **Bateson's Learning**: Process difference between current state (context) and desired state (prompt)
+- **Campbell's Journey**: Transform existing patterns from files and projects into new possibilities
+
+### Context-Aware Guidelines:
+1. **Style Consistency**: Match the user's established coding patterns from context files
+2. **Architecture Alignment**: Build upon existing architectural decisions shown in files
+3. **Pattern Recognition**: Reference similar patterns from both context projects and folder files
+4. **Complexity Matching**: Align solution complexity with user's proficiency level shown in existing code
+5. **File Integration**: Consider how your solution integrates with existing files in the folders
+
+### Consciousness Integration:
+As the ${voice.consciousness.jungianArchetype} archetype, analyze this request through your specialized lens while honoring the user's established patterns from ${contextProjects.length} projects and ${contextFiles.length} context files.
+
+---
+
+## USER REQUEST:
+${userPrompt}
+
+## CONTEXT-AWARE RESPONSE:
+Generate a solution that:
+1. Builds upon the user's existing code patterns from all available context
+2. Maintains consistency with their established style shown in files
+3. References relevant context files and projects when applicable
+4. Advances their coding evolution naturally
+5. Considers integration with existing folder structure and files
+
+Provide your response as a ${voice.consciousness.jungianArchetype} would, incorporating the living spiral methodology and full context awareness.`;
   }
 
   // Build comprehensive context summary

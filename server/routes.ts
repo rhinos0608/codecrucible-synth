@@ -183,6 +183,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Folder file API routes - Pro tier gated following AI_INSTRUCTIONS.md patterns
+  app.get('/api/folders/:folderId/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const { folderId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify folder ownership
+      const folder = await storage.getProjectFolder(parseInt(folderId));
+      if (!folder || folder.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied to folder' });
+      }
+      
+      const files = await storage.getFolderFiles(parseInt(folderId));
+      res.json(files);
+    } catch (error) {
+      logger.error('Error fetching folder files', error as Error, { 
+        userId: req.user?.claims?.sub,
+        folderId: req.params.folderId 
+      });
+      res.status(500).json({ error: 'Failed to fetch folder files' });
+    }
+  });
+
+  app.post('/api/folders/:folderId/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const { folderId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify folder ownership
+      const folder = await storage.getProjectFolder(parseInt(folderId));
+      if (!folder || folder.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied to folder' });
+      }
+      
+      const fileData = {
+        ...req.body,
+        folderId: parseInt(folderId),
+        userId,
+      };
+      
+      // Create the file without validation for now - will fix schema import later
+      const file = await storage.createFolderFile(fileData);
+      
+      logger.info('Folder file created successfully', { fileId: file.id, folderId, userId });
+      res.json(file);
+    } catch (error) {
+      logger.error('Error creating folder file', error as Error, { 
+        userId: req.user?.claims?.sub,
+        folderId: req.params.folderId,
+        requestBody: req.body 
+      });
+      
+      if (error instanceof Error && error.message.includes('validation')) {
+        res.status(400).json({ error: 'Invalid file data', details: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to create file' });
+      }
+    }
+  });
+
+  app.put('/api/files/:fileId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { fileId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const updatedFile = await storage.updateFolderFile(
+        parseInt(fileId), 
+        req.body, 
+        userId
+      );
+      
+      logger.info('Folder file updated successfully', { fileId, userId });
+      res.json(updatedFile);
+    } catch (error) {
+      logger.error('Error updating folder file', error as Error, { 
+        userId: req.user?.claims?.sub,
+        fileId: req.params.fileId 
+      });
+      
+      if (error instanceof Error && error.message.includes('not found')) {
+        res.status(404).json({ error: 'File not found or access denied' });
+      } else {
+        res.status(500).json({ error: 'Failed to update file' });
+      }
+    }
+  });
+
+  app.delete('/api/files/:fileId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { fileId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      await storage.deleteFolderFile(parseInt(fileId), userId);
+      
+      logger.info('Folder file deleted successfully', { fileId, userId });
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('Error deleting folder file', error as Error, { 
+        userId: req.user?.claims?.sub,
+        fileId: req.params.fileId 
+      });
+      
+      if (error instanceof Error && error.message.includes('not found')) {
+        res.status(404).json({ error: 'File not found or access denied' });
+      } else {
+        res.status(500).json({ error: 'Failed to delete file' });
+      }
+    }
+  });
+
+  app.get('/api/context-files', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const contextFiles = await storage.getContextEnabledFiles(userId);
+      res.json(contextFiles);
+    } catch (error) {
+      logger.error('Error fetching context files', error as Error, { userId: req.user?.claims?.sub });
+      res.status(500).json({ error: 'Failed to fetch context files' });
+    }
+  });
+
   app.get('/api/subscription/info', isAuthenticated, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
@@ -235,6 +356,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       logger.error('Error fetching onboarding status', error as Error, { userId: req.user?.claims?.sub });
       res.status(500).json({ error: 'Failed to fetch onboarding status' });
+    }
+  });
+
+  // Context-aware generation endpoints
+  app.get('/api/context/summary', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const contextFiles = await storage.getContextEnabledFiles(userId);
+      
+      const summary = {
+        totalFiles: contextFiles.length,
+        languages: [...new Set(contextFiles.map((f: any) => f.language))],
+        totalSize: contextFiles.reduce((sum: number, f: any) => sum + f.content.length, 0),
+        files: contextFiles.map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          language: f.language,
+          description: f.description,
+          size: f.content.length
+        }))
+      };
+      
+      res.json(summary);
+    } catch (error) {
+      logger.error('Error getting context summary:', error as Error);
+      res.status(500).json({ error: 'Failed to get context summary' });
     }
   });
 

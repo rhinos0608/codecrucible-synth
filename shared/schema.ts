@@ -159,6 +159,22 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Folder files table for text file management - Following Alexander's Pattern Language
+export const folderFiles = pgTable("folder_files", {
+  id: serial("id").primaryKey(),
+  folderId: integer("folder_id").notNull().references(() => projectFolders.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  fileType: varchar("file_type", { length: 50 }).default("text"),
+  language: varchar("language", { length: 50 }).default("text"),
+  description: text("description"),
+  tags: jsonb("tags").default([]),
+  isContextEnabled: boolean("is_context_enabled").default(false), // AI context integration
+  userId: varchar("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Analytics tables for tracking user behavior and preferences
 export const userAnalytics = pgTable("user_analytics", {
   id: serial("id").primaryKey(),
@@ -604,6 +620,29 @@ export type PhantomLedgerEntry = typeof phantomLedgerEntries.$inferSelect;
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
+
+// Folder file insert schema with validation
+export const insertFolderFileSchema = createInsertSchema(folderFiles).pick({
+  folderId: true,
+  name: true,
+  content: true,
+  fileType: true,
+  language: true,
+  description: true,
+  tags: true,
+  isContextEnabled: true,
+}).extend({
+  name: z.string().min(1).max(255),
+  content: z.string().min(1),
+  fileType: z.string().min(1).max(50).default("text"),
+  language: z.string().min(1).max(50).default("text"),
+  description: z.string().max(1000).optional(),
+  tags: z.array(z.string()).default([]),
+  isContextEnabled: z.boolean().default(false),
+});
+
+export type FolderFile = typeof folderFiles.$inferSelect;
+export type InsertFolderFile = z.infer<typeof insertFolderFileSchema>;
 
 export type InsertUserAnalytics = z.infer<typeof insertUserAnalyticsSchema>;
 export type UserAnalytics = typeof userAnalytics.$inferSelect;

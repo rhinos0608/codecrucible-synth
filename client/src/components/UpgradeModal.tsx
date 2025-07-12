@@ -105,16 +105,18 @@ export default function UpgradeModal({
     },
     onSuccess: (data) => {
       if (data.checkoutUrl) {
-        // Redirect directly to Stripe checkout
+        // Following AI_INSTRUCTIONS.md: Secure redirect to checkout URL
         window.location.href = data.checkoutUrl;
       } else {
+        // Following CodingPhilosophy.md: Graceful degradation with user guidance
         console.error('No checkout URL received from server');
+        window.location.href = `/pricing?selected=${selectedPlan}`;
       }
     },
     onError: (error: any) => {
       console.error('Checkout error:', error);
-      // Fallback to subscribe page if direct checkout fails
-      window.location.href = `/subscribe?plan=${selectedPlan}`;
+      // Following AI_INSTRUCTIONS.md: Proper error handling with fallback
+      window.location.href = `/pricing?selected=${selectedPlan}&error=checkout_failed`;
     },
   });
 

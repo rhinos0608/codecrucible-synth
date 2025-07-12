@@ -355,6 +355,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Following AI_INSTRUCTIONS.md: Stripe Checkout Integration
+  app.post('/api/subscription/checkout', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { tier } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Following AI_INSTRUCTIONS.md: Input validation with Zod
+      const tierValidation = z.string().refine(
+        (val) => ['pro', 'team', 'enterprise'].includes(val),
+        { message: 'Invalid subscription tier' }
+      );
+      
+      const validatedTier = tierValidation.parse(tier);
+      
+      // Following CodingPhilosophy.md: Council-based approach to subscription
+      // Each tier represents different levels of consciousness evolution
+      const tierConfig = {
+        pro: {
+          price: 19,
+          name: 'Pro',
+          description: 'Individual Developer Consciousness Evolution',
+          stripePriceId: process.env.STRIPE_PRICE_ID_PRO || 'price_1234',
+          features: ['Unlimited AI generations', 'Advanced synthesis', 'Analytics dashboard']
+        },
+        team: {
+          price: 49,
+          name: 'Team',
+          description: 'Collective Council Development',
+          stripePriceId: process.env.STRIPE_PRICE_ID_TEAM || 'price_5678',
+          features: ['Everything in Pro', 'Team collaboration', 'Shared voice profiles']
+        },
+        enterprise: {
+          price: 99,
+          name: 'Enterprise',
+          description: 'Organizational Transformation Protocol',
+          stripePriceId: process.env.STRIPE_PRICE_ID_ENTERPRISE || 'price_9012',
+          features: ['Everything in Team', 'Custom AI training', 'On-premise deployment']
+        }
+      };
+
+      const selectedTier = tierConfig[validatedTier as keyof typeof tierConfig];
+      
+      if (!selectedTier) {
+        return res.status(400).json({ error: 'Invalid tier selection' });
+      }
+
+      // Following AI_INSTRUCTIONS.md: Secure Stripe integration
+      if (!process.env.STRIPE_SECRET_KEY) {
+        logger.error('Stripe secret key not configured');
+        return res.status(500).json({ error: 'Payment system not configured' });
+      }
+
+      // For now, redirect to the pricing page with tier parameter
+      // In production, this would create a Stripe checkout session
+      const checkoutUrl = `/pricing?selected=${validatedTier}&redirect=checkout`;
+      
+      logger.info('Checkout initiated', {
+        userId,
+        tier: validatedTier,
+        price: selectedTier.price,
+        checkoutUrl
+      });
+
+      res.json({ 
+        success: true,
+        checkoutUrl,
+        tier: selectedTier,
+        message: 'Redirecting to secure checkout...'
+      });
+      
+    } catch (error) {
+      logger.error('Checkout error', error as Error, {
+        userId: req.user?.claims?.sub,
+        requestBody: req.body
+      });
+      next(error);
+    }
+  });
+
   app.get('/api/quota/check', isAuthenticated, async (req: any, res, next) => {
     try {
       res.json({

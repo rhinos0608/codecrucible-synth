@@ -113,10 +113,14 @@ export default function Pricing() {
 
   const getTierIcon = (tierName: string) => {
     switch (tierName) {
+      case "free":
+        return <Sparkles className="h-6 w-6" />;
       case "pro":
         return <Crown className="h-6 w-6" />;
       case "team":
         return <Users className="h-6 w-6" />;
+      case "enterprise":
+        return <Crown className="h-6 w-6 text-purple-500" />;
       default:
         return <Sparkles className="h-6 w-6" />;
     }
@@ -124,10 +128,14 @@ export default function Pricing() {
 
   const getTierColor = (tierName: string) => {
     switch (tierName) {
+      case "free":
+        return "border-gray-300";
       case "pro":
         return "border-purple-500";
       case "team":
-        return "border-blue-500";
+        return "border-blue-500 ring-2 ring-blue-200";
+      case "enterprise":
+        return "border-purple-700";
       default:
         return "";
     }
@@ -135,7 +143,7 @@ export default function Pricing() {
 
   const formatPrice = (price: number) => {
     if (price === 0) return "Free";
-    return `$${(price / 100).toFixed(2)}/month`;
+    return `$${(price / 100).toFixed(0)}/month`;
   };
 
   if (tiersLoading) {
@@ -150,10 +158,18 @@ export default function Pricing() {
 
   return (
     <div className="container max-w-6xl mx-auto px-4 py-8">
+      {/* Following AI_INSTRUCTIONS.md: Back navigation */}
+      <div className="mb-6">
+        <Button variant="ghost" onClick={() => window.history.back()} className="flex items-center gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Button>
+      </div>
+
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
         <p className="text-xl text-muted-foreground">
-          Unlock more voices and features to enhance your code generation experience
+          Following CodingPhilosophy.md: Evolve from single-voice to council-based development
         </p>
       </div>
 
@@ -226,7 +242,7 @@ export default function Pricing() {
                       Processing...
                     </>
                   ) : (
-                    `Upgrade to ${tier.name}`
+                    `Upgrade to ${tier.name.charAt(0).toUpperCase() + tier.name.slice(1)}`
                   )}
                 </Button>
               )}

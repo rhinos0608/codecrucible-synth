@@ -434,6 +434,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Following AI_INSTRUCTIONS.md: Subscription Tiers Endpoint
+  app.get('/api/subscription/tiers', async (req: any, res, next) => {
+    try {
+      // Following CodingPhilosophy.md: Council-based subscription tiers representing consciousness evolution
+      const tiers = [
+        {
+          name: 'free',
+          price: 0,
+          dailyGenerationLimit: 3,
+          maxVoiceCombinations: 2,
+          allowsAnalytics: false,
+          allowsTeams: false,
+          features: [
+            'Basic code generation',
+            'Single voice perspectives',
+            'Limited daily generations',
+            'Community support'
+          ]
+        },
+        {
+          name: 'pro',
+          price: 1900, // in cents
+          dailyGenerationLimit: -1,
+          maxVoiceCombinations: -1,
+          allowsAnalytics: true,
+          allowsTeams: false,
+          features: [
+            'Unlimited code generations',
+            'Advanced synthesis engine',
+            'Analytics dashboard', 
+            'Priority voice recommendations',
+            'Export generated code',
+            'Advanced customization',
+            'Priority support'
+          ]
+        },
+        {
+          name: 'team',
+          price: 4900, // in cents
+          dailyGenerationLimit: -1,
+          maxVoiceCombinations: -1,
+          allowsAnalytics: true,
+          allowsTeams: true,
+          features: [
+            'Everything in Pro',
+            'Team collaboration',
+            'Shared voice profiles',
+            'Advanced analytics',
+            'Team management',
+            'Real-time collaboration',
+            'Custom voice creation'
+          ]
+        },
+        {
+          name: 'enterprise',
+          price: 9900, // in cents
+          dailyGenerationLimit: -1,
+          maxVoiceCombinations: -1,
+          allowsAnalytics: true,
+          allowsTeams: true,
+          features: [
+            'Everything in Team',
+            'Custom AI training',
+            'On-premise deployment',
+            'SSO integration',
+            'Dedicated support',
+            'Custom integrations',
+            'SLA guarantees',
+            'Compliance features'
+          ]
+        }
+      ];
+
+      logger.info('Subscription tiers requested', {
+        tierCount: tiers.length,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(tiers);
+    } catch (error) {
+      logger.error('Failed to fetch subscription tiers', error as Error);
+      next(error);
+    }
+  });
+
   app.get('/api/quota/check', isAuthenticated, async (req: any, res, next) => {
     try {
       res.json({

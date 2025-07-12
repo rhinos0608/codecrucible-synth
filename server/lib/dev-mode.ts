@@ -43,6 +43,10 @@ function detectDevMode(): DevModeConfig {
   if (devModeFlag === 'true') {
     isEnabled = true;
     reason = 'dev_mode_flag_enabled';
+  } else if (replId && !nodeEnv) {
+    // Following AI_INSTRUCTIONS.md: Enable dev mode for Replit development environment
+    isEnabled = true;
+    reason = 'replit_development_environment';
   } else if (nodeEnv !== 'production' && replId) {
     isEnabled = true;
     reason = 'replit_development_environment';

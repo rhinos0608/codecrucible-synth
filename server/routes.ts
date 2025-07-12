@@ -423,6 +423,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 description: selectedTier.description,
               },
               unit_amount: selectedTier.price * 100, // Convert to cents
+              recurring: {
+                interval: 'month'
+              }
             },
             quantity: 1,
           },
@@ -843,6 +846,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { prompt, selectedVoices, analysisDepth = 2, mergeStrategy = 'competitive', qualityFiltering = true } = req.body;
       
+      // Import dev mode utilities
+      const { isDevModeEnabled } = await import('./lib/dev-mode');
+      
       // Following AI_INSTRUCTIONS.md: Input validation
       if (!prompt || prompt.trim().length === 0) {
         return res.status(400).json({ error: 'Prompt is required' });
@@ -853,10 +859,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Following CodingPhilosophy.md: Council-based solution generation
-      logger.info('Dev mode session generation started', {
+      logger.info('Session generation started', {
         userId: userId.substring(0, 8) + '...',
         prompt: prompt.substring(0, 100) + '...',
-        voiceCount: (selectedVoices.perspectives?.length || 0) + (selectedVoices.roles?.length || 0)
+        voiceCount: (selectedVoices.perspectives?.length || 0) + (selectedVoices.roles?.length || 0),
+        devModeEnabled: isDevModeEnabled()
       });
 
       // Create session in storage

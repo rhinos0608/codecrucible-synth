@@ -534,7 +534,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getDevModeConfig } = await import('./lib/dev-mode');
       const devModeConfig = getDevModeConfig();
       
-      const sessionId = Date.now();
+      // Create proper database session following AI_INSTRUCTIONS.md defensive programming patterns
+      const sessionData = {
+        userId,
+        prompt: prompt.trim(),
+        selectedVoices,
+        mode: devModeConfig.isEnabled ? 'dev' : 'production'
+      };
+      
+      // Insert session into database to get proper auto-incremented ID
+      const createdSession = await storage.createVoiceSession(sessionData);
+      const sessionId = createdSession.id;
       
       // Extract perspectives and roles from selectedVoices with defensive programming
       const perspectives = Array.isArray(selectedVoices?.perspectives) ? selectedVoices.perspectives : [];
@@ -617,7 +627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       global.sessionSolutions.set(sessionId, formattedSolutions);
 
-      const sessionData = {
+      const responseData = {
         session: {
           id: sessionId,
           userId: userId,
@@ -636,7 +646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avgConfidence: solutions.reduce((sum, s) => sum + s.confidence, 0) / solutions.length
       });
       
-      res.json(sessionData);
+      res.json(responseData);
     } catch (error) {
       console.error('❌ Real OpenAI session creation error:', error);
       
@@ -847,9 +857,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.body.prompt || 'Synthesize the voice solutions'
       );
       
-      console.log('✅ Synthesis completed:', { sessionId, resultLength: synthesisResult.code?.length || 0 });
+      // Store synthesis in database following AI_INSTRUCTIONS.md defensive programming patterns
+      const synthesisRecord = await storage.createSynthesis({
+        sessionId: parseInt(sessionId),
+        combinedCode: synthesisResult.code || synthesisResult.synthesizedCode || '',
+        synthesisSteps: synthesisResult.synthesisSteps || [],
+        qualityScore: synthesisResult.qualityScore || synthesisResult.confidence || 90,
+        ethicalScore: synthesisResult.ethicalScore || 85
+      });
       
-      res.json(synthesisResult);
+      console.log('✅ Synthesis completed and stored:', { 
+        sessionId, 
+        synthesisId: synthesisRecord.id,
+        resultLength: synthesisResult.code?.length || 0 
+      });
+      
+      // Return synthesis with database-generated ID
+      res.json({
+        ...synthesisResult,
+        id: synthesisRecord.id,
+        synthesisId: synthesisRecord.id
+      });
     } catch (error) {
       console.error('Synthesis error:', error);
       res.status(500).json({ error: 'Failed to synthesize solutions', details: error.message });

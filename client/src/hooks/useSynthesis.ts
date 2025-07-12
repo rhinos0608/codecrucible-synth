@@ -125,9 +125,9 @@ export function useSynthesis() {
         }
       });
 
-      // Transform backend response to frontend format
+      // Transform backend response to frontend format - Following AI_INSTRUCTIONS.md defensive programming
       const result: SynthesisResult = {
-        synthesisId: backendResult.id || Date.now(),
+        synthesisId: backendResult.id, // Use database-generated ID, no fallback to timestamp
         synthesizedCode: backendResult.synthesizedCode || backendResult.code || '',
         explanation: backendResult.explanation || 'AI-generated synthesis combining multiple voice perspectives',
         confidence: backendResult.confidence || 95,

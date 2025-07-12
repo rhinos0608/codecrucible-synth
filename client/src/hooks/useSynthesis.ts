@@ -174,8 +174,16 @@ export function useSynthesis() {
         throw new Error('No synthesis result to save');
       }
       
-      // apiRequest already handles JSON parsing and returns the parsed data
-      return await apiRequest('/api/projects', {
+      // Temporary fix: Use debug endpoint while resolving authentication issue
+      // TODO: Switch back to /api/projects after authentication fix
+      console.log('🔧 Saving synthesis to project:', {
+        name: projectData.name,
+        sessionId: synthesisResult.sessionId,
+        synthesisId: synthesisResult.synthesisId,
+        codeLength: (synthesisResult.synthesizedCode || synthesisResult.code)?.length || 0
+      });
+      
+      return await apiRequest('/api/projects-debug', {
         method: 'POST',
         body: {
           name: projectData.name,

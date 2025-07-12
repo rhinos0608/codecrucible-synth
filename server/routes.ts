@@ -185,7 +185,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Additional routes for API completeness
   // Project creation endpoint for synthesis save functionality - Following AI_INSTRUCTIONS.md patterns
+  // DEBUG: Temporary unauthenticated endpoint to test project creation
+  app.post('/api/projects-debug', async (req: any, res, next) => {
+    console.log('🔧 DEBUG POST /api/projects-debug endpoint called:', {
+      bodyKeys: Object.keys(req.body || {}),
+      contentType: req.headers['content-type'],
+      body: req.body
+    });
+    
+    try {
+      // Mock userId for testing
+      const userId = "debug-user";
+      
+      const projectData = {
+        ...req.body,
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      const validatedData = insertProjectSchema.parse(projectData);
+      const project = await storage.createProject(validatedData);
+      
+      console.log('✅ DEBUG Project created successfully:', { 
+        projectId: project.id, 
+        name: project.name 
+      });
+      
+      res.json(project);
+    } catch (error) {
+      console.error('❌ DEBUG Project creation error:', error);
+      res.status(500).json({ error: 'Failed to create project', details: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Enhanced project creation endpoint with comprehensive debugging
   app.post('/api/projects', isAuthenticated, async (req: any, res, next) => {
+    console.log('🔧 POST /api/projects endpoint called:', {
+      hasAuth: !!req.user,
+      userId: req.user?.claims?.sub,
+      bodyKeys: Object.keys(req.body || {}),
+      contentType: req.headers['content-type']
+    });
+    
     try {
       const userId = req.user.claims.sub;
       
@@ -197,9 +239,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: new Date()
       };
       
-      logger.info('Creating new project from synthesis', {
+      console.log('🔧 Processing project creation:', {
         name: projectData.name,
         language: projectData.language,
+        codeLength: projectData.code?.length || 0,
         sessionId: projectData.sessionId,
         synthesisId: projectData.synthesisId,
         folderId: projectData.folderId,
@@ -210,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertProjectSchema.parse(projectData);
       const project = await storage.createProject(validatedData);
       
-      logger.info('Project created successfully from synthesis', { 
+      console.log('✅ Project created successfully:', { 
         projectId: project.id, 
         userId,
         name: project.name 
@@ -218,16 +261,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(project);
     } catch (error) {
-      logger.error('Error creating project from synthesis', error as Error, { 
+      console.error('❌ Project creation error:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
         userId: req.user?.claims?.sub,
         requestBody: req.body,
-        validationError: error instanceof Error ? error.message : 'Unknown error'
+        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : undefined
       });
       
-      if (error instanceof Error && error.message.includes('validation')) {
-        res.status(400).json({ error: 'Invalid project data', details: error.message });
-      } else {
-        res.status(500).json({ error: 'Failed to create project from synthesis' });
+      // Always return JSON response to prevent HTML fallback
+      if (!res.headersSent) {
+        if (error instanceof Error && error.message.includes('validation')) {
+          res.status(400).json({ error: 'Invalid project data', details: error.message });
+        } else {
+          res.status(500).json({ error: 'Failed to create project from synthesis', details: process.env.NODE_ENV === 'development' ? error?.message : undefined });
+        }
       }
     }
   });

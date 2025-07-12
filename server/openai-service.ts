@@ -7,10 +7,25 @@ import type { CodePerspective, DevelopmentRole } from '@shared/schema';
 // Security validation following AI_INSTRUCTIONS.md
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// In dev mode, allow missing API key and use fallback responses
-const openai = OPENAI_API_KEY ? new OpenAI({ 
-  apiKey: OPENAI_API_KEY 
-}) : null;
+// Enhanced initialization with proper error handling
+let openai: OpenAI | null = null;
+
+try {
+  if (OPENAI_API_KEY) {
+    openai = new OpenAI({ 
+      apiKey: OPENAI_API_KEY,
+      // Add timeout and retry configuration following AI_INSTRUCTIONS.md patterns
+      timeout: 30000,
+      maxRetries: 2
+    });
+    logger.info('OpenAI client initialized successfully');
+  } else {
+    logger.warn('OpenAI API key not configured - using fallback responses');
+  }
+} catch (error) {
+  logger.error('Failed to initialize OpenAI client', error as Error);
+  openai = null;
+}
 
 interface ProjectContext {
   name: string;
@@ -185,7 +200,14 @@ Provide a JSON response with:
       let parsedResponse;
       
       if (openai && OPENAI_API_KEY) {
-        // Use real OpenAI API
+        // Use real OpenAI API with enhanced error handling
+        logger.debug('Making OpenAI API request', { 
+          requestId, 
+          model: "gpt-4o", 
+          systemPromptLength: systemPrompt.length,
+          userPromptLength: userPrompt.length 
+        });
+        
         const response = await openai.chat.completions.create({
           model: "gpt-4o",
           messages: [
@@ -197,12 +219,27 @@ Provide a JSON response with:
           max_tokens: 2000
         });
 
-        const content = response.choices[0].message.content;
+        const content = response.choices[0]?.message?.content;
         if (!content) {
-          throw new APIError(500, 'Empty response from OpenAI');
+          logger.error('Empty response from OpenAI', null, { requestId, response });
+          throw new APIError(500, 'Empty response from OpenAI API');
         }
 
-        parsedResponse = JSON.parse(content);
+        logger.debug('OpenAI API response received', { 
+          requestId, 
+          contentLength: content.length,
+          finishReason: response.choices[0]?.finish_reason 
+        });
+
+        try {
+          parsedResponse = JSON.parse(content);
+        } catch (parseError) {
+          logger.error('Failed to parse OpenAI JSON response', parseError as Error, { 
+            requestId, 
+            content: content.substring(0, 500) + '...' 
+          });
+          throw new APIError(500, 'Invalid JSON response from OpenAI API');
+        }
       } else {
         // Fallback response for dev mode without API key
         logger.info('Using fallback response - no OpenAI API key configured', { requestId });
@@ -315,6 +352,25 @@ export default ExampleComponent;`,
     });
 
     try {
+      // Check if OpenAI is available - following AI_INSTRUCTIONS.md security patterns
+      if (!openai || !OPENAI_API_KEY) {
+        logger.warn('OpenAI API not available for synthesis - using fallback', { sessionId });
+        
+        // Provide basic synthesis fallback
+        const fallbackSynthesis = `// Synthesized Solution
+// Combined ${solutions.length} voice perspectives
+
+${solutions.map((sol, idx) => `
+// Solution ${idx + 1}: ${sol.voiceCombination}
+// Confidence: ${sol.confidence}%
+${sol.code}
+`).join('\n\n')}
+
+// Note: This is a basic combination. Configure OPENAI_API_KEY for intelligent synthesis.`;
+
+        return fallbackSynthesis;
+      }
+
       const systemPrompt = `${this.getBaseInstructions()}
 
 You are synthesizing multiple code solutions into a final implementation. Follow AI_INSTRUCTIONS.md patterns:
@@ -368,6 +424,16 @@ Return only the final synthesized code with inline comments explaining key decis
 
     } catch (error) {
       logger.error('Solution synthesis failed', error as Error, { sessionId });
+      
+      // Handle specific OpenAI errors following AI_INSTRUCTIONS.md patterns
+      if (error instanceof Error && error.message.includes('API key')) {
+        throw new APIError(401, 'Invalid OpenAI API key configuration');
+      }
+
+      if (error instanceof Error && error.message.includes('quota')) {
+        throw new APIError(429, 'OpenAI API quota exceeded. Please try again later.');
+      }
+
       throw new APIError(500, `Solution synthesis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

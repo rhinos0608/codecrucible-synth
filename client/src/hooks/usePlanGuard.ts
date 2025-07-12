@@ -144,6 +144,8 @@ export function usePlanGuard() {
       
       return { success: true, data: result };
     } catch (error: any) {
+      console.error('Generation error:', error);
+      
       // Handle specific error types from server
       if (error.message?.includes('403')) {
         const errorData = JSON.parse(error.message.split('403: ')[1] || '{}');
@@ -171,15 +173,38 @@ export function usePlanGuard() {
         return { success: false, error: userMessage };
       }
       
-      // Handle other errors
-      const genericError = 'Generation failed. Please try again.';
+      // Extract meaningful error messages from server responses
+      let errorMessage = 'Generation failed. Please try again.';
+      
+      if (error.message?.includes('401')) {
+        errorMessage = 'OpenAI API configuration issue. Please check API key.';
+      } else if (error.message?.includes('429')) {
+        errorMessage = 'API rate limit exceeded. Please try again later.';
+      } else if (error.message?.includes('500')) {
+        // Try to extract the actual error message from server
+        const serverError = error.message.split('500: ')[1];
+        if (serverError) {
+          try {
+            const errorData = JSON.parse(serverError);
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            // If not JSON, use the raw server error message
+            errorMessage = serverError.length > 0 ? serverError : errorMessage;
+          }
+        }
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message && !error.message.includes('fetch')) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Generation Failed",
-        description: genericError,
+        description: errorMessage,
         variant: "destructive",
       });
       
-      return { success: false, error: genericError };
+      return { success: false, error: errorMessage };
     }
   };
 

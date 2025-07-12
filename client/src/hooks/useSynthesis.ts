@@ -171,19 +171,12 @@ export function useSynthesis() {
       const response = await apiRequest('POST', '/api/projects', {
         name: projectData.name,
         description: projectData.description || `Synthesized solution from session ${synthesisResult.sessionId}`,
-        code: synthesisResult.synthesizedCode,
+        code: synthesisResult.synthesizedCode || synthesisResult.code,
         language: 'javascript',
         sessionId: synthesisResult.sessionId,
         synthesisId: synthesisResult.synthesisId,
         tags: projectData.tags || ['synthesis', 'multi-voice', 'ai-generated'],
-        isPublic: false,
-        metadata: {
-          confidence: synthesisResult.confidence,
-          integratedApproaches: synthesisResult.integratedApproaches,
-          securityConsiderations: synthesisResult.securityConsiderations,
-          performanceOptimizations: synthesisResult.performanceOptimizations,
-          synthesisTimestamp: synthesisResult.timestamp
-        }
+        isPublic: false
       });
       
       return response.json();
@@ -206,7 +199,7 @@ export function useSynthesis() {
 
   // Copy synthesis result to clipboard
   const copyToClipboard = useCallback(async () => {
-    if (!synthesisResult?.synthesizedCode) {
+    if (!synthesisResult?.synthesizedCode && !synthesisResult?.code) {
       toast({
         title: "Nothing to Copy",
         description: "No synthesis result available to copy.",
@@ -216,7 +209,8 @@ export function useSynthesis() {
     }
     
     try {
-      await navigator.clipboard.writeText(synthesisResult.synthesizedCode);
+      const codeToSave = synthesisResult.synthesizedCode || synthesisResult.code || '';
+      await navigator.clipboard.writeText(codeToSave);
       toast({
         title: "Code Copied",
         description: "Synthesized code copied to clipboard successfully."

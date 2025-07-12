@@ -1314,9 +1314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const projectData = {
         ...req.body,
-        userId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        userId
       };
 
       logger.info('Creating new project', {

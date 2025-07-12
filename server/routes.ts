@@ -82,15 +82,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/project-folders', isAuthenticated, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
-      const folderData = insertProjectFolderSchema.parse({
-        ...req.body,
-        userId
-      });
       
-      const folder = await storage.createProjectFolder(folderData);
+      // Add missing defaults for required fields
+      const folderData = {
+        ...req.body,
+        userId,
+        sortOrder: req.body.sortOrder || 0,
+        isShared: req.body.isShared || false,
+        parentId: req.body.parentId || null
+      };
+      
+      const validatedData = insertProjectFolderSchema.parse(folderData);
+      const folder = await storage.createProjectFolder(validatedData);
       res.json(folder);
     } catch (error) {
-      logger.error('Error creating project folder', error as Error, { userId: req.user?.claims?.sub });
+      logger.error('Error creating project folder', error as Error, { 
+        userId: req.user?.claims?.sub,
+        requestBody: req.body 
+      });
       if (error instanceof Error && error.message.includes('subscription')) {
         res.status(403).json({ error: 'Pro subscription required for project folders' });
       } else {

@@ -344,6 +344,8 @@ export const insertSynthesisSchema = createInsertSchema(syntheses).pick({
   ethicalScore: true,
 });
 
+
+
 export const insertPhantomLedgerEntrySchema = createInsertSchema(phantomLedgerEntries).pick({
   sessionId: true,
   title: true,
@@ -548,10 +550,14 @@ export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).pick
   isDefault: true,
 });
 
-// Types
+// Types - consolidating duplicates
 export type UpsertUser = typeof users.$inferInsert;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type ProjectFolder = typeof projectFolders.$inferSelect;
+export type InsertProjectFolder = z.infer<typeof insertProjectFolderSchema>;
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
 
 // Usage limits table for quota enforcement following AI_INSTRUCTIONS.md
 export const usageLimits = pgTable("usage_limits", {

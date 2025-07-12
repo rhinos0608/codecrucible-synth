@@ -118,8 +118,10 @@ export function EnhancedProjectsPanel({
     name: '',
     description: '',
     color: '#3b82f6',
-    icon: 'folder',
+    icon: '📁',
     parentId: null as number | null,
+    sortOrder: 0,
+    isShared: false,
     visibility: 'private' as 'private' | 'team' | 'public'
   });
 
@@ -140,10 +142,7 @@ export function EnhancedProjectsPanel({
   // Create folder mutation
   const createFolderMutation = useMutation({
     mutationFn: async (folderData: typeof newFolderData) => {
-      return await apiRequest('/api/project-folders', {
-        method: 'POST',
-        body: JSON.stringify(folderData)
-      });
+      return await apiRequest('POST', '/api/project-folders', folderData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
@@ -512,27 +511,79 @@ export function EnhancedProjectsPanel({
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">QWAN Score</CardTitle>
+                  <CardTitle className="text-sm">Code Quality</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">87%</div>
-                  <div className="text-xs text-gray-500">Quality without a name</div>
+                  <div className="text-2xl font-bold">{Math.round(projects.length > 0 ? projects.reduce((acc, p) => acc + p.complexity, 0) / projects.length : 0)}</div>
+                  <div className="text-xs text-gray-500">Average complexity</div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
           <TabsContent value="synthesis" className="flex-1">
-            <div className="text-center py-8">
-              <Brain className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium mb-2">Synthesis Library</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Your synthesized solutions will appear here after running council generation.
-              </p>
-              <Button variant="outline">
-                <Zap className="w-4 h-4 mr-2" />
-                Generate New Synthesis
-              </Button>
+            <div className="space-y-4">
+              {/* Synthesized Projects */}
+              {projects.filter(p => p.sessionId).map(project => (
+                <Card key={project.id} className="border border-purple-200 dark:border-purple-800">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="w-5 h-5 text-purple-600" />
+                      {project.name}
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                        Synthesized
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {project.description}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{project.language}</Badge>
+                        <Badge variant="outline">Complexity: {project.complexity}</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(project.code);
+                            toast({ title: "Code copied to clipboard" });
+                          }}
+                        >
+                          <Copy className="w-4 h-4 mr-2" />
+                          Copy Code
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleContextSelection(project, !selectedContextProjects.some(p => p.id === project.id))}
+                        >
+                          <Database className="w-4 h-4 mr-2" />
+                          {selectedContextProjects.some(p => p.id === project.id) ? 'Remove Context' : 'Use as Context'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {/* Empty State */}
+              {projects.filter(p => p.sessionId).length === 0 && (
+                <div className="text-center py-8">
+                  <Brain className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-lg font-medium mb-2">Synthesis Library</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Your synthesized solutions will appear here after running council generation.
+                  </p>
+                  <Button variant="outline" onClick={() => window.location.href = '/'}>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Generate New Synthesis
+                  </Button>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>

@@ -9,10 +9,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { FeatureGate } from "@/components/FeatureGate";
 import TeamCollaborationPanel from "@/components/team-collaboration-panel";
+import RealTimeCollaborationPanel from "@/components/real-time-collaboration-panel";
 import AdvancedAvatarCustomizer from "@/components/advanced-avatar-customizer";
 
 export default function Teams() {
   const [showCollaborationPanel, setShowCollaborationPanel] = useState(false);
+  const [showRealTimePanel, setShowRealTimePanel] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const [showVoiceCustomizer, setShowVoiceCustomizer] = useState(false);
   const { user } = useAuth();
 
@@ -52,7 +55,7 @@ export default function Teams() {
 
   const collaborativeSessions = [
     {
-      id: '1',
+      id: '550e8400-e29b-41d4-a716-446655440001',
       title: 'E-commerce API Refactor',
       participants: ['Alice Chen', 'Bob Smith'],
       status: 'active',
@@ -69,6 +72,16 @@ export default function Teams() {
     }
   ];
 
+  const handleStartCollaboration = () => {
+    setShowRealTimePanel(true);
+    setSelectedSessionId(undefined); // New session
+  };
+
+  const handleJoinSession = (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+    setShowRealTimePanel(true);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -83,7 +96,7 @@ export default function Teams() {
             </p>
           </div>
           <FeatureGate feature="team_collaboration">
-            <Button onClick={() => setShowCollaborationPanel(true)}>
+            <Button onClick={handleStartCollaboration}>
               <Plus className="w-4 h-4 mr-2" />
               New Session
             </Button>
@@ -140,7 +153,14 @@ export default function Teams() {
                           <div className="flex gap-2">
                             {session.status === 'active' ? (
                               <>
-                                <Button size="sm" variant="default">
+                                <Button 
+                                  size="sm" 
+                                  variant="default"
+                                  onClick={() => {
+                                    setSelectedSessionId(session.id);
+                                    setShowRealTimePanel(true);
+                                  }}
+                                >
                                   <MessageSquare className="w-4 h-4 mr-1" />
                                   Join Session
                                 </Button>
@@ -150,7 +170,14 @@ export default function Teams() {
                                 </Button>
                               </>
                             ) : (
-                              <Button size="sm" variant="outline">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedSessionId(session.id);
+                                  setShowRealTimePanel(true);
+                                }}
+                              >
                                 View Results
                               </Button>
                             )}
@@ -346,6 +373,19 @@ export default function Teams() {
           onClose={() => setShowVoiceCustomizer(false)}
           onSave={() => {}}
         />
+
+        {/* Real-Time Collaboration Panel */}
+        {showRealTimePanel && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <RealTimeCollaborationPanel
+              sessionId={selectedSessionId}
+              onClose={() => {
+                setShowRealTimePanel(false);
+                setSelectedSessionId(undefined);
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

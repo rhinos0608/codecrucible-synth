@@ -11,6 +11,8 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { securityMiddleware } from "./security-middleware";
 import { enforcePlanRestrictions, validateFeatureAccess } from "./middleware/enforcePlan";
 import { enforceSubscriptionLimits, enforceSynthesisAccess } from "./middleware/subscription-enforcement";
+import { customVoiceService } from "./custom-voice-service";
+import { collaborationService } from "./collaboration-service";
 import { processStripeWebhook } from "./lib/stripe/updateUserPlan";
 import { incrementUsageQuota, checkGenerationQuota } from "./lib/utils/checkQuota";
 import { logSecurityEvent } from "./lib/security/logSecurityEvent";
@@ -87,6 +89,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Custom Voice Profile Creation Route (Pro+ Feature)
+  app.post('/api/voice-profiles/custom', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const customVoiceData = { ...req.body, userId };
+      
+      const customVoice = await customVoiceService.createCustomVoice(customVoiceData);
+      res.json(customVoice);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Team Collaboration Routes (Team+ Feature)
+  app.post('/api/collaboration/sessions', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessionData = { ...req.body, initiatorId: userId };
+      
+      const session = await collaborationService.createCollaborativeSession(sessionData);
+      res.json(session);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/collaboration/sessions/:id', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const sessionId = req.params.id;
+      const session = await collaborationService.getSession(sessionId);
+      
+      if (!session) {
+        return res.status(404).json({ message: 'Session not found' });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Voice Profile Testing Route (Pro+ Feature)
+  app.post('/api/voice-profiles/test', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const testData = { ...req.body, userId };
+      
+      const testResults = await customVoiceService.testCustomVoice(testData.promptTemplate || '', testData);
+      res.json({ testResults });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // VFSP Analytics Route (Pro+ Feature)
+  app.get('/api/analytics/vfsp', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const timeRange = req.query.range as string || '30d';
+      
+      // For now, return mock data - in production this would generate real analytics
+      const mockAnalytics = {
+        volatilityIndex: 42,
+        forecastModel: {
+          nextWeekPrediction: 85,
+          nextMonthPrediction: 92,
+          confidenceLevel: 78,
+          trendDirection: 'increasing',
+          seasonalPatterns: [
+            { period: 'Morning (9-12)', intensity: 95, description: 'Peak productivity hours' },
+            { period: 'Afternoon (1-5)', intensity: 75, description: 'Steady development' },
+            { period: 'Evening (6-9)', intensity: 60, description: 'Review and planning' }
+          ]
+        },
+        symbolicPatterns: [
+          {
+            pattern: 'Explorer + Security Engineer',
+            significance: 88,
+            frequency: 24,
+            impact: 'high',
+            description: 'Highly effective for secure API development'
+          }
+        ],
+        evolutionTracking: [],
+        insights: [
+          {
+            id: '1',
+            title: 'Peak Productivity Window Identified',
+            description: 'Your most effective coding occurs between 9-11 AM with 95% consistency',
+            priority: 'high',
+            category: 'productivity',
+            actionRequired: 'Schedule complex tasks during morning hours'
+          }
+        ],
+        recommendations: [
+          {
+            voices: ['Explorer', 'Security Engineer'],
+            confidence: 92,
+            reasoning: 'Based on your high success rate with security implementations',
+            expectedImprovement: 23
+          }
+        ]
+      };
+      
+      res.json(mockAnalytics);
+    } catch (error) {
+      next(error);
     }
   });
 

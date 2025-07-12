@@ -59,10 +59,10 @@ export function SubscriptionStatus() {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <CardTitle>Subscription Status</CardTitle>
+            <CardTitle className="text-base">Subscription Status</CardTitle>
             <Badge className={getTierColor()}>
               <span className="flex items-center gap-1">
                 {getTierIcon()}
@@ -72,7 +72,7 @@ export function SubscriptionStatus() {
           </div>
           {tierName === "free" && (
             <Link href="/pricing">
-              <Button size="sm" variant="outline">
+              <Button size="sm" variant="outline" className="ml-2 h-6 px-2 text-xs">
                 Upgrade
               </Button>
             </Link>
@@ -144,9 +144,9 @@ export function SubscriptionStatus() {
         </div>
 
         {tierName === "free" && (
-          <div className="pt-2 border-t">
+          <div className="pt-3 border-t">
             <Link href="/pricing">
-              <Button className="w-full" size="sm">
+              <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg" size="sm">
                 <Crown className="h-4 w-4 mr-2" />
                 Upgrade to Pro
               </Button>

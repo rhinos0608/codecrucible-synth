@@ -217,7 +217,8 @@ Requirements:
     const code = this.extractCode(content);
     const explanation = this.extractExplanation(content);
     
-    return {
+    // Enhanced solution validation following AI_INSTRUCTIONS.md patterns
+    const solution = {
       id: solutionId,
       sessionId,
       voiceCombination: `${type}:${voiceId}`,
@@ -229,6 +230,18 @@ Requirements:
       perspective: type === 'perspective' ? voiceId : '',
       role: type === 'role' ? voiceId : ''
     };
+    
+    // Critical debugging for missing code issue
+    console.log('🎯 Voice solution created for', voiceId, ':', {
+      voiceCombination: solution.voiceCombination,
+      hasCode: !!solution.code && solution.code.trim().length > 0,
+      codeLength: solution.code?.length || 0,
+      explanationLength: solution.explanation?.length || 0,
+      confidence: solution.confidence,
+      rawContentLength: content.length
+    });
+    
+    return solution;
     
     } catch (error) {
       console.error(`❌ OpenAI API error for voice ${voiceId}:`, error);
@@ -474,8 +487,67 @@ Combine multiple code solutions into one optimal implementation using consciousn
   }
 
   private extractCode(content: string): string {
-    const codeMatch = content.match(/```(?:typescript|javascript|tsx|jsx)?\n([\s\S]*?)\n```/);
-    return codeMatch ? codeMatch[1].trim() : content.substring(0, 1500);
+    // Enhanced code extraction following AI_INSTRUCTIONS.md defensive programming patterns
+    if (!content || typeof content !== 'string') {
+      console.warn('⚠️ Invalid content provided to extractCode:', typeof content);
+      return '// Error: No content available for code extraction';
+    }
+    
+    // Try multiple code block patterns
+    const patterns = [
+      /```(?:typescript|ts|javascript|js|tsx|jsx|react)?\n([\s\S]*?)\n```/g,
+      /```\n([\s\S]*?)\n```/g,
+      /`([^`\n]+)`/g
+    ];
+    
+    for (const pattern of patterns) {
+      const matches = content.match(pattern);
+      if (matches && matches.length > 0) {
+        // Extract the largest code block
+        let largestMatch = '';
+        matches.forEach(match => {
+          const extracted = match.replace(/```(?:typescript|ts|javascript|js|tsx|jsx|react)?\n?/, '').replace(/\n?```$/, '').trim();
+          if (extracted.length > largestMatch.length) {
+            largestMatch = extracted;
+          }
+        });
+        
+        if (largestMatch.length > 10) { // Minimum viable code length
+          console.log('✅ Code extracted successfully:', { 
+            originalLength: content.length, 
+            extractedLength: largestMatch.length 
+          });
+          return largestMatch;
+        }
+      }
+    }
+    
+    // If no code blocks found, try to extract meaningful content
+    const lines = content.split('\n').filter(line => {
+      const trimmed = line.trim();
+      return trimmed.length > 0 && 
+             !trimmed.startsWith('#') && 
+             !trimmed.startsWith('*') &&
+             !trimmed.toLowerCase().includes('explanation') &&
+             !trimmed.toLowerCase().includes('summary');
+    });
+    
+    if (lines.length > 0) {
+      const extractedContent = lines.slice(0, 20).join('\n'); // First 20 meaningful lines
+      console.log('📝 Fallback content extraction:', { 
+        linesFound: lines.length, 
+        extractedLength: extractedContent.length 
+      });
+      return extractedContent;
+    }
+    
+    // Final fallback - return first substantial portion
+    const fallback = content.substring(0, 1500).trim();
+    console.warn('⚠️ Using fallback extraction for voice content:', { 
+      contentLength: content.length,
+      fallbackLength: fallback.length 
+    });
+    return fallback || '// Error: Unable to extract meaningful code content';
   }
 
   private extractExplanation(content: string): string {

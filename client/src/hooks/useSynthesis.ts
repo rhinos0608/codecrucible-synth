@@ -174,19 +174,21 @@ export function useSynthesis() {
         throw new Error('No synthesis result to save');
       }
       
-      const response = await apiRequest('POST', '/api/projects', {
-        name: projectData.name,
-        description: projectData.description || `Synthesized solution from session ${synthesisResult.sessionId}`,
-        code: synthesisResult.synthesizedCode || synthesisResult.code,
-        language: 'javascript',
-        sessionId: synthesisResult.sessionId,
-        synthesisId: synthesisResult.synthesisId,
-        tags: projectData.tags || ['synthesis', 'multi-voice', 'ai-generated'],
-        folderId: projectData.folderId, // Enhanced folder organization support
-        isPublic: false
+      // apiRequest already handles JSON parsing and returns the parsed data
+      return await apiRequest('/api/projects', {
+        method: 'POST',
+        body: {
+          name: projectData.name,
+          description: projectData.description || `Synthesized solution from session ${synthesisResult.sessionId}`,
+          code: synthesisResult.synthesizedCode || synthesisResult.code,
+          language: 'javascript',
+          sessionId: synthesisResult.sessionId,
+          synthesisId: synthesisResult.synthesisId,
+          tags: projectData.tags || ['synthesis', 'multi-voice', 'ai-generated'],
+          folderId: projectData.folderId, // Enhanced folder organization support
+          isPublic: false
+        }
       });
-      
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });

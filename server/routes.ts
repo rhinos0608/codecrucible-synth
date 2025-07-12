@@ -4,7 +4,7 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertProjectFolderSchema } from "@shared/schema";
+import { insertProjectFolderSchema, insertProjectSchema } from "@shared/schema";
 import { contextAwareOpenAI } from "./context-aware-openai-service";
 import { realOpenAIService } from "./openai-service";
 
@@ -184,6 +184,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Additional routes for API completeness
+  // Project creation endpoint for synthesis save functionality - Following AI_INSTRUCTIONS.md patterns
+  app.post('/api/projects', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Enhanced validation following AI_INSTRUCTIONS.md security patterns
+      const projectData = {
+        ...req.body,
+        userId, // Ensure userId is set from authenticated user
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      logger.info('Creating new project from synthesis', {
+        name: projectData.name,
+        language: projectData.language,
+        sessionId: projectData.sessionId,
+        synthesisId: projectData.synthesisId,
+        folderId: projectData.folderId,
+        userId
+      });
+      
+      // Validate project data using schema
+      const validatedData = insertProjectSchema.parse(projectData);
+      const project = await storage.createProject(validatedData);
+      
+      logger.info('Project created successfully from synthesis', { 
+        projectId: project.id, 
+        userId,
+        name: project.name 
+      });
+      
+      res.json(project);
+    } catch (error) {
+      logger.error('Error creating project from synthesis', error as Error, { 
+        userId: req.user?.claims?.sub,
+        requestBody: req.body,
+        validationError: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      if (error instanceof Error && error.message.includes('validation')) {
+        res.status(400).json({ error: 'Invalid project data', details: error.message });
+      } else {
+        res.status(500).json({ error: 'Failed to create project from synthesis' });
+      }
+    }
+  });
+
   app.get('/api/projects', isAuthenticated, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
@@ -522,17 +570,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId
       });
       
-      // Store solutions for later retrieval
-      const formattedSolutions = solutions.map(solution => ({
-        id: solution.id,
-        sessionId: solution.sessionId,
-        voiceEngine: solution.voiceCombination,
-        voiceName: solution.voiceCombination,
-        code: solution.code,
-        explanation: solution.explanation,
-        confidence: solution.confidence,
-        createdAt: new Date().toISOString()
-      }));
+      // Store solutions for later retrieval with enhanced validation
+      const formattedSolutions = solutions.map(solution => {
+        // Enhanced logging to debug missing code issues
+        console.log('🔧 Formatting solution:', {
+          id: solution.id,
+          voiceCombination: solution.voiceCombination,
+          codeLength: solution.code?.length || 0,
+          hasCode: !!solution.code && solution.code.trim().length > 0,
+          codePreview: solution.code?.substring(0, 50) + '...'
+        });
+        
+        return {
+          id: solution.id,
+          sessionId: solution.sessionId,
+          voiceEngine: solution.voiceCombination,
+          voiceName: solution.voiceCombination,
+          code: solution.code || '// No code generated - OpenAI response processing error',
+          explanation: solution.explanation || 'No explanation available',
+          confidence: solution.confidence || 0,
+          createdAt: new Date().toISOString()
+        };
+      });
 
       // Store in memory for retrieval by solutions endpoint
       if (!global.sessionSolutions) {

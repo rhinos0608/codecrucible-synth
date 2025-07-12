@@ -836,8 +836,8 @@ export function EnhancedProjectsPanel({
 
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Generated Code</label>
-                    <div className="mt-1 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                      <pre className="text-xs whitespace-pre-wrap overflow-auto max-h-96">
+                    <div className="mt-1 p-4 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg">
+                      <pre className="text-xs whitespace-pre-wrap overflow-auto max-h-96 text-gray-900 dark:text-gray-100 font-mono leading-relaxed">
                         {selectedProjectDetail?.code || 'No code available'}
                       </pre>
                     </div>

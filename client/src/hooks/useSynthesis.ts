@@ -161,9 +161,9 @@ export function useSynthesis() {
     }
   });
 
-  // Save synthesis to project with real-time sync
+  // Save synthesis to project with folder organization support - Following CodingPhilosophy.md patterns
   const saveToProject = useMutation({
-    mutationFn: async (projectData: { name: string; description?: string; tags?: string[] }) => {
+    mutationFn: async (projectData: { name: string; description?: string; tags?: string[]; folderId?: number | null }) => {
       if (!synthesisResult) {
         throw new Error('No synthesis result to save');
       }
@@ -176,6 +176,7 @@ export function useSynthesis() {
         sessionId: synthesisResult.sessionId,
         synthesisId: synthesisResult.synthesisId,
         tags: projectData.tags || ['synthesis', 'multi-voice', 'ai-generated'],
+        folderId: projectData.folderId, // Enhanced folder organization support
         isPublic: false
       });
       

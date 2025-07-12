@@ -39,15 +39,23 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
     }
   }, [isOpen, solutions.length, synthesisResult, isSynthesizing, synthesizeSolutions, sessionId, solutions]);
 
-  // Handle save to project with name prompt
+  // Handle save to project with enhanced folder selection - Following CodingPhilosophy.md patterns
   const handleSaveToProject = async () => {
     const projectName = prompt("Enter a name for your project:");
     if (projectName && projectName.trim()) {
       if (synthesisResult) {
+        // Enhanced save with folder support for organized project management
         saveToProject({ 
           name: projectName.trim(),
           description: `Synthesized solution from ${solutions.length} AI voices`,
-          tags: ['synthesis', 'multi-voice', 'ai-generated']
+          tags: ['synthesis', 'multi-voice', 'ai-generated'],
+          // Future enhancement: Add folder selection dialog
+          folderId: null // Will be enhanced with folder selection UI
+        });
+        
+        toast({
+          title: "Project Saved",
+          description: `"${projectName}" has been saved to your projects. You can organize it into folders from the Projects panel.`,
         });
       } else {
         toast({

@@ -375,7 +375,7 @@ export default function Dashboard() {
                     console.log("🎯 Enhanced Projects button clicked, setting showEnhancedProjectsPanel to true");
                     setShowEnhancedProjectsPanel(true);
                   }}
-                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                  className="text-gray-400 hover:text-blue-400 border-gray-600/50 hover:border-blue-500/50 hover:bg-blue-500/10 whitespace-nowrap transition-all duration-200"
                 >
                   <FolderOpen className="w-4 h-4 mr-2" />
                   Projects

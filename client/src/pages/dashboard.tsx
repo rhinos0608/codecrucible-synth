@@ -250,8 +250,19 @@ export default function Dashboard() {
   };
 
   const handleGenerateSolutions = async () => {
-    // Check quota before proceeding
-    if (!planGuard.canGenerate) {
+    // Enhanced dev mode logging for debugging
+    console.log('Council Generation Debug - Plan Guard State:', {
+      canGenerate: planGuard.canGenerate,
+      planTier: planGuard.planTier,
+      quotaUsed: planGuard.quotaUsed,
+      quotaLimit: planGuard.quotaLimit,
+      isLoading: planGuard.isLoading,
+      error: planGuard.error
+    });
+    
+    // Check quota before proceeding - with dev mode awareness
+    if (!planGuard.canGenerate && planGuard.planTier !== 'development') {
+      console.log('Generation blocked - redirecting to upgrade modal');
       setShowUpgradeModal(true);
       return;
     }
@@ -600,7 +611,14 @@ export default function Dashboard() {
                   </Button>
 
                   <Button
-                    onClick={() => setShowChatGPTGeneration(true)}
+                    onClick={() => {
+                      console.log('Live Streaming button clicked - Dev mode check:', {
+                        canGenerate: planGuard.canGenerate,
+                        planTier: planGuard.planTier,
+                        isDevMode: planGuard.planTier === 'development'
+                      });
+                      setShowChatGPTGeneration(true);
+                    }}
                     disabled={!state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-3 px-4"
                   >

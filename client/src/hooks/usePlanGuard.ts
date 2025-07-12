@@ -118,8 +118,22 @@ export function usePlanGuard() {
 
   // Handle generation attempt with error handling
   const attemptGeneration = async (generationFn: () => Promise<any>) => {
-    // Pre-check quota
+    // Pre-check quota with dev mode support
     const quotaCheck = await checkQuota();
+    
+    console.log('Attempt Generation - Quota Check:', quotaCheck);
+    
+    // Dev mode bypass - following AI_INSTRUCTIONS.md patterns
+    if (quotaCheck?.devMode || quotaCheck?.planTier === 'development') {
+      console.log('Dev mode detected - bypassing quota restrictions');
+      try {
+        const result = await generationFn();
+        return { success: true, data: result };
+      } catch (error) {
+        console.error('Generation failed in dev mode:', error);
+        return { success: false, error: String(error) };
+      }
+    }
     
     if (!quotaCheck?.allowed) {
       const message = quotaCheck?.reason === 'quota_exceeded' 
@@ -132,7 +146,7 @@ export function usePlanGuard() {
         variant: "destructive",
       });
       
-      return { success: false, error: message };
+      return { success: false, reason: 'quota_exceeded', error: message };
     }
 
     try {

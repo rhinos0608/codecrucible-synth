@@ -527,6 +527,18 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **Data Flow Verification**: Comprehensive audit confirms backend move operation succeeds but frontend filtering/display needs cache synchronization
 - **Production Debug Tools**: All debugging follows AI_INSTRUCTIONS.md patterns with console logging for project movement troubleshooting
 
+### Critical Dev Mode Council Generation & Live Streaming Audit Fix (January 12, 2025)
+- **Critical Issue Identified**: Council Generation redirecting to premium tab in dev mode due to incomplete quota check endpoint
+- **Quota Endpoint Enhancement**: Fixed /api/quota/check to properly detect and return dev mode status with unlimitedGenerations flag
+- **Plan Guard Dev Mode Bypass**: Enhanced usePlanGuard.ts to recognize devMode and development planTier for quota bypassing
+- **attemptGeneration Enhancement**: Added dev mode bypass in planGuard.attemptGeneration following AI_INSTRUCTIONS.md security patterns
+- **Dashboard Debug Logging**: Added comprehensive plan guard state logging for Council Generation and Live Streaming buttons
+- **Dev Mode Detection**: Fixed server-side dev mode detection with proper import of getDevModeConfig from lib/dev-mode
+- **Unlimited Generation Fix**: Dev mode now properly returns allowed: true, devMode: true, planTier: 'development' for unlimited access
+- **Live Streaming Dev Mode**: Enhanced Live Streaming button with dev mode logging and proper state detection
+- **AI_INSTRUCTIONS.md Compliance**: All dev mode implementations follow security patterns with comprehensive logging and error handling
+- **CodingPhilosophy.md Integration**: Council-based debugging with Jung's Descent Protocol for error handling and consciousness patterns
+
 ### Critical React Compilation Error Resolution & AI_INSTRUCTIONS.md Compliance Audit (January 12, 2025)
 - **Comprehensive Code Audit**: Conducted full audit through AI_INSTRUCTIONS.md and CodingPhilosophy.md compliance following user error log analysis
 - **React Import Compliance**: Fixed "Cannot read properties of undefined (reading 'toString')" error by implementing defensive programming patterns

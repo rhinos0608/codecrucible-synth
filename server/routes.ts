@@ -332,10 +332,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+      
+      // Critical fix: Import and check dev mode following AI_INSTRUCTIONS.md patterns
+      const { getDevModeConfig } = await import('./lib/dev-mode');
+      const devModeConfig = getDevModeConfig();
+      
+      // Dev mode bypass for unlimited generation
+      if (devModeConfig.isEnabled) {
+        res.json({ 
+          dailyGenerated: 0,
+          dailyLimit: 999,
+          remaining: 999,
+          allowed: true,
+          devMode: true,
+          planTier: 'development',
+          quotaUsed: 0,
+          quotaLimit: 999,
+          reason: 'dev_mode_unlimited'
+        });
+        return;
+      }
+      
+      // Production quota checking
+      const planTier = user?.planTier || 'free';
+      const dailyLimit = planTier === 'free' ? 3 : 999;
+      const quotaUsed = user?.dailyGenerated || 0;
+      const remaining = Math.max(0, dailyLimit - quotaUsed);
+      
       res.json({ 
-        dailyGenerated: 0,
-        dailyLimit: user?.planTier === 'free' ? 3 : 999,
-        remaining: user?.planTier === 'free' ? 3 : 999
+        dailyGenerated: quotaUsed,
+        dailyLimit: dailyLimit,
+        remaining: remaining,
+        allowed: remaining > 0,
+        devMode: false,
+        planTier: planTier,
+        quotaUsed: quotaUsed,
+        quotaLimit: dailyLimit,
+        reason: remaining > 0 ? 'quota_available' : 'quota_exceeded'
       });
     } catch (error) {
       logger.error('Error checking quota', error as Error, { userId: req.user?.claims?.sub });

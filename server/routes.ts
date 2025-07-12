@@ -457,6 +457,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mode: 'production'
       });
       
+      // Store solutions for later retrieval
+      const formattedSolutions = solutions.map(solution => ({
+        id: solution.id,
+        sessionId: solution.sessionId,
+        voiceEngine: solution.voiceCombination,
+        voiceName: solution.voiceCombination,
+        code: solution.code,
+        explanation: solution.explanation,
+        confidence: solution.confidence,
+        createdAt: new Date().toISOString()
+      }));
+
+      // Store in memory for retrieval by solutions endpoint
+      if (!global.sessionSolutions) {
+        global.sessionSolutions = new Map();
+      }
+      global.sessionSolutions.set(sessionId, formattedSolutions);
+
       const sessionData = {
         session: {
           id: sessionId,
@@ -466,16 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'completed',
           createdAt: new Date().toISOString()
         },
-        solutions: solutions.map(solution => ({
-          id: solution.id,
-          sessionId: solution.sessionId,
-          voiceEngine: solution.voiceCombination,
-          voiceName: solution.voiceCombination,
-          code: solution.code,
-          explanation: solution.explanation,
-          confidence: solution.confidence,
-          createdAt: new Date().toISOString()
-        }))
+        solutions: formattedSolutions
       };
       
       console.log('✅ Real OpenAI generation completed:', { 
@@ -571,11 +580,8 @@ const ${voiceName.toLowerCase().replace(' ', '')}Solution = () => {
       const sessionId = parseInt(req.params.sessionId);
       console.log('🔧 Real OpenAI Synthesis request for session:', sessionId);
 
-      // Get solutions for this session (using mock data until we have storage integration)
-      const solutions = [
-        { voiceCombination: "Explorer", code: "// Explorer code...", explanation: "Explorer analysis" },
-        { voiceCombination: "Maintainer", code: "// Maintainer code...", explanation: "Maintainer approach" }
-      ];
+      // Get solutions for this session from global storage
+      const solutions = global.sessionSolutions?.get(sessionId) || [];
       const originalPrompt = req.body?.originalPrompt || 'Synthesize code solutions';
       
       console.log('🚀 Initiating REAL OpenAI synthesis:', {
@@ -607,12 +613,11 @@ const ${voiceName.toLowerCase().replace(' ', '')}Solution = () => {
   // Session solutions endpoint - Returns solutions from session creation
   app.get("/api/sessions/:id/solutions", isAuthenticated, async (req: any, res) => {
     try {
-      const sessionId = req.params.id;
+      const sessionId = parseInt(req.params.id);
       console.log('Fetching solutions for session:', sessionId);
       
-      // In production, this would fetch from storage, but for now return solutions that match the session creation
-      // This should be populated by the actual solutions created during the /api/sessions POST call
-      const solutions = await storage.getSolutionsBySessionId?.(parseInt(sessionId)) || [];
+      // Get solutions from memory storage
+      const solutions = global.sessionSolutions?.get(sessionId) || [];
       
       console.log('Returning solutions:', solutions.length);
       res.json(solutions);

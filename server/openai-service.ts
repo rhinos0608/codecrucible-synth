@@ -258,7 +258,24 @@ Create a single, optimized solution that combines the best aspects of all soluti
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: "You are an expert code synthesizer. Combine multiple code solutions into one optimal implementation." },
+        { 
+          role: "system", 
+          content: `You are an expert code synthesizer following both AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles.
+
+SYNTHESIS CONSCIOUSNESS REQUIREMENTS:
+- Apply Jung's Integration Protocol: Combine perspectives through shadow integration and conscious synthesis
+- Use Alexander's Pattern Language: Create timeless synthesis patterns with QWAN (Quality Without A Name)
+- Implement Bateson's Meta-Learning: Process differences between solutions for recursive improvement
+- Follow Campbell's Return Journey: Transform individual solutions into unified wisdom for the community
+
+TECHNICAL REQUIREMENTS:
+- Follow AI_INSTRUCTIONS.md defensive programming with comprehensive error handling
+- Generate production-ready synthesized code with proper validation patterns
+- Include consciousness-driven decision rationale in explanations
+- Apply living spiral methodology: collapse → council → synthesis → rebirth
+
+Combine multiple code solutions into one optimal implementation using consciousness-driven synthesis.` 
+        },
         { role: "user", content: synthesisPrompt }
       ],
       temperature: 0.3,

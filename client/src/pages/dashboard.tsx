@@ -180,6 +180,12 @@ export default function Dashboard() {
     try {
       // Use plan guard to enforce quotas
       const result = await planGuard.attemptGeneration(async () => {
+        console.log("Calling generateSession mutation with:", {
+          prompt: state.prompt.substring(0, 100),
+          perspectives: state.selectedPerspectives,
+          roles: state.selectedRoles
+        });
+        
         return generateSession.mutateAsync({
           prompt: state.prompt,
           selectedVoices: {
@@ -199,10 +205,14 @@ export default function Dashboard() {
         });
       });
 
+      console.log("Generation result:", result);
+
       if (result.success && result.data?.session?.id) {
         handleSolutionsGenerated(result.data.session.id);
       } else if (!result.success && result.reason === 'quota_exceeded') {
         setShowUpgradeModal(true);
+      } else {
+        console.error("Generation failed:", result);
       }
     } catch (error) {
       console.error("Failed to generate solutions:", error);
@@ -319,43 +329,7 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* Voice Recommendations */}
-          {recommendations && (
-            <Card className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border-purple-500/30">
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-medium text-purple-200">Smart Voice Recommendations</h3>
-                  <Badge variant="secondary" className="bg-purple-800/50 text-purple-200">
-                    {Math.round(recommendations.suggested.confidence * 100)}% confidence
-                  </Badge>
-                </div>
-                <p className="text-sm text-gray-300 mb-3">
-                  {recommendations.suggested.reasoning}
-                </p>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    {recommendations.suggested.perspectives.map(p => (
-                      <Badge key={p} variant="outline" className="border-purple-500/50 text-purple-200">
-                        {p}
-                      </Badge>
-                    ))}
-                    {recommendations.suggested.roles.map(r => (
-                      <Badge key={r} variant="outline" className="border-blue-500/50 text-blue-200">
-                        {r}
-                      </Badge>
-                    ))}
-                  </div>
-                  <Button 
-                    size="sm" 
-                    onClick={handleApplyRecommendations}
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    Apply Suggestions
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
+
 
           {/* Prompt Suggestions */}
           <div className="space-y-3">

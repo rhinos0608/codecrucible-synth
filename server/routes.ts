@@ -519,11 +519,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // REAL OpenAI Streaming endpoint - Following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+  // REAL OpenAI Streaming endpoint - GET and POST support for EventSource
+  app.get("/api/sessions/stream", isAuthenticated, async (req: any, res) => {
+    // Handle EventSource GET requests by treating them as streaming requests
+    const { prompt, selectedVoices, sessionId } = req.query;
+    
+    if (!prompt || !selectedVoices) {
+      res.status(400).json({ error: 'Missing required parameters' });
+      return;
+    }
+    
+    // Parse selectedVoices from query string
+    let parsedVoices;
+    try {
+      parsedVoices = JSON.parse(selectedVoices as string);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid selectedVoices format' });
+      return;
+    }
+    
+    // Handle the streaming with the same logic as POST
+    await handleStreamingRequest(req, res, {
+      prompt: prompt as string,
+      selectedVoices: parsedVoices,
+      sessionId: parseInt(sessionId as string) || Date.now()
+    });
+  });
+
   app.post("/api/sessions/stream", isAuthenticated, async (req: any, res) => {
+    await handleStreamingRequest(req, res, req.body);
+  });
+
+  // Unified streaming handler following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+  async function handleStreamingRequest(req: any, res: any, { prompt, selectedVoices, sessionId }: any) {
     try {
       const userId = req.user.claims.sub;
-      const { prompt, selectedVoices } = req.body;
       
       // Critical dev mode check following AI_INSTRUCTIONS.md patterns
       const { getDevModeConfig } = await import('./lib/dev-mode');
@@ -545,8 +575,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Credentials': 'true'
       });
-
-      const sessionId = Date.now();
       
       // Start streaming message with consciousness framework integration
       res.write(`data: ${JSON.stringify({ 
@@ -566,7 +594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const completedSolutions: any[] = [];
         
-        // Stream all voices in TRUE PARALLEL with real OpenAI streaming - Following AI_INSTRUCTIONS.md patterns
+        // Stream all voices in TRUE PARALLEL with real OpenAI streaming
         const voicePromises = allVoices.map(async (voice) => {
           // Voice arrival notification
           res.write(`data: ${JSON.stringify({
@@ -586,24 +614,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: voice.type,
             onChunk: (chunk: string) => {
               try {
-                // Safe JSON serialization to prevent syntax errors
-                const safeChunk = chunk.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+                // Send voice content chunks to frontend
                 res.write(`data: ${JSON.stringify({
-                  type: 'voice_chunk',
+                  type: 'voice_content',
                   voiceId: voice.id,
-                  voiceName: voice.id,
-                  chunk: safeChunk,
-                  isComplete: false
+                  content: chunk
                 })}\n\n`);
               } catch (jsonError) {
                 console.error('JSON serialization error in chunk:', jsonError);
-                res.write(`data: ${JSON.stringify({
-                  type: 'voice_chunk',
-                  voiceId: voice.id,
-                  voiceName: voice.id,
-                  chunk: '[Content encoding error]',
-                  isComplete: false
-                })}\n\n`);
               }
             },
             onComplete: async (solution: any) => {
@@ -612,10 +630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               res.write(`data: ${JSON.stringify({
                 type: 'voice_complete',
                 voiceId: voice.id,
-                voiceName: voice.id,
-                fullCode: solution.code,
-                explanation: solution.explanation,
-                confidence: solution.confidence
+                confidence: solution.confidence || 85
               })}\n\n`);
             }
           });
@@ -628,12 +643,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         global.sessionSolutions = global.sessionSolutions || new Map();
         global.sessionSolutions.set(sessionId, completedSolutions);
         
-        // Complete streaming with council synthesis invitation
+        // Complete streaming 
         res.write(`data: ${JSON.stringify({
           type: 'session_complete',
           sessionId: sessionId,
-          solutionCount: completedSolutions.length,
-          message: 'Council assembly complete. Ready for synthesis...'
+          solutionCount: completedSolutions.length
         })}\n\n`);
         
         console.log('✅ Real OpenAI streaming completed:', { sessionId, solutionCount: completedSolutions.length });
@@ -641,7 +655,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (openaiError) {
         console.error('❌ Real OpenAI streaming error:', openaiError);
         
-        // Jung's Descent Protocol - Error handling with consciousness
         res.write(`data: ${JSON.stringify({
           type: 'error',
           message: 'AI council assembly encountered resistance. Implementing recovery protocol...',
@@ -653,9 +666,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('Streaming endpoint error:', error);
-      res.status(500).json({ error: 'Real OpenAI streaming failed', details: error.message });
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Real OpenAI streaming failed', details: error.message });
+      }
     }
-  });
+  }
 
   // Solutions endpoint for Implementation Options modal
   app.get("/api/sessions/:id/solutions", isAuthenticated, async (req: any, res) => {
@@ -712,58 +727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Synthesis endpoint for combining solutions - REAL OpenAI Integration
-  app.post("/api/sessions/:sessionId/synthesis", async (req, res) => {
-    try {
-      const sessionId = parseInt(req.params.sessionId);
-      console.log('🔧 Real OpenAI Synthesis request for session:', sessionId);
 
-      // Get solutions for this session from global storage
-      const solutions = global.sessionSolutions?.get(sessionId) || [];
-      const originalPrompt = req.body?.originalPrompt || 'Synthesize code solutions';
-      
-      console.log('🚀 Initiating REAL OpenAI synthesis:', {
-        sessionId,
-        solutionCount: solutions.length,
-        promptLength: originalPrompt.length
-      });
-
-      // Call REAL OpenAI synthesis service - NO mock data allowed
-      const synthesisResult = await realOpenAIService.synthesizeSolutions(
-        solutions,
-        sessionId,
-        originalPrompt
-      );
-
-      console.log('✅ Real OpenAI synthesis completed:', {
-        sessionId,
-        confidence: synthesisResult.confidence,
-        codeLength: synthesisResult.synthesizedCode?.length || 0
-      });
-
-      res.json(synthesisResult);
-    } catch (error) {
-      console.error('❌ Real OpenAI synthesis error:', error);
-      res.status(500).json({ error: 'Failed to synthesize solutions with real OpenAI' });
-    }
-  });
-
-  // Session solutions endpoint - Returns solutions from session creation
-  app.get("/api/sessions/:id/solutions", isAuthenticated, async (req: any, res) => {
-    try {
-      const sessionId = parseInt(req.params.id);
-      console.log('Fetching solutions for session:', sessionId);
-      
-      // Get solutions from memory storage
-      const solutions = global.sessionSolutions?.get(sessionId) || [];
-      
-      console.log('Returning solutions:', solutions.length);
-      res.json(solutions);
-    } catch (error) {
-      console.error('Solutions fetch error:', error);
-      res.status(500).json({ error: 'Failed to fetch solutions' });
-    }
-  });
 
   // Error tracking endpoint
   app.post("/api/errors/track", async (req, res) => {

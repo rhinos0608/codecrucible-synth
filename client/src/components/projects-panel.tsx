@@ -121,14 +121,14 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>
+          <DialogTitle className="text-gray-100">
             <div className="flex items-center space-x-3">
-              <Code className="w-6 h-6 text-purple-600" />
+              <Code className="w-6 h-6 text-purple-400" />
               <div>
-                <h3 className="text-xl font-semibold">Project Library</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Manage your saved synthesized solutions</p>
+                <h3 className="text-xl font-semibold text-gray-100">Project Library</h3>
+                <p className="text-sm text-gray-400">Manage your saved synthesized solutions</p>
               </div>
             </div>
           </DialogTitle>
@@ -136,11 +136,11 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
 
         <div className="flex flex-1 min-h-0">
           {/* Projects List */}
-          <div className="w-1/2 pr-4 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+          <div className="w-1/2 pr-4 border-r border-gray-700 flex flex-col">
             <div className="mb-4 flex-shrink-0">
-              <h4 className="text-lg font-semibold mb-2">Saved Projects ({projects.length})</h4>
+              <h4 className="text-lg font-semibold mb-2 text-gray-100">Saved Projects ({projects.length})</h4>
               {isLoading && (
-                <div className="text-center py-8 text-gray-500">Loading projects...</div>
+                <div className="text-center py-8 text-gray-400">Loading projects...</div>
               )}
             </div>
             
@@ -149,9 +149,9 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
                 {projects.map((project: Project) => (
                   <Card 
                     key={project.id}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
+                    className={`cursor-pointer transition-all hover:shadow-md bg-gray-800 border-gray-700 hover:bg-gray-750 ${
                       selectedProject?.id === project.id 
-                        ? 'ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-900/20' 
+                        ? 'ring-2 ring-purple-500 bg-purple-900/20' 
                         : ''
                     }`}
                     onClick={() => setSelectedProject(project)}
@@ -159,10 +159,10 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <CardTitle className="text-sm font-medium truncate">
+                          <CardTitle className="text-sm font-medium truncate text-gray-100">
                             {project.name}
                           </CardTitle>
-                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-2">
                             {project.description || 'No description'}
                           </p>
                         </div>
@@ -172,7 +172,7 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
                       </div>
                     </CardHeader>
                     <CardContent className="pt-0">
-                      <div className="flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center justify-between text-xs text-gray-400">
                         <div className="flex items-center space-x-2">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(project.createdAt!)}</span>

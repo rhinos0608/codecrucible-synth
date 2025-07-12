@@ -120,29 +120,29 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-gray-900 border-gray-700 text-gray-100">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
+          <DialogTitle className="flex items-center gap-2 text-gray-100">
+            <User className="w-5 h-5 text-purple-400" />
             {editingProfile ? "Edit Code Engine Profile" : "Create Custom Code Engine Profile"}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="basic" className="flex items-center gap-1">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
+            <TabsTrigger value="basic" className="flex items-center gap-1 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-gray-300">
               <User className="w-4 h-4" />
               Basic
             </TabsTrigger>
-            <TabsTrigger value="avatar" className="flex items-center gap-1">
+            <TabsTrigger value="avatar" className="flex items-center gap-1 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-gray-300">
               <Palette className="w-4 h-4" />
               Avatar
             </TabsTrigger>
-            <TabsTrigger value="chat" className="flex items-center gap-1">
+            <TabsTrigger value="chat" className="flex items-center gap-1 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-gray-300">
               <MessageSquare className="w-4 h-4" />
               Chat Style
             </TabsTrigger>
-            <TabsTrigger value="preview" className="flex items-center gap-1">
+            <TabsTrigger value="preview" className="flex items-center gap-1 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-gray-300">
               <Sparkles className="w-4 h-4" />
               Preview
             </TabsTrigger>
@@ -151,16 +151,16 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
           <ScrollArea className="h-[500px] mt-4">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <TabsContent value="basic" className="space-y-4">
+                <TabsContent value="basic" className="space-y-4 mt-0 border-0 p-0">
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Engine Profile Name</FormLabel>
+                          <FormLabel className="text-gray-200">Engine Profile Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., My Senior Full-Stack Engine" {...field} />
+                            <Input placeholder="e.g., My Senior Full-Stack Engine" {...field} className="bg-gray-800 border-gray-600 text-gray-100" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -172,9 +172,9 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                       name="specialization"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Specialization</FormLabel>
+                          <FormLabel className="text-gray-200">Specialization</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., React, Python, DevOps" {...field} />
+                            <Input placeholder="e.g., React, Python, DevOps" {...field} className="bg-gray-800 border-gray-600 text-gray-100" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -188,7 +188,7 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                       name="perspective"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Archetype Perspective</FormLabel>
+                          <FormLabel className="text-gray-200">Archetype Perspective</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -216,7 +216,7 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                       name="role"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Coding Role</FormLabel>
+                          <FormLabel className="text-gray-200">Coding Role</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -245,11 +245,11 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                     name="personality"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Personality & Approach</FormLabel>
+                        <FormLabel className="text-gray-200">Personality & Approach</FormLabel>
                         <FormControl>
                           <Textarea 
                             placeholder="Describe how this voice should approach problems, communicate, and make decisions..."
-                            className="h-24"
+                            className="h-24 bg-gray-800 border-gray-600 text-gray-100"
                             {...field} 
                           />
                         </FormControl>
@@ -259,10 +259,10 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                   />
                 </TabsContent>
 
-                <TabsContent value="avatar" className="space-y-4">
+                <TabsContent value="avatar" className="space-y-4 mt-0 border-0 p-0">
                   <div>
-                    <Label className="text-base font-medium">Choose Avatar</Label>
-                    <p className="text-sm text-muted-foreground mb-4">
+                    <Label className="text-base font-medium text-gray-200">Choose Avatar</Label>
+                    <p className="text-sm text-gray-400 mb-4">
                       Select an emoji that represents this voice profile
                     </p>
                     <div className="grid grid-cols-6 gap-3">
@@ -298,14 +298,14 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="chat" className="space-y-4">
+                <TabsContent value="chat" className="space-y-4 mt-0 border-0 p-0">
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="chatStyle"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Communication Style</FormLabel>
+                          <FormLabel className="text-gray-200">Communication Style</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -333,7 +333,7 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                       name="ethicalStance"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Ethical Stance</FormLabel>
+                          <FormLabel className="text-gray-200">Ethical Stance</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -358,10 +358,10 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
                   </div>
                 </TabsContent>
 
-                <TabsContent value="preview" className="space-y-4">
-                  <Card>
+                <TabsContent value="preview" className="space-y-4 mt-0 border-0 p-0">
+                  <Card className="bg-gray-800 border-gray-700">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2 text-gray-100">
                         <span className="text-2xl">{selectedAvatar}</span>
                         {form.watch("name") || "Voice Profile"}
                       </CardTitle>

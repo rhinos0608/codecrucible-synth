@@ -153,19 +153,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/projects/:projectId/move', isAuthenticated, async (req: any, res, next) => {
+  app.put('/api/projects/:projectId/move', isAuthenticated, async (req: any, res, next) => {
     try {
       const { projectId } = req.params;
       const { folderId } = req.body;
       const userId = req.user.claims.sub;
       
-      const moved = await storage.moveProjectToFolder(parseInt(projectId), folderId);
-      if (!moved) {
+      console.log('Moving project API called:', { projectId, folderId, userId });
+      
+      // Validate project exists and belongs to user
+      const project = await storage.getProject(parseInt(projectId));
+      if (!project || project.userId !== userId) {
         return res.status(404).json({ error: 'Project not found' });
       }
       
+      const moved = await storage.moveProjectToFolder(parseInt(projectId), folderId);
+      if (!moved) {
+        return res.status(500).json({ error: 'Failed to move project' });
+      }
+      
+      console.log('Project moved successfully:', { projectId, folderId });
       res.json({ success: true });
     } catch (error) {
+      console.error('Error moving project:', error);
       logger.error('Error moving project', error as Error, { userId: req.user?.claims?.sub });
       res.status(500).json({ error: 'Failed to move project' });
     }

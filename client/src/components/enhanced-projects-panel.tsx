@@ -41,7 +41,8 @@ import {
   Layers,
   TreePine,
   Sparkles,
-  ArrowLeft
+  ArrowLeft,
+  FileText
 } from 'lucide-react';
 import { FolderFileManager } from './folder-file-manager';
 
@@ -97,6 +98,8 @@ export function EnhancedProjectsPanel({
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [showMoveProject, setShowMoveProject] = useState(false);
   const [movingProject, setMovingProject] = useState<Project | null>(null);
+  const [showProjectDetail, setShowProjectDetail] = useState(false);
+  const [selectedProjectDetail, setSelectedProjectDetail] = useState<Project | null>(null);
   
   // New folder data with defensive defaults
   const [newFolderData, setNewFolderData] = useState({
@@ -210,13 +213,18 @@ export function EnhancedProjectsPanel({
   // Move project mutation following Alexander's Pattern Language
   const moveProjectMutation = useMutation({
     mutationFn: async ({ projectId, folderId }: { projectId: number; folderId: number | null }) => {
+      console.log('Moving project:', { projectId, folderId });
       return apiRequest(`/api/projects/${projectId}/move`, {
         method: 'PUT',
         body: JSON.stringify({ folderId }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
       setShowMoveProject(false);
       setMovingProject(null);
       toast({
@@ -225,10 +233,10 @@ export function EnhancedProjectsPanel({
       });
     },
     onError: (error) => {
-      console.error('Project move failed - engaging error voices:', error);
+      console.error('Project move failed - engaging error council:', error);
       toast({
         title: "Move Failed",
-        description: "Failed to move project. Please try again.",
+        description: `Failed to move project: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     },
@@ -386,11 +394,18 @@ export function EnhancedProjectsPanel({
 
   const confirmMoveProject = (folderId: number | null) => {
     if (movingProject) {
+      console.log('Confirming move for project:', movingProject.id, 'to folder:', folderId);
       moveProjectMutation.mutate({
         projectId: movingProject.id,
         folderId
       });
     }
+  };
+
+  // Campbell's Journey - project exploration through detailed view
+  const handleViewProject = (project: Project) => {
+    setSelectedProjectDetail(project);
+    setShowProjectDetail(true);
   };
 
   // Campbell's Journey - transformation through project rendering
@@ -403,7 +418,10 @@ export function EnhancedProjectsPanel({
               checked={selectedProjects.has(project.id)}
               onCheckedChange={(checked) => handleContextSelection(project, checked as boolean)}
             />
-            <div>
+            <div 
+              className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+              onClick={() => handleViewProject(project)}
+            >
               <CardTitle className="text-sm">{project.name || 'Untitled Project'}</CardTitle>
               <CardDescription className="text-xs">
                 {project.language || 'Unknown'} • {COMPLEXITY_LABELS[(project.complexity || 1).toString() as keyof typeof COMPLEXITY_LABELS]}
@@ -767,6 +785,87 @@ export function EnhancedProjectsPanel({
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setShowMoveProject(false)}>
                     Cancel
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Project Detail View Dialog - Following CodingPhilosophy.md exploration patterns */}
+            <Dialog open={showProjectDetail} onOpenChange={setShowProjectDetail}>
+              <DialogContent className="max-w-4xl max-h-[90vh]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    {selectedProjectDetail?.name || 'Project Details'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Full project output and metadata
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Language</label>
+                      <p className="text-sm">{selectedProjectDetail?.language || 'Unknown'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Complexity</label>
+                      <p className="text-sm">{COMPLEXITY_LABELS[(selectedProjectDetail?.complexity || 1).toString() as keyof typeof COMPLEXITY_LABELS]}</p>
+                    </div>
+                  </div>
+                  
+                  {selectedProjectDetail?.description && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Description</label>
+                      <p className="text-sm mt-1">{selectedProjectDetail.description}</p>
+                    </div>
+                  )}
+
+                  {selectedProjectDetail?.tags && selectedProjectDetail.tags.length > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Tags</label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedProjectDetail.tags.map(tag => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Generated Code</label>
+                    <div className="mt-1 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                      <pre className="text-xs whitespace-pre-wrap overflow-auto max-h-96">
+                        {selectedProjectDetail?.code || 'No code available'}
+                      </pre>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      size="sm"
+                      onClick={() => selectedProjectDetail && handleCopyProject(selectedProjectDetail)}
+                      className="flex items-center gap-2"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy Code
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => selectedProjectDetail && handleMoveProject(selectedProjectDetail)}
+                      className="flex items-center gap-2"
+                    >
+                      <Folder className="w-4 h-4" />
+                      Move to Folder
+                    </Button>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowProjectDetail(false)}>
+                    Close
                   </Button>
                 </DialogFooter>
               </DialogContent>

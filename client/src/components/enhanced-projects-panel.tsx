@@ -87,9 +87,16 @@ export function EnhancedProjectsPanel({
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [complexityFilter, setComplexityFilter] = useState<number | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [showEditFolder, setShowEditFolder] = useState(false);
+  const [showDeleteFolder, setShowDeleteFolder] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
   const [showFolderManager, setShowFolderManager] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<ProjectFolder | null>(null);
+  const [editingFolder, setEditingFolder] = useState<ProjectFolder | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<ProjectFolder | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [showMoveProject, setShowMoveProject] = useState(false);
+  const [movingProject, setMovingProject] = useState<Project | null>(null);
   
   // New folder data with defensive defaults
   const [newFolderData, setNewFolderData] = useState({
@@ -112,7 +119,7 @@ export function EnhancedProjectsPanel({
     retry: 3,
   });
 
-  // Council-based error handling for mutations
+  // Council-based error handling for mutations following CodingPhilosophy.md
   const createFolderMutation = useMutation({
     mutationFn: async (data: InsertProjectFolder) => {
       return apiRequest('/api/project-folders', {
@@ -137,11 +144,91 @@ export function EnhancedProjectsPanel({
       });
     },
     onError: (error) => {
-      // Council-based error handling - engage multiple voices for error resolution
       console.error('Folder creation failed - engaging error council:', error);
       toast({
         title: "Creation Failed",
         description: "Failed to create folder. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update folder mutation following Jung's Descent Protocol
+  const updateFolderMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertProjectFolder> }) => {
+      return apiRequest(`/api/project-folders/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
+      setShowEditFolder(false);
+      setEditingFolder(null);
+      toast({
+        title: "Success",
+        description: "Folder updated successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Folder update failed - invoking council:', error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update folder. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete folder mutation with defensive patterns
+  const deleteFolderMutation = useMutation({
+    mutationFn: async (folderId: number) => {
+      return apiRequest(`/api/project-folders/${folderId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setShowDeleteFolder(false);
+      setDeletingFolder(null);
+      toast({
+        title: "Success",
+        description: "Folder deleted successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Folder deletion failed - council assembly required:', error);
+      toast({
+        title: "Deletion Failed",
+        description: "Failed to delete folder. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Move project mutation following Alexander's Pattern Language
+  const moveProjectMutation = useMutation({
+    mutationFn: async ({ projectId, folderId }: { projectId: number; folderId: number | null }) => {
+      return apiRequest(`/api/projects/${projectId}/move`, {
+        method: 'PUT',
+        body: JSON.stringify({ folderId }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setShowMoveProject(false);
+      setMovingProject(null);
+      toast({
+        title: "Success",
+        description: "Project moved successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Project move failed - engaging error voices:', error);
+      toast({
+        title: "Move Failed",
+        description: "Failed to move project. Please try again.",
         variant: "destructive",
       });
     },
@@ -240,6 +327,72 @@ export function EnhancedProjectsPanel({
     setSelectedFolder(null);
   };
 
+  // Alexander's Pattern Language - folder management patterns
+  const handleEditFolder = (folder: ProjectFolder) => {
+    setEditingFolder(folder);
+    setNewFolderData({
+      name: folder.name,
+      description: folder.description || '',
+      color: folder.color || '#3b82f6',
+      icon: folder.icon || '📁',
+      parentId: folder.parentId,
+      visibility: folder.visibility
+    });
+    setShowEditFolder(true);
+  };
+
+  const handleDeleteFolder = (folder: ProjectFolder) => {
+    setDeletingFolder(folder);
+    setShowDeleteFolder(true);
+  };
+
+  const confirmDeleteFolder = () => {
+    if (deletingFolder) {
+      deleteFolderMutation.mutate(deletingFolder.id);
+    }
+  };
+
+  // Campbell's Journey - project transformation patterns
+  const handleCopyProject = async (project: Project) => {
+    try {
+      await navigator.clipboard.writeText(project.code);
+      toast({
+        title: "Copied!",
+        description: "Project code copied to clipboard",
+      });
+    } catch (error) {
+      console.error('Copy failed - council intervention needed:', error);
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy project code",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+    // Trigger project edit modal/flow
+    toast({
+      title: "Edit Project",
+      description: "Project editing functionality coming soon",
+    });
+  };
+
+  const handleMoveProject = (project: Project) => {
+    setMovingProject(project);
+    setShowMoveProject(true);
+  };
+
+  const confirmMoveProject = (folderId: number | null) => {
+    if (movingProject) {
+      moveProjectMutation.mutate({
+        projectId: movingProject.id,
+        folderId
+      });
+    }
+  };
+
   // Campbell's Journey - transformation through project rendering
   const renderProjectCard = (project: Project) => (
     <Card key={project.id} className="mb-2">
@@ -258,11 +411,32 @@ export function EnhancedProjectsPanel({
             </div>
           </div>
           <div className="flex gap-1">
-            <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-6 w-6 p-0"
+              onClick={() => handleCopyProject(project)}
+              title="Copy project code"
+            >
               <Copy className="w-3 h-3" />
             </Button>
-            <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-6 w-6 p-0"
+              onClick={() => handleEditProject(project)}
+              title="Edit project"
+            >
               <Edit className="w-3 h-3" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-6 w-6 p-0"
+              onClick={() => handleMoveProject(project)}
+              title="Move to folder"
+            >
+              <Folder className="w-3 h-3" />
             </Button>
           </div>
         </div>
@@ -308,14 +482,35 @@ export function EnhancedProjectsPanel({
               <Badge variant="outline" className="text-xs">
                 {folderProjects.length}
               </Badge>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 w-6 p-0 ml-auto"
-                onClick={() => handleOpenFolder(folder)}
-              >
-                <File className="w-3 h-3" />
-              </Button>
+              <div className="flex gap-1 ml-auto">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={() => handleOpenFolder(folder)}
+                  title="Manage folder files"
+                >
+                  <File className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={() => handleEditFolder(folder)}
+                  title="Edit folder"
+                >
+                  <Edit className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={() => handleDeleteFolder(folder)}
+                  title="Delete folder"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
             
             {isExpanded && (
@@ -450,6 +645,128 @@ export function EnhancedProjectsPanel({
                 <DialogFooter>
                   <Button onClick={handleCreateFolder} disabled={createFolderMutation.isPending}>
                     {createFolderMutation.isPending ? 'Creating...' : 'Create Folder'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Edit Folder Dialog - Following CodingPhilosophy.md patterns */}
+            <Dialog open={showEditFolder} onOpenChange={setShowEditFolder}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Folder</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Name</label>
+                    <Input
+                      value={newFolderData.name}
+                      onChange={(e) => setNewFolderData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Folder name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Description</label>
+                    <Textarea
+                      value={newFolderData.description}
+                      onChange={(e) => setNewFolderData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Optional description"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Color</label>
+                    <div className="flex gap-2 mt-1">
+                      {FOLDER_COLORS.map(color => (
+                        <button
+                          key={color}
+                          className={`w-6 h-6 rounded border-2 ${newFolderData.color === color ? 'border-gray-900' : 'border-gray-300'}`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => setNewFolderData(prev => ({ ...prev, color }))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button 
+                    onClick={() => {
+                      if (editingFolder) {
+                        updateFolderMutation.mutate({
+                          id: editingFolder.id,
+                          data: {
+                            name: newFolderData.name,
+                            description: newFolderData.description,
+                            color: newFolderData.color,
+                            icon: newFolderData.icon
+                          }
+                        });
+                      }
+                    }} 
+                    disabled={updateFolderMutation.isPending}
+                  >
+                    {updateFolderMutation.isPending ? 'Updating...' : 'Update Folder'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Delete Folder Confirmation - Jung's Descent Protocol */}
+            <Dialog open={showDeleteFolder} onOpenChange={setShowDeleteFolder}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete Folder</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to delete "{deletingFolder?.name}"? This will move all projects in this folder to "Ungrouped Projects". This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowDeleteFolder(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={confirmDeleteFolder}
+                    disabled={deleteFolderMutation.isPending}
+                  >
+                    {deleteFolderMutation.isPending ? 'Deleting...' : 'Delete Folder'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Move Project Dialog - Alexander's Pattern Language */}
+            <Dialog open={showMoveProject} onOpenChange={setShowMoveProject}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Move Project</DialogTitle>
+                  <DialogDescription>
+                    Choose a folder for "{movingProject?.name}" or select "Ungrouped" to remove from all folders.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => confirmMoveProject(null)}
+                  >
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Ungrouped Projects
+                  </Button>
+                  {folders.map(folder => (
+                    <Button
+                      key={folder.id}
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => confirmMoveProject(folder.id)}
+                    >
+                      <Folder className="w-4 h-4 mr-2" style={{ color: folder.color }} />
+                      {folder.name}
+                    </Button>
+                  ))}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowMoveProject(false)}>
+                    Cancel
                   </Button>
                 </DialogFooter>
               </DialogContent>

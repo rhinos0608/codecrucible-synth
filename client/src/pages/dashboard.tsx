@@ -277,111 +277,113 @@ export default function Dashboard() {
       <div className="dashboard-main flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
         <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+          <div className="flex items-center justify-between min-w-0">
+            <div className="flex items-center space-x-3 flex-shrink-0">
               <Terminal className="w-6 h-6 text-blue-400" />
               <div>
                 <h1 className="text-xl font-semibold">CodeCrucible</h1>
                 <p className="text-sm text-gray-400">Multi-Engine AI Code Generator</p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <FeatureGate feature="voice_profiles" fallback={
+            <div className="flex items-center space-x-2 overflow-x-auto flex-shrink-0 min-w-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <div className="flex items-center space-x-2 whitespace-nowrap">
+                <FeatureGate feature="voice_profiles" fallback={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    <Crown className="w-3 h-3 mr-1" />
+                    Voice Profiles (Pro)
+                  </Button>
+                }>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAvatarCustomizer(true)}
+                    className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Voice Profiles
+                  </Button>
+                </FeatureGate>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowProjectsPanel(true)}
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                >
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  Projects
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateWithConfirmation('/onboarding')}
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                  data-tour="learning-button"
+                >
+                  <GraduationCap className="w-4 h-4 mr-2" />
+                  Learning
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateWithConfirmation('/analytics')}
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Analytics
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowUpgradeModal(true)}
-                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                 >
-                  <User className="w-4 h-4 mr-2" />
-                  <Crown className="w-3 h-3 mr-1" />
-                  Voice Profiles (Pro)
+                  <Crown className="w-4 h-4 mr-2" />
+                  Premium
                 </Button>
-              }>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowAvatarCustomizer(true)}
-                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                  onClick={() => navigateWithConfirmation('/teams')}
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                  data-tour="teams-button"
                 >
-                  <User className="w-4 h-4 mr-2" />
-                  Voice Profiles
+                  <Users className="w-4 h-4 mr-2" />
+                  Teams
                 </Button>
-              </FeatureGate>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowProjectsPanel(true)}
-                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
-              >
-                <FolderOpen className="w-4 h-4 mr-2" />
-                Projects
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateWithConfirmation('/onboarding')}
-                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
-                data-tour="learning-button"
-              >
-                <GraduationCap className="w-4 h-4 mr-2" />
-                Learning
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateWithConfirmation('/analytics')}
-                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Analytics
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowUpgradeModal(true)}
-                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
-              >
-                <Crown className="w-4 h-4 mr-2" />
-                Premium
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateWithConfirmation('/teams')}
-                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
-                data-tour="teams-button"
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Teams
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (isGenerating || showChatGPTGeneration) {
-                    const confirmed = window.confirm('Code generation is in progress. Are you sure you want to logout? Your progress will be lost.');
-                    if (confirmed) {
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (isGenerating || showChatGPTGeneration) {
+                      const confirmed = window.confirm('Code generation is in progress. Are you sure you want to logout? Your progress will be lost.');
+                      if (confirmed) {
+                        window.location.href = '/api/logout';
+                      }
+                    } else {
                       window.location.href = '/api/logout';
                     }
-                  } else {
-                    window.location.href = '/api/logout';
-                  }
-                }}
-                className="text-red-300 hover:text-red-100 border-red-600"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowRightPanel(!showRightPanel)}
-                className="text-gray-400 hover:text-gray-200"
-              >
-                <Settings className="w-5 h-5" />
-              </Button>
+                  }}
+                  className="text-red-300 hover:text-red-100 border-red-600 whitespace-nowrap"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowRightPanel(!showRightPanel)}
+                  className="text-gray-400 hover:text-gray-200"
+                >
+                  <Settings className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
           </div>
         </header>

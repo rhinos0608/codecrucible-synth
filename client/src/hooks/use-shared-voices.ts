@@ -23,6 +23,13 @@ export function useSharedVoiceProfiles(teamId?: string) {
   });
 }
 
+export function useTeamVoiceProfiles(userId?: string) {
+  return useQuery({
+    queryKey: ['/api/teams/voice-profiles/shared', userId],
+    enabled: !!userId,
+  });
+}
+
 export function useShareVoiceProfile() {
   const queryClient = useQueryClient();
   

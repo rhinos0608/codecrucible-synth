@@ -1,4 +1,4 @@
-import { Brain, Code, User, Star, Play } from "lucide-react";
+import { Brain, Code, User, Star, Play, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
+import { useTeamVoiceProfiles } from "@/hooks/use-shared-voices";
+import { useAuth } from "@/hooks/useAuth";
 import * as LucideIcons from "lucide-react";
 import type { VoiceProfile } from "@shared/schema";
 
@@ -18,6 +20,8 @@ export function PerspectiveSelector() {
   } = useVoiceSelection();
   
   const { profiles, isLoading } = useVoiceProfiles();
+  const { user } = useAuth();
+  const { data: sharedVoices, isLoading: sharedVoicesLoading } = useTeamVoiceProfiles(user?.id);
 
   const renderIcon = (iconName: string, className: string) => {
     const IconComponent = (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())];
@@ -77,7 +81,7 @@ export function PerspectiveSelector() {
   return (
     <div className="p-4">
       <Tabs defaultValue="perspectives" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-4">
+        <TabsList className="grid w-full grid-cols-4 mb-4">
           <TabsTrigger value="perspectives" className="text-xs">
             <Brain className="w-3 h-3 mr-1" />
             Analysis
@@ -89,6 +93,10 @@ export function PerspectiveSelector() {
           <TabsTrigger value="profiles" className="text-xs">
             <User className="w-3 h-3 mr-1" />
             My Profiles
+          </TabsTrigger>
+          <TabsTrigger value="team-profiles" className="text-xs">
+            <Users className="w-3 h-3 mr-1" />
+            Team's Profiles
           </TabsTrigger>
         </TabsList>
 
@@ -224,6 +232,84 @@ export function PerspectiveSelector() {
               )}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="team-profiles" className="space-y-3">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-medium text-gray-300">Team's Profiles</h3>
+              <p className="text-xs text-gray-500">Voice profiles shared by your team members</p>
+            </div>
+          </div>
+          
+          {sharedVoicesLoading ? (
+            <div className="text-center py-8 text-gray-500">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Loading team profiles...</p>
+            </div>
+          ) : !sharedVoices?.sharedProfiles || sharedVoices.sharedProfiles.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No team profiles shared yet</p>
+              <p className="text-xs mt-1">Team members can share their custom voice profiles here</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {sharedVoices.sharedProfiles.map((profile: any) => (
+                <Card
+                  key={profile.id}
+                  className="p-3 cursor-pointer transition-all group border border-gray-600 bg-gray-700/50 hover:border-blue-500/40 hover:bg-blue-500/10"
+                  onClick={() => {
+                    // Convert shared profile to VoiceProfile format for application
+                    const voiceProfile = {
+                      id: profile.id,
+                      name: profile.name,
+                      description: profile.description,
+                      selectedPerspectives: profile.specializations?.slice(0, 2) || [],
+                      selectedRoles: profile.specializations?.slice(0, 2) || [],
+                      avatar: "👥",
+                      specialization: profile.specializations?.join(', ') || '',
+                      isDefault: false
+                    };
+                    handleApplyProfile(voiceProfile as VoiceProfile);
+                  }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/20">
+                      <span className="text-sm">👥</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm text-blue-300 flex items-center gap-2">
+                          {profile.name}
+                          <Badge variant="outline" className="text-xs px-1 py-0 bg-blue-500/10 border-blue-500/30">
+                            Team
+                          </Badge>
+                        </h4>
+                        <Play className="w-3 h-3 text-gray-400 group-hover:text-blue-400" />
+                      </div>
+                      <div className="flex gap-1 mt-1 mb-1">
+                        {profile.specializations?.slice(0, 3).map((spec: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="text-xs px-1 py-0">
+                            {spec}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-400 truncate">{profile.description}</p>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span>by {profile.creator}</span>
+                          <Badge variant="outline" className="text-xs px-1 py-0">
+                            {profile.effectiveness}% effective
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

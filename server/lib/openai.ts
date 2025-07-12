@@ -29,24 +29,7 @@ export async function callOpenAI({
   max_tokens = 1024
 }: OpenAIRequest): Promise<OpenAIResponse> {
   try {
-    // Dev mode fallback: Return mock data if no API key in development
-    if (isDevModeFeatureEnabled('mockOpenAI') && !process.env.OPENAI_API_KEY) {
-      logDevModeBypass('openai_mock_response', {
-        model,
-        promptLength: prompt.length,
-        reason: 'no_api_key_in_dev'
-      });
-
-      return {
-        result: `[DEV-GEN 🔧] Mock response for: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}" — Keep building, this is just mock data in development mode.`,
-        model: `${model}-mock`,
-        usage: {
-          prompt_tokens: Math.ceil(prompt.length / 4),
-          completion_tokens: 50,
-          total_tokens: Math.ceil(prompt.length / 4) + 50
-        }
-      };
-    }
+    // REMOVED: Following AI_INSTRUCTIONS.md - NO mock/fallback data allowed
 
     // Validate API key
     if (!process.env.OPENAI_API_KEY) {

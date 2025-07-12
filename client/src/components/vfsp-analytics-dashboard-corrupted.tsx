@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Brain, Zap, TrendingUp, TrendingDown, Eye, Calendar } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { FeatureGate } from '@/components/FeatureGate';
-import { apiRequest } from '@/lib/queryClient';
+// VFSP Analytics Dashboard - Volatility, Forecast, Symbolic Patterning
+import { useState, useEffect } from "react";
+import { BarChart3, Brain, TrendingUp, Zap, Eye, Target, Clock, Users } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { FeatureGate } from "@/components/FeatureGate";
 
-// VFSP Analytics Interfaces - Following AI_INSTRUCTIONS.md patterns
 interface VFSPAnalytics {
   volatilityIndex: number;
   forecastModel: ProductivityForecast;
@@ -71,7 +70,7 @@ const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#8dd1e1', '#d084d0'
 export function VFSPAnalyticsDashboard() {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
   
-  // Fetch REAL VFSP analytics data - NO mock data allowed
+  // Fetch VFSP analytics data
   const { data: analytics, isLoading } = useQuery({
     queryKey: ['/api/analytics/vfsp', timeRange],
     queryFn: async () => {
@@ -91,6 +90,9 @@ export function VFSPAnalyticsDashboard() {
     if (index < 60) return "Moderate variation in approach";
     return "High volatility - exploring diverse methodologies";
   };
+
+  // REMOVED: Following AI_INSTRUCTIONS.md - NO mock data allowed
+  // Using real analytics data only
 
   // Following AI_INSTRUCTIONS.md - Only use real analytics data
   if (!analytics) {
@@ -194,7 +196,7 @@ export function VFSPAnalyticsDashboard() {
                     {data.forecastModel.nextWeekPrediction}%
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Predicted productivity increase
+                    Predicted productivity ({data.forecastModel.confidenceLevel}% confidence)
                   </p>
                 </CardContent>
               </Card>
@@ -202,8 +204,8 @@ export function VFSPAnalyticsDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-blue-500" />
-                    Monthly Outlook
+                    <Target className="w-5 h-5 text-blue-500" />
+                    Monthly Projection
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -211,13 +213,13 @@ export function VFSPAnalyticsDashboard() {
                     {data.forecastModel.nextMonthPrediction}%
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Long-term productivity projection
+                    Long-term productivity trend: {data.forecastModel.trendDirection}
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Insights */}
+            {/* Actionable Insights */}
             <Card>
               <CardHeader>
                 <CardTitle>Actionable Insights</CardTitle>
@@ -290,10 +292,13 @@ export function VFSPAnalyticsDashboard() {
             {/* Seasonal Patterns */}
             <Card>
               <CardHeader>
-                <CardTitle>Seasonal Productivity Patterns</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-orange-500" />
+                  Daily Productivity Patterns
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={data.forecastModel.seasonalPatterns}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="period" />
@@ -309,9 +314,12 @@ export function VFSPAnalyticsDashboard() {
           <TabsContent value="evolution" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Voice Combination Evolution</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-green-500" />
+                  Voice Evolution Tracking
+                </CardTitle>
                 <CardDescription>
-                  Track how your voice combinations mature and improve over time
+                  How your voice combinations mature and improve over time
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -330,17 +338,29 @@ export function VFSPAnalyticsDashboard() {
                       </div>
                       
                       <ResponsiveContainer width="100%" height={200}>
-                        <LineChart data={evolution.timepoints.map((point, idx) => ({
-                          timepoint: point,
+                        <LineChart data={evolution.timepoints.map((time, idx) => ({
+                          time,
                           effectiveness: evolution.effectivenessProgression[idx],
                           usage: evolution.usageProgression[idx]
                         }))}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="timepoint" />
+                          <XAxis dataKey="time" />
                           <YAxis />
                           <Tooltip />
-                          <Line type="monotone" dataKey="effectiveness" stroke="#8884d8" name="Effectiveness %" />
-                          <Line type="monotone" dataKey="usage" stroke="#82ca9d" name="Usage Count" />
+                          <Line 
+                            type="monotone" 
+                            dataKey="effectiveness" 
+                            stroke="#8884d8" 
+                            strokeWidth={2}
+                            name="Effectiveness %"
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="usage" 
+                            stroke="#82ca9d" 
+                            strokeWidth={2}
+                            name="Usage Count"
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -351,7 +371,6 @@ export function VFSPAnalyticsDashboard() {
           </TabsContent>
 
           <TabsContent value="forecast" className="space-y-6">
-            {/* AI Recommendations */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -375,11 +394,11 @@ export function VFSPAnalyticsDashboard() {
                           ))}
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-semibold text-green-600">
-                            +{rec.expectedImprovement}%
-                          </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm font-medium">
                             {rec.confidence}% confidence
+                          </div>
+                          <div className="text-xs text-green-600">
+                            +{rec.expectedImprovement}% improvement
                           </div>
                         </div>
                       </div>
@@ -388,34 +407,6 @@ export function VFSPAnalyticsDashboard() {
                       </p>
                     </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Forecast Model Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Forecast Model Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Confidence Level</div>
-                    <div className="text-2xl font-bold">{data.forecastModel.confidenceLevel}%</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Trend Direction</div>
-                    <div className="flex items-center gap-1">
-                      {data.forecastModel.trendDirection === 'increasing' ? (
-                        <TrendingUp className="w-4 h-4 text-green-500" />
-                      ) : data.forecastModel.trendDirection === 'decreasing' ? (
-                        <TrendingDown className="w-4 h-4 text-red-500" />
-                      ) : (
-                        <div className="w-4 h-4 bg-gray-400 rounded-full" />
-                      )}
-                      <span className="capitalize">{data.forecastModel.trendDirection}</span>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>

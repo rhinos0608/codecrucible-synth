@@ -119,7 +119,7 @@ export default function Dashboard() {
     }
   });
 
-  // Enhanced generation with quota enforcement
+  // Enhanced generation with quota enforcement - FIXED to use mutation API
   const handleSecureGeneration = async () => {
     if (!planGuard.canGenerate) {
       setShowUpgradeModal(true);
@@ -127,15 +127,20 @@ export default function Dashboard() {
     }
 
     const result = await planGuard.attemptGeneration(async () => {
-      return generateSession(
-        state.prompt,
-        getSelectedItems(),
-        state.prompt
-      );
+      return generateSession.mutateAsync({
+        prompt: state.prompt,
+        selectedVoices: {
+          perspectives: state.selectedPerspectives,
+          roles: state.selectedRoles
+        },
+        recursionDepth: 2,
+        synthesisMode: "competitive",
+        ethicalFiltering: true
+      });
     });
 
-    if (result.success && result.data) {
-      handleSolutionsGenerated(result.data);
+    if (result.success && result.data?.session?.id) {
+      handleSolutionsGenerated(result.data.session.id);
     }
   };
 

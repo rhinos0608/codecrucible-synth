@@ -108,16 +108,29 @@ class RealOpenAIService {
       }));
     });
 
-    // Execute all OpenAI calls in parallel
-    const solutions = await Promise.all(voicePromises);
-    
-    logger.info('REAL OpenAI parallel generation completed', {
-      sessionId,
-      solutionCount: solutions.length,
-      avgConfidence: solutions.reduce((sum, s) => sum + s.confidence, 0) / solutions.length
-    });
-
-    return solutions;
+    // Execute all OpenAI calls in parallel with enhanced error handling
+    try {
+      console.log('🚀 Starting parallel OpenAI generation:', {
+        voicePromises: voicePromises.length,
+        sessionId
+      });
+      
+      const solutions = await Promise.all(voicePromises);
+      
+      console.log('✅ All OpenAI calls completed:', {
+        solutionCount: solutions.length,
+        sessionId
+      });
+      
+      return solutions;
+    } catch (parallelError) {
+      console.error('❌ Parallel OpenAI generation failed:', parallelError);
+      logger.error('Parallel generation error', { 
+        sessionId, 
+        error: parallelError instanceof Error ? parallelError.message : 'Unknown error' 
+      });
+      throw parallelError;
+    }
   }
 
   // REAL OpenAI voice solution generation - NO mock data

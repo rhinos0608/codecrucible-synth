@@ -488,6 +488,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Call REAL OpenAI service with comprehensive error handling
+      console.log('🔧 About to call generateSolutions with:', {
+        prompt: prompt.substring(0, 50),
+        perspectives,
+        roles,
+        sessionId,
+        userId,
+        mode: devModeConfig.isEnabled ? 'development' : 'production'
+      });
+      
       const solutions = await realOpenAIService.generateSolutions({
         prompt: prompt,
         perspectives,
@@ -495,6 +504,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId,
         userId,
         mode: devModeConfig.isEnabled ? 'development' : 'production'
+      });
+      
+      console.log('✅ generateSolutions completed successfully:', {
+        solutionCount: solutions?.length || 0,
+        sessionId
       });
       
       // Store solutions for later retrieval

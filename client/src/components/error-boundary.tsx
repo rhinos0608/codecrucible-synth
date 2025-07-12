@@ -73,7 +73,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       }
 
       return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+        <div className="min-h-screen w-full flex items-center justify-center bg-gray-800 p-4">
           <Card className="w-full max-w-md">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3 mb-4">

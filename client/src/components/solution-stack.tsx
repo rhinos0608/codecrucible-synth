@@ -161,7 +161,7 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
                     <div className="p-4">
                       <div className="mb-4">
                         <h5 className="text-sm font-medium mb-2">Generated Code</h5>
-                        <div className="bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-100 overflow-x-auto max-h-64 overflow-y-auto">
+                        <div className="bg-gray-800 rounded-lg p-3 text-xs font-mono text-gray-100 overflow-x-auto max-h-64 overflow-y-auto">
                           <pre className="whitespace-pre-wrap break-words">{solution.code || "No code generated"}</pre>
                         </div>
                       </div>

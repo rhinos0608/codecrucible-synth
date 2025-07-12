@@ -43,7 +43,7 @@ export default function LegalSection() {
           </TabsList>
           
           <TabsContent value="terms" className="mt-0">
-            <ScrollArea className="h-64 w-full rounded-md border border-gray-600/50 bg-gray-900/30 p-4">
+            <ScrollArea className="h-64 w-full rounded-md border border-gray-600/50 bg-gray-800/30 p-4">
               <div className="space-y-4 text-sm text-gray-300">
                 <div className="flex items-center mb-3">
                   <FileText className="h-4 w-4 mr-2 text-gray-400" />
@@ -135,7 +135,7 @@ export default function LegalSection() {
           </TabsContent>
           
           <TabsContent value="privacy" className="mt-0">
-            <ScrollArea className="h-64 w-full rounded-md border border-gray-600/50 bg-gray-900/30 p-4">
+            <ScrollArea className="h-64 w-full rounded-md border border-gray-600/50 bg-gray-800/30 p-4">
               <div className="space-y-4 text-sm text-gray-300">
                 <div className="flex items-center mb-3">
                   <Shield className="h-4 w-4 mr-2 text-gray-400" />

@@ -117,7 +117,7 @@ export default function PaywallTest({ isOpen, onClose }: PaywallTestProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-800 border-gray-700">
         <DialogHeader>
           <DialogTitle className="flex items-center text-white">
             <Shield className="h-6 w-6 mr-2 text-orange-500" />

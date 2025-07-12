@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Users } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
 import { AvatarCustomizer } from "@/components/avatar-customizer";
+import { PremiumTiers } from "@/components/premium-tiers";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useAuth } from "@/hooks/useAuth";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showPremiumTiers, setShowPremiumTiers] = useState(false);
   const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
@@ -267,11 +269,11 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.location.href = '/teams'}
+                onClick={() => setShowPremiumTiers(true)}
                 className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
               >
-                <Users className="w-4 h-4 mr-2" />
-                Teams
+                <Crown className="w-4 h-4 mr-2" />
+                Premium
               </Button>
               <Button
                 variant="ghost"
@@ -527,6 +529,11 @@ export default function Dashboard() {
         trigger="quota_exceeded"
         currentQuota={planGuard.quotaUsed}
         quotaLimit={planGuard.quotaLimit}
+      />
+
+      <PremiumTiers
+        isOpen={showPremiumTiers}
+        onClose={() => setShowPremiumTiers(false)}
       />
 
       {/* Error Monitor */}

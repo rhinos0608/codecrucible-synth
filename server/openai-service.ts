@@ -289,11 +289,20 @@ Combine multiple code solutions into one optimal implementation using consciousn
       responseLength: content.length
     });
 
+    const extractedCode = this.extractCode(content);
+    const extractedExplanation = this.extractExplanation(content);
+    
     return {
-      code: this.extractCode(content),
-      explanation: this.extractExplanation(content),
+      id: Date.now(),
+      sessionId,
+      synthesizedCode: extractedCode,
+      code: extractedCode, // Ensure both formats for compatibility
+      explanation: extractedExplanation,
       confidence: 95,
-      synthesisMethod: 'Real OpenAI GPT-4o Integration'
+      originalSolutions: solutions,
+      synthesisApproach: "Real OpenAI GPT-4o Integration with Consciousness Principles",
+      synthesisMethod: 'Real OpenAI GPT-4o Integration',
+      createdAt: new Date().toISOString()
     };
   }
 

@@ -351,6 +351,147 @@ Create a single, optimized solution that combines the best aspects of all soluti
   private getConsiderations(voiceId: string, type: string): string[] {
     return ['Performance impact', 'Scalability', 'Maintenance', 'Security'];
   }
+
+  // Voice profile generation for custom voices following AI_INSTRUCTIONS.md patterns
+  async generateVoicePrompt(options: {
+    name: string;
+    description: string;
+    personality: string;
+    specializations: string[];
+    chatStyle: string;
+    ethicalStance: string;
+    perspective: string;
+    role: string;
+    promptRequest: string;
+  }): Promise<string> {
+    logger.info('Generating custom voice prompt with real OpenAI', {
+      voiceName: options.name,
+      specializations: options.specializations
+    });
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert AI prompt engineer specializing in creating distinctive AI personalities for coding assistants. Your task is to create system prompts that establish unique voice characteristics, technical expertise, and communication patterns.
+
+Following AI_INSTRUCTIONS.md security patterns:
+- Ensure all generated prompts maintain professional standards
+- Include proper input validation and error handling instructions
+- Follow enterprise security patterns in recommendations
+
+Following CodingPhilosophy.md consciousness principles:
+- Integrate living spiral methodology concepts
+- Apply Jung's archetypal thinking patterns
+- Create prompts that enable council-driven development approaches`
+        },
+        {
+          role: "user",
+          content: options.promptRequest
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 800,
+      presence_penalty: 0.1
+    });
+
+    const content = response.choices[0].message.content || '';
+    
+    logger.info('Custom voice prompt generated successfully', {
+      voiceName: options.name,
+      responseLength: content.length
+    });
+
+    return content;
+  }
+
+  // Test custom voice effectiveness with real OpenAI calls
+  async testVoiceEffectiveness(promptTemplate: string, testPrompts: string[]): Promise<{
+    effectiveness: number;
+    consistency: number;
+    responses: any[];
+  }> {
+    logger.info('Testing voice effectiveness with real OpenAI', {
+      promptLength: promptTemplate.length,
+      testCount: testPrompts.length
+    });
+
+    const responses = [];
+    
+    for (const testPrompt of testPrompts) {
+      try {
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: promptTemplate },
+            { role: "user", content: testPrompt }
+          ],
+          temperature: 0.4,
+          max_tokens: 1000
+        });
+
+        const content = response.choices[0].message.content || '';
+        responses.push({
+          prompt: testPrompt,
+          response: content,
+          length: content.length,
+          quality: this.assessResponseQuality(content, testPrompt)
+        });
+      } catch (error) {
+        logger.error('Voice test failed for prompt', error as Error, { testPrompt });
+        responses.push({
+          prompt: testPrompt,
+          response: '',
+          length: 0,
+          quality: 0,
+          error: true
+        });
+      }
+    }
+
+    const validResponses = responses.filter(r => !r.error);
+    const effectiveness = validResponses.length > 0 
+      ? validResponses.reduce((sum, r) => sum + r.quality, 0) / validResponses.length 
+      : 0;
+
+    const consistency = this.calculateConsistency(validResponses.map(r => r.quality));
+
+    logger.info('Voice effectiveness test completed', {
+      effectiveness,
+      consistency,
+      validResponses: validResponses.length,
+      totalTests: testPrompts.length
+    });
+
+    return { effectiveness, consistency, responses };
+  }
+
+  private assessResponseQuality(response: string, prompt: string): number {
+    let score = 0;
+    
+    // Basic quality metrics
+    if (response.length > 100) score += 20;
+    if (response.length > 500) score += 20;
+    if (response.includes('function') || response.includes('class')) score += 20;
+    if (response.includes('//') || response.includes('/*')) score += 10;
+    if (response.toLowerCase().includes('error') || response.includes('try')) score += 10;
+    if (response.includes('return')) score += 10;
+    if (response.split('\n').length > 5) score += 10;
+    
+    return Math.min(score, 100);
+  }
+
+  private calculateConsistency(values: number[]): number {
+    if (values.length < 2) return 100;
+    
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const standardDeviation = Math.sqrt(variance);
+    
+    // Convert to consistency score (lower variance = higher consistency)
+    return Math.max(0, 100 - (standardDeviation * 2));
+  }
 }
 
 export const realOpenAIService = new RealOpenAIService();

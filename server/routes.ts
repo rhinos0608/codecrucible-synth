@@ -1444,5 +1444,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // OpenAI Integration Audit Route - Following AI_INSTRUCTIONS.md patterns
+  app.get('/api/audit/openai-integration', isAuthenticated, async (req: any, res, next) => {
+    try {
+      logger.info('Starting OpenAI integration audit', { 
+        userId: req.user?.claims?.sub?.substring(0, 8) + '...' 
+      });
+      
+      // Run comprehensive audit against AI_INSTRUCTIONS.md and CodingPhilosophy.md
+      const { openaiAuditor } = await import('./openai-integration-audit');
+      const auditResult = await openaiAuditor.auditIntegration();
+      
+      logger.info('OpenAI integration audit completed', {
+        overallStatus: auditResult.overallStatus,
+        passCount: auditResult.summary.passCount,
+        failCount: auditResult.summary.failCount,
+        warningCount: auditResult.summary.warningCount
+      });
+      
+      res.json({
+        success: true,
+        audit: auditResult,
+        timestamp: new Date().toISOString(),
+        auditor: 'OpenAI Integration Auditor v1.0'
+      });
+    } catch (error) {
+      logger.error('OpenAI integration audit failed', error as Error);
+      next(error);
+    }
+  });
+
   return server;
 }

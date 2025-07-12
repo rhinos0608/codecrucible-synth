@@ -101,24 +101,73 @@ class CustomVoiceService {
   }
   
   /**
-   * Generate AI-powered prompt template for custom voice
+   * Generate AI-powered prompt template for custom voice with REAL OpenAI integration
    */
   private async generatePromptTemplate(voiceData: CustomVoiceRequest): Promise<string> {
-    const basePrompts = {
-      analytical: "Approach problems with systematic analysis and data-driven insights.",
-      friendly: "Communicate with warmth and encouragement while maintaining technical accuracy.",
-      direct: "Provide concise, straightforward solutions with minimal explanation overhead.",
-      detailed: "Offer comprehensive explanations with step-by-step reasoning and context."
-    };
-    
-    const ethicalFrameworks = {
-      neutral: "Consider multiple perspectives and present balanced technical solutions.",
-      conservative: "Prioritize stability, security, and proven patterns in your recommendations.",
-      progressive: "Embrace innovative approaches and cutting-edge technologies when appropriate."
-    };
-    
-    const promptTemplate = `
-You are ${voiceData.name}, a specialized AI coding assistant with the following characteristics:
+    try {
+      // Real OpenAI integration for dynamic prompt generation following AI_INSTRUCTIONS.md
+      const promptGenerationRequest = `Create a comprehensive system prompt for an AI coding assistant with these characteristics:
+
+Name: ${voiceData.name}
+Description: ${voiceData.description}
+Personality: ${voiceData.personality}
+Specializations: ${voiceData.specialization.join(', ')}
+Communication Style: ${voiceData.chatStyle}
+Ethical Stance: ${voiceData.ethicalStance}
+Primary Perspective: ${voiceData.perspective}
+Technical Role: ${voiceData.role}
+
+Generate a detailed system prompt that:
+1. Establishes the AI's unique personality and communication style
+2. Defines specific technical expertise areas
+3. Sets clear behavioral guidelines based on ethical stance
+4. Includes specific instructions for the declared specializations
+5. Creates distinctive voice characteristics that differentiate from other AI assistants
+
+The prompt should be 200-400 words and ready for use as an OpenAI system message.`;
+
+      logger.info('Generating custom voice prompt with real OpenAI', {
+        voiceName: voiceData.name,
+        specializations: voiceData.specialization
+      });
+
+      const response = await openaiService.generateVoicePrompt({
+        name: voiceData.name,
+        description: voiceData.description,
+        personality: voiceData.personality,
+        specializations: voiceData.specialization,
+        chatStyle: voiceData.chatStyle,
+        ethicalStance: voiceData.ethicalStance,
+        perspective: voiceData.perspective,
+        role: voiceData.role,
+        promptRequest: promptGenerationRequest
+      });
+
+      logger.info('Custom voice prompt generated successfully', {
+        voiceName: voiceData.name,
+        promptLength: response.length
+      });
+
+      return response;
+
+    } catch (error) {
+      logger.error('Failed to generate OpenAI voice prompt, using fallback', error as Error);
+      
+      // Fallback template if OpenAI fails
+      const basePrompts = {
+        analytical: "Approach problems with systematic analysis and data-driven insights.",
+        friendly: "Communicate with warmth and encouragement while maintaining technical accuracy.",
+        direct: "Provide concise, straightforward solutions with minimal explanation overhead.",
+        detailed: "Offer comprehensive explanations with step-by-step reasoning and context."
+      };
+      
+      const ethicalFrameworks = {
+        neutral: "Consider multiple perspectives and present balanced technical solutions.",
+        conservative: "Prioritize stability, security, and proven patterns in your recommendations.",
+        progressive: "Embrace innovative approaches and cutting-edge technologies when appropriate."
+      };
+      
+      return `You are ${voiceData.name}, a specialized AI coding assistant with the following characteristics:
 
 PERSONALITY: ${voiceData.personality}
 
@@ -147,9 +196,10 @@ Provide solutions that demonstrate your unique perspective while maintaining hig
   }
   
   /**
-   * Test custom voice with sample prompts to validate effectiveness
+   * Test custom voice with sample prompts using REAL OpenAI integration
    */
   private async testCustomVoice(promptTemplate: string, voiceData: CustomVoiceRequest): Promise<VoiceTestResult> {
+    // Real OpenAI integration for voice testing following AI_INSTRUCTIONS.md patterns
     const testPrompts = [
       "Create a simple React component for user authentication",
       "Implement error handling for a database connection",

@@ -82,11 +82,11 @@ export function PerspectiveSelector() {
     <div className="p-4">
       <Tabs defaultValue="perspectives" className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-4">
-          <TabsTrigger value="perspectives" className="text-xs">
+          <TabsTrigger value="perspectives" className="text-xs" data-tour="perspectives-tab">
             <Brain className="w-3 h-3 mr-1" />
             Analysis
           </TabsTrigger>
-          <TabsTrigger value="roles" className="text-xs">
+          <TabsTrigger value="roles" className="text-xs" data-tour="roles-tab">
             <Code className="w-3 h-3 mr-1" />
             Specialization
           </TabsTrigger>
@@ -129,6 +129,8 @@ export function PerspectiveSelector() {
                         : `border-gray-600 bg-gray-700/50 hover:border-gray-500`
                     }`}
                     onClick={handlePerspectiveClick}
+                    data-tour="perspective-button"
+                    data-selected={isSelected}
                   >
                     <div className="flex items-center space-x-3">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${

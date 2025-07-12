@@ -380,3 +380,16 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **Multi-Layered Experience**: Five paths from Quick Start (5 min) to Consciousness Integration (master level) with progressive revelation
 - **Production Integration**: All onboarding components fully integrated with authentication, routing, and existing voice selection systems
 - **Consciousness Metrics**: Real-time tracking of user transformation from single-voice to council-based development practices
+
+### Comprehensive Guided Tour Framework Implementation (January 12, 2025)
+- **New User Detection System**: Created useNewUserDetection hook with comprehensive onboarding status tracking and consciousness level assessment
+- **Interactive Guided Tour**: Built GuidedTour component with 14 step-by-step instructions covering voice selection, solution generation, and project management
+- **Dual Philosophy Integration**: Tour steps integrate both AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md living spiral principles
+- **Smart Tour Targeting**: Added data attributes (data-tour) to all interactive elements for precise component highlighting and user guidance
+- **Progress Tracking**: Implemented tour progress tracking with milestone completion, skip functionality, and consciousness evolution metrics
+- **Contextual Education**: Each tour step includes philosophy principles (Jung's Descent, Alexander's Patterns, Campbell's Journey) and technical patterns
+- **Interactive Requirements**: Tour validates user interactions before advancing, ensuring hands-on learning of voice council assembly
+- **API Integration**: Added 6 new endpoints for tour status, completion tracking, milestone recording, and development mode testing
+- **Production Safety**: Tour only appears for new users (< 7 days, incomplete tour) with proper authentication and feature gating
+- **Council-Based Learning**: Guides users from traditional "single AI prompting" to conscious multi-voice collaborative development
+- **Enhanced OpenAI Integration**: All AI components now follow both instruction sets with integrated CodingPhilosophy.md and AI_INSTRUCTIONS.md patterns

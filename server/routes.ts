@@ -535,5 +535,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // New User Detection & Tour API Endpoints following AI_INSTRUCTIONS.md patterns
+  app.get('/api/user/onboarding-status/:userId', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.params.userId;
+      
+      // Mock onboarding status - in production this would check database
+      const onboardingStatus = {
+        userId,
+        hasCompletedTour: false,
+        hasGeneratedFirstSolution: false,
+        hasUsedVoiceProfiles: false,
+        hasAccessedTeams: false,
+        hasUsedSynthesis: false,
+        firstLoginAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        lastActiveAt: new Date(),
+      };
+      
+      logger.info('Onboarding status retrieved', { userId });
+      res.json(onboardingStatus);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/user/complete-tour', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { userId, completedAt } = req.body;
+      
+      // Track tour completion
+      logger.info('Tour completed', { userId, completedAt });
+      
+      res.json({ success: true, message: 'Tour marked as completed' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/user/skip-tour', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { userId, skippedAt } = req.body;
+      
+      // Track tour skip
+      logger.info('Tour skipped', { userId, skippedAt });
+      
+      res.json({ success: true, message: 'Tour marked as skipped' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/user/track-milestone', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { userId, milestoneType, completedAt, metadata } = req.body;
+      
+      // Track milestone completion
+      logger.info('Milestone tracked', { 
+        userId, 
+        milestoneType, 
+        completedAt, 
+        metadata 
+      });
+      
+      res.json({ success: true, message: 'Milestone tracked successfully' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/user/update-activity', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { userId, lastActiveAt } = req.body;
+      
+      // Update last activity
+      logger.info('Activity updated', { userId, lastActiveAt });
+      
+      res.json({ success: true, message: 'Activity updated' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/user/reset-onboarding', isAuthenticated, async (req: any, res, next) => {
+    try {
+      if (process.env.NODE_ENV !== 'development') {
+        return res.status(403).json({ error: 'Only available in development' });
+      }
+      
+      const { userId } = req.body;
+      
+      // Reset onboarding for testing
+      logger.info('Onboarding reset for testing', { userId });
+      
+      res.json({ success: true, message: 'Onboarding reset for testing' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return server;
 }

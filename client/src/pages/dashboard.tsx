@@ -27,6 +27,8 @@ import LegalSection from "@/components/legal-section";
 import ErrorMonitor from "@/components/error-monitor";
 import { FeatureGate } from "@/components/FeatureGate";
 import { isFrontendDevModeEnabled, isFrontendDevModeFeatureEnabled, createDevModeBadge, devLog } from "@/lib/dev-mode";
+import { GuidedTour } from "@/components/guided-tour/GuidedTour";
+import { useNewUserDetection } from "@/hooks/useNewUserDetection";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -55,6 +57,14 @@ export default function Dashboard() {
     selectPerspectives,
     selectRoles
   } = useVoiceSelection();
+
+  const { 
+    shouldShowTour, 
+    newUserMetrics, 
+    completeTour, 
+    skipTour, 
+    trackMilestone 
+  } = useNewUserDetection();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
 
@@ -275,6 +285,7 @@ export default function Dashboard() {
                 size="sm"
                 onClick={() => window.location.href = '/onboarding'}
                 className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                data-tour="learning-button"
               >
                 <GraduationCap className="w-4 h-4 mr-2" />
                 Learning
@@ -302,6 +313,7 @@ export default function Dashboard() {
                 size="sm"
                 onClick={() => window.location.href = '/teams'}
                 className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                data-tour="teams-button"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Teams
@@ -434,6 +446,7 @@ export default function Dashboard() {
                   value={state.prompt}
                   onChange={(e) => handlePromptChange(e.target.value)}
                   className="min-h-[120px] bg-transparent border-none resize-none text-gray-100 placeholder-gray-500 focus:ring-0"
+                  data-tour="prompt-textarea"
                 />
                 {isAnalyzing && (
                   <div className="flex items-center space-x-2 mt-2 text-sm text-purple-300">
@@ -450,6 +463,7 @@ export default function Dashboard() {
                   onClick={handleGenerateSolutions}
                   disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
                   className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-tour="generate-button"
                 >
                   <Play className="w-4 h-4 mr-2" />
                   {isGenerating ? "Generating..." : 
@@ -560,6 +574,18 @@ export default function Dashboard() {
         trigger="manual"
         currentQuota={planGuard.quotaUsed}
         quotaLimit={planGuard.quotaLimit}
+      />
+
+      {/* Guided Tour for New Users */}
+      <GuidedTour
+        isNewUser={shouldShowTour}
+        onComplete={() => {
+          completeTour.mutate();
+          trackMilestone.mutate({ type: 'first_solution' });
+        }}
+        onSkip={() => {
+          skipTour.mutate();
+        }}
       />
 
       {/* Error Monitor */}

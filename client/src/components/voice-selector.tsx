@@ -6,8 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
-import { useTeamVoiceProfiles } from "@/hooks/use-shared-voices";
-import { useAuth } from "@/hooks/useAuth";
+import { useTeamVoiceProfiles } from "@/hooks/useTeamVoiceProfiles";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 import * as LucideIcons from "lucide-react";
 import type { VoiceProfile } from "@shared/schema";
 
@@ -20,8 +20,8 @@ export function PerspectiveSelector() {
   } = useVoiceSelection();
   
   const { profiles, isLoading } = useVoiceProfiles();
-  const { user } = useAuth();
-  const { data: sharedVoices, isLoading: sharedVoicesLoading } = useTeamVoiceProfiles(user?.id);
+  const { user } = useAuthContext();
+  const { data: sharedVoices, isLoading: sharedVoicesLoading } = useTeamVoiceProfiles();
 
   const renderIcon = (iconName: string, className: string) => {
     const IconComponent = (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())];

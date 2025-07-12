@@ -21,7 +21,7 @@ export default function UpgradeModal({
   currentQuota = 0,
   quotaLimit = 3
 }: UpgradeModalProps) {
-  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'team'>('pro');
+  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'team' | 'enterprise'>('team');
   const { planTier } = usePlanGuard();
 
   const getTriggerMessage = () => {
@@ -41,7 +41,7 @@ export default function UpgradeModal({
     {
       id: 'pro' as const,
       name: 'Pro',
-      price: '$15',
+      price: '$19',
       period: '/month',
       description: 'Perfect for individual developers',
       icon: <Zap className="h-6 w-6" />,
@@ -53,12 +53,12 @@ export default function UpgradeModal({
         'Export generated code',
         'Advanced customization'
       ],
-      highlighted: true
+      highlighted: false
     },
     {
       id: 'team' as const,
       name: 'Team',
-      price: '$50',
+      price: '$49',
       period: '/month',
       description: 'For teams and organizations',
       icon: <Users className="h-6 w-6" />,
@@ -70,11 +70,30 @@ export default function UpgradeModal({
         'Team management',
         'Priority support'
       ],
+      highlighted: true
+    },
+    {
+      id: 'enterprise' as const,
+      name: 'Enterprise',
+      price: '$99',
+      period: '/month',
+      description: 'For large organizations',
+      icon: <BarChart className="h-6 w-6" />,
+      features: [
+        'Everything in Team',
+        'Custom AI training',
+        'On-premise deployment',
+        'SSO integration',
+        'Dedicated support',
+        'Custom integrations',
+        'SLA guarantees',
+        'Compliance features'
+      ],
       highlighted: false
     }
   ];
 
-  const handleUpgrade = async (planType: 'pro' | 'team') => {
+  const handleUpgrade = async (planType: 'pro' | 'team' | 'enterprise') => {
     try {
       // Redirect to Stripe checkout or subscription page
       window.location.href = `/subscribe?plan=${planType}`;
@@ -96,7 +115,7 @@ export default function UpgradeModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid md:grid-cols-2 gap-6 mt-6">
+        <div className="grid md:grid-cols-3 gap-4 mt-6">
           {plans.map((plan) => (
             <Card 
               key={plan.id}

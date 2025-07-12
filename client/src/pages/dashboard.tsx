@@ -9,7 +9,7 @@ import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
 import { AvatarCustomizer } from "@/components/avatar-customizer";
-import { PremiumTiers } from "@/components/premium-tiers";
+
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useAuth } from "@/hooks/useAuth";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
@@ -34,7 +34,6 @@ export default function Dashboard() {
   const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showPremiumTiers, setShowPremiumTiers] = useState(false);
   const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
@@ -269,7 +268,7 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowPremiumTiers(true)}
+                onClick={() => setShowUpgradeModal(true)}
                 className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
               >
                 <Crown className="w-4 h-4 mr-2" />
@@ -526,14 +525,9 @@ export default function Dashboard() {
       <UpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        trigger="quota_exceeded"
+        trigger="manual"
         currentQuota={planGuard.quotaUsed}
         quotaLimit={planGuard.quotaLimit}
-      />
-
-      <PremiumTiers
-        isOpen={showPremiumTiers}
-        onClose={() => setShowPremiumTiers(false)}
       />
 
       {/* Error Monitor */}

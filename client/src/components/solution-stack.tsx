@@ -1,4 +1,5 @@
 import { X, Layers3, CheckCircle, Loader2 } from "lucide-react";
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,10 +44,24 @@ const getVoiceDisplayName = (voiceCombination: string): string => {
 };
 
 export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: ImplementationOptionsProps) {
-  const { data: solutions = [], isLoading } = useQuery({
+  const { data: solutions = [], isLoading, error } = useQuery({
     queryKey: ["/api/sessions", sessionId, "solutions"],
     enabled: !!sessionId && isOpen,
   });
+
+  // Debug logging following AI_INSTRUCTIONS.md patterns
+  React.useEffect(() => {
+    if (isOpen && sessionId) {
+      console.log('SolutionStack Debug:', {
+        sessionId,
+        isOpen,
+        isLoading,
+        solutionCount: solutions?.length || 0,
+        solutions: solutions?.map(s => ({ id: s.id, voiceCombination: s.voiceCombination })) || [],
+        error: error?.message || null
+      });
+    }
+  }, [isOpen, sessionId, isLoading, solutions, error]);
 
   const handleMergeClick = () => {
     onMergeClick(solutions);
@@ -70,6 +85,20 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
               <span className="ml-2 text-gray-600 dark:text-gray-400">Generating solutions...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-red-500 mb-2">Error loading solutions</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{error.message}</p>
+              </div>
+            </div>
+          ) : solutions.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-gray-600 dark:text-gray-400 mb-2">No solutions found</p>
+                <p className="text-sm text-gray-500">Session ID: {sessionId}</p>
+              </div>
             </div>
           ) : (
             <>

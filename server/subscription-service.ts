@@ -257,7 +257,7 @@ class SubscriptionService {
         case "checkout.session.completed": {
           const session = event.data.object as Stripe.Checkout.Session;
           const userId = session.metadata?.userId;
-          const tier = session.metadata?.tier as "pro" | "team";
+          const tier = session.metadata?.tier as "pro" | "team" | "enterprise";
           
           if (!userId || !tier) {
             logger.error("Missing metadata in checkout session", { sessionId: session.id });
@@ -290,7 +290,7 @@ class SubscriptionService {
     }
   }
 
-  private async upgradeSubscription(userId: string, tier: "pro" | "team", stripeSubscriptionId: string) {
+  private async upgradeSubscription(userId: string, tier: "pro" | "team" | "enterprise", stripeSubscriptionId: string) {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) {
       throw new Error("User not found");

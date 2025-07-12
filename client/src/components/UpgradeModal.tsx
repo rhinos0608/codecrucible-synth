@@ -120,15 +120,11 @@ export default function UpgradeModal({
 
   const handleUpgrade = async (planType: 'pro' | 'team' | 'enterprise') => {
     try {
-      if (planType === 'enterprise') {
-        // For enterprise, redirect to subscribe page for now
-        window.location.href = `/subscribe?plan=${planType}`;
-        return;
-      }
-      
+      // Use Stripe checkout for all plans
       upgradeMutation.mutate(planType);
     } catch (error) {
       console.error('Failed to initiate upgrade:', error);
+      // Fallback to subscribe page only if Stripe fails
       window.location.href = `/subscribe?plan=${planType}`;
     }
   };

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { X, Layers3, CheckCircle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -85,7 +86,7 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
   });
 
   // Debug logging following AI_INSTRUCTIONS.md patterns
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen && sessionId) {
       console.log('SolutionStack Debug:', {
         sessionId,

@@ -1004,5 +1004,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get solutions for a session - Following AI_INSTRUCTIONS.md security patterns
+  app.get("/api/sessions/:id/solutions", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      
+      // Following AI_INSTRUCTIONS.md: Input validation with Zod
+      const sessionIdSchema = z.number().int().positive();
+      const validatedSessionId = sessionIdSchema.parse(sessionId);
+      
+      if (isNaN(validatedSessionId)) {
+        throw new APIError(400, 'Invalid session ID');
+      }
+      
+      // Verify session ownership following AI_INSTRUCTIONS.md security patterns
+      const session = await storage.getVoiceSession(validatedSessionId);
+      if (!session || session.userId !== req.user?.claims?.sub) {
+        throw new APIError(404, 'Session not found or access denied');
+      }
+      
+      logger.debug('Fetching solutions for session', { 
+        sessionId: validatedSessionId, 
+        userId: req.user.claims.sub.substring(0, 8) + '...'
+      });
+      
+      const solutions = await storage.getSolutionsBySession(validatedSessionId);
+      
+      // Following CodingPhilosophy.md: Ensure solutions maintain council structure
+      const formattedSolutions = solutions.map(solution => ({
+        ...solution,
+        // Following AI_INSTRUCTIONS.md: Secure data formatting
+        id: solution.id,
+        sessionId: solution.sessionId,
+        voiceCombination: solution.voiceCombination,
+        code: solution.code || '',
+        explanation: solution.explanation || '',
+        confidence: solution.confidence || 85,
+        strengths: Array.isArray(solution.strengths) ? solution.strengths : 
+          (typeof solution.strengths === 'string' ? solution.strengths.split(',') : []),
+        considerations: Array.isArray(solution.considerations) ? solution.considerations : 
+          (typeof solution.considerations === 'string' ? solution.considerations.split(',') : [])
+      }));
+      
+      res.json(formattedSolutions);
+    } catch (error) {
+      logger.error('Failed to fetch solutions', error as Error, {
+        sessionId: req.params.id,
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
+
   return server;
 }

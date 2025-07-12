@@ -1,5 +1,5 @@
 // Frontend Feature Gate Component - AI_INSTRUCTIONS.md Security Patterns
-import React from 'react';
+
 import { useAuth } from '@/hooks/useAuth';
 import { usePlanGuard } from '@/hooks/usePlanGuard';
 import { isFrontendDevModeEnabled } from '@/lib/dev-mode';

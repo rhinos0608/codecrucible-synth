@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { PerspectiveSelector } from "@/components/voice-selector";
 import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
-import { LiveCodeGeneration } from "@/components/live-code-generation";
+
 import { AvatarCustomizer } from "@/components/avatar-customizer";
 
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
@@ -35,7 +35,7 @@ export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
   const [showSynthesisPanel, setShowSynthesisPanel] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
-  const [showLiveGeneration, setShowLiveGeneration] = useState(false);
+
   const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -172,13 +172,15 @@ export default function Dashboard() {
       return;
     }
 
-    // Validation following AI_INSTRUCTIONS.md security patterns
-    console.log("Voice Selection Debug:", {
+    // Enhanced Live Council Generation logging following AI_INSTRUCTIONS.md security patterns
+    console.log("Live Council Generation Debug:", {
       perspectives: state.selectedPerspectives,
       roles: state.selectedRoles,
       prompt: state.prompt.substring(0, 50) + "...",
       perspectiveCount: state.selectedPerspectives.length,
-      roleCount: state.selectedRoles.length
+      roleCount: state.selectedRoles.length,
+      mode: "live_council_generation",
+      realTimeOpenAI: true
     });
     
     if (!state.prompt.trim()) {
@@ -194,10 +196,11 @@ export default function Dashboard() {
     try {
       // Use plan guard to enforce quotas
       const result = await planGuard.attemptGeneration(async () => {
-        console.log("Calling generateSession mutation with:", {
+        console.log("Starting Live Council Generation with real OpenAI integration:", {
           prompt: state.prompt.substring(0, 100),
           perspectives: state.selectedPerspectives,
-          roles: state.selectedRoles
+          roles: state.selectedRoles,
+          mode: "live_council_generation"
         });
         
         return generateSession.mutateAsync({
@@ -461,39 +464,30 @@ export default function Dashboard() {
                 <div className="text-sm text-gray-400">
                   {state.prompt.length > 0 ? `${state.prompt.length} characters` : "Start typing your request..."}
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  <Button
-                    onClick={handleGenerateSolutions}
-                    disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                    data-tour="generate-button"
-                  >
-                    <Play className="w-4 h-4 mr-2" />
-                    {isGenerating ? "Generating..." : 
-                     planGuard.planTier === 'free' ? 
-                       `Generate Solutions (${planGuard.quotaUsed}/${planGuard.quotaLimit})` : 
-                       "Generate Solutions"}
-                    {isFrontendDevModeFeatureEnabled('showDevBadges') && (
-                      <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 text-xs">
-                        {createDevModeBadge()}
-                      </Badge>
-                    )}
-                  </Button>
-                  
-                  <Button
-                    onClick={() => setShowLiveGeneration(true)}
-                    disabled={!state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Brain className="w-4 h-4 mr-2" />
-                    Live Council Generation
-                    {isFrontendDevModeFeatureEnabled('showDevBadges') && (
-                      <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-800 text-xs">
-                        STREAM
-                      </Badge>
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  onClick={handleGenerateSolutions}
+                  disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                  data-tour="generate-button"
+                >
+                  <Brain className="w-4 h-4 mr-2" />
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Live Council Generation...
+                    </>
+                  ) : (
+                    "Live Council Generation"
+                  )}
+                  <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800 text-xs">
+                    {planGuard.planTier === 'free' ? `${planGuard.quotaUsed}/${planGuard.quotaLimit}` : 'UNLIMITED'}
+                  </Badge>
+                  {isFrontendDevModeFeatureEnabled('showDevBadges') && (
+                    <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 text-xs">
+                      {createDevModeBadge()}
+                    </Badge>
+                  )}
+                </Button>
               </div>
               {/* Validation Error Display */}
               {!state.prompt.trim() && (
@@ -584,19 +578,7 @@ export default function Dashboard() {
         editingProfile={editingProfile}
       />
 
-      <LiveCodeGeneration
-        isOpen={showLiveGeneration}
-        onClose={() => setShowLiveGeneration(false)}
-        prompt={state.prompt}
-        selectedVoices={{
-          perspectives: state.selectedPerspectives,
-          roles: state.selectedRoles
-        }}
-        onComplete={(sessionId) => {
-          setCurrentSessionId(sessionId);
-          setShowSolutionStack(true);
-        }}
-      />
+
 
 
 

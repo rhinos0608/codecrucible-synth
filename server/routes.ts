@@ -1107,6 +1107,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create streaming session endpoint for live generation
+  app.post('/api/sessions/stream', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { prompt, selectedVoices, mode = 'streaming' } = req.body;
+      
+      // Create voice session first
+      const session = await storage.createVoiceSession({
+        userId,
+        prompt,
+        selectedVoices,
+        recursionDepth: 2,
+        synthesisMode: 'competitive',
+        ethicalFiltering: true,
+        mode
+      });
+      
+      logger.info('Live streaming session created', { sessionId: session.id, userId });
+      res.json({ sessionId: session.id });
+      
+    } catch (error) {
+      logger.error('Failed to create streaming session', error as Error);
+      res.status(500).json({ error: 'Failed to create session' });
+    }
+  });
+
   // Following CodingPhilosophy.md: Real-time voice streaming endpoint
   app.get('/api/sessions/:sessionId/stream/:voiceId', isAuthenticated, async (req: any, res, next) => {
     try {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -25,6 +25,7 @@ import { SubscriptionStatus } from "@/components/subscription/subscription-statu
 import UpgradeModal from "@/components/UpgradeModal";
 import LegalSection from "@/components/legal-section";
 import ErrorMonitor from "@/components/error-monitor";
+import { FeatureGate } from "@/components/FeatureGate";
 import { isFrontendDevModeEnabled, isFrontendDevModeFeatureEnabled, createDevModeBadge, devLog } from "@/lib/dev-mode";
 
 export default function Dashboard() {
@@ -237,15 +238,28 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAvatarCustomizer(true)}
-                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
-              >
-                <User className="w-4 h-4 mr-2" />
-                Voice Profiles
-              </Button>
+              <FeatureGate feature="voice_profiles" fallback={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  <Crown className="w-3 h-3 mr-1" />
+                  Voice Profiles (Pro)
+                </Button>
+              }>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAvatarCustomizer(true)}
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Voice Profiles
+                </Button>
+              </FeatureGate>
               <Button
                 variant="outline"
                 size="sm"
@@ -273,6 +287,15 @@ export default function Dashboard() {
               >
                 <Crown className="w-4 h-4 mr-2" />
                 Premium
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/teams'}
+                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Teams
               </Button>
               <Button
                 variant="ghost"

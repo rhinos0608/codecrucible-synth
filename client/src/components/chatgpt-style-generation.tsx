@@ -76,13 +76,14 @@ export function ChatGPTStyleGeneration({
     if (isOpen && prompt && (selectedVoices.perspectives.length > 0 || selectedVoices.roles.length > 0) && !isStreaming) {
       startStreaming(prompt, selectedVoices);
     }
-    
-    return () => {
-      if (!isOpen) {
-        reset();
-      }
-    };
-  }, [isOpen, prompt, selectedVoices.perspectives.join(','), selectedVoices.roles.join(','), isStreaming, startStreaming, reset]);
+  }, [isOpen, prompt, selectedVoices.perspectives.length, selectedVoices.roles.length]);
+
+  // Reset when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      reset();
+    }
+  }, [isOpen, reset]);
 
   // Voice color mapping following CodingPhilosophy.md consciousness visualization
   // Voice color mapping following CodingPhilosophy.md consciousness visualization

@@ -79,7 +79,7 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     prompt: string, 
     selectedVoices: { perspectives: string[]; roles: string[] }
   ) => {
-    if (!user || !prompt.trim()) return;
+    if (!user || !prompt.trim() || isStreaming) return;
 
     setIsStreaming(true);
     const initializedVoices = initializeVoices(selectedVoices);
@@ -115,7 +115,7 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
       onError?.('Failed to start streaming generation');
       setIsStreaming(false);
     }
-  }, [user, initializeVoices, onError]);
+  }, [user, onError, isStreaming]);
 
   // Start individual voice stream with enhanced error handling
   const startVoiceStream = useCallback((voiceId: string, sessionId: number, type: 'perspective' | 'role') => {

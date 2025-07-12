@@ -27,8 +27,8 @@ import LegalSection from "@/components/legal-section";
 import ErrorMonitor from "@/components/error-monitor";
 import { FeatureGate } from "@/components/FeatureGate";
 import { isFrontendDevModeEnabled, isFrontendDevModeFeatureEnabled, createDevModeBadge, devLog } from "@/lib/dev-mode";
-import { GuidedTour } from "@/components/guided-tour/GuidedTour";
-import { useNewUserDetection } from "@/hooks/useNewUserDetection";
+// import { GuidedTour } from "@/components/guided-tour/GuidedTour";
+// import { useNewUserDetection } from "@/hooks/useNewUserDetection";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -58,13 +58,13 @@ export default function Dashboard() {
     selectRoles
   } = useVoiceSelection();
 
-  const { 
-    shouldShowTour, 
-    newUserMetrics, 
-    completeTour, 
-    skipTour, 
-    trackMilestone 
-  } = useNewUserDetection();
+  // const { 
+  //   shouldShowTour, 
+  //   newUserMetrics, 
+  //   completeTour, 
+  //   skipTour, 
+  //   trackMilestone 
+  // } = useNewUserDetection();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
 
@@ -576,8 +576,8 @@ export default function Dashboard() {
         quotaLimit={planGuard.quotaLimit}
       />
 
-      {/* Guided Tour for New Users */}
-      <GuidedTour
+      {/* Guided Tour for New Users - Temporarily disabled for audit */}
+      {/* <GuidedTour
         isNewUser={shouldShowTour}
         onComplete={() => {
           completeTour.mutate();
@@ -586,7 +586,7 @@ export default function Dashboard() {
         onSkip={() => {
           skipTour.mutate();
         }}
-      />
+      /> */}
 
       {/* Error Monitor */}
       <ErrorMonitor

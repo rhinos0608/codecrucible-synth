@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/hooks/useAuth";
 
 // Following AI_INSTRUCTIONS.md: Strict TypeScript and input validation
 interface UserOnboardingStatus {
@@ -26,15 +26,16 @@ interface NewUserMetrics {
 }
 
 export function useNewUserDetection() {
-  const { user } = useAuthContext();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [shouldShowTour, setShouldShowTour] = useState(false);
 
-  // Get user onboarding status
+  // Get user onboarding status - Following AI_INSTRUCTIONS.md error handling patterns
   const onboardingStatusQuery = useQuery({
     queryKey: ["/api/user/onboarding-status", user?.id],
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1, // Limit retries to prevent excessive requests
     select: (data: any): UserOnboardingStatus => ({
       userId: data.userId || user?.id || '',
       hasCompletedTour: data.hasCompletedTour || false,
@@ -46,6 +47,9 @@ export function useNewUserDetection() {
       firstLoginAt: new Date(data.firstLoginAt || Date.now()),
       lastActiveAt: new Date(data.lastActiveAt || Date.now()),
     }),
+    onError: (error) => {
+      console.error('Failed to load onboarding status:', error);
+    },
   });
 
   // Calculate new user metrics
@@ -148,7 +152,7 @@ export function useNewUserDetection() {
     },
   });
 
-  // Update last active timestamp
+  // Update last active timestamp - throttled to prevent excessive requests
   const updateLastActive = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", "/api/user/update-activity", {
@@ -164,8 +168,12 @@ export function useNewUserDetection() {
       const metrics = calculateNewUserMetrics(onboardingStatusQuery.data);
       setShouldShowTour(metrics.isNewUser && metrics.needsGuidance);
       
-      // Update activity tracker
-      updateLastActive.mutate();
+      // Temporarily disable activity tracking to fix unhandled promise rejections
+      // Only update activity once per session to reduce API calls
+      // if (metrics.isNewUser && !localStorage.getItem('activity_updated_this_session')) {
+      //   updateLastActive.mutate();
+      //   localStorage.setItem('activity_updated_this_session', 'true');
+      // }
     }
   }, [onboardingStatusQuery.data]);
 

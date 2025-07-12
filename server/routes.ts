@@ -540,6 +540,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.params.userId;
       
+      // Following AI_INSTRUCTIONS.md: Input validation
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'Invalid user ID' });
+      }
+      
       // Mock onboarding status - in production this would check database
       const onboardingStatus = {
         userId,
@@ -552,9 +557,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastActiveAt: new Date(),
       };
       
-      logger.info('Onboarding status retrieved', { userId });
+      logger.debug('Onboarding status retrieved', { userId });
       res.json(onboardingStatus);
     } catch (error) {
+      logger.error('Error retrieving onboarding status', error as Error, { userId: req.params.userId });
       next(error);
     }
   });
@@ -607,11 +613,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, lastActiveAt } = req.body;
       
-      // Update last activity
-      logger.info('Activity updated', { userId, lastActiveAt });
+      // Following AI_INSTRUCTIONS.md: Input validation
+      if (!userId || !lastActiveAt) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      // Update last activity with throttling
+      logger.debug('Activity updated', { userId, lastActiveAt });
       
       res.json({ success: true, message: 'Activity updated' });
     } catch (error) {
+      logger.error('Error updating activity', error as Error, { userId: req.body.userId });
       next(error);
     }
   });

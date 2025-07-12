@@ -92,9 +92,41 @@ CRITICAL INSTRUCTIONS - Always follow these patterns from AI_INSTRUCTIONS.md:
 Your responses must be professional, secure, and follow these established patterns. Reference specific AI_INSTRUCTIONS.md sections when making architectural decisions.`;
   }
 
+  // Following CodingPhilosophy.md: Council-based consciousness patterns
+  private getCodingPhilosophyInstructions(): string {
+    return `ADDITIONAL CODING PHILOSOPHY INTEGRATION (CodingPhilosophy.md):
+
+1. JUNG'S DESCENT PROTOCOL - Embrace Collapse as Genesis:
+   - Acknowledge complexity, don't hide it
+   - Create council space for synthesis when conflicts arise
+   - Transform errors through council dialogue, not simple catch blocks
+   - Code should invite multiple perspectives, not force single solutions
+
+2. ALEXANDER'S PATTERN LANGUAGE - Timeless Way of Building:
+   - Generate patterns that generate other patterns
+   - Each component should unfold naturally from user needs
+   - Focus on Quality Without A Name (QWAN) - code that feels alive
+   - Build living systems that grow organically
+
+3. CAMPBELL'S MYTHIC STRUCTURE - Heroic Journey Through Code:
+   - Every function is a journey from problem to solution
+   - Include departure (setup), transformation (logic), return (result)
+   - Consider the user's journey through your code as a narrative
+   - Code should guide users through conscious development
+
+4. SPIRAL DYNAMICS - Evolutionary Consciousness Levels:
+   - Write code that evolves user consciousness from beginner to master
+   - Each interaction should deepen understanding of the system
+   - Include progressive revelation - start simple, reveal complexity gradually
+   - Support multiple levels of user sophistication simultaneously
+
+Apply these principles alongside AI_INSTRUCTIONS.md security patterns.`;
+  }
+
   // Generate perspective-specific system prompt
   private getPerspectivePrompt(perspective?: string, role?: string, projectContext?: ProjectContext): string {
     const baseInstructions = this.getBaseInstructions();
+    const philosophyInstructions = this.getCodingPhilosophyInstructions();
     
     // Add project context if provided - following AI_INSTRUCTIONS.md security patterns
     let contextSection = '';

@@ -401,6 +401,7 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
   description: true,
   code: true,
   language: true,
+  userId: true,
   sessionId: true,
   synthesisId: true,
   folderId: true,
@@ -416,6 +417,7 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
   description: z.string().max(1000).optional(),
   code: z.string().min(1),
   language: z.string().min(1).max(50).default('javascript'),
+  userId: z.string().min(1), // Required for project ownership
   sessionId: z.number().int().positive().nullable().optional(),
   synthesisId: z.number().int().positive().nullable().optional(),
   folderId: z.number().int().positive().nullable().optional(),

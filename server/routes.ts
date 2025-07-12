@@ -185,40 +185,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Additional routes for API completeness
   // Project creation endpoint for synthesis save functionality - Following AI_INSTRUCTIONS.md patterns
-  // DEBUG: Temporary unauthenticated endpoint to test project creation
-  app.post('/api/projects-debug', async (req: any, res, next) => {
-    console.log('🔧 DEBUG POST /api/projects-debug endpoint called:', {
-      bodyKeys: Object.keys(req.body || {}),
-      contentType: req.headers['content-type'],
-      body: req.body
-    });
-    
-    try {
-      // Mock userId for testing
-      const userId = "debug-user";
-      
-      const projectData = {
-        ...req.body,
-        userId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      const validatedData = insertProjectSchema.parse(projectData);
-      const project = await storage.createProject(validatedData);
-      
-      console.log('✅ DEBUG Project created successfully:', { 
-        projectId: project.id, 
-        name: project.name 
-      });
-      
-      res.json(project);
-    } catch (error) {
-      console.error('❌ DEBUG Project creation error:', error);
-      res.status(500).json({ error: 'Failed to create project', details: error instanceof Error ? error.message : 'Unknown error' });
-    }
-  });
-
   // Enhanced project creation endpoint with comprehensive debugging
   app.post('/api/projects', isAuthenticated, async (req: any, res, next) => {
     console.log('🔧 POST /api/projects endpoint called:', {
@@ -232,9 +198,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       
       // Enhanced validation following AI_INSTRUCTIONS.md security patterns
+      // Defensive programming: handle null foreign key references properly
       const projectData = {
         ...req.body,
         userId, // Ensure userId is set from authenticated user
+        // Ensure foreign key references are properly handled
+        sessionId: req.body.sessionId || null,
+        synthesisId: req.body.synthesisId || null,
+        folderId: req.body.folderId || null,
         createdAt: new Date(),
         updatedAt: new Date()
       };

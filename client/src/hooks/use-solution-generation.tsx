@@ -26,14 +26,31 @@ export function useSolutionGeneration() {
   const generateSession = useMutation({
     mutationFn: async (request: GenerateSessionRequest): Promise<GenerateSessionResponse> => {
       console.log('Generating session with real OpenAI integration:', request);
-      const response = await apiRequest("POST", "/api/sessions", request);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate solutions');
+      try {
+        const response = await apiRequest("POST", "/api/sessions", request);
+        
+        console.log('API Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          // Enhanced error handling following AI_INSTRUCTIONS.md patterns
+          let errorData;
+          try {
+            errorData = await response.json();
+          } catch (parseError) {
+            // Server returned HTML instead of JSON - critical server error
+            const htmlText = await response.text();
+            console.error('Server returned HTML instead of JSON:', htmlText.substring(0, 200));
+            throw new Error(`Server error (${response.status}): API endpoint returned HTML instead of JSON`);
+          }
+          throw new Error(errorData.error || `API request failed with status ${response.status}`);
+        }
+        
+        return response.json();
+      } catch (networkError) {
+        console.error('Network or parsing error in Council Generation:', networkError);
+        throw networkError;
       }
-      
-      return response.json();
     },
     onSuccess: (data) => {
       console.log('Session generation completed:', data);

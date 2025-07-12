@@ -446,28 +446,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       console.log('🔧 Real OpenAI Session Creation:', { ...req.body, userId });
       
+      // Enhanced input validation following AI_INSTRUCTIONS.md security patterns
+      if (!req.body || typeof req.body !== 'object') {
+        console.error('❌ Invalid request body structure');
+        return res.status(400).json({ error: 'Invalid request body' });
+      }
+      
+      const { prompt, selectedVoices } = req.body;
+      
+      if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+        console.error('❌ Invalid or missing prompt');
+        return res.status(400).json({ error: 'Valid prompt is required' });
+      }
+      
+      if (!selectedVoices || typeof selectedVoices !== 'object') {
+        console.error('❌ Invalid selectedVoices structure');
+        return res.status(400).json({ error: 'Valid selectedVoices object is required' });
+      }
+      
       // Dev mode check following AI_INSTRUCTIONS.md patterns
       const { getDevModeConfig } = await import('./lib/dev-mode');
       const devModeConfig = getDevModeConfig();
       
-      const { prompt, selectedVoices } = req.body;
       const sessionId = Date.now();
       
-      // Extract perspectives and roles from selectedVoices
-      const perspectives = selectedVoices?.perspectives || [];
-      const roles = selectedVoices?.roles || [];
+      // Extract perspectives and roles from selectedVoices with defensive programming
+      const perspectives = Array.isArray(selectedVoices?.perspectives) ? selectedVoices.perspectives : [];
+      const roles = Array.isArray(selectedVoices?.roles) ? selectedVoices.roles : [];
+      
+      if (perspectives.length === 0 && roles.length === 0) {
+        console.error('❌ No voices selected');
+        return res.status(400).json({ error: 'At least one perspective or role must be selected' });
+      }
       
       console.log('🚀 Initiating REAL OpenAI API calls:', {
         sessionId,
         userId,
         devMode: devModeConfig.isEnabled,
         voiceCount: perspectives.length + roles.length,
-        promptLength: prompt?.length || 0
+        promptLength: prompt.length
       });
       
-      // Call REAL OpenAI service - NO mock data allowed
+      // Call REAL OpenAI service with comprehensive error handling
       const solutions = await realOpenAIService.generateSolutions({
-        prompt: prompt || 'Create a code solution',
+        prompt: prompt,
         perspectives,
         roles,
         sessionId,
@@ -515,7 +537,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(sessionData);
     } catch (error) {
       console.error('❌ Real OpenAI session creation error:', error);
-      res.status(500).json({ error: 'Failed to create session with real OpenAI' });
+      
+      // Enhanced error handling following AI_INSTRUCTIONS.md patterns
+      let errorMessage = 'Failed to create session with real OpenAI';
+      let statusCode = 500;
+      
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3)
+        });
+        
+        // Specific error handling for common issues
+        if (error.message.includes('API key')) {
+          errorMessage = 'OpenAI API configuration error';
+          statusCode = 503;
+        } else if (error.message.includes('quota') || error.message.includes('rate')) {
+          errorMessage = 'OpenAI service temporarily unavailable';
+          statusCode = 503;
+        } else if (error.message.includes('Invalid')) {
+          errorMessage = 'Invalid request parameters';
+          statusCode = 400;
+        }
+      }
+      
+      // Always return JSON - NEVER let it fall through to default error handler
+      if (!res.headersSent) {
+        res.status(statusCode).json({ 
+          error: errorMessage,
+          details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+        });
+      }
     }
   });
 

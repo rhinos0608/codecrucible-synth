@@ -130,6 +130,8 @@ class RealOpenAIService {
   }): Promise<FastSolution> {
     const { prompt, voiceId, type, sessionId, solutionId } = options;
     
+    try {
+    
     console.log('🎯 Generating voice solution:', {
       voiceId,
       type,
@@ -190,6 +192,29 @@ Requirements:
       perspective: type === 'perspective' ? voiceId : '',
       role: type === 'role' ? voiceId : ''
     };
+    
+    } catch (error) {
+      console.error(`❌ OpenAI API error for voice ${voiceId}:`, error);
+      logger.error('OpenAI API call failed', { 
+        voiceId, 
+        type, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      
+      // Return error solution instead of crashing
+      return {
+        id: solutionId,
+        sessionId,
+        voiceCombination: `${type}:${voiceId}`,
+        code: `// Error generating solution for ${voiceId}\n// ${error instanceof Error ? error.message : 'Unknown error'}`,
+        explanation: `Error: Failed to generate solution using ${voiceId}. ${error instanceof Error ? error.message : 'Please try again.'}`,
+        confidence: 0.1,
+        strengths: ['Error handling'],
+        considerations: ['API service temporarily unavailable'],
+        perspective: type === 'perspective' ? voiceId : '',
+        role: type === 'role' ? voiceId : ''
+      };
+    }
   }
 
   // REAL OpenAI streaming generation - NO simulation

@@ -257,7 +257,7 @@ export default function Dashboard() {
 
 
   return (
-    <div className="min-h-screen flex bg-gray-900 text-gray-100">
+    <div className="min-h-screen flex bg-gray-900 text-gray-100 main-content">
       {/* Main Chat Interface */}
       <div className="flex-1 flex flex-col">
         {/* Header */}

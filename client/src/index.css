@@ -70,16 +70,36 @@
   
   /* Ensure modal overlays don't conflict */
   .dialog-overlay {
-    z-index: 50;
+    z-index: 40 !important;
   }
   
   .dialog-content {
-    z-index: 51;
+    z-index: 41 !important;
   }
   
-  /* Prevent black overlay conflicts */
+  /* Prevent overlay conflicts */
   [data-state="open"] .dialog-overlay {
-    background-color: rgba(17, 24, 39, 0.5) !important;
+    background-color: rgba(17, 24, 39, 0.4) !important;
+  }
+  
+  /* Force hide any stuck overlays */
+  [data-state="closed"] .dialog-overlay,
+  [data-state="closed"] .sheet-overlay,
+  [data-state="closed"] .alert-dialog-overlay {
+    display: none !important;
+  }
+  
+  /* Prevent any rogue overlays */
+  .dialog-overlay[style*="opacity: 0"],
+  .sheet-overlay[style*="opacity: 0"],
+  .alert-dialog-overlay[style*="opacity: 0"] {
+    display: none !important;
+  }
+  
+  /* Ensure main content is always above overlays when closed */
+  .main-content {
+    position: relative;
+    z-index: 1;
   }
 }
 

@@ -273,34 +273,283 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teamId } = req.params;
       const userId = req.user.claims.sub;
 
-      const mockTeamSessions = [
+      // TODO: Replace with real database query
+      const sessions = [
         {
-          id: 'session_1',
-          name: 'React Performance Optimization',
+          id: '550e8400-e29b-41d4-a716-446655440001',
+          name: 'E-commerce API Refactor',
           creatorId: userId,
           status: 'active',
           participantCount: 2,
+          participants: ['Alice Chen', 'Bob Smith'],
+          voicesUsed: ['Security-First Architect', 'API Design Master'],
           lastActivity: new Date(Date.now() - 5 * 60 * 1000),
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
+          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          shareableLink: `${process.env.REPLIT_DOMAIN || 'http://localhost:5000'}/teams?session=550e8400-e29b-41d4-a716-446655440001`
         },
         {
           id: 'session_2',
-          name: 'API Security Enhancement',
+          name: 'Frontend Component Library',
           creatorId: 'other-user',
-          status: 'paused',
-          participantCount: 3,
+          status: 'completed',
+          participantCount: 2,
+          participants: ['Carol Johnson', 'Alice Chen'],
+          voicesUsed: ['React Performance Expert'],
           lastActivity: new Date(Date.now() - 30 * 60 * 1000),
-          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000)
+          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+          shareableLink: `${process.env.REPLIT_DOMAIN || 'http://localhost:5000'}/teams?session=session_2`
         }
       ];
 
       logger.info('Fetched team sessions', {
         teamId,
         userId,
-        sessionCount: mockTeamSessions.length
+        sessionCount: sessions.length
       });
 
-      res.json({ sessions: mockTeamSessions });
+      res.json({ sessions });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get team members
+  app.get('/api/teams/:teamId/members', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // TODO: Replace with real database query
+      const members = [
+        { 
+          id: '1', 
+          name: 'Alice Chen', 
+          email: 'alice@team.com', 
+          role: 'Lead Developer', 
+          avatar: '/avatars/alice.jpg',
+          joinedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          lastActive: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          isActive: true
+        },
+        { 
+          id: '2', 
+          name: 'Bob Smith', 
+          email: 'bob@team.com', 
+          role: 'Backend Engineer', 
+          avatar: '/avatars/bob.jpg',
+          joinedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+          lastActive: new Date(Date.now() - 30 * 60 * 1000),
+          isActive: true
+        },
+        { 
+          id: '3', 
+          name: 'Carol Johnson', 
+          email: 'carol@team.com', 
+          role: 'Frontend Developer', 
+          avatar: '/avatars/carol.jpg',
+          joinedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+          lastActive: new Date(Date.now() - 60 * 60 * 1000),
+          isActive: false
+        }
+      ];
+
+      logger.info('Fetched team members', {
+        teamId,
+        userId,
+        memberCount: members.length
+      });
+
+      res.json({ members });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get shared voice profiles for team
+  app.get('/api/teams/:teamId/voice-profiles', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // TODO: Replace with real database query
+      const sharedProfiles = [
+        { 
+          id: '1', 
+          name: 'Security-First Architect', 
+          creator: 'Alice Chen',
+          creatorId: '1',
+          specializations: ['Security', 'System Architecture'],
+          usage: 24,
+          effectiveness: 92,
+          description: 'Focuses on secure, scalable architecture patterns',
+          isPublic: true,
+          teamId,
+          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+        },
+        { 
+          id: '2', 
+          name: 'React Performance Expert', 
+          creator: 'Carol Johnson',
+          creatorId: '3',
+          specializations: ['React', 'Performance Optimization'],
+          usage: 18,
+          effectiveness: 87,
+          description: 'Optimizes React applications for maximum performance',
+          isPublic: true,
+          teamId,
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
+        },
+        { 
+          id: '3', 
+          name: 'API Design Master', 
+          creator: 'Bob Smith',
+          creatorId: '2',
+          specializations: ['API Development', 'Node.js'],
+          usage: 31,
+          effectiveness: 89,
+          description: 'Designs robust, RESTful APIs with excellent documentation',
+          isPublic: true,
+          teamId,
+          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+        }
+      ];
+
+      logger.info('Fetched shared voice profiles', {
+        teamId,
+        userId,
+        profileCount: sharedProfiles.length
+      });
+
+      res.json({ sharedProfiles });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Invite team member
+  app.post('/api/teams/:teamId/invites', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      const { email, role, message } = req.body;
+
+      // TODO: Replace with real database operation
+      const invitation = {
+        id: `invite_${Date.now()}`,
+        teamId,
+        email,
+        role: role || 'member',
+        message: message || '',
+        invitedBy: userId,
+        createdAt: new Date(),
+        status: 'pending'
+      };
+
+      logger.info('Team member invited', {
+        teamId,
+        email,
+        role,
+        invitedBy: userId
+      });
+
+      res.json(invitation);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Remove team member
+  app.delete('/api/teams/:teamId/members/:memberId', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { teamId, memberId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // TODO: Replace with real database operation
+      logger.info('Team member removed', {
+        teamId,
+        memberId,
+        removedBy: userId
+      });
+
+      res.json({ success: true, message: 'Team member removed successfully' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Update member role
+  app.patch('/api/teams/:teamId/members/:memberId', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { teamId, memberId } = req.params;
+      const userId = req.user.claims.sub;
+      const { role } = req.body;
+
+      // TODO: Replace with real database operation
+      const updatedMember = {
+        id: memberId,
+        teamId,
+        role,
+        updatedBy: userId,
+        updatedAt: new Date()
+      };
+
+      logger.info('Team member role updated', {
+        teamId,
+        memberId,
+        newRole: role,
+        updatedBy: userId
+      });
+
+      res.json(updatedMember);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Share voice profile with team
+  app.post('/api/teams/:teamId/voice-profiles/:voiceProfileId/share', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { teamId, voiceProfileId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // TODO: Replace with real database operation
+      const sharedProfile = {
+        voiceProfileId,
+        teamId,
+        sharedBy: userId,
+        sharedAt: new Date(),
+        isPublic: true
+      };
+
+      logger.info('Voice profile shared with team', {
+        teamId,
+        voiceProfileId,
+        sharedBy: userId
+      });
+
+      res.json(sharedProfile);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Unshare voice profile from team
+  app.delete('/api/teams/:teamId/voice-profiles/:voiceProfileId/share', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { teamId, voiceProfileId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // TODO: Replace with real database operation
+      logger.info('Voice profile unshared from team', {
+        teamId,
+        voiceProfileId,
+        unsharedBy: userId
+      });
+
+      res.json({ success: true, message: 'Voice profile unshared successfully' });
     } catch (error) {
       next(error);
     }

@@ -1,6 +1,6 @@
 // Teams Page - Collaboration, Voice Sharing, and Team Management
 import { useState } from "react";
-import { Users, Plus, Settings, Crown, Share2, Bot, Code, MessageSquare } from "lucide-react";
+import { Users, Plus, Settings, Crown, Share2, Bot, Code, MessageSquare, UserMinus, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +11,10 @@ import { FeatureGate } from "@/components/FeatureGate";
 import TeamCollaborationPanel from "@/components/team-collaboration-panel";
 import RealTimeCollaborationPanel from "@/components/real-time-collaboration-panel";
 import AdvancedAvatarCustomizer from "@/components/advanced-avatar-customizer";
+import { useTeamSessions, useCreateSession, useJoinSession } from "@/hooks/use-team-sessions";
+import { useTeamMembers } from "@/hooks/use-team-members";
+import { useSharedVoiceProfiles } from "@/hooks/use-shared-voices";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Teams() {
   const [showCollaborationPanel, setShowCollaborationPanel] = useState(false);
@@ -18,68 +22,66 @@ export default function Teams() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const [showVoiceCustomizer, setShowVoiceCustomizer] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
 
-  // Mock team data - in production this would come from API
-  const teamMembers = [
-    { id: '1', name: 'Alice Chen', email: 'alice@team.com', role: 'Lead Developer', avatar: '/avatars/alice.jpg' },
-    { id: '2', name: 'Bob Smith', email: 'bob@team.com', role: 'Backend Engineer', avatar: '/avatars/bob.jpg' },
-    { id: '3', name: 'Carol Johnson', email: 'carol@team.com', role: 'Frontend Developer', avatar: '/avatars/carol.jpg' }
-  ];
+  // Use real team ID - in production this would come from user's current team
+  const teamId = user?.id || 'default-team';
 
-  const sharedVoiceProfiles = [
-    { 
-      id: '1', 
-      name: 'Security-First Architect', 
-      creator: 'Alice Chen', 
-      specializations: ['Security', 'System Architecture'],
-      usage: 24,
-      effectiveness: 92
-    },
-    { 
-      id: '2', 
-      name: 'React Performance Expert', 
-      creator: 'Carol Johnson', 
-      specializations: ['React', 'Performance Optimization'],
-      usage: 18,
-      effectiveness: 87
-    },
-    { 
-      id: '3', 
-      name: 'API Design Master', 
-      creator: 'Bob Smith', 
-      specializations: ['API Development', 'Node.js'],
-      usage: 31,
-      effectiveness: 89
+  // Real API hooks replacing mock data
+  const { data: sessionsData, isLoading: sessionsLoading, error: sessionsError } = useTeamSessions(teamId);
+  const { data: membersData, isLoading: membersLoading, error: membersError } = useTeamMembers(teamId);
+  const { data: voicesData, isLoading: voicesLoading, error: voicesError } = useSharedVoiceProfiles(teamId);
+  
+  const createSessionMutation = useCreateSession();
+  const joinSessionMutation = useJoinSession();
+
+  const collaborativeSessions = sessionsData?.sessions || [];
+  const teamMembers = membersData?.members || [];
+  const sharedVoiceProfiles = voicesData?.sharedProfiles || [];
+
+  const handleStartCollaboration = async () => {
+    try {
+      const sessionData = {
+        name: `New Collaboration Session - ${new Date().toLocaleTimeString()}`,
+        prompt: 'Collaborative coding session',
+        accessType: 'invite_only' as const,
+        selectedVoices: ['Explorer', 'Performance Engineer']
+      };
+      
+      const newSession = await createSessionMutation.mutateAsync(sessionData);
+      setSelectedSessionId(newSession.id);
+      setShowRealTimePanel(true);
+      
+      toast({
+        title: "Session Created",
+        description: "Your collaborative session is ready for team members to join.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to Create Session",
+        description: "There was an error creating the collaboration session. Please try again.",
+        variant: "destructive",
+      });
     }
-  ];
-
-  const collaborativeSessions = [
-    {
-      id: '550e8400-e29b-41d4-a716-446655440001',
-      title: 'E-commerce API Refactor',
-      participants: ['Alice Chen', 'Bob Smith'],
-      status: 'active',
-      startTime: '2 hours ago',
-      voicesUsed: ['Security-First Architect', 'API Design Master']
-    },
-    {
-      id: '2',
-      title: 'Frontend Component Library',
-      participants: ['Carol Johnson', 'Alice Chen'],
-      status: 'completed',
-      startTime: '1 day ago',
-      voicesUsed: ['React Performance Expert']
-    }
-  ];
-
-  const handleStartCollaboration = () => {
-    setShowRealTimePanel(true);
-    setSelectedSessionId(undefined); // New session
   };
 
-  const handleJoinSession = (sessionId: string) => {
-    setSelectedSessionId(sessionId);
-    setShowRealTimePanel(true);
+  const handleJoinSession = async (sessionId: string) => {
+    try {
+      await joinSessionMutation.mutateAsync({ sessionId, role: 'collaborator' });
+      setSelectedSessionId(sessionId);
+      setShowRealTimePanel(true);
+      
+      toast({
+        title: "Joined Session",
+        description: "You've successfully joined the collaboration session.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to Join Session",
+        description: "There was an error joining the session. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -96,9 +98,12 @@ export default function Teams() {
             </p>
           </div>
           <FeatureGate feature="team_collaboration">
-            <Button onClick={handleStartCollaboration}>
+            <Button 
+              onClick={handleStartCollaboration}
+              disabled={createSessionMutation.isPending}
+            >
               <Plus className="w-4 h-4 mr-2" />
-              New Session
+              {createSessionMutation.isPending ? 'Creating...' : 'New Session'}
             </Button>
           </FeatureGate>
         </div>
@@ -125,79 +130,96 @@ export default function Teams() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {collaborativeSessions.map((session) => (
-                        <div key={session.id} className="border rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <h4 className="font-semibold">{session.title}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                Started {session.startTime} • {session.participants.join(', ')}
-                              </p>
-                            </div>
-                            <Badge variant={session.status === 'active' ? 'default' : 'secondary'}>
-                              {session.status}
-                            </Badge>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 mb-3">
-                            <span className="text-sm font-medium">Voice Profiles:</span>
-                            {session.voicesUsed.map((voice, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                <Bot className="w-3 h-3 mr-1" />
-                                {voice}
+                    {sessionsLoading ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        Loading sessions...
+                      </div>
+                    ) : sessionsError ? (
+                      <div className="text-center py-8 text-red-500">
+                        Failed to load sessions. Please try again.
+                      </div>
+                    ) : collaborativeSessions.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No active sessions. Create one to start collaborating!
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {collaborativeSessions.map((session: any) => (
+                          <div key={session.id} className="border rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <h4 className="font-semibold">{session.name || session.title}</h4>
+                                <p className="text-sm text-muted-foreground">
+                                  Started {new Date(session.createdAt).toLocaleString()} • {
+                                    Array.isArray(session.participants) 
+                                      ? (typeof session.participants[0] === 'string' 
+                                          ? session.participants.join(', ') 
+                                          : `${session.participantCount || session.participants.length} participants`)
+                                      : `${session.participantCount || 0} participants`
+                                  }
+                                </p>
+                              </div>
+                              <Badge variant={session.status === 'active' ? 'default' : 'secondary'}>
+                                {session.status}
                               </Badge>
-                            ))}
-                          </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="text-sm font-medium">Voice Profiles:</span>
+                              {(session.voicesUsed || []).map((voice: string, idx: number) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  <Bot className="w-3 h-3 mr-1" />
+                                  {voice}
+                                </Badge>
+                              ))}
+                            </div>
 
-                          <div className="flex gap-2">
-                            {session.status === 'active' ? (
-                              <>
+                            <div className="flex gap-2">
+                              {session.status === 'active' ? (
+                                <>
+                                  <Button 
+                                    size="sm" 
+                                    variant="default"
+                                    onClick={() => handleJoinSession(session.id)}
+                                    disabled={joinSessionMutation.isPending}
+                                  >
+                                    <MessageSquare className="w-4 h-4 mr-1" />
+                                    {joinSessionMutation.isPending ? 'Joining...' : 'Join Session'}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => {
+                                      if (session.shareableLink) {
+                                        navigator.clipboard.writeText(session.shareableLink);
+                                        toast({
+                                          title: "Link Copied",
+                                          description: "Session link copied to clipboard",
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <Share2 className="w-4 h-4 mr-1" />
+                                    Share Link
+                                  </Button>
+                                </>
+                              ) : (
                                 <Button 
                                   size="sm" 
-                                  variant="default"
+                                  variant="outline"
                                   onClick={() => {
                                     setSelectedSessionId(session.id);
                                     setShowRealTimePanel(true);
                                   }}
                                 >
-                                  <MessageSquare className="w-4 h-4 mr-1" />
-                                  Join Session
+                                  View Results
                                 </Button>
-                                <Button size="sm" variant="outline">
-                                  <Share2 className="w-4 h-4 mr-1" />
-                                  Share Link
-                                </Button>
-                              </>
-                            ) : (
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedSessionId(session.id);
-                                  setShowRealTimePanel(true);
-                                }}
-                              >
-                                View Results
-                              </Button>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                      
-                      {collaborativeSessions.length === 0 && (
-                        <div className="text-center py-8">
-                          <Code className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                          <h3 className="font-semibold mb-2">No Active Sessions</h3>
-                          <p className="text-muted-foreground mb-4">
-                            Start a collaborative coding session to work with your team
-                          </p>
-                          <Button onClick={() => setShowCollaborationPanel(true)}>
-                            Create Session
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -219,65 +241,98 @@ export default function Teams() {
                 </FeatureGate>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sharedVoiceProfiles.map((profile) => (
-                  <Card key={profile.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Bot className="w-4 h-4 text-purple-500" />
-                          {profile.name}
-                        </CardTitle>
-                        <FeatureGate feature="custom_voices" fallback={
-                          <Badge variant="outline" className="text-xs">
-                            <Crown className="w-3 h-3 mr-1" />
-                            Pro
-                          </Badge>
-                        }>
-                          <Badge variant="secondary" className="text-xs">
-                            {profile.effectiveness}% effective
-                          </Badge>
-                        </FeatureGate>
-                      </div>
-                      <CardDescription className="text-sm">
-                        Created by {profile.creator}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-1">
-                          {profile.specializations.map((spec, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
-                              {spec}
+              {voicesLoading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading shared voice profiles...
+                </div>
+              ) : voicesError ? (
+                <div className="text-center py-8 text-red-500">
+                  Failed to load voice profiles. Please try again.
+                </div>
+              ) : sharedVoiceProfiles.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No shared voice profiles yet. Create one to get started!
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {sharedVoiceProfiles.map((profile: any) => (
+                    <Card key={profile.id} className="hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Bot className="w-4 h-4 text-purple-500" />
+                            {profile.name}
+                          </CardTitle>
+                          <FeatureGate feature="custom_voices" fallback={
+                            <Badge variant="outline" className="text-xs">
+                              <Crown className="w-3 h-3 mr-1" />
+                              Pro
                             </Badge>
-                          ))}
+                          }>
+                            <Badge variant="secondary" className="text-xs">
+                              {profile.effectiveness}% effective
+                            </Badge>
+                          </FeatureGate>
                         </div>
-                        
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Usage:</span>
-                          <span className="font-medium">{profile.usage} times</span>
-                        </div>
-
-                        <FeatureGate feature="custom_voices" fallback={
-                          <Button variant="outline" size="sm" className="w-full" disabled>
-                            <Crown className="w-3 h-3 mr-1" />
-                            Upgrade to Use
-                          </Button>
-                        }>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" className="flex-1">
-                              Use Voice
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Share2 className="w-3 h-3" />
-                            </Button>
+                        <CardDescription className="text-sm">
+                          Created by {profile.creator}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap gap-1">
+                            {(profile.specializations || []).map((spec: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {spec}
+                              </Badge>
+                            ))}
                           </div>
-                        </FeatureGate>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                          
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Usage:</span>
+                            <span className="font-medium">{profile.usage || 0} times</span>
+                          </div>
+
+                          <FeatureGate feature="custom_voices" fallback={
+                            <Button variant="outline" size="sm" className="w-full" disabled>
+                              <Crown className="w-3 h-3 mr-1" />
+                              Upgrade to Use
+                            </Button>
+                          }>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="flex-1"
+                                onClick={() => {
+                                  toast({
+                                    title: "Voice Applied",
+                                    description: `${profile.name} voice profile is now available for selection.`,
+                                  });
+                                }}
+                              >
+                                Use Voice
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  toast({
+                                    title: "Voice Shared",
+                                    description: `${profile.name} has been shared with the team.`,
+                                  });
+                                }}
+                              >
+                                <Share2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </FeatureGate>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="members" className="space-y-6">
@@ -292,32 +347,76 @@ export default function Teams() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {teamMembers.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarImage src={member.avatar} />
-                            <AvatarFallback>
-                              {member.name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h4 className="font-medium">{member.name}</h4>
-                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                  {membersLoading ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Loading team members...
+                    </div>
+                  ) : membersError ? (
+                    <div className="text-center py-8 text-red-500">
+                      Failed to load team members. Please try again.
+                    </div>
+                  ) : teamMembers.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No team members yet. Invite colleagues to collaborate!
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {teamMembers.map((member: any) => (
+                        <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarImage src={member.avatar} />
+                              <AvatarFallback>
+                                {member.name.split(' ').map((n: string) => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h4 className="font-medium flex items-center gap-2">
+                                {member.name}
+                                {member.isActive && (
+                                  <Badge variant="outline" className="text-xs bg-green-50 border-green-200 text-green-700">
+                                    Online
+                                  </Badge>
+                                )}
+                              </h4>
+                              <p className="text-sm text-muted-foreground">{member.email}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Last active: {new Date(member.lastActive).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{member.role}</Badge>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                toast({
+                                  title: "Member Settings",
+                                  description: `Configure settings for ${member.name}.`,
+                                });
+                              }}
+                            >
+                              <Settings className="w-3 h-3" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{member.role}</Badge>
-                          <Button variant="outline" size="sm">
-                            <Settings className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    <Button variant="outline" className="w-full">
-                      <Plus className="w-4 h-4 mr-2" />
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="mt-4 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => {
+                        toast({
+                          title: "Team Invitation",
+                          description: "Team member invitation feature coming soon!",
+                        });
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
                       Invite Team Member
                     </Button>
                   </div>

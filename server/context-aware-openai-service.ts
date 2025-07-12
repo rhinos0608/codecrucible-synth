@@ -190,7 +190,7 @@ export class ContextAwareOpenAIService {
     }
   }
 
-  // Generate context string from folder files
+  // Generate context string from folder files following CodingPhilosophy.md patterns
   private buildFolderContextString(contextFiles: any[]): string {
     if (contextFiles.length === 0) return '';
     

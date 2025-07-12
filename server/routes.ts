@@ -921,64 +921,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mode: 'development'
       });
 
-      // Generate solutions using the OpenAI service
-      const { openaiService } = await import('./openai-service');
-      const solutions = [];
-
-      // Create voice combinations
-      const voiceCombinations = [];
+      // Ultra-fast parallel generation using optimized service
+      const { optimizedOpenAIService } = await import('./openai-service');
       
-      if (selectedVoices.perspectives?.length > 0 && selectedVoices.roles?.length > 0) {
-        // Both perspectives and roles selected - create combinations
-        for (const perspective of selectedVoices.perspectives) {
-          for (const role of selectedVoices.roles) {
-            voiceCombinations.push({ perspective, role });
-          }
-        }
-      } else if (selectedVoices.perspectives?.length > 0) {
-        // Only perspectives selected
-        for (const perspective of selectedVoices.perspectives) {
-          voiceCombinations.push({ perspective, role: null });
-        }
-      } else if (selectedVoices.roles?.length > 0) {
-        // Only roles selected
-        for (const role of selectedVoices.roles) {
-          voiceCombinations.push({ perspective: null, role });
-        }
-      }
+      // Generate all solutions in parallel for Apple-level performance
+      const generatedSolutions = await optimizedOpenAIService.generateSolutions({
+        prompt,
+        perspectives: selectedVoices.perspectives || [],
+        roles: selectedVoices.roles || [],
+        sessionId: session.id,
+        mode: 'development'
+      });
 
-      // Generate solutions for each voice combination
-      for (const { perspective, role } of voiceCombinations) {
+      // Store solutions in database
+      const solutions = [];
+      for (const generatedSolution of generatedSolutions) {
         try {
-          const generatedSolution = await openaiService.generateSolution({
-            prompt,
-            perspectives: selectedVoices.perspectives || [],
-            roles: selectedVoices.roles || [],
-            analysisDepth,
-            mergeStrategy,
-            qualityFiltering,
-            sessionId: session.id
-          }, perspective, role);
-
-          // Store solution in database
           const solution = await storage.createSolution({
             sessionId: session.id,
-            voiceCombination: perspective && role ? `${perspective}-${role}` : 
-                             perspective ? `${perspective}` : 
-                             role ? `${role}` : 'default',
+            voiceCombination: generatedSolution.voiceCombination,
             code: generatedSolution.code,
             explanation: generatedSolution.explanation,
             confidence: generatedSolution.confidence,
             strengths: generatedSolution.strengths,
             considerations: generatedSolution.considerations
           });
-
           solutions.push(solution);
         } catch (error) {
-          logger.error('Failed to generate solution for voice combination', error as Error, {
+          logger.error('Failed to store solution', error as Error, {
             sessionId: session.id,
-            perspective,
-            role
+            solutionId: generatedSolution.id
           });
         }
       }
@@ -1079,10 +1051,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Import OpenAI service dynamically for synthesis
-      const { openaiService } = await import('./openai-service');
+      const { optimizedOpenAIService } = await import('./openai-service');
       
       // Perform synthesis with real OpenAI - Following AI_INSTRUCTIONS.md patterns
-      const synthesizedSolution = await openaiService.synthesizeSolutions({
+      const synthesizedSolution = await optimizedOpenAIService.synthesizeSolutions({
         sessionId,
         solutions: solutions.map(sol => ({
           voiceCombination: sol.voiceCombination,
@@ -1173,7 +1145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Import OpenAI service for streaming
-      const { openaiService } = await import('./openai-service');
+      const { optimizedOpenAIService } = await import('./openai-service');
 
       // Handle request/response close properly for SSE
       req.on('close', () => {
@@ -1189,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Start streaming generation with error handling
       try {
-        await openaiService.generateSolutionStream({
+        await optimizedOpenAIService.generateSolutionStream({
           prompt: session.prompt,
           perspectives: session.selectedVoices.perspectives || [],
           roles: session.selectedVoices.roles || [],

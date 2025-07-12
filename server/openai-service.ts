@@ -103,7 +103,10 @@ class OpenAIService {
 
       // Get voice-specific system prompt
       const systemPrompt = this.getVoiceSystemPrompt(voiceId, type);
-      const userPrompt = `Generate code for the following request: ${prompt}`;
+      const userPrompt = `Generate code for the following request: ${prompt}
+
+Please provide a complete, production-ready solution following AI_INSTRUCTIONS.md patterns.
+Include comprehensive code with proper error handling and modern best practices.`;
 
       logger.info('Creating OpenAI streaming completion', { voiceId, systemPromptLength: systemPrompt.length });
 
@@ -1105,6 +1108,12 @@ Production Readiness:
     onComplete: (solution: any) => Promise<void>
   ): Promise<void> {
     const mockSolution = this.generateMockSolution(voiceId, prompt);
+    
+    logger.info('Starting simulated streaming generation', { 
+      voiceId, 
+      type, 
+      mockResponseLength: mockSolution.code.length 
+    });
     const chunks = mockSolution.code.split(' ');
     
     // Simulate typing with realistic delays
@@ -1125,40 +1134,94 @@ Production Readiness:
     });
   }
 
-  // Following AI_INSTRUCTIONS.md: Secure fallback simulation for development
-  private async simulateStreamGeneration(
-    voiceId: string,
-    type: 'perspective' | 'role',
-    request: CodeGenerationRequest,
-    onChunk: (chunk: string) => void,
-    onComplete: (solution: GeneratedSolution) => void
-  ): Promise<void> {
-    const sampleCode = this.generateFallbackSolution(request.prompt, voiceId, type);
+  // Generate mock solution for fallback scenarios - Following CodingPhilosophy.md patterns
+  private generateMockSolution(voiceId: string, prompt: string): GeneratedSolution {
+    const promptSummary = prompt.substring(0, 50).replace(/[^a-zA-Z0-9 ]/g, '');
     
-    // Simulate realistic typing with chunks
-    const chunks = sampleCode.split(' ');
-    
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = i === 0 ? chunks[i] : ' ' + chunks[i];
-      onChunk(chunk);
-      
-      // Realistic typing speed
-      await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
-    }
+    const voiceResponses = {
+      seeker: {
+        code: `// Explorer: Investigating ${promptSummary}...
+import React, { useState, useEffect } from 'react';
 
-    // Create solution object
-    const solution: GeneratedSolution = {
-      voiceCombination: voiceId,
-      code: sampleCode,
-      explanation: `Simulated solution from ${voiceId} (${type}) for development mode`,
-      confidence: 75 + Math.floor(Math.random() * 20),
-      strengths: ['Development mode simulation', 'Quick iteration', 'No API costs'],
-      considerations: ['Replace with real OpenAI integration', 'Add proper validation'],
-      perspective: type === 'perspective' ? voiceId : '',
-      role: type === 'role' ? voiceId : ''
+function ExploratoryImplementation() {
+  const [state, setState] = useState(null);
+  
+  useEffect(() => {
+    const experiment = async () => {
+      try {
+        const result = await fetch('/api/innovative-endpoint');
+        setState(result);
+      } catch (error) {
+        console.error('Exploration failed:', error);
+      }
+    };
+    experiment();
+  }, []);
+  
+  return <div className="innovative-ui">{state}</div>;
+}
+
+export default ExploratoryImplementation;`,
+        explanation: `Explorer analysis focuses on innovative approaches and experimental patterns for: ${promptSummary}`,
+        confidence: 82,
+        strengths: ["Innovative approach", "Experimental patterns", "Future-oriented thinking"],
+        considerations: ["Needs validation", "Experimental nature", "May require refinement"]
+      },
+      
+      steward: {
+        code: `// Maintainer: Robust ${promptSummary} implementation
+import React, { useState, useCallback } from 'react';
+
+function ReliableImplementation() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/data', {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error(\`HTTP error! status: \${response.status}\`);
+      }
+      
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  return loading ? <div>Loading...</div> : error ? <div>Error: {error}</div> : <div>{data}</div>;
+}
+
+export default ReliableImplementation;`,
+        explanation: `Maintainer analysis emphasizes stability, error handling, and robust patterns for: ${promptSummary}`,
+        confidence: 88,
+        strengths: ["Robust error handling", "Stable implementation", "Production-ready"],
+        considerations: ["Conservative approach", "May need optimization", "Requires testing"]
+      }
     };
 
-    onComplete(solution);
+    const response = voiceResponses[voiceId] || voiceResponses.seeker;
+    
+    return {
+      voiceCombination: voiceId,
+      code: response.code,
+      explanation: response.explanation,
+      confidence: response.confidence,
+      strengths: response.strengths,
+      considerations: response.considerations,
+      perspective: voiceId,
+      role: ''
+    };
   }
 
   // Generate realistic fallback code for development
@@ -1227,6 +1290,20 @@ export function ${voiceId.charAt(0).toUpperCase() + voiceId.slice(1)}Solution({ 
     </Card>
   );
 }`;
+  }
+  }
+
+  // Extract explanation from mixed response content
+  private extractExplanationFromResponse(content: string): string {
+    // Look for explanation sections
+    const explanationMatch = content.match(/(?:explanation|description|summary):\s*(.+?)(?:\n\n|$)/is);
+    if (explanationMatch) {
+      return explanationMatch[1].trim();
+    }
+    
+    // Fallback to first paragraph
+    const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('//') && !line.startsWith('```'));
+    return lines[0] || 'AI-generated code solution';
   }
 }
 

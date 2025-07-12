@@ -42,17 +42,45 @@ class RealOpenAIService {
   // REAL OpenAI parallel generation - NO fallbacks allowed
   async generateSolutions(options: {
     prompt: string;
-    perspectives: string[];
-    roles: string[];
+    selectedVoices?: {
+      perspectives?: string[];
+      roles?: string[];
+    };
+    perspectives?: string[];
+    roles?: string[];
     sessionId: number;
-    mode: string;
+    mode?: string;
+    userId?: string;
   }): Promise<FastSolution[]> {
-    const { prompt, perspectives, roles, sessionId } = options;
+    const { prompt, selectedVoices, perspectives: directPerspectives, roles: directRoles, sessionId } = options;
+    
+    // Following AI_INSTRUCTIONS.md defensive programming patterns
+    const perspectives = selectedVoices?.perspectives || directPerspectives || [];
+    const roles = selectedVoices?.roles || directRoles || [];
+    
+    console.log('🔧 OpenAI Service Input Validation:', {
+      selectedVoices,
+      perspectives,
+      roles,
+      sessionId,
+      hasPrompt: !!prompt
+    });
+    
+    // Validate inputs following AI_INSTRUCTIONS.md security patterns
+    if (!prompt || typeof prompt !== 'string') {
+      throw new Error('Invalid prompt provided to OpenAI service');
+    }
+    
+    if (!Array.isArray(perspectives) || !Array.isArray(roles)) {
+      throw new Error('Invalid voice arrays provided to OpenAI service');
+    }
     
     logger.info('Starting REAL OpenAI parallel generation', {
       sessionId,
       voiceCount: perspectives.length + roles.length,
-      promptLength: prompt.length
+      promptLength: prompt.length,
+      perspectiveVoices: perspectives,
+      roleVoices: roles
     });
 
     // Performance optimization: Parallel processing all voices simultaneously
@@ -101,6 +129,14 @@ class RealOpenAIService {
     solutionId: number;
   }): Promise<FastSolution> {
     const { prompt, voiceId, type, sessionId, solutionId } = options;
+    
+    console.log('🎯 Generating voice solution:', {
+      voiceId,
+      type,
+      sessionId,
+      solutionId,
+      promptLength: prompt.length
+    });
     
     const systemPrompt = this.getSystemPrompt(voiceId, type);
     const userPrompt = `Generate a complete, production-ready solution for: ${prompt}

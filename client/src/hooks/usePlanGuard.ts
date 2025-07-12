@@ -112,14 +112,21 @@ export function usePlanGuard() {
       const isDevMode = quotaCheck.devMode || quotaCheck.planTier === 'development';
       
       setState({
-        canGenerate: quotaCheck.allowed || isDevMode,
-        canSynthesize: planTier === 'pro' || planTier === 'team' || isDevMode,
-        canAccessAnalytics: planTier === 'pro' || planTier === 'team' || isDevMode,
+        canGenerate: quotaCheck.allowed || isDevMode || quotaCheck.unlimitedGenerations,
+        canSynthesize: planTier === 'pro' || planTier === 'team' || isDevMode || quotaCheck.unlimitedGenerations,
+        canAccessAnalytics: planTier === 'pro' || planTier === 'team' || isDevMode || quotaCheck.unlimitedGenerations,
         quotaUsed: quotaCheck.quotaUsed || 0,
         quotaLimit: quotaCheck.quotaLimit || (isDevMode ? -1 : 3),
         planTier: isDevMode ? 'development' : planTier,
         isLoading: false,
         error: null
+      });
+      
+      console.log('✅ Plan Guard State Updated:', {
+        canGenerate: quotaCheck.allowed || isDevMode || quotaCheck.unlimitedGenerations,
+        isDevMode,
+        unlimitedGenerations: quotaCheck.unlimitedGenerations,
+        planTier: isDevMode ? 'development' : planTier
       });
     };
 
@@ -134,8 +141,12 @@ export function usePlanGuard() {
     console.log('Attempt Generation - Quota Check:', quotaCheck);
     
     // Dev mode bypass - following AI_INSTRUCTIONS.md patterns
-    if (quotaCheck?.devMode || quotaCheck?.planTier === 'development') {
-      console.log('Dev mode detected - bypassing quota restrictions');
+    if (quotaCheck?.devMode || quotaCheck?.planTier === 'development' || quotaCheck?.unlimitedGenerations) {
+      console.log('✅ Dev mode/unlimited access detected - bypassing ALL quota restrictions:', {
+        devMode: quotaCheck?.devMode,
+        planTier: quotaCheck?.planTier,
+        unlimitedGenerations: quotaCheck?.unlimitedGenerations
+      });
       try {
         const result = await generationFn();
         return { success: true, data: result };

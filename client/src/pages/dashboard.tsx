@@ -260,12 +260,27 @@ export default function Dashboard() {
       error: planGuard.error
     });
     
-    // Check quota before proceeding - with dev mode awareness
-    if (!planGuard.canGenerate && planGuard.planTier !== 'development') {
-      console.log('Generation blocked - redirecting to upgrade modal');
+    // Check quota before proceeding - with enhanced dev mode awareness
+    const isDevModeActive = planGuard.planTier === 'development' || planGuard.quotaLimit === 999 || planGuard.quotaLimit === -1;
+    
+    if (!planGuard.canGenerate && !isDevModeActive) {
+      console.log('❌ Generation BLOCKED - redirecting to upgrade modal:', {
+        canGenerate: planGuard.canGenerate,
+        planTier: planGuard.planTier,
+        quotaLimit: planGuard.quotaLimit,
+        isDevModeActive
+      });
       setShowUpgradeModal(true);
       return;
     }
+    
+    console.log('✅ Generation ALLOWED - proceeding with council assembly:', {
+      canGenerate: planGuard.canGenerate,
+      planTier: planGuard.planTier,
+      isDevModeActive,
+      quotaUsed: planGuard.quotaUsed,
+      quotaLimit: planGuard.quotaLimit
+    });
 
     // Enhanced Live Council Generation logging following AI_INSTRUCTIONS.md security patterns
     console.log("Live Council Generation Debug:", {

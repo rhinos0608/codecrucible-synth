@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,7 +46,7 @@ export default function Dashboard() {
   const [showLearningPanel, setShowLearningPanel] = useState(false);
 
   // Debug logging for panel states - following AI_INSTRUCTIONS.md patterns
-  React.useEffect(() => {
+  useEffect(() => {
     console.log("🔍 Panel States:", {
       projects: showProjectsPanel,
       analytics: showAnalyticsPanel,

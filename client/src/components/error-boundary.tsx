@@ -1,4 +1,4 @@
-import React from 'react';
+import { Component, ErrorInfo, ReactNode, ComponentType } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, RefreshCw, Bug } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,15 +6,15 @@ import { Button } from "@/components/ui/button";
 interface ErrorBoundaryState {
   hasError: boolean;
   error?: Error;
-  errorInfo?: React.ErrorInfo;
+  errorInfo?: ErrorInfo;
 }
 
 interface ErrorBoundaryProps {
-  children: React.ReactNode;
-  fallback?: React.ComponentType<{ error: Error; retry: () => void }>;
+  children: ReactNode;
+  fallback?: ComponentType<{ error: Error; retry: () => void }>;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -25,7 +25,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error for debugging
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     

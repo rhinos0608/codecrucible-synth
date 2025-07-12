@@ -435,7 +435,15 @@ const LazyComponent = React.lazy(() => import('./HeavyComponent'));`
   }
 
   // Enhanced synthesis with real OpenAI integration - Following AI_INSTRUCTIONS.md patterns
-  async synthesizeSolutions(options: { sessionId: number; solutions: any[]; mode: string }) {
+  // Main synthesis method - Real OpenAI integration following AI_INSTRUCTIONS.md patterns
+  async synthesizeSolutions(options: { sessionId: number; solutions: any[]; mode: string }): Promise<{
+    synthesizedCode: string;
+    explanation: string;
+    confidence: number;
+    integratedApproaches: string[];
+    securityConsiderations: string[];
+    performanceOptimizations: string[];
+  }> {
     try {
       const { sessionId, solutions } = options;
       
@@ -932,98 +940,100 @@ export default ExampleComponent;`,
     }
   }
 
-  async synthesizeSolutions(solutions: GeneratedSolution[], sessionId: number): Promise<string> {
-    logger.info('Starting solution synthesis', {
-      sessionId,
-      solutionCount: solutions.length
-    });
+  // Get voice-specific system prompt for streaming
+  private getVoiceSystemPrompt(voiceId: string, type: 'perspective' | 'role'): string {
+    const baseInstructions = this.getBaseInstructions();
 
-    try {
-      // Check if OpenAI is available - following AI_INSTRUCTIONS.md security patterns
-      if (!openai || !OPENAI_API_KEY) {
-        logger.warn('OpenAI API not available for synthesis - using fallback', { sessionId });
+    
+    if (type === 'perspective') {
+      const perspectivePrompts = {
+        seeker: `You are the Explorer - an AI voice focused on innovative approaches and experimental patterns.
         
-        // Provide basic synthesis fallback
-        const fallbackSynthesis = `// Synthesized Solution
-// Combined ${solutions.length} voice perspectives
-
-${solutions.map((sol, idx) => `
-// Solution ${idx + 1}: ${sol.voiceCombination}
-// Confidence: ${sol.confidence}%
-${sol.code}
-`).join('\n\n')}
-
-// Note: This is a basic combination. Configure OPENAI_API_KEY for intelligent synthesis.`;
-
-        return fallbackSynthesis;
-      }
-
-      const systemPrompt = `${this.getBaseInstructions()}
-
-You are synthesizing multiple code solutions into a final implementation. Follow AI_INSTRUCTIONS.md patterns:
-- Maintain security and performance standards
-- Apply single source of truth principles
-- Use established architectural patterns
-- Ensure Apple design system compliance`;
-
-      const userPrompt = `
-Synthesize these ${solutions.length} code solutions into a single, optimized implementation:
-
-${solutions.map((sol, idx) => `
-SOLUTION ${idx + 1} (${sol.voiceCombination}):
-Confidence: ${sol.confidence}%
-Code:
-${sol.code}
-
-Explanation: ${sol.explanation}
-Strengths: ${sol.strengths.join(', ')}
-Considerations: ${sol.considerations.join(', ')}
-`).join('\n---\n')}
-
-Requirements:
-- Combine the best aspects of each solution
-- Resolve any conflicts or inconsistencies
-- Follow AI_INSTRUCTIONS.md patterns
-- Maintain performance and security standards
-- Provide a complete, production-ready implementation
-
-Return only the final synthesized code with inline comments explaining key decisions.`;
-
-      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.3, // Lower temperature for more consistent synthesis
-        max_tokens: 3000
-      });
-
-      const synthesizedCode = response.choices[0].message.content || '';
+Core traits:
+- Embrace uncertainty and explore unconventional solutions
+- Focus on cutting-edge techniques and emerging patterns
+- Question assumptions and push boundaries
+- Value innovation over convention`,
+        
+        steward: `You are the Maintainer - an AI voice focused on stability, reliability, and maintainable code.
+        
+Core traits:
+- Prioritize long-term maintainability and stability
+- Focus on proven patterns and established practices
+- Emphasize error handling and robust architecture
+- Value consistency and reliability`,
+        
+        witness: `You are the Analyzer - an AI voice focused on deep analysis and pattern recognition.
+        
+Core traits:
+- Examine code from multiple analytical perspectives
+- Identify hidden patterns and potential issues
+- Focus on comprehensive understanding
+- Value thorough analysis over quick solutions`,
+        
+        nurturer: `You are the Developer - an AI voice focused on growth, learning, and user experience.
+        
+Core traits:
+- Prioritize developer experience and code readability
+- Focus on educational value and growth opportunities
+- Emphasize user-centric design
+- Value empathy and understanding`,
+        
+        decider: `You are the Implementor - an AI voice focused on decisive action and practical solutions.
+        
+Core traits:
+- Make clear decisions and provide concrete implementations
+- Focus on actionable solutions and immediate results
+- Emphasize pragmatic approaches
+- Value efficiency and results`
+      };
       
-      logger.info('Solution synthesis completed', {
-        sessionId,
-        outputLength: synthesizedCode.length
-      });
+      return `${baseInstructions}
 
-      return synthesizedCode;
+${perspectivePrompts[voiceId] || perspectivePrompts.seeker}
 
-    } catch (error) {
-      logger.error('Solution synthesis failed', error as Error, { sessionId });
+Generate code that reflects this perspective while following AI_INSTRUCTIONS.md security patterns.`;
+    } else {
+      const rolePrompts = {
+        guardian: `You are the Security Engineer - focused on security, privacy, and data protection.
+        
+Core responsibilities:
+- Implement security best practices and input validation
+- Focus on authentication, authorization, and data protection
+- Identify and mitigate security vulnerabilities
+- Ensure compliance with security standards`,
+        
+        architect: `You are the Systems Architect - focused on scalable, maintainable system design.
+        
+Core responsibilities:
+- Design scalable and maintainable architectures
+- Focus on system integration and data flow
+- Plan for future growth and flexibility
+- Ensure architectural consistency`,
+        
+        designer: `You are the UI/UX Engineer - focused on user experience and interface design.
+        
+Core responsibilities:
+- Create intuitive and accessible user interfaces
+- Focus on user experience and interaction design
+- Implement responsive and adaptive designs
+- Ensure design consistency and usability`,
+        
+        optimizer: `You are the Performance Engineer - focused on speed, efficiency, and optimization.
+        
+Core responsibilities:
+- Optimize code for performance and efficiency
+- Focus on resource usage and speed improvements
+- Implement caching and optimization strategies
+- Monitor and improve system performance`
+      };
       
-      // Handle specific OpenAI errors following AI_INSTRUCTIONS.md patterns
-      if (error instanceof Error && error.message.includes('API key')) {
-        throw new APIError(401, 'Invalid OpenAI API key configuration');
-      }
+      return `${baseInstructions}
 
-      if (error instanceof Error && error.message.includes('quota')) {
-        throw new APIError(429, 'OpenAI API quota exceeded. Please try again later.');
-      }
+${rolePrompts[voiceId] || rolePrompts.architect}
 
-      throw new APIError(500, `Solution synthesis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+Generate code that fulfills this role while maintaining AI_INSTRUCTIONS.md compliance.`;
     }
-  }
 
   // Following CodeCrucible Protocol: Integration with both instruction sets
   private buildCodingPhilosophyIntegration(): string {

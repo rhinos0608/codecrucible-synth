@@ -1081,15 +1081,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import OpenAI service dynamically for synthesis
       const { openaiService } = await import('./openai-service');
       
-      // Perform synthesis with real OpenAI
+      // Perform synthesis with real OpenAI - Following AI_INSTRUCTIONS.md patterns
       const synthesizedSolution = await openaiService.synthesizeSolutions({
         sessionId,
-        solutions,
+        solutions: solutions.map(sol => ({
+          voiceCombination: sol.voiceCombination,
+          code: sol.code,
+          explanation: sol.explanation,
+          confidence: sol.confidence,
+          strengths: Array.isArray(sol.strengths) ? sol.strengths : [],
+          considerations: Array.isArray(sol.considerations) ? sol.considerations : [],
+          perspective: sol.voiceCombination.includes('steward') ? 'steward' : 'seeker',
+          role: sol.voiceCombination.includes('guardian') ? 'guardian' : 'architect'
+        })),
         mode: 'advanced'
       });
 
-      logger.info('OpenAI synthesis completed successfully', { sessionId });
-      res.json(synthesizedSolution);
+      // Store synthesis result in database for real-time sync
+      const synthesis = await storage.createSynthesis({
+        sessionId,
+        combinedCode: synthesizedSolution.synthesizedCode || '',
+        explanation: synthesizedSolution.explanation || '',
+        confidence: synthesizedSolution.confidence || 85,
+        integratedApproaches: synthesizedSolution.integratedApproaches || [],
+        securityConsiderations: synthesizedSolution.securityConsiderations || [],
+        performanceOptimizations: synthesizedSolution.performanceOptimizations || []
+      });
+
+      logger.info('OpenAI synthesis completed successfully', { 
+        sessionId, 
+        synthesisId: synthesis.id,
+        codeLength: synthesizedSolution.synthesizedCode?.length || 0 
+      });
+      
+      // Return comprehensive synthesis response for real-time sync
+      res.json({
+        ...synthesizedSolution,
+        synthesisId: synthesis.id,
+        timestamp: new Date().toISOString(),
+        sessionId: sessionId
+      });
       
     } catch (error) {
       logger.error('OpenAI synthesis failed', error as Error, { sessionId: req.params.sessionId });

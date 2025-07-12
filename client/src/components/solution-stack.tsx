@@ -81,6 +81,8 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
   const { data: solutions = [], isLoading, error } = useQuery({
     queryKey: ["/api/sessions", sessionId, "solutions"],
     enabled: !!sessionId && isOpen,
+    retry: 3,
+    retryDelay: 1000,
   });
 
   // Debug logging following AI_INSTRUCTIONS.md patterns

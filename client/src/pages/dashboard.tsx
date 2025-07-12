@@ -109,8 +109,17 @@ export default function Dashboard() {
   };
 
   const handleSolutionsGenerated = (sessionId: number) => {
+    console.log("🎯 handleSolutionsGenerated called:", {
+      sessionId,
+      previousSessionId: currentSessionId,
+      aboutToSetShowSolutionStack: true
+    });
     setCurrentSessionId(sessionId);
     setShowSolutionStack(true);
+    console.log("✅ Solution Stack state updated:", {
+      newSessionId: sessionId,
+      showSolutionStack: true
+    });
   };
 
   const handleMergeClick = (solutions: Solution[]) => {
@@ -243,6 +252,12 @@ export default function Dashboard() {
       console.log("Generation result:", result);
 
       if (result.success && result.data?.session?.id) {
+        console.log("✅ Council Generation Success - Opening Solutions Display:", {
+          sessionId: result.data.session.id,
+          solutionCount: result.data.session.solutionCount,
+          showSolutionStack: showSolutionStack,
+          currentSessionId: currentSessionId
+        });
         handleSolutionsGenerated(result.data.session.id);
       } else if (!result.success && result.reason === 'quota_exceeded') {
         setShowUpgradeModal(true);

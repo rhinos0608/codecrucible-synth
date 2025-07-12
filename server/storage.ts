@@ -77,6 +77,7 @@ export interface IStorage {
   createVoiceSession(session: InsertVoiceSession): Promise<VoiceSession>;
   getVoiceSession(id: number): Promise<VoiceSession | undefined>;
   getVoiceSessionsByUser(userId: string): Promise<VoiceSession[]>;
+  getUserSessions(userId: string): Promise<VoiceSession[]>;
   
   // Solution operations
   createSolution(solution: InsertSolution): Promise<Solution>;
@@ -254,6 +255,16 @@ export class DatabaseStorage implements IStorage {
       .where(eq(voiceSessions.userId, userId))
       .orderBy(desc(voiceSessions.createdAt))
       .limit(50);
+  }
+  
+  // Alias for getUserSessions (for onboarding status API)
+  async getUserSessions(userId: string): Promise<VoiceSession[]> {
+    return this.getVoiceSessionsByUser(userId);
+  }
+  
+  // Alias for getUserSessions (for onboarding status API)
+  async getUserSessions(userId: string): Promise<VoiceSession[]> {
+    return this.getVoiceSessionsByUser(userId);
   }
   
   // Solution operations

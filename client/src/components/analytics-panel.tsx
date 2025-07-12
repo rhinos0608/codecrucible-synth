@@ -17,7 +17,7 @@ export function AnalyticsPanel({ isOpen, onClose }: AnalyticsPanelProps) {
       console.log("📊 Analytics Dialog onOpenChange:", { open, wasOpen: isOpen });
       onClose();
     }}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100" aria-describedby="analytics-dashboard-description">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-gray-100">
             <div className="flex items-center space-x-3">
@@ -29,6 +29,9 @@ export function AnalyticsPanel({ isOpen, onClose }: AnalyticsPanelProps) {
             </div>
           </DialogTitle>
         </DialogHeader>
+        <div id="analytics-dashboard-description" className="sr-only">
+          View your voice usage statistics, generation metrics, and performance analytics
+        </div>
         
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

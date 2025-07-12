@@ -553,44 +553,40 @@ export default function Dashboard() {
                   <Button
                     onClick={handleGenerateSolutions}
                     disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-3 px-4"
                     data-tour="generate-button"
                   >
-                    <div className="flex items-center justify-center w-full">
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          <span>Council Generation...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Brain className="w-4 h-4 mr-2" />
-                          <span>Council Generation</span>
-                        </>
-                      )}
-                      <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 text-xs">
-                        {planGuard.planTier === 'free' ? `${planGuard.quotaUsed}/${planGuard.quotaLimit}` : 'UNLIMITED'}
-                      </Badge>
-                    </div>
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
+                        <span className="font-medium">Council Generation...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="w-5 h-5 flex-shrink-0" />
+                        <span className="font-medium">Council Generation</span>
+                      </>
+                    )}
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs font-medium">
+                      {planGuard.planTier === 'free' ? `${planGuard.quotaUsed}/${planGuard.quotaLimit}` : 'UNLIMITED'}
+                    </Badge>
                   </Button>
 
                   <Button
                     onClick={() => setShowChatGPTGeneration(true)}
                     disabled={!state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center"
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-3 px-4"
                   >
-                    <div className="flex items-center justify-center w-full">
-                      <Brain className="w-4 h-4 mr-2" />
-                      <span>Live Streaming</span>
-                      <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800 text-xs">
-                        REAL-TIME
+                    <Brain className="w-5 h-5 flex-shrink-0" />
+                    <span className="font-medium">Live Streaming</span>
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs font-medium">
+                      REAL-TIME
+                    </Badge>
+                    {isFrontendDevModeFeatureEnabled('showDevBadges') && (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs font-medium">
+                        {createDevModeBadge()}
                       </Badge>
-                      {isFrontendDevModeFeatureEnabled('showDevBadges') && (
-                        <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 text-xs">
-                          {createDevModeBadge()}
-                        </Badge>
-                      )}
-                    </div>
+                    )}
                   </Button>
                 </div>
               </div>

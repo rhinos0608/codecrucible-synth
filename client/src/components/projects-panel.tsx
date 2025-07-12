@@ -134,9 +134,9 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 max-h-[calc(90vh-120px)]">
           {/* Projects List */}
-          <div className="w-1/2 pr-4 border-r border-gray-700 flex flex-col">
+          <div className="w-1/2 pr-4 border-r border-gray-700 flex flex-col min-h-0">
             <div className="mb-4 flex-shrink-0">
               <h4 className="text-lg font-semibold mb-2 text-gray-100">Saved Projects ({projects.length})</h4>
               {isLoading && (
@@ -201,9 +201,9 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
           </div>
 
           {/* Project Details */}
-          <div className="w-1/2 pl-4 flex flex-col">
+          <div className="w-1/2 pl-4 flex flex-col min-h-0">
             {selectedProject ? (
-              <div className="h-full flex flex-col">
+              <div className="h-full flex flex-col min-h-0">
                 <div className="flex items-start justify-between mb-4 flex-shrink-0">
                   <div className="flex-1 min-w-0">
                     <h4 className="text-lg font-semibold truncate">{selectedProject.name}</h4>
@@ -235,34 +235,36 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
                 )}
 
                 {/* Code Preview */}
-                <div className="flex-1 mb-4 min-h-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium">Code Preview</h5>
+                <div className="flex-1 mb-4 min-h-0 flex flex-col">
+                  <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                    <h5 className="text-sm font-medium text-gray-200">Code Preview</h5>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => copyProjectCode(selectedProject)}
-                      className="h-8 px-2 text-xs"
+                      className="h-8 px-2 text-xs text-gray-400 hover:text-gray-200"
                     >
                       <Copy className="w-3 h-3 mr-1" />
                       Copy
                     </Button>
                   </div>
-                  <ScrollArea className="bg-gray-900 rounded-lg p-4 text-sm font-mono text-gray-100 h-full">
-                    <div className="pr-2">
-                      <pre className="whitespace-pre-wrap break-words">{selectedProject.code}</pre>
-                    </div>
-                  </ScrollArea>
+                  <div className="flex-1 min-h-0">
+                    <ScrollArea className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm font-mono text-gray-100 h-full">
+                      <div className="pr-2">
+                        <pre className="whitespace-pre-wrap break-words">{selectedProject.code}</pre>
+                      </div>
+                    </ScrollArea>
+                  </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center justify-between flex-shrink-0 gap-3">
+                {/* Actions - Fixed positioning to prevent cutoff */}
+                <div className="flex flex-col space-y-3 pt-4 border-t border-gray-700 flex-shrink-0 bg-gray-900">
                   <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => copyProjectCode(selectedProject)}
-                      className="flex items-center space-x-1.5"
+                      className="flex items-center space-x-1.5 text-gray-300 hover:text-gray-100 border-gray-600 hover:border-gray-500"
                     >
                       <Copy className="w-4 h-4" />
                       <span>Copy Code</span>
@@ -271,22 +273,24 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
                       variant="outline"
                       size="sm"
                       onClick={() => useProjectAsContext(selectedProject)}
-                      className="flex items-center space-x-1.5"
+                      className="flex items-center space-x-1.5 text-green-300 hover:text-green-100 border-green-600 hover:border-green-500"
                     >
                       <ExternalLink className="w-4 h-4" />
                       <span>Use as Context</span>
                     </Button>
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => deleteProject.mutate(selectedProject.id)}
-                    disabled={deleteProject.isPending}
-                    className="flex items-center space-x-1.5"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>{deleteProject.isPending ? "Deleting..." : "Delete"}</span>
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteProject.mutate(selectedProject.id)}
+                      disabled={deleteProject.isPending}
+                      className="flex items-center space-x-1.5 bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{deleteProject.isPending ? "Deleting..." : "Delete"}</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : (

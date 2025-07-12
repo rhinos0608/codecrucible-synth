@@ -18,7 +18,7 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
       console.log("👥 Teams Dialog onOpenChange:", { open, wasOpen: isOpen });
       onClose();
     }}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100" aria-describedby="teams-collaboration-description">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-gray-100">
             <div className="flex items-center space-x-3">
@@ -31,6 +31,9 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
             </div>
           </DialogTitle>
         </DialogHeader>
+        <div id="teams-collaboration-description" className="sr-only">
+          Manage team members, share voice profiles, and collaborate on coding sessions
+        </div>
         
         <div className="flex-1 overflow-y-auto p-6">
           <Tabs defaultValue="sessions" className="w-full">

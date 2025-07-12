@@ -81,22 +81,36 @@ export function PerspectiveSelector() {
   return (
     <div className="p-4">
       <Tabs defaultValue="perspectives" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4 h-auto">
-          <TabsTrigger value="perspectives" className="text-xs px-2 py-2 flex flex-col items-center space-y-1" data-tour="perspectives-tab">
-            <Brain className="w-3 h-3" />
-            <span className="text-xs whitespace-nowrap">Analysis</span>
+        <TabsList className="grid w-full grid-cols-4 mb-4 h-auto bg-gray-800/50 border border-gray-700">
+          <TabsTrigger 
+            value="perspectives" 
+            className="text-xs px-2 py-3 flex flex-col items-center space-y-1 data-[state=active]:bg-gray-700 data-[state=active]:text-gray-100 text-gray-400 hover:text-gray-200" 
+            data-tour="perspectives-tab"
+          >
+            <Brain className="w-4 h-4" />
+            <span className="text-xs whitespace-nowrap leading-tight">Analysis</span>
           </TabsTrigger>
-          <TabsTrigger value="roles" className="text-xs px-2 py-2 flex flex-col items-center space-y-1" data-tour="roles-tab">
-            <Code className="w-3 h-3" />
-            <span className="text-xs whitespace-nowrap">Specialization</span>
+          <TabsTrigger 
+            value="roles" 
+            className="text-xs px-2 py-3 flex flex-col items-center space-y-1 data-[state=active]:bg-gray-700 data-[state=active]:text-gray-100 text-gray-400 hover:text-gray-200" 
+            data-tour="roles-tab"
+          >
+            <Code className="w-4 h-4" />
+            <span className="text-xs whitespace-nowrap leading-tight">Specialization</span>
           </TabsTrigger>
-          <TabsTrigger value="profiles" className="text-xs px-2 py-2 flex flex-col items-center space-y-1">
-            <User className="w-3 h-3" />
-            <span className="text-xs whitespace-nowrap">My Profiles</span>
+          <TabsTrigger 
+            value="profiles" 
+            className="text-xs px-2 py-3 flex flex-col items-center space-y-1 data-[state=active]:bg-gray-700 data-[state=active]:text-gray-100 text-gray-400 hover:text-gray-200"
+          >
+            <User className="w-4 h-4" />
+            <span className="text-xs whitespace-nowrap leading-tight">My Profiles</span>
           </TabsTrigger>
-          <TabsTrigger value="team-profiles" className="text-xs px-2 py-2 flex flex-col items-center space-y-1">
-            <Users className="w-3 h-3" />
-            <span className="text-xs whitespace-nowrap">Team's Profiles</span>
+          <TabsTrigger 
+            value="team-profiles" 
+            className="text-xs px-2 py-3 flex flex-col items-center space-y-1 data-[state=active]:bg-gray-700 data-[state=active]:text-gray-100 text-gray-400 hover:text-gray-200"
+          >
+            <Users className="w-4 h-4" />
+            <span className="text-xs whitespace-nowrap leading-tight">Team's Profiles</span>
           </TabsTrigger>
         </TabsList>
 

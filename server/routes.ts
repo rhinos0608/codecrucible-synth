@@ -49,6 +49,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Onboarding API Routes - Following AI_INSTRUCTIONS.md patterns
+  app.get('/api/onboarding/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      // Get user registration date from database
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Calculate account age in days
+      const accountAge = Math.floor((Date.now() - new Date(user.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Get user activity metrics
+      const sessions = await storage.getUserSessions(userId);
+      const voiceProfiles = await storage.getVoiceProfiles(userId);
+      
+      const metrics = {
+        accountAge,
+        sessionsCreated: sessions.length,
+        tourCompleted: user.tourCompleted || false,
+        lastLoginDays: 0, // User is currently logged in
+        synthesisUsed: sessions.some((s: any) => s.synthesisUsed),
+        voiceProfilesCreated: voiceProfiles.length,
+        collaborationParticipated: false // TODO: implement when collaboration is ready
+      };
+
+      res.json(metrics);
+    } catch (error) {
+      console.error('Failed to get onboarding status:', error);
+      res.status(500).json({ error: 'Failed to get onboarding status' });
+    }
+  });
+
+  app.post('/api/onboarding/complete-tour', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      // Update user tour completion status
+      await storage.updateUser(userId, { tourCompleted: true });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to complete tour:', error);
+      res.status(500).json({ error: 'Failed to complete tour' });
+    }
+  });
+
+  app.post('/api/onboarding/skip-tour', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      // Update user tour completion status (same as complete)
+      await storage.updateUser(userId, { tourCompleted: true });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to skip tour:', error);
+      res.status(500).json({ error: 'Failed to skip tour' });
+    }
+  });
+
+  app.post('/api/onboarding/milestone', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const milestone = req.body;
+      
+      // Log milestone event (could be stored in analytics or user metrics)
+      console.log('User milestone achieved:', {
+        userId,
+        milestone: milestone.type,
+        timestamp: milestone.timestamp
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to track milestone:', error);
+      res.status(500).json({ error: 'Failed to track milestone' });
+    }
+  });
+
   // Team collaboration sessions endpoints  
   app.get('/api/collaboration/sessions', isAuthenticated, async (req: any, res, next) => {
     console.log('Collaboration sessions endpoint hit - user:', req.user ? 'authenticated' : 'not authenticated');

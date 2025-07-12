@@ -33,8 +33,8 @@ import LegalSection from "@/components/legal-section";
 import ErrorMonitor from "@/components/error-monitor";
 import { FeatureGate } from "@/components/FeatureGate";
 import { isFrontendDevModeEnabled, isFrontendDevModeFeatureEnabled, createDevModeBadge, devLog } from "@/lib/dev-mode";
-// import { GuidedTour } from "@/components/guided-tour/GuidedTour";
-// import { useNewUserDetection } from "@/hooks/useNewUserDetection";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { useNewUserDetection } from "@/hooks/useNewUserDetection";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -80,20 +80,31 @@ export default function Dashboard() {
     selectRoles
   } = useVoiceSelection();
 
-  // const { 
-  //   shouldShowTour, 
-  //   newUserMetrics, 
-  //   completeTour, 
-  //   skipTour, 
-  //   trackMilestone 
-  // } = useNewUserDetection();
+  const { 
+    shouldShowTour, 
+    newUserMetrics, 
+    completeTour, 
+    skipTour, 
+    trackMilestone 
+  } = useNewUserDetection();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
 
-  // Navigation guard to prevent accidental exit during code generation
-  const { navigateWithConfirmation, isBlocking } = useNavigationGuard({
+  // Enhanced navigation guard to prevent accidental exit during code generation
+  const { navigateWithConfirmation, isBlocking, confirmationDialog } = useNavigationGuard({
     shouldBlock: isGenerating || showChatGPTGeneration,
-    message: 'Code generation is in progress. Are you sure you want to leave? Your progress will be lost.',
+    message: 'Code generation is in progress. Are you sure you want to leave? All progress will be lost.',
+    type: 'critical',
+    context: {
+      feature: isGenerating ? 'Council Generation' : 'Live Streaming',
+      progress: isGenerating ? 'Generating...' : 'Streaming...',
+      timeInvested: '30+ seconds',
+      consequences: [
+        'All generated code will be lost',
+        'Voice analysis progress will be reset',
+        'You will need to restart the generation process'
+      ]
+    },
     onBlock: () => {
       console.log('Navigation blocked during code generation');
     },
@@ -166,6 +177,8 @@ export default function Dashboard() {
       console.error('Failed to track recommendation:', error);
     }
   });
+
+
 
   const handleApplyRecommendations = () => {
     console.log("[Dashboard] Apply Recommendations clicked", {
@@ -289,7 +302,9 @@ export default function Dashboard() {
 
 
   return (
-    <div className="dashboard-container min-h-screen flex bg-gray-900 text-gray-100 main-content overflow-hidden">
+    <>
+      {confirmationDialog}
+      <div className="dashboard-container min-h-screen flex bg-gray-900 text-gray-100 main-content overflow-hidden">
       {/* Main Chat Interface */}
       <div className="dashboard-main flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
@@ -627,7 +642,7 @@ export default function Dashboard() {
             <div className="p-4">
               <SubscriptionStatus />
             </div>
-            <div className="border-t border-gray-700">
+            <div className="border-t border-gray-700" data-tour="voice-selector">
               <PerspectiveSelector />
             </div>
           </div>
@@ -647,6 +662,7 @@ export default function Dashboard() {
         onClose={() => setShowSynthesisPanel(false)}
         solutions={currentSolutions}
         sessionId={currentSessionId || 0}
+        data-tour="synthesis-button"
       />
 
       {showProjectsPanel && (
@@ -660,6 +676,7 @@ export default function Dashboard() {
             setProjectContext(project);
             setPrompt(`Using project "${project.name}" as context:\n\n${project.description || 'No description provided'}\n\n`);
           }}
+          data-tour="save-project"
         />
       )}
 
@@ -716,10 +733,15 @@ export default function Dashboard() {
         currentQuota={planGuard.quotaUsed}
         quotaLimit={planGuard.quotaLimit}
       />
+      
+      <ErrorMonitor 
+        isOpen={showErrorMonitor} 
+        onClose={() => setShowErrorMonitor(false)} 
+      />
 
-      {/* Guided Tour for New Users - Temporarily disabled for audit */}
-      {/* <GuidedTour
-        isNewUser={shouldShowTour}
+      {/* Enhanced Onboarding Tour for New Users */}
+      <OnboardingTour
+        isActive={shouldShowTour}
         onComplete={() => {
           completeTour.mutate();
           trackMilestone.mutate({ type: 'first_solution' });
@@ -727,13 +749,8 @@ export default function Dashboard() {
         onSkip={() => {
           skipTour.mutate();
         }}
-      /> */}
-
-      {/* Error Monitor */}
-      <ErrorMonitor
-        isVisible={showErrorMonitor}
-        onToggle={() => setShowErrorMonitor(!showErrorMonitor)}
       />
     </div>
+    </>
   );
 }

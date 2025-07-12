@@ -1,26 +1,37 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
+import { useConfirmationDialog } from '@/components/ConfirmationDialog';
 
 interface NavigationGuardOptions {
   shouldBlock: boolean;
   message?: string;
   onBlock?: () => void;
   onConfirm?: () => void;
+  context?: {
+    feature?: string;
+    progress?: string;
+    timeInvested?: string;
+    consequences?: string[];
+  };
+  type?: 'warning' | 'danger' | 'info' | 'critical';
 }
 
 /**
- * Navigation guard hook following AI_INSTRUCTIONS.md patterns
- * Prevents accidental navigation during critical operations like code generation
+ * Enhanced navigation guard hook following AI_INSTRUCTIONS.md patterns
+ * Prevents accidental navigation during critical operations with consciousness-aware confirmations
  */
 export const useNavigationGuard = ({
   shouldBlock,
-  message = 'Are you sure you want to leave? Your code generation progress will be lost.',
+  message = 'Are you sure you want to leave? Your progress will be lost.',
   onBlock,
-  onConfirm
+  onConfirm,
+  context,
+  type = 'warning'
 }: NavigationGuardOptions) => {
   const [location, setLocation] = useLocation();
   const isBlockingRef = useRef(false);
   const pendingNavigationRef = useRef<string | null>(null);
+  const { showConfirmation, confirmationDialog } = useConfirmationDialog();
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -36,19 +47,28 @@ export const useNavigationGuard = ({
       if (shouldBlock && !isBlockingRef.current) {
         event.preventDefault();
         
-        // Show confirmation dialog
-        const confirmed = window.confirm(message);
+        // Show enhanced confirmation dialog
+        showConfirmation(
+          {
+            title: 'Confirm Navigation',
+            description: message,
+            type,
+            context,
+            confirmText: 'Leave Anyway',
+            cancelText: 'Stay Here',
+            isDestructive: type === 'danger' || type === 'critical'
+          },
+          () => {
+            isBlockingRef.current = true;
+            onConfirm?.();
+            // Allow navigation after confirmation
+            setTimeout(() => window.history.back(), 100);
+          }
+        );
         
-        if (confirmed) {
-          isBlockingRef.current = true;
-          onConfirm?.();
-          // Allow navigation after confirmation
-          window.history.back();
-        } else {
-          // Prevent navigation
-          window.history.pushState(null, '', window.location.pathname);
-          onBlock?.();
-        }
+        // Prevent immediate navigation
+        window.history.pushState(null, '', window.location.pathname);
+        onBlock?.();
       }
     };
 
@@ -63,17 +83,24 @@ export const useNavigationGuard = ({
     };
   }, [shouldBlock, message, onBlock, onConfirm]);
 
-  // Custom navigation function with confirmation
+  // Enhanced navigation function with consciousness-aware confirmation
   const navigateWithConfirmation = (newLocation: string) => {
     if (shouldBlock) {
-      const confirmed = window.confirm(message);
-      
-      if (confirmed) {
-        onConfirm?.();
-        setLocation(newLocation);
-      } else {
-        onBlock?.();
-      }
+      showConfirmation(
+        {
+          title: 'Confirm Navigation',
+          description: message,
+          type,
+          context,
+          confirmText: 'Continue',
+          cancelText: 'Stay Here',
+          isDestructive: type === 'danger' || type === 'critical'
+        },
+        () => {
+          onConfirm?.();
+          setLocation(newLocation);
+        }
+      );
     } else {
       setLocation(newLocation);
     }
@@ -81,6 +108,7 @@ export const useNavigationGuard = ({
 
   return {
     navigateWithConfirmation,
-    isBlocking: shouldBlock
+    isBlocking: shouldBlock,
+    confirmationDialog
   };
 };

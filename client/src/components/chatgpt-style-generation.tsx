@@ -47,10 +47,21 @@ export function ChatGPTStyleGeneration({
     }
   });
 
-  // Navigation guard for active streaming - Following AI_INSTRUCTIONS.md patterns
-  useNavigationGuard({
+  // Enhanced navigation guard for active streaming - Following AI_INSTRUCTIONS.md patterns
+  const { confirmationDialog } = useNavigationGuard({
     shouldBlock: isStreaming,
     message: 'Live streaming generation is active. Are you sure you want to stop? All progress will be lost.',
+    type: 'critical',
+    context: {
+      feature: 'Live Council Generation',
+      progress: isStreaming ? 'In Progress' : 'Complete',
+      timeInvested: isStreaming ? '30+ seconds' : 'N/A',
+      consequences: [
+        'All generated code will be lost',
+        'Voice synthesis progress will be reset',
+        'You will need to restart the generation process'
+      ]
+    },
     onBlock: () => {
       console.log('Navigation blocked during streaming generation');
     },
@@ -126,8 +137,10 @@ export function ChatGPTStyleGeneration({
   const progress = totalVoices > 0 ? (completedVoices / totalVoices) * 100 : 0;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] bg-gray-900 border-gray-700">
+    <>
+      {confirmationDialog}
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-6xl max-h-[90vh] bg-gray-900 border-gray-700">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3 text-gray-100">
             <Brain className="w-6 h-6 text-purple-400" />
@@ -291,7 +304,8 @@ export function ChatGPTStyleGeneration({
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

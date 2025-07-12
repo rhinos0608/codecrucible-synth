@@ -118,19 +118,19 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-              <span className="ml-2 text-gray-600 dark:text-gray-400">Generating solutions...</span>
+              <span className="ml-2 text-gray-400">Generating solutions...</span>
             </div>
           ) : error ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
                 <p className="text-red-500 mb-2">Error loading solutions</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{error.message}</p>
+                <p className="text-sm text-gray-400">{error.message}</p>
               </div>
             </div>
           ) : solutions.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
-                <p className="text-gray-600 dark:text-gray-400 mb-2">No solutions found</p>
+                <p className="text-gray-400 mb-2">No solutions found</p>
                 <p className="text-sm text-gray-500">Session ID: {sessionId}</p>
               </div>
             </div>
@@ -143,13 +143,13 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <div className="flex -space-x-1">
-                            <div className="w-8 h-8 bg-steward rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
-                              <CheckCircle className="w-4 h-4 text-white" />
+                            <div className="w-8 h-8 bg-steward rounded-full border-2 border-gray-800 flex items-center justify-center">
+                              <CheckCircle className="w-4 h-4 text-gray-100" />
                             </div>
                           </div>
                           <div>
                             <h4 className="font-semibold text-steward">{getVoiceDisplayName(solution.voiceCombination)}</h4>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">{solution.explanation}</p>
+                            <p className="text-xs text-gray-400">{solution.explanation}</p>
                           </div>
                         </div>
                         <Badge variant="secondary" className="bg-steward/20 text-steward">
@@ -168,16 +168,16 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
                       
                       <div className="grid grid-cols-2 gap-4 text-xs">
                         <div>
-                          <h6 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Strengths</h6>
-                          <ul className="space-y-1 text-gray-600 dark:text-gray-400">
+                          <h6 className="font-medium text-gray-300 mb-1">Strengths</h6>
+                          <ul className="space-y-1 text-gray-400">
                             {(solution.strengths as string[]).map((strength, idx) => (
                               <li key={idx}>• {strength}</li>
                             ))}
                           </ul>
                         </div>
                         <div>
-                          <h6 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Considerations</h6>
-                          <ul className="space-y-1 text-gray-600 dark:text-gray-400">
+                          <h6 className="font-medium text-gray-300 mb-1">Considerations</h6>
+                          <ul className="space-y-1 text-gray-400">
                             {(solution.considerations as string[]).map((consideration, idx) => (
                               <li key={idx}>• {consideration}</li>
                             ))}
@@ -191,8 +191,8 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
 
               {solutions.length > 0 && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
+                    <div className="text-sm text-gray-400">
                       Ready to merge solutions into final implementation?
                     </div>
                     <Button 

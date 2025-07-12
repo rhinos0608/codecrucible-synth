@@ -23,7 +23,7 @@ export function DecisionHistory({ isOpen, onClose }: DecisionHistoryProps) {
           <DialogTitle>
             <div>
               <h3 className="text-xl font-semibold">Decision History</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Code generation decisions and AI engine convergence analysis</p>
+              <p className="text-sm text-gray-400">Code generation decisions and AI engine convergence analysis</p>
             </div>
           </DialogTitle>
         </DialogHeader>
@@ -59,7 +59,7 @@ export function DecisionHistory({ isOpen, onClose }: DecisionHistoryProps) {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                       <div>
-                        <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Voices Engaged</h6>
+                        <h6 className="text-sm font-medium text-gray-300 mb-2">Voices Engaged</h6>
                         <div className="flex flex-wrap gap-1">
                           {(entry.voicesEngaged as string[]).map((voice) => (
                             <Badge key={voice} variant="secondary" className="text-xs">
@@ -69,14 +69,14 @@ export function DecisionHistory({ isOpen, onClose }: DecisionHistoryProps) {
                         </div>
                       </div>
                       <div>
-                        <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decision Outcome</h6>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">{entry.decisionOutcome}</p>
+                        <h6 className="text-sm font-medium text-gray-300 mb-2">Decision Outcome</h6>
+                        <p className="text-xs text-gray-400">{entry.decisionOutcome}</p>
                       </div>
                     </div>
 
                     <div>
-                      <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Key Learnings</h6>
-                      <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                      <h6 className="text-sm font-medium text-gray-300 mb-2">Key Learnings</h6>
+                      <ul className="text-xs text-gray-400 space-y-1">
                         {(entry.keyLearnings as string[]).map((learning, idx) => (
                           <li key={idx}>• {learning}</li>
                         ))}
@@ -91,32 +91,32 @@ export function DecisionHistory({ isOpen, onClose }: DecisionHistoryProps) {
           {/* Analytics Summary */}
           {analytics && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="bg-gray-50 dark:bg-gray-700/50 p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+              <Card className="bg-gray-700/50 p-4 text-center">
+                <div className="text-2xl font-bold text-purple-400">
                   {analytics.totalSessions || 0}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Total Sessions</div>
+                <div className="text-sm text-gray-400">Total Sessions</div>
               </Card>
               
-              <Card className="bg-gray-50 dark:bg-gray-700/50 p-4 text-center">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              <Card className="bg-gray-700/50 p-4 text-center">
+                <div className="text-2xl font-bold text-green-400">
                   {Math.round(analytics.averageEthicalScore || 0)}%
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Avg Ethical Score</div>
+                <div className="text-sm text-gray-400">Avg Ethical Score</div>
               </Card>
               
-              <Card className="bg-gray-50 dark:bg-gray-700/50 p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              <Card className="bg-gray-700/50 p-4 text-center">
+                <div className="text-2xl font-bold text-blue-400">
                   {analytics.averageVoicesPerSession?.toFixed(1) || "0.0"}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Avg Voices/Session</div>
+                <div className="text-sm text-gray-400">Avg Voices/Session</div>
               </Card>
               
-              <Card className="bg-gray-50 dark:bg-gray-700/50 p-4 text-center">
-                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+              <Card className="bg-gray-700/50 p-4 text-center">
+                <div className="text-2xl font-bold text-orange-400">
                   {analytics.learningInsights || 0}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Learning Insights</div>
+                <div className="text-sm text-gray-400">Learning Insights</div>
               </Card>
             </div>
           )}

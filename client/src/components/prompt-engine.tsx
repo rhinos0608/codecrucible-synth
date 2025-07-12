@@ -79,7 +79,7 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
             <Button
               key={index}
               variant="ghost"
-              className="text-left p-3 text-sm bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors h-auto whitespace-normal"
+              className="text-left p-3 text-sm bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors h-auto whitespace-normal"
               onClick={() => setPrompt(prompt)}
             >
               {prompt}
@@ -103,10 +103,10 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
 
       {/* Generation Settings */}
       <div className="mb-6">
-        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Generation Settings</h4>
+        <h4 className="text-sm font-medium text-gray-300 mb-3">Generation Settings</h4>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-600 dark:text-gray-400">Analysis Depth</label>
+            <label className="text-sm text-gray-400">Analysis Depth</label>
             <Select 
               value={state.analysisDepth.toString()} 
               onValueChange={(value) => setAnalysisDepth(parseInt(value) as 1 | 2 | 3)}
@@ -123,7 +123,7 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
           </div>
           
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-600 dark:text-gray-400">Merge Strategy</label>
+            <label className="text-sm text-gray-400">Merge Strategy</label>
             <Select value={state.mergeStrategy} onValueChange={setMergeStrategy}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -137,7 +137,7 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
           </div>
           
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-600 dark:text-gray-400">Quality Filtering</label>
+            <label className="text-sm text-gray-400">Quality Filtering</label>
             <Switch
               checked={state.qualityFiltering}
               onCheckedChange={toggleQualityFiltering}
@@ -157,8 +157,8 @@ export function PromptEngine({ onSolutionsGenerated }: PromptEngineProps) {
       </Button>
 
       {/* Active Configuration Summary */}
-      <Card className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50">
-        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+      <Card className="mt-6 p-4 bg-gray-700/50">
+        <h4 className="text-sm font-medium text-gray-300 mb-2">
           Active Configuration
         </h4>
         <div className="space-y-1 text-xs">

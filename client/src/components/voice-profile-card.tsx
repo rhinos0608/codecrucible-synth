@@ -13,7 +13,7 @@ interface VoiceProfileCardProps {
 
 export function VoiceProfileCard({ profile, onEdit, onDelete, onSetDefault }: VoiceProfileCardProps) {
   return (
-    <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
+    <Card className="bg-gray-800/50 border-gray-700/50 hover:bg-gray-700/50 transition-colors">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -25,7 +25,7 @@ export function VoiceProfileCard({ profile, onEdit, onDelete, onSetDefault }: Vo
                   <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                 )}
               </CardTitle>
-              <p className="text-xs text-white/60">{profile.specialization}</p>
+              <p className="text-xs text-gray-400">{profile.specialization}</p>
             </div>
           </div>
           <div className="flex gap-1">
@@ -33,7 +33,7 @@ export function VoiceProfileCard({ profile, onEdit, onDelete, onSetDefault }: Vo
               variant="ghost"
               size="sm"
               onClick={() => onEdit(profile)}
-              className="h-8 w-8 p-0 hover:bg-white/20"
+              className="h-8 w-8 p-0 hover:bg-gray-600/50"
             >
               <Edit className="w-3 h-3" />
             </Button>
@@ -58,10 +58,10 @@ export function VoiceProfileCard({ profile, onEdit, onDelete, onSetDefault }: Vo
               {profile.role}
             </Badge>
           </div>
-          <p className="text-xs text-white/70 line-clamp-2">
+          <p className="text-xs text-gray-300 line-clamp-2">
             {profile.personality}
           </p>
-          <div className="flex justify-between items-center text-xs text-white/50">
+          <div className="flex justify-between items-center text-xs text-gray-500">
             <span>{profile.chatStyle} style</span>
             {!profile.isDefault && (
               <Button

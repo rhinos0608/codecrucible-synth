@@ -17,15 +17,15 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
   };
 
   return (
-    <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+    <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
+      <div className="p-6 border-b border-gray-700">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-gradient-to-br from-seeker to-witness rounded-lg flex items-center justify-center">
             <Code2 className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-lg font-bold">CodeCrucible</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Multi-Engine Code Generator</p>
+            <p className="text-xs text-gray-400">Multi-Engine Code Generator</p>
           </div>
         </div>
       </div>
@@ -36,7 +36,7 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
             variant={activeView === "voices" ? "default" : "ghost"}
             className={`w-full justify-start ${
               activeView === "voices" 
-                ? "bg-blue-50 dark:bg-blue-900/20 text-seeker border border-blue-200 dark:border-blue-800" 
+                ? "bg-blue-900/20 text-seeker border border-blue-800" 
                 : ""
             }`}
             onClick={() => onViewChange("voices")}

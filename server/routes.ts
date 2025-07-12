@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { onboardingAIService } from "./onboarding-ai-service";
+import Stripe from 'stripe';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -407,22 +408,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: 'Payment system not configured' });
       }
 
-      // For now, redirect to the pricing page with tier parameter
-      // In production, this would create a Stripe checkout session
-      const checkoutUrl = `/pricing?selected=${validatedTier}&redirect=checkout`;
+      // Import Stripe for actual checkout session creation
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+      // Create actual Stripe checkout session following AI_INSTRUCTIONS.md patterns
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `CodeCrucible ${selectedTier.name}`,
+                description: selectedTier.description,
+              },
+              unit_amount: selectedTier.price * 100, // Convert to cents
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${req.headers.origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.headers.origin}/pricing?cancelled=true`,
+        customer_email: req.user.email || undefined,
+        metadata: {
+          userId,
+          tier: validatedTier,
+          subscriptionType: 'monthly'
+        }
+      });
       
-      logger.info('Checkout initiated', {
+      logger.info('Stripe checkout session created', {
         userId,
         tier: validatedTier,
-        price: selectedTier.price,
-        checkoutUrl
+        sessionId: session.id,
+        checkoutUrl: session.url
       });
 
       res.json({ 
         success: true,
-        checkoutUrl,
+        checkoutUrl: session.url,
         tier: selectedTier,
-        message: 'Redirecting to secure checkout...'
+        sessionId: session.id,
+        message: 'Redirecting to Stripe checkout...'
       });
       
     } catch (error) {
@@ -805,6 +833,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true, message: 'Onboarding reset for testing' });
     } catch (error) {
+      next(error);
+    }
+  });
+
+  // Following AI_INSTRUCTIONS.md: Session Generation Endpoint for Dev Mode
+  app.post('/api/sessions', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { prompt, selectedVoices, analysisDepth = 2, mergeStrategy = 'competitive', qualityFiltering = true } = req.body;
+      
+      // Following AI_INSTRUCTIONS.md: Input validation
+      if (!prompt || prompt.trim().length === 0) {
+        return res.status(400).json({ error: 'Prompt is required' });
+      }
+      
+      if (!selectedVoices || (!selectedVoices.perspectives?.length && !selectedVoices.roles?.length)) {
+        return res.status(400).json({ error: 'At least one voice must be selected' });
+      }
+
+      // Following CodingPhilosophy.md: Council-based solution generation
+      logger.info('Dev mode session generation started', {
+        userId: userId.substring(0, 8) + '...',
+        prompt: prompt.substring(0, 100) + '...',
+        voiceCount: (selectedVoices.perspectives?.length || 0) + (selectedVoices.roles?.length || 0)
+      });
+
+      // Create session in storage
+      const session = await storage.createVoiceSession({
+        userId,
+        prompt,
+        selectedPerspectives: selectedVoices.perspectives || [],
+        selectedRoles: selectedVoices.roles || [],
+        analysisDepth,
+        mergeStrategy,
+        qualityFiltering,
+        mode: 'development'
+      });
+
+      // Generate solutions using the OpenAI service
+      const { openaiService } = await import('./openai-service');
+      const solutions = [];
+
+      // Create voice combinations
+      const voiceCombinations = [];
+      
+      if (selectedVoices.perspectives?.length > 0 && selectedVoices.roles?.length > 0) {
+        // Both perspectives and roles selected - create combinations
+        for (const perspective of selectedVoices.perspectives) {
+          for (const role of selectedVoices.roles) {
+            voiceCombinations.push({ perspective, role });
+          }
+        }
+      } else if (selectedVoices.perspectives?.length > 0) {
+        // Only perspectives selected
+        for (const perspective of selectedVoices.perspectives) {
+          voiceCombinations.push({ perspective, role: null });
+        }
+      } else if (selectedVoices.roles?.length > 0) {
+        // Only roles selected
+        for (const role of selectedVoices.roles) {
+          voiceCombinations.push({ perspective: null, role });
+        }
+      }
+
+      // Generate solutions for each voice combination
+      for (const { perspective, role } of voiceCombinations) {
+        try {
+          const generatedSolution = await openaiService.generateSolution({
+            prompt,
+            perspectives: selectedVoices.perspectives || [],
+            roles: selectedVoices.roles || [],
+            analysisDepth,
+            mergeStrategy,
+            qualityFiltering,
+            sessionId: session.id
+          }, perspective, role);
+
+          // Store solution in database
+          const solution = await storage.createSolution({
+            sessionId: session.id,
+            voiceCombination: perspective && role ? `${perspective}-${role}` : 
+                             perspective ? `${perspective}` : 
+                             role ? `${role}` : 'default',
+            code: generatedSolution.code,
+            explanation: generatedSolution.explanation,
+            confidence: generatedSolution.confidence,
+            strengths: generatedSolution.strengths,
+            considerations: generatedSolution.considerations
+          });
+
+          solutions.push(solution);
+        } catch (error) {
+          logger.error('Failed to generate solution for voice combination', error as Error, {
+            sessionId: session.id,
+            perspective,
+            role
+          });
+        }
+      }
+
+      logger.info('Dev mode session generation completed', {
+        sessionId: session.id,
+        solutionCount: solutions.length,
+        userId: userId.substring(0, 8) + '...'
+      });
+
+      res.json({ 
+        session,
+        solutions,
+        message: 'Solutions generated successfully'
+      });
+      
+    } catch (error) {
+      logger.error('Session generation failed', error as Error, {
+        userId: req.user?.claims?.sub?.substring(0, 8) + '...',
+        requestBody: req.body
+      });
       next(error);
     }
   });

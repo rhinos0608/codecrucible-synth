@@ -10,6 +10,7 @@ import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { securityMiddleware } from "./security-middleware";
 import { enforcePlanRestrictions, validateFeatureAccess } from "./middleware/enforcePlan";
+import { enforceSubscriptionLimits, enforceSynthesisAccess } from "./middleware/subscription-enforcement";
 import { processStripeWebhook } from "./lib/stripe/updateUserPlan";
 import { incrementUsageQuota, checkGenerationQuota } from "./lib/utils/checkQuota";
 import { logSecurityEvent } from "./lib/security/logSecurityEvent";

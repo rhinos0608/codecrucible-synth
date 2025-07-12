@@ -2,6 +2,7 @@
 import React from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlanGuard } from '@/hooks/usePlanGuard';
+import { isFrontendDevModeEnabled } from '@/lib/dev-mode';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ const FEATURE_MATRIX = {
   'voice_recommendations': ['pro', 'team', 'enterprise'],
   'code_export': ['pro', 'team', 'enterprise'],
   'custom_voices': ['pro', 'team', 'enterprise'],
+  'voice_profiles': ['pro', 'team', 'enterprise'],
   'team_collaboration': ['team', 'enterprise'],
   'shared_profiles': ['team', 'enterprise'],
   'team_management': ['team', 'enterprise'],
@@ -45,6 +47,11 @@ interface FeatureGateProps {
  * Check if user has access to a specific feature
  */
 const hasFeatureAccess = (userTier: string, feature: FeatureName): boolean => {
+  // Dev mode bypass - grant access to all features in development
+  if (isFrontendDevModeEnabled()) {
+    return true;
+  }
+  
   const allowedTiers = FEATURE_MATRIX[feature];
   if (!allowedTiers) return false;
   return allowedTiers.includes(userTier as SubscriptionTier);
@@ -108,6 +115,7 @@ const UpgradePrompt: React.FC<{
     'voice_recommendations': 'Smart Voice Recommendations',
     'code_export': 'Code Export & GitHub Integration',
     'custom_voices': 'Custom Voice Profiles',
+    'voice_profiles': 'Voice Profile Management',
     'team_collaboration': 'Team Collaboration',
     'shared_profiles': 'Shared Voice Profiles',
     'team_management': 'Team Management',

@@ -380,7 +380,34 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getTeamMembers(teamId: number): Promise<TeamMember[]> {
-    return await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
+    const membersWithUserData = await db
+      .select({
+        id: teamMembers.id,
+        teamId: teamMembers.teamId,
+        userId: teamMembers.userId,
+        role: teamMembers.role,
+        joinedAt: teamMembers.joinedAt,
+        // User data from join
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      })
+      .from(teamMembers)
+      .innerJoin(users, eq(teamMembers.userId, users.id))
+      .where(eq(teamMembers.teamId, teamId));
+
+    return membersWithUserData.map(member => ({
+      id: member.id,
+      teamId: member.teamId,
+      userId: member.userId,
+      role: member.role,
+      joinedAt: member.joinedAt,
+      // Additional user data for frontend
+      name: `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.userId,
+      email: member.email || `${member.userId}@example.com`,
+      avatar: member.profileImageUrl || `/avatars/user-${member.id}.jpg`,
+    }));
   }
   
   async removeTeamMember(teamId: number, userId: string): Promise<boolean> {

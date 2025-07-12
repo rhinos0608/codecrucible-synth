@@ -1,6 +1,6 @@
 // Teams Page - Collaboration, Voice Sharing, and Team Management
 import { useState } from "react";
-import { Users, Plus, Settings, Crown, Share2, Bot, Code, MessageSquare, UserMinus, UserPlus } from "lucide-react";
+import { Users, Plus, Settings, Crown, Share2, Bot, Code, MessageSquare, UserMinus, UserPlus, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +15,7 @@ import { useTeamSessions, useCreateSession, useJoinSession } from "@/hooks/use-t
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { useSharedVoiceProfiles } from "@/hooks/use-shared-voices";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export default function Teams() {
   const [showCollaborationPanel, setShowCollaborationPanel] = useState(false);
@@ -23,6 +24,7 @@ export default function Teams() {
   const [showVoiceCustomizer, setShowVoiceCustomizer] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Use real team ID - in production this would come from user's current team
   const teamId = user?.id || 'default-team';
@@ -88,14 +90,25 @@ export default function Teams() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Users className="w-8 h-8 text-blue-500" />
-              Team Collaboration
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Collaborate on code, share voice profiles, and work together in real-time
-            </p>
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setLocation('/')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Users className="w-8 h-8 text-blue-500" />
+                Team Collaboration
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Collaborate on code, share voice profiles, and work together in real-time
+              </p>
+            </div>
           </div>
           <FeatureGate feature="team_collaboration">
             <Button 

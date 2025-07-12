@@ -399,37 +399,38 @@ Return valid JSON format.`;
 
   // REMOVED: No fallback methods allowed - only real OpenAI integration
 
-  // Enhanced system prompts with proper voice mapping following AI_INSTRUCTIONS.md patterns  
+  // Enhanced system prompts with comprehensive voice mapping following AI_INSTRUCTIONS.md patterns  
   private getFastSystemPrompt(voiceId: string, type: 'perspective' | 'role'): string {
-    const base = "You are an expert software engineer. Generate production-ready code with comprehensive solutions.";
+    const base = "You are an expert software engineer. Generate comprehensive, production-ready code with detailed implementations. Always provide substantial code examples (minimum 1200 characters) with complete functionality.";
     
     if (type === 'perspective') {
-      const prompts = {
-        // Current voice names from the system
-        seeker: `${base} Focus on innovation and exploration. Generate curious, investigative solutions.`,
-        explorer: `${base} Focus on innovation and exploration. Generate curious, investigative solutions.`,
-        steward: `${base} Focus on maintainability and reliability. Generate robust, well-documented code.`,
-        maintainer: `${base} Focus on maintainability and reliability. Generate robust, well-documented code.`,
-        witness: `${base} Focus on deep analysis and understanding. Generate comprehensive, analytical solutions.`,
-        analyzer: `${base} Focus on deep analysis and understanding. Generate comprehensive, analytical solutions.`,
-        nurturer: `${base} Focus on user experience and accessibility. Generate user-friendly, intuitive code.`,
-        developer: `${base} Focus on user experience and accessibility. Generate user-friendly, intuitive code.`,
-        decider: `${base} Focus on practical implementation. Generate efficient, production-ready solutions.`,
-        implementor: `${base} Focus on practical implementation. Generate efficient, production-ready solutions.`
-      };
-      return prompts[voiceId] || prompts.explorer;
+      switch (voiceId) {
+        case 'seeker':
+          return `${base} As an Explorer, investigate edge cases, alternative algorithms, and innovative approaches. Generate comprehensive code that explores different implementation strategies and provides multiple solution paths.`;
+        case 'steward':
+          return `${base} As a Maintainer, focus on code sustainability, maintainability, and technical debt reduction. Generate robust, well-documented code following SOLID principles with extensive error handling.`;
+        case 'witness':
+          return `${base} As an Analyzer, identify patterns, performance bottlenecks, and architectural insights. Generate analytically-driven code with detailed performance considerations and optimization opportunities.`;
+        case 'nurturer':
+          return `${base} As a Developer, prioritize developer experience, API usability, and team productivity. Generate intuitive, well-documented code with clear interfaces and developer-friendly patterns.`;
+        case 'decider':
+          return `${base} As an Implementor, make decisive technical choices and deliver production-ready solutions. Generate practical, shipping-quality code with clear implementation strategies.`;
+        default:
+          return `${base} Generate comprehensive, production-ready code solutions.`;
+      }
     } else {
-      const prompts = {
-        guardian: `${base} Focus on security and validation. Generate secure, protected code.`,
-        security: `${base} Focus on security and validation. Generate secure, protected code.`,
-        architect: `${base} Focus on scalable design patterns. Generate well-structured, scalable code.`,
-        systems: `${base} Focus on scalable design patterns. Generate well-structured, scalable code.`,
-        designer: `${base} Focus on UI/UX and design. Generate beautiful, responsive interfaces.`,
-        uiux: `${base} Focus on UI/UX and design. Generate beautiful, responsive interfaces.`,
-        optimizer: `${base} Focus on performance and efficiency. Generate optimized, fast code.`,
-        performance: `${base} Focus on performance and efficiency. Generate optimized, fast code.`
-      };
-      return prompts[voiceId] || prompts.architect;
+      switch (voiceId) {
+        case 'guardian':
+          return `${base} As a Security Engineer, focus on vulnerability analysis, input validation, and secure coding practices. Generate security-first implementations with comprehensive validation, sanitization, and error handling.`;
+        case 'architect':
+          return `${base} As a Systems Architect, focus on scalable architecture, design patterns, and system-level solutions. Generate well-structured, enterprise-grade code with proper separation of concerns, modular design, and scalable patterns. Provide comprehensive implementations with multiple components and clear architecture.`;
+        case 'designer':
+          return `${base} As a UI/UX Engineer, focus on component design, responsive layouts, and accessibility standards. Generate beautiful, accessible interfaces with comprehensive styling and responsive behavior.`;
+        case 'optimizer':
+          return `${base} As a Performance Engineer, focus on algorithm optimization, caching strategies, and performance monitoring. Generate highly optimized code with performance benchmarks and efficiency considerations.`;
+        default:
+          return `${base} Generate comprehensive, production-ready code solutions.`;
+      }
     }
   }
 

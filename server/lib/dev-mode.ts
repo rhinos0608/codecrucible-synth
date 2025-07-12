@@ -64,8 +64,6 @@ function detectDevMode(): DevModeConfig {
       bypassRateLimit: isEnabled,
       extendedPromptLength: isEnabled,
       unlimitedSynthesis: isEnabled,
-      unlimitedVoiceProfiles: isEnabled,
-      unlimitedTeamFeatures: isEnabled,
     },
     metadata: {
       environment: isEnabled ? 'development' : 'production',

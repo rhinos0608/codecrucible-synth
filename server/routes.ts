@@ -339,8 +339,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getDevModeConfig } = await import('./lib/dev-mode');
       const devModeConfig = getDevModeConfig();
       
+      console.log('🔧 Dev Mode Check - Environment Variables:', {
+        NODE_ENV: process.env.NODE_ENV,
+        REPL_ID: process.env.REPL_ID?.substring(0, 8) + '...',
+        DEV_MODE: process.env.DEV_MODE,
+        devModeEnabled: devModeConfig.isEnabled,
+        reason: devModeConfig.reason
+      });
+      
       // Dev mode bypass for unlimited generation
       if (devModeConfig.isEnabled) {
+        console.log('✅ Dev mode enabled - bypassing quota limits');
         res.json({ 
           dailyGenerated: 0,
           dailyLimit: 999,
@@ -350,6 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           planTier: 'development',
           quotaUsed: 0,
           quotaLimit: 999,
+          unlimitedGenerations: true,
           reason: 'dev_mode_unlimited'
         });
         return;
@@ -500,77 +510,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Streaming endpoint for Live Streaming - Enhanced SSE with voice simulation
-  app.post("/api/sessions/stream", async (req, res) => {
+  // REAL OpenAI Streaming endpoint - Following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+  app.post("/api/sessions/stream", isAuthenticated, async (req: any, res) => {
     try {
-      console.log('Live streaming request:', req.body);
+      const userId = req.user.claims.sub;
+      const { prompt, selectedVoices } = req.body;
+      
+      console.log('🔧 Real OpenAI Streaming request:', {
+        userId,
+        prompt: prompt?.substring(0, 50) + '...',
+        selectedVoices,
+        voiceCount: (selectedVoices.perspectives?.length || 0) + (selectedVoices.roles?.length || 0)
+      });
       
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type'
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Credentials': 'true'
       });
 
-      // Enhanced streaming with voice simulation
-      const voices = ['Explorer', 'Maintainer', 'Security Engineer', 'Systems Architect'];
       const sessionId = Date.now();
       
-      // Start streaming message
+      // Start streaming message with consciousness framework integration
       res.write(`data: ${JSON.stringify({ 
         type: 'session_start', 
         sessionId: sessionId,
-        voices: voices 
+        message: 'Initiating council assembly with consciousness-driven AI voices...'
       })}\n\n`);
       
-      // Simulate voice streaming with delays
-      let voiceIndex = 0;
-      const streamInterval = setInterval(() => {
-        if (voiceIndex < voices.length) {
-          const voiceName = voices[voiceIndex];
-          const codeContent = `// ${voiceName} analysis
-const ${voiceName.toLowerCase().replace(' ', '')}Solution = () => {
-  console.log('${voiceName} perspective on: ${req.body?.prompt?.substring(0, 30) || 'optimization'}');
-  
-  return {
-    approach: '${voiceName} methodology',
-    implementation: 'Streaming generation',
-    confidence: ${85 + Math.floor(Math.random() * 10)}
-  };
-};`;
+      try {
+        // Generate REAL OpenAI solutions with streaming response
+        const solutions = await realOpenAIService.generateSolutions({
+          prompt,
+          selectedVoices,
+          userId,
+          sessionId,
+          mode: 'streaming'
+        });
 
+        // Stream each solution in real-time following CodingPhilosophy.md living spiral
+        for (let i = 0; i < solutions.length; i++) {
+          const solution = solutions[i];
+          
+          // Voice arrival notification
           res.write(`data: ${JSON.stringify({
-            type: 'voice_update',
-            voiceId: voiceName.toLowerCase().replace(' ', '_'),
-            voiceName: voiceName,
-            content: codeContent,
-            isComplete: false
+            type: 'voice_connected',
+            voiceId: solution.voiceCombination || `voice_${i}`,
+            voiceName: solution.voiceCombination || 'AI Voice',
+            message: 'Voice joined the council...'
           })}\n\n`);
           
-          voiceIndex++;
-        } else {
-          // Complete streaming
-          res.write(`data: ${JSON.stringify({
-            type: 'session_complete',
-            sessionId: sessionId,
-            message: 'All voices have completed generation'
-          })}\n\n`);
+          // Stream the actual OpenAI-generated code in chunks for ChatGPT effect
+          const codeChunks = solution.code.match(/.{1,50}/g) || [solution.code];
           
-          clearInterval(streamInterval);
-          res.end();
+          for (let j = 0; j < codeChunks.length; j++) {
+            res.write(`data: ${JSON.stringify({
+              type: 'voice_chunk',
+              voiceId: solution.voiceCombination || `voice_${i}`,
+              voiceName: solution.voiceCombination || 'AI Voice',
+              chunk: codeChunks[j],
+              isComplete: j === codeChunks.length - 1,
+              confidence: solution.confidence
+            })}\n\n`);
+            
+            // Real-time delay for ChatGPT typing effect
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+          
+          // Voice completion with explanation
+          res.write(`data: ${JSON.stringify({
+            type: 'voice_complete',
+            voiceId: solution.voiceCombination || `voice_${i}`,
+            voiceName: solution.voiceCombination || 'AI Voice',
+            fullCode: solution.code,
+            explanation: solution.explanation,
+            confidence: solution.confidence
+          })}\n\n`);
         }
-      }, 800); // 800ms between voice updates
+
+        // Store solutions for synthesis
+        global.sessionSolutions = global.sessionSolutions || new Map();
+        global.sessionSolutions.set(sessionId, solutions);
+        
+        // Complete streaming with council synthesis invitation
+        res.write(`data: ${JSON.stringify({
+          type: 'session_complete',
+          sessionId: sessionId,
+          solutionCount: solutions.length,
+          message: 'Council assembly complete. Ready for synthesis...'
+        })}\n\n`);
+        
+        console.log('✅ Real OpenAI streaming completed:', { sessionId, solutionCount: solutions.length });
+        
+      } catch (openaiError) {
+        console.error('❌ Real OpenAI streaming error:', openaiError);
+        
+        // Jung's Descent Protocol - Error handling with consciousness
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          message: 'AI council assembly encountered resistance. Implementing recovery protocol...',
+          error: openaiError.message
+        })}\n\n`);
+      }
       
-      // Cleanup on client disconnect
-      req.on('close', () => {
-        clearInterval(streamInterval);
-        console.log('Streaming client disconnected');
-      });
+      res.end();
       
     } catch (error) {
-      console.error('Streaming error:', error);
-      res.status(500).json({ error: 'Streaming failed' });
+      console.error('Streaming endpoint error:', error);
+      res.status(500).json({ error: 'Real OpenAI streaming failed', details: error.message });
     }
   });
 

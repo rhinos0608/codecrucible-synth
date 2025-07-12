@@ -52,8 +52,18 @@ export function usePlanGuard() {
     if (!isAuthenticated || !user) return null;
     
     try {
-      const response = await apiRequest("GET", "/api/quota/check");
+      const response = await apiRequest("/api/quota/check", { method: "GET" });
       const data = await response.json();
+      
+      console.log('Quota check response:', {
+        allowed: data.allowed,
+        devMode: data.devMode,
+        planTier: data.planTier,
+        quotaUsed: data.quotaUsed,
+        quotaLimit: data.quotaLimit,
+        reason: data.reason
+      });
+      
       return data;
     } catch (error) {
       console.error('Failed to check quota:', error);

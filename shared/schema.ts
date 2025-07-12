@@ -373,7 +373,7 @@ export const insertProjectFolderSchema = createInsertSchema(projectFolders).pick
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   icon: z.string().min(1).max(50).optional(),
   userId: z.string().min(1),
-  parentId: z.number().int().positive().optional(),
+  parentId: z.number().int().positive().optional().nullable(),
   isShared: z.boolean().default(false),
   visibility: z.enum(['private', 'team', 'public']).default('private'),
   sortOrder: z.number().int().min(0).default(0)

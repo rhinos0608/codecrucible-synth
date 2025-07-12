@@ -83,25 +83,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       
-      // Add missing defaults for required fields
+      // Process parentId properly - null vs undefined handling following AI_INSTRUCTIONS.md
       const folderData = {
         ...req.body,
         userId,
-        sortOrder: req.body.sortOrder || 0,
-        isShared: req.body.isShared || false,
-        parentId: req.body.parentId || null
+        sortOrder: req.body.sortOrder ?? 0,
+        isShared: req.body.isShared ?? false,
+        parentId: req.body.parentId === '' || req.body.parentId === 'null' ? null : req.body.parentId,
+        color: req.body.color || '#3b82f6',
+        icon: req.body.icon || '📁'
       };
+      
+      logger.info('Creating project folder with data:', { folderData, userId });
       
       const validatedData = insertProjectFolderSchema.parse(folderData);
       const folder = await storage.createProjectFolder(validatedData);
+      
+      logger.info('Project folder created successfully:', { folderId: folder.id, userId });
       res.json(folder);
     } catch (error) {
       logger.error('Error creating project folder', error as Error, { 
         userId: req.user?.claims?.sub,
-        requestBody: req.body 
+        requestBody: req.body,
+        validationError: error instanceof Error ? error.message : 'Unknown error'
       });
+      
       if (error instanceof Error && error.message.includes('subscription')) {
         res.status(403).json({ error: 'Pro subscription required for project folders' });
+      } else if (error instanceof Error && error.message.includes('validation')) {
+        res.status(400).json({ error: 'Invalid folder data', details: error.message });
       } else {
         res.status(500).json({ error: 'Failed to create project folder' });
       }

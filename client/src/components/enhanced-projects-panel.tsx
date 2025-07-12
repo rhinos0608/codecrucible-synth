@@ -139,21 +139,35 @@ export function EnhancedProjectsPanel({
     staleTime: 30000
   });
 
-  // Create folder mutation
+  // Create folder mutation following AI_INSTRUCTIONS.md patterns
   const createFolderMutation = useMutation({
     mutationFn: async (folderData: typeof newFolderData) => {
-      return await apiRequest('POST', '/api/project-folders', folderData);
+      // Ensure proper data formatting following AI_INSTRUCTIONS.md patterns
+      const sanitizedData = {
+        ...folderData,
+        parentId: folderData.parentId || null,
+        sortOrder: folderData.sortOrder || 0,
+        isShared: folderData.isShared || false,
+        color: folderData.color || '#3b82f6',
+        icon: folderData.icon || '📁'
+      };
+      
+      console.log('Sending folder creation request:', sanitizedData);
+      return await apiRequest('POST', '/api/project-folders', sanitizedData);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Folder created successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
       setShowCreateFolder(false);
       setNewFolderData({
         name: '',
         description: '',
         color: '#3b82f6',
-        icon: 'folder',
+        icon: '📁',
         parentId: null,
-        visibility: 'private'
+        sortOrder: 0,
+        isShared: false,
+        visibility: 'private' as 'private' | 'team' | 'public'
       });
       toast({
         title: "Folder created",
@@ -161,10 +175,17 @@ export function EnhancedProjectsPanel({
       });
     },
     onError: (error: any) => {
+      console.error('Folder creation failed:', error);
       if (error.message.includes('subscription')) {
         toast({
           title: "Pro subscription required",
           description: "Project folders are available with Pro subscription.",
+          variant: "destructive"
+        });
+      } else if (error.message.includes('validation')) {
+        toast({
+          title: "Validation Error",
+          description: "Please check your folder data and try again.",
           variant: "destructive"
         });
       } else {

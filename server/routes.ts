@@ -1391,6 +1391,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stripe payment routes following AI_INSTRUCTIONS.md patterns
+  app.post("/api/create-payment-intent", async (req, res, next) => {
+    try {
+      const { amount } = req.body;
+      
+      if (!amount || amount <= 0) {
+        throw new APIError(400, 'Invalid amount provided');
+      }
+      
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: "usd",
+        metadata: {
+          integration_check: 'accept_a_payment',
+        },
+      });
+      
+      logger.info('Payment intent created', {
+        paymentIntentId: paymentIntent.id,
+        amount: amount,
+        currency: 'usd'
+      });
+      
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id
+      });
+    } catch (error: any) {
+      logger.error('Error creating payment intent', error);
+      next(new APIError(500, "Error creating payment intent: " + error.message));
+    }
+  });
+
+  // Subscription creation endpoint for Pro plans
+  app.post('/api/create-subscription', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { priceId } = req.body;
+      
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      if (!priceId) {
+        throw new APIError(400, 'Price ID is required');
+      }
+      
+      let user = await storage.getUser(userId);
+      if (!user) {
+        throw new APIError(404, 'User not found');
+      }
+
+      // Check if user already has a subscription
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        
+        if (subscription.status === 'active') {
+          return res.json({
+            subscriptionId: subscription.id,
+            clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+            status: subscription.status
+          });
+        }
+      }
+      
+      let customerId = user.stripeCustomerId;
+      
+      // Create Stripe customer if doesn't exist
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email || undefined,
+          metadata: {
+            userId: userId,
+            username: user.username
+          },
+        });
+        
+        customerId = customer.id;
+        
+        // Update user with Stripe customer ID
+        await storage.updateUser(userId, { stripeCustomerId: customerId });
+      }
+
+      // Create subscription
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{
+          price: priceId,
+        }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      // Update user with subscription ID
+      await storage.updateUser(userId, { 
+        stripeSubscriptionId: subscription.id,
+        planTier: 'pro' // Upgrade to pro tier
+      });
+      
+      logger.info('Subscription created successfully', {
+        userId,
+        subscriptionId: subscription.id,
+        customerId,
+        priceId
+      });
+  
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+        status: subscription.status
+      });
+    } catch (error: any) {
+      logger.error('Error creating subscription', error);
+      next(new APIError(500, "Error creating subscription: " + error.message));
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

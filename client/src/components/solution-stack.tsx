@@ -16,7 +16,13 @@ interface ImplementationOptionsProps {
 }
 
 // Map voice combination IDs to display names following AI_INSTRUCTIONS.md patterns
-const getVoiceDisplayName = (voiceCombination: string): string => {
+const getVoiceDisplayName = (voiceCombination: string | undefined): string => {
+  // Defensive programming: handle undefined/null voiceCombination - Jung's Descent Protocol
+  if (!voiceCombination) {
+    console.warn('🔧 Voice Council Assembly: Undefined voice combination detected, using fallback name');
+    return 'Unknown Voice Engine';
+  }
+  
   // Enhanced voice name mapping following AI_INSTRUCTIONS.md patterns
   
   // Handle colon-separated format (e.g., "perspective:seeker" -> "Explorer")
@@ -33,14 +39,14 @@ const getVoiceDisplayName = (voiceCombination: string): string => {
   }
   
   // Handle perspective-prefixed voices (e.g., "perspective-seeker" -> "Explorer")
-  if (voiceCombination.startsWith('perspective-')) {
+  if (voiceCombination && voiceCombination.startsWith('perspective-')) {
     const perspectiveId = voiceCombination.replace('perspective-', '');
     const perspective = CODE_PERSPECTIVES.find(p => p.id === perspectiveId);
     if (perspective) return perspective.name;
   }
   
   // Handle role-prefixed voices (e.g., "role-architect" -> "Systems Architect")
-  if (voiceCombination.startsWith('role-')) {
+  if (voiceCombination && voiceCombination.startsWith('role-')) {
     const roleId = voiceCombination.replace('role-', '');
     const role = DEVELOPMENT_ROLES.find(r => r.id === roleId);
     if (role) return role.name;
@@ -53,8 +59,8 @@ const getVoiceDisplayName = (voiceCombination: string): string => {
   const role = DEVELOPMENT_ROLES.find(r => r.id === voiceCombination);
   if (role) return role.name;
   
-  // Handle combined voice cases (perspective-role or perspective+role)
-  const combinationParts = voiceCombination.split(/[-+]/);
+  // Handle combined voice cases (perspective-role or perspective+role) - Alexander's Pattern Language
+  const combinationParts = voiceCombination ? voiceCombination.split(/[-+]/) : [];
   if (combinationParts.length === 2) {
     const [part1, part2] = combinationParts;
     
@@ -73,8 +79,8 @@ const getVoiceDisplayName = (voiceCombination: string): string => {
     return `${name1} + ${name2}`;
   }
   
-  // Fallback: return original if no mapping found
-  return voiceCombination;
+  // Fallback: return original if no mapping found - Consciousness-driven resilience
+  return voiceCombination || 'Voice Engine';
 };
 
 export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: ImplementationOptionsProps) {
@@ -166,7 +172,7 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
                             </div>
                           </div>
                           <div>
-                            <h4 className="font-semibold text-steward">{getVoiceDisplayName(solution.voiceCombination)}</h4>
+                            <h4 className="font-semibold text-steward">{getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName)}</h4>
                             <p className="text-xs text-gray-400">{solution.explanation}</p>
                           </div>
                         </div>
@@ -186,20 +192,12 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
                       
                       <div className="grid grid-cols-2 gap-4 text-xs">
                         <div>
-                          <h6 className="font-medium text-gray-300 mb-1">Strengths</h6>
-                          <ul className="space-y-1 text-gray-400">
-                            {(solution.strengths as string[]).map((strength, idx) => (
-                              <li key={idx}>• {strength}</li>
-                            ))}
-                          </ul>
+                          <h6 className="font-medium text-gray-300 mb-1">Voice Engine</h6>
+                          <p className="text-gray-400 text-xs">{solution.voiceEngine || solution.voiceName || 'Unknown Engine'}</p>
                         </div>
                         <div>
-                          <h6 className="font-medium text-gray-300 mb-1">Considerations</h6>
-                          <ul className="space-y-1 text-gray-400">
-                            {(solution.considerations as string[]).map((consideration, idx) => (
-                              <li key={idx}>• {consideration}</li>
-                            ))}
-                          </ul>
+                          <h6 className="font-medium text-gray-300 mb-1">Solution Type</h6>
+                          <p className="text-gray-400 text-xs">Code Analysis & Generation</p>
                         </div>
                       </div>
                     </div>

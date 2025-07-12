@@ -229,13 +229,31 @@ Provide a JSON response with ACTUAL IMPLEMENTATION CODE (never use placeholder t
   "considerations": ["Consideration 1", "Consideration 2", "Consideration 3"]
 }
 
-CRITICAL: The 'code' field must contain complete, functional React/TypeScript code that addresses the request. Never return placeholder comments.`;
+CRITICAL: The 'code' field must contain complete, functional React/TypeScript code that addresses the request. Never return placeholder comments or template code.
+
+Example of what NOT to do:
+- "// REPLACE THIS COMMENT WITH ACTUAL CODE"
+- "// TODO: Implement functionality"
+- Generic boilerplate templates
+
+Example of what TO do:
+- Complete, working implementation
+- Proper React components with real functionality
+- Actual business logic that solves the request`;
 
       let parsedResponse;
       
+      // Debug OpenAI client status
+      logger.debug('OpenAI client status check', {
+        requestId,
+        hasOpenAIClient: !!openai,
+        hasAPIKey: !!OPENAI_API_KEY,
+        keyLength: OPENAI_API_KEY?.length || 0
+      });
+
       if (openai && OPENAI_API_KEY) {
         // Use real OpenAI API with enhanced error handling
-        logger.debug('Making OpenAI API request', { 
+        logger.info('Making OpenAI API request', { 
           requestId, 
           model: "gpt-4o", 
           systemPromptLength: systemPrompt.length,

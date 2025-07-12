@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -270,6 +270,15 @@ export default function Dashboard() {
                 Projects
               </Button>
 
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/onboarding'}
+                className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+              >
+                <GraduationCap className="w-4 h-4 mr-2" />
+                Learning
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

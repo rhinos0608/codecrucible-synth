@@ -4,6 +4,7 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { onboardingAIService } from "./onboarding-ai-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -369,6 +370,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const server = app.listen(5000, '0.0.0.0', () => {
     console.log('Server running on port 5000');
+  });
+
+  // Onboarding AI routes following CodeCrucible Protocol
+  app.get('/api/onboarding/progress/:userId', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.params.userId;
+      
+      // Mock onboarding progress following AI_INSTRUCTIONS.md patterns
+      const progress = {
+        userId,
+        currentPhase: 'quick-start',
+        completedModules: [],
+        spiralCycles: 0,
+        qwanAssessments: 0,
+        councilExperiences: 0,
+        masteryLevel: 0,
+        insights: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      res.json(progress);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/onboarding/analysis/:userId', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.params.userId;
+      
+      // Mock AI analysis following CodingPhilosophy.md patterns
+      const analysis = {
+        userReadiness: 75,
+        recommendedPath: 'council-initiation',
+        nextSteps: ['Complete voice simulator', 'Practice council dialogue'],
+        personalizedGuidance: 'You show strong potential for multi-voice mastery',
+        voiceAffinities: {
+          explorer: 85,
+          maintainer: 70,
+          analyzer: 65,
+        },
+      };
+      
+      res.json(analysis);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/onboarding/consciousness-metrics/:userId', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.params.userId;
+      
+      // Mock consciousness metrics following CodingPhilosophy.md patterns
+      const metrics = {
+        singleVoiceToCouncil: 60,
+        linearToSpiral: 45,
+        reactiveToProactive: 30,
+        individualToCollective: 25,
+        mechanicalToLiving: 50,
+        overall: 42,
+      };
+      
+      res.json(metrics);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/onboarding/progress', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const updateData = req.body;
+      
+      logger.info('Onboarding progress updated', { 
+        userId: updateData.userId,
+        update: updateData 
+      });
+      
+      res.json({ success: true, message: 'Progress updated' });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/onboarding/spiral-reflection', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const reflection = req.body;
+      
+      // Process with onboarding AI service
+      const result = await onboardingAIService.processSpiralReflection(reflection);
+      
+      logger.info('Spiral reflection processed', { 
+        userId: reflection.userId,
+        phase: reflection.phase 
+      });
+      
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/onboarding/qwan-assessment', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const assessment = req.body;
+      
+      // Process with onboarding AI service
+      const result = await onboardingAIService.processQWANAssessment(assessment);
+      
+      logger.info('QWAN assessment processed', { 
+        userId: assessment.userId,
+        codeId: assessment.codeId 
+      });
+      
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/onboarding/council-experience', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const experience = req.body;
+      
+      // Process with onboarding AI service
+      const result = await onboardingAIService.processCouncilExperience(experience);
+      
+      logger.info('Council experience processed', { 
+        userId: experience.userId,
+        voiceCount: experience.selectedVoices.length 
+      });
+      
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/onboarding/personalized-path', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const preferences = req.body;
+      
+      // Generate personalized learning path
+      const personalizedPath = {
+        pathType: `${preferences.learningStyle}-${preferences.timeCommitment}`,
+        customSteps: [
+          'Voice archetype deep dive',
+          'Spiral pattern mastery',
+          'QWAN assessment training',
+        ],
+        estimatedDuration: preferences.timeCommitment === 'quick' ? '1-2 hours' : '4-6 hours',
+      };
+      
+      logger.info('Personalized path generated', { 
+        userId: preferences.userId,
+        pathType: personalizedPath.pathType 
+      });
+      
+      res.json(personalizedPath);
+    } catch (error) {
+      next(error);
+    }
   });
 
   return server;

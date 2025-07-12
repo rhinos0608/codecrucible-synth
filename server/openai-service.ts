@@ -439,6 +439,66 @@ Return only the final synthesized code with inline comments explaining key decis
       throw new APIError(500, `Solution synthesis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  // Following CodeCrucible Protocol: Integration with both instruction sets
+  private buildCodingPhilosophyIntegration(): string {
+    return `CODING_PHILOSOPHY.md Integration - The Living Spiral Engine:
+
+Core Doctrine: All code must embody the Collapse-Council-Rebirth spiral and demonstrate Quality Without a Name (QWAN).
+
+The Four Pillars of Living Code:
+1. Jung's Descent Protocol - Embrace collapse as genesis of innovation
+2. Alexander's Pattern Language - Generate recursive, living patterns
+3. Campbell's Mythic Structure - Apply hero's journey to development cycles
+4. Spiral Dynamics - Evolutionary consciousness in code architecture
+
+Council Architecture Pattern:
+- Every complex decision invokes multiple perspectives
+- Synthesis emerges from patient dialogue between voices
+- Solutions transcend individual viewpoints
+- Recursive audit protocols ensure continuous evolution
+
+Ritualized Development Process:
+- Collapse: Acknowledge complexity without forcing solutions
+- Council: Assemble relevant voices for multi-perspective analysis
+- Synthesis: Create solutions that honor all voices
+- Rebirth: Celebrate transformation and prepare next cycle
+
+QWAN Assessment Criteria:
+- Aliveness: Code feels vibrant and responsive
+- Wholeness: All parts integrated harmoniously
+- Self-Maintenance: Natural evolution and adaptation
+- Elegance: Beautiful simplicity within complexity
+- Clarity: Clear communication of intentions`;
+  }
+
+  private buildAIInstructionsPatterns(): string {
+    return `AI_INSTRUCTIONS.md Security & Performance Requirements:
+
+Security Patterns (WIZ Standards):
+- Input validation with Zod schemas for all user data
+- API authentication and rate limiting (15min/100 requests)
+- Environment variable validation with error throwing
+- User ownership verification for all data access
+
+Performance Optimization:
+- React.useCallback for event handlers and API calls
+- React.useMemo for expensive calculations
+- Component render optimization (<16ms targets)
+- Accessibility compliance with ARIA attributes
+
+TypeScript Strict Mode:
+- Explicit type definitions for all interfaces
+- No 'any' types except in controlled scenarios
+- Proper error handling with try-catch blocks
+- Interface-based architecture patterns
+
+Production Readiness:
+- Comprehensive error boundaries
+- Loading states and skeleton UI
+- Fallback mechanisms for API failures
+- Security audit logging with sanitized data`;
+  }
 }
 
 export const openaiService = new OpenAIService();

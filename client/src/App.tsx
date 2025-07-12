@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import Analytics from "@/pages/analytics";
 import Pricing from "@/pages/pricing";
 import Teams from "@/pages/teams";
+import Onboarding from "@/pages/onboarding";
 import Subscribe from "@/pages/subscribe";
 import SubscriptionSuccess from "@/pages/subscription-success";
 import SubscriptionCancel from "@/pages/subscription-cancel";
@@ -34,6 +35,9 @@ function Router() {
       </Route>
       <Route path="/teams">
         {isAuthenticated ? <Teams /> : <Landing />}
+      </Route>
+      <Route path="/onboarding">
+        {isAuthenticated ? <Onboarding /> : <Landing />}
       </Route>
       
       {/* Main route */}

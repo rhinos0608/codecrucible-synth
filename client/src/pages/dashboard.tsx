@@ -260,9 +260,10 @@ export default function Dashboard() {
       error: planGuard.error
     });
     
-    // Check quota before proceeding - with enhanced dev mode awareness
+    // Enhanced dev mode detection following AI_INSTRUCTIONS.md patterns
     const isDevModeActive = planGuard.planTier === 'development' || planGuard.quotaLimit === 999 || planGuard.quotaLimit === -1;
     
+    // Dev mode should ALWAYS allow generation
     if (!planGuard.canGenerate && !isDevModeActive) {
       console.log('❌ Generation BLOCKED - redirecting to upgrade modal:', {
         canGenerate: planGuard.canGenerate,
@@ -272,6 +273,15 @@ export default function Dashboard() {
       });
       setShowUpgradeModal(true);
       return;
+    }
+    
+    // Force proceed if dev mode is active regardless of canGenerate status
+    if (isDevModeActive && !planGuard.canGenerate) {
+      console.log('🔧 DEV MODE OVERRIDE - forcing generation despite canGenerate=false:', {
+        planTier: planGuard.planTier,
+        quotaLimit: planGuard.quotaLimit,
+        devModeOverride: true
+      });
     }
     
     console.log('✅ Generation ALLOWED - proceeding with council assembly:', {

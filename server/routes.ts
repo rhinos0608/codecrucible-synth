@@ -525,11 +525,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { prompt, selectedVoices } = req.body;
       
+      // Critical dev mode check following AI_INSTRUCTIONS.md patterns
+      const { getDevModeConfig } = await import('./lib/dev-mode');
+      const devModeConfig = getDevModeConfig();
+      
       console.log('🔧 Real OpenAI Streaming request:', {
         userId,
         prompt: prompt?.substring(0, 50) + '...',
         selectedVoices,
-        voiceCount: (selectedVoices.perspectives?.length || 0) + (selectedVoices.roles?.length || 0)
+        voiceCount: (selectedVoices.perspectives?.length || 0) + (selectedVoices.roles?.length || 0),
+        devMode: devModeConfig.isEnabled
       });
       
       res.writeHead(200, {
@@ -561,10 +566,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const completedSolutions: any[] = [];
         
-        // Stream each voice in parallel with real OpenAI streaming
-        for (let i = 0; i < allVoices.length; i++) {
-          const voice = allVoices[i];
-          
+        // Stream all voices in TRUE PARALLEL with real OpenAI streaming - Following AI_INSTRUCTIONS.md patterns
+        const voicePromises = allVoices.map(async (voice) => {
           // Voice arrival notification
           res.write(`data: ${JSON.stringify({
             type: 'voice_connected',
@@ -574,7 +577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })}\n\n`);
           
           // Real-time OpenAI streaming for this voice
-          await realOpenAIService.generateSolutionStream({
+          return realOpenAIService.generateSolutionStream({
             prompt,
             perspectives,
             roles,
@@ -582,13 +585,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voiceId: voice.id,
             type: voice.type,
             onChunk: (chunk: string) => {
-              res.write(`data: ${JSON.stringify({
-                type: 'voice_chunk',
-                voiceId: voice.id,
-                voiceName: voice.id,
-                chunk: chunk,
-                isComplete: false
-              })}\n\n`);
+              try {
+                // Safe JSON serialization to prevent syntax errors
+                const safeChunk = chunk.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+                res.write(`data: ${JSON.stringify({
+                  type: 'voice_chunk',
+                  voiceId: voice.id,
+                  voiceName: voice.id,
+                  chunk: safeChunk,
+                  isComplete: false
+                })}\n\n`);
+              } catch (jsonError) {
+                console.error('JSON serialization error in chunk:', jsonError);
+                res.write(`data: ${JSON.stringify({
+                  type: 'voice_chunk',
+                  voiceId: voice.id,
+                  voiceName: voice.id,
+                  chunk: '[Content encoding error]',
+                  isComplete: false
+                })}\n\n`);
+              }
             },
             onComplete: async (solution: any) => {
               completedSolutions.push(solution);
@@ -603,7 +619,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })}\n\n`);
             }
           });
-        }
+        });
+
+        // Wait for ALL voices to complete in parallel
+        await Promise.all(voicePromises);
 
         // Store solutions for synthesis
         global.sessionSolutions = global.sessionSolutions || new Map();

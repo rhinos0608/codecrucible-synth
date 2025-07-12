@@ -12,6 +12,30 @@
   display: none;
 }
 
+/* Ensure navigation buttons stay accessible */
+.nav-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(55, 65, 81, 0.8) rgba(31, 41, 55, 0.3);
+}
+
+.nav-scroll-container::-webkit-scrollbar {
+  height: 4px;
+}
+
+.nav-scroll-container::-webkit-scrollbar-track {
+  background: rgba(31, 41, 55, 0.3);
+  border-radius: 2px;
+}
+
+.nav-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(55, 65, 81, 0.8);
+  border-radius: 2px;
+}
+
+.nav-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.9);
+}
+
 :root {
   --background: hsl(240, 10%, 3.9%);
   --foreground: hsl(0, 0%, 98%);

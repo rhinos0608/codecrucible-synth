@@ -338,19 +338,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProjectsByUser(userId: string): Promise<Project[]> {
-    return await db
-      .select()
-      .from(projects)
-      .where(eq(projects.userId, userId))
-      .orderBy(desc(projects.createdAt));
-  }
-
-  async getProjectsByUser(userId: string): Promise<Project[]> {
-    return await db
-      .select()
-      .from(projects)
-      .where(eq(projects.userId, userId))
-      .orderBy(desc(projects.createdAt));
+    try {
+      return await db
+        .select()
+        .from(projects)
+        .where(eq(projects.userId, userId))
+        .orderBy(desc(projects.createdAt));
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      return [];
+    }
   }
   
   async getProject(id: number): Promise<Project | undefined> {
@@ -377,22 +374,33 @@ export class DatabaseStorage implements IStorage {
 
   // Project folder operations - Pro tier gated following AI_INSTRUCTIONS.md
   async createProjectFolder(folder: InsertProjectFolder): Promise<ProjectFolder> {
-    const [newFolder] = await db
-      .insert(projectFolders)
-      .values({
-        ...folder,
-        userId: folder.userId || '',
-      })
-      .returning();
-    return newFolder;
+    try {
+      const [newFolder] = await db
+        .insert(projectFolders)
+        .values({
+          ...folder,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+      return newFolder;
+    } catch (error) {
+      console.error('Error creating project folder:', error);
+      throw error;
+    }
   }
 
   async getProjectFolders(userId: string): Promise<ProjectFolder[]> {
-    return await db
-      .select()
-      .from(projectFolders)
-      .where(eq(projectFolders.userId, userId))
-      .orderBy(projectFolders.sortOrder, projectFolders.name);
+    try {
+      return await db
+        .select()
+        .from(projectFolders)
+        .where(eq(projectFolders.userId, userId))
+        .orderBy(projectFolders.sortOrder, projectFolders.name);
+    } catch (error) {
+      console.error('Error fetching project folders:', error);
+      return [];
+    }
   }
 
   async getProjectFolder(id: number): Promise<ProjectFolder | undefined> {

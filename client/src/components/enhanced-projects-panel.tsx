@@ -76,79 +76,70 @@ interface EnhancedProjectsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onUseAsContext?: (projects: Project[]) => void;
-  selectedContextProjects?: Project[];
+  selectedContextProjects: Project[];
 }
 
-const LANGUAGE_COLORS = {
-  'typescript': '#3178C6',
-  'javascript': '#F7DF1E',
-  'python': '#3776AB',
-  'react': '#61DAFB',
-  'vue': '#4FC08D',
-  'angular': '#DD0031',
-  'node': '#339933',
-  'express': '#000000',
-  'css': '#1572B6',
-  'html': '#E34F26',
-  'sql': '#4479A1',
-  'php': '#777BB4',
-  'java': '#ED8B00',
-  'c++': '#00599C',
-  'rust': '#000000',
-  'go': '#00ADD8',
-  'default': '#6B7280'
+const COMPLEXITY_LABELS = {
+  '1': 'Simple',
+  '2': 'Moderate', 
+  '3': 'Complex'
 };
 
-const COMPLEXITY_LABELS = {
-  1: 'Simple',
-  2: 'Medium',
-  3: 'Complex',
-  4: 'Advanced',
-  5: 'Expert'
-};
+const FOLDER_COLORS = [
+  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+  '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#6366f1'
+];
+
+const FOLDER_ICONS = [
+  'folder', 'code', 'layers', 'settings', 'database',
+  'globe', 'shield', 'zap', 'target', 'book'
+];
 
 export function EnhancedProjectsPanel({ 
   isOpen, 
   onClose, 
-  onUseAsContext,
-  selectedContextProjects = []
+  onUseAsContext, 
+  selectedContextProjects 
 }: EnhancedProjectsPanelProps) {
-  const [activeTab, setActiveTab] = useState('browse');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // State management
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProjects, setSelectedProjects] = useState<Set<number>>(new Set());
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [complexityFilter, setComplexityFilter] = useState<number | null>(null);
-  const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
-  const [selectedProjects, setSelectedProjects] = useState<Set<number>>(new Set());
   const [showCreateFolder, setShowCreateFolder] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState<ProjectFolder | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
+  
+  // New folder data
   const [newFolderData, setNewFolderData] = useState({
     name: '',
     description: '',
-    color: '#3B82F6',
+    color: '#3b82f6',
     icon: 'folder',
     parentId: null as number | null,
     visibility: 'private' as 'private' | 'team' | 'public'
   });
 
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  // Fetch projects
+  // Fetch projects with error handling
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ['/api/projects'],
-    enabled: isOpen
+    retry: 1,
+    staleTime: 30000
   });
 
-  // Fetch folders
+  // Fetch folders with error handling
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ['/api/project-folders'],
-    enabled: isOpen
+    retry: 1,
+    staleTime: 30000
   });
 
   // Create folder mutation
   const createFolderMutation = useMutation({
-    mutationFn: async (folderData: any) => {
+    mutationFn: async (folderData: typeof newFolderData) => {
       return await apiRequest('/api/project-folders', {
         method: 'POST',
         body: JSON.stringify(folderData)
@@ -160,14 +151,14 @@ export function EnhancedProjectsPanel({
       setNewFolderData({
         name: '',
         description: '',
-        color: '#3B82F6',
+        color: '#3b82f6',
         icon: 'folder',
         parentId: null,
         visibility: 'private'
       });
       toast({
         title: "Folder created",
-        description: "Your project folder has been created successfully."
+        description: "Your new folder has been created successfully."
       });
     },
     onError: (error: any) => {
@@ -181,38 +172,6 @@ export function EnhancedProjectsPanel({
         toast({
           title: "Error",
           description: "Failed to create folder. Please try again.",
-          variant: "destructive"
-        });
-      }
-    }
-  });
-
-  // Move project mutation
-  const moveProjectMutation = useMutation({
-    mutationFn: async ({ projectId, folderId }: { projectId: number; folderId: number | null }) => {
-      return await apiRequest(`/api/projects/${projectId}/move`, {
-        method: 'POST',
-        body: JSON.stringify({ folderId })
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
-      toast({
-        title: "Project moved",
-        description: "Project has been moved successfully."
-      });
-    },
-    onError: (error: any) => {
-      if (error.message.includes('subscription')) {
-        toast({
-          title: "Pro subscription required",
-          description: "Project organization requires Pro subscription.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to move project. Please try again.",
           variant: "destructive"
         });
       }
@@ -274,150 +233,123 @@ export function EnhancedProjectsPanel({
   };
 
   // Get projects in folder
-  const getProjectsInFolder = (folderId: number | null): Project[] => {
+  const getProjectsInFolder = (folderId: number | null) => {
     return filteredProjects.filter((p: Project) => p.folderId === folderId);
   };
 
-  // Folder tree renderer
-  const renderFolderTree = (folders: ProjectFolder[], level: number = 0) => {
-    return folders.map(folder => {
-      const isExpanded = expandedFolders.has(folder.id);
-      const folderProjects = getProjectsInFolder(folder.id);
-      const childFolders = buildFolderTree(folders, folder.id);
-      
-      return (
-        <div key={folder.id} className="mb-2">
-          <div 
-            className={`flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${level > 0 ? 'ml-4' : ''}`}
-            onClick={() => {
-              if (isExpanded) {
-                setExpandedFolders(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(folder.id);
-                  return newSet;
-                });
-              } else {
-                setExpandedFolders(prev => new Set([...prev, folder.id]));
-              }
-            }}
-          >
-            {isExpanded ? (
-              <ChevronDown className="w-4 h-4 text-gray-500" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-gray-500" />
-            )}
-            <FolderOpen 
-              className="w-4 h-4" 
-              style={{ color: folder.color || '#3B82F6' }}
-            />
-            <span className="font-medium">{folder.name}</span>
-            <Badge variant="secondary" className="ml-auto">
-              {folderProjects.length}
-            </Badge>
-          </div>
-          
-          {isExpanded && (
-            <div className="ml-6 mt-2 space-y-1">
-              {folderProjects.map(project => renderProjectCard(project))}
-              {childFolders.length > 0 && renderFolderTree(childFolders, level + 1)}
-            </div>
-          )}
-        </div>
-      );
+  // Toggle folder expansion
+  const toggleFolder = (folderId: number) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
     });
   };
 
-  // Project card renderer
-  const renderProjectCard = (project: Project) => {
-    const isSelected = selectedProjects.has(project.id);
-    const languageColor = LANGUAGE_COLORS[project.language.toLowerCase()] || LANGUAGE_COLORS.default;
-    
-    return (
-      <Card key={project.id} className={`mb-2 transition-all ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={isSelected}
-                onCheckedChange={(checked) => handleContextSelection(project, checked as boolean)}
-                className="mt-1"
+  // Render project card
+  const renderProjectCard = (project: Project) => (
+    <Card key={project.id} className="mb-2">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={selectedProjects.has(project.id)}
+              onCheckedChange={(checked) => handleContextSelection(project, checked as boolean)}
+            />
+            <div>
+              <CardTitle className="text-sm">{project.name}</CardTitle>
+              <CardDescription className="text-xs">
+                {project.language} • {COMPLEXITY_LABELS[project.complexity.toString() as keyof typeof COMPLEXITY_LABELS]}
+              </CardDescription>
+            </div>
+          </div>
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+              <Copy className="w-3 h-3" />
+            </Button>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+              <Edit className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="flex flex-wrap gap-1 mb-2">
+          {project.tags.map(tag => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+          {project.description || 'No description'}
+        </p>
+      </CardContent>
+    </Card>
+  );
+
+  // Render folder tree
+  const renderFolderTree = (folders: ProjectFolder[], depth = 0) => (
+    <div className={`${depth > 0 ? 'ml-4' : ''}`}>
+      {folders.map(folder => {
+        const folderProjects = getProjectsInFolder(folder.id);
+        const childFolders = buildFolderTree(folders, folder.id);
+        const isExpanded = expandedFolders.has(folder.id);
+        
+        return (
+          <div key={folder.id} className="mb-2">
+            <div 
+              className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded cursor-pointer"
+              onClick={() => toggleFolder(folder.id)}
+            >
+              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              <div 
+                className="w-3 h-3 rounded" 
+                style={{ backgroundColor: folder.color }}
               />
-              <div>
-                <CardTitle className="text-sm">{project.name}</CardTitle>
-                <CardDescription className="text-xs">
-                  {project.description || 'No description'}
-                </CardDescription>
+              <FolderOpen className="w-4 h-4" />
+              <span className="text-sm font-medium">{folder.name}</span>
+              <Badge variant="outline" className="text-xs">
+                {folderProjects.length}
+              </Badge>
+            </div>
+            
+            {isExpanded && (
+              <div className="ml-6 mt-2">
+                {folderProjects.map(project => renderProjectCard(project))}
+                {childFolders.length > 0 && renderFolderTree(childFolders, depth + 1)}
               </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <Badge 
-                variant="outline" 
-                className="text-xs"
-                style={{ borderColor: languageColor, color: languageColor }}
-              >
-                {project.language}
-              </Badge>
-              <Badge variant="secondary" className="text-xs">
-                {COMPLEXITY_LABELS[project.complexity as keyof typeof COMPLEXITY_LABELS]}
-              </Badge>
-            </div>
+            )}
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-1">
-              {project.tags.slice(0, 3).map(tag => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {project.tags.length > 3 && (
-                <Badge variant="outline" className="text-xs">
-                  +{project.tags.length - 3}
-                </Badge>
-              )}
-            </div>
-            <div className="flex gap-1">
-              <Button size="sm" variant="ghost" className="h-6 px-2">
-                <Copy className="w-3 h-3" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-6 px-2">
-                <Edit className="w-3 h-3" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-6 px-2">
-                <Move className="w-3 h-3" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
+        );
+      })}
+    </div>
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
+      <DialogContent className="max-w-6xl h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <TreePine className="w-5 h-5" />
-            Enhanced Projects Library
-            <Badge variant="outline" className="ml-2">
-              <Sparkles className="w-3 h-3 mr-1" />
-              Living Spiral Architecture
-            </Badge>
+            <Layers className="w-5 h-5" />
+            Enhanced Projects & Context Management
+            <Crown className="w-4 h-4 text-yellow-500" />
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <Tabs defaultValue="browse" className="flex-1 flex flex-col">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="browse">
               <BookOpen className="w-4 h-4 mr-2" />
               Browse & Context
             </TabsTrigger>
             <TabsTrigger value="organize">
-              <FolderOpen className="w-4 h-4 mr-2" />
+              <TreePine className="w-4 h-4 mr-2" />
               Organize
-              <Crown className="w-3 h-3 ml-1" />
             </TabsTrigger>
             <TabsTrigger value="analytics">
               <Target className="w-4 h-4 mr-2" />
@@ -630,22 +562,26 @@ export function EnhancedProjectsPanel({
                   placeholder="Optional description"
                 />
               </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <Label htmlFor="folderColor">Color</Label>
-                  <Input
-                    id="folderColor"
-                    type="color"
-                    value={newFolderData.color}
-                    onChange={(e) => setNewFolderData(prev => ({ ...prev, color: e.target.value }))}
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Color</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {FOLDER_COLORS.map(color => (
+                      <div
+                        key={color}
+                        className={`w-6 h-6 rounded cursor-pointer border-2 ${
+                          newFolderData.color === color ? 'border-gray-400' : 'border-transparent'
+                        }`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setNewFolderData(prev => ({ ...prev, color }))}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <Label htmlFor="folderVisibility">Visibility</Label>
-                  <Select
-                    value={newFolderData.visibility}
-                    onValueChange={(value) => setNewFolderData(prev => ({ ...prev, visibility: value as 'private' | 'team' | 'public' }))}
-                  >
+                <div>
+                  <Label>Visibility</Label>
+                  <Select value={newFolderData.visibility} onValueChange={(value: 'private' | 'team' | 'public') => 
+                    setNewFolderData(prev => ({ ...prev, visibility: value }))}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -657,15 +593,15 @@ export function EnhancedProjectsPanel({
                   </Select>
                 </div>
               </div>
-              <div className="flex gap-2 justify-end">
+              <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowCreateFolder(false)}>
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={() => createFolderMutation.mutate(newFolderData)}
-                  disabled={createFolderMutation.isPending || !newFolderData.name}
+                  disabled={!newFolderData.name.trim() || createFolderMutation.isPending}
                 >
-                  Create Folder
+                  {createFolderMutation.isPending ? 'Creating...' : 'Create Folder'}
                 </Button>
               </div>
             </div>

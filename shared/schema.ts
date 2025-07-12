@@ -359,6 +359,7 @@ export const insertProjectFolderSchema = createInsertSchema(projectFolders).pick
   description: true,
   color: true,
   icon: true,
+  userId: true,
   parentId: true,
   isShared: true,
   visibility: true,
@@ -369,6 +370,7 @@ export const insertProjectFolderSchema = createInsertSchema(projectFolders).pick
   description: z.string().max(500).optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   icon: z.string().min(1).max(50).optional(),
+  userId: z.string().min(1),
   parentId: z.number().int().positive().optional(),
   isShared: z.boolean().default(false),
   visibility: z.enum(['private', 'team', 'public']).default('private'),
@@ -392,16 +394,18 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
   qualityScore: true,
 }).extend({
   // Security validation following AI_INSTRUCTIONS.md patterns
-  name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
-  code: z.string().min(1).max(50000),
-  language: z.string().min(1).max(50),
+  name: z.string().min(1).max(255),
+  description: z.string().max(1000).optional(),
+  code: z.string().min(1),
+  language: z.string().min(1).max(50).default('javascript'),
+  sessionId: z.number().int().positive().optional(),
+  synthesisId: z.number().int().positive().optional(),
   folderId: z.number().int().positive().optional(),
-  tags: z.array(z.string().min(1).max(30)).max(10).default([]),
+  tags: z.array(z.string()).default([]),
   isPublic: z.boolean().default(false),
   isTemplate: z.boolean().default(false),
   visibility: z.enum(['private', 'team', 'public']).default('private'),
-  voiceConfiguration: z.record(z.any()).optional(),
+  voiceConfiguration: z.object({}).optional(),
   qualityScore: z.number().min(0).max(100).optional()
 });
 

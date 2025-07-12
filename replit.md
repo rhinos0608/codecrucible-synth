@@ -246,3 +246,7 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **Production Safety**: Dev mode automatically disabled in production with security warnings
 - **Schema Updates**: Added `mode` field to `voice_sessions` table for dev/production session tracking
 - **UI Dev Badges**: Frontend displays dev mode indicators on generation buttons and interface elements
+- **Internal OpenAI Proxy**: Implemented `/api/openai` endpoint for unlimited GPT-4/3.5 generations with fallback mock responses
+- **Smart Prompt Suggestions**: Added intelligent coding prompt suggestions above "Your Request" field following AI_INSTRUCTIONS.md patterns
+- **DEV_MODE_TEST.md**: Created comprehensive testing guide and documentation for development mode features
+- **Subscription Service Fix**: Resolved critical dev mode bypass issue in subscription service for proper quota bypassing

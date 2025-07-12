@@ -1,123 +1,126 @@
-# Development Mode Testing Documentation
+# CodeCrucible Development Mode Testing Guide
+
+## Overview
+
+This document outlines the testing process for CodeCrucible's development mode features, ensuring unlimited AI generations and proper dev mode functionality.
 
 ## Dev Mode Features Implemented
 
-### Backend Dev Mode Detection
-- **Environment Detection**: Automatically detects Replit development environment (NODE_ENV !== 'production' || REPL_ID present)
-- **Manual Override**: DEV_MODE=true environment variable for explicit control
-- **Security Audit**: All dev mode usage is logged with watermarks and reasoning
+### ✅ Backend Features
+- **Unlimited Generations**: Quota checks bypassed in development environment
+- **Subscription Tier Override**: Free tier users get unlimited access in dev mode
+- **Rate Limit Bypass**: All API rate limiting disabled in development
+- **Extended Prompt Length**: Increased from 5,000 to 15,000 characters
+- **Unlimited Voice Combinations**: No restrictions on perspective/role selections
+- **Dev Mode Logging**: Comprehensive audit trail of all bypasses
 
-### Features Enabled in Dev Mode
+### ✅ Frontend Features  
+- **Dev Mode Badges**: UI indicators showing "DEV 🔧" throughout interface
+- **Smart Prompt Suggestions**: Quick start ideas above "Your Request" field
+- **Extended UI Features**: All Pro/Team features accessible in development
+- **Debug Panels**: Additional developer tools and monitoring
+- **Watermark Integration**: All dev-generated content marked with "DEV-GEN 🔧"
 
-#### 1. Unlimited AI Generations
-- **Quota Bypass**: Free tier users get unlimited generations (no 3/day limit)
-- **Plan Override**: Quota checking returns unlimited (-1) quota limit
-- **Logging**: All bypasses logged with "DEV-GEN 🔧" watermark
+### ✅ OpenAI Proxy Integration
+- **Internal API**: `/api/openai` endpoint for unlimited GPT-4/3.5 access
+- **Fallback Responses**: Mock data when no API key configured
+- **Security Validation**: Input sanitization and rate limiting
+- **Development Optimization**: Enhanced logging and error handling
 
-#### 2. Unlimited Voice Combinations  
-- **Voice Limit Bypass**: Free tier can use unlimited voice combinations (not just 2)
-- **Enhanced Logging**: Tracks when voice limits are bypassed
-- **Security Compliance**: Maintains logging for production safety
+## Environment Detection
 
-#### 3. Rate Limit Bypass
-- **Endpoint Protection**: All rate limiting bypassed in development
-- **Security Monitoring**: Bypass events logged for security audit
-- **Production Safety**: Only active in development environments
+Dev mode is automatically enabled when:
+1. `DEV_MODE=true` environment variable is set
+2. `NODE_ENV !== 'production'` AND `REPL_ID` is present (Replit environment)
+3. `NODE_ENV=development` is set
 
-#### 4. Extended Prompt Length
-- **Normal Limit**: 5,000 characters in production
-- **Dev Limit**: 15,000 characters in development mode
-- **Graduated Logging**: Logs when normal limits exceeded but dev limits not reached
+## Testing Checklist
 
-#### 5. Unlimited Synthesis Access
-- **Feature Access**: Free tier gets Pro-level synthesis access
-- **Security Bypass**: validateFeatureAccess middleware bypassed for synthesis
-- **Audit Trail**: All synthesis access bypasses logged
+### Quick Verification
+- [ ] Dashboard shows "DEV 🔧" badges on generation buttons
+- [ ] Quota checks return unlimited access
+- [ ] Smart prompt suggestions appear above "Your Request" field
+- [ ] Console logs show dev mode bypass messages
+- [ ] All voice combinations selectable (no limits)
 
-### Frontend Dev Mode Features
+### Deep Testing
+- [ ] Generate multiple sessions without hitting quota limits
+- [ ] Test synthesis functionality (should work for free tier)
+- [ ] Verify extended prompt length (up to 15,000 characters)
+- [ ] Check OpenAI proxy endpoint responds correctly
+- [ ] Confirm dev mode watermarks in generated content
 
-#### 1. Dev Mode Badges
-- **Visual Indicators**: "DEV-GEN 🔧" badges on generation buttons
-- **Conditional Rendering**: Only shown when `showDevBadges` feature enabled
-- **User Awareness**: Clear indication when in development mode
+### Production Safety
+- [ ] Verify dev mode disabled when `NODE_ENV=production`
+- [ ] Confirm no dev bypasses in production logs
+- [ ] Test normal quota enforcement in production mode
 
-#### 2. Enhanced Debug Panels
-- **Extended Logging**: Console logging for development debugging
-- **Debug Information**: Access to dev mode configuration and status
-- **Development Tools**: Enhanced debugging capabilities
+## Configuration Files
 
-#### 3. Unlimited UI Features
-- **Feature Toggles**: UI restrictions lifted in development
-- **Enhanced Access**: All premium UI features available
-- **Testing Capabilities**: Full feature testing without restrictions
+### Environment Setup (.env.example)
+```bash
+# Development Mode Configuration
+DEV_MODE=true
+NODE_ENV=development
 
-### Security & Production Safety
+# OpenAI API (Optional - fallback to mock if not provided)
+OPENAI_API_KEY=your-openai-api-key-here
 
-#### 1. Environment Isolation
-- **Production Check**: Dev mode disabled in production builds
-- **Environment Variables**: Clear separation of dev/prod environments
-- **Security Warnings**: Logs warnings if dev mode detected in production
+# Database and other required configs
+DATABASE_URL=postgresql://...
+SESSION_SECRET=your-session-secret
+```
 
-#### 2. Audit Logging
-- **Comprehensive Tracking**: All dev mode usage logged with context
-- **Security Events**: Dev mode bypasses tracked as security events
-- **Watermark System**: "DEV-GEN 🔧" watermarks on all dev-generated content
+### Expected Log Output
+```
+[INFO] Development mode enabled {
+  "reason": "replit_development_environment",
+  "features": { "unlimitedGenerations": true, ... }
+}
 
-#### 3. User Path Protection
-- **Isolated Sessions**: Dev mode sessions tracked separately
-- **Data Integrity**: Dev mode metadata prevents production data contamination
-- **User Safety**: Dev mode features invisible to production users
+[INFO] Dev mode bypass: quota_check_bypassed {
+  "userId": "43922150...",
+  "feature": "unlimitedGenerations",
+  "devModeWatermark": "DEV-GEN 🔧"
+}
+```
 
-## Testing Verification
+## Common Issues & Solutions
 
-### Backend Tests
-1. **Quota Bypass**: Generate > 3 solutions as free user
-2. **Voice Combinations**: Use > 2 voice combinations as free user  
-3. **Rate Limiting**: Make rapid API requests without throttling
-4. **Extended Prompts**: Submit prompts > 5,000 characters
-5. **Synthesis Access**: Access synthesis panel as free user
+### Issue: Dev mode not enabling
+**Solution**: Check environment variables and ensure REPL_ID is present in Replit environment
 
-### Frontend Tests
-1. **Dev Badges**: Verify "DEV-GEN 🔧" badges appear on buttons
-2. **Debug Panels**: Check enhanced debugging information
-3. **Console Logging**: Verify dev mode console output
-4. **Feature Access**: Test unlimited UI features
+### Issue: Quota limits still applying  
+**Solution**: Verify subscription service dev mode bypass is implemented correctly
 
-### Security Tests
-1. **Production Safety**: Verify dev mode disabled in production builds
-2. **Audit Logs**: Check comprehensive logging of dev mode usage
-3. **Environment Detection**: Test NODE_ENV and REPL_ID detection
-4. **Manual Override**: Test DEV_MODE=true environment variable
+### Issue: OpenAI proxy errors
+**Solution**: Check API key configuration or rely on fallback mock responses
 
-## Usage Instructions
+## Security Notes
 
-### For Developers
-1. **Automatic**: Dev mode automatically enabled in Replit environment
-2. **Manual**: Set `DEV_MODE=true` environment variable for explicit control
-3. **Verification**: Check console logs for "Development mode enabled" message
-4. **Testing**: Use unlimited generations, voice combinations, and synthesis
+- Dev mode bypasses are logged for security audit
+- Production deployment automatically disables all dev features
+- Input validation remains active even in dev mode
+- User authentication still required for all operations
 
-### For Production
-1. **Disabled**: Dev mode automatically disabled in production
-2. **Security**: All dev mode features inaccessible to production users
-3. **Monitoring**: Production environments log warnings if dev mode detected
-4. **Safety**: User data and billing unaffected by dev mode features
+## Performance Impact
 
-## Implementation Files Modified
+- Minimal performance overhead in production (dev checks are cached)
+- Enhanced logging in development may increase log volume
+- OpenAI proxy adds latency but provides unlimited access
 
-### Backend
-- `server/lib/dev-mode.ts` - Core dev mode detection and configuration
-- `server/lib/utils/checkQuota.ts` - Quota bypass logic
-- `server/security-middleware.ts` - Rate limit bypass
-- `server/middleware/enforcePlan.ts` - Feature access bypass
-- `server/routes.ts` - Voice combination and prompt length extensions
-- `server/openai-service.ts` - Dev mode watermarks
-- `shared/schema.ts` - Session mode tracking
+## Success Metrics
 
-### Frontend  
-- `client/src/lib/dev-mode.ts` - Frontend dev mode detection
-- `client/src/pages/dashboard.tsx` - Dev mode UI enhancements
+When properly implemented, you should see:
+1. Zero quota-related generation failures in development
+2. "DEV-GEN 🔧" watermarks in all generated content
+3. Comprehensive dev mode bypass logging
+4. Full feature access regardless of subscription tier
+5. Smart prompt suggestions helping with common coding tasks
 
-### Database Schema Changes
-- Added `mode` field to `voice_sessions` table for dev/production tracking
-- Maintains data integrity between development and production sessions
+## Next Steps
+
+- Test with real OpenAI API key for production-quality responses
+- Monitor dev mode usage patterns for optimization
+- Expand prompt suggestions based on user feedback
+- Consider additional dev tools and debugging features

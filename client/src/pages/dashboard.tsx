@@ -357,6 +357,66 @@ export default function Dashboard() {
             </Card>
           )}
 
+          {/* Prompt Suggestions */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Quick Start Ideas</h3>
+              <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+                {isFrontendDevModeEnabled() ? 'DEV 🔧' : 'Suggestions'}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {[
+                {
+                  category: "React Components",
+                  prompt: "Create a responsive navigation component with dark mode toggle",
+                  icon: "⚛️"
+                },
+                {
+                  category: "API Integration", 
+                  prompt: "Build a REST API client with error handling and TypeScript types",
+                  icon: "🔌"
+                },
+                {
+                  category: "Database Schema",
+                  prompt: "Design a user authentication system with Drizzle ORM and PostgreSQL",
+                  icon: "🗄️"
+                },
+                {
+                  category: "UI/UX Features",
+                  prompt: "Implement a dashboard with charts, filters, and real-time updates",
+                  icon: "📊"
+                },
+                {
+                  category: "Performance",
+                  prompt: "Optimize a React app for faster loading and better SEO",
+                  icon: "⚡"
+                },
+                {
+                  category: "Security",
+                  prompt: "Add authentication, input validation, and rate limiting to an API",
+                  icon: "🔒"
+                }
+              ].map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => handlePromptChange(suggestion.prompt)}
+                  className="group p-3 text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 hover:border-gray-600 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">{suggestion.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-400 font-medium mb-1">{suggestion.category}</div>
+                      <div className="text-sm text-gray-200 group-hover:text-white line-clamp-2 leading-relaxed">
+                        {suggestion.prompt}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Current Prompt */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Your Request</h3>

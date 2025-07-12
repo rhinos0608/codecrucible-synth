@@ -188,14 +188,16 @@ REQUIREMENTS:
 - Include proper error handling and security validation
 - Follow Apple design system guidelines
 
-Provide a JSON response with:
+Provide a JSON response with ACTUAL IMPLEMENTATION CODE (never use placeholder text):
 {
-  "code": "// Your generated code here",
+  "code": "// REPLACE THIS COMMENT WITH ACTUAL REACT/TYPESCRIPT CODE FOR THE REQUEST",
   "explanation": "Clear explanation of the approach and decisions",
   "confidence": 85,
   "strengths": ["Benefit 1", "Benefit 2", "Benefit 3"],
   "considerations": ["Consideration 1", "Consideration 2", "Consideration 3"]
-}`;
+}
+
+CRITICAL: The 'code' field must contain complete, functional React/TypeScript code that addresses the request. Never return placeholder comments.`;
 
       let parsedResponse;
       

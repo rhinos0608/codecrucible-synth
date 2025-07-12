@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import type { Solution } from "@shared/schema";
+import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
 
 interface ImplementationOptionsProps {
   isOpen: boolean;
@@ -12,6 +13,34 @@ interface ImplementationOptionsProps {
   sessionId: number | null;
   onMergeClick: (solutions: Solution[]) => void;
 }
+
+// Map voice combination IDs to display names following AI_INSTRUCTIONS.md patterns
+const getVoiceDisplayName = (voiceCombination: string): string => {
+  // Handle single voice cases
+  const perspective = CODE_PERSPECTIVES.find(p => p.id === voiceCombination);
+  if (perspective) return perspective.name;
+  
+  const role = DEVELOPMENT_ROLES.find(r => r.id === voiceCombination);
+  if (role) return role.name;
+  
+  // Handle combined voice cases (perspective-role or perspective+role)
+  const combinationParts = voiceCombination.split(/[-+]/);
+  if (combinationParts.length === 2) {
+    const [part1, part2] = combinationParts;
+    const perspective1 = CODE_PERSPECTIVES.find(p => p.id === part1);
+    const role1 = DEVELOPMENT_ROLES.find(r => r.id === part1);
+    const perspective2 = CODE_PERSPECTIVES.find(p => p.id === part2);
+    const role2 = DEVELOPMENT_ROLES.find(r => r.id === part2);
+    
+    const name1 = perspective1?.name || role1?.name || part1;
+    const name2 = perspective2?.name || role2?.name || part2;
+    
+    return `${name1} + ${name2}`;
+  }
+  
+  // Fallback: return original if no mapping found
+  return voiceCombination;
+};
 
 export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: ImplementationOptionsProps) {
   const { data: solutions = [], isLoading } = useQuery({
@@ -36,7 +65,7 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
           </DialogTitle>
         </DialogHeader>
 
-        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-1">
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-1" style={{ scrollbarWidth: 'thin' }}>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -56,7 +85,7 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
                             </div>
                           </div>
                           <div>
-                            <h4 className="font-semibold text-steward">{solution.voiceCombination}</h4>
+                            <h4 className="font-semibold text-steward">{getVoiceDisplayName(solution.voiceCombination)}</h4>
                             <p className="text-xs text-gray-600 dark:text-gray-400">{solution.explanation}</p>
                           </div>
                         </div>
@@ -69,8 +98,8 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
                     <div className="p-4">
                       <div className="mb-4">
                         <h5 className="text-sm font-medium mb-2">Generated Code</h5>
-                        <div className="bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-100 overflow-x-auto max-h-48 overflow-y-auto">
-                          <pre className="whitespace-pre-wrap">{solution.code}</pre>
+                        <div className="bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-100 overflow-x-auto max-h-64 overflow-y-auto">
+                          <pre className="whitespace-pre-wrap break-words">{solution.code || "No code generated"}</pre>
                         </div>
                       </div>
                       

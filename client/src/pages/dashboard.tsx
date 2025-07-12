@@ -257,9 +257,9 @@ export default function Dashboard() {
 
 
   return (
-    <div className="min-h-screen flex bg-gray-900 text-gray-100 main-content">
+    <div className="dashboard-container min-h-screen flex bg-gray-900 text-gray-100 main-content overflow-hidden">
       {/* Main Chat Interface */}
-      <div className="flex-1 flex flex-col">
+      <div className="dashboard-main flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
         <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -568,7 +568,7 @@ export default function Dashboard() {
 
       {/* Right Panel */}
       {showRightPanel && (
-        <div className="w-96 bg-gray-800 border-l border-gray-700 flex flex-col">
+        <div className="dashboard-right-panel w-80 lg:w-96 xl:w-[400px] min-w-[320px] max-w-[480px] bg-gray-800 border-l border-gray-700 flex flex-col flex-shrink-0">
           <div className="p-4 border-b border-gray-700">
             <h2 className="text-lg font-semibold text-gray-100">Configuration</h2>
             <p className="text-sm text-gray-400">Select code engines and configure generation settings</p>

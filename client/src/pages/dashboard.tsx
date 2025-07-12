@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PerspectiveSelector } from "@/components/voice-selector";
 import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
@@ -316,7 +317,10 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowProjectsPanel(true)}
+                  onClick={() => {
+                    console.log("🎯 Projects button clicked, setting showProjectsPanel to true");
+                    setShowProjectsPanel(true);
+                  }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                 >
                   <FolderOpen className="w-4 h-4 mr-2" />
@@ -336,7 +340,10 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowAnalyticsPanel(true)}
+                  onClick={() => {
+                    console.log("📊 Analytics button clicked, setting showAnalyticsPanel to true");
+                    setShowAnalyticsPanel(true);
+                  }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                 >
                   <BarChart3 className="w-4 h-4 mr-2" />
@@ -354,7 +361,10 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowTeamsPanel(true)}
+                  onClick={() => {
+                    console.log("👥 Teams button clicked, setting showTeamsPanel to true");
+                    setShowTeamsPanel(true);
+                  }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   data-tour="teams-button"
                 >
@@ -661,50 +671,84 @@ export default function Dashboard() {
       />
 
       {/* Analytics Panel */}
-      {showAnalyticsPanel && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-100">Analytics Dashboard</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAnalyticsPanel(false)}
-                className="text-gray-400 hover:text-gray-200"
-              >
-                ✕
-              </Button>
-            </div>
+      <Dialog open={showAnalyticsPanel} onOpenChange={(open) => {
+        console.log("📊 Analytics Dialog onOpenChange:", { open, currentState: showAnalyticsPanel });
+        setShowAnalyticsPanel(open);
+      }}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="text-gray-100">
+              <div className="flex items-center space-x-3">
+                <BarChart3 className="w-6 h-6 text-blue-400" />
+                <span>Analytics Dashboard</span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-6">
             <div className="text-gray-300">
               <p className="mb-4">Analytics dashboard functionality is in development.</p>
               <p className="text-sm text-gray-400">Track your code generation usage, voice effectiveness, and development patterns.</p>
+              <div className="mt-6 space-y-4">
+                <Card className="bg-gray-800 border-gray-600">
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-200 mb-2">Usage Metrics</h3>
+                    <p className="text-sm text-gray-400">Code generation statistics and patterns</p>
+                  </div>
+                </Card>
+                <Card className="bg-gray-800 border-gray-600">
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-200 mb-2">Voice Effectiveness</h3>
+                    <p className="text-sm text-gray-400">Performance analysis of different AI voices</p>
+                  </div>
+                </Card>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Teams Panel */}
-      {showTeamsPanel && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-100">Teams Collaboration</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowTeamsPanel(false)}
-                className="text-gray-400 hover:text-gray-200"
-              >
-                ✕
-              </Button>
-            </div>
+      <Dialog open={showTeamsPanel} onOpenChange={(open) => {
+        console.log("👥 Teams Dialog onOpenChange:", { open, currentState: showTeamsPanel });
+        setShowTeamsPanel(open);
+      }}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="text-gray-100">
+              <div className="flex items-center space-x-3">
+                <Users className="w-6 h-6 text-blue-400" />
+                <span>Teams Collaboration</span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-6">
             <div className="text-gray-300">
               <p className="mb-4">Team collaboration features are in development.</p>
               <p className="text-sm text-gray-400">Collaborate with team members on real-time code generation and share custom voice profiles.</p>
+              <div className="mt-6 space-y-4">
+                <Card className="bg-gray-800 border-gray-600">
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-200 mb-2">Active Sessions</h3>
+                    <p className="text-sm text-gray-400">Real-time collaborative coding sessions</p>
+                  </div>
+                </Card>
+                <Card className="bg-gray-800 border-gray-600">
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-200 mb-2">Shared Voice Profiles</h3>
+                    <p className="text-sm text-gray-400">Team member custom voice configurations</p>
+                  </div>
+                </Card>
+                <Card className="bg-gray-800 border-gray-600">
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-200 mb-2">Team Members</h3>
+                    <p className="text-sm text-gray-400">Manage team access and permissions</p>
+                  </div>
+                </Card>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
 
 

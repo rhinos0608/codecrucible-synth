@@ -29,13 +29,14 @@ export function SubscriptionStatus() {
     return null;
   }
 
-  const { tier, usage, teamInfo } = subscriptionInfo;
-  const isUnlimited = usage.limit === -1;
-  const usagePercent = isUnlimited ? 0 : (usage.used / usage.limit) * 100;
+  const { tier = 'free', usage = { used: 0, limit: 3 }, teamInfo } = subscriptionInfo || {};
+  const tierName = typeof tier === 'string' ? tier : tier?.name || 'free';
+  const isUnlimited = usage?.limit === -1;
+  const usagePercent = isUnlimited ? 0 : ((usage?.used || 0) / (usage?.limit || 1)) * 100;
   const isNearLimit = !isUnlimited && usagePercent >= 80;
 
   const getTierIcon = () => {
-    switch (tier.name) {
+    switch (tierName) {
       case "pro":
         return <Crown className="h-5 w-5" />;
       case "team":
@@ -46,7 +47,7 @@ export function SubscriptionStatus() {
   };
 
   const getTierColor = () => {
-    switch (tier.name) {
+    switch (tierName) {
       case "pro":
         return "bg-purple-500 text-white";
       case "team":
@@ -65,11 +66,11 @@ export function SubscriptionStatus() {
             <Badge className={getTierColor()}>
               <span className="flex items-center gap-1">
                 {getTierIcon()}
-                {tier.name.toUpperCase()}
+                {tierName.toUpperCase()}
               </span>
             </Badge>
           </div>
-          {tier.name === "free" && (
+          {tierName === "free" && (
             <Link href="/pricing">
               <Button size="sm" variant="outline">
                 Upgrade
@@ -111,16 +112,38 @@ export function SubscriptionStatus() {
         <div className="pt-2 border-t">
           <h4 className="text-sm font-medium mb-2">Plan Features</h4>
           <ul className="space-y-1 text-sm text-muted-foreground">
-            {tier.features.map((feature, index) => (
-              <li key={index} className="flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                {feature}
-              </li>
-            ))}
+            {tierName === 'free' && (
+              <>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span>
+                  3 daily generations
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span>
+                  Basic voice profiles
+                </li>
+              </>
+            )}
+            {(tierName === 'pro' || tierName === 'team') && (
+              <>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span>
+                  Unlimited generations
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span>
+                  Custom voice profiles
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span>
+                  Team collaboration
+                </li>
+              </>
+            )}
           </ul>
         </div>
 
-        {tier.name === "free" && (
+        {tierName === "free" && (
           <div className="pt-2 border-t">
             <Link href="/pricing">
               <Button className="w-full" size="sm">

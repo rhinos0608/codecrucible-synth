@@ -229,12 +229,8 @@ Generate real, functional code that can be executed immediately.`;
   }
 
   // REAL OpenAI synthesis - NO mock data
-  async synthesizeSolutions(options: {
-    prompt: string;
-    solutions: any[];
-    sessionId: number;
-  }): Promise<any> {
-    const { prompt, solutions, sessionId } = options;
+  async synthesizeSolutions(solutions: any[], sessionId: number, originalPrompt?: string): Promise<any> {
+    const prompt = originalPrompt || 'Synthesize the following code solutions';
     
     const synthesisPrompt = `Synthesize the following code solutions into one optimal implementation:
 

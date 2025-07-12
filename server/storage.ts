@@ -94,6 +94,7 @@ export interface IStorage {
   // Project operations
   createProject(project: InsertProject): Promise<Project>;
   getProjects(limit?: number): Promise<Project[]>;
+  getProjectsByUser(userId: string): Promise<Project[]>;
   getProject(id: number): Promise<Project | undefined>;
   updateProject(id: number, updates: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: number): Promise<boolean>;
@@ -311,6 +312,22 @@ export class DatabaseStorage implements IStorage {
       .from(projects)
       .orderBy(desc(projects.createdAt))
       .limit(limit);
+  }
+
+  async getProjectsByUser(userId: string): Promise<Project[]> {
+    return await db
+      .select()
+      .from(projects)
+      .where(eq(projects.userId, userId))
+      .orderBy(desc(projects.createdAt));
+  }
+
+  async getProjectsByUser(userId: string): Promise<Project[]> {
+    return await db
+      .select()
+      .from(projects)
+      .where(eq(projects.userId, userId))
+      .orderBy(desc(projects.createdAt));
   }
   
   async getProject(id: number): Promise<Project | undefined> {

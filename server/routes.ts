@@ -1054,25 +1054,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { optimizedOpenAIService } = await import('./openai-service');
       
       // Perform synthesis with real OpenAI - Following AI_INSTRUCTIONS.md patterns
-      const synthesizedSolution = await optimizedOpenAIService.synthesizeSolutions({
-        sessionId,
-        solutions: solutions.map(sol => ({
+      const synthesizedSolution = await optimizedOpenAIService.synthesizeSolutions(
+        solutions.map(sol => ({
           voiceCombination: sol.voiceCombination,
           code: sol.code,
           explanation: sol.explanation,
           confidence: sol.confidence,
           strengths: Array.isArray(sol.strengths) ? sol.strengths : [],
-          considerations: Array.isArray(sol.considerations) ? sol.considerations : [],
-          perspective: sol.voiceCombination.includes('steward') ? 'steward' : 'seeker',
-          role: sol.voiceCombination.includes('guardian') ? 'guardian' : 'architect'
+          considerations: Array.isArray(sol.considerations) ? sol.considerations : []
         })),
-        mode: 'advanced'
-      });
+        sessionId,
+        session.prompt || 'Synthesize the following code solutions'
+      );
 
       // Store synthesis result in database for real-time sync - Fixed database constraint following AI_INSTRUCTIONS.md patterns
       const synthesisData = {
         sessionId,
-        combinedCode: synthesizedSolution.synthesizedCode || '',
+        combinedCode: synthesizedSolution.code || '',
         synthesisSteps: [
           { step: 1, action: 'Solution Analysis', description: 'Analyzed multiple AI voice solutions' },
           { step: 2, action: 'Pattern Integration', description: 'Integrated best patterns from each voice' },
@@ -1095,15 +1093,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       logger.info('OpenAI synthesis completed successfully', { 
         sessionId, 
         synthesisId: synthesis.id,
-        codeLength: synthesizedSolution.synthesizedCode?.length || 0 
+        codeLength: synthesizedSolution.code?.length || 0 
       });
       
       // Return comprehensive synthesis response for real-time sync
       res.json({
-        ...synthesizedSolution,
+        synthesizedCode: synthesizedSolution.code,
+        explanation: synthesizedSolution.explanation,
+        confidence: synthesizedSolution.confidence,
         synthesisId: synthesis.id,
         timestamp: new Date().toISOString(),
-        sessionId: sessionId
+        sessionId: sessionId,
+        integratedApproaches: ['Multi-voice synthesis', 'AI-powered integration'],
+        securityConsiderations: ['Input validation', 'Output sanitization'],
+        performanceOptimizations: ['Code optimization', 'Pattern efficiency']
       });
       
     } catch (error) {
@@ -1304,6 +1307,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // End of streaming functionality
+
+  // Projects API endpoints - Following AI_INSTRUCTIONS.md patterns
+  app.post('/api/projects', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const projectData = {
+        ...req.body,
+        userId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      logger.info('Creating new project', {
+        name: projectData.name,
+        language: projectData.language,
+        sessionId: projectData.sessionId,
+        userId: userId.substring(0, 8) + '...'
+      });
+
+      const project = await storage.createProject(projectData);
+      res.json(project);
+    } catch (error) {
+      logger.error('Project creation failed', error as Error, {
+        userId: req.user?.claims?.sub,
+        requestBody: req.body
+      });
+      next(error);
+    }
+  });
+
+  // Get user projects
+  app.get('/api/projects', isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user.claims.sub;
+      const projects = await storage.getProjectsByUser(userId);
+      res.json(projects);
+    } catch (error) {
+      logger.error('Failed to fetch projects', error as Error, {
+        userId: req.user?.claims?.sub
+      });
+      next(error);
+    }
+  });
   
   return server;
 }

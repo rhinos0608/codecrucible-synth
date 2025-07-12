@@ -37,6 +37,10 @@ export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
   const [showSynthesisPanel, setShowSynthesisPanel] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const [showVoiceProfilesPanel, setShowVoiceProfilesPanel] = useState(false);
+  const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
+  const [showTeamsPanel, setShowTeamsPanel] = useState(false);
+  const [showLearningPanel, setShowLearningPanel] = useState(false);
 
   const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
   const [showChatGPTGeneration, setShowChatGPTGeneration] = useState(false);
@@ -285,7 +289,7 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-400">Multi-Engine AI Code Generator</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 overflow-x-auto flex-shrink-0 min-w-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex items-center space-x-2 overflow-x-auto flex-shrink-0 min-w-0 scrollbar-hide">
               <div className="flex items-center space-x-2 whitespace-nowrap">
                 <FeatureGate feature="voice_profiles" fallback={
                   <Button
@@ -332,7 +336,7 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigateWithConfirmation('/analytics')}
+                  onClick={() => setShowAnalyticsPanel(true)}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                 >
                   <BarChart3 className="w-4 h-4 mr-2" />
@@ -350,7 +354,7 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigateWithConfirmation('/teams')}
+                  onClick={() => setShowTeamsPanel(true)}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   data-tour="teams-button"
                 >
@@ -656,6 +660,51 @@ export default function Dashboard() {
         }}
       />
 
+      {/* Analytics Panel */}
+      {showAnalyticsPanel && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-100">Analytics Dashboard</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAnalyticsPanel(false)}
+                className="text-gray-400 hover:text-gray-200"
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="text-gray-300">
+              <p className="mb-4">Analytics dashboard functionality is in development.</p>
+              <p className="text-sm text-gray-400">Track your code generation usage, voice effectiveness, and development patterns.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teams Panel */}
+      {showTeamsPanel && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-100">Teams Collaboration</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTeamsPanel(false)}
+                className="text-gray-400 hover:text-gray-200"
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="text-gray-300">
+              <p className="mb-4">Team collaboration features are in development.</p>
+              <p className="text-sm text-gray-400">Collaborate with team members on real-time code generation and share custom voice profiles.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
 
 

@@ -45,6 +45,16 @@ export default function Dashboard() {
   const [showTeamsPanel, setShowTeamsPanel] = useState(false);
   const [showLearningPanel, setShowLearningPanel] = useState(false);
 
+  // Debug logging for panel states - following AI_INSTRUCTIONS.md patterns
+  React.useEffect(() => {
+    console.log("🔍 Panel States:", {
+      projects: showProjectsPanel,
+      analytics: showAnalyticsPanel,
+      teams: showTeamsPanel,
+      voiceProfiles: showVoiceProfilesPanel
+    });
+  }, [showProjectsPanel, showAnalyticsPanel, showTeamsPanel, showVoiceProfilesPanel]);
+
   const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
   const [showChatGPTGeneration, setShowChatGPTGeneration] = useState(false);
 
@@ -639,15 +649,19 @@ export default function Dashboard() {
         sessionId={currentSessionId || 0}
       />
 
-      <ProjectsPanel
-        isOpen={showProjectsPanel}
-        onClose={() => setShowProjectsPanel(false)}
-        onUseAsContext={(project) => {
-          setProjectContext(project);
-          // Clear the prompt and add context information
-          setPrompt(`Using project "${project.name}" as context:\n\n${project.description || 'No description provided'}\n\n`);
-        }}
-      />
+      {showProjectsPanel && (
+        <ProjectsPanel
+          isOpen={showProjectsPanel}
+          onClose={() => {
+            console.log("🎯 Projects panel closing");
+            setShowProjectsPanel(false);
+          }}
+          onUseAsContext={(project) => {
+            setProjectContext(project);
+            setPrompt(`Using project "${project.name}" as context:\n\n${project.description || 'No description provided'}\n\n`);
+          }}
+        />
+      )}
 
       <AvatarCustomizer
         isOpen={showAvatarCustomizer}
@@ -672,15 +686,25 @@ export default function Dashboard() {
         }}
       />
 
-      <AnalyticsPanel
-        isOpen={showAnalyticsPanel}
-        onClose={() => setShowAnalyticsPanel(false)}
-      />
+      {showAnalyticsPanel && (
+        <AnalyticsPanel
+          isOpen={showAnalyticsPanel}
+          onClose={() => {
+            console.log("📊 Analytics panel closing");
+            setShowAnalyticsPanel(false);
+          }}
+        />
+      )}
 
-      <TeamsPanel
-        isOpen={showTeamsPanel}
-        onClose={() => setShowTeamsPanel(false)}
-      />
+      {showTeamsPanel && (
+        <TeamsPanel
+          isOpen={showTeamsPanel}
+          onClose={() => {
+            console.log("👥 Teams panel closing");
+            setShowTeamsPanel(false);
+          }}
+        />
+      )}
 
 
 

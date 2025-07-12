@@ -10,8 +10,13 @@ interface AnalyticsPanelProps {
 }
 
 export function AnalyticsPanel({ isOpen, onClose }: AnalyticsPanelProps) {
+  console.log("📊 AnalyticsPanel render:", { isOpen });
+  
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      console.log("📊 Analytics Dialog onOpenChange:", { open, wasOpen: isOpen });
+      onClose();
+    }}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-gray-100">

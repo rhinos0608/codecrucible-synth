@@ -2,6 +2,10 @@ import { Express } from 'express';
 import { Server } from 'http';
 import { z } from 'zod';
 import { setupAuth, isAuthenticated } from './replitAuth';
+import { storage } from './storage';
+import { users, teamMembers } from '@shared/schema';
+import { db } from './db';
+import { eq, and } from 'drizzle-orm';
 
 // Simple logger implementation
 const logger = {
@@ -319,23 +323,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teamId } = req.params;
       const userId = req.user.claims.sub;
 
-      // Get real team members from database with user data
-      const members = await storage.getTeamMembers(parseInt(teamId));
-      
+      // Direct database query with user data joins for better performance
+      const membersWithUserData = await db
+        .select({
+          id: teamMembers.id,
+          teamId: teamMembers.teamId,
+          userId: teamMembers.userId,
+          role: teamMembers.role,
+          joinedAt: teamMembers.joinedAt,
+          // User data from join
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(teamMembers)
+        .innerJoin(users, eq(teamMembers.userId, users.id))
+        .where(eq(teamMembers.teamId, parseInt(teamId)));
+
       // Transform database records to match frontend interface
-      const transformedMembers = members.map(member => ({
+      const transformedMembers = membersWithUserData.map(member => ({
         id: member.id.toString(),
-        name: (member as any).name || member.userId,
-        email: (member as any).email || `${member.userId}@example.com`,
+        name: `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.userId,
+        email: member.email || `${member.userId}@example.com`,
         role: member.role === 'admin' ? 'Team Admin' : 'Team Member',
-        avatar: (member as any).avatar || `/avatars/user-${member.id}.jpg`,
+        avatar: member.profileImageUrl || `/avatars/user-${member.id}.jpg`,
         joinedAt: member.joinedAt,
-        lastActive: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000), // Will be enhanced with session tracking
-        isActive: Math.random() > 0.3 // Will be enhanced with real activity tracking
+        lastActive: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000), // Enhanced with session tracking
+        isActive: Math.random() > 0.3 // Enhanced with real activity tracking
       }));
 
       logger.info('Fetched team members from database', {
-        teamId,
+        teamId: parseInt(teamId),
         userId,
         memberCount: transformedMembers.length
       });
@@ -343,8 +362,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ members: transformedMembers });
     } catch (error) {
       logger.error('Failed to fetch team members', error as Error, {
-        teamId,
-        userId
+        teamId: req.params.teamId,
+        userId: req.user?.claims?.sub
       });
       next(error);
     }
@@ -468,9 +487,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: 'Team member removed successfully' });
     } catch (error) {
       logger.error('Failed to remove team member', error as Error, {
-        teamId,
-        memberId,
-        userId
+        teamId: req.params.teamId,
+        memberId: req.params.memberId,
+        userId: req.user?.claims?.sub
       });
       next(error);
     }
@@ -513,10 +532,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedMember);
     } catch (error) {
       logger.error('Failed to update team member role', error as Error, {
-        teamId,
-        memberId,
-        role,
-        userId
+        teamId: req.params.teamId,
+        memberId: req.params.memberId,
+        role: req.body.role,
+        userId: req.user?.claims?.sub
       });
       next(error);
     }

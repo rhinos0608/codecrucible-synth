@@ -397,17 +397,15 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(teamMembers.userId, users.id))
       .where(eq(teamMembers.teamId, teamId));
 
+    // Return properly typed TeamMember objects with joined user data
     return membersWithUserData.map(member => ({
       id: member.id,
       teamId: member.teamId,
       userId: member.userId,
       role: member.role,
       joinedAt: member.joinedAt,
-      // Additional user data for frontend
-      name: `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.userId,
-      email: member.email || `${member.userId}@example.com`,
-      avatar: member.profileImageUrl || `/avatars/user-${member.id}.jpg`,
-    }));
+      // Additional user data will be handled in route transformation
+    } as TeamMember));
   }
   
   async removeTeamMember(teamId: number, userId: string): Promise<boolean> {

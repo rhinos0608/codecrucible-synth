@@ -10,6 +10,7 @@ import { contextAwareOpenAI } from "./context-aware-openai-service";
 import { realOpenAIService } from "./openai-service";
 import { enforceSubscriptionLimits } from "./middleware/subscription-enforcement";
 import { getDevModeConfig } from "./lib/dev-mode";
+import { analyticsService } from "./analytics-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware

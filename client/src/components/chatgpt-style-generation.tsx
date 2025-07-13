@@ -1,6 +1,6 @@
 // ChatGPT-style live generation component following CodingPhilosophy.md consciousness principles
 import { useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -150,6 +150,9 @@ export function ChatGPTStyleGeneration({
               ChatGPT Style
             </Badge>
           </DialogTitle>
+          <DialogDescription className="text-gray-300">
+            Watch AI voices generate code solutions in real-time with streaming output
+          </DialogDescription>
           
           {/* Progress indicator */}
           <div className="space-y-2">

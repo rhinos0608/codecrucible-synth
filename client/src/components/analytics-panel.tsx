@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ export function AnalyticsPanel({ isOpen, onClose }: AnalyticsPanelProps) {
       console.log("📊 Analytics Dialog onOpenChange:", { open, wasOpen: isOpen });
       onClose();
     }}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100" aria-describedby="analytics-dashboard-description">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-gray-900 border-gray-700 text-gray-100">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-gray-100">
             <div className="flex items-center space-x-3">
@@ -28,6 +28,9 @@ export function AnalyticsPanel({ isOpen, onClose }: AnalyticsPanelProps) {
               </Badge>
             </div>
           </DialogTitle>
+          <DialogDescription className="text-gray-300">
+            Comprehensive analytics and insights for your voice sessions and project activity
+          </DialogDescription>
         </DialogHeader>
         <div id="analytics-dashboard-description" className="sr-only">
           View your voice usage statistics, generation metrics, and performance analytics

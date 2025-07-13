@@ -1,5 +1,5 @@
 import { X, BookOpen, CheckCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { usePhantomLedger, useAnalytics } from "@/hooks/use-solution-generation";
@@ -26,6 +26,9 @@ export function DecisionHistory({ isOpen, onClose }: DecisionHistoryProps) {
               <p className="text-sm text-gray-400">Code generation decisions and AI engine convergence analysis</p>
             </div>
           </DialogTitle>
+          <DialogDescription className="text-gray-500">
+            Track ethical decisions, voice convergence patterns, and generation history across your coding sessions
+          </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-1">

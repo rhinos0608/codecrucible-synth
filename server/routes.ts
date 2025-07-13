@@ -1060,6 +1060,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Critical fix: API 404 handler - prevents HTML DOCTYPE responses causing JSON parse errors
+  // Following AI_INSTRUCTIONS.md defensive programming patterns
+  app.use('/api/*', (req, res, next) => {
+    if (!res.headersSent) {
+      console.log('❌ API endpoint not found:', {
+        method: req.method,
+        path: req.path,
+        url: req.url,
+        userAgent: req.headers['user-agent']?.slice(0, 50)
+      });
+      
+      res.status(404).json({ 
+        error: 'API endpoint not found',
+        path: req.path,
+        method: req.method,
+        message: `${req.method} ${req.path} is not implemented`
+      });
+    }
+  });
+
+  // Global error handler following AI_INSTRUCTIONS.md security patterns  
+  app.use((error: any, req: any, res: any, next: any) => {
+    console.error('❌ Global error handler:', {
+      error: error.message,
+      path: req.path,
+      method: req.method,
+      userId: req.user?.claims?.sub,
+      stack: error.stack?.split('\n').slice(0, 3)
+    });
+
+    logger.error('Unhandled API error', error, {
+      path: req.path,
+      method: req.method,
+      userId: req.user?.claims?.sub
+    });
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Internal server error',
+        message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+      });
+    }
+  });
+
   const server = app.listen(5000, '0.0.0.0', () => {
     console.log('Server running on port 5000');
   });

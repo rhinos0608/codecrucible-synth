@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -126,6 +126,9 @@ export function TeamCollaborationPanel({ isOpen, onClose, teamId }: TeamCollabor
             Team Collaboration
             <Badge variant="secondary">Team Feature</Badge>
           </DialogTitle>
+          <DialogDescription>
+            Create and manage collaborative coding sessions with your team members
+          </DialogDescription>
         </DialogHeader>
 
         <FeatureGate feature="team_collaboration" className="min-h-[400px]">

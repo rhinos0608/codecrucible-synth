@@ -630,12 +630,13 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **Production Database Integrity**: All voice profiles and project movements now use authentic database operations with audit logging
 - **AI_INSTRUCTIONS.md Compliance**: Complete implementation following security patterns with input validation and comprehensive error handling
 
-### Critical JSON Parsing & DialogContent Accessibility Fix (January 13, 2025)
-- **API 404 Handler Implementation**: Added comprehensive 404 handler to prevent HTML DOCTYPE responses causing "Unexpected token '<'" JSON parsing errors
-- **Global Error Handler**: Implemented production-ready global error handler ensuring all API responses return JSON following AI_INSTRUCTIONS.md security patterns
+### Critical API Request Format & JSON Parsing Fix (January 13, 2025)
+- **Root Cause Resolution**: Fixed "Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON" errors caused by incorrect apiRequest function signature usage
+- **API Request Format Standardization**: Updated voice profile creation and project movement calls from legacy `apiRequest("METHOD", url, data)` to new `apiRequest(url, { method: "METHOD", body: data })` format
+- **Voice Profile API Fix**: Fixed createVoiceProfile, updateVoiceProfile, and deleteVoiceProfile mutations in use-voice-profiles.tsx to use correct API format
+- **Project Movement API Fix**: Fixed moveProjectMutation in enhanced-projects-panel.tsx to properly send PUT requests with correct body structure
 - **DialogContent Accessibility Compliance**: Fixed all missing DialogDescription components in analytics-panel, phantom-ledger, team-collaboration-panel, chatgpt-style-generation, and solution-stack components
-- **Defensive Programming Enhancement**: Added proper error boundaries and null handling throughout API endpoints with comprehensive logging
-- **Jung's Descent Protocol Implementation**: Enhanced error handling with council-based error recovery and ritualized error logging patterns
-- **Alexander's Pattern Language Integration**: Consistent API response patterns and error messaging throughout application architecture
-- **Production Security Compliance**: All error handlers follow AI_INSTRUCTIONS.md patterns with proper input validation and audit logging
-- **Complete DialogDescription Imports**: Fixed all missing DialogDescription import statements preventing React component compilation errors
+- **API 404 Handler Enhancement**: Added comprehensive 404 handler to prevent HTML DOCTYPE responses from unmatched endpoints
+- **Defensive Programming Implementation**: Enhanced error handling with proper JSON response validation and comprehensive logging
+- **Jung's Descent Protocol Integration**: Council-based error recovery patterns implemented throughout API request lifecycle
+- **Production API Consistency**: All API requests now follow AI_INSTRUCTIONS.md patterns with proper authentication and error handling

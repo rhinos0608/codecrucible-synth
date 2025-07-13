@@ -38,16 +38,13 @@ export function useCreateVoiceProfile() {
       console.log('🔧 Creating voice profile via API:', profile);
       
       try {
-        const response = await apiRequest("POST", "/api/voice-profiles", profile);
+        const response = await apiRequest("/api/voice-profiles", {
+          method: "POST",
+          body: profile
+        });
         
-        console.log('Voice profile API response:', { status: response.status, ok: response.ok });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          throw new Error(errorData.error || `HTTP ${response.status}`);
-        }
-        
-        return await response.json();
+        console.log('✅ Voice profile created successfully:', response);
+        return response;
       } catch (error) {
         console.error('❌ Voice profile creation API failed:', error);
         throw error;
@@ -90,7 +87,10 @@ export function useUpdateVoiceProfile() {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<InsertVoiceProfile> }) => {
-      return apiRequest("PATCH", `/api/voice-profiles/${id}`, updates);
+      return apiRequest(`/api/voice-profiles/${id}`, {
+        method: "PATCH",
+        body: updates
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });
@@ -126,7 +126,9 @@ export function useDeleteVoiceProfile() {
 
   return useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("DELETE", `/api/voice-profiles/${id}`);
+      return apiRequest(`/api/voice-profiles/${id}`, {
+        method: "DELETE"
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });

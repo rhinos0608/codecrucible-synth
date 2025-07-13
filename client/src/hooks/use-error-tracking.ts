@@ -32,8 +32,11 @@ export function useErrorTracking() {
 
       // Try to send to server, but don't fail if server is unavailable
       try {
-        const response = await apiRequest('POST', '/api/errors/track', errorEvent);
-        return response.json();
+        const response = await apiRequest('/api/errors/track', {
+          method: 'POST',
+          body: errorEvent
+        });
+        return response;
       } catch (serverError) {
         console.warn('[Error Tracking] Failed to send error to server:', serverError);
         // Store locally as fallback

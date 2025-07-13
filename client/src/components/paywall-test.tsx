@@ -27,8 +27,9 @@ export default function PaywallTest({ isOpen, onClose }: PaywallTestProps) {
   // Test generation endpoint
   const testGeneration = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/test/generation", {
-        prompt: "Test security enforcement"
+      return await apiRequest("/api/test/generation", {
+        method: "POST",
+        body: { prompt: "Test security enforcement" }
       });
     },
     onSuccess: (data) => {
@@ -51,8 +52,9 @@ export default function PaywallTest({ isOpen, onClose }: PaywallTestProps) {
   // Test synthesis endpoint
   const testSynthesis = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/test/synthesis", {
-        sessionId: 1
+      return await apiRequest("/api/test/synthesis", {
+        method: "POST", 
+        body: { sessionId: 1 }
       });
     },
     onSuccess: () => {
@@ -75,7 +77,7 @@ export default function PaywallTest({ isOpen, onClose }: PaywallTestProps) {
   // Test analytics endpoint
   const testAnalytics = useMutation({
     mutationFn: async () => {
-      return await apiRequest("GET", "/api/analytics/dashboard");
+      return await apiRequest("/api/analytics/dashboard");
     },
     onSuccess: () => {
       setTestResults(prev => [...prev, {

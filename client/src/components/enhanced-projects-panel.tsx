@@ -217,18 +217,13 @@ export function EnhancedProjectsPanel({
       
       // Enhanced PUT request following AI_INSTRUCTIONS.md patterns with comprehensive error handling
       try {
-        const response = await apiRequest('PUT', `/api/projects/${projectId}/move`, {
-          folderId
+        const response = await apiRequest(`/api/projects/${projectId}/move`, {
+          method: 'PUT',
+          body: { folderId }
         });
         
-        console.log('Move project API response:', { status: response.status, ok: response.ok });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          throw new Error(errorData.error || `HTTP ${response.status}`);
-        }
-        
-        return await response.json();
+        console.log('✅ Project moved successfully:', response);
+        return response;
       } catch (error) {
         console.error('❌ API request failed:', error);
         throw error;

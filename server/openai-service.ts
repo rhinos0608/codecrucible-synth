@@ -493,55 +493,114 @@ Combine multiple code solutions into one optimal implementation using consciousn
       return '// Error: No content available for code extraction';
     }
     
-    // Try multiple code block patterns
-    const patterns = [
-      /```(?:typescript|ts|javascript|js|tsx|jsx|react)?\n([\s\S]*?)\n```/g,
-      /```\n([\s\S]*?)\n```/g,
-      /`([^`\n]+)`/g
+    console.log('🔍 Raw content analysis for code extraction:', {
+      contentLength: content.length,
+      firstLines: content.split('\n').slice(0, 5),
+      hasCodeBlock: content.includes('```'),
+      content: content.substring(0, 200) + '...'
+    });
+    
+    // Enhanced code block patterns with more flexible matching
+    const codeBlockPatterns = [
+      // Standard markdown code blocks with language
+      /```(?:typescript|ts|javascript|js|tsx|jsx|react|html|css|json)\n([\s\S]*?)\n```/gi,
+      // Generic code blocks
+      /```\n([\s\S]*?)\n```/gi,
+      // Code blocks without newlines
+      /```([\s\S]*?)```/gi,
+      // Inline code (fallback)
+      /`([^`\n]{20,})`/gi
     ];
     
-    for (const pattern of patterns) {
-      const matches = content.match(pattern);
-      if (matches && matches.length > 0) {
-        // Extract the largest code block
-        let largestMatch = '';
-        matches.forEach(match => {
-          const extracted = match.replace(/```(?:typescript|ts|javascript|js|tsx|jsx|react)?\n?/, '').replace(/\n?```$/, '').trim();
-          if (extracted.length > largestMatch.length) {
-            largestMatch = extracted;
-          }
-        });
-        
-        if (largestMatch.length > 10) { // Minimum viable code length
-          console.log('✅ Code extracted successfully:', { 
-            originalLength: content.length, 
-            extractedLength: largestMatch.length 
-          });
-          return largestMatch;
-        }
+    // Try each pattern and collect all matches
+    let allMatches = [];
+    for (const pattern of codeBlockPatterns) {
+      const matches = [...content.matchAll(pattern)];
+      if (matches.length > 0) {
+        allMatches.push(...matches.map(match => match[1]?.trim()).filter(Boolean));
       }
     }
     
-    // If no code blocks found, try to extract meaningful content
-    const lines = content.split('\n').filter(line => {
+    if (allMatches.length > 0) {
+      // Find the largest code block
+      const largestMatch = allMatches.reduce((largest, current) => 
+        current.length > largest.length ? current : largest, '');
+      
+      if (largestMatch.length > 10) {
+        console.log('✅ Code extracted successfully:', { 
+          originalLength: content.length, 
+          extractedLength: largestMatch.length,
+          matchesFound: allMatches.length
+        });
+        return largestMatch;
+      }
+    }
+    
+    // Enhanced fallback: Look for code-like patterns
+    const codePatterns = [
+      // Function definitions
+      /(?:function|const|let|var|class|interface|type)\s+\w+[\s\S]*?(?=\n\n|\n#|\n\*\*|$)/gi,
+      // Import/export statements and following code
+      /(?:import|export)[\s\S]*?(?=\n\n|\n#|\n\*\*|$)/gi,
+      // React components
+      /<[A-Z][\s\S]*?>/gi
+    ];
+    
+    let codeSnippets = [];
+    for (const pattern of codePatterns) {
+      const matches = [...content.matchAll(pattern)];
+      codeSnippets.push(...matches.map(match => match[0]?.trim()).filter(Boolean));
+    }
+    
+    if (codeSnippets.length > 0) {
+      const combinedCode = codeSnippets.join('\n\n');
+      console.log('🎯 Pattern-based code extraction:', { 
+        snippetsFound: codeSnippets.length, 
+        extractedLength: combinedCode.length 
+      });
+      return combinedCode;
+    }
+    
+    // Last resort: Extract structured content by removing explanatory text
+    const lines = content.split('\n');
+    const codeLines = lines.filter(line => {
       const trimmed = line.trim();
-      return trimmed.length > 0 && 
-             !trimmed.startsWith('#') && 
-             !trimmed.startsWith('*') &&
-             !trimmed.toLowerCase().includes('explanation') &&
-             !trimmed.toLowerCase().includes('summary');
+      // Skip empty lines, headers, and explanatory text
+      if (!trimmed || 
+          trimmed.startsWith('#') || 
+          trimmed.startsWith('*') ||
+          trimmed.startsWith('**') ||
+          /^(explanation|summary|note|implementation|approach|solution|here)/i.test(trimmed) ||
+          trimmed.length < 10) {
+        return false;
+      }
+      
+      // Keep lines that look like code
+      return trimmed.includes('(') || 
+             trimmed.includes('{') || 
+             trimmed.includes(';') ||
+             trimmed.includes('=') ||
+             trimmed.includes('import') ||
+             trimmed.includes('export') ||
+             trimmed.includes('function') ||
+             trimmed.includes('const') ||
+             trimmed.includes('let') ||
+             trimmed.includes('var') ||
+             trimmed.includes('<') ||
+             trimmed.includes('/>');
     });
     
-    if (lines.length > 0) {
-      const extractedContent = lines.slice(0, 20).join('\n'); // First 20 meaningful lines
-      console.log('📝 Fallback content extraction:', { 
-        linesFound: lines.length, 
+    if (codeLines.length > 0) {
+      const extractedContent = codeLines.join('\n');
+      console.log('📝 Structural content extraction:', { 
+        totalLines: lines.length,
+        codeLinesFound: codeLines.length, 
         extractedLength: extractedContent.length 
       });
       return extractedContent;
     }
     
-    // Final fallback - return first substantial portion
+    // Final fallback - return substantial portion of content
     const fallback = content.substring(0, 1500).trim();
     console.warn('⚠️ Using fallback extraction for voice content:', { 
       contentLength: content.length,

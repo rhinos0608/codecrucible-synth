@@ -12,7 +12,7 @@ import Pricing from "@/pages/pricing";
 import Teams from "@/pages/teams";
 import Onboarding from "@/pages/onboarding";
 import Subscribe from "@/pages/subscribe";
-import SubscriptionSuccess from "@/pages/subscription-success";
+import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
 import SubscriptionCancel from "@/pages/subscription-cancel";
 import { VoiceSelectionProvider } from "@/contexts/voice-selection-context";
 import { AuthProvider } from "@/components/auth/AuthProvider";

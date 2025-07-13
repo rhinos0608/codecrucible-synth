@@ -22,7 +22,7 @@ interface ArkaneTechnologiesProduct {
 
 const ARKANE_TECHNOLOGIES_PRODUCTS: ArkaneTechnologiesProduct[] = [
   {
-    name: 'Arkane Technologies Pro',
+    name: 'CodeCrucible Pro',
     description: 'Perfect for individual developers - Unlimited code generations, advanced synthesis engine, analytics dashboard',
     priceAmount: 1900, // $19.00
     interval: 'month',
@@ -37,7 +37,7 @@ const ARKANE_TECHNOLOGIES_PRODUCTS: ArkaneTechnologiesProduct[] = [
     ]
   },
   {
-    name: 'Arkane Technologies Team',
+    name: 'CodeCrucible Team',
     description: 'For teams and organizations - Everything in Pro plus team collaboration and shared voice profiles',
     priceAmount: 4900, // $49.00
     interval: 'month',
@@ -52,7 +52,7 @@ const ARKANE_TECHNOLOGIES_PRODUCTS: ArkaneTechnologiesProduct[] = [
     ]
   },
   {
-    name: 'Arkane Technologies Enterprise',
+    name: 'CodeCrucible Enterprise',
     description: 'For large organizations - Everything in Team plus custom AI training and on-premise deployment',
     priceAmount: 9900, // $99.00
     interval: 'month',
@@ -101,11 +101,11 @@ class StripeProductManager {
         }
 
         // Search for existing product - Following AI_INSTRUCTIONS.md patterns
-        // Also search for legacy CodeCrucible and Rhythm Chamber products to migrate them
-        const legacyCodeCrucibleName = productData.name.replace('Arkane Technologies', 'CodeCrucible');
-        const legacyRhythmChamberName = productData.name.replace('Arkane Technologies', 'Rhythm Chamber');
+        // Also search for legacy Arkane Technologies and Rhythm Chamber products to migrate them
+        const legacyArkaneName = productData.name.replace('CodeCrucible', 'Arkane Technologies');
+        const legacyRhythmChamberName = productData.name.replace('CodeCrucible', 'Rhythm Chamber');
         const existingProducts = await this.stripe.products.search({
-          query: `name:'${productData.name}' OR name:'${productData.name} (Manual)' OR name:'${legacyCodeCrucibleName}' OR name:'${legacyRhythmChamberName}'`,
+          query: `name:'${productData.name}' OR name:'${productData.name} (Manual)' OR name:'${legacyArkaneName}' OR name:'${legacyRhythmChamberName}'`,
         });
 
         let product: Stripe.Product;
@@ -116,7 +116,7 @@ class StripeProductManager {
           product = existingProducts.data[0];
           
           // Check if this is a legacy product that needs rebranding
-          const isLegacyProduct = product.name.includes('CodeCrucible') || product.name.includes('Rhythm Chamber');
+          const isLegacyProduct = product.name.includes('Arkane Technologies') || product.name.includes('Rhythm Chamber');
           
           // Only try to activate/update if it's not an automatic product
           if ((!product.active || isLegacyProduct) && product.metadata?.created_by !== 'stripe_automatic') {

@@ -809,6 +809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stripe checkout endpoint - Following AI_INSTRUCTIONS.md security patterns
+  // Updated to use CodeCrucible payment links from Arkane Technologies
   app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res, next) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -822,31 +823,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(400, 'Invalid subscription tier');
       }
       
-      const successUrl = `${req.protocol}://${req.get('host')}/subscription/success?tier=${tier}`;
-      const cancelUrl = `${req.protocol}://${req.get('host')}/subscription/cancel`;
+      // CodeCrucible payment links from Arkane Technologies Stripe account
+      // These links will redirect to Stripe's hosted checkout and then back to our success page
+      const CODECRUCIBLE_PAYMENT_LINKS = {
+        pro: 'https://buy.stripe.com/7sY4gy8XW7cBdJb05i4c801',
+        team: 'https://buy.stripe.com/cNi7sK7TS40p48B3hu4c802',
+        enterprise: 'https://buy.stripe.com/cNi7sK7TS40p48B3hu4c802' // Team tier for now
+      };
       
-      // Import subscription service
-      const { subscriptionService } = await import('./subscription-service');
+      const checkoutUrl = CODECRUCIBLE_PAYMENT_LINKS[tier as keyof typeof CODECRUCIBLE_PAYMENT_LINKS];
       
-      const session = await subscriptionService.createCheckoutSession(
-        userId,
-        tier as 'pro' | 'team' | 'enterprise',
-        successUrl,
-        cancelUrl
-      );
+      if (!checkoutUrl) {
+        throw new APIError(400, `No payment link configured for tier: ${tier}`);
+      }
       
-      logger.info('Stripe checkout session created for real money transaction', {
+      logger.info('Redirecting to CodeCrucible payment link for real money transaction', {
         userId: userId.substring(0, 8) + '...',
         tier,
-        sessionId: session.id,
-        checkoutUrl: session.url,
-        mode: session.mode,
-        paymentMethodTypes: session.payment_method_types
+        checkoutUrl,
+        company: 'Arkane Technologies',
+        app: 'CodeCrucible'
       });
       
-      res.json({ checkoutUrl: session.url });
+      res.json({ checkoutUrl });
     } catch (error) {
-      logger.error('Stripe checkout error', error as Error, {
+      logger.error('CodeCrucible checkout redirect error', error as Error, {
         userId: req.user?.claims?.sub,
         tier: req.body?.tier
       });

@@ -286,6 +286,29 @@ class SubscriptionService {
     return session;
   }
 
+  /**
+   * Map Stripe price ID to subscription tier for CodeCrucible payment links
+   * Following AI_INSTRUCTIONS.md security patterns
+   */
+  private mapPriceIdToTier(priceId: string): "pro" | "team" | "enterprise" | null {
+    // CodeCrucible payment link price IDs from Arkane Technologies Stripe account
+    const CODECRUCIBLE_PRICE_MAPPING: Record<string, "pro" | "team" | "enterprise"> = {
+      'price_1RkNL6A1twisVzen0NGxfG7f': 'pro',    // Pro Plan: $19/month
+      'price_1RkNLgA1twisVzenGkDoiILm': 'team',   // Team Plan: $49/month
+      // Add more mappings as needed
+    };
+    
+    const tier = CODECRUCIBLE_PRICE_MAPPING[priceId];
+    
+    logger.info('Mapping price ID to tier', {
+      priceId,
+      tier: tier || 'unknown',
+      mappingAvailable: !!tier
+    });
+    
+    return tier || null;
+  }
+
   async handleWebhook(event: Stripe.Event) {
     try {
       logger.info('Processing Stripe webhook event', {
@@ -297,27 +320,79 @@ class SubscriptionService {
       switch (event.type) {
         case "checkout.session.completed": {
           const session = event.data.object as Stripe.Checkout.Session;
-          const userId = session.metadata?.userId;
-          const tier = session.metadata?.tier as "pro" | "team" | "enterprise";
+          let userId = session.metadata?.userId;
+          let tier = session.metadata?.tier as "pro" | "team" | "enterprise";
+          
+          // For payment links, metadata might not be available, so we need to determine tier from the subscription
+          if (!userId || !tier) {
+            logger.info("Payment link checkout - determining tier from subscription", { 
+              sessionId: session.id, 
+              subscriptionId: session.subscription,
+              customerId: session.customer,
+              paymentStatus: session.payment_status 
+            });
+            
+            // Get subscription details to determine the tier
+            if (this.stripe && session.subscription) {
+              try {
+                const subscription = await this.stripe.subscriptions.retrieve(session.subscription as string);
+                const priceId = subscription.items.data[0]?.price.id;
+                
+                // Map price ID to tier for CodeCrucible payment links
+                tier = this.mapPriceIdToTier(priceId);
+                
+                // Try to find user by customer ID or email
+                if (!userId && session.customer) {
+                  const customer = await this.stripe.customers.retrieve(session.customer as string);
+                  if (customer && !customer.deleted && customer.email) {
+                    const [user] = await db.select().from(users).where(eq(users.email, customer.email));
+                    if (user) {
+                      userId = user.id;
+                      logger.info('Found user by customer email', {
+                        userId: userId.substring(0, 8) + '...',
+                        customerEmail: customer.email,
+                        tier
+                      });
+                    }
+                  }
+                }
+                
+                logger.info('Determined payment link details', {
+                  userId: userId?.substring(0, 8) + '...',
+                  tier,
+                  priceId,
+                  subscriptionId: subscription.id
+                });
+              } catch (error) {
+                logger.error('Error retrieving subscription for payment link', error as Error, {
+                  sessionId: session.id,
+                  subscriptionId: session.subscription
+                });
+                return;
+              }
+            }
+          }
           
           if (!userId || !tier) {
-            logger.error("Missing metadata in checkout session", { 
+            logger.error("Unable to determine user or tier for checkout session", { 
               sessionId: session.id, 
               metadata: session.metadata,
+              customerId: session.customer,
               paymentStatus: session.payment_status 
             });
             return;
           }
 
-          logger.info('Processing successful checkout session', {
+          logger.info('Processing successful CodeCrucible checkout session', {
             userId: userId.substring(0, 8) + '...',
             tier,
             sessionId: session.id,
             paymentStatus: session.payment_status,
-            subscriptionId: session.subscription
+            subscriptionId: session.subscription,
+            source: session.metadata?.userId ? 'session_metadata' : 'payment_link'
           });
 
-          // Update user subscription
+          // Update user subscription and activate features
           await this.upgradeSubscription(userId, tier, session.subscription as string);
           break;
         }
@@ -388,10 +463,11 @@ class SubscriptionService {
 
     const previousTier = user.subscriptionTier;
     
-    // Update user subscription
+    // Update user subscription and activate features - Following AI_INSTRUCTIONS.md patterns
     await db.update(users)
       .set({
         subscriptionTier: tier,
+        planTier: tier, // Ensure planTier is also updated for feature gates
         subscriptionStatus: "active",
         stripeSubscriptionId,
         subscriptionStartDate: new Date(),

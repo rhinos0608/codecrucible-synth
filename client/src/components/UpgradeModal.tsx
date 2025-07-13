@@ -35,7 +35,7 @@ export default function UpgradeModal({
       case 'analytics_blocked':
         return 'Analytics features require a Pro or Team subscription.';
       default:
-        return 'Unlock the full power of Arkane Technologies with Pro features.';
+        return 'Unlock the full power of CodeCrucible with Pro features.';
     }
   };
 
@@ -142,7 +142,7 @@ export default function UpgradeModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-yellow-500" />
-            Upgrade Your Arkane Technologies Experience
+            Upgrade Your CodeCrucible Experience
           </DialogTitle>
           <DialogDescription>
             {getTriggerMessage()}

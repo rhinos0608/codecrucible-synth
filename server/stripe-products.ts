@@ -284,17 +284,23 @@ class StripeProductManager {
 
   /**
    * Get price ID for a specific tier
+   * Updated with correct Stripe price IDs from user
    */
   async getPriceId(tier: 'pro' | 'team' | 'enterprise'): Promise<string> {
-    // Ensure products exist first
-    await this.ensureProductsExist();
+    // Use the correct Stripe price IDs provided by user
+    const CORRECT_PRICE_IDS = {
+      pro: 'price_1RkNL6A1twisVzen0NGxfG7f',
+      team: 'price_1RkNLgA1twisVzenGkDoiILm',
+      enterprise: 'price_1RkNLgA1twisVzenGkDoiILm' // Enterprise maps to team for now
+    };
     
-    const cached = this.productCache.get(tier);
-    if (!cached) {
-      throw new Error(`No price found for tier: ${tier}`);
+    const priceId = CORRECT_PRICE_IDS[tier];
+    if (!priceId) {
+      throw new Error(`Price ID not found for tier: ${tier}`);
     }
     
-    return cached.priceId;
+    logger.info(`Using correct Stripe price ID for tier: ${tier}`, { priceId });
+    return priceId;
   }
 
   /**

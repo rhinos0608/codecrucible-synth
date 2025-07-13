@@ -190,6 +190,7 @@ export async function processStripeWebhook(event: Stripe.Event): Promise<void> {
 
 /**
  * Determine plan tier from Stripe subscription
+ * Updated with correct Stripe price IDs from user
  */
 function determinePlanTier(subscription: Stripe.Subscription): 'free' | 'pro' | 'team' {
   // Check subscription items for price information
@@ -197,7 +198,14 @@ function determinePlanTier(subscription: Stripe.Subscription): 'free' | 'pro' | 
     const priceId = item.price.id;
     const unitAmount = item.price.unit_amount;
     
-    // Match against known price points (updated for Arkane Technologies)
+    // Match against correct Stripe price IDs provided by user
+    if (priceId === 'price_1RkNL6A1twisVzen0NGxfG7f') { // Pro tier
+      return 'pro';
+    } else if (priceId === 'price_1RkNLgA1twisVzenGkDoiILm') { // Team tier
+      return 'team';
+    }
+    
+    // Fallback to unit amount matching (updated for Arkane Technologies)
     if (unitAmount === 1900) { // $19.00
       return 'pro';
     } else if (unitAmount === 4900) { // $49.00

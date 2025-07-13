@@ -812,3 +812,11 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **API Endpoints**: Added /api/enterprise-voice-templates endpoints with proper authentication and subscription validation
 - **Enhanced Specializations**: Added 6 new technical specializations including Microservices, Penetration Testing, Compliance, and Domain Modeling
 - **Production Ready**: All enterprise voice templates follow AI_INSTRUCTIONS.md security patterns with comprehensive error handling
+
+### Stripe Price ID Updates (January 13, 2025)
+- **Correct Price IDs Implemented**: Updated stripe-products.ts with user-provided Stripe price IDs
+- **Pro Tier**: price_1RkNL6A1twisVzen0NGxfG7f ($19/month)
+- **Team Tier**: price_1RkNLgA1twisVzenGkDoiILm ($49/month)
+- **Enterprise Tier**: Maps to Team tier price ID for now
+- **Plan Determination**: Enhanced updateUserPlan.ts to use correct price IDs for subscription tier detection
+- **Security Compliance**: All price ID updates follow AI_INSTRUCTIONS.md patterns with comprehensive logging

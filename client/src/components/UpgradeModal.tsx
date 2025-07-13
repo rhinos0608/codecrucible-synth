@@ -51,9 +51,11 @@ export default function UpgradeModal({
         'Unlimited code generations',
         'Advanced synthesis engine',
         'Analytics dashboard',
-        'Priority voice recommendations',
-        'Export generated code',
-        'Advanced customization'
+        'Smart voice recommendations',
+        'Custom voice profiles',
+        'Project folders',
+        'Voice profile management',
+        'Real-time code streaming'
       ],
       highlighted: false,
       comingSoon: false

@@ -101,7 +101,7 @@ export const getRequiredFeature = (path: string): string | null => {
   const routeFeatureMap: Record<string, string> = {
     '/api/sessions/synthesize': 'synthesis_engine',
     '/api/analytics': 'analytics_dashboard',
-    '/api/voice-profiles': 'custom_voices',
+    '/api/voice-profiles': 'voice_profiles',
     '/api/project-folders': 'project_folders',
     '/api/teams': 'team_collaboration',
     '/api/export': 'code_export',

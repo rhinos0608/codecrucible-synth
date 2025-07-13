@@ -726,6 +726,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stripe checkout endpoint - Following AI_INSTRUCTIONS.md security patterns
+  app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        throw new APIError(401, 'User authentication required');
+      }
+      
+      const { tier } = req.body;
+      
+      if (!['pro', 'team', 'enterprise'].includes(tier)) {
+        throw new APIError(400, 'Invalid subscription tier');
+      }
+      
+      const successUrl = `${req.protocol}://${req.get('host')}/subscription/success`;
+      const cancelUrl = `${req.protocol}://${req.get('host')}/subscription/cancel`;
+      
+      // Import subscription service
+      const { subscriptionService } = await import('./subscription-service');
+      
+      const session = await subscriptionService.createCheckoutSession(
+        userId,
+        tier as 'pro' | 'team' | 'enterprise',
+        successUrl,
+        cancelUrl
+      );
+      
+      logger.info('Stripe checkout session created', {
+        userId,
+        tier,
+        sessionId: session.id,
+        checkoutUrl: session.url
+      });
+      
+      res.json({ checkoutUrl: session.url });
+    } catch (error) {
+      logger.error('Stripe checkout error', error as Error, {
+        userId: req.user?.claims?.sub,
+        tier: req.body?.tier
+      });
+      next(error);
+    }
+  });
+
   app.get('/api/quota/check', isAuthenticated, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;

@@ -100,11 +100,11 @@ export default function UpgradeModal({
 
   const upgradeMutation = useMutation({
     mutationFn: async (tier: string) => {
-      const response = await apiRequest("POST", "/api/subscription/checkout", { tier });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.json();
+      const response = await apiRequest("/api/subscription/checkout", {
+        method: "POST",
+        body: { tier }
+      });
+      return response;
     },
     onSuccess: (data) => {
       if (data.checkoutUrl) {

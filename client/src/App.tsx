@@ -40,6 +40,11 @@ function Router() {
         {isAuthenticated ? <Onboarding /> : <Landing />}
       </Route>
       
+      {/* Dashboard route - for Stripe post-checkout redirects */}
+      <Route path="/dashboard">
+        {isLoading ? <div>Loading...</div> : (isAuthenticated ? <Dashboard /> : <Landing />)}
+      </Route>
+      
       {/* Main route */}
       <Route path="/">
         {isLoading ? <div>Loading...</div> : (isAuthenticated ? <Dashboard /> : <Landing />)}

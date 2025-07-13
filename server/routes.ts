@@ -754,8 +754,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(400, 'Invalid subscription tier');
       }
       
-      const successUrl = `${req.protocol}://${req.get('host')}/dashboard?upgrade=success&tier=${tier}`;
-      const cancelUrl = `${req.protocol}://${req.get('host')}/dashboard?upgrade=cancelled`;
+      const successUrl = `${req.protocol}://${req.get('host')}/subscription/success?tier=${tier}`;
+      const cancelUrl = `${req.protocol}://${req.get('host')}/subscription/cancel`;
       
       // Import subscription service
       const { subscriptionService } = await import('./subscription-service');

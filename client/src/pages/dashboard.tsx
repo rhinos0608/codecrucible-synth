@@ -75,6 +75,24 @@ export default function Dashboard() {
   const { profiles } = useVoiceProfiles();
   const { recommendations, isAnalyzing, analyzePrompt } = useVoiceRecommendations();
   const planGuard = usePlanGuard();
+  const { toast } = useToast();
+  
+  // Upgrade success detection - following AI_INSTRUCTIONS.md patterns
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const upgrade = urlParams.get('upgrade');
+    const tier = urlParams.get('tier');
+    
+    if (upgrade === 'success' && tier) {
+      toast({
+        title: "Subscription Activated",
+        description: `Welcome to Arkane Technologies ${tier.charAt(0).toUpperCase() + tier.slice(1)}! You now have unlimited AI generations.`,
+      });
+      
+      // Clean URL parameters
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [toast]);
   
   const { 
     state, 
@@ -92,8 +110,6 @@ export default function Dashboard() {
     skipTour, 
     trackMilestone 
   } = useNewUserDetection();
-  
-  const { toast } = useToast();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
 

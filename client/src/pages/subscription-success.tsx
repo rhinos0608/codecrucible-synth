@@ -8,14 +8,19 @@ import { useLocation } from "wouter";
 export default function SubscriptionSuccess() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  
+  // Extract tier from URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const tier = urlParams.get('tier') || 'pro';
+  const tierDisplay = tier.charAt(0).toUpperCase() + tier.slice(1);
 
   useEffect(() => {
-    // Show success toast
+    // Show success toast with tier information
     toast({
       title: "Subscription Activated",
-      description: "Your subscription has been successfully activated! Welcome to Arkane Technologies Pro/Team.",
+      description: `Your Arkane Technologies ${tierDisplay} subscription has been successfully activated! Welcome to unlimited AI generation.`,
     });
-  }, [toast]);
+  }, [toast, tierDisplay]);
 
   const handleContinue = () => {
     setLocation("/");
@@ -34,15 +39,17 @@ export default function SubscriptionSuccess() {
         </CardHeader>
         <CardContent className="text-center space-y-4">
           <p className="text-muted-foreground">
-            Your subscription has been successfully activated. You now have access to all the premium features of CodeCrucible.
+            Your Arkane Technologies {tierDisplay} subscription has been successfully activated. You now have access to unlimited AI code generation and premium features.
           </p>
           <div className="bg-muted rounded-lg p-4">
-            <h3 className="font-semibold mb-2">What's Next?</h3>
+            <h3 className="font-semibold mb-2">Your {tierDisplay} Features:</h3>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• Unlimited code generations</li>
-              <li>• Advanced analytics dashboard</li>
-              <li>• Voice preference learning</li>
-              <li>• Priority support</li>
+              <li>• Unlimited AI code generations</li>
+              <li>• Multiple voice combinations</li>
+              <li>• Advanced synthesis engine</li>
+              <li>• Analytics dashboard</li>
+              {tier === 'team' && <li>• Team collaboration features</li>}
+              {tier === 'enterprise' && <li>• Custom AI training & SSO</li>}
             </ul>
           </div>
           <Button onClick={handleContinue} className="w-full">

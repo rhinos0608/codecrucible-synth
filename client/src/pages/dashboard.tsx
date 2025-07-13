@@ -460,9 +460,6 @@ export default function Dashboard() {
                   <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500/20 text-orange-400 rounded-full border border-orange-500/30">
                     Coming Soon
                   </span>
-                  <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500/20 text-orange-400 rounded-full border border-orange-500/30">
-                    Coming Soon
-                  </span>
                 </Button>
                 <Button
                   variant="outline"

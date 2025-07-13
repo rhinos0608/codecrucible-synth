@@ -163,19 +163,17 @@ export default function UpgradeModal({
                   Most Popular
                 </Badge>
               )}
+              {plan.comingSoon && (
+                <Badge className="absolute -top-2 right-4 bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                  Coming Soon
+                </Badge>
+              )}
               
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {plan.icon}
-                    <CardTitle className="flex items-center gap-2">
-                      {plan.name}
-                      {plan.comingSoon && (
-                        <span className="px-2 py-0.5 text-xs bg-orange-500/20 text-orange-400 rounded-full border border-orange-500/30">
-                          Coming Soon
-                        </span>
-                      )}
-                    </CardTitle>
+                    <CardTitle>{plan.name}</CardTitle>
                   </div>
                   <div className="text-right">
                     <span className="text-3xl font-bold">{plan.price}</span>

@@ -46,6 +46,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { Project, ProjectFolder } from '@/shared/schema';
 import { FileSelectionModal } from './file-selection-modal';
 import { FeatureGate } from './FeatureGate';
+import { FileManager } from './file-manager';
 
 const FOLDER_COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
@@ -79,6 +80,7 @@ export function EnhancedProjectsPanel({
   const [showDeleteProject, setShowDeleteProject] = useState(false);
   const [showDeleteFolder, setShowDeleteFolder] = useState(false);
   const [showFileSelection, setShowFileSelection] = useState(false);
+  const [showFileManager, setShowFileManager] = useState(false);
   
   // Form data
   const [newFolderData, setNewFolderData] = useState({ 
@@ -91,6 +93,7 @@ export function EnhancedProjectsPanel({
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<ProjectFolder | null>(null);
   const [fileSelectionProject, setFileSelectionProject] = useState<Project | null>(null);
+  const [selectedFolderForFileManager, setSelectedFolderForFileManager] = useState<ProjectFolder | null>(null);
   
   // Data hooks - Fixed to use correct destructuring
   const { projects = [], isLoading: projectsLoading, error: projectsError } = useProjects();
@@ -515,7 +518,20 @@ export function EnhancedProjectsPanel({
                         </div>
                         
                         {/* Folder Actions */}
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFolderForFileManager(folder);
+                              setShowFileManager(true);
+                            }}
+                            className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            title={`Manage files in "${folder.name}"`}
+                          >
+                            <FileText className="w-3 h-3" />
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -680,12 +696,26 @@ export function EnhancedProjectsPanel({
       </Dialog>
 
       {/* File Selection Modal */}
-      <FileSelectionModal
-        isOpen={showFileSelection}
-        onClose={() => setShowFileSelection(false)}
-        onSelectFiles={handleFilesSelected}
-        project={fileSelectionProject}
-      />
+      {showFileSelection && fileSelectionProject && (
+        <FileSelectionModal
+          isOpen={showFileSelection}
+          onClose={() => setShowFileSelection(false)}
+          project={fileSelectionProject}
+          onFilesSelected={handleFilesSelected}
+        />
+      )}
+
+      {/* File Manager Modal */}
+      {showFileManager && selectedFolderForFileManager && (
+        <FileManager
+          isOpen={showFileManager}
+          onClose={() => {
+            setShowFileManager(false);
+            setSelectedFolderForFileManager(null);
+          }}
+          folder={selectedFolderForFileManager}
+        />
+      )}
     </>
   );
 }

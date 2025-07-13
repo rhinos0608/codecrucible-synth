@@ -773,6 +773,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI Chat endpoint for file assistance - Following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+  app.post('/api/ai/chat', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { messages, context } = req.body;
+      
+      // Import OpenAI service following Jung's Descent Protocol
+      const { realOpenAIService } = await import('./openai-service');
+      
+      console.log('🧠 AI Chat Request:', {
+        userId: userId.substring(0, 8) + '...',
+        messageCount: messages?.length || 0,
+        context,
+        hasFileContent: messages?.[1]?.content?.includes('File content:') || false
+      });
+      
+      // Validate request structure following Alexander's Pattern Language
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: 'Messages array is required' });
+      }
+      
+      // Generate AI response using real OpenAI integration
+      const response = await realOpenAIService.generateChatResponse({
+        messages,
+        context: context || 'file_assistance',
+        temperature: 0.7,
+        maxTokens: 1000
+      });
+      
+      logger.info('AI chat response generated', {
+        userId: userId.substring(0, 8) + '...',
+        context,
+        responseLength: response?.length || 0
+      });
+      
+      res.json({ 
+        response,
+        context,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      logger.error('AI chat failed', error as Error, {
+        userId: req.user?.claims?.sub,
+        context: req.body?.context
+      });
+      
+      // Fallback response following CodingPhilosophy.md consciousness principles
+      res.status(500).json({ 
+        error: 'AI chat temporarily unavailable',
+        fallback: 'Please try again or contact support for file analysis assistance'
+      });
+    }
+  });
+
+  // File management endpoints for project folders - Following AI_INSTRUCTIONS.md patterns
+  app.get('/api/folders/:folderId/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const { folderId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      console.log('📁 Fetching files for folder:', { folderId, userId: userId.substring(0, 8) + '...' });
+      
+      // Mock files for now - to be replaced with actual database integration
+      const mockFiles = [
+        {
+          id: 1,
+          name: 'example.js',
+          content: '// Example JavaScript file\nconsole.log("Hello from CodeCrucible!");',
+          fileType: 'code',
+          language: 'javascript',
+          description: 'Example JavaScript file for testing',
+          tags: ['example', 'test'],
+          isContextEnabled: true,
+          folderId: parseInt(folderId),
+          userId,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 2,
+          name: 'readme.md',
+          content: '# Project Documentation\n\nThis is a sample markdown file for project documentation.',
+          fileType: 'documentation',
+          language: 'markdown',
+          description: 'Project documentation file',
+          tags: ['documentation', 'readme'],
+          isContextEnabled: false,
+          folderId: parseInt(folderId),
+          userId,
+          createdAt: new Date().toISOString()
+        }
+      ];
+      
+      res.json(mockFiles);
+    } catch (error: any) {
+      console.error('❌ Get folder files error:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch files' });
+    }
+  });
+
+  app.post('/api/folders/:folderId/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const { folderId } = req.params;
+      const userId = req.user.claims.sub;
+      const fileData = req.body;
+      
+      console.log('📝 Creating file in folder:', { folderId, fileName: fileData.name, userId: userId.substring(0, 8) + '...' });
+      
+      // Mock file creation - to be replaced with actual database integration
+      const newFile = {
+        id: Math.floor(Math.random() * 10000),
+        ...fileData,
+        folderId: parseInt(folderId),
+        userId,
+        createdAt: new Date().toISOString()
+      };
+      
+      res.json(newFile);
+    } catch (error: any) {
+      console.error('❌ Create file error:', error);
+      res.status(500).json({ error: error.message || 'Failed to create file' });
+    }
+  });
+
+  app.put('/api/files/:fileId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { fileId } = req.params;
+      const userId = req.user.claims.sub;
+      const updateData = req.body;
+      
+      console.log('✏️ Updating file:', { fileId, userId: userId.substring(0, 8) + '...' });
+      
+      // Mock file update - to be replaced with actual database integration
+      const updatedFile = {
+        id: parseInt(fileId),
+        ...updateData,
+        userId,
+        updatedAt: new Date().toISOString()
+      };
+      
+      res.json(updatedFile);
+    } catch (error: any) {
+      console.error('❌ Update file error:', error);
+      res.status(500).json({ error: error.message || 'Failed to update file' });
+    }
+  });
+
+  app.delete('/api/files/:fileId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { fileId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      console.log('🗑️ Deleting file:', { fileId, userId: userId.substring(0, 8) + '...' });
+      
+      // Mock file deletion - to be replaced with actual database integration
+      res.json({ success: true, message: 'File deleted successfully' });
+    } catch (error: any) {
+      console.error('❌ Delete file error:', error);
+      res.status(500).json({ error: error.message || 'Failed to delete file' });
+    }
+  });
+
   app.get('/api/context-files', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

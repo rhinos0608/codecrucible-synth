@@ -35,7 +35,23 @@ export function useCreateVoiceProfile() {
 
   return useMutation({
     mutationFn: async (profile: InsertVoiceProfile) => {
-      return apiRequest("POST", "/api/voice-profiles", profile);
+      console.log('🔧 Creating voice profile via API:', profile);
+      
+      try {
+        const response = await apiRequest("POST", "/api/voice-profiles", profile);
+        
+        console.log('Voice profile API response:', { status: response.status, ok: response.ok });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('❌ Voice profile creation API failed:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });
@@ -45,6 +61,8 @@ export function useCreateVoiceProfile() {
       });
     },
     onError: (error: Error) => {
+      console.error('❌ Voice profile creation failed:', { error: error.message, stack: error.stack });
+      
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -56,9 +74,10 @@ export function useCreateVoiceProfile() {
         }, 500);
         return;
       }
+      
       toast({
-        title: "Error",
-        description: "Failed to create voice profile. Please try again.",
+        title: "Voice Profile Creation Failed",
+        description: `Error: ${error.message || 'Unknown error occurred'}`,
         variant: "destructive",
       });
     },

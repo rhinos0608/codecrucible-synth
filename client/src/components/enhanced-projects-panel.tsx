@@ -215,13 +215,24 @@ export function EnhancedProjectsPanel({
     mutationFn: async ({ projectId, folderId }: { projectId: number; folderId: number | null }) => {
       console.log('Moving project via PUT request:', { projectId, folderId });
       
-      // Enhanced PUT request following AI_INSTRUCTIONS.md patterns
-      const response = await apiRequest('PUT', `/api/projects/${projectId}/move`, {
-        folderId
-      });
-      
-      console.log('Move project response:', response.status);
-      return response.json();
+      // Enhanced PUT request following AI_INSTRUCTIONS.md patterns with comprehensive error handling
+      try {
+        const response = await apiRequest('PUT', `/api/projects/${projectId}/move`, {
+          folderId
+        });
+        
+        console.log('Move project API response:', { status: response.status, ok: response.ok });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('❌ API request failed:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       // Force immediate cache invalidation and refresh - Alexander's Pattern Language
@@ -256,10 +267,16 @@ export function EnhancedProjectsPanel({
       }, 100);
     },
     onError: (error) => {
-      console.error('Project move failed - engaging error council:', error);
+      console.error('❌ Project move failed - engaging error council:', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        projectId: movingProject?.id,
+        targetFolderId: movingProject?.folderId
+      });
+      
       toast({
-        title: "Move Failed",
-        description: `Failed to move project: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        title: "Project Move Failed",
+        description: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
         variant: "destructive",
       });
     },

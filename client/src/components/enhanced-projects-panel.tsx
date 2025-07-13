@@ -430,21 +430,23 @@ export function EnhancedProjectsPanel({
                   <span className="text-sm font-medium">
                     {selectedProjects.size} project{selectedProjects.size !== 1 ? 's' : ''} selected for context
                   </span>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const contextProjects = projects.filter(p => selectedProjects.has(p.id));
-                      onUseAsContext?.(contextProjects);
-                      toast({
-                        title: "Context Applied",
-                        description: `${contextProjects.length} projects will inform AI generation`,
-                      });
-                    }}
-                    className="flex items-center gap-1"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    Use as Context
-                  </Button>
+                  <FeatureGate feature="ai_project_context" tier="pro">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const contextProjects = projects.filter(p => selectedProjects.has(p.id));
+                        onUseAsContext?.(contextProjects);
+                        toast({
+                          title: "Context Applied",
+                          description: `${contextProjects.length} projects will inform AI generation`,
+                        });
+                      }}
+                      className="flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Use as Context
+                    </Button>
+                  </FeatureGate>
                 </div>
               </div>
             )}
@@ -482,10 +484,11 @@ export function EnhancedProjectsPanel({
                     </div>
                   )}
 
-                  {/* Project Folders */}
-                  {folders.map(folder => (
-                    <div key={folder.id} className="space-y-2">
-                      <div className="flex items-center justify-between group hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-2 py-1">
+                  {/* Project Folders - Pro Feature Following AI_INSTRUCTIONS.md Patterns */}
+                  <FeatureGate feature="project_folders" tier="pro">
+                    {folders.map(folder => (
+                      <div key={folder.id} className="space-y-2">
+                        <div className="flex items-center justify-between group hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-2 py-1">
                         <div 
                           className="flex items-center gap-2 cursor-pointer flex-1" 
                           onClick={() => {
@@ -526,19 +529,20 @@ export function EnhancedProjectsPanel({
                             <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
-                      </div>
-                      
-                      {expandedFolders.has(folder.id) && (
-                        <div className="ml-6 space-y-2">
-                          {getFilteredProjects().filter(p => p.folderId === folder.id).length > 0 ? (
-                            getFilteredProjects().filter(p => p.folderId === folder.id).map(renderProjectCard)
-                          ) : (
-                            <div className="text-xs text-gray-500 dark:text-gray-400 py-2">No projects in this folder</div>
-                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        
+                        {expandedFolders.has(folder.id) && (
+                          <div className="ml-6 space-y-2">
+                            {getFilteredProjects().filter(p => p.folderId === folder.id).length > 0 ? (
+                              getFilteredProjects().filter(p => p.folderId === folder.id).map(renderProjectCard)
+                            ) : (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 py-2">No projects in this folder</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </FeatureGate>
 
                   {/* Ungrouped Projects */}
                   {getFilteredProjects().filter(p => !p.folderId).length > 0 && (

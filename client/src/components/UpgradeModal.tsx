@@ -53,7 +53,8 @@ export default function UpgradeModal({
         'Analytics dashboard',
         'Smart voice recommendations',
         'Custom voice profiles',
-        'Project folders',
+        'Project folders with organization',
+        'AI context from your projects',
         'Voice profile management',
         'Real-time code streaming'
       ],
@@ -71,7 +72,8 @@ export default function UpgradeModal({
         'Everything in Pro',
         'Team collaboration',
         'Shared voice profiles',
-        'Advanced analytics',
+        'Advanced team analytics',
+        'Collaborative project context',
         'Team management',
         'Priority support'
       ],

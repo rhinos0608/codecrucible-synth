@@ -19,6 +19,7 @@ export const FEATURE_MATRIX = {
   'custom_voices': ['pro', 'team', 'enterprise'],
   'voice_profiles': ['pro', 'team', 'enterprise'],
   'project_folders': ['pro', 'team', 'enterprise'],
+  'ai_project_context': ['pro', 'team', 'enterprise'],
   'team_collaboration': ['team', 'enterprise'],
   'shared_profiles': ['team', 'enterprise'],
   'team_management': ['team', 'enterprise'],

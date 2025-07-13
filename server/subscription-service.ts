@@ -203,8 +203,15 @@ class SubscriptionService {
     // Import Stripe product manager for real product creation
     const { stripeProductManager } = await import('./stripe-products');
     
-    // Ensure products exist and get price ID
+    // Force ensure products exist and are active, then get price ID
+    await stripeProductManager.ensureProductsExist();
     const priceId = await stripeProductManager.getPriceId(tier);
+    
+    logger.info('Using Stripe price for checkout session', {
+      tier,
+      priceId,
+      userId: userId.substring(0, 8) + '...'
+    });
     
     // Create or retrieve Stripe customer
     let stripeCustomerId = user.stripeCustomerId;

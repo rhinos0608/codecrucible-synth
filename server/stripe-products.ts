@@ -107,9 +107,16 @@ class StripeProductManager {
         let price: Stripe.Price;
 
         if (existingProducts.data.length > 0) {
-          // Use existing product
+          // Use existing product but ensure it's active
           product = existingProducts.data[0];
-          logger.info(`Found existing Stripe product: ${product.name}`, { productId: product.id });
+          
+          // Check if product is active, activate if needed
+          if (!product.active) {
+            logger.info(`Activating inactive Stripe product: ${product.name}`, { productId: product.id });
+            product = await this.stripe.products.update(product.id, { active: true });
+          }
+          
+          logger.info(`Using existing Stripe product: ${product.name}`, { productId: product.id, active: product.active });
 
           // Get the active price for this product
           const prices = await this.stripe.prices.list({
@@ -119,16 +126,18 @@ class StripeProductManager {
 
           if (prices.data.length > 0) {
             price = prices.data[0];
-            logger.info(`Found existing price for ${product.name}`, { priceId: price.id, amount: price.unit_amount });
+            logger.info(`Found existing active price for ${product.name}`, { priceId: price.id, amount: price.unit_amount, active: price.active });
           } else {
             // Create new price for existing product
+            logger.info(`No active prices found for ${product.name}, creating new price`);
             price = await this.createPrice(product.id, productData);
           }
         } else {
-          // Create new product and price
+          // Create new product and price - Following AI_INSTRUCTIONS.md defensive programming
           product = await this.stripe.products.create({
             name: productData.name,
             description: productData.description,
+            active: true, // Explicitly set product as active
             metadata: {
               tier: productData.tier,
               features: productData.features.join('|'),
@@ -136,7 +145,7 @@ class StripeProductManager {
             },
           });
 
-          logger.info(`Created new Stripe product: ${product.name}`, { productId: product.id });
+          logger.info(`Created new Stripe product: ${product.name}`, { productId: product.id, active: product.active });
 
           price = await this.createPrice(product.id, productData);
         }
@@ -171,26 +180,38 @@ class StripeProductManager {
    * Create a new Stripe price for a product
    */
   private async createPrice(productId: string, productData: CodeCrucibleProduct): Promise<Stripe.Price> {
-    const price = await this.stripe.prices.create({
-      product: productId,
-      unit_amount: productData.priceAmount,
-      currency: 'usd',
-      recurring: {
-        interval: productData.interval,
-      },
-      metadata: {
+    try {
+      const price = await this.stripe.prices.create({
+        product: productId,
+        unit_amount: productData.priceAmount,
+        currency: 'usd',
+        active: true, // Explicitly set price as active
+        recurring: {
+          interval: productData.interval,
+        },
+        metadata: {
+          tier: productData.tier,
+          app: 'CodeCrucible'
+        },
+      });
+
+      logger.info(`✅ Created new Stripe price: $${productData.priceAmount / 100}/${productData.interval}`, {
+        priceId: price.id,
+        productId: productId,
         tier: productData.tier,
-        app: 'CodeCrucible'
-      },
-    });
+        active: price.active,
+        amount: price.unit_amount
+      });
 
-    logger.info(`Created new Stripe price: $${productData.priceAmount / 100}/${productData.interval}`, {
-      priceId: price.id,
-      productId: productId,
-      tier: productData.tier
-    });
-
-    return price;
+      return price;
+    } catch (error) {
+      logger.error(`❌ Failed to create Stripe price for ${productData.tier}`, error as Error, {
+        productId,
+        tier: productData.tier,
+        amount: productData.priceAmount
+      });
+      throw error;
+    }
   }
 
   /**
@@ -275,7 +296,13 @@ class StripeProductManager {
 // Singleton instance
 export const stripeProductManager = new StripeProductManager();
 
-// Initialize products on startup
-stripeProductManager.ensureProductsExist().catch(error => {
-  logger.error('Failed to initialize Stripe products on startup', error);
-});
+// Initialize products on startup - Following AI_INSTRUCTIONS.md patterns
+if (process.env.STRIPE_SECRET_KEY) {
+  stripeProductManager.ensureProductsExist().then(() => {
+    logger.info('Stripe products initialized successfully on startup');
+  }).catch(error => {
+    logger.error('Failed to initialize Stripe products on startup', error);
+  });
+} else {
+  logger.warn('STRIPE_SECRET_KEY not found, skipping product initialization');
+}

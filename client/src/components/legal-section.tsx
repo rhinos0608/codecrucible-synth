@@ -22,7 +22,6 @@ export default function LegalSection() {
           Terms of Service and Privacy Policy for Arkane Technologies platform usage
         </CardDescription>
       </CardHeader>
-      
       <CardContent className="pt-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-gray-800/30 border border-gray-600/30 mb-4">
@@ -57,10 +56,7 @@ export default function LegalSection() {
                 <div className="space-y-4">
                   <section>
                     <h4 className="font-medium text-gray-300 mb-2">1. Overview</h4>
-                    <p className="text-gray-300 leading-relaxed">
-                      Arkane Technologies is a web-based multi-voice AI development platform created by Arkane Technologies. 
-                      These Terms govern your access to and use of the service. By using the platform, you agree to these Terms.
-                    </p>
+                    <p className="text-gray-300 leading-relaxed">Code Crucible is a web-based multi-voice AI development platform created by Arkane Technologies. These Terms govern your access to and use of the service. By using the platform, you agree to these Terms.</p>
                   </section>
                   
                   <section>

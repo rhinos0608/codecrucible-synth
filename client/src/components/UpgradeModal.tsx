@@ -41,6 +41,26 @@ export default function UpgradeModal({
 
   const plans = [
     {
+      id: 'enterprise' as const,
+      name: 'Enterprise',
+      price: '$99',
+      period: '/month',
+      description: 'For large organizations',
+      icon: <BarChart className="h-6 w-6" />,
+      features: [
+        'Everything in Team',
+        'Custom AI training',
+        'On-premise deployment',
+        'SSO integration',
+        'Dedicated support',
+        'Custom integrations',
+        'SLA guarantees',
+        'Compliance features'
+      ],
+      highlighted: false,
+      comingSoon: true
+    },
+    {
       id: 'pro' as const,
       name: 'Pro',
       price: '$19',
@@ -75,26 +95,6 @@ export default function UpgradeModal({
       ],
       highlighted: true,
       comingSoon: false
-    },
-    {
-      id: 'enterprise' as const,
-      name: 'Enterprise',
-      price: '$99',
-      period: '/month',
-      description: 'For large organizations',
-      icon: <BarChart className="h-6 w-6" />,
-      features: [
-        'Everything in Team',
-        'Custom AI training',
-        'On-premise deployment',
-        'SSO integration',
-        'Dedicated support',
-        'Custom integrations',
-        'SLA guarantees',
-        'Compliance features'
-      ],
-      highlighted: false,
-      comingSoon: true
     }
   ];
 
@@ -164,7 +164,7 @@ export default function UpgradeModal({
                 </Badge>
               )}
               {plan.comingSoon && (
-                <Badge className="absolute -top-2 right-4 bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                <Badge className="absolute -top-2 left-4 bg-orange-500/20 text-orange-400 border border-orange-500/30 z-10">
                   Coming Soon
                 </Badge>
               )}

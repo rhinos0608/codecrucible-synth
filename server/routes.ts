@@ -1148,14 +1148,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         devMode: devModeConfig.isEnabled
       });
       
+      // Enhanced SSE headers for proper streaming with authentication
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Credentials': 'true'
+        'Access-Control-Allow-Origin': req.headers.origin || '*',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cookie',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'X-Accel-Buffering': 'no', // Disable nginx buffering for real-time streaming
+        'Transfer-Encoding': 'chunked'
       });
+      
+      // Connection keepalive heartbeat to prevent browser timeout
+      const heartbeat = setInterval(() => {
+        try {
+          res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`);
+        } catch (e) {
+          clearInterval(heartbeat);
+        }
+      }, 15000);
       
       // Start streaming message with consciousness framework integration
       res.write(`data: ${JSON.stringify({ 
@@ -1217,8 +1230,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         });
 
-        // Wait for ALL voices to complete in parallel
-        await Promise.all(voicePromises);
+        // Wait for ALL voices to complete in parallel with timeout protection
+        try {
+          await Promise.allSettled(voicePromises.map(promise => 
+            Promise.race([
+              promise,
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Voice timeout after 60s')), 60000)
+              )
+            ])
+          ));
+        } catch (timeoutError) {
+          console.warn('⏰ Voice timeout occurred:', timeoutError);
+          res.write(`data: ${JSON.stringify({
+            type: 'warning',
+            message: 'Some voices took longer than expected. Proceeding with available solutions...'
+          })}\n\n`);
+        }
 
         // Store solutions for synthesis
         global.sessionSolutions = global.sessionSolutions || new Map();
@@ -1233,22 +1261,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log('✅ Real OpenAI streaming completed:', { sessionId, solutionCount: completedSolutions.length });
         
+        // Clear heartbeat interval
+        clearInterval(heartbeat);
+        
       } catch (openaiError) {
         console.error('❌ Real OpenAI streaming error:', openaiError);
         
+        // Enhanced error handling following AI_INSTRUCTIONS.md patterns
         res.write(`data: ${JSON.stringify({
           type: 'error',
           message: 'AI council assembly encountered resistance. Implementing recovery protocol...',
-          error: openaiError.message
+          error: openaiError.message,
+          voiceId: 'system',
+          recoverable: true
         })}\n\n`);
+        
+        // Clear heartbeat on error
+        clearInterval(heartbeat);
       }
       
-      res.end();
+      // Ensure proper connection cleanup
+      setTimeout(() => {
+        try {
+          res.end();
+        } catch (e) {
+          console.warn('SSE connection already closed');
+        }
+      }, 100);
       
     } catch (error) {
       console.error('Streaming endpoint error:', error);
+      
+      // Defensive programming - ensure JSON response even on catastrophic failure
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Real OpenAI streaming failed', details: error.message });
+        res.status(500).json({ 
+          error: 'Real OpenAI streaming failed', 
+          details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        try {
+          res.write(`data: ${JSON.stringify({
+            type: 'fatal_error',
+            message: 'Critical system error occurred',
+            shouldReconnect: false
+          })}\n\n`);
+          res.end();
+        } catch (writeError) {
+          console.error('Failed to write error response:', writeError);
+        }
       }
     }
   }

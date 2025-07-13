@@ -94,13 +94,19 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
     setCurrentSessionId(sessionId);
 
     try {
-      // Use POST method for streaming instead of EventSource - Following AI_INSTRUCTIONS.md patterns
+      // Enhanced fetch with proper error handling and timeout protection
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      
       const response = await fetch('/api/sessions/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache'
         },
         credentials: 'include',
+        signal: controller.signal,
         body: JSON.stringify({
           prompt,
           selectedVoices,
@@ -108,12 +114,16 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
         })
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(`Streaming failed: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Streaming request failed:', response.status, errorText);
+        throw new Error(`Streaming failed: ${response.status} - ${errorText}`);
       }
 
       if (!response.body) {
-        throw new Error('Response body is null');
+        throw new Error('Response body is null - SSE stream not available');
       }
 
       // Process Server-Sent Events from the response stream
@@ -140,36 +150,97 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
                   const data = JSON.parse(line.slice(6));
                   console.log('📡 Streaming data received:', data.type, data.voiceId);
                   
-                  if (data.type === 'voice_content') {
-                    // Update specific voice content
-                    setVoices(prev => prev.map(voice => 
-                      voice.id === data.voiceId 
-                        ? { 
-                            ...voice, 
-                            content: voice.content + (data.content || ''),
-                            isTyping: true,
-                            isComplete: false
-                          }
-                        : voice
-                    ));
-                  } else if (data.type === 'voice_complete') {
-                    // Mark voice as complete
-                    setVoices(prev => prev.map(voice => 
-                      voice.id === data.voiceId 
-                        ? { 
-                            ...voice, 
-                            isTyping: false,
-                            isComplete: true,
-                            confidence: data.confidence || 85
-                          }
-                        : voice
-                    ));
-                  } else if (data.type === 'session_complete') {
-                    // All voices completed
-                    console.log('✅ All voices completed streaming');
-                    setIsStreaming(false);
-                    onComplete?.(sessionId);
-                    return; // Exit the stream processing
+                  // Enhanced stream processing with proper error handling
+                  switch (data.type) {
+                    case 'heartbeat':
+                      // Keep connection alive
+                      break;
+                      
+                    case 'session_start':
+                      console.log('🎯 Session started:', data.sessionId);
+                      break;
+                      
+                    case 'voice_connected':
+                      setVoices(prev => prev.map(voice => 
+                        voice.id === data.voiceId 
+                          ? { ...voice, isTyping: true }
+                          : voice
+                      ));
+                      break;
+                      
+                    case 'voice_content':
+                      // Update specific voice content
+                      setVoices(prev => prev.map(voice => 
+                        voice.id === data.voiceId 
+                          ? { 
+                              ...voice, 
+                              content: voice.content + (data.content || ''),
+                              isTyping: true,
+                              isComplete: false
+                            }
+                          : voice
+                      ));
+                      break;
+                      
+                    case 'voice_complete':
+                      // Mark voice as complete
+                      setVoices(prev => prev.map(voice => 
+                        voice.id === data.voiceId 
+                          ? { 
+                              ...voice, 
+                              isTyping: false,
+                              isComplete: true,
+                              confidence: data.confidence || 85
+                            }
+                          : voice
+                      ));
+                      break;
+                      
+                    case 'session_complete':
+                      // All voices completed
+                      console.log('✅ All voices completed streaming');
+                      setIsStreaming(false);
+                      onComplete?.(sessionId);
+                      return; // Exit the stream processing
+                      
+                    case 'warning':
+                      console.warn('⚠️ Streaming warning:', data.message);
+                      break;
+                      
+                    case 'error':
+                      console.error('❌ Streaming error:', data);
+                      
+                      // Enhanced error handling - check if recoverable
+                      if (data.recoverable && data.voiceId && data.voiceId !== 'system') {
+                        console.log('🔄 Recoverable voice error, marking voice as failed but continuing...');
+                        // Mark this voice as failed but continue with others
+                        setVoices(prev => prev.map(voice => 
+                          voice.id === data.voiceId 
+                            ? { 
+                                ...voice, 
+                                isTyping: false, 
+                                isComplete: true, 
+                                confidence: 0, 
+                                content: voice.content || 'Error occurred during generation' 
+                              }
+                            : voice
+                        ));
+                        break;
+                      }
+                      
+                      // Non-recoverable error
+                      setIsStreaming(false);
+                      onError?.(data.message || 'Streaming error');
+                      return;
+                      
+                    case 'fatal_error':
+                      console.error('💥 Fatal streaming error:', data);
+                      setIsStreaming(false);
+                      onError?.(data.message || 'Fatal streaming error');
+                      return;
+                      
+                    default:
+                      console.log('📡 Unknown streaming event:', data.type, data);
                   }
                 } catch (parseError) {
                   console.error('Failed to parse streaming data:', parseError);
@@ -180,7 +251,25 @@ export function useStreamingGeneration({ onComplete, onError }: UseStreamingGene
         } catch (streamError) {
           console.error('Stream processing error:', streamError);
           setIsStreaming(false);
-          onError?.('Stream processing failed');
+          
+          // Enhanced error classification
+          let errorMessage = 'Stream processing failed';
+          if (streamError.name === 'AbortError') {
+            errorMessage = 'Stream was aborted';
+          } else if (streamError.message.includes('ERR_BLOCKED_BY_CLIENT')) {
+            errorMessage = 'Connection blocked by browser security - please check ad blockers or extensions';
+          } else if (streamError.message.includes('network')) {
+            errorMessage = 'Network connection error - please check your internet connection';
+          }
+          
+          onError?.(errorMessage);
+        } finally {
+          // Always release the reader to prevent memory leaks
+          try {
+            reader.releaseLock();
+          } catch (releaseError) {
+            console.warn('Reader already released');
+          }
         }
       };
 

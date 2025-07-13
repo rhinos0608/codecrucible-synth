@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
 
+// Configure Neon for WebSocket support - Following AI_INSTRUCTIONS.md defensive patterns
 neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
@@ -11,5 +12,18 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Enhanced connection pool with resilience following AI_INSTRUCTIONS.md
+export const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  max: 20, // Maximum connections
+  idleTimeoutMillis: 30000, // Close idle connections after 30s
+  connectionTimeoutMillis: 2000, // Connection timeout
+});
+
+// Enhanced error handling for database connections
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle database client', err);
+  // Don't exit the process, just log the error
+});
+
 export const db = drizzle({ client: pool, schema });

@@ -38,8 +38,11 @@ export default function Pricing() {
 
   const checkoutMutation = useMutation({
     mutationFn: async (tier: string) => {
-      const response = await apiRequest("POST", "/api/subscription/checkout", { tier });
-      return response.json();
+      const response = await apiRequest("/api/subscription/checkout", {
+        method: "POST",
+        body: { tier }
+      });
+      return response;
     },
     onSuccess: (data) => {
       if (data.checkoutUrl) {

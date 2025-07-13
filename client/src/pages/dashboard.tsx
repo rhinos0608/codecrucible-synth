@@ -766,7 +766,7 @@ export default function Dashboard() {
           <div className="flex-1 overflow-y-auto">
             {/* Subscription Status */}
             <div className="p-4">
-              <SubscriptionStatus />
+              <SubscriptionStatus onUpgrade={() => setShowUpgradeModal(true)} />
             </div>
             <div className="border-t border-gray-700" data-tour="voice-selector">
               <PerspectiveSelector />

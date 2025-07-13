@@ -726,6 +726,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Subscription tiers endpoint - Following AI_INSTRUCTIONS.md security patterns
+  app.get("/api/subscription/tiers", async (req, res) => {
+    try {
+      // Import subscription service
+      const { subscriptionService } = await import('./subscription-service');
+      const tiers = subscriptionService.getAllTiers();
+      res.json(tiers);
+    } catch (error) {
+      logger.error('Error fetching subscription tiers', error as Error);
+      res.status(500).json({ error: 'Failed to fetch subscription tiers' });
+    }
+  });
+
   // Stripe checkout endpoint - Following AI_INSTRUCTIONS.md security patterns
   app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res, next) => {
     try {

@@ -72,6 +72,7 @@ export function EnhancedProjectsPanel({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProjects, setSelectedProjects] = useState<Set<number>>(new Set());
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
+  const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   
   // Dialog states
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -215,6 +216,16 @@ export function EnhancedProjectsPanel({
     setSelectedProjects(newSelected);
   };
 
+  const toggleProjectExpansion = (projectId: number) => {
+    const newExpanded = new Set(expandedProjects);
+    if (newExpanded.has(projectId)) {
+      newExpanded.delete(projectId);
+    } else {
+      newExpanded.add(projectId);
+    }
+    setExpandedProjects(newExpanded);
+  };
+
   const getFilteredProjects = () => {
     return projects.filter(project =>
       project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -222,62 +233,145 @@ export function EnhancedProjectsPanel({
     );
   };
 
-  const renderProjectCard = (project: Project) => (
-    <Card 
-      key={project.id} 
-      className={`cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-        selectedProjects.has(project.id) ? 'ring-2 ring-blue-500' : ''
-      }`}
-      onClick={() => toggleProjectSelection(project.id)}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <h4 className="font-medium text-sm">{project.name}</h4>
-            {project.description && (
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {project.description}
-              </p>
-            )}
-            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                <Code className="w-3 h-3" />
-                {project.language || 'Unknown'}
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {new Date(project.createdAt).toLocaleDateString()}
-              </span>
+  const renderProjectCard = (project: Project) => {
+    const isExpanded = expandedProjects.has(project.id);
+    const isSelected = selectedProjects.has(project.id);
+    
+    return (
+      <Card 
+        key={project.id} 
+        className={`transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+          isSelected ? 'ring-2 ring-blue-500' : ''
+        }`}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div 
+              className="flex-1 cursor-pointer"
+              onClick={() => toggleProjectExpansion(project.id)}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-medium text-sm">{project.name}</h4>
+                {isExpanded ? 
+                  <ChevronDown className="w-4 h-4 text-gray-500" /> : 
+                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                }
+              </div>
+              {project.description && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  {project.description}
+                </p>
+              )}
+              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  <Code className="w-3 h-3" />
+                  {project.language || 'javascript'}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  {new Date(project.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 ml-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleProjectSelection(project.id);
+                }}
+                className={`h-7 w-7 p-0 ${isSelected ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
+                title="Select for AI context"
+              >
+                <Sparkles className={`w-3 h-3 ${isSelected ? 'text-blue-600' : 'text-gray-500'}`} />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectFiles(project);
+                }}
+                className="h-7 w-7 p-0"
+                title="Select specific files"
+              >
+                <Target className="w-3 h-3" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteProject(project);
+                }}
+                className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                title="Delete project"
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
             </div>
           </div>
-          <div className="flex items-center gap-1 ml-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSelectFiles(project);
-              }}
-              className="h-7 w-7 p-0"
-            >
-              <Target className="w-3 h-3" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteProject(project);
-              }}
-              className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
-            >
-              <Trash2 className="w-3 h-3" />
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+          
+          {/* Expanded Code Content */}
+          {isExpanded && (
+            <div className="mt-4 border-t pt-4">
+              <div className="bg-gray-900 dark:bg-gray-950 rounded-lg p-4 max-h-96 overflow-y-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-400 font-mono">Full Project Code</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      navigator.clipboard.writeText(project.code || '');
+                      toast({
+                        title: "Copied",
+                        description: "Project code copied to clipboard",
+                      });
+                    }}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-gray-300"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                </div>
+                <pre className="text-xs text-gray-100 dark:text-gray-100 font-mono whitespace-pre-wrap break-words">
+                  {project.code || 'No code available for this project.'}
+                </pre>
+              </div>
+              
+              {/* Project Actions when expanded */}
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    toggleProjectSelection(project.id);
+                    toast({
+                      title: isSelected ? "Removed from Context" : "Added to Context",
+                      description: `${project.name} ${isSelected ? 'removed from' : 'added to'} AI context`,
+                    });
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {isSelected ? 'Remove from Context' : 'Add to Context'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleSelectFiles(project)}
+                  className="flex items-center gap-1"
+                >
+                  <Target className="w-3 h-3" />
+                  Select Files
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <>

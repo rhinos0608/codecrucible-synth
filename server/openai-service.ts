@@ -39,7 +39,7 @@ interface StreamOptions {
 }
 
 class RealOpenAIService {
-  // REAL OpenAI parallel generation - NO fallbacks allowed
+  // REAL OpenAI parallel generation with custom user profiles integration
   async generateSolutions(options: {
     prompt: string;
     selectedVoices?: {
@@ -51,8 +51,9 @@ class RealOpenAIService {
     sessionId: number;
     mode?: string;
     userId?: string;
+    customProfiles?: any[];
   }): Promise<FastSolution[]> {
-    const { prompt, selectedVoices, perspectives: directPerspectives, roles: directRoles, sessionId } = options;
+    const { prompt, selectedVoices, perspectives: directPerspectives, roles: directRoles, sessionId, userId, customProfiles } = options;
     
     // Following AI_INSTRUCTIONS.md defensive programming patterns
     const perspectives = selectedVoices?.perspectives || directPerspectives || [];
@@ -75,9 +76,21 @@ class RealOpenAIService {
       throw new Error('Invalid voice arrays provided to OpenAI service');
     }
     
-    logger.info('Starting REAL OpenAI parallel generation', {
+    // Fetch custom user profiles if userId provided - Following AI_INSTRUCTIONS.md patterns
+    let userCustomProfiles: any[] = [];
+    if (userId && customProfiles) {
+      userCustomProfiles = customProfiles;
+      logger.info('Using custom user profiles for code generation', {
+        userId: userId.substring(0, 8) + '...',
+        customProfileCount: userCustomProfiles.length,
+        profileNames: userCustomProfiles.map(p => p.name)
+      });
+    }
+
+    logger.info('Starting REAL OpenAI parallel generation with custom profiles', {
       sessionId,
       voiceCount: perspectives.length + roles.length,
+      customProfileCount: userCustomProfiles.length,
       promptLength: prompt.length,
       perspectiveVoices: perspectives,
       roleVoices: roles
@@ -86,25 +99,35 @@ class RealOpenAIService {
     // Performance optimization: Parallel processing all voices simultaneously
     const voicePromises: Promise<FastSolution>[] = [];
     
-    // Generate perspective solutions in parallel
+    // Generate perspective solutions in parallel with custom profile enhancement
     perspectives.forEach((perspective, index) => {
+      const customProfile = userCustomProfiles.find(p => 
+        p.selectedPerspectives?.includes(perspective) || p.perspective === perspective
+      );
+      
       voicePromises.push(this.generateVoiceSolution({
         prompt,
         voiceId: perspective,
         type: 'perspective',
         sessionId,
-        solutionId: index + 1
+        solutionId: index + 1,
+        customProfile
       }));
     });
     
-    // Generate role solutions in parallel
+    // Generate role solutions in parallel with custom profile enhancement
     roles.forEach((role, index) => {
+      const customProfile = userCustomProfiles.find(p => 
+        p.selectedRoles?.includes(role) || p.role === role
+      );
+      
       voicePromises.push(this.generateVoiceSolution({
         prompt,
         voiceId: role,
         type: 'role',
         sessionId,
-        solutionId: perspectives.length + index + 1
+        solutionId: perspectives.length + index + 1,
+        customProfile
       }));
     });
 
@@ -133,17 +156,36 @@ class RealOpenAIService {
     }
   }
 
-  // REAL OpenAI voice solution generation - NO mock data
+  // REAL OpenAI voice solution generation with custom profile integration
   private async generateVoiceSolution(options: {
     prompt: string;
     voiceId: string;
     type: 'perspective' | 'role';
     sessionId: number;
     solutionId: number;
+    customProfile?: any;
   }): Promise<FastSolution> {
-    const { prompt, voiceId, type, sessionId, solutionId } = options;
+    const { prompt, voiceId, type, sessionId, solutionId, customProfile } = options;
     
     try {
+      // Enhanced system prompt with custom profile integration
+      let enhancedSystemPrompt = this.getSystemPrompt(voiceId, type);
+      
+      if (customProfile) {
+        enhancedSystemPrompt += `\n\nCUSTOM PROFILE ENHANCEMENT:\n`;
+        enhancedSystemPrompt += `Name: ${customProfile.name}\n`;
+        enhancedSystemPrompt += `Personality: ${customProfile.personality || 'Analytical'}\n`;
+        enhancedSystemPrompt += `Communication Style: ${customProfile.chatStyle || 'Professional'}\n`;
+        enhancedSystemPrompt += `Specialization: ${customProfile.specialization || 'General Programming'}\n`;
+        enhancedSystemPrompt += `Ethical Stance: ${customProfile.ethicalStance || 'Balanced'}\n`;
+        enhancedSystemPrompt += `\nAdapt your response to embody these custom characteristics while maintaining your core voice identity.`;
+        
+        logger.info('Using custom profile for voice generation', {
+          voiceId,
+          profileName: customProfile.name,
+          specialization: customProfile.specialization
+        });
+      }
     
     console.log('🎯 Generating voice solution:', {
       voiceId,
@@ -153,7 +195,6 @@ class RealOpenAIService {
       promptLength: prompt.length
     });
     
-    const systemPrompt = this.getSystemPrompt(voiceId, type);
     const userPrompt = `Generate a complete, production-ready solution for: ${prompt}
 
 Requirements:
@@ -163,12 +204,13 @@ Requirements:
 - Follow modern best practices
 - Provide clear explanation`;
 
-    logger.info('Making REAL OpenAI API call', { 
+    logger.info('Making REAL OpenAI API call with custom profile integration', { 
       voiceId, 
       type, 
       model: 'gpt-4o',
-      systemPromptLength: systemPrompt.length,
-      userPromptLength: userPrompt.length 
+      systemPromptLength: enhancedSystemPrompt.length,
+      userPromptLength: userPrompt.length,
+      hasCustomProfile: !!customProfile
     });
 
     // Enhanced OpenAI API call with comprehensive error handling following AI_INSTRUCTIONS.md
@@ -177,7 +219,7 @@ Requirements:
       response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: enhancedSystemPrompt },
           { role: "user", content: userPrompt }
         ],
         temperature: 0.4,
@@ -265,12 +307,39 @@ Requirements:
     sessionId: number;
     voiceId: string;
     type: 'perspective' | 'role';
+    customProfile?: any;
     onChunk: (chunk: string) => void;
     onComplete: (solution: any) => Promise<void>;
   }): Promise<void> {
-    const { prompt, sessionId, voiceId, type, onChunk, onComplete } = options;
+    const { prompt, sessionId, voiceId, type, customProfile, onChunk, onComplete } = options;
     
-    const systemPrompt = this.getSystemPrompt(voiceId, type);
+    // Enhanced system prompt with custom profile integration - Following AI_INSTRUCTIONS.md patterns
+    let systemPrompt = this.getSystemPrompt(voiceId, type);
+    
+    // Apply custom profile enhancements if available
+    if (customProfile) {
+      const profileEnhancement = `
+
+--- CUSTOM VOICE PROFILE ENHANCEMENT ---
+Voice Profile: ${customProfile.name}
+Avatar: ${customProfile.avatar || 'Default'}
+Personality: ${customProfile.personality || 'Professional'}
+Communication Style: ${customProfile.chatStyle || 'Balanced'}
+Specialization: ${customProfile.specialization || 'General'}
+Ethical Stance: ${customProfile.ethicalStance || 'Balanced'}
+
+Apply the above personality and specialization characteristics to your responses while maintaining your core ${voiceId} voice identity.`;
+      
+      systemPrompt += profileEnhancement;
+      
+      logger.info('Custom profile applied to streaming voice', {
+        voiceId,
+        profileName: customProfile.name,
+        specialization: customProfile.specialization,
+        chatStyle: customProfile.chatStyle
+      });
+    }
+    
     const userPrompt = `Generate complete, production-ready code for: ${prompt}
 
 Requirements:
@@ -280,6 +349,7 @@ Requirements:
 - Follow modern best practices and patterns
 - Provide complete working implementation
 - Focus on ${type === 'perspective' ? 'analytical perspective' : 'technical specialization'} as ${voiceId}
+${customProfile ? `- Apply ${customProfile.name} voice profile characteristics with ${customProfile.specialization || 'general'} specialization` : ''}
 
 Generate real, functional code that can be executed immediately.`;
 

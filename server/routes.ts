@@ -1188,6 +1188,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const perspectives = Array.isArray(selectedVoices?.perspectives) ? selectedVoices.perspectives : [];
       const roles = Array.isArray(selectedVoices?.roles) ? selectedVoices.roles : [];
       
+      // Fetch user's custom voice profiles for AI generation - Following AI_INSTRUCTIONS.md patterns
+      let userCustomProfiles = [];
+      try {
+        userCustomProfiles = await storage.getVoiceProfiles(userId);
+        console.log('📋 Fetched custom profiles for code generation:', {
+          userId: userId.substring(0, 8) + '...',
+          profileCount: userCustomProfiles.length,
+          profileNames: userCustomProfiles.map(p => p.name)
+        });
+      } catch (profileError) {
+        console.warn('⚠️ Could not fetch custom profiles, proceeding without them:', profileError);
+        userCustomProfiles = [];
+      }
+      
       if (perspectives.length === 0 && roles.length === 0) {
         console.error('❌ No voices selected');
         return res.status(400).json({ error: 'At least one perspective or role must be selected' });
@@ -1233,7 +1247,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roles,
         sessionId,
         userId,
-        mode: devModeConfig.isEnabled ? 'development' : 'production'
+        mode: devModeConfig.isEnabled ? 'development' : 'production',
+        customProfiles: userCustomProfiles
       });
       
       console.log('✅ generateSolutions completed successfully:', {
@@ -1379,7 +1394,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })}\n\n`);
       
       try {
-        // Real-time streaming generation following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+        // Fetch user's custom voice profiles for AI streaming generation - Following AI_INSTRUCTIONS.md patterns
+        let userCustomProfiles = [];
+        try {
+          userCustomProfiles = await storage.getVoiceProfiles(userId);
+          console.log('📋 Fetched custom profiles for streaming generation:', {
+            userId: userId.substring(0, 8) + '...',
+            profileCount: userCustomProfiles.length,
+            profileNames: userCustomProfiles.map(p => p.name)
+          });
+        } catch (profileError) {
+          console.warn('⚠️ Could not fetch custom profiles for streaming, proceeding without them:', profileError);
+          userCustomProfiles = [];
+        }
+
+        // Real-time streaming generation with custom profile integration following AI_INSTRUCTIONS.md and CodingPhilosophy.md
         const perspectives = selectedVoices?.perspectives || [];
         const roles = selectedVoices?.roles || [];
         const allVoices = [
@@ -1399,7 +1428,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: `${voice.id} voice joining the council...`
           })}\n\n`);
           
-          // Real-time OpenAI streaming for this voice
+          // Find matching custom profile for this voice
+          const customProfile = userCustomProfiles.find(p => 
+            (voice.type === 'perspective' && (p.selectedPerspectives?.includes(voice.id) || p.perspective === voice.id)) ||
+            (voice.type === 'role' && (p.selectedRoles?.includes(voice.id) || p.role === voice.id))
+          );
+
+          // Real-time OpenAI streaming for this voice with custom profile enhancement
           return realOpenAIService.generateSolutionStream({
             prompt,
             perspectives,
@@ -1407,6 +1442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sessionId,
             voiceId: voice.id,
             type: voice.type,
+            customProfile,
             onChunk: (chunk: string) => {
               try {
                 // Send voice content chunks to frontend

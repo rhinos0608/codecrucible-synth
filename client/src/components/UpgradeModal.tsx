@@ -74,7 +74,7 @@ export default function UpgradeModal({
         'Priority support'
       ],
       highlighted: true,
-      comingSoon: false
+      comingSoon: true
     },
     {
       id: 'enterprise' as const,

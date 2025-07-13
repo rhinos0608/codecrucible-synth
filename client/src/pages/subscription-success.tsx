@@ -2,29 +2,59 @@ import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 
 export default function SubscriptionSuccess() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { isAuthenticated, isLoading } = useAuthContext();
   
-  // Extract tier from URL parameters
-  const urlParams = new URLSearchParams(window.location.search);
-  const tier = urlParams.get('tier') || 'pro';
-  const tierDisplay = tier.charAt(0).toUpperCase() + tier.slice(1);
+  // Extract tier from URL parameters - Enhanced error handling following AI_INSTRUCTIONS.md
+  let tier = 'pro';
+  let tierDisplay = 'Pro';
+  
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tierParam = urlParams.get('tier');
+    if (tierParam && ['pro', 'team', 'enterprise'].includes(tierParam.toLowerCase())) {
+      tier = tierParam.toLowerCase();
+      tierDisplay = tier.charAt(0).toUpperCase() + tier.slice(1);
+    }
+  } catch (error) {
+    console.error('Error parsing URL parameters:', error);
+    // Use defaults if URL parsing fails
+  }
 
   useEffect(() => {
-    // Show success toast with tier information
-    toast({
-      title: "Subscription Activated",
-      description: `Your Arkane Technologies ${tierDisplay} subscription has been successfully activated! Welcome to unlimited AI generation.`,
-    });
-  }, [toast, tierDisplay]);
+    // Only show toast when not loading to avoid premature display
+    if (!isLoading) {
+      toast({
+        title: "Subscription Activated",
+        description: `Your Arkane Technologies ${tierDisplay} subscription has been successfully activated! Welcome to unlimited AI generation.`,
+      });
+    }
+  }, [toast, tierDisplay, isLoading]);
 
   const handleContinue = () => {
     setLocation("/");
   };
+
+  // Show loading state while authentication is being verified
+  // This prevents 404 redirects during the brief auth verification period
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+            <p className="text-muted-foreground">Processing your subscription...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">

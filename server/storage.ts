@@ -212,8 +212,32 @@ export class DatabaseStorage implements IStorage {
   
   // Voice profile operations
   async createVoiceProfile(profile: InsertVoiceProfile): Promise<VoiceProfile> {
-    const [created] = await db.insert(voiceProfiles).values(profile).returning();
-    return created;
+    try {
+      console.log('🔧 Creating voice profile with data:', {
+        name: profile.name,
+        perspective: profile.perspective,
+        role: profile.role,
+        userId: profile.userId,
+        hasSelectedPerspectives: !!profile.selectedPerspectives,
+        hasSelectedRoles: !!profile.selectedRoles
+      });
+
+      // Ensure selectedPerspectives and selectedRoles are properly formatted as arrays
+      const profileData = {
+        ...profile,
+        selectedPerspectives: profile.selectedPerspectives || [],
+        selectedRoles: profile.selectedRoles || [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const [created] = await db.insert(voiceProfiles).values(profileData).returning();
+      console.log('✅ Voice profile created successfully:', { id: created.id, name: created.name });
+      return created;
+    } catch (error) {
+      console.error('❌ Voice profile creation error:', error);
+      throw error;
+    }
   }
   
   async getVoiceProfiles(userId: string): Promise<VoiceProfile[]> {
@@ -475,11 +499,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async moveProjectToFolder(projectId: number, folderId: number | null): Promise<boolean> {
-    const result = await db
-      .update(projects)
-      .set({ folderId })
-      .where(eq(projects.id, projectId));
-    return (result.rowCount ?? 0) > 0;
+    try {
+      console.log('🔧 Moving project to folder:', { projectId, folderId });
+      
+      const result = await db
+        .update(projects)
+        .set({ 
+          folderId,
+          updatedAt: new Date()
+        })
+        .where(eq(projects.id, projectId));
+      
+      const success = (result.rowCount ?? 0) > 0;
+      console.log('✅ Project move result:', { success, rowCount: result.rowCount });
+      return success;
+    } catch (error) {
+      console.error('❌ Project move error:', error);
+      throw error;
+    }
   }
   
   // Team operations

@@ -101,13 +101,30 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
 
   const onSubmit = async (data: any) => {
     try {
+      console.log('🔧 Voice profile form submission:', { 
+        data, 
+        selectedAvatar, 
+        editingProfile: !!editingProfile 
+      });
+
+      // Ensure required arrays are properly formatted
+      const profileData = {
+        ...data,
+        avatar: selectedAvatar,
+        selectedPerspectives: data.perspective ? [data.perspective] : [],
+        selectedRoles: data.role ? [data.role] : [],
+        description: data.description || `Custom ${data.name} voice profile`
+      };
+
+      console.log('🔧 Formatted profile data:', profileData);
+
       if (editingProfile) {
         await updateProfile.mutateAsync({ 
           id: editingProfile.id, 
-          updates: { ...data, avatar: selectedAvatar } 
+          updates: profileData
         });
       } else {
-        await createProfile.mutateAsync({ ...data, avatar: selectedAvatar });
+        await createProfile.mutateAsync(profileData);
       }
       form.reset();
       onClose();

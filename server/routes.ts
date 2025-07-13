@@ -1342,11 +1342,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { sessionId } = req.params;
       const userId = req.user.claims.sub;
+      const timestampSessionId = parseInt(sessionId);
       
-      console.log('🔬 Synthesis request:', { sessionId, userId });
+      console.log('🔬 Synthesis request:', { sessionId, userId, timestampSessionId });
       
       // Retrieve solutions for synthesis
-      const solutions = global.sessionSolutions?.get(parseInt(sessionId)) || [];
+      const solutions = global.sessionSolutions?.get(timestampSessionId) || [];
       
       if (solutions.length === 0) {
         res.status(404).json({ error: 'No solutions found for synthesis' });
@@ -1356,13 +1357,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Call REAL OpenAI synthesis service
       const synthesisResult = await realOpenAIService.synthesizeSolutions(
         solutions, 
-        parseInt(sessionId),
+        timestampSessionId,
         req.body.prompt || 'Synthesize the voice solutions'
       );
       
-      // Store synthesis in database following AI_INSTRUCTIONS.md defensive programming patterns
+      // Find or create the database session record for synthesis storage
+      let databaseSessionId: number;
+      try {
+        // Try to find existing session in database by looking up recent sessions
+        const recentSessions = await storage.getVoiceSessionsByUser(userId);
+        const matchingSession = recentSessions.find(session => {
+          // Match based on recent creation time (within last hour)
+          const sessionTime = new Date(session.createdAt).getTime();
+          const currentTime = Date.now();
+          return Math.abs(currentTime - sessionTime) < 3600000; // 1 hour tolerance
+        });
+        
+        if (matchingSession) {
+          databaseSessionId = matchingSession.id;
+          console.log('📍 Found matching database session:', { databaseSessionId, originalTimestamp: timestampSessionId });
+        } else {
+          // Create a new session record for synthesis storage
+          const newSession = await storage.createVoiceSession({
+            userId,
+            prompt: req.body.prompt || 'Synthesis session',
+            perspectives: [],
+            roles: [],
+            mode: getDevModeConfig().enabled ? 'development' : 'production'
+          });
+          databaseSessionId = newSession.id;
+          console.log('📝 Created new database session for synthesis:', { databaseSessionId, originalTimestamp: timestampSessionId });
+        }
+      } catch (sessionError) {
+        console.warn('⚠️ Could not find/create database session, using fallback approach:', sessionError);
+        // Fallback: create minimal session for synthesis
+        const fallbackSession = await storage.createVoiceSession({
+          userId,
+          prompt: 'Synthesis fallback session',
+          perspectives: [],
+          roles: [],
+          mode: 'production'
+        });
+        databaseSessionId = fallbackSession.id;
+      }
+      
+      // Store synthesis using the database session ID
       const synthesisRecord = await storage.createSynthesis({
-        sessionId: parseInt(sessionId),
+        sessionId: databaseSessionId, // Use database-generated ID, not timestamp
         combinedCode: synthesisResult.code || synthesisResult.synthesizedCode || '',
         synthesisSteps: synthesisResult.synthesisSteps || [],
         qualityScore: synthesisResult.qualityScore || synthesisResult.confidence || 90,
@@ -1370,7 +1411,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       console.log('✅ Synthesis completed and stored:', { 
-        sessionId, 
+        originalSessionId: timestampSessionId,
+        databaseSessionId,
         synthesisId: synthesisRecord.id,
         resultLength: synthesisResult.code?.length || 0 
       });
@@ -1379,7 +1421,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         ...synthesisResult,
         id: synthesisRecord.id,
-        synthesisId: synthesisRecord.id
+        synthesisId: synthesisRecord.id,
+        sessionId: timestampSessionId // Return original for frontend consistency
       });
     } catch (error) {
       console.error('Synthesis error:', error);

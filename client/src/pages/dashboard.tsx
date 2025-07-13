@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2 } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2, Target, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -36,6 +36,7 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { isFrontendDevModeEnabled, isFrontendDevModeFeatureEnabled, createDevModeBadge, devLog } from "@/lib/dev-mode";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { useNewUserDetection } from "@/hooks/useNewUserDetection";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -67,6 +68,7 @@ export default function Dashboard() {
   const [showErrorMonitor, setShowErrorMonitor] = useState(false);
   const [projectContext, setProjectContext] = useState<Project | null>(null);
   const [selectedContextProjects, setSelectedContextProjects] = useState<Project[]>([]);
+  const [contextFileCount, setContextFileCount] = useState(0);
   const [showEnhancedProjectsPanel, setShowEnhancedProjectsPanel] = useState(false);
 
   const { user } = useAuth();
@@ -90,6 +92,8 @@ export default function Dashboard() {
     skipTour, 
     trackMilestone 
   } = useNewUserDetection();
+  
+  const { toast } = useToast();
   
   const { generateSession, isGenerating } = useSolutionGeneration();
 
@@ -133,6 +137,7 @@ export default function Dashboard() {
           perspectives: state.selectedPerspectives,
           roles: state.selectedRoles
         },
+        contextProjects: selectedContextProjects,
         recursionDepth: 2,
         synthesisMode: "competitive",
         ethicalFiltering: true
@@ -207,7 +212,27 @@ export default function Dashboard() {
   // Handle using projects as context
   const handleUseAsContext = (projects: Project[]) => {
     setSelectedContextProjects(projects);
-    console.log('Projects selected for context:', projects.length);
+    
+    // Calculate total file count from all projects with selectedFiles
+    const totalFiles = projects.reduce((count, project) => {
+      return count + (project.selectedFiles?.length || 0);
+    }, 0);
+    setContextFileCount(totalFiles);
+    
+    console.log('🔧 Context Updated - Projects selected for AI council:', {
+      projectCount: projects.length,
+      totalFiles,
+      projects: projects.map(p => ({
+        name: p.name,
+        selectedFiles: p.selectedFiles?.length || 0
+      }))
+    });
+
+    // Show success notification following AI_INSTRUCTIONS.md patterns
+    toast({
+      title: "AI Council Context Updated",
+      description: `Using ${projects.length} project${projects.length !== 1 ? 's' : ''} with ${totalFiles} selected files for enhanced code generation.`,
+    });
   };
 
 
@@ -597,7 +622,33 @@ export default function Dashboard() {
 
           {/* Current Prompt */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Your Request</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Your Request</h3>
+              {selectedContextProjects.length > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-blue-900/30 border border-blue-700/50 rounded-full">
+                  <Target className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs text-blue-300 font-medium">
+                    {selectedContextProjects.length} project{selectedContextProjects.length !== 1 ? 's' : ''} • {contextFileCount} files
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-4 w-4 p-0 text-blue-400 hover:text-blue-300"
+                    onClick={() => {
+                      setSelectedContextProjects([]);
+                      setContextFileCount(0);
+                      toast({
+                        title: "Context Cleared",
+                        description: "AI council context has been reset.",
+                      });
+                    }}
+                    title="Clear context"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
             <Card className="bg-gray-800 border-gray-700">
               <div className="p-4">
                 <Textarea

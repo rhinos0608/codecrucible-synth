@@ -933,7 +933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid request body' });
       }
       
-      const { prompt, selectedVoices } = req.body;
+      const { prompt, selectedVoices, contextProjects } = req.body;
       
       if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
         console.error('❌ Invalid or missing prompt');
@@ -956,6 +956,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedVoices,
         mode: devModeConfig.isEnabled ? 'dev' : 'production'
       };
+
+      // Process context projects for enhanced AI generation
+      let contextData = '';
+      if (contextProjects && Array.isArray(contextProjects) && contextProjects.length > 0) {
+        console.log('🔧 Processing context projects:', {
+          projectCount: contextProjects.length,
+          projects: contextProjects.map(p => ({ name: p.name, filesCount: p.selectedFiles?.length || 0 }))
+        });
+        
+        for (const project of contextProjects) {
+          if (project.selectedFiles && Array.isArray(project.selectedFiles)) {
+            contextData += `\n\n--- Project: ${project.name} ---\n`;
+            for (const file of project.selectedFiles) {
+              contextData += `\n// File: ${file.name} (${file.type}, ${file.size} bytes)\n`;
+              if (file.content) {
+                contextData += file.content + '\n';
+              }
+            }
+          }
+        }
+      }
       
       // Insert session into database to get proper auto-incremented ID
       const createdSession = await storage.createVoiceSession(sessionData);
@@ -999,8 +1020,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(503).json({ error: 'OpenAI service method not available' });
       }
       
+      // Generate solutions using Real OpenAI Service with context following AI_INSTRUCTIONS.md patterns
+      const enhancedPrompt = contextData 
+        ? `${prompt.trim()}\n\n--- CONTEXT FROM EXISTING PROJECTS ---${contextData}\n\nPlease use the above context to generate more relevant and integrated solutions.`
+        : prompt.trim();
+
       const solutions = await realOpenAIService.generateSolutions({
-        prompt: prompt,
+        prompt: enhancedPrompt,
         perspectives,
         roles,
         sessionId,

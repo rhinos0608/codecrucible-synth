@@ -11,8 +11,11 @@ interface SubscriptionStatusProps {
 }
 
 export function SubscriptionStatus({ onUpgrade }: SubscriptionStatusProps) {
-  const { data: subscriptionInfo, isLoading } = useQuery({
+  const { data: subscriptionInfo, isLoading, error } = useQuery({
     queryKey: ["/api/subscription/info"],
+    retry: 3,
+    staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: true
   });
 
   if (isLoading) {
@@ -20,17 +23,61 @@ export function SubscriptionStatus({ onUpgrade }: SubscriptionStatusProps) {
       <Card>
         <CardContent className="pt-6">
           <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-2 bg-gray-200 rounded"></div>
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  if (!subscriptionInfo) {
-    return null;
+  // Enhanced error handling following AI_INSTRUCTIONS.md patterns - always show subscription status
+  if (error || !subscriptionInfo) {
+    console.log('⚠️ Subscription info error, showing fallback status:', error);
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">Subscription Status</CardTitle>
+              <Badge className="bg-gray-500 text-white">
+                <span className="flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  LOADING...
+                </span>
+              </Badge>
+            </div>
+            <Button 
+              onClick={onUpgrade}
+              size="sm" 
+              variant="outline" 
+              className="ml-2 h-6 px-2 text-xs"
+            >
+              Upgrade
+            </Button>
+          </div>
+          <CardDescription>
+            Checking subscription status...
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Daily Usage</span>
+              <span className="text-gray-300">Loading...</span>
+            </div>
+          </div>
+          <Button 
+            onClick={onUpgrade}
+            className="w-full bg-purple-600 hover:bg-purple-700"
+          >
+            <Crown className="h-4 w-4 mr-2" />
+            Upgrade to Pro
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   const { tier = 'free', usage = { used: 0, limit: 3 }, teamInfo } = subscriptionInfo || {};

@@ -795,6 +795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get usage data for complete subscription info
       const today = new Date().toISOString().split('T')[0];
+      const { checkGenerationQuota } = await import('./lib/utils/checkQuota');
       const quotaCheck = await checkGenerationQuota(userId, req.ip, req.get('User-Agent'));
       
       console.log('🔧 Subscription info endpoint:', {

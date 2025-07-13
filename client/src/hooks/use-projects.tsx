@@ -15,11 +15,13 @@ export function useProjects() {
   } = useQuery({
     queryKey: ["/api/projects"],
     queryFn: async (): Promise<Project[]> => {
+      console.log('🔍 Fetching projects from API...');
       const result = await apiRequest("/api/projects");
       console.log('📊 Projects API Response:', {
         count: result.length,
         projectIds: result.map((p: any) => p.id),
-        projectNames: result.map((p: any) => p.name)
+        projectNames: result.map((p: any) => p.name),
+        rawData: result
       });
       return result;
     },
@@ -115,6 +117,16 @@ export function useProjects() {
       enabled: !!id
     });
   };
+
+  // Enhanced debugging for hook return values
+  console.log('🔄 useProjects hook returning:', {
+    projectsCount: projects.length,
+    isLoading,
+    hasError: !!error,
+    projectIds: projects.map(p => p.id),
+    projectNames: projects.map(p => p.name),
+    returnStructure: 'projects array directly'
+  });
 
   return {
     projects,

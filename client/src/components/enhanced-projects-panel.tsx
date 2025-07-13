@@ -89,9 +89,18 @@ export function EnhancedProjectsPanel({
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [fileSelectionProject, setFileSelectionProject] = useState<Project | null>(null);
   
-  // Data hooks
-  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useProjects();
+  // Data hooks - Fixed to use correct destructuring
+  const { projects = [], isLoading: projectsLoading, error: projectsError } = useProjects();
   const { data: folders = [], isLoading: foldersLoading, error: foldersError } = useProjectFolders();
+  
+  // Enhanced debugging to track hook data flow
+  console.log('🔧 Hook Data Flow Debug:', {
+    useProjectsResult: useProjects(),
+    projectsFromHook: projects,
+    projectsLength: projects.length,
+    projectsLoading,
+    projectsError: projectsError?.message || null
+  });
 
   // Debug logging in development and force refresh when panel opens
   useEffect(() => {

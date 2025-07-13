@@ -164,8 +164,8 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
           ) : (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {solutions.map((solution) => (
-                  <Card key={solution.id} className={`border border-steward/20 rounded-lg overflow-hidden`}>
+                {solutions.map((solution, index) => (
+                  <Card key={solution.id || `solution-${index}-${solution.voiceCombination || 'unknown'}`} className={`border border-steward/20 rounded-lg overflow-hidden`}>
                     <div className="bg-steward/10 p-4 border-b border-steward/20">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">

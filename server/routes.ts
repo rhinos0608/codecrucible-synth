@@ -8,6 +8,7 @@ import { insertProjectFolderSchema, insertProjectSchema } from "@shared/schema";
 import { contextAwareOpenAI } from "./context-aware-openai-service";
 import { realOpenAIService } from "./openai-service";
 import { enforceSubscriptionLimits } from "./middleware/subscription-enforcement";
+import { getDevModeConfig } from "./lib/dev-mode";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -1381,8 +1382,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const newSession = await storage.createVoiceSession({
             userId,
             prompt: req.body.prompt || 'Synthesis session',
-            perspectives: [],
-            roles: [],
+            selectedVoices: {
+              perspectives: ['decider'], // Default synthesis perspective
+              roles: ['architect'] // Default synthesis role
+            },
             mode: getDevModeConfig().enabled ? 'development' : 'production'
           });
           databaseSessionId = newSession.id;
@@ -1394,8 +1397,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const fallbackSession = await storage.createVoiceSession({
           userId,
           prompt: 'Synthesis fallback session',
-          perspectives: [],
-          roles: [],
+          selectedVoices: {
+            perspectives: ['decider'], // Default synthesis perspective
+            roles: ['architect'] // Default synthesis role
+          },
           mode: 'production'
         });
         databaseSessionId = fallbackSession.id;

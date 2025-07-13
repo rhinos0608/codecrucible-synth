@@ -808,6 +808,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Analytics dashboard endpoint with time range support
+  app.get('/api/analytics/dashboard', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const range = req.query.range as string || '30d';
+      
+      logger.debug('Fetching analytics dashboard', { userId, range });
+      
+      const analytics = await analyticsService.getAnalyticsDashboard(userId, range);
+      res.json(analytics);
+    } catch (error) {
+      logger.error('Analytics dashboard fetch failed', error as Error);
+      res.status(500).json({ error: 'Failed to fetch analytics dashboard' });
+    }
+  });
+
   // Stripe checkout endpoint - Following AI_INSTRUCTIONS.md security patterns
   // Updated to use CodeCrucible payment links from Arkane Technologies
   app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res, next) => {

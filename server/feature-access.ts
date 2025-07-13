@@ -14,6 +14,7 @@ export const FEATURE_MATRIX = {
   'unlimited_generations': ['pro', 'team', 'enterprise'],
   'synthesis_engine': ['pro', 'team', 'enterprise'],
   'analytics_dashboard': ['pro', 'team', 'enterprise'],
+  'analytics_advanced': ['pro', 'team', 'enterprise'],
   'voice_recommendations': ['pro', 'team', 'enterprise'],
   'code_export': ['pro', 'team', 'enterprise'],
   'custom_voices': ['pro', 'team', 'enterprise'],

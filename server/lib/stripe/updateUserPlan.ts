@@ -197,11 +197,13 @@ function determinePlanTier(subscription: Stripe.Subscription): 'free' | 'pro' | 
     const priceId = item.price.id;
     const unitAmount = item.price.unit_amount;
     
-    // Match against known price points
-    if (unitAmount === 1500) { // $15.00
+    // Match against known price points (updated for Arkane Technologies)
+    if (unitAmount === 1900) { // $19.00
       return 'pro';
-    } else if (unitAmount === 5000) { // $50.00
+    } else if (unitAmount === 4900) { // $49.00
       return 'team';
+    } else if (unitAmount === 9900) { // $99.00
+      return 'team'; // Enterprise maps to team for now
     }
   }
   

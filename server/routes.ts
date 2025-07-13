@@ -869,7 +869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Production quota checking
-      const planTier = user?.planTier || 'free';
+      const planTier = user?.subscriptionTier || 'free';
       const dailyLimit = planTier === 'free' ? 3 : 999;
       const quotaUsed = user?.dailyGenerated || 0;
       const remaining = Math.max(0, dailyLimit - quotaUsed);

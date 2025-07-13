@@ -29,17 +29,42 @@ interface DevModeConfig {
 /**
  * Determine if development mode should be enabled
  * Based on NODE_ENV, REPL_ID, and DEV_MODE environment variables
+ * 
+ * ⚠️ PRODUCTION DEPLOYMENT: Dev mode disabled for ProductLaunch
+ * To re-enable: Set FORCE_PRODUCTION_MODE=false or remove the override
  */
 function detectDevMode(): DevModeConfig {
   const nodeEnv = process.env.NODE_ENV;
   const replId = process.env.REPL_ID;
   const devModeFlag = process.env.DEV_MODE;
+  const forceProduction = process.env.FORCE_PRODUCTION_MODE !== 'false'; // Default to true for ProductLaunch
+  
+  // ProductLaunch override: Force production mode unless explicitly disabled
+  if (forceProduction) {
+    return {
+      isEnabled: false,
+      reason: 'forced_production_mode_for_deployment',
+      features: {
+        unlimitedGenerations: false,
+        unlimitedVoiceCombinations: false,
+        bypassRateLimit: false,
+        extendedPromptLength: false,
+        unlimitedSynthesis: false,
+      },
+      metadata: {
+        environment: 'production',
+        replId: replId || undefined,
+        nodeEnv: nodeEnv || undefined,
+        timestamp: new Date().toISOString(),
+      }
+    };
+  }
   
   // Default to production behavior
   let isEnabled = false;
   let reason = 'production_mode';
   
-  // Check conditions for enabling dev mode
+  // Check conditions for enabling dev mode (kept for future re-activation)
   if (devModeFlag === 'true') {
     isEnabled = true;
     reason = 'dev_mode_flag_enabled';

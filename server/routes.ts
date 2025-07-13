@@ -833,6 +833,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test endpoint for direct subscription upgrade - Following AI_INSTRUCTIONS.md debugging patterns
+  app.post("/api/test/direct-upgrade", async (req: any, res, next) => {
+    try {
+      const { userId, tier } = req.body;
+      
+      if (!userId || !tier) {
+        return res.status(400).json({ error: 'Missing userId or tier' });
+      }
+      
+      logger.info('Testing direct subscription upgrade', { userId, tier });
+      
+      // Import subscription service
+      const { subscriptionService } = await import('./subscription-service');
+      
+      // Simulate checkout.session.completed webhook event
+      const mockEvent = {
+        type: "checkout.session.completed",
+        id: `evt_test_${Date.now()}`,
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: `cs_test_${Date.now()}`,
+            payment_status: "paid",
+            subscription: `sub_test_${Date.now()}`,
+            metadata: {
+              userId,
+              tier
+            }
+          }
+        }
+      };
+      
+      // Process the mock webhook event
+      await subscriptionService.handleWebhook(mockEvent as any);
+      
+      // Verify the upgrade
+      const user = await storage.getUser(userId);
+      
+      res.json({
+        success: true,
+        message: 'Direct upgrade completed',
+        userTier: user?.subscriptionTier,
+        userStatus: user?.subscriptionStatus,
+        mockEventProcessed: true
+      });
+      
+    } catch (error) {
+      logger.error('Direct upgrade test failed', error as Error, { 
+        userId: req.body?.userId,
+        tier: req.body?.tier 
+      });
+      next(error);
+    }
+  });
+
   app.get('/api/quota/check', isAuthenticated, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;

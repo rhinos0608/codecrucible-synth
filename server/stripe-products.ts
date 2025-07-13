@@ -3,15 +3,15 @@
  * Following AI_INSTRUCTIONS.md security patterns for payment processing
  * 
  * This module ensures proper Stripe product creation and price management
- * for real money transactions with Rhythm Chamber subscription tiers.
+ * for real money transactions with Arkane Technologies subscription tiers.
  * 
- * Rhythm Chamber - By Arkane Technologies
+ * Arkane Technologies - Multi-Voice AI Platform
  */
 
 import Stripe from "stripe";
 import { logger } from "./logger";
 
-interface RhythmChamberProduct {
+interface ArkaneTechnologiesProduct {
   name: string;
   description: string;
   priceAmount: number; // in cents
@@ -20,9 +20,9 @@ interface RhythmChamberProduct {
   features: string[];
 }
 
-const RHYTHM_CHAMBER_PRODUCTS: RhythmChamberProduct[] = [
+const ARKANE_TECHNOLOGIES_PRODUCTS: ArkaneTechnologiesProduct[] = [
   {
-    name: 'Rhythm Chamber Pro',
+    name: 'Arkane Technologies Pro',
     description: 'Perfect for individual developers - Unlimited code generations, advanced synthesis engine, analytics dashboard',
     priceAmount: 1900, // $19.00
     interval: 'month',
@@ -37,7 +37,7 @@ const RHYTHM_CHAMBER_PRODUCTS: RhythmChamberProduct[] = [
     ]
   },
   {
-    name: 'Rhythm Chamber Team',
+    name: 'Arkane Technologies Team',
     description: 'For teams and organizations - Everything in Pro plus team collaboration and shared voice profiles',
     priceAmount: 4900, // $49.00
     interval: 'month',
@@ -52,7 +52,7 @@ const RHYTHM_CHAMBER_PRODUCTS: RhythmChamberProduct[] = [
     ]
   },
   {
-    name: 'Rhythm Chamber Enterprise',
+    name: 'Arkane Technologies Enterprise',
     description: 'For large organizations - Everything in Team plus custom AI training and on-premise deployment',
     priceAmount: 9900, // $99.00
     interval: 'month',
@@ -85,14 +85,14 @@ class StripeProductManager {
   }
 
   /**
-   * Create or retrieve Stripe products and prices for all Rhythm Chamber tiers
+   * Create or retrieve Stripe products and prices for all Arkane Technologies tiers
    * Following AI_INSTRUCTIONS.md patterns for defensive programming
    */
   async ensureProductsExist(): Promise<Map<string, { productId: string; priceId: string }>> {
     try {
-      logger.info('Ensuring Stripe products exist for Rhythm Chamber tiers');
+      logger.info('Ensuring Stripe products exist for Arkane Technologies tiers');
 
-      for (const productData of RHYTHM_CHAMBER_PRODUCTS) {
+      for (const productData of ARKANE_TECHNOLOGIES_PRODUCTS) {
         const cacheKey = productData.tier;
         
         // Check if already cached
@@ -101,10 +101,11 @@ class StripeProductManager {
         }
 
         // Search for existing product - Following AI_INSTRUCTIONS.md patterns
-        // Also search for legacy CodeCrucible products to migrate them
-        const legacyName = productData.name.replace('Rhythm Chamber', 'CodeCrucible');
+        // Also search for legacy CodeCrucible and Rhythm Chamber products to migrate them
+        const legacyCodeCrucibleName = productData.name.replace('Arkane Technologies', 'CodeCrucible');
+        const legacyRhythmChamberName = productData.name.replace('Arkane Technologies', 'Rhythm Chamber');
         const existingProducts = await this.stripe.products.search({
-          query: `name:'${productData.name}' OR name:'${productData.name} (Manual)' OR name:'${legacyName}'`,
+          query: `name:'${productData.name}' OR name:'${productData.name} (Manual)' OR name:'${legacyCodeCrucibleName}' OR name:'${legacyRhythmChamberName}'`,
         });
 
         let product: Stripe.Product;
@@ -114,24 +115,24 @@ class StripeProductManager {
           // Use existing product - Following AI_INSTRUCTIONS.md defensive programming
           product = existingProducts.data[0];
           
-          // Check if this is a legacy CodeCrucible product that needs rebranding
-          const isLegacyProduct = product.name.includes('CodeCrucible');
+          // Check if this is a legacy product that needs rebranding
+          const isLegacyProduct = product.name.includes('CodeCrucible') || product.name.includes('Rhythm Chamber');
           
           // Only try to activate/update if it's not an automatic product
           if ((!product.active || isLegacyProduct) && product.metadata?.created_by !== 'stripe_automatic') {
             try {
               const updateData: any = { active: true };
               
-              // If this is a legacy CodeCrucible product, rebrand it to Rhythm Chamber
+              // If this is a legacy product, rebrand it to Arkane Technologies
               if (isLegacyProduct) {
                 updateData.name = productData.name;
                 updateData.description = productData.description;
                 updateData.metadata = {
                   tier: productData.tier,
                   features: productData.features.join('|'),
-                  app: 'RhythmChamber',
+                  app: 'ArkaneTechnologies',
                   company: 'ArkaneTechnologies',
-                  created_by: 'rhythmchamber_migrated',
+                  created_by: 'arkane_migrated',
                   legacy_name: product.name
                 };
                 logger.info(`Migrating legacy product from ${product.name} to ${productData.name}`, { productId: product.id });
@@ -158,9 +159,9 @@ class StripeProductManager {
                     metadata: {
                       tier: productData.tier,
                       features: productData.features.join('|'),
-                      app: 'RhythmChamber',
+                      app: 'ArkaneTechnologies',
                       company: 'ArkaneTechnologies',
-                      created_by: 'rhythmchamber_manual'
+                      created_by: 'arkane_manual'
                     },
                   });
                   logger.info(`Created manual product: ${product.name}`, { productId: product.id });
@@ -204,9 +205,9 @@ class StripeProductManager {
             metadata: {
               tier: productData.tier,
               features: productData.features.join('|'),
-              app: 'RhythmChamber',
+              app: 'ArkaneTechnologies',
               company: 'ArkaneTechnologies',
-              created_by: 'rhythmchamber_manual'
+              created_by: 'arkane_manual'
             },
           });
 
@@ -244,7 +245,7 @@ class StripeProductManager {
   /**
    * Create a new Stripe price for a product
    */
-  private async createPrice(productId: string, productData: RhythmChamberProduct): Promise<Stripe.Price> {
+  private async createPrice(productId: string, productData: ArkaneTechnologiesProduct): Promise<Stripe.Price> {
     try {
       const price = await this.stripe.prices.create({
         product: productId,
@@ -256,9 +257,9 @@ class StripeProductManager {
         },
         metadata: {
           tier: productData.tier,
-          app: 'RhythmChamber',
+          app: 'ArkaneTechnologies',
           company: 'ArkaneTechnologies',
-          created_by: 'rhythmchamber_manual'
+          created_by: 'arkane_manual'
         },
       });
 

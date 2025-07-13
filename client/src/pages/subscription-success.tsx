@@ -13,7 +13,7 @@ export default function SubscriptionSuccess() {
     // Show success toast
     toast({
       title: "Subscription Activated",
-      description: "Your subscription has been successfully activated! Welcome to CodeCrucible Pro/Team.",
+      description: "Your subscription has been successfully activated! Welcome to Arkane Technologies Pro/Team.",
     });
   }, [toast]);
 

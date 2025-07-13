@@ -63,7 +63,7 @@ function CheckoutForm({ tier, price, onSuccess, onCancel }: StripeCheckoutProps)
         // Payment successful
         toast({
           title: "Payment Successful",
-          description: `Welcome to CodeCrucible ${tier.charAt(0).toUpperCase() + tier.slice(1)}!`,
+          description: `Welcome to Arkane Technologies ${tier.charAt(0).toUpperCase() + tier.slice(1)}!`,
         });
         if (onSuccess) onSuccess();
       }

@@ -24,8 +24,8 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
             <Code2 className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold">Rhythm Chamber</h1>
-            <p className="text-xs text-gray-400">by Arkane Technologies</p>
+            <h1 className="text-lg font-bold">Arkane Technologies</h1>
+            <p className="text-xs text-gray-400">Multi-Voice AI Platform</p>
           </div>
         </div>
       </div>

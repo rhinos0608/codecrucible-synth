@@ -35,7 +35,7 @@ export default function UpgradeModal({
       case 'analytics_blocked':
         return 'Analytics features require a Pro or Team subscription.';
       default:
-        return 'Unlock the full power of CodeCrucible with Pro features.';
+        return 'Unlock the full power of Arkane Technologies with Pro features.';
     }
   };
 

@@ -200,7 +200,11 @@ class SubscriptionService {
       throw new Error("User not found");
     }
 
-    const subscription = SUBSCRIPTION_TIERS[tier];
+    // Import Stripe product manager for real product creation
+    const { stripeProductManager } = await import('./stripe-products');
+    
+    // Ensure products exist and get price ID
+    const priceId = await stripeProductManager.getPriceId(tier);
     
     // Create or retrieve Stripe customer
     let stripeCustomerId = user.stripeCustomerId;
@@ -209,6 +213,8 @@ class SubscriptionService {
         email: user.email || undefined,
         metadata: {
           userId: user.id,
+          tier: tier,
+          app: 'CodeCrucible'
         },
       });
       stripeCustomerId = customer.id;
@@ -217,25 +223,21 @@ class SubscriptionService {
       await db.update(users)
         .set({ stripeCustomerId })
         .where(eq(users.id, userId));
+      
+      logger.info('Created Stripe customer for user', {
+        userId: userId.substring(0, 8) + '...',
+        customerId: stripeCustomerId,
+        tier
+      });
     }
 
-    // Create checkout session
+    // Create checkout session with real Stripe products
     const session = await this.stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       payment_method_types: ["card"],
       line_items: [
         {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `CodeCrucible ${tier.charAt(0).toUpperCase() + tier.slice(1)} Plan`,
-              description: subscription.features.join(", "),
-            },
-            unit_amount: subscription.price,
-            recurring: {
-              interval: "month",
-            },
-          },
+          price: priceId, // Use real Stripe price ID instead of inline price_data
           quantity: 1,
         },
       ],
@@ -245,7 +247,33 @@ class SubscriptionService {
       metadata: {
         userId: user.id,
         tier,
+        app: 'CodeCrucible'
       },
+      subscription_data: {
+        metadata: {
+          userId: user.id,
+          tier,
+          app: 'CodeCrucible'
+        }
+      },
+      // Enable customer portal for subscription management
+      customer_update: {
+        address: 'auto',
+        name: 'auto'
+      },
+      // Collect tax automatically
+      automatic_tax: { enabled: true },
+      // Allow promotion codes
+      allow_promotion_codes: true,
+    });
+
+    logger.info('Created Stripe checkout session for real money transaction', {
+      userId: userId.substring(0, 8) + '...',
+      tier,
+      sessionId: session.id,
+      priceId,
+      amount: SUBSCRIPTION_TIERS[tier].price,
+      mode: session.mode
     });
 
     return session;
@@ -253,6 +281,12 @@ class SubscriptionService {
 
   async handleWebhook(event: Stripe.Event) {
     try {
+      logger.info('Processing Stripe webhook event', {
+        eventType: event.type,
+        eventId: event.id,
+        created: new Date(event.created * 1000).toISOString()
+      });
+
       switch (event.type) {
         case "checkout.session.completed": {
           const session = event.data.object as Stripe.Checkout.Session;
@@ -260,9 +294,21 @@ class SubscriptionService {
           const tier = session.metadata?.tier as "pro" | "team" | "enterprise";
           
           if (!userId || !tier) {
-            logger.error("Missing metadata in checkout session", { sessionId: session.id });
+            logger.error("Missing metadata in checkout session", { 
+              sessionId: session.id, 
+              metadata: session.metadata,
+              paymentStatus: session.payment_status 
+            });
             return;
           }
+
+          logger.info('Processing successful checkout session', {
+            userId: userId.substring(0, 8) + '...',
+            tier,
+            sessionId: session.id,
+            paymentStatus: session.payment_status,
+            subscriptionId: session.subscription
+          });
 
           // Update user subscription
           await this.upgradeSubscription(userId, tier, session.subscription as string);
@@ -271,21 +317,58 @@ class SubscriptionService {
 
         case "customer.subscription.updated": {
           const subscription = event.data.object as Stripe.Subscription;
+          logger.info('Processing subscription update', {
+            subscriptionId: subscription.id,
+            status: subscription.status,
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
+          });
           await this.handleSubscriptionUpdate(subscription);
           break;
         }
 
         case "customer.subscription.deleted": {
           const subscription = event.data.object as Stripe.Subscription;
+          logger.info('Processing subscription cancellation', {
+            subscriptionId: subscription.id,
+            canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null
+          });
           await this.handleSubscriptionCancellation(subscription);
           break;
         }
 
+        case "invoice.payment_succeeded": {
+          const invoice = event.data.object as Stripe.Invoice;
+          logger.info('Payment succeeded for invoice', {
+            invoiceId: invoice.id,
+            subscriptionId: invoice.subscription,
+            amountPaid: invoice.amount_paid,
+            currency: invoice.currency
+          });
+          break;
+        }
+
+        case "invoice.payment_failed": {
+          const invoice = event.data.object as Stripe.Invoice;
+          logger.warn('Payment failed for invoice', {
+            invoiceId: invoice.id,
+            subscriptionId: invoice.subscription,
+            amountDue: invoice.amount_due,
+            currency: invoice.currency
+          });
+          break;
+        }
+
         default:
-          logger.info("Unhandled webhook event", { type: event.type });
+          logger.info("Unhandled webhook event", { 
+            type: event.type,
+            eventId: event.id 
+          });
       }
     } catch (error) {
-      logger.error("Error handling webhook", error as Error);
+      logger.error("Error handling webhook", error as Error, {
+        eventType: event.type,
+        eventId: event.id
+      });
       throw error;
     }
   }

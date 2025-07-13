@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
@@ -753,8 +754,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new APIError(400, 'Invalid subscription tier');
       }
       
-      const successUrl = `${req.protocol}://${req.get('host')}/subscription/success`;
-      const cancelUrl = `${req.protocol}://${req.get('host')}/subscription/cancel`;
+      const successUrl = `${req.protocol}://${req.get('host')}/dashboard?upgrade=success&tier=${tier}`;
+      const cancelUrl = `${req.protocol}://${req.get('host')}/dashboard?upgrade=cancelled`;
       
       // Import subscription service
       const { subscriptionService } = await import('./subscription-service');
@@ -766,11 +767,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cancelUrl
       );
       
-      logger.info('Stripe checkout session created', {
-        userId,
+      logger.info('Stripe checkout session created for real money transaction', {
+        userId: userId.substring(0, 8) + '...',
         tier,
         sessionId: session.id,
-        checkoutUrl: session.url
+        checkoutUrl: session.url,
+        mode: session.mode,
+        paymentMethodTypes: session.payment_method_types
       });
       
       res.json({ checkoutUrl: session.url });
@@ -778,6 +781,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       logger.error('Stripe checkout error', error as Error, {
         userId: req.user?.claims?.sub,
         tier: req.body?.tier
+      });
+      next(error);
+    }
+  });
+
+  // Stripe webhook endpoint - Following AI_INSTRUCTIONS.md security patterns for payment processing
+  app.post("/api/subscription/webhook", express.raw({ type: 'application/json' }), async (req: any, res, next) => {
+    try {
+      const signature = req.headers['stripe-signature'];
+      
+      if (!signature) {
+        throw new APIError(400, 'Missing Stripe signature');
+      }
+      
+      if (!process.env.STRIPE_WEBHOOK_SECRET) {
+        throw new APIError(500, 'Stripe webhook secret not configured');
+      }
+      
+      // Import Stripe product manager for webhook validation
+      const { stripeProductManager } = await import('./stripe-products');
+      
+      // Validate webhook signature and parse event
+      const event = stripeProductManager.validateWebhookSignature(req.body, signature);
+      
+      // Import subscription service for webhook processing
+      const { subscriptionService } = await import('./subscription-service');
+      
+      // Process webhook event
+      await subscriptionService.handleWebhook(event);
+      
+      logger.info('Stripe webhook processed successfully for real money transaction', {
+        eventType: event.type,
+        eventId: event.id,
+        created: new Date(event.created * 1000).toISOString()
+      });
+      
+      res.json({ 
+        received: true,
+        eventType: event.type,
+        processed: true,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Stripe webhook processing failed', error as Error, {
+        signature: !!req.headers['stripe-signature'],
+        hasSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+        contentType: req.headers['content-type']
       });
       next(error);
     }

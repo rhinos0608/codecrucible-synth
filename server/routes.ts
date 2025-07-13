@@ -788,9 +788,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+      
+      // Fixed critical bug: use subscriptionTier not planTier following AI_INSTRUCTIONS.md patterns
+      const subscriptionTier = user?.subscriptionTier || 'free';
+      const subscriptionStatus = user?.subscriptionStatus || 'inactive';
+      
+      // Get usage data for complete subscription info
+      const today = new Date().toISOString().split('T')[0];
+      const quotaCheck = await checkGenerationQuota(userId, req.ip, req.get('User-Agent'));
+      
+      console.log('🔧 Subscription info endpoint:', {
+        userId: userId.substring(0, 8) + '...',
+        subscriptionTier,
+        subscriptionStatus,
+        quotaUsed: quotaCheck.quotaUsed,
+        quotaLimit: quotaCheck.quotaLimit
+      });
+      
       res.json({ 
-        tier: user?.planTier || 'free',
-        stripeSubscriptionId: user?.stripeSubscriptionId || null
+        tier: subscriptionTier,
+        status: subscriptionStatus,
+        stripeSubscriptionId: user?.stripeSubscriptionId || null,
+        stripeCustomerId: user?.stripeCustomerId || null,
+        usage: {
+          used: quotaCheck.quotaUsed || 0,
+          limit: quotaCheck.quotaLimit || 3
+        }
       });
     } catch (error) {
       logger.error('Error fetching subscription info', error as Error, { userId: req.user?.claims?.sub });
@@ -1701,24 +1724,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Synthesis endpoint for combining voice solutions - PREMIUM FEATURE (Pro+)
-  app.post("/api/sessions/:sessionId/synthesis", isAuthenticated, enforcePlanRestrictions(), async (req: any, res) => {
-    // Check synthesis feature access (Pro+ required)
+  app.post("/api/sessions/:sessionId/synthesis", isAuthenticated, enforceSubscriptionLimits, async (req: any, res) => {
+    // Double-check synthesis feature access (Pro+ required) following AI_INSTRUCTIONS.md patterns
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
     const planTier = user?.subscriptionTier || 'free';
     
-    // Free tier synthesis restriction following AI_INSTRUCTIONS.md patterns
+    // Critical Free tier synthesis blocking - NO BYPASSES
     if (planTier === 'free') {
-      console.log('❌ Free tier synthesis attempt blocked:', { userId: userId.substring(0, 8) + '...', planTier });
+      console.log('❌ Free tier synthesis attempt blocked:', { 
+        userId: userId.substring(0, 8) + '...', 
+        planTier,
+        endpoint: '/api/sessions/:sessionId/synthesis',
+        timestamp: new Date().toISOString()
+      });
       return res.status(403).json({
         error: 'Synthesis feature requires Pro+ subscription',
         feature: 'synthesis_engine',
         currentTier: planTier,
         requiredTier: 'pro',
         upgradeUrl: '/subscribe?plan=pro&feature=synthesis_engine',
-        symbolic: 'Upgrade to Pro to access advanced synthesis capabilities.'
+        symbolic: 'Upgrade to Pro to access advanced synthesis capabilities.',
+        blocked: true
       });
     }
+    
+    console.log('✅ Synthesis access granted for Pro+ user:', { 
+      userId: userId.substring(0, 8) + '...', 
+      planTier,
+      timestamp: new Date().toISOString()
+    });
     try {
       const { sessionId } = req.params;
       const userId = req.user.claims.sub;

@@ -77,6 +77,7 @@ export function EnhancedProjectsPanel({
   // Dialog states
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showDeleteProject, setShowDeleteProject] = useState(false);
+  const [showDeleteFolder, setShowDeleteFolder] = useState(false);
   const [showFileSelection, setShowFileSelection] = useState(false);
   
   // Form data
@@ -88,6 +89,7 @@ export function EnhancedProjectsPanel({
   
   // Selection states
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<ProjectFolder | null>(null);
   const [fileSelectionProject, setFileSelectionProject] = useState<Project | null>(null);
   
   // Data hooks - Fixed to use correct destructuring
@@ -131,6 +133,7 @@ export function EnhancedProjectsPanel({
   // Mutation hooks
   const createFolderMutation = useCreateProjectFolder();
   const deleteProjectMutation = useDeleteProject();
+  const deleteFolderMutation = useDeleteProjectFolder();
   const moveMutation = useMoveProject();
   
   // Initialize selected projects from props
@@ -172,6 +175,11 @@ export function EnhancedProjectsPanel({
     setShowDeleteProject(true);
   };
 
+  const handleDeleteFolder = (folder: ProjectFolder) => {
+    setDeletingFolder(folder);
+    setShowDeleteFolder(true);
+  };
+
   const confirmDeleteProject = async () => {
     if (!deletingProject) return;
 
@@ -187,6 +195,33 @@ export function EnhancedProjectsPanel({
       toast({
         title: "Error",
         description: "Failed to delete project",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmDeleteFolder = async () => {
+    if (!deletingFolder) return;
+
+    try {
+      await deleteFolderMutation.mutateAsync(deletingFolder.id);
+      setShowDeleteFolder(false);
+      setDeletingFolder(null);
+      // Collapse the deleted folder if it was expanded
+      setExpandedFolders(prev => {
+        const newExpanded = new Set(prev);
+        newExpanded.delete(deletingFolder.id);
+        return newExpanded;
+      });
+      toast({
+        title: "Success",
+        description: `Folder "${deletingFolder.name}" deleted successfully`,
+      });
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete folder. Please try again.",
         variant: "destructive",
       });
     }
@@ -450,27 +485,47 @@ export function EnhancedProjectsPanel({
                   {/* Project Folders */}
                   {folders.map(folder => (
                     <div key={folder.id} className="space-y-2">
-                      <div className="flex items-center gap-2 cursor-pointer" 
-                           onClick={() => {
-                             const newExpanded = new Set(expandedFolders);
-                             if (newExpanded.has(folder.id)) {
-                               newExpanded.delete(folder.id);
-                             } else {
-                               newExpanded.add(folder.id);
-                             }
-                             setExpandedFolders(newExpanded);
-                           }}>
-                        {expandedFolders.has(folder.id) ? 
-                          <ChevronDown className="w-4 h-4" /> : 
-                          <ChevronRight className="w-4 h-4" />
-                        }
-                        <Folder className="w-4 h-4" style={{ color: folder.color }} />
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {folder.name}
-                        </h3>
-                        <span className="text-xs text-gray-500">
-                          ({getFilteredProjects().filter(p => p.folderId === folder.id).length})
-                        </span>
+                      <div className="flex items-center justify-between group hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-2 py-1">
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer flex-1" 
+                          onClick={() => {
+                            const newExpanded = new Set(expandedFolders);
+                            if (newExpanded.has(folder.id)) {
+                              newExpanded.delete(folder.id);
+                            } else {
+                              newExpanded.add(folder.id);
+                            }
+                            setExpandedFolders(newExpanded);
+                          }}
+                        >
+                          {expandedFolders.has(folder.id) ? 
+                            <ChevronDown className="w-4 h-4" /> : 
+                            <ChevronRight className="w-4 h-4" />
+                          }
+                          <Folder className="w-4 h-4" style={{ color: folder.color }} />
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {folder.name}
+                          </h3>
+                          <span className="text-xs text-gray-500">
+                            ({getFilteredProjects().filter(p => p.folderId === folder.id).length})
+                          </span>
+                        </div>
+                        
+                        {/* Folder Actions */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteFolder(folder);
+                            }}
+                            className="h-6 w-6 p-0 text-red-600 hover:text-red-700 dark:text-red-500 dark:hover:text-red-400"
+                            title={`Delete folder "${folder.name}"`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
                       
                       {expandedFolders.has(folder.id) && (
@@ -591,6 +646,30 @@ export function EnhancedProjectsPanel({
               disabled={deleteProjectMutation.isPending}
             >
               {deleteProjectMutation.isPending ? 'Deleting...' : 'Delete Project'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Folder Confirmation */}
+      <Dialog open={showDeleteFolder} onOpenChange={setShowDeleteFolder}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Folder</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the folder "{deletingFolder?.name}"? This action cannot be undone and will permanently remove the folder. All projects in this folder will be moved to "Ungrouped Projects".
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteFolder(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteFolder}
+              disabled={deleteFolderMutation.isPending}
+            >
+              {deleteFolderMutation.isPending ? 'Deleting...' : 'Delete Folder'}
             </Button>
           </DialogFooter>
         </DialogContent>

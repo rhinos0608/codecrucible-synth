@@ -90,8 +90,22 @@ export function EnhancedProjectsPanel({
   const [fileSelectionProject, setFileSelectionProject] = useState<Project | null>(null);
   
   // Data hooks
-  const { data: projects = [], isLoading: projectsLoading } = useProjects();
-  const { data: folders = [], isLoading: foldersLoading } = useProjectFolders();
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useProjects();
+  const { data: folders = [], isLoading: foldersLoading, error: foldersError } = useProjectFolders();
+
+  // Debug logging in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎯 Projects Panel Data:', {
+        projects: projects.length,
+        folders: folders.length,
+        projectsLoading,
+        foldersLoading,
+        projectsError,
+        foldersError
+      });
+    }
+  }, [projects, folders, projectsLoading, foldersLoading, projectsError, foldersError]);
   
   // Mutation hooks
   const createFolderMutation = useCreateProjectFolder();
@@ -312,20 +326,78 @@ export function EnhancedProjectsPanel({
                 <div className="text-center py-8">Loading projects...</div>
               ) : (
                 <div className="space-y-4">
+                  {/* Debug Information */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="text-xs text-gray-500 p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                      Debug: {projects.length} projects, {folders.length} folders
+                    </div>
+                  )}
+
+                  {/* Project Folders */}
+                  {folders.map(folder => (
+                    <div key={folder.id} className="space-y-2">
+                      <div className="flex items-center gap-2 cursor-pointer" 
+                           onClick={() => {
+                             const newExpanded = new Set(expandedFolders);
+                             if (newExpanded.has(folder.id)) {
+                               newExpanded.delete(folder.id);
+                             } else {
+                               newExpanded.add(folder.id);
+                             }
+                             setExpandedFolders(newExpanded);
+                           }}>
+                        {expandedFolders.has(folder.id) ? 
+                          <ChevronDown className="w-4 h-4" /> : 
+                          <ChevronRight className="w-4 h-4" />
+                        }
+                        <Folder className="w-4 h-4" style={{ color: folder.color }} />
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {folder.name}
+                        </h3>
+                        <span className="text-xs text-gray-500">
+                          ({getFilteredProjects().filter(p => p.folderId === folder.id).length})
+                        </span>
+                      </div>
+                      
+                      {expandedFolders.has(folder.id) && (
+                        <div className="ml-6 space-y-2">
+                          {getFilteredProjects().filter(p => p.folderId === folder.id).length > 0 ? (
+                            getFilteredProjects().filter(p => p.folderId === folder.id).map(renderProjectCard)
+                          ) : (
+                            <div className="text-xs text-gray-500 py-2">No projects in this folder</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
                   {/* Ungrouped Projects */}
                   {getFilteredProjects().filter(p => !p.folderId).length > 0 && (
                     <div>
                       <h3 className="text-sm font-medium mb-2 flex items-center gap-1">
                         <BookOpen className="w-4 h-4" />
-                        Ungrouped Projects
+                        Ungrouped Projects ({getFilteredProjects().filter(p => !p.folderId).length})
                       </h3>
-                      {getFilteredProjects().filter(p => !p.folderId).map(renderProjectCard)}
+                      <div className="space-y-2">
+                        {getFilteredProjects().filter(p => !p.folderId).map(renderProjectCard)}
+                      </div>
                     </div>
                   )}
 
-                  {getFilteredProjects().length === 0 && (
+                  {/* Empty State */}
+                  {getFilteredProjects().length === 0 && folders.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
-                      No projects found matching your criteria
+                      <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p>No projects or folders found</p>
+                      <p className="text-xs mt-1">Create your first project by generating code with the AI voices</p>
+                    </div>
+                  )}
+                  
+                  {/* No Projects Found */}
+                  {getFilteredProjects().length === 0 && folders.length > 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-sm">No projects match your search criteria</p>
+                      <p className="text-xs mt-1">Try adjusting your search or check different folders</p>
                     </div>
                   )}
                 </div>

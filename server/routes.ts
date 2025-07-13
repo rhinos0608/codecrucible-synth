@@ -20,6 +20,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Enterprise Voice Templates API endpoints
+  app.get('/api/enterprise-voice-templates', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Import enterprise voice templates
+      const { ENTERPRISE_VOICE_TEMPLATES } = await import('./enterprise-voice-templates');
+      
+      // Get user subscription info to filter available templates
+      const user = await storage.getUser(userId);
+      const userTier = user?.tier || 'free';
+      
+      // Filter templates based on subscription tier
+      const availableTemplates = ENTERPRISE_VOICE_TEMPLATES.filter(template => {
+        const tierHierarchy = { free: 0, pro: 1, team: 2, enterprise: 3 };
+        return tierHierarchy[userTier] >= tierHierarchy[template.requiredTier];
+      });
+      
+      logger.info('Enterprise voice templates fetched', { 
+        userId: userId.substring(0, 8) + '...',
+        userTier,
+        availableCount: availableTemplates.length
+      });
+      
+      res.json(availableTemplates);
+    } catch (error) {
+      logger.error('Failed to fetch enterprise voice templates', error as Error);
+      res.status(500).json({ message: 'Failed to fetch enterprise voice templates' });
+    }
+  });
+
+  app.get('/api/enterprise-voice-templates/:templateId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { templateId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Import enterprise voice templates
+      const { ENTERPRISE_VOICE_TEMPLATES } = await import('./enterprise-voice-templates');
+      
+      const template = ENTERPRISE_VOICE_TEMPLATES.find(t => t.id === templateId);
+      if (!template) {
+        return res.status(404).json({ message: 'Template not found' });
+      }
+      
+      // Check user subscription tier
+      const user = await storage.getUser(userId);
+      const userTier = user?.tier || 'free';
+      const tierHierarchy = { free: 0, pro: 1, team: 2, enterprise: 3 };
+      
+      if (tierHierarchy[userTier] < tierHierarchy[template.requiredTier]) {
+        return res.status(403).json({ 
+          message: `Template requires ${template.requiredTier} subscription or higher` 
+        });
+      }
+      
+      logger.info('Enterprise voice template fetched', { 
+        templateId,
+        userId: userId.substring(0, 8) + '...',
+        userTier
+      });
+      
+      res.json(template);
+    } catch (error) {
+      logger.error('Failed to fetch enterprise voice template', error as Error);
+      res.status(500).json({ message: 'Failed to fetch enterprise voice template' });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {

@@ -48,7 +48,9 @@ const SPECIALIZATION_OPTIONS = [
   'React Development', 'TypeScript', 'Node.js', 'Database Design',
   'API Development', 'Security', 'Performance Optimization', 'UI/UX',
   'Testing', 'DevOps', 'Mobile Development', 'Machine Learning',
-  'Blockchain', 'Game Development', 'System Architecture', 'Cloud Computing'
+  'Blockchain', 'Game Development', 'System Architecture', 'Cloud Computing',
+  'Microservices', 'Penetration Testing', 'Compliance', 'Risk Assessment',
+  'Code Quality', 'Business Logic', 'Requirements Analysis', 'Domain Modeling'
 ];
 
 const PERSPECTIVE_OPTIONS = [
@@ -59,6 +61,52 @@ const ROLE_OPTIONS = [
   'Security Engineer', 'Systems Architect', 'UI/UX Engineer', 
   'Performance Engineer', 'Full-Stack Developer', 'Backend Specialist',
   'Frontend Specialist', 'DevOps Engineer', 'Data Engineer', 'ML Engineer'
+];
+
+// Enterprise voice templates for quick profile creation
+const ENTERPRISE_TEMPLATES = [
+  {
+    id: 'senior-backend-engineer',
+    name: 'Senior Backend Engineer',
+    description: 'Expert in backend architecture and scalable system design',
+    category: 'Backend',
+    requiredTier: 'pro'
+  },
+  {
+    id: 'security-auditor',
+    name: 'Security Auditor',
+    description: 'Specialized in security assessments and vulnerability detection',
+    category: 'Security',
+    requiredTier: 'team'
+  },
+  {
+    id: 'code-reviewer',
+    name: 'Code Reviewer',
+    description: 'Expert in code quality and team coding standards',
+    category: 'Quality',
+    requiredTier: 'pro'
+  },
+  {
+    id: 'domain-expert',
+    name: 'Domain Expert',
+    description: 'Business domain specialist with deep understanding of business logic',
+    category: 'Business',
+    requiredTier: 'team'
+  },
+  {
+    id: 'performance-optimizer',
+    name: 'Performance Optimizer',
+    description: 'Specialist in performance tuning and scalability',
+    category: 'Performance',
+    requiredTier: 'pro'
+  },
+  {
+    id: 'api-designer',
+    name: 'API Designer',
+    description: 'Expert in API design and integration patterns',
+    category: 'Design',
+    requiredTier: 'team'
+  }
 ];
 
 const AVATAR_THEMES = [
@@ -72,6 +120,7 @@ export function AdvancedAvatarCustomizer({
   onSave, 
   editingProfile 
 }: AdvancedAvatarCustomizerProps) {
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [voiceData, setVoiceData] = useState<CustomVoiceData>({
     name: '',
     description: '',
@@ -198,6 +247,43 @@ export function AdvancedAvatarCustomizer({
     return "text-red-600";
   };
 
+  const handleApplyTemplate = async (templateId: string) => {
+    try {
+      const response = await apiRequest(`/api/enterprise-voice-templates/${templateId}`, {
+        method: 'GET'
+      });
+      
+      if (response.ok) {
+        const templateData = await response.json();
+        
+        // Apply template data to voice profile
+        setVoiceData(prev => ({
+          ...prev,
+          name: templateData.name,
+          description: templateData.description,
+          personality: templateData.personality,
+          specialization: templateData.specialization,
+          chatStyle: templateData.chatStyle,
+          ethicalStance: templateData.ethicalStance,
+          perspective: templateData.perspective,
+          role: templateData.role,
+          avatar: templateData.avatar
+        }));
+        
+        toast({
+          title: "Template Applied",
+          description: `${templateData.name} template has been applied successfully.`
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Template Error",
+        description: "Failed to apply template. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -210,13 +296,89 @@ export function AdvancedAvatarCustomizer({
         </DialogHeader>
 
         <FeatureGate feature="custom_voices" className="min-h-[400px]">
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+          <Tabs defaultValue="templates" className="w-full">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="templates">Templates</TabsTrigger>
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="specialization">Specialization</TabsTrigger>
               <TabsTrigger value="personality">Personality</TabsTrigger>
               <TabsTrigger value="testing">Testing</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="templates" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Brain className="w-5 h-5" />
+                    Enterprise Voice Templates
+                  </CardTitle>
+                  <CardDescription>
+                    Pre-configured voice profiles for common enterprise roles
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {ENTERPRISE_TEMPLATES.map((template) => (
+                      <Card 
+                        key={template.id}
+                        className={`cursor-pointer transition-all ${
+                          selectedTemplate === template.id 
+                            ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                        onClick={() => setSelectedTemplate(template.id)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-sm">{template.name}</h4>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                {template.description}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {template.category}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {template.requiredTier}+
+                                </Badge>
+                              </div>
+                            </div>
+                            {selectedTemplate === template.id && (
+                              <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                  
+                  {selectedTemplate && (
+                    <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Zap className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                          Template Selected
+                        </span>
+                      </div>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                        This template will pre-fill the voice profile with enterprise-grade configurations. 
+                        You can customize it further in the other tabs.
+                      </p>
+                      <Button 
+                        onClick={() => handleApplyTemplate(selectedTemplate)}
+                        className="w-full"
+                        size="sm"
+                      >
+                        Apply Template & Continue
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="basic" className="space-y-4">
               <Card>

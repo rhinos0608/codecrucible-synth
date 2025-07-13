@@ -39,8 +39,9 @@ function detectDevMode(): DevModeConfig {
   const devModeFlag = process.env.DEV_MODE;
   const forceProduction = process.env.FORCE_PRODUCTION_MODE !== 'false'; // Default to true for ProductLaunch
   
-  // ProductLaunch override: Force production mode unless explicitly disabled
-  if (forceProduction) {
+  // CRITICAL SECURITY: Force production mode for deployment
+  // Dev mode should only be enabled with explicit DEV_MODE=true flag
+  if (forceProduction || (!devModeFlag || devModeFlag !== 'true')) {
     return {
       isEnabled: false,
       reason: 'forced_production_mode_for_deployment',
@@ -64,20 +65,11 @@ function detectDevMode(): DevModeConfig {
   let isEnabled = false;
   let reason = 'production_mode';
   
-  // Check conditions for enabling dev mode (kept for future re-activation)
+  // STRICT: Only enable dev mode with explicit DEV_MODE=true flag
+  // All other conditions removed for production security
   if (devModeFlag === 'true') {
     isEnabled = true;
-    reason = 'dev_mode_flag_enabled';
-  } else if (replId && !nodeEnv) {
-    // Following AI_INSTRUCTIONS.md: Enable dev mode for Replit development environment
-    isEnabled = true;
-    reason = 'replit_development_environment';
-  } else if (nodeEnv !== 'production' && replId) {
-    isEnabled = true;
-    reason = 'replit_development_environment';
-  } else if (nodeEnv === 'development') {
-    isEnabled = true;
-    reason = 'development_node_env';
+    reason = 'explicit_dev_mode_flag_enabled';
   }
   
   const config: DevModeConfig = {

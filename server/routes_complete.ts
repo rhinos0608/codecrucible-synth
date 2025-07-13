@@ -146,57 +146,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // VFSP Analytics Route (Pro+ Feature)
+  // VFSP Analytics Route (Pro+ Feature) - Real Database Implementation
   app.get('/api/analytics/vfsp', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
       const timeRange = req.query.range as string || '30d';
       
-      // For now, return mock data - in production this would generate real analytics
-      const mockAnalytics = {
-        volatilityIndex: 42,
+      // Real analytics from database following AI_INSTRUCTIONS.md patterns
+      const analyticsData = await analyticsService.getAnalyticsDashboard(userId);
+      const voiceUsageStats = await storage.getVoiceUsageStats(userId);
+      const sessionAnalytics = await storage.getSessionAnalytics(userId);
+      
+      // Calculate real VFSP metrics from authentic data
+      const realAnalytics = {
+        volatilityIndex: analyticsData.summary.volatilityScore || 0,
         forecastModel: {
-          nextWeekPrediction: 85,
-          nextMonthPrediction: 92,
-          confidenceLevel: 78,
-          trendDirection: 'increasing',
-          seasonalPatterns: [
-            { period: 'Morning (9-12)', intensity: 95, description: 'Peak productivity hours' },
-            { period: 'Afternoon (1-5)', intensity: 75, description: 'Steady development' },
-            { period: 'Evening (6-9)', intensity: 60, description: 'Review and planning' }
-          ]
+          nextWeekPrediction: analyticsData.summary.weeklyProjection || 0,
+          nextMonthPrediction: analyticsData.summary.monthlyProjection || 0,
+          confidenceLevel: analyticsData.summary.confidenceLevel || 0,
+          trendDirection: analyticsData.summary.totalGenerations > 0 ? 'increasing' : 'stable',
+          seasonalPatterns: analyticsData.dailyMetrics.map(day => ({
+            period: new Date(day.date).toLocaleDateString(),
+            intensity: day.generationCount,
+            description: `${day.generationCount} generations`
+          }))
         },
-        symbolicPatterns: [
-          {
-            pattern: 'Explorer + Security Engineer',
-            significance: 88,
-            frequency: 24,
-            impact: 'high',
-            description: 'Highly effective for secure API development'
-          }
-        ],
-        evolutionTracking: [],
-        insights: [
-          {
-            id: '1',
-            title: 'Peak Productivity Window Identified',
-            description: 'Your most effective coding occurs between 9-11 AM with 95% consistency',
-            priority: 'high',
-            category: 'productivity',
-            actionRequired: 'Schedule complex tasks during morning hours'
-          }
-        ],
-        recommendations: [
-          {
-            voices: ['Explorer', 'Security Engineer'],
-            confidence: 92,
-            reasoning: 'Based on your high success rate with security implementations',
-            expectedImprovement: 23
-          }
-        ]
+        symbolicPatterns: voiceUsageStats.map(stat => ({
+          pattern: stat.voiceName,
+          significance: stat.successRate,
+          frequency: stat.usageCount,
+          impact: stat.averageRating > 4 ? 'high' : 'medium',
+          description: `${stat.usageCount} uses with ${stat.successRate}% success rate`
+        })),
+        evolutionTracking: sessionAnalytics.slice(0, 10),
+        insights: analyticsData.recommendations.map((rec, index) => ({
+          id: String(index + 1),
+          title: `Voice Combination Insight`,
+          description: rec.reasoning,
+          priority: rec.confidence > 80 ? 'high' : 'medium',
+          category: 'productivity',
+          actionRequired: `Try ${rec.voices.join(' + ')} combination`
+        })),
+        recommendations: analyticsData.recommendations
       };
       
-      res.json(mockAnalytics);
+      res.json(realAnalytics);
     } catch (error) {
       next(error);
     }
@@ -1734,78 +1728,7 @@ async function generateRealSolutions(sessionId: number, requestData: any) {
   }
 }
 
-// Legacy mock solution generation (remove after testing)
-async function generateMockSolutions(sessionId: number, selectedVoices: any) {
-  const mockSolutions = [
-    {
-      sessionId,
-      voiceCombination: "Steward + Guardian",
-      code: `// Security-focused form validation hook
-import { useState, useCallback } from 'react';
-import { z } from 'zod';
-
-export function useSecureForm<T>(schema: z.ZodSchema<T>) {
-  const [values, setValues] = useState<Partial<T>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  const validate = useCallback((data: Partial<T>) => {
-    try {
-      schema.parse(data);
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        error.errors.forEach(err => {
-          newErrors[err.path.join('.')] = err.message;
-        });
-        setErrors(newErrors);
-      }
-      return false;
-    }
-  }, [schema]);
-  
-  return { values, setValues, errors, validate };
-}`,
-      explanation: "Security-first approach with comprehensive input validation and XSS protection",
-      confidence: 94,
-      strengths: ["Input sanitization", "XSS protection", "Type safety"],
-      considerations: ["More complex setup", "Performance overhead"]
-    },
-    {
-      sessionId,
-      voiceCombination: "Seeker + Optimizer",
-      code: `// High-performance form hook with debouncing
-import { useCallback, useMemo, useState } from 'react';
-import { debounce } from 'lodash';
-
-export function useOptimizedForm<T>() {
-  const [values, setValues] = useState<Partial<T>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  const debouncedValidation = useMemo(
-    () => debounce((data: Partial<T>) => {
-      // Validation logic here
-    }, 300),
-    []
-  );
-  
-  const updateValue = useCallback((field: keyof T, value: any) => {
-    setValues(prev => ({ ...prev, [field]: value }));
-    debouncedValidation({ ...values, [field]: value });
-  }, [values, debouncedValidation]);
-  
-  return { values, errors, updateValue };
-}`,
-      explanation: "Performance-optimized approach with debounced validation and memory efficiency",
-      confidence: 89,
-      strengths: ["Optimized renders", "Debounced validation", "Memory efficient"],
-      considerations: ["Complex optimization", "Debugging difficulty"]
-    }
-  ];
-
-  const promises = mockSolutions.map(solution => storage.createSolution(solution));
-  return Promise.all(promises);
-}
+// REMOVED: Legacy mock solution generation eliminated - only real OpenAI integration allowed
 
 // ========================================
 // REAL-TIME COLLABORATION API ROUTES

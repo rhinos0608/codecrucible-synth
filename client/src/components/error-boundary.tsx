@@ -125,7 +125,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 // Hook version for functional components
 export function useErrorBoundary() {
-  const [error, setError] = React.useState<Error | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   const resetError = () => setError(null);
   
@@ -134,7 +134,7 @@ export function useErrorBoundary() {
     setError(error);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (error) {
       throw error;
     }

@@ -37,8 +37,8 @@ type SubscriptionTier = 'free' | 'pro' | 'team' | 'enterprise';
 
 interface FeatureGateProps {
   feature: FeatureName;
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
+  children: ReactNode;
+  fallback?: ReactNode;
   showUpgrade?: boolean;
   className?: string;
 }
@@ -227,7 +227,7 @@ export const useFeatureAccess = (feature: FeatureName) => {
  */
 export const FeatureLock: React.FC<{
   feature: FeatureName;
-  children: React.ReactNode;
+  children: ReactNode;
   disabled?: boolean;
 }> = ({ feature, children, disabled = false }) => {
   const { hasAccess, upgradeUrl } = useFeatureAccess(feature);

@@ -491,11 +491,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Enhanced validation following AI_INSTRUCTIONS.md security patterns
       // Defensive programming: handle null foreign key references properly
+      let mappedSessionId = req.body.sessionId || null;
+      
+      // Handle timestamp-based session IDs that exceed PostgreSQL integer range
+      if (mappedSessionId && mappedSessionId > 2147483647) {
+        console.log('⚠️ Timestamp-based session ID detected, attempting database mapping:', { originalId: mappedSessionId });
+        
+        try {
+          // Try to find a matching database session by timestamp proximity
+          const recentSessions = await storage.getVoiceSessionsByUser(userId);
+          const matchingSession = recentSessions.find(session => {
+            const sessionTime = new Date(session.createdAt).getTime();
+            return Math.abs(mappedSessionId - sessionTime) < 600000; // 10 minute tolerance
+          });
+          
+          if (matchingSession) {
+            mappedSessionId = matchingSession.id;
+            console.log('📍 Found matching database session:', { originalId: req.body.sessionId, mappedId: mappedSessionId });
+          } else {
+            // If no match found, create a new session for reference
+            const fallbackSession = await storage.createVoiceSession({
+              userId,
+              prompt: 'Project save reference session',
+              selectedVoices: {
+                perspectives: ['decider'],
+                roles: ['architect']
+              },
+              mode: getDevModeConfig().enabled ? 'development' : 'production'
+            });
+            mappedSessionId = fallbackSession.id;
+            console.log('📝 Created fallback session for project save:', { originalId: req.body.sessionId, mappedId: mappedSessionId });
+          }
+        } catch (sessionError) {
+          console.warn('⚠️ Could not map session ID, using null:', sessionError);
+          mappedSessionId = null; // Safe fallback
+        }
+      }
+      
       const projectData = {
         ...req.body,
         userId, // Ensure userId is set from authenticated user
-        // Ensure foreign key references are properly handled
-        sessionId: req.body.sessionId || null,
+        // Ensure foreign key references are properly handled with ID mapping
+        sessionId: mappedSessionId,
         synthesisId: req.body.synthesisId || null,
         folderId: req.body.folderId || null,
         createdAt: new Date(),
@@ -506,7 +543,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: projectData.name,
         language: projectData.language,
         codeLength: projectData.code?.length || 0,
-        sessionId: projectData.sessionId,
+        originalSessionId: req.body.sessionId,
+        mappedSessionId: projectData.sessionId,
         synthesisId: projectData.synthesisId,
         folderId: projectData.folderId,
         userId

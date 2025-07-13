@@ -9,6 +9,8 @@ import { insertProjectFolderSchema, insertProjectSchema } from "@shared/schema";
 import { contextAwareOpenAI } from "./context-aware-openai-service";
 import { realOpenAIService } from "./openai-service";
 import { enforceSubscriptionLimits } from "./middleware/subscription-enforcement";
+import { enforcePlanRestrictions } from "./middleware/enforcePlan";
+import { incrementUsageQuota } from "./lib/utils/checkQuota";
 import { getDevModeConfig } from "./lib/dev-mode";
 import { analyticsService } from "./analytics-service";
 
@@ -192,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/project-folders/:id', isAuthenticated, async (req: any, res, next) => {
+  app.put('/api/project-folders/:id', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -210,7 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/project-folders/:id', isAuthenticated, async (req: any, res, next) => {
+  app.delete('/api/project-folders/:id', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -809,8 +811,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Analytics dashboard endpoint with time range support
-  app.get('/api/analytics/dashboard', isAuthenticated, async (req: any, res) => {
+  // Analytics dashboard endpoint - PREMIUM FEATURE (Pro+) with time range support
+  app.get('/api/analytics/dashboard', isAuthenticated, enforceSubscriptionLimits, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const range = req.query.range as string || '30d';
@@ -1009,22 +1011,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      // Production quota checking
+      // Production quota checking using proper usageLimits table following AI_INSTRUCTIONS.md
       const planTier = user?.subscriptionTier || 'free';
-      const dailyLimit = planTier === 'free' ? 3 : 999;
-      const quotaUsed = user?.dailyGenerated || 0;
-      const remaining = Math.max(0, dailyLimit - quotaUsed);
+      
+      // Pro and Team users have unlimited generations
+      if (planTier === 'pro' || planTier === 'team' || planTier === 'enterprise') {
+        res.json({ 
+          dailyGenerated: 0,
+          dailyLimit: -1,
+          remaining: -1,
+          allowed: true,
+          devMode: false,
+          planTier: planTier,
+          quotaUsed: 0,
+          quotaLimit: -1,
+          unlimitedGenerations: true,
+          reason: 'unlimited_tier'
+        });
+        return;
+      }
+      
+      // Free tier quota checking from usageLimits table
+      const today = new Date().toISOString().split('T')[0];
+      const { checkGenerationQuota } = await import('./lib/utils/checkQuota');
+      
+      const quotaCheck = await checkGenerationQuota(userId, req.ip, req.get('User-Agent'));
       
       res.json({ 
-        dailyGenerated: quotaUsed,
-        dailyLimit: dailyLimit,
-        remaining: remaining,
-        allowed: remaining > 0,
+        dailyGenerated: quotaCheck.quotaUsed,
+        dailyLimit: quotaCheck.quotaLimit,
+        remaining: quotaCheck.quotaLimit === -1 ? -1 : Math.max(0, quotaCheck.quotaLimit - quotaCheck.quotaUsed),
+        allowed: quotaCheck.allowed,
         devMode: false,
-        planTier: planTier,
-        quotaUsed: quotaUsed,
-        quotaLimit: dailyLimit,
-        reason: remaining > 0 ? 'quota_available' : 'quota_exceeded'
+        planTier: quotaCheck.planTier,
+        quotaUsed: quotaCheck.quotaUsed,
+        quotaLimit: quotaCheck.quotaLimit,
+        reason: quotaCheck.reason || (quotaCheck.allowed ? 'quota_available' : 'quota_exceeded')
       });
     } catch (error) {
       logger.error('Error checking quota', error as Error, { userId: req.user?.claims?.sub });
@@ -1032,8 +1054,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Voice Profile Management Routes - Complete implementation following AI_INSTRUCTIONS.md
-  app.get('/api/voice-profiles', isAuthenticated, async (req: any, res, next) => {
+  // Voice Profile Management Routes - PREMIUM FEATURE (Pro+) following AI_INSTRUCTIONS.md
+  app.get('/api/voice-profiles', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
       console.log('🔧 Fetching voice profiles for user:', userId);
@@ -1048,7 +1070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/voice-profiles', isAuthenticated, async (req: any, res, next) => {
+  app.post('/api/voice-profiles', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
       console.log('🔧 Creating voice profile:', {
@@ -1119,7 +1141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/voice-profiles/:id', isAuthenticated, async (req: any, res, next) => {
+  app.patch('/api/voice-profiles/:id', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
@@ -1144,7 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/voice-profiles/:id', isAuthenticated, async (req: any, res, next) => {
+  app.delete('/api/voice-profiles/:id', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
@@ -1210,7 +1232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Critical session endpoints - REAL OpenAI integration following AI_INSTRUCTIONS.md patterns
-  app.post("/api/sessions", isAuthenticated, async (req: any, res) => {
+  app.post("/api/sessions", isAuthenticated, enforcePlanRestrictions(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       console.log('🔧 Real OpenAI Session Creation:', { ...req.body, userId });
@@ -1390,6 +1412,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avgConfidence: solutions.reduce((sum, s) => sum + s.confidence, 0) / solutions.length
       });
       
+      // Increment usage quota after successful generation (following AI_INSTRUCTIONS.md patterns)
+      try {
+        await incrementUsageQuota(userId);
+        console.log('✅ Usage quota incremented for user:', userId.substring(0, 8) + '...');
+      } catch (quotaError) {
+        console.error('⚠️ Failed to increment usage quota:', quotaError);
+        // Don't fail the response, just log the error
+      }
+      
       res.json(responseData);
     } catch (error) {
       console.error('❌ Real OpenAI session creation error:', error);
@@ -1429,7 +1460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // REAL OpenAI Streaming endpoint - POST only for live streaming
-  app.post("/api/sessions/stream", isAuthenticated, async (req: any, res) => {
+  app.post("/api/sessions/stream", isAuthenticated, enforcePlanRestrictions(), async (req: any, res) => {
     await handleStreamingRequest(req, res, req.body);
   });
 
@@ -1584,6 +1615,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log('✅ Real OpenAI streaming completed:', { sessionId, solutionCount: completedSolutions.length });
         
+        // Increment usage quota after successful streaming generation (following AI_INSTRUCTIONS.md patterns)
+        try {
+          await incrementUsageQuota(userId);
+          console.log('✅ Usage quota incremented for streaming user:', userId.substring(0, 8) + '...');
+        } catch (quotaError) {
+          console.error('⚠️ Failed to increment usage quota for streaming:', quotaError);
+          // Don't fail the response, just log the error
+        }
+        
         // Clear heartbeat interval
         clearInterval(heartbeat);
         
@@ -1660,8 +1700,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Synthesis endpoint for combining voice solutions
-  app.post("/api/sessions/:sessionId/synthesis", isAuthenticated, async (req: any, res) => {
+  // Synthesis endpoint for combining voice solutions - PREMIUM FEATURE (Pro+)
+  app.post("/api/sessions/:sessionId/synthesis", isAuthenticated, enforcePlanRestrictions(), async (req: any, res) => {
+    // Check synthesis feature access (Pro+ required)
+    const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
+    const planTier = user?.subscriptionTier || 'free';
+    
+    // Free tier synthesis restriction following AI_INSTRUCTIONS.md patterns
+    if (planTier === 'free') {
+      console.log('❌ Free tier synthesis attempt blocked:', { userId: userId.substring(0, 8) + '...', planTier });
+      return res.status(403).json({
+        error: 'Synthesis feature requires Pro+ subscription',
+        feature: 'synthesis_engine',
+        currentTier: planTier,
+        requiredTier: 'pro',
+        upgradeUrl: '/subscribe?plan=pro&feature=synthesis_engine',
+        symbolic: 'Upgrade to Pro to access advanced synthesis capabilities.'
+      });
+    }
     try {
       const { sessionId } = req.params;
       const userId = req.user.claims.sub;

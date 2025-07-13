@@ -505,12 +505,12 @@ export default function Dashboard() {
                     console.log("👥 Teams button clicked, setting showTeamsPanel to true");
                     setShowTeamsPanel(true);
                   }}
-                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap relative"
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   data-tour="teams-button"
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Teams
-                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded border border-orange-400 text-[10px]">
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500/20 text-orange-400 rounded-full border border-orange-500/30">
                     Coming Soon
                   </span>
                 </Button>

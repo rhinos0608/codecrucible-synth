@@ -109,28 +109,26 @@ export function usePlanGuard() {
 
       const planTier = quotaCheck.planTier;
       
-      // Following AI_INSTRUCTIONS.md: Dev mode overrides for frontend
-      const isDevMode = quotaCheck.devMode || quotaCheck.planTier === 'development';
-      
-      // Enhanced dev mode detection following AI_INSTRUCTIONS.md patterns
-      const devModeActive = isDevMode || quotaCheck.unlimitedGenerations || quotaCheck.quotaLimit === 999;
+      // Following AI_INSTRUCTIONS.md: Use actual subscription tier, not dev mode override
+      // Dev mode should not affect plan display in production
+      const actualPlanTier = subscription?.tier || planTier;
       
       setState({
-        canGenerate: quotaCheck.allowed || devModeActive,
-        canSynthesize: planTier === 'pro' || planTier === 'team' || devModeActive,
-        canAccessAnalytics: planTier === 'pro' || planTier === 'team' || devModeActive,
+        canGenerate: quotaCheck.allowed,
+        canSynthesize: actualPlanTier === 'pro' || actualPlanTier === 'team' || actualPlanTier === 'enterprise',
+        canAccessAnalytics: actualPlanTier === 'pro' || actualPlanTier === 'team' || actualPlanTier === 'enterprise',
         quotaUsed: quotaCheck.quotaUsed || 0,
-        quotaLimit: devModeActive ? -1 : (quotaCheck.quotaLimit || 3),
-        planTier: devModeActive ? 'development' : planTier,
+        quotaLimit: quotaCheck.quotaLimit || 3,
+        planTier: actualPlanTier,
         isLoading: false,
         error: null
       });
       
       console.log('✅ Plan Guard State Updated:', {
-        canGenerate: quotaCheck.allowed || isDevMode || quotaCheck.unlimitedGenerations,
-        isDevMode,
+        canGenerate: quotaCheck.allowed,
+        actualPlanTier: actualPlanTier,
         unlimitedGenerations: quotaCheck.unlimitedGenerations,
-        planTier: isDevMode ? 'development' : planTier
+        planTier: actualPlanTier
       });
     };
 
@@ -139,27 +137,28 @@ export function usePlanGuard() {
 
   // Handle generation attempt with error handling
   const attemptGeneration = async (generationFn: () => Promise<any>) => {
-    // Pre-check quota with dev mode support
+    // Pre-check quota following CodingPhilosophy.md consciousness principles
     const quotaCheck = await checkQuota();
     
     console.log('Attempt Generation - Quota Check:', quotaCheck);
     
-    // Critical dev mode bypass - following AI_INSTRUCTIONS.md patterns  
-    const isDevModeActive = quotaCheck?.devMode || quotaCheck?.planTier === 'development' || quotaCheck?.unlimitedGenerations || quotaCheck?.quotaLimit === 999;
+    // Following AI_INSTRUCTIONS.md: Check actual plan permissions, not dev mode
+    const actualPlanTier = subscription?.tier || quotaCheck?.planTier;
+    const hasUnlimitedGenerations = quotaCheck?.unlimitedGenerations || actualPlanTier === 'pro' || actualPlanTier === 'team' || actualPlanTier === 'enterprise';
     
-    if (isDevModeActive) {
-      console.log('✅ Dev mode DETECTED - bypassing ALL quota restrictions in attemptGeneration:', {
-        devMode: quotaCheck?.devMode,
+    if (hasUnlimitedGenerations && quotaCheck?.allowed) {
+      console.log('✅ Pro tier DETECTED - unlimited generations available in attemptGeneration:', {
+        actualPlanTier: actualPlanTier,
         planTier: quotaCheck?.planTier,
         unlimitedGenerations: quotaCheck?.unlimitedGenerations,
         quotaLimit: quotaCheck?.quotaLimit,
-        bypassReason: 'dev_mode_unlimited_access'
+        bypassReason: 'pro_tier_unlimited_access'
       });
       try {
         const result = await generationFn();
         return { success: true, data: result };
       } catch (error) {
-        console.error('Generation failed in dev mode:', error);
+        console.error('Generation failed for Pro tier:', error);
         return { success: false, error: String(error) };
       }
     }

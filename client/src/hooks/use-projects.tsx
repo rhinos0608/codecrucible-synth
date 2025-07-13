@@ -14,17 +14,16 @@ export function useProjects() {
     error
   } = useQuery({
     queryKey: ["/api/projects"],
-    queryFn: async (): Promise<Project[]> => {
-      const response = await apiRequest("GET", "/api/projects");
-      return response.json();
-    }
+    queryFn: (): Promise<Project[]> => apiRequest("/api/projects")
   });
 
   // Create new project
   const createProject = useMutation({
     mutationFn: async (projectData: Omit<InsertProject, 'id'>) => {
-      const response = await apiRequest("POST", "/api/projects", projectData);
-      return response.json();
+      return apiRequest("/api/projects", {
+        method: "POST",
+        body: projectData
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -96,9 +95,7 @@ export function useProjects() {
   const getProject = (id: number) => {
     return useQuery({
       queryKey: ["/api/projects", id],
-      queryFn: async (): Promise<Project> => {
-        return apiRequest(`/api/projects/${id}`);
-      },
+      queryFn: (): Promise<Project> => apiRequest(`/api/projects/${id}`),
       enabled: !!id
     });
   };

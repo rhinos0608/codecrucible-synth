@@ -110,7 +110,7 @@ export function PerspectiveSelector() {
             className="text-xs px-2 py-3 flex flex-col items-center space-y-1 data-[state=active]:bg-gray-700 data-[state=active]:text-gray-100 text-gray-400 hover:text-gray-200"
           >
             <Users className="w-4 h-4" />
-            <span className="text-xs whitespace-nowrap leading-tight">Team's Profiles</span>
+            <span className="text-xs whitespace-nowrap leading-tight">Team Profiles</span>
           </TabsTrigger>
         </TabsList>
 
@@ -239,9 +239,9 @@ export function PerspectiveSelector() {
                 </div>
               ) : profiles.length === 0 ? (
                 <div className="text-center py-6">
-                  <User className="w-8 h-8 mx-auto text-gray-500 mb-2" />
+                  <User className="w-8 h-8 mx-auto text-gray-500 dark:text-gray-400 mb-2" />
                   <div className="text-sm text-gray-400 mb-2">No profiles yet</div>
-                  <div className="text-xs text-gray-500">Create custom profiles in Settings</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Create custom profiles in Settings</div>
                 </div>
               ) : (
                 profiles.map(renderUserProfileCard)
@@ -254,17 +254,17 @@ export function PerspectiveSelector() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-medium text-gray-300">Team's Profiles</h3>
-              <p className="text-xs text-gray-500">Voice profiles shared by your team members</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Voice profiles shared by your team members</p>
             </div>
           </div>
           
           {sharedVoicesLoading ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Loading team profiles...</p>
             </div>
           ) : !sharedVoices?.sharedProfiles || sharedVoices.sharedProfiles.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No team profiles shared yet</p>
               <p className="text-xs mt-1">Team members can share their custom voice profiles here</p>
@@ -313,7 +313,7 @@ export function PerspectiveSelector() {
                       </div>
                       <div className="flex items-center justify-between">
                         <p className="text-xs text-gray-400 truncate">{profile.description}</p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                           <span>by {profile.creator}</span>
                           <Badge variant="outline" className="text-xs px-1 py-0">
                             {profile.effectiveness}% effective

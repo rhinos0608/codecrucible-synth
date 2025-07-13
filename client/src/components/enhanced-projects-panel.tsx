@@ -288,8 +288,8 @@ export function EnhancedProjectsPanel({
               <div className="flex items-center gap-2 mb-1">
                 <h4 className="font-medium text-sm">{project.name}</h4>
                 {isExpanded ? 
-                  <ChevronDown className="w-4 h-4 text-gray-500" /> : 
-                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                  <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : 
+                  <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 }
               </div>
               {project.description && (
@@ -297,7 +297,7 @@ export function EnhancedProjectsPanel({
                   {project.description}
                 </p>
               )}
-              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1">
                   <Code className="w-3 h-3" />
                   {project.language || 'javascript'}
@@ -319,7 +319,7 @@ export function EnhancedProjectsPanel({
                 className={`h-7 w-7 p-0 ${isSelected ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
                 title="Select for AI context"
               >
-                <Sparkles className={`w-3 h-3 ${isSelected ? 'text-blue-600' : 'text-gray-500'}`} />
+                <Sparkles className={`w-3 h-3 ${isSelected ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'}`} />
               </Button>
               <Button
                 size="sm"
@@ -506,7 +506,7 @@ export function EnhancedProjectsPanel({
                           <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             {folder.name}
                           </h3>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             ({getFilteredProjects().filter(p => p.folderId === folder.id).length})
                           </span>
                         </div>
@@ -533,7 +533,7 @@ export function EnhancedProjectsPanel({
                           {getFilteredProjects().filter(p => p.folderId === folder.id).length > 0 ? (
                             getFilteredProjects().filter(p => p.folderId === folder.id).map(renderProjectCard)
                           ) : (
-                            <div className="text-xs text-gray-500 py-2">No projects in this folder</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 py-2">No projects in this folder</div>
                           )}
                         </div>
                       )}
@@ -555,7 +555,7 @@ export function EnhancedProjectsPanel({
 
                   {/* Empty State */}
                   {getFilteredProjects().length === 0 && folders.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                       <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
                       <p>No projects or folders found</p>
                       <p className="text-xs mt-1">Create your first project by generating code with the AI voices</p>
@@ -564,7 +564,7 @@ export function EnhancedProjectsPanel({
                   
                   {/* No Projects Found */}
                   {getFilteredProjects().length === 0 && folders.length > 0 && (
-                    <div className="text-center py-4 text-gray-500">
+                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                       <p className="text-sm">No projects match your search criteria</p>
                       <p className="text-xs mt-1">Try adjusting your search or check different folders</p>
                     </div>

@@ -423,8 +423,8 @@ export default function Dashboard() {
             <div className="flex items-center space-x-3 flex-shrink-0">
               <Terminal className="w-6 h-6 text-blue-400" />
               <div>
-                <h1 className="text-xl font-semibold">CodeCrucible</h1>
-                <p className="text-sm text-gray-400">Multi-Engine AI Code Generator</p>
+                <h1 className="text-xl font-semibold">Arkane Technologies</h1>
+                <p className="text-sm text-gray-400">Multi-Voice AI Coding Assistant</p>
               </div>
             </div>
             <div className="flex items-center space-x-2 overflow-x-auto flex-shrink-0 min-w-0 nav-scroll-container">

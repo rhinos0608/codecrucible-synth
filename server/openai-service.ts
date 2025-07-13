@@ -133,21 +133,21 @@ class RealOpenAIService {
 
     // Execute all OpenAI calls in parallel with enhanced error handling
     try {
-      console.log('🚀 Starting parallel OpenAI generation:', {
+      logger.info('Starting parallel OpenAI generation', {
         voicePromises: voicePromises.length,
         sessionId
       });
       
       const solutions = await Promise.all(voicePromises);
       
-      console.log('✅ All OpenAI calls completed:', {
+      logger.info('All OpenAI calls completed successfully', {
         solutionCount: solutions.length,
         sessionId
       });
       
       return solutions;
     } catch (parallelError) {
-      console.error('❌ Parallel OpenAI generation failed:', parallelError);
+      logger.error('Parallel OpenAI generation failed', parallelError as Error);
       logger.error('Parallel generation error', { 
         sessionId, 
         error: parallelError instanceof Error ? parallelError.message : 'Unknown error' 

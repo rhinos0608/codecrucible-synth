@@ -22,7 +22,7 @@ export const pool = new Pool({
 
 // Enhanced error handling for database connections
 pool.on('error', (err, client) => {
-  console.error('Unexpected error on idle database client', err);
+  logger.error('Unexpected error on idle database client', err);
   // Don't exit the process, just log the error
 });
 

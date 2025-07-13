@@ -3,13 +3,15 @@
  * Following AI_INSTRUCTIONS.md security patterns for payment processing
  * 
  * This module ensures proper Stripe product creation and price management
- * for real money transactions with CodeCrucible subscription tiers.
+ * for real money transactions with Rhythm Chamber subscription tiers.
+ * 
+ * Rhythm Chamber - By Arkane Technologies
  */
 
 import Stripe from "stripe";
 import { logger } from "./logger";
 
-interface CodeCrucibleProduct {
+interface RhythmChamberProduct {
   name: string;
   description: string;
   priceAmount: number; // in cents
@@ -18,9 +20,9 @@ interface CodeCrucibleProduct {
   features: string[];
 }
 
-const CODECRUCIBLE_PRODUCTS: CodeCrucibleProduct[] = [
+const RHYTHM_CHAMBER_PRODUCTS: RhythmChamberProduct[] = [
   {
-    name: 'CodeCrucible Pro',
+    name: 'Rhythm Chamber Pro',
     description: 'Perfect for individual developers - Unlimited code generations, advanced synthesis engine, analytics dashboard',
     priceAmount: 1900, // $19.00
     interval: 'month',
@@ -35,7 +37,7 @@ const CODECRUCIBLE_PRODUCTS: CodeCrucibleProduct[] = [
     ]
   },
   {
-    name: 'CodeCrucible Team',
+    name: 'Rhythm Chamber Team',
     description: 'For teams and organizations - Everything in Pro plus team collaboration and shared voice profiles',
     priceAmount: 4900, // $49.00
     interval: 'month',
@@ -50,7 +52,7 @@ const CODECRUCIBLE_PRODUCTS: CodeCrucibleProduct[] = [
     ]
   },
   {
-    name: 'CodeCrucible Enterprise',
+    name: 'Rhythm Chamber Enterprise',
     description: 'For large organizations - Everything in Team plus custom AI training and on-premise deployment',
     priceAmount: 9900, // $99.00
     interval: 'month',
@@ -83,14 +85,14 @@ class StripeProductManager {
   }
 
   /**
-   * Create or retrieve Stripe products and prices for all CodeCrucible tiers
+   * Create or retrieve Stripe products and prices for all Rhythm Chamber tiers
    * Following AI_INSTRUCTIONS.md patterns for defensive programming
    */
   async ensureProductsExist(): Promise<Map<string, { productId: string; priceId: string }>> {
     try {
-      logger.info('Ensuring Stripe products exist for CodeCrucible tiers');
+      logger.info('Ensuring Stripe products exist for Rhythm Chamber tiers');
 
-      for (const productData of CODECRUCIBLE_PRODUCTS) {
+      for (const productData of RHYTHM_CHAMBER_PRODUCTS) {
         const cacheKey = productData.tier;
         
         // Check if already cached
@@ -133,8 +135,9 @@ class StripeProductManager {
                     metadata: {
                       tier: productData.tier,
                       features: productData.features.join('|'),
-                      app: 'CodeCrucible',
-                      created_by: 'codecrucible_manual'
+                      app: 'RhythmChamber',
+                      company: 'ArkaneTechnologies',
+                      created_by: 'rhythmchamber_manual'
                     },
                   });
                   logger.info(`Created manual product: ${product.name}`, { productId: product.id });
@@ -178,8 +181,9 @@ class StripeProductManager {
             metadata: {
               tier: productData.tier,
               features: productData.features.join('|'),
-              app: 'CodeCrucible',
-              created_by: 'codecrucible_manual'
+              app: 'RhythmChamber',
+              company: 'ArkaneTechnologies',
+              created_by: 'rhythmchamber_manual'
             },
           });
 
@@ -217,7 +221,7 @@ class StripeProductManager {
   /**
    * Create a new Stripe price for a product
    */
-  private async createPrice(productId: string, productData: CodeCrucibleProduct): Promise<Stripe.Price> {
+  private async createPrice(productId: string, productData: RhythmChamberProduct): Promise<Stripe.Price> {
     try {
       const price = await this.stripe.prices.create({
         product: productId,
@@ -229,8 +233,9 @@ class StripeProductManager {
         },
         metadata: {
           tier: productData.tier,
-          app: 'CodeCrucible',
-          created_by: 'codecrucible_manual'
+          app: 'RhythmChamber',
+          company: 'ArkaneTechnologies',
+          created_by: 'rhythmchamber_manual'
         },
       });
 

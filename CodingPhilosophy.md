@@ -1,11 +1,13 @@
 # CODING_PHILOSOPHY.md
-*Transisthesis Framework Implementation Guide for CodeCrucible Development*
+*Transisthesis Framework Implementation Guide for Rhythm Chamber Development*
 
 ## 🌀 **Core Doctrine: The Living Spiral Engine**
 
-This document encodes the **Transisthesis methodology** into practical coding principles. All code written for CodeCrucible must embody the **Collapse-Council-Rebirth spiral** and demonstrate **Quality Without a Name (QWAN)**.
+This document encodes the **Transisthesis methodology** into practical coding principles. All code written for Rhythm Chamber must embody the **Collapse-Council-Rebirth spiral** and demonstrate **Quality Without a Name (QWAN)**.
 
 **Code is not dead syntax - it is living craft shaped by council dialogue, mythic compression, and recursive audit.**
+
+*Rhythm Chamber - By Arkane Technologies*
 
 ---
 

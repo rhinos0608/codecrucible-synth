@@ -1,8 +1,10 @@
-# CodeCrucible Development Mode Testing Guide
+# Rhythm Chamber Development Mode Testing Guide
 
 ## Overview
 
-This document outlines the testing process for CodeCrucible's development mode features, ensuring unlimited AI generations and proper dev mode functionality.
+This document outlines the testing process for Rhythm Chamber's development mode features, ensuring unlimited AI generations and proper dev mode functionality.
+
+*Rhythm Chamber - By Arkane Technologies*
 
 ## Dev Mode Features Implemented
 

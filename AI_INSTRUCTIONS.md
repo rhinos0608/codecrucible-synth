@@ -1,4 +1,4 @@
-AI_INSTRUCTIONS.md – CodeCrucible Multi-Voice AI Platform
+AI_INSTRUCTIONS.md – Rhythm Chamber Multi-Voice AI Platform by Arkane Technologies
 
 Goal
 Create production-ready, secure, performant multi-voice AI collaboration platform that follows consciousness-driven development principles and implements recursive voice synthesis patterns. Every component must be maintainable, testable, and follow established council-driven architectural patterns.
@@ -611,7 +611,7 @@ const enforceQuotaLimits = async (req: Request, res: Response, next: NextFunctio
   next();
 };
 
-✅ CODECRUCIBLE DEPLOYMENT CHECKLIST
+✅ RHYTHM CHAMBER DEPLOYMENT CHECKLIST
 Pre-Deployment Validation
 
  Voice System: All 5 archetypes + 4 specializations working
@@ -644,7 +644,7 @@ Security Validation
  CORS Configuration: Proper credential handling
 
 
-🔺 CODECRUCIBLE INSTRUCTION PRIORITY
+🔺 RHYTHM CHAMBER INSTRUCTION PRIORITY
 
 VOICE CONSCIOUSNESS PATTERNS - Multi-voice collaboration integrity
 SECURITY FIRST - AI generation and user data protection
@@ -657,7 +657,7 @@ ANALYTICS & LEARNING - Voice effectiveness and user growth
 
 Every code suggestion must reference the multi-voice consciousness architecture and maintain council-driven development principles. Do not compromise voice integrity for convenience.
 
-🧠 CodeCrucible Autonomous Council Optimization Directive (CACOD)
+🧠 Rhythm Chamber Autonomous Council Optimization Directive (RCACOD)
 Multi-Voice Cost Optimization
 
 Voice Parallelization: Generate multiple voices simultaneously

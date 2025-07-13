@@ -55,7 +55,8 @@ export default function UpgradeModal({
         'Export generated code',
         'Advanced customization'
       ],
-      highlighted: false
+      highlighted: false,
+      comingSoon: false
     },
     {
       id: 'team' as const,
@@ -72,7 +73,8 @@ export default function UpgradeModal({
         'Team management',
         'Priority support'
       ],
-      highlighted: true
+      highlighted: true,
+      comingSoon: false
     },
     {
       id: 'enterprise' as const,
@@ -91,7 +93,8 @@ export default function UpgradeModal({
         'SLA guarantees',
         'Compliance features'
       ],
-      highlighted: false
+      highlighted: false,
+      comingSoon: true
     }
   ];
 
@@ -165,7 +168,14 @@ export default function UpgradeModal({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {plan.icon}
-                    <CardTitle>{plan.name}</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      {plan.name}
+                      {plan.comingSoon && (
+                        <span className="px-2 py-0.5 text-xs bg-orange-500/20 text-orange-400 rounded-full border border-orange-500/30">
+                          Coming Soon
+                        </span>
+                      )}
+                    </CardTitle>
                   </div>
                   <div className="text-right">
                     <span className="text-3xl font-bold">{plan.price}</span>

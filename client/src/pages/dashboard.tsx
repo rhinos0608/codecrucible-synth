@@ -452,11 +452,17 @@ export default function Dashboard() {
                   variant="outline"
                   size="sm"
                   onClick={() => navigateWithConfirmation('/onboarding')}
-                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap relative"
                   data-tour="learning-button"
                 >
                   <GraduationCap className="w-4 h-4 mr-2" />
                   Learning
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500/20 text-orange-400 rounded-full border border-orange-500/30">
+                    Coming Soon
+                  </span>
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500/20 text-orange-400 rounded-full border border-orange-500/30">
+                    Coming Soon
+                  </span>
                 </Button>
                 <Button
                   variant="outline"

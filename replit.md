@@ -704,3 +704,10 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **Database Integration**: Connected to existing useDeleteProjectFolder hook with proper cache invalidation
 - **Security Compliance**: All folder deletion features follow AI_INSTRUCTIONS.md patterns with authentication and validation
 - **Production UX**: Delete buttons appear on hover with red styling and proper tooltips for clear user intent
+
+### Coming Soon Labels Implementation (January 13, 2025)
+- **Learning Tab Coming Soon**: Added orange "Coming Soon" badge to Learning navigation button in dashboard header
+- **Enterprise Plan Coming Soon**: Added "Coming Soon" label to Enterprise subscription tier in premium modal
+- **Consistent Styling**: Used orange-themed badges with proper border styling and background opacity for visibility
+- **TypeScript Integration**: Added comingSoon property to plan interface with proper boolean typing
+- **AI_INSTRUCTIONS.md Compliance**: All UI enhancements follow security patterns with consistent styling and user experience

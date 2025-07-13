@@ -222,6 +222,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE endpoint for removing projects following AI_INSTRUCTIONS.md security patterns
+  app.delete('/api/projects/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      console.log('🔧 Deleting project API called:', {
+        projectId: req.params.id,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+
+      // Enhanced input validation following AI_INSTRUCTIONS.md defensive programming
+      if (isNaN(projectId) || projectId <= 0) {
+        console.error('❌ Invalid project ID for deletion:', req.params.id);
+        return res.status(400).json({ 
+          error: 'Invalid project ID',
+          message: 'Project ID must be a positive number'
+        });
+      }
+
+      // Verify project exists and ownership using defensive programming  
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        console.error('❌ Project not found for deletion:', projectId);
+        return res.status(404).json({ 
+          error: 'Project not found',
+          message: 'The requested project does not exist'
+        });
+      }
+
+      console.log('🔧 Project deletion verification:', {
+        projectFound: !!project,
+        projectName: project.name,
+        projectUserId: project.userId,
+        requestUserId: userId,
+        ownershipMatch: project.userId === userId
+      });
+
+      // Enhanced security: verify project ownership following AI_INSTRUCTIONS.md patterns
+      if (project.userId !== userId) {
+        console.error('❌ Unauthorized project deletion attempt:', { 
+          projectId, 
+          userId, 
+          projectOwner: project.userId,
+          projectName: project.name 
+        });
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only delete your own projects'
+        });
+      }
+
+      console.log('🔧 Proceeding with project deletion:', { 
+        projectId, 
+        projectName: project.name,
+        userId 
+      });
+      
+      // Delete project using storage interface with audit logging
+      const deleted = await storage.deleteProject(projectId);
+      
+      console.log('✅ Project deletion result:', { 
+        success: deleted, 
+        projectId,
+        projectName: project.name 
+      });
+
+      if (deleted) {
+        console.log('✅ Project deleted successfully:', { 
+          projectId, 
+          projectName: project.name,
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.json({
+          success: true,
+          projectId,
+          message: `Project "${project.name}" deleted successfully`
+        });
+      } else {
+        console.error('❌ Failed to delete project from database:', projectId);
+        res.status(500).json({ 
+          error: 'Deletion failed',
+          message: 'Failed to delete project from database'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Project deletion error:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        projectId: req.params.id,
+        userId: req.user?.claims?.sub,
+        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : undefined
+      });
+      
+      logger.error('Project deletion failed', error as Error, { 
+        userId: req.user?.claims?.sub,
+        projectId: req.params.id
+      });
+      
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: 'Internal server error',
+          message: 'An unexpected error occurred during project deletion'
+        });
+      }
+    }
+  });
+
+  // GET endpoint for fetching project files following AI_INSTRUCTIONS.md patterns
+  app.get('/api/projects/:id/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      console.log('🔧 Fetching project files API called:', {
+        projectId: req.params.id,
+        userId,
+        timestamp: new Date().toISOString()
+      });
+
+      // Enhanced input validation following AI_INSTRUCTIONS.md defensive programming
+      if (isNaN(projectId) || projectId <= 0) {
+        console.error('❌ Invalid project ID for file fetch:', req.params.id);
+        return res.status(400).json({ 
+          error: 'Invalid project ID',
+          message: 'Project ID must be a positive number'
+        });
+      }
+
+      // Verify project exists and ownership using defensive programming  
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        console.error('❌ Project not found for file fetch:', projectId);
+        return res.status(404).json({ 
+          error: 'Project not found',
+          message: 'The requested project does not exist'
+        });
+      }
+
+      console.log('🔧 Project file fetch verification:', {
+        projectFound: !!project,
+        projectName: project.name,
+        projectUserId: project.userId,
+        requestUserId: userId,
+        ownershipMatch: project.userId === userId
+      });
+
+      // Enhanced security: verify project ownership following AI_INSTRUCTIONS.md patterns
+      if (project.userId !== userId) {
+        console.error('❌ Unauthorized project file access attempt:', { 
+          projectId, 
+          userId, 
+          projectOwner: project.userId,
+          projectName: project.name 
+        });
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only access files from your own projects'
+        });
+      }
+
+      // Generate mock project files for AI council context selection
+      // Following CodingPhilosophy.md patterns for consciousness-driven file analysis
+      const projectFiles = [
+        {
+          id: 1,
+          name: `${project.name.toLowerCase().replace(/\s+/g, '-')}.${project.language?.toLowerCase() || 'js'}`,
+          path: `/src/${project.name.toLowerCase().replace(/\s+/g, '-')}.${project.language?.toLowerCase() || 'js'}`,
+          content: project.code || '// Generated code content',
+          type: 'code' as const,
+          size: (project.code || '').length,
+          language: project.language || 'JavaScript',
+          folderId: project.folderId
+        },
+        {
+          id: 2,
+          name: 'README.md',
+          path: '/README.md',
+          content: `# ${project.name}\n\n${project.description || 'Project description'}\n\n## Features\n\n- Generated with AI council collaboration\n- Multi-voice synthesis architecture\n- Defensive programming patterns`,
+          type: 'doc' as const,
+          size: 250,
+          language: 'Markdown'
+        },
+        {
+          id: 3,
+          name: 'package.json',
+          path: '/package.json',
+          content: `{\n  "name": "${project.name.toLowerCase().replace(/\s+/g, '-')}",\n  "version": "1.0.0",\n  "description": "${project.description || 'AI-generated project'}",\n  "main": "index.js",\n  "dependencies": {}\n}`,
+          type: 'config' as const,
+          size: 180,
+          language: 'JSON'
+        }
+      ];
+
+      // Add additional files based on project complexity
+      if (project.complexity && project.complexity > 1) {
+        projectFiles.push({
+          id: 4,
+          name: 'config.js',
+          path: '/config/config.js',
+          content: 'module.exports = {\n  // Configuration settings\n  environment: "development",\n  api: {\n    baseUrl: "http://localhost:3000"\n  }\n};',
+          type: 'config' as const,
+          size: 120,
+          language: 'JavaScript'
+        });
+      }
+
+      if (project.tags && project.tags.includes('database')) {
+        projectFiles.push({
+          id: 5,
+          name: 'schema.sql',
+          path: '/database/schema.sql',
+          content: '-- Database schema\nCREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(255) NOT NULL,\n  email VARCHAR(255) UNIQUE\n);',
+          type: 'data' as const,
+          size: 150,
+          language: 'SQL'
+        });
+      }
+
+      console.log('✅ Project files generated successfully:', { 
+        projectId, 
+        projectName: project.name,
+        fileCount: projectFiles.length,
+        userId
+      });
+      
+      res.json(projectFiles);
+    } catch (error) {
+      console.error('❌ Project files fetch error:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        projectId: req.params.id,
+        userId: req.user?.claims?.sub,
+        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : undefined
+      });
+      
+      logger.error('Project files fetch failed', error as Error, { 
+        userId: req.user?.claims?.sub,
+        projectId: req.params.id
+      });
+      
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: 'Internal server error',
+          message: 'An unexpected error occurred while fetching project files'
+        });
+      }
+    }
+  });
+
   // Additional routes for API completeness
   // Project creation endpoint for synthesis save functionality - Following AI_INSTRUCTIONS.md patterns
   // Enhanced project creation endpoint with comprehensive debugging

@@ -46,8 +46,10 @@ export function useProjects() {
   // Update project
   const updateProject = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<InsertProject> }) => {
-      const response = await apiRequest("PUT", `/api/projects/${id}`, updates);
-      return response.json();
+      return apiRequest(`/api/projects/${id}`, {
+        method: "PUT",
+        body: updates
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -69,7 +71,9 @@ export function useProjects() {
   // Delete project
   const deleteProject = useMutation({
     mutationFn: async (projectId: number) => {
-      await apiRequest("DELETE", `/api/projects/${projectId}`);
+      return apiRequest(`/api/projects/${projectId}`, {
+        method: "DELETE"
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -93,8 +97,7 @@ export function useProjects() {
     return useQuery({
       queryKey: ["/api/projects", id],
       queryFn: async (): Promise<Project> => {
-        const response = await apiRequest("GET", `/api/projects/${id}`);
-        return response.json();
+        return apiRequest(`/api/projects/${id}`);
       },
       enabled: !!id
     });
@@ -116,8 +119,7 @@ export function useProjectAnalytics() {
   return useQuery({
     queryKey: ["/api/projects/analytics"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/projects");
-      const projects: Project[] = await response.json();
+      const projects: Project[] = await apiRequest("/api/projects");
       
       // Calculate analytics from project data
       const totalProjects = projects.length;

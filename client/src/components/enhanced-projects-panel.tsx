@@ -45,6 +45,7 @@ import {
   FileText
 } from 'lucide-react';
 import { FolderFileManager } from './folder-file-manager';
+import { FileSelectionModal } from './file-selection-modal';
 
 // Enhanced Projects Panel following AI_INSTRUCTIONS.md and CodingPhilosophy.md patterns
 // Implements consciousness-driven development with defensive programming and council-based error handling
@@ -100,6 +101,10 @@ export function EnhancedProjectsPanel({
   const [movingProject, setMovingProject] = useState<Project | null>(null);
   const [showProjectDetail, setShowProjectDetail] = useState(false);
   const [selectedProjectDetail, setSelectedProjectDetail] = useState<Project | null>(null);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [showDeleteProject, setShowDeleteProject] = useState(false);
+  const [showFileSelection, setShowFileSelection] = useState(false);
+  const [fileSelectionProject, setFileSelectionProject] = useState<Project | null>(null);
   
   // New folder data with defensive defaults
   const [newFolderData, setNewFolderData] = useState({
@@ -205,6 +210,32 @@ export function EnhancedProjectsPanel({
       toast({
         title: "Deletion Failed",
         description: "Failed to delete folder. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete project mutation following AI_INSTRUCTIONS.md security patterns
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: number) => {
+      return apiRequest(`/api/projects/${projectId}`, {
+        method: 'DELETE'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setShowDeleteProject(false);
+      setDeletingProject(null);
+      toast({
+        title: "Success",
+        description: "Project deleted successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Project deletion failed - council intervention required:', error);
+      toast({
+        title: "Deletion Failed", 
+        description: "Failed to delete project. Please check permissions.",
         variant: "destructive",
       });
     },
@@ -424,6 +455,41 @@ export function EnhancedProjectsPanel({
     });
   };
 
+  const handleDeleteProject = (project: Project) => {
+    setDeletingProject(project);
+    setShowDeleteProject(true);
+  };
+
+  const confirmDeleteProject = () => {
+    if (deletingProject) {
+      deleteProjectMutation.mutate(deletingProject.id);
+    }
+  };
+
+  // File selection for AI council context following AI_INSTRUCTIONS.md patterns
+  const handleSelectFiles = (project: Project) => {
+    setFileSelectionProject(project);
+    setShowFileSelection(true);
+  };
+
+  const handleFilesSelected = (files: any[], projectContext: Project) => {
+    console.log('🔧 Files selected for AI council context:', {
+      projectId: projectContext.id,
+      projectName: projectContext.name,
+      selectedFiles: files.map(f => ({ name: f.name, type: f.type, size: f.size }))
+    });
+
+    if (onUseAsContext) {
+      // Pass the project with selected files as enhanced context
+      onUseAsContext([{ ...projectContext, selectedFiles: files }]);
+    }
+
+    toast({
+      title: "Context Selected",
+      description: `Using ${files.length} files from ${projectContext.name} for AI council context.`,
+    });
+  };
+
   const handleMoveProject = (project: Project) => {
     setMovingProject(project);
     setShowMoveProject(true);
@@ -496,6 +562,24 @@ export function EnhancedProjectsPanel({
               title="Move to folder"
             >
               <Folder className="w-3 h-3" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-6 w-6 p-0"
+              onClick={() => handleSelectFiles(project)}
+              title="Select files for AI council"
+            >
+              <Target className="w-3 h-3" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-6 w-6 p-0 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+              onClick={() => handleDeleteProject(project)}
+              title="Delete project"
+            >
+              <Trash2 className="w-3 h-3" />
             </Button>
           </div>
         </div>
@@ -915,6 +999,15 @@ export function EnhancedProjectsPanel({
                       <Folder className="w-4 h-4" />
                       Move to Folder
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => selectedProjectDetail && handleSelectFiles(selectedProjectDetail)}
+                      className="flex items-center gap-2"
+                    >
+                      <Target className="w-4 h-4" />
+                      Select Files for AI
+                    </Button>
                   </div>
                 </div>
                 <DialogFooter>
@@ -964,6 +1057,38 @@ export function EnhancedProjectsPanel({
           </div>
         </div>
       </DialogContent>
+
+      {/* Delete Project Confirmation - AI_INSTRUCTIONS.md security patterns */}
+      <Dialog open={showDeleteProject} onOpenChange={setShowDeleteProject}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deletingProject?.name}"? This action cannot be undone and will permanently remove the project and all its code.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteProject(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteProject}
+              disabled={deleteProjectMutation.isPending}
+            >
+              {deleteProjectMutation.isPending ? 'Deleting...' : 'Delete Project'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* File Selection Modal for AI Council Context */}
+      <FileSelectionModal
+        isOpen={showFileSelection}
+        onClose={() => setShowFileSelection(false)}
+        onSelectFiles={handleFilesSelected}
+        project={fileSelectionProject}
+      />
     </Dialog>
   );
 }

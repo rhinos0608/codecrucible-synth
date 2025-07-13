@@ -93,19 +93,30 @@ export function EnhancedProjectsPanel({
   const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useProjects();
   const { data: folders = [], isLoading: foldersLoading, error: foldersError } = useProjectFolders();
 
-  // Debug logging in development
+  // Debug logging in development and force refresh when panel opens
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('🎯 Projects Panel Data:', {
+      console.log('🎯 Enhanced Projects Panel Data:', {
         projects: projects.length,
         folders: folders.length,
         projectsLoading,
         foldersLoading,
-        projectsError,
-        foldersError
+        projectsError: projectsError?.message || null,
+        foldersError: foldersError?.message || null,
+        projectIds: projects.map(p => p.id),
+        projectNames: projects.map(p => p.name)
       });
     }
   }, [projects, folders, projectsLoading, foldersLoading, projectsError, foldersError]);
+  
+  // Force refresh when panel opens to ensure latest data
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🔄 Projects panel opened - forcing data refresh');
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
+    }
+  }, [isOpen, queryClient]);
   
   // Mutation hooks
   const createFolderMutation = useCreateProjectFolder();

@@ -198,8 +198,16 @@ export function useSynthesis() {
         }
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch
+      await queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/projects'] });
+      
+      // Also invalidate project folders in case it was saved to a folder
+      await queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
+      
+      console.log('✅ Project saved successfully - cache invalidated and refetched');
+      
       toast({
         title: "Project Saved",
         description: "Synthesized solution saved to projects successfully."

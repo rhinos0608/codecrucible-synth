@@ -7,14 +7,25 @@ export function useProjects() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all projects
+  // Fetch all projects with enhanced debugging
   const {
     data: projects = [],
     isLoading,
     error
   } = useQuery({
     queryKey: ["/api/projects"],
-    queryFn: (): Promise<Project[]> => apiRequest("/api/projects")
+    queryFn: async (): Promise<Project[]> => {
+      const result = await apiRequest("/api/projects");
+      console.log('📊 Projects API Response:', {
+        count: result.length,
+        projectIds: result.map((p: any) => p.id),
+        projectNames: result.map((p: any) => p.name)
+      });
+      return result;
+    },
+    staleTime: 0, // Always consider data stale to force fresh requests
+    refetchOnWindowFocus: true,
+    refetchOnMount: true
   });
 
   // Create new project
@@ -25,8 +36,13 @@ export function useProjects() {
         body: projectData
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch for immediate UI update
+      await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/projects"] });
+      
+      console.log('✅ Project created successfully - cache invalidated and refetched');
+      
       toast({
         title: "Project Created",
         description: "Your project has been saved successfully."

@@ -101,8 +101,10 @@ class StripeProductManager {
         }
 
         // Search for existing product - Following AI_INSTRUCTIONS.md patterns
+        // Also search for legacy CodeCrucible products to migrate them
+        const legacyName = productData.name.replace('Rhythm Chamber', 'CodeCrucible');
         const existingProducts = await this.stripe.products.search({
-          query: `name:'${productData.name}' OR name:'${productData.name} (Manual)'`,
+          query: `name:'${productData.name}' OR name:'${productData.name} (Manual)' OR name:'${legacyName}'`,
         });
 
         let product: Stripe.Product;
@@ -112,12 +114,33 @@ class StripeProductManager {
           // Use existing product - Following AI_INSTRUCTIONS.md defensive programming
           product = existingProducts.data[0];
           
-          // Only try to activate if it's not an automatic product
-          if (!product.active && product.metadata?.created_by !== 'stripe_automatic') {
+          // Check if this is a legacy CodeCrucible product that needs rebranding
+          const isLegacyProduct = product.name.includes('CodeCrucible');
+          
+          // Only try to activate/update if it's not an automatic product
+          if ((!product.active || isLegacyProduct) && product.metadata?.created_by !== 'stripe_automatic') {
             try {
-              logger.info(`Attempting to activate Stripe product: ${product.name}`, { productId: product.id });
-              product = await this.stripe.products.update(product.id, { active: true });
-              logger.info(`Successfully activated product: ${product.name}`);
+              const updateData: any = { active: true };
+              
+              // If this is a legacy CodeCrucible product, rebrand it to Rhythm Chamber
+              if (isLegacyProduct) {
+                updateData.name = productData.name;
+                updateData.description = productData.description;
+                updateData.metadata = {
+                  tier: productData.tier,
+                  features: productData.features.join('|'),
+                  app: 'RhythmChamber',
+                  company: 'ArkaneTechnologies',
+                  created_by: 'rhythmchamber_migrated',
+                  legacy_name: product.name
+                };
+                logger.info(`Migrating legacy product from ${product.name} to ${productData.name}`, { productId: product.id });
+              } else {
+                logger.info(`Attempting to activate Stripe product: ${product.name}`, { productId: product.id });
+              }
+              
+              product = await this.stripe.products.update(product.id, updateData);
+              logger.info(`Successfully updated product: ${product.name}`);
             } catch (error: any) {
               if (error.message?.includes('automatically') || error.message?.includes('cannot be updated')) {
                 logger.warn(`Cannot update automatic Stripe product: ${product.name}`, { 

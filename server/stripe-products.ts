@@ -98,25 +98,58 @@ class StripeProductManager {
           continue;
         }
 
-        // Search for existing product
+        // Search for existing product - Following AI_INSTRUCTIONS.md patterns
         const existingProducts = await this.stripe.products.search({
-          query: `name:'${productData.name}'`,
+          query: `name:'${productData.name}' OR name:'${productData.name} (Manual)'`,
         });
 
         let product: Stripe.Product;
         let price: Stripe.Price;
 
         if (existingProducts.data.length > 0) {
-          // Use existing product but ensure it's active
+          // Use existing product - Following AI_INSTRUCTIONS.md defensive programming
           product = existingProducts.data[0];
           
-          // Check if product is active, activate if needed
-          if (!product.active) {
-            logger.info(`Activating inactive Stripe product: ${product.name}`, { productId: product.id });
-            product = await this.stripe.products.update(product.id, { active: true });
+          // Only try to activate if it's not an automatic product
+          if (!product.active && product.metadata?.created_by !== 'stripe_automatic') {
+            try {
+              logger.info(`Attempting to activate Stripe product: ${product.name}`, { productId: product.id });
+              product = await this.stripe.products.update(product.id, { active: true });
+              logger.info(`Successfully activated product: ${product.name}`);
+            } catch (error: any) {
+              if (error.message?.includes('automatically') || error.message?.includes('cannot be updated')) {
+                logger.warn(`Cannot update automatic Stripe product: ${product.name}`, { 
+                  productId: product.id, 
+                  isAutomatic: true,
+                  active: product.active 
+                });
+                // For automatic products, we need to create a new one if inactive
+                if (!product.active) {
+                  logger.info('Creating new product since automatic product is inactive');
+                  product = await this.stripe.products.create({
+                    name: `${productData.name} (Manual)`,
+                    description: productData.description,
+                    active: true,
+                    metadata: {
+                      tier: productData.tier,
+                      features: productData.features.join('|'),
+                      app: 'CodeCrucible',
+                      created_by: 'codecrucible_manual'
+                    },
+                  });
+                  logger.info(`Created manual product: ${product.name}`, { productId: product.id });
+                }
+              } else {
+                throw error;
+              }
+            }
           }
           
-          logger.info(`Using existing Stripe product: ${product.name}`, { productId: product.id, active: product.active });
+          logger.info(`Using Stripe product: ${product.name}`, { 
+            productId: product.id, 
+            active: product.active,
+            isAutomatic: product.metadata?.created_by === 'stripe_automatic' || product.name.includes('(created by Stripe)')
+          });
 
           // Get the active price for this product
           const prices = await this.stripe.prices.list({
@@ -126,7 +159,11 @@ class StripeProductManager {
 
           if (prices.data.length > 0) {
             price = prices.data[0];
-            logger.info(`Found existing active price for ${product.name}`, { priceId: price.id, amount: price.unit_amount, active: price.active });
+            logger.info(`Found existing active price for ${product.name}`, { 
+              priceId: price.id, 
+              amount: price.unit_amount, 
+              active: price.active 
+            });
           } else {
             // Create new price for existing product
             logger.info(`No active prices found for ${product.name}, creating new price`);
@@ -141,7 +178,8 @@ class StripeProductManager {
             metadata: {
               tier: productData.tier,
               features: productData.features.join('|'),
-              app: 'CodeCrucible'
+              app: 'CodeCrucible',
+              created_by: 'codecrucible_manual'
             },
           });
 
@@ -191,7 +229,8 @@ class StripeProductManager {
         },
         metadata: {
           tier: productData.tier,
-          app: 'CodeCrucible'
+          app: 'CodeCrucible',
+          created_by: 'codecrucible_manual'
         },
       });
 

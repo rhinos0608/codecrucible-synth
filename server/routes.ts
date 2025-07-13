@@ -7,6 +7,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertProjectFolderSchema, insertProjectSchema } from "@shared/schema";
 import { contextAwareOpenAI } from "./context-aware-openai-service";
 import { realOpenAIService } from "./openai-service";
+import { enforceSubscriptionLimits } from "./middleware/subscription-enforcement";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -70,7 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project folder routes - Pro tier gated following AI_INSTRUCTIONS.md
-  app.get('/api/project-folders', isAuthenticated, async (req: any, res, next) => {
+  app.get('/api/project-folders', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
       const folders = await storage.getProjectFolders(userId);
@@ -81,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/project-folders', isAuthenticated, async (req: any, res, next) => {
+  app.post('/api/project-folders', isAuthenticated, enforceSubscriptionLimits, async (req: any, res, next) => {
     try {
       const userId = req.user.claims.sub;
       

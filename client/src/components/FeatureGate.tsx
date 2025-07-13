@@ -17,6 +17,7 @@ const FEATURE_MATRIX = {
   'code_export': ['pro', 'team', 'enterprise'],
   'custom_voices': ['pro', 'team', 'enterprise'],
   'voice_profiles': ['pro', 'team', 'enterprise'],
+  'project_folders': ['pro', 'team', 'enterprise'],
   'team_collaboration': ['team', 'enterprise'],
   'shared_profiles': ['team', 'enterprise'],
   'team_management': ['team', 'enterprise'],

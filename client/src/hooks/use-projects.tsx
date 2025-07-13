@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Project, InsertProject } from "@shared/schema";
+import type { Project, InsertProject } from "../../../shared/schema";
 
 export function useProjects() {
   const { toast } = useToast();
@@ -112,6 +112,47 @@ export function useProjects() {
     deleteProject,
     getProject
   };
+}
+
+// Individual exports for component compatibility
+export function useCreateProject() {
+  const { createProject } = useProjects();
+  return createProject;
+}
+
+export function useDeleteProject() {
+  const { deleteProject } = useProjects();
+  return deleteProject;
+}
+
+export function useMoveProject() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  return useMutation({
+    mutationFn: async ({ projectId, folderId }: { projectId: number; folderId: number | null }) => {
+      return apiRequest(`/api/projects/${projectId}/move`, {
+        method: 'PUT',
+        body: { folderId }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/project-folders"] });
+      toast({
+        title: "Project Moved",
+        description: "Project has been moved successfully."
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to move project:", error);
+      toast({
+        title: "Move Failed",
+        description: "Failed to move project. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
 }
 
 // Analytics hook for project insights

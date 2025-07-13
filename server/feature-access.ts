@@ -18,6 +18,7 @@ export const FEATURE_MATRIX = {
   'code_export': ['pro', 'team', 'enterprise'],
   'custom_voices': ['pro', 'team', 'enterprise'],
   'voice_profiles': ['pro', 'team', 'enterprise'],
+  'project_folders': ['pro', 'team', 'enterprise'],
   'team_collaboration': ['team', 'enterprise'],
   'shared_profiles': ['team', 'enterprise'],
   'team_management': ['team', 'enterprise'],
@@ -99,6 +100,7 @@ export const getRequiredFeature = (path: string): string | null => {
     '/api/sessions/synthesize': 'synthesis_engine',
     '/api/analytics': 'analytics_dashboard',
     '/api/voice-profiles': 'custom_voices',
+    '/api/project-folders': 'project_folders',
     '/api/teams': 'team_collaboration',
     '/api/export': 'code_export',
     '/api/recommendations': 'voice_recommendations'

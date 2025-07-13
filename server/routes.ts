@@ -161,25 +161,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { folderId } = req.body;
       const userId = req.user.claims.sub;
       
-      console.log('Moving project API called:', { projectId, folderId, userId });
+      console.log('🔧 Moving project API called:', { projectId, folderId, userId, requestBody: req.body });
       
-      // Validate project exists and belongs to user
-      const project = await storage.getProject(parseInt(projectId));
-      if (!project || project.userId !== userId) {
+      // Enhanced validation following AI_INSTRUCTIONS.md defensive programming
+      const projectIdNum = parseInt(projectId);
+      if (isNaN(projectIdNum)) {
+        console.error('❌ Invalid project ID:', projectId);
+        return res.status(400).json({ error: 'Invalid project ID' });
+      }
+      
+      // Validate project exists and belongs to user with comprehensive logging
+      const project = await storage.getProject(projectIdNum);
+      console.log('🔧 Project lookup result:', { projectFound: !!project, projectUserId: project?.userId, requestUserId: userId });
+      
+      if (!project) {
+        console.error('❌ Project not found:', projectIdNum);
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const moved = await storage.moveProjectToFolder(parseInt(projectId), folderId);
-      if (!moved) {
-        return res.status(500).json({ error: 'Failed to move project' });
+      if (project.userId !== userId) {
+        console.error('❌ Access denied - project owner mismatch:', { projectUserId: project.userId, requestUserId: userId });
+        return res.status(403).json({ error: 'Access denied to project' });
       }
       
-      console.log('Project moved successfully:', { projectId, folderId });
-      res.json({ success: true });
+      // Handle null folderId properly for moving to root
+      const targetFolderId = folderId ? parseInt(folderId) : null;
+      console.log('🔧 Target folder processing:', { original: folderId, parsed: targetFolderId, isNull: folderId === null });
+      
+      const moved = await storage.moveProjectToFolder(projectIdNum, targetFolderId);
+      console.log('🔧 Move operation result:', { moved, projectId: projectIdNum, targetFolderId });
+      
+      if (!moved) {
+        console.error('❌ Move operation failed at storage layer');
+        return res.status(500).json({ error: 'Failed to move project - storage operation failed' });
+      }
+      
+      console.log('✅ Project moved successfully:', { projectId: projectIdNum, folderId: targetFolderId, userId });
+      res.json({ success: true, projectId: projectIdNum, folderId: targetFolderId });
     } catch (error) {
-      console.error('Error moving project:', error);
-      logger.error('Error moving project', error as Error, { userId: req.user?.claims?.sub });
-      res.status(500).json({ error: 'Failed to move project' });
+      console.error('❌ Critical error moving project:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : undefined,
+        projectId: req.params.projectId,
+        folderId: req.body.folderId,
+        userId: req.user?.claims?.sub
+      });
+      
+      logger.error('Error moving project', error as Error, { 
+        userId: req.user?.claims?.sub,
+        projectId: req.params.projectId,
+        folderId: req.body.folderId
+      });
+      
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: 'Failed to move project', 
+          details: process.env.NODE_ENV === 'development' ? error?.message : undefined 
+        });
+      }
     }
   });
 
@@ -478,22 +517,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: req.body.name,
         perspective: req.body.perspective,
         role: req.body.role,
-        bodyKeys: Object.keys(req.body)
+        bodyKeys: Object.keys(req.body),
+        fullBody: req.body
       });
       
-      // Direct validation without schema import for now - will fix schema later  
-      const profileData = { ...req.body, userId };
-      const profile = await storage.createVoiceProfile(profileData);
+      // Enhanced validation following AI_INSTRUCTIONS.md security patterns
+      if (!req.body.name || typeof req.body.name !== 'string') {
+        console.error('❌ Invalid voice profile name:', req.body.name);
+        return res.status(400).json({ error: 'Valid name is required' });
+      }
       
+      // Prepare profile data with comprehensive field mapping
+      const profileData = {
+        userId,
+        name: req.body.name,
+        description: req.body.description || `Custom ${req.body.name} voice profile`,
+        selectedPerspectives: req.body.selectedPerspectives || [req.body.perspective].filter(Boolean),
+        selectedRoles: req.body.selectedRoles || [req.body.role].filter(Boolean),
+        analysisDepth: req.body.analysisDepth || 2,
+        mergeStrategy: req.body.mergeStrategy || 'competitive',
+        qualityFiltering: req.body.qualityFiltering !== false,
+        isDefault: req.body.isDefault || false,
+        avatar: req.body.avatar || '🤖',
+        personality: req.body.personality || 'Analytical',
+        chatStyle: req.body.chatStyle || 'analytical',
+        specialization: req.body.specialization || 'General',
+        ethicalStance: req.body.ethicalStance || 'progressive',
+        perspective: req.body.perspective,
+        role: req.body.role
+      };
+      
+      console.log('🔧 Formatted profile data for storage:', {
+        userId,
+        name: profileData.name,
+        perspectives: profileData.selectedPerspectives,
+        roles: profileData.selectedRoles,
+        avatar: profileData.avatar
+      });
+      
+      const profile = await storage.createVoiceProfile(profileData);
       console.log('✅ Voice profile created successfully:', { id: profile.id, name: profile.name });
       res.json(profile);
     } catch (error) {
-      console.error("❌ Error creating voice profile:", error);
+      console.error("❌ Error creating voice profile:", {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : undefined,
+        userId: req.user?.claims?.sub,
+        requestBody: req.body
+      });
+      
       logger.error('Voice profile creation failed', error as Error, { 
         userId: req.user?.claims?.sub,
         requestBody: req.body 
       });
-      res.status(500).json({ message: "Failed to create voice profile", details: error.message });
+      
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: "Failed to create voice profile", 
+          details: process.env.NODE_ENV === 'development' ? error?.message : undefined 
+        });
+      }
     }
   });
 

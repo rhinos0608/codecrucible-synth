@@ -19,7 +19,7 @@ export default function LegalSection() {
           </Badge>
         </CardTitle>
         <CardDescription className="text-gray-400 text-xs">
-          Terms of Service and Privacy Policy for CodeCrucible platform usage
+          Terms of Service and Privacy Policy for Arkane Technologies platform usage
         </CardDescription>
       </CardHeader>
       
@@ -58,7 +58,7 @@ export default function LegalSection() {
                   <section>
                     <h4 className="font-medium text-gray-300 mb-2">1. Overview</h4>
                     <p className="text-gray-300 leading-relaxed">
-                      CodeCrucible is a web-based multi-voice AI development platform created by Rhythm Chamber. 
+                      Arkane Technologies is a web-based multi-voice AI development platform created by Arkane Technologies. 
                       These Terms govern your access to and use of the service. By using the platform, you agree to these Terms.
                     </p>
                   </section>
@@ -66,7 +66,7 @@ export default function LegalSection() {
                   <section>
                     <h4 className="font-medium text-gray-300 mb-2">2. Subscriptions and Payments</h4>
                     <p className="text-gray-300 leading-relaxed mb-2">
-                      We offer Free, Pro ($15/month), and Team ($50/month) plans.
+                      We offer Free, Pro ($19/month), and Team ($49/month) plans.
                     </p>
                     <ul className="text-gray-400 text-xs space-y-1 ml-4">
                       <li>• Payments are processed securely via Stripe</li>
@@ -92,7 +92,7 @@ export default function LegalSection() {
                     <h4 className="font-medium text-gray-300 mb-2">4. Intellectual Property</h4>
                     <p className="text-gray-300 leading-relaxed">
                       All generated code belongs to the user. The platform logic, architecture, and voice framework 
-                      remain the property of Rhythm Chamber.
+                      remain the property of Arkane Technologies.
                     </p>
                   </section>
                   
@@ -122,10 +122,10 @@ export default function LegalSection() {
                     <div className="flex items-center">
                       <Mail className="h-3 w-3 mr-2 text-gray-400" />
                       <a 
-                        href="mailto:support@rhythmchamber.app" 
+                        href="mailto:support@arkane.tech" 
                         className="text-gray-300 hover:text-gray-200 text-sm underline"
                       >
-                        support@rhythmchamber.app
+                        support@arkane.tech
                       </a>
                     </div>
                   </section>
@@ -205,10 +205,10 @@ export default function LegalSection() {
                     <div className="flex items-center mt-2">
                       <Mail className="h-3 w-3 mr-2 text-gray-400" />
                       <a 
-                        href="mailto:support@rhythmchamber.app" 
+                        href="mailto:support@arkane.tech" 
                         className="text-gray-300 hover:text-gray-200 text-sm underline"
                       >
-                        support@rhythmchamber.app
+                        support@arkane.tech
                       </a>
                     </div>
                   </section>

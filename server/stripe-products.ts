@@ -319,7 +319,7 @@ class StripeProductManager {
     await this.ensureProductsExist();
     
     const products = [];
-    for (const productData of CODECRUCIBLE_PRODUCTS) {
+    for (const productData of ARKANE_TECHNOLOGIES_PRODUCTS) {
       const cached = this.productCache.get(productData.tier);
       if (cached) {
         products.push({

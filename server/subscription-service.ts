@@ -221,7 +221,7 @@ class SubscriptionService {
         metadata: {
           userId: user.id,
           tier: tier,
-          app: 'CodeCrucible'
+          app: 'ArkaneTechnologies'
         },
       });
       stripeCustomerId = customer.id;
@@ -254,13 +254,13 @@ class SubscriptionService {
       metadata: {
         userId: user.id,
         tier,
-        app: 'CodeCrucible'
+        app: 'ArkaneTechnologies'
       },
       subscription_data: {
         metadata: {
           userId: user.id,
           tier,
-          app: 'CodeCrucible'
+          app: 'ArkaneTechnologies'
         }
       },
       // Enable customer portal for subscription management

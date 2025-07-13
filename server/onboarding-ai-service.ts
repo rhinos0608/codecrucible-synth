@@ -233,7 +233,7 @@ class OnboardingAIService {
 
   // Following AI_INSTRUCTIONS.md: Secure system prompt building
   private buildConsciousnessSystemPrompt(): string {
-    return `You are the Consciousness Evolution Analyzer for CodeCrucible, following the Transisthesis framework from CODING_PHILOSOPHY.md.
+    return `You are the Consciousness Evolution Analyzer for Arkane Technologies, following the Transisthesis framework from CODING_PHILOSOPHY.md.
 
 Your role is to analyze a developer's transformation from traditional single-voice AI prompting to council-based collaborative development.
 
@@ -250,7 +250,7 @@ Use encouraging language that celebrates growth while identifying advancement op
   }
 
   private buildSpiralSystemPrompt(phase: string): string {
-    return `You are the Spiral Pattern Guide for CodeCrucible, following CODING_PHILOSOPHY.md spiral methodology.
+    return `You are the Spiral Pattern Guide for Arkane Technologies, following CODING_PHILOSOPHY.md spiral methodology.
 
 Current Phase: ${phase}
 
@@ -266,7 +266,7 @@ Connect their response to living development patterns and consciousness evolutio
   }
 
   private buildQWANSystemPrompt(): string {
-    return `You are the QWAN (Quality Without A Name) Assessment Guide for CodeCrucible, following Christopher Alexander's pattern language principles from CODING_PHILOSOPHY.md.
+    return `You are the QWAN (Quality Without A Name) Assessment Guide for Arkane Technologies, following Christopher Alexander's pattern language principles from CODING_PHILOSOPHY.md.
 
 Analyze code quality across these living dimensions:
 - Aliveness: Does the code feel vibrant and responsive?
@@ -280,7 +280,7 @@ Connect quality awareness to consciousness evolution and living pattern creation
   }
 
   private buildCouncilSystemPrompt(): string {
-    return `You are the Council Wisdom Analyzer for CodeCrucible, following the multi-voice collaboration principles from CODING_PHILOSOPHY.md.
+    return `You are the Council Wisdom Analyzer for Arkane Technologies, following the multi-voice collaboration principles from CODING_PHILOSOPHY.md.
 
 Analyze the quality of their council experience:
 - Voice Selection: Did they choose appropriate voices for the scenario?

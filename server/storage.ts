@@ -100,6 +100,7 @@ export interface IStorage {
   // Solution operations
   createSolution(solution: InsertSolution): Promise<Solution>;
   getSolutionsBySession(sessionId: number): Promise<Solution[]>;
+  getSolution(solutionId: number): Promise<Solution | undefined>;
   
   // Synthesis operations
   createSynthesis(synthesis: InsertSynthesis): Promise<Synthesis>;
@@ -354,6 +355,14 @@ export class DatabaseStorage implements IStorage {
   
   async getSolutionsBySession(sessionId: number): Promise<Solution[]> {
     return await db.select().from(solutions).where(eq(solutions.sessionId, sessionId));
+  }
+
+  async getSolution(solutionId: number): Promise<Solution | undefined> {
+    const [solution] = await db
+      .select()
+      .from(solutions)
+      .where(eq(solutions.id, solutionId));
+    return solution;
   }
   
   // Synthesis operations

@@ -3,6 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Solution } from "@shared/schema";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
 
@@ -62,6 +66,42 @@ export function PostGenerationDecision({
   onContinueWithVoice, 
   onSynthesizeAll 
 }: PostGenerationDecisionProps) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  // Create chat session mutation
+  const createChatSessionMutation = useMutation({
+    mutationFn: async (solution: Solution) => {
+      return apiRequest('/api/chat/sessions', {
+        method: 'POST',
+        body: {
+          selectedVoice: getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName),
+          initialSolutionId: solution.id,
+          voiceEngine: solution.voiceEngine || solution.voiceCombination,
+          sessionId: solution.sessionId
+        }
+      });
+    },
+    onSuccess: (chatSession) => {
+      console.log('✅ Chat session created:', chatSession);
+      onClose();
+      // Navigate to full-page chat
+      setLocation(`/chat/${chatSession.id}`);
+    },
+    onError: (error) => {
+      console.error('❌ Failed to create chat session:', error);
+      toast({
+        title: "Failed to start chat",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleContinueWithVoice = (solution: Solution) => {
+    console.log('🧠 Creating chat session with:', getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName));
+    createChatSessionMutation.mutate(solution);
+  };
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
@@ -109,11 +149,16 @@ export function PostGenerationDecision({
                   </p>
                   
                   <Button 
-                    onClick={() => onContinueWithVoice(solution)}
+                    onClick={() => handleContinueWithVoice(solution)}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                     size="sm"
+                    disabled={createChatSessionMutation.isPending}
                   >
-                    <MessageCircle className="w-4 h-4 mr-2" />
+                    {createChatSessionMutation.isPending ? (
+                      <Brain className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                    )}
                     Chat with {getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName)}
                   </Button>
                 </Card>

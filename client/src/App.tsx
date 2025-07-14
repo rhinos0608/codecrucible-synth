@@ -17,6 +17,7 @@ import SubscriptionCancel from "@/pages/subscription-cancel";
 import { VoiceSelectionProvider } from "@/contexts/voice-selection-context";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import ErrorBoundary from "@/components/error-boundary";
+import { ChatPage } from "@/pages/ChatPage";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuthContext();
@@ -38,6 +39,11 @@ function Router() {
       </Route>
       <Route path="/onboarding">
         {isAuthenticated ? <Onboarding /> : <Landing />}
+      </Route>
+      
+      {/* Chat route - for full-page ChatGPT-like experience */}
+      <Route path="/chat/:sessionId">
+        {isAuthenticated ? <ChatPage /> : <Landing />}
       </Route>
       
       {/* Dashboard route - for Stripe post-checkout redirects */}

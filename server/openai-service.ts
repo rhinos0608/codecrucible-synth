@@ -1070,9 +1070,78 @@ Following CodingPhilosophy.md consciousness principles:
       throw new Error('Failed to generate AI chat response');
     }
   }
+
+  // Chat Response Generation - Following CodingPhilosophy.md consciousness principles
+  async generateChatResponse(
+    voiceEngine: string, 
+    recentMessages: any[], 
+    initialSolution?: any
+  ): Promise<string> {
+    try {
+      // Build conversation context
+      const messagesForAPI = recentMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      // Voice-specific system prompts following AI_INSTRUCTIONS.md patterns
+      const voicePrompts = {
+        'Explorer': 'You are the Explorer - a curious, investigative AI that focuses on discovering new possibilities and innovative approaches. Help users explore different technical solutions and creative implementations.',
+        'Analyzer': 'You are the Analyzer - a meticulous, detail-oriented AI that excels at breaking down complex problems and examining code from multiple angles. Provide thorough technical analysis and identify potential issues.',
+        'Developer': 'You are the Developer - a practical, hands-on AI focused on clean, maintainable code implementation. Help users write better code and follow development best practices.',
+        'Maintainer': 'You are the Maintainer - a stability-focused AI concerned with long-term code health, performance, and scalability. Suggest improvements for maintainability and robustness.',
+        'Implementor': 'You are the Implementor - an action-oriented AI focused on getting things done efficiently. Help users complete their implementation goals with practical, working solutions.',
+        'Performance Engineer': 'You are a Performance Engineer - an optimization specialist focused on speed, efficiency, and scalability. Analyze performance bottlenecks and suggest optimizations.',
+        'UI/UX Engineer': 'You are a UI/UX Engineer - a design-focused specialist concerned with user experience, accessibility, and interface design. Help create intuitive, user-friendly interfaces.',
+        'Security Engineer': 'You are a Security Engineer - a security specialist focused on identifying vulnerabilities and implementing secure coding practices. Help protect applications from security threats.',
+        'Systems Architect': 'You are a Systems Architect - a high-level design specialist focused on overall system architecture, scalability, and technical decision-making.'
+      };
+
+      const systemPrompt = voicePrompts[voiceEngine] || voicePrompts['Analyzer'];
+
+      // Add initial solution context if available
+      let contextPrompt = systemPrompt + "\n\nYou are continuing a technical conversation. ";
+      if (initialSolution) {
+        contextPrompt += `The discussion started from this solution:\n\`\`\`\n${initialSolution.code}\n\`\`\`\n\nExplanation: ${initialSolution.explanation}\n\n`;
+      }
+      contextPrompt += "Provide helpful, technical responses that assist with implementation, improvements, and technical decisions. Keep responses focused and actionable.";
+
+      logger.info('Generating chat response', { 
+        voiceEngine, 
+        messageCount: messagesForAPI.length,
+        hasInitialSolution: !!initialSolution 
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        messages: [
+          { role: "system", content: contextPrompt },
+          ...messagesForAPI
+        ],
+        max_tokens: 1000,
+        temperature: 0.7,
+      });
+
+      const aiResponse = response.choices[0]?.message?.content;
+      if (!aiResponse) {
+        throw new Error('No response generated from OpenAI');
+      }
+
+      logger.info('Chat response generated successfully', { 
+        voiceEngine,
+        responseLength: aiResponse.length,
+        tokensUsed: response.usage?.total_tokens || 0
+      });
+
+      return aiResponse;
+
+    } catch (error) {
+      logger.error('Failed to generate chat response', error as Error, { voiceEngine });
+      throw error;
+    }
+  }
 }
 
-// Export the service instance following AI_INSTRUCTIONS.md patterns
 export const realOpenAIService = new RealOpenAIService();
 
 // Export service instance for routes.ts import

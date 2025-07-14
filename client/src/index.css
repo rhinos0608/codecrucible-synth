@@ -244,6 +244,35 @@
   .scroll-smooth {
     -webkit-overflow-scrolling: touch;
   }
+
+  /* Onboarding Tour Highlight */
+  .tour-highlight {
+    position: relative;
+    z-index: 100;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4) !important;
+    background: rgba(59, 130, 246, 0.05) !important;
+    transition: all 0.3s ease !important;
+  }
+  
+  .tour-highlight::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+    border-radius: 10px;
+    z-index: -1;
+    animation: tourPulse 2s infinite;
+  }
+  
+  @keyframes tourPulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.02); }
+  }
 }
 
 @layer utilities {

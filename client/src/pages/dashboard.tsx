@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2, Target, X, Menu } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2, Target, X, Menu, ChevronRight, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -69,7 +69,7 @@ export default function Dashboard() {
   const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
-  const [showRightPanel, setShowRightPanel] = useState(true);
+  const [showRightPanel, setShowRightPanel] = useState(true); // Show configuration on startup
   const [showErrorMonitor, setShowErrorMonitor] = useState(false);
   const [projectContext, setProjectContext] = useState<Project | null>(null);
   const [selectedContextProjects, setSelectedContextProjects] = useState<Project[]>([]);
@@ -521,19 +521,25 @@ export default function Dashboard() {
                     setShowAnalyticsPanel(true);
                   }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
+                  data-tour="navigation-buttons"
                 >
                   <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Analytics</span>
                   <span className="sm:hidden">Stats</span>
                 </Button>
-                {/* Mobile Menu Toggle */}
+                {/* Settings/Configuration Toggle */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowRightPanel(!showRightPanel)}
-                  className="md:hidden text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                  className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                  title={showRightPanel ? "Hide Configuration" : "Show Configuration"}
                 >
-                  <Menu className="w-4 h-4" />
+                  <Menu className="w-4 h-4 md:hidden" />
+                  <Settings className="w-4 h-4 hidden md:inline" />
+                  <span className="hidden lg:inline ml-2">
+                    {showRightPanel ? "Hide Config" : "Show Config"}
+                  </span>
                 </Button>
                 
                 <Button
@@ -594,6 +600,11 @@ export default function Dashboard() {
 
         {/* Chat Area - Mobile Optimized */}
         <div className="flex-1 flex flex-col p-3 sm:p-6 space-y-4 sm:space-y-6">
+          {/* Welcome Element for Tour */}
+          <div className="hidden" data-tour="welcome">
+            <h1 className="text-2xl font-bold text-gray-100">Welcome to CodeCrucible</h1>
+            <p className="text-gray-400">Your AI-powered collaborative coding platform</p>
+          </div>
 
           {/* Project Context */}
           {projectContext && (
@@ -735,7 +746,7 @@ export default function Dashboard() {
                 )}
                 
                 {/* File Upload Area */}
-                <div className="mt-4 border-t border-gray-700 pt-4">
+                <div className="mt-4 border-t border-gray-700 pt-4" data-tour="file-upload">
                   <FileUploadArea
                     sessionId={sessionId}
                     onFileUploaded={handleFileUploaded}
@@ -864,7 +875,7 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 overflow-y-auto">
               {/* Subscription Status */}
-              <div className="p-3 sm:p-4">
+              <div className="p-3 sm:p-4" data-tour="subscription-status">
                 <SubscriptionStatus onUpgrade={() => setShowUpgradeModal(true)} />
               </div>
               <div className="border-t border-gray-700" data-tour="voice-selector">
@@ -881,6 +892,7 @@ export default function Dashboard() {
         onClose={() => setShowSolutionStack(false)}
         sessionId={currentSessionId}
         onMergeClick={handleMergeClick}
+        data-tour="solution-stack"
       />
 
       <SynthesisPanel

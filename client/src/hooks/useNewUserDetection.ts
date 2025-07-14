@@ -89,14 +89,16 @@ export function useNewUserDetection() {
       metrics.sessionsCreated < 3 // Haven't created many sessions
     );
 
-    setShouldShowTour(isNewUser);
+    // TEMPORARY: Force show tour for testing - remove after implementation
+    // Set to true to force show tour regardless of completion status
+    const forceShowTour = true;
+
+    setShouldShowTour(forceShowTour);
     
     console.log('New User Detection:', {
       isNewUser,
-      accountAge: metrics.accountAge,
       tourCompleted: metrics.tourCompleted,
-      sessionsCreated: metrics.sessionsCreated,
-      shouldShowTour: isNewUser
+      shouldShowTour: forceShowTour
     });
   }, [newUserMetrics, isAuthenticated, isLoading]);
 

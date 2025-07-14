@@ -32,19 +32,45 @@ const ONBOARDING_STEPS: TourStep[] = [
     codingPhilosophyPrinciple: 'The whole is greater than the sum of its parts - council-based development'
   },
   {
+    id: 'configuration-panel',
+    title: 'Configuration Panel',
+    description: 'This is your mission control center. Configure AI voices, manage subscription settings, and access powerful Pro features. The panel opens automatically on startup and can be toggled with the settings button.',
+    target: '[data-tour="voice-selector"]',
+    position: 'left',
+    category: 'navigation',
+    aiInsight: 'Master the tools before wielding them - configuration is key to success'
+  },
+  {
     id: 'voice-selection',
     title: 'Choose Your AI Council',
-    description: 'Select different AI voices to form your coding council. Each voice specializes in different aspects: architecture, security, performance, and user experience.',
+    description: 'Select different AI voices to form your coding council. Each voice specializes in different aspects: Explorer (research), Analyzer (debugging), Developer (implementation), Maintainer (optimization), and Implementor (execution).',
     target: '[data-tour="voice-selector"]',
     position: 'left',
     category: 'voice-selection',
     interactionRequired: true,
     nextStepCondition: () => {
-      // Check if at least one voice is selected
       const voices = document.querySelectorAll('[data-tour="voice-selector"] [aria-pressed="true"]');
       return voices.length > 0;
     },
     aiInsight: 'Different coding challenges require different perspectives - assemble wisely'
+  },
+  {
+    id: 'subscription-status',
+    title: 'Subscription & Limits',
+    description: 'Monitor your usage limits, generations remaining, and subscription tier. Pro users get unlimited generations, advanced synthesis, and team collaboration features.',
+    target: '[data-tour="subscription-status"]',
+    position: 'left',
+    category: 'navigation',
+    codingPhilosophyPrinciple: 'Understanding your resources enables better planning'
+  },
+  {
+    id: 'file-upload',
+    title: 'File Upload & Context',
+    description: 'Upload files to provide context to your AI council. Drag and drop files or click to browse. Your files help the AI understand your existing codebase and provide more relevant solutions.',
+    target: '[data-tour="file-upload"]',
+    position: 'top',
+    category: 'generation',
+    aiInsight: 'Context is king - the more information you provide, the better the solutions'
   },
   {
     id: 'prompt-input',
@@ -62,7 +88,7 @@ const ONBOARDING_STEPS: TourStep[] = [
   {
     id: 'generation-methods',
     title: 'Two Generation Modes',
-    description: 'Choose between Council Generation (traditional) for complete solutions, or Live Streaming for real-time collaborative coding experience.',
+    description: 'Choose between Council Generation (traditional) for complete solutions, or Live Streaming for real-time collaborative coding experience. Watch as each AI voice contributes simultaneously.',
     target: '[data-tour="generate-button"]',
     position: 'top',
     category: 'generation',
@@ -71,7 +97,7 @@ const ONBOARDING_STEPS: TourStep[] = [
   {
     id: 'solutions-review',
     title: 'Review Multi-Voice Solutions',
-    description: 'Each AI voice provides a unique solution approach. Compare different perspectives, code styles, and architectural decisions.',
+    description: 'Each AI voice provides a unique solution approach. Compare different perspectives, code styles, and architectural decisions. Click on solutions to expand and review the code.',
     target: '[data-tour="solution-stack"]',
     position: 'right',
     category: 'generation',
@@ -80,7 +106,7 @@ const ONBOARDING_STEPS: TourStep[] = [
   {
     id: 'synthesis-power',
     title: 'Synthesize Into Perfection',
-    description: 'Combine the best elements from multiple solutions using our AI synthesis engine. Create the optimal solution by merging different approaches.',
+    description: 'Combine the best elements from multiple solutions using our AI synthesis engine. Create the optimal solution by merging different approaches. This is a Pro feature.',
     target: '[data-tour="synthesis-button"]',
     position: 'bottom',
     category: 'collaboration',
@@ -89,15 +115,33 @@ const ONBOARDING_STEPS: TourStep[] = [
   {
     id: 'project-management',
     title: 'Save and Organize',
-    description: 'Save your solutions as projects for future reference. Build a knowledge base of AI-generated solutions you can reuse and learn from.',
+    description: 'Save your solutions as projects for future reference. Create folders (Pro feature) to organize your work. Build a knowledge base of AI-generated solutions you can reuse and learn from.',
     target: '[data-tour="save-project"]',
     position: 'left',
     category: 'projects'
   },
   {
+    id: 'navigation-features',
+    title: 'Navigation & Features',
+    description: 'Access your saved projects, analytics dashboard, team collaboration (Pro), and voice profiles. Each button provides quick access to different areas of the platform.',
+    target: '[data-tour="navigation-buttons"]',
+    position: 'bottom',
+    category: 'navigation',
+    aiInsight: 'Master navigation to unlock the full potential of the platform'
+  },
+  {
+    id: 'ai-chat',
+    title: 'Continue with AI Chat',
+    description: 'After generating solutions, you can continue the conversation with specific AI voices. Get clarifications, ask for modifications, or dive deeper into implementation details.',
+    target: '[data-tour="ai-chat"]',
+    position: 'center',
+    category: 'collaboration',
+    codingPhilosophyPrinciple: 'Dialogue and iteration lead to understanding'
+  },
+  {
     id: 'learning-path',
-    title: 'Continue Learning',
-    description: 'Access advanced onboarding paths, team collaboration features, and consciousness-based development techniques through the Learning section.',
+    title: 'Advanced Learning',
+    description: 'Access advanced onboarding paths, team collaboration features, and consciousness-based development techniques through the Learning section (Coming Soon).',
     target: '[data-tour="learning-button"]',
     position: 'bottom',
     category: 'navigation',

@@ -298,7 +298,6 @@ export const insertUserSchema = createInsertSchema(users).pick({
 });
 
 export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).pick({
-  userId: true,
   name: true,
   description: true,
   selectedPerspectives: true,
@@ -314,6 +313,15 @@ export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).pick({
   ethicalStance: true,
   perspective: true,
   role: true,
+}).extend({
+  // Security validation following AI_INSTRUCTIONS.md patterns
+  name: z.string().min(1).max(100),
+  description: z.string().max(1000).optional(),
+  selectedPerspectives: z.array(z.string()).min(1),
+  selectedRoles: z.array(z.string()).min(1),
+  specialization: z.string().max(500),
+  perspective: z.string().min(1).max(50),
+  role: z.string().min(1).max(50)
 });
 
 // Security-first validation schema following AI_INSTRUCTIONS.md

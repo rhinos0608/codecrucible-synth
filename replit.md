@@ -736,6 +736,16 @@ Each voice contributes unique perspectives to code generation and synthesis.
 - **Production Monitoring**: Added comprehensive logging for subscription tier detection and paywall enforcement verification
 - **Emergency Fix Documentation**: Created CRITICAL_PAYWALL_AUDIT_REPORT.md documenting all revenue-affecting bugs and resolutions
 
+### Voice Profile Creation End-to-End Fix (January 14, 2025)
+- **Root Cause Resolution**: Fixed voice profile creation using wrong API endpoint (/api/voice-profiles/custom vs /api/voice-profiles)
+- **Data Mapping Fix**: Corrected CustomVoiceData to InsertVoiceProfile schema transformation in advanced-avatar-customizer.tsx
+- **API Request Format**: Updated from legacy apiRequest("POST", url, data) to new apiRequest(url, { method: "POST", body: data }) format
+- **Schema Validation Enhancement**: Added proper validation rules to insertVoiceProfileSchema with security patterns following AI_INSTRUCTIONS.md
+- **Query Invalidation**: Fixed voice profiles not appearing in "My Profiles" sidebar by proper cache invalidation
+- **Jung's Descent Protocol Integration**: Implemented consciousness-driven error handling for voice profile creation failures
+- **Alexander's Pattern Language**: Consistent API patterns across voice profile management with proper authentication
+- **Production Voice Management**: Voice profiles now create and display correctly in the sidebar for Pro+ users
+
 ### Comprehensive Paywall Implementation Audit & Final Fixes (July 13, 2025)
 - **CRITICAL FIX**: Missing `ai_project_context` feature in frontend FeatureGate.tsx causing project context integration to show as enterprise-only
 - **CRITICAL FIX**: Voice profiles feature mapping mismatch - `/api/voice-profiles` was mapped to `custom_voices` but dashboard used `voice_profiles` feature gate

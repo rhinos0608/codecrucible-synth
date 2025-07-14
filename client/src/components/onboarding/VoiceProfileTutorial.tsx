@@ -71,7 +71,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 border rounded-lg">
-              <h4 className="font-medium mb-2">Personality Traits</h4>
+              <h4 className="font-medium mb-2 text-[#484a52]">Personality Traits</h4>
               <div className="space-y-2">
                 <Badge variant="outline">Analytical</Badge>
                 <Badge variant="outline">Friendly</Badge>

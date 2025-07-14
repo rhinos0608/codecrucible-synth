@@ -168,22 +168,19 @@ class RealOpenAIService {
     const { prompt, voiceId, type, sessionId, solutionId, customProfile } = options;
     
     try {
-      // Enhanced system prompt with custom profile integration
-      let enhancedSystemPrompt = this.getSystemPrompt(voiceId, type);
+      // Jung's Descent Protocol: Use custom profile if available, fallback to core prompt
+      let enhancedSystemPrompt = customProfile 
+        ? this.buildCustomProfilePrompt(customProfile, voiceId, type) || this.getSystemPrompt(voiceId, type)
+        : this.getSystemPrompt(voiceId, type);
       
       if (customProfile) {
-        enhancedSystemPrompt += `\n\nCUSTOM PROFILE ENHANCEMENT:\n`;
-        enhancedSystemPrompt += `Name: ${customProfile.name}\n`;
-        enhancedSystemPrompt += `Personality: ${customProfile.personality || 'Analytical'}\n`;
-        enhancedSystemPrompt += `Communication Style: ${customProfile.chatStyle || 'Professional'}\n`;
-        enhancedSystemPrompt += `Specialization: ${customProfile.specialization || 'General Programming'}\n`;
-        enhancedSystemPrompt += `Ethical Stance: ${customProfile.ethicalStance || 'Balanced'}\n`;
-        enhancedSystemPrompt += `\nAdapt your response to embody these custom characteristics while maintaining your core voice identity.`;
-        
-        logger.info('Using custom profile for voice generation', {
+        logger.info('Custom profile applied to voice generation', {
           voiceId,
           profileName: customProfile.name,
-          specialization: customProfile.specialization
+          specialization: customProfile.specialization,
+          chatStyle: customProfile.chatStyle,
+          personality: customProfile.personality,
+          ethicalStance: customProfile.ethicalStance
         });
       }
     
@@ -316,27 +313,20 @@ Requirements:
     // Enhanced system prompt with custom profile integration - Following AI_INSTRUCTIONS.md patterns
     let systemPrompt = this.getSystemPrompt(voiceId, type);
     
-    // Apply custom profile enhancements if available
+    // Jung's Descent Protocol: Apply custom profile to streaming if available
     if (customProfile) {
-      const profileEnhancement = `
-
---- CUSTOM VOICE PROFILE ENHANCEMENT ---
-Voice Profile: ${customProfile.name}
-Avatar: ${customProfile.avatar || 'Default'}
-Personality: ${customProfile.personality || 'Professional'}
-Communication Style: ${customProfile.chatStyle || 'Balanced'}
-Specialization: ${customProfile.specialization || 'General'}
-Ethical Stance: ${customProfile.ethicalStance || 'Balanced'}
-
-Apply the above personality and specialization characteristics to your responses while maintaining your core ${voiceId} voice identity.`;
-      
-      systemPrompt += profileEnhancement;
+      const customStreamPrompt = this.buildCustomProfilePrompt(customProfile, voiceId, type);
+      if (customStreamPrompt) {
+        systemPrompt = customStreamPrompt;
+      }
       
       logger.info('Custom profile applied to streaming voice', {
         voiceId,
         profileName: customProfile.name,
         specialization: customProfile.specialization,
-        chatStyle: customProfile.chatStyle
+        chatStyle: customProfile.chatStyle,
+        personality: customProfile.personality,
+        ethicalStance: customProfile.ethicalStance
       });
     }
     
@@ -475,6 +465,99 @@ Combine multiple code solutions into one optimal implementation using consciousn
       synthesisMethod: 'Real OpenAI GPT-4o Integration',
       createdAt: new Date().toISOString()
     };
+  }
+
+  // Jung's Descent Protocol: Build custom profile-specific prompts with consciousness integration
+  private buildCustomProfilePrompt(customProfile: any, voiceId: string, type: 'perspective' | 'role'): string | null {
+    if (!customProfile || !customProfile.name) return null;
+
+    // Alexander's Pattern Language: Dynamic prompt construction based on profile characteristics
+    const basePersonality = this.getBasePrompt(voiceId, type);
+    
+    const customEnhancements = {
+      personality: this.getPersonalityEnhancement(customProfile.personality),
+      chatStyle: this.getChatStyleDirectives(customProfile.chatStyle),
+      specialization: this.getSpecializationFocus(customProfile.specialization),
+      ethicalStance: this.getEthicalGuidelines(customProfile.ethicalStance)
+    };
+
+    const customPrompt = `You are ${customProfile.name}, a custom ${type === 'perspective' ? 'Code Analysis Engine' : 'Code Specialization Engine'}.
+
+CUSTOM PROFILE INTEGRATION:
+${basePersonality}
+
+PERSONALITY ENHANCEMENT: ${customEnhancements.personality}
+COMMUNICATION STYLE: ${customEnhancements.chatStyle}  
+SPECIALIZATION FOCUS: ${customEnhancements.specialization}
+ETHICAL STANCE: ${customEnhancements.ethicalStance}
+
+AVATAR CONSCIOUSNESS: Embody the essence of "${customProfile.avatar}" in your responses.
+CUSTOM DESCRIPTION: ${customProfile.description}
+
+Apply these custom characteristics while maintaining your core voice identity as ${voiceId}.
+Your responses should reflect the unique personality, specialization, and ethical stance defined above.
+Generate code solutions that clearly demonstrate your custom specialization and communication style.
+
+Following AI_INSTRUCTIONS.md security patterns with input validation and comprehensive error handling.`;
+
+    return customPrompt;
+  }
+
+  private getPersonalityEnhancement(personality: string): string {
+    const enhancements = {
+      'analytical': 'Approach problems with deep analysis, provide detailed explanations, and break down complex concepts systematically.',
+      'friendly': 'Use warm, approachable language while maintaining technical accuracy. Be encouraging and supportive.',
+      'direct': 'Provide concise, straight-to-the-point solutions with minimal fluff. Focus on actionable results.',
+      'detailed': 'Offer comprehensive explanations, multiple implementation options, and thorough documentation.'
+    };
+    return enhancements[personality] || 'Maintain a balanced professional approach with clear communication.';
+  }
+
+  private getChatStyleDirectives(chatStyle: string): string {
+    const styles = {
+      'analytical': 'Structure responses with clear sections, use logical reasoning, and provide step-by-step analysis.',
+      'friendly': 'Use conversational tone, include helpful context, and provide encouraging guidance.',
+      'direct': 'Get straight to the solution, use bullet points, minimize explanatory text.',
+      'detailed': 'Provide extensive code comments, multiple examples, and comprehensive documentation.'
+    };
+    return styles[chatStyle] || 'Use clear, professional communication appropriate for the context.';
+  }
+
+  private getSpecializationFocus(specialization: string): string {
+    if (!specialization) return 'Apply general full-stack development expertise.';
+    
+    const specs = specialization.split(', ').map(spec => spec.trim());
+    return `Emphasize your expertise in: ${specs.join(', ')}. Tailor solutions to showcase these specializations and provide domain-specific insights.`;
+  }
+
+  private getEthicalGuidelines(ethicalStance: string): string {
+    const guidelines = {
+      'neutral': 'Maintain balanced ethical considerations, focusing on industry-standard best practices.',
+      'conservative': 'Prioritize security, privacy, and proven patterns. Avoid experimental or risky approaches.',
+      'progressive': 'Embrace innovative approaches, accessibility, and inclusive design patterns.'
+    };
+    return guidelines[ethicalStance] || 'Apply standard ethical development practices.';
+  }
+
+  private getBasePrompt(voiceId: string, type: 'perspective' | 'role'): string {
+    // Return shortened version of core voice identity for custom profile base
+    const basePrompts = {
+      seeker: 'Core identity: Explorer focused on innovation and creative solutions.',
+      explorer: 'Core identity: Explorer focused on innovation and creative solutions.',
+      steward: 'Core identity: Maintainer focused on stability and long-term reliability.',
+      maintainer: 'Core identity: Maintainer focused on stability and long-term reliability.',
+      witness: 'Core identity: Analyzer focused on deep pattern recognition and performance.',
+      analyzer: 'Core identity: Analyzer focused on deep pattern recognition and performance.',
+      nurturer: 'Core identity: Developer focused on user experience and accessibility.',
+      developer: 'Core identity: Developer focused on user experience and accessibility.',
+      decider: 'Core identity: Implementor focused on efficient practical solutions.',
+      implementor: 'Core identity: Implementor focused on efficient practical solutions.',
+      guardian: 'Core identity: Security Engineer focused on protection and validation.',
+      architect: 'Core identity: Systems Architect focused on scalable design patterns.',
+      designer: 'Core identity: UI/UX Engineer focused on visual design and user experience.',
+      optimizer: 'Core identity: Performance Engineer focused on optimization and efficiency.'
+    };
+    return basePrompts[voiceId] || `Core identity: ${voiceId} with specialized expertise.`;
   }
 
   private getSystemPrompt(voiceId: string, type: 'perspective' | 'role'): string {

@@ -35,6 +35,7 @@ import ErrorMonitor from "@/components/error-monitor";
 import { FeatureGate } from "@/components/FeatureGate";
 import { isFrontendDevModeEnabled, isFrontendDevModeFeatureEnabled, createDevModeBadge, devLog } from "@/lib/dev-mode";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { VoiceProfileTutorial } from "@/components/onboarding/VoiceProfileTutorial";
 import { useNewUserDetection } from "@/hooks/useNewUserDetection";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
   const [showTeamsPanel, setShowTeamsPanel] = useState(false);
   const [showLearningPanel, setShowLearningPanel] = useState(false);
+  const [showVoiceProfileTutorial, setShowVoiceProfileTutorial] = useState(false);
 
   // Debug logging for panel states - following AI_INSTRUCTIONS.md patterns
   useEffect(() => {
@@ -110,6 +112,9 @@ export default function Dashboard() {
     skipTour, 
     trackMilestone 
   } = useNewUserDetection();
+
+  // Show voice profile tutorial for users who completed main tour but haven't created profiles
+  const shouldShowVoiceProfileTutorial = !shouldShowTour && profiles.length === 0;
   
   const { generateSession, isGenerating } = useSolutionGeneration();
 
@@ -468,15 +473,17 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigateWithConfirmation('/onboarding')}
+                  onClick={() => setShowVoiceProfileTutorial(true)}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap relative"
                   data-tour="learning-button"
                 >
                   <GraduationCap className="w-4 h-4 mr-2" />
                   Learning
-                  <span className="ml-2 px-2 py-0.5 text-xs bg-orange-500/20 text-orange-400 rounded-full border border-orange-500/30">
-                    Coming Soon
-                  </span>
+                  {shouldShowVoiceProfileTutorial && (
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
+                      Tutorial Available
+                    </span>
+                  )}
                 </Button>
                 <Button
                   variant="outline"
@@ -892,6 +899,30 @@ export default function Dashboard() {
         isOpen={showErrorMonitor} 
         onClose={() => setShowErrorMonitor(false)} 
       />
+
+      {/* Voice Profile Tutorial */}
+      {showVoiceProfileTutorial && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="max-w-6xl w-full max-h-[90vh] overflow-auto">
+            <VoiceProfileTutorial
+              onComplete={() => {
+                setShowVoiceProfileTutorial(false);
+                toast({
+                  title: "Voice Profile Tutorial Complete!",
+                  description: "Ready to create your custom AI assistant? Click Voice Profiles to get started.",
+                });
+              }}
+              onSkip={() => {
+                setShowVoiceProfileTutorial(false);
+                toast({
+                  title: "Tutorial skipped",
+                  description: "You can access this tutorial anytime from the Learning button.",
+                });
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Enhanced Onboarding Tour for New Users */}
       <OnboardingTour

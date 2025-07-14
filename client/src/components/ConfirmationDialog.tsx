@@ -106,7 +106,7 @@ export function ConfirmationDialog({
         {/* Context Information - Following CodingPhilosophy.md consciousness principles */}
         {context && (
           <div className={`p-4 rounded-lg border ${getTypeColors()}`}>
-            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-[#484a52]">
               <Brain className="w-4 h-4" />
               Impact Assessment
             </h4>

@@ -281,7 +281,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
             <div className="flex items-center space-x-3">
               <IconComponent className="w-8 h-8 text-blue-600" />
               <div>
-                <CardTitle className="text-xl">{currentStepData.title}</CardTitle>
+                <CardTitle className="text-xl text-[#393b42]">{currentStepData.title}</CardTitle>
                 <CardDescription>{currentStepData.description}</CardDescription>
               </div>
             </div>

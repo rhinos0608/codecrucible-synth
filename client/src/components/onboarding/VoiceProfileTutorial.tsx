@@ -182,7 +182,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
                   <span className="text-sm">3</span>
                 </div>
                 <div>
-                  <p className="font-medium">Enhanced Generation</p>
+                  <p className="font-medium text-[#393b42]">Enhanced Generation</p>
                   <p className="text-sm text-gray-800 dark:text-gray-100">
                     AI generates with your custom characteristics
                   </p>

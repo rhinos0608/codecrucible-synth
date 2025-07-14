@@ -73,19 +73,19 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
             <div className="p-4 border rounded-lg">
               <h4 className="font-medium mb-2 text-[#484a52]">Personality Traits</h4>
               <div className="space-y-2">
-                <Badge variant="outline">Analytical</Badge>
-                <Badge variant="outline">Friendly</Badge>
-                <Badge variant="outline">Direct</Badge>
-                <Badge variant="outline">Detailed</Badge>
+                <Badge variant="outline" className="text-[#484a52]">Analytical</Badge>
+                <Badge variant="outline" className="text-[#484a52]">Friendly</Badge>
+                <Badge variant="outline" className="text-[#484a52]">Direct</Badge>
+                <Badge variant="outline" className="text-[#484a52]">Detailed</Badge>
               </div>
             </div>
             <div className="p-4 border rounded-lg">
-              <h4 className="font-medium mb-2">Communication Styles</h4>
+              <h4 className="font-medium mb-2 text-[#484a52]">Communication Styles</h4>
               <div className="space-y-2">
-                <Badge variant="outline">Step-by-step</Badge>
-                <Badge variant="outline">Conversational</Badge>
-                <Badge variant="outline">Bullet points</Badge>
-                <Badge variant="outline">Comprehensive</Badge>
+                <Badge variant="outline" className="text-[#484a52]">Step-by-step</Badge>
+                <Badge variant="outline" className="text-[#484a52]">Conversational</Badge>
+                <Badge variant="outline" className="text-[#484a52]">Bullet points</Badge>
+                <Badge variant="outline" className="text-[#484a52]">Comprehensive</Badge>
               </div>
             </div>
           </div>
@@ -285,7 +285,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
                 <CardDescription>{currentStepData.description}</CardDescription>
               </div>
             </div>
-            <Badge variant="outline">
+            <Badge variant="outline" className="text-[#484a52]">
               Step {currentStep + 1} of {tutorialSteps.length}
             </Badge>
           </div>

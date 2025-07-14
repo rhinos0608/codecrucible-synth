@@ -160,7 +160,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
                   <span className="text-sm">1</span>
                 </div>
                 <div>
-                  <p className="font-medium">Select Core Voices</p>
+                  <p className="font-medium text-[#484a52]">Select Core Voices</p>
                   <p className="text-sm text-gray-800 dark:text-gray-100">
                     Choose Explorer, Maintainer, Analyzer, etc.
                   </p>

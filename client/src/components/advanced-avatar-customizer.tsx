@@ -39,10 +39,13 @@ interface VoiceTestResult {
 }
 
 interface AdvancedAvatarCustomizerProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (voiceData: CustomVoiceData) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onSave?: (voiceData: CustomVoiceData) => void;
+  onSuccess?: () => void;
   editingProfile?: any;
+  initialData?: any;
+  mode?: 'create' | 'edit';
 }
 
 const SPECIALIZATION_OPTIONS = [
@@ -119,20 +122,42 @@ export function AdvancedAvatarCustomizer({
   isOpen, 
   onClose, 
   onSave, 
-  editingProfile 
+  onSuccess,
+  editingProfile,
+  initialData,
+  mode = 'create'
 }: AdvancedAvatarCustomizerProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
-  const [voiceData, setVoiceData] = useState<CustomVoiceData>({
-    name: '',
-    description: '',
-    personality: '',
-    specialization: [],
-    chatStyle: 'analytical',
-    ethicalStance: 'neutral',
-    perspective: 'Explorer',
-    role: 'Full-Stack Developer',
-    avatar: 'professional',
-    isPublic: false
+  const [voiceData, setVoiceData] = useState<CustomVoiceData>(() => {
+    if (mode === 'edit' && (initialData || editingProfile)) {
+      const profile = initialData || editingProfile;
+      return {
+        name: profile.name || '',
+        description: profile.description || '',
+        personality: profile.personality || '',
+        specialization: Array.isArray(profile.specialization) 
+          ? profile.specialization 
+          : profile.specialization?.split(', ') || [],
+        chatStyle: profile.chatStyle || 'analytical',
+        ethicalStance: profile.ethicalStance || 'neutral',
+        perspective: profile.perspective || 'Explorer',
+        role: profile.role || 'Full-Stack Developer',
+        avatar: profile.avatar || 'professional',
+        isPublic: profile.isPublic || false
+      };
+    }
+    return {
+      name: '',
+      description: '',
+      personality: '',
+      specialization: [],
+      chatStyle: 'analytical',
+      ethicalStance: 'neutral',
+      perspective: 'Explorer',
+      role: 'Full-Stack Developer',
+      avatar: 'professional',
+      isPublic: false
+    };
   });
 
   const [testResults, setTestResults] = useState<VoiceTestResult | null>(null);
@@ -183,22 +208,29 @@ export function AdvancedAvatarCustomizer({
         role: customVoiceData.role
       };
       
-      const response = await apiRequest("/api/voice-profiles", {
-        method: "POST",
+      const endpoint = mode === 'edit' && (initialData?.id || editingProfile?.id) 
+        ? `/api/voice-profiles/${initialData?.id || editingProfile?.id}`
+        : "/api/voice-profiles";
+      
+      const response = await apiRequest(endpoint, {
+        method: mode === 'edit' ? "PATCH" : "POST",
         body: profileData
       });
       
-      console.log('✅ Voice profile created:', response);
+      console.log(`✅ Voice profile ${mode === 'edit' ? 'updated' : 'created'}:`, response);
       return response;
     },
     onSuccess: (data) => {
       toast({
-        title: "Voice Profile Created",
-        description: `${data.name} has been successfully created and added to your profiles.`
+        title: mode === 'edit' ? "Voice Profile Updated" : "Voice Profile Created",
+        description: mode === 'edit' 
+          ? `${data.name} has been successfully updated.`
+          : `${data.name} has been successfully created and added to your profiles.`
       });
       queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });
-      onSave(voiceData);
-      onClose();
+      if (onSave) onSave(voiceData);
+      if (onSuccess) onSuccess();
+      if (onClose) onClose();
     },
     onError: (error: any) => {
       console.error('❌ Voice profile creation failed:', error);

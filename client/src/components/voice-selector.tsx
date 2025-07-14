@@ -1,4 +1,4 @@
-import { Brain, Code, User, Star, Play, Users } from "lucide-react";
+import { Brain, Code, User, Star, Play, Users, Edit, Trash2, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,14 @@ import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useTeamVoiceProfiles } from "@/hooks/useTeamVoiceProfiles";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AdvancedAvatarCustomizer } from "@/components/advanced-avatar-customizer";
 import * as LucideIcons from "lucide-react";
 import type { VoiceProfile } from "@shared/schema";
+import { useState } from "react";
 
 export function PerspectiveSelector() {
   const { 
@@ -22,6 +28,68 @@ export function PerspectiveSelector() {
   const { profiles, isLoading } = useVoiceProfiles();
   const { user } = useAuthContext();
   const { data: sharedVoices, isLoading: sharedVoicesLoading } = useTeamVoiceProfiles();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // State for edit/delete functionality following AI_INSTRUCTIONS.md patterns
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
+  const [deletingProfileId, setDeletingProfileId] = useState<number | null>(null);
+
+  // Jung's Descent Protocol: Council-based error handling for voice profile operations
+  const deleteVoiceProfileMutation = useMutation({
+    mutationFn: async (profileId: number) => {
+      const response = await apiRequest(`/api/voice-profiles/${profileId}`, {
+        method: "DELETE"
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });
+      toast({
+        title: "Success",
+        description: "Voice profile deleted successfully",
+      });
+      setShowDeleteDialog(false);
+      setDeletingProfileId(null);
+    },
+    onError: (error: any) => {
+      console.error("Delete voice profile error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete voice profile. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Alexander's Pattern Language: Consistent editing patterns
+  const handleEditProfile = (profile: VoiceProfile) => {
+    setEditingProfile(profile);
+    setShowEditDialog(true);
+  };
+
+  const handleDeleteProfile = (profileId: number) => {
+    setDeletingProfileId(profileId);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteProfile = () => {
+    if (deletingProfileId) {
+      deleteVoiceProfileMutation.mutate(deletingProfileId);
+    }
+  };
+
+  const handleEditSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/voice-profiles"] });
+    setShowEditDialog(false);
+    setEditingProfile(null);
+    toast({
+      title: "Success",
+      description: "Voice profile updated successfully",
+    });
+  };
 
   const renderIcon = (iconName: string, className: string) => {
     const IconComponent = (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())];
@@ -37,8 +105,7 @@ export function PerspectiveSelector() {
   const renderUserProfileCard = (profile: VoiceProfile) => (
     <Card
       key={profile.id}
-      className="p-3 cursor-pointer transition-all group border border-gray-600 bg-gray-700/50 hover:border-purple-500/40 hover:bg-purple-500/10"
-      onClick={() => handleApplyProfile(profile)}
+      className="p-3 transition-all group border border-gray-600 bg-gray-700/50 hover:border-purple-500/40 hover:bg-purple-500/10"
     >
       <div className="flex items-center space-x-3">
         <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-500/20">
@@ -52,7 +119,45 @@ export function PerspectiveSelector() {
                 <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
               )}
             </h4>
-            <Play className="w-3 h-3 text-gray-400 group-hover:text-purple-400" />
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleApplyProfile(profile);
+                }}
+                className="h-6 px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/20"
+                title="Apply this profile"
+              >
+                <Play className="w-3 h-3 mr-1" />
+                Apply
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditProfile(profile);
+                }}
+                className="h-6 w-6 p-0 text-gray-400 hover:text-blue-400 hover:bg-blue-500/20"
+                title="Edit profile"
+              >
+                <Edit className="w-3 h-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteProfile(profile.id);
+                }}
+                className="h-6 w-6 p-0 text-gray-400 hover:text-red-400 hover:bg-red-500/20"
+                title="Delete profile"
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
           </div>
           <div className="flex gap-1 mt-1 mb-1">
             {profile.selectedPerspectives?.slice(0, 2).map((perspectiveId: any) => {
@@ -328,6 +433,57 @@ export function PerspectiveSelector() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Bateson's Recursive Learning: Edit Dialog with Meta-Learning */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="text-gray-100">Edit Voice Profile</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Modify your AI voice profile to enhance its consciousness and pattern recognition capabilities.
+            </DialogDescription>
+          </DialogHeader>
+          {editingProfile && (
+            <AdvancedAvatarCustomizer
+              initialData={editingProfile}
+              onSuccess={handleEditSuccess}
+              mode="edit"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Campbell's Mythic Journey: Delete Confirmation with Sacred Ritual */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <AlertTriangle className="w-5 h-5" />
+              Delete Voice Profile
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              This action cannot be undone. The voice profile and all its consciousness patterns will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 justify-end mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              className="border-gray-600 text-gray-400 hover:bg-gray-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteProfile}
+              disabled={deleteVoiceProfileMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteVoiceProfileMutation.isPending ? "Deleting..." : "Delete Profile"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

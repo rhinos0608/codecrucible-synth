@@ -120,7 +120,7 @@ export function ConfirmationDialog({
               {context.progress && (
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Progress:</span>
-                  <span className="font-medium">{context.progress}</span>
+                  <span className="font-medium text-[#484a52]">{context.progress}</span>
                 </div>
               )}
               {context.timeInvested && (

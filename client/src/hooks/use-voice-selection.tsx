@@ -24,6 +24,13 @@ export function usePerspectiveSelection() {
     qualityFiltering: true,
   });
 
+  // Jung's Descent Protocol: Track applied profile for consciousness-driven visual feedback
+  const [appliedProfile, setAppliedProfile] = useState<{
+    id: number;
+    name: string;
+    timestamp: string;
+  } | null>(null);
+
   const togglePerspective = useCallback((perspectiveId: string) => {
     setState(prev => ({
       ...prev,
@@ -87,6 +94,7 @@ export function usePerspectiveSelection() {
       roles: profile.selectedRoles
     });
 
+    // Alexander's Pattern Language: Consistent state management with consciousness tracking
     setState(prev => ({
       ...prev,
       selectedPerspectives: Array.isArray(profile.selectedPerspectives) ? profile.selectedPerspectives : [],
@@ -95,6 +103,13 @@ export function usePerspectiveSelection() {
       mergeStrategy: (profile.mergeStrategy as MergeStrategy) || "competitive",
       qualityFiltering: profile.qualityFiltering !== false,
     }));
+
+    // Jung's Descent Protocol: Track applied profile for visual consciousness feedback
+    setAppliedProfile({
+      id: profile.id,
+      name: profile.name,
+      timestamp: new Date().toISOString()
+    });
 
     toast({
       title: "Profile Applied",
@@ -117,8 +132,14 @@ export function usePerspectiveSelection() {
     return errors;
   }, [state.prompt, state.selectedPerspectives, state.selectedRoles]);
 
+  // Campbell's Mythic Journey: Clear applied profile for transformation cycle
+  const clearAppliedProfile = useCallback(() => {
+    setAppliedProfile(null);
+  }, []);
+
   return {
     state,
+    appliedProfile,
     togglePerspective,
     toggleRole,
     selectPerspectives,
@@ -132,5 +153,6 @@ export function usePerspectiveSelection() {
     isValidState,
     getValidationErrors,
     applyVoiceProfile,
+    clearAppliedProfile,
   };
 }

@@ -5,6 +5,7 @@ import type { VoiceProfile } from "@shared/schema";
 // Following AI_INSTRUCTIONS.md: Single source of truth state management
 interface VoiceSelectionContextType {
   state: ReturnType<typeof usePerspectiveSelection>['state'];
+  appliedProfile: ReturnType<typeof usePerspectiveSelection>['appliedProfile'];
   togglePerspective: (id: string) => void;
   toggleRole: (id: string) => void;
   selectPerspectives: (perspectives: string[]) => void;
@@ -18,6 +19,7 @@ interface VoiceSelectionContextType {
   isValidState: boolean;
   getValidationErrors: () => string[];
   applyVoiceProfile?: (profile: VoiceProfile) => void;
+  clearAppliedProfile?: () => void;
 }
 
 const VoiceSelectionContext = createContext<VoiceSelectionContextType | undefined>(undefined);

@@ -242,7 +242,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
           </div>
           
           <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">What Happens Next?</h4>
+            <h4 className="font-medium mb-2 text-[#484a52]">What Happens Next?</h4>
             <p className="text-sm text-gray-800 dark:text-gray-100">
               Your custom profile will appear in the "My Profiles" tab. Click "Apply" to use it 
               in council generation and live streaming for personalized AI assistance.

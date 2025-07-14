@@ -419,7 +419,7 @@ export function AdvancedAvatarCustomizer({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto z-40">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Brain className="w-5 h-5 text-purple-500" />
@@ -536,9 +536,9 @@ export function AdvancedAvatarCustomizer({
                           <SelectTrigger className="bg-gray-50 dark:bg-gray-800">
                             <SelectValue placeholder="Choose from examples or enter custom name" />
                           </SelectTrigger>
-                          <SelectContent className="bg-white dark:bg-gray-800">
+                          <SelectContent className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" style={{ zIndex: 9999 }}>
                             {ENGINE_NAME_EXAMPLES.map((name, index) => (
-                              <SelectItem key={index} value={name} className="dark:text-gray-100">
+                              <SelectItem key={index} value={name} className="dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
                                 {name}
                               </SelectItem>
                             ))}
@@ -560,12 +560,12 @@ export function AdvancedAvatarCustomizer({
                         value={voiceData.avatar} 
                         onValueChange={(value) => setVoiceData(prev => ({ ...prev, avatar: value }))}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
+                        <SelectTrigger className="bg-gray-50 dark:bg-gray-800">
+                          <SelectValue placeholder="Select avatar theme" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" style={{ zIndex: 9999 }}>
                           {AVATAR_THEMES.map(theme => (
-                            <SelectItem key={theme} value={theme}>
+                            <SelectItem key={theme} value={theme} className="dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
                               {theme.charAt(0).toUpperCase() + theme.slice(1)}
                             </SelectItem>
                           ))}
@@ -588,17 +588,17 @@ export function AdvancedAvatarCustomizer({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="perspective">Base Perspective</Label>
+                      <Label htmlFor="perspective">Archetype Perspective</Label>
                       <Select 
                         value={voiceData.perspective} 
                         onValueChange={(value) => setVoiceData(prev => ({ ...prev, perspective: value }))}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
+                        <SelectTrigger className="bg-gray-50 dark:bg-gray-800">
+                          <SelectValue placeholder="Select perspective" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" style={{ zIndex: 9999 }}>
                           {PERSPECTIVE_OPTIONS.map(perspective => (
-                            <SelectItem key={perspective} value={perspective}>
+                            <SelectItem key={perspective} value={perspective} className="dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
                               {perspective}
                             </SelectItem>
                           ))}
@@ -606,17 +606,17 @@ export function AdvancedAvatarCustomizer({
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="role">Specialist Role</Label>
+                      <Label htmlFor="role">Coding Role</Label>
                       <Select 
                         value={voiceData.role} 
                         onValueChange={(value) => setVoiceData(prev => ({ ...prev, role: value }))}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
+                        <SelectTrigger className="bg-gray-50 dark:bg-gray-800">
+                          <SelectValue placeholder="Select role" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" style={{ zIndex: 9999 }}>
                           {ROLE_OPTIONS.map(role => (
-                            <SelectItem key={role} value={role}>
+                            <SelectItem key={role} value={role} className="dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
                               {role}
                             </SelectItem>
                           ))}
@@ -650,9 +650,9 @@ export function AdvancedAvatarCustomizer({
                       <SelectTrigger className="bg-gray-50 dark:bg-gray-800">
                         <SelectValue placeholder="Choose from predefined specializations" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-gray-800">
+                      <SelectContent className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" style={{ zIndex: 9999 }}>
                         {SPECIALIZATION_EXAMPLES.map((spec, index) => (
-                          <SelectItem key={index} value={spec} className="dark:text-gray-100">
+                          <SelectItem key={index} value={spec} className="dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700">
                             {spec}
                           </SelectItem>
                         ))}

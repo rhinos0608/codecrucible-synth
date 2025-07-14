@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2, Target, X } from "lucide-react";
+import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2, Target, X, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -444,19 +444,21 @@ export default function Dashboard() {
       <div className="dashboard-container min-h-screen flex bg-gray-900 text-gray-100 main-content overflow-hidden">
       {/* Main Chat Interface */}
       <div className="dashboard-main flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
-        <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        {/* Header - Mobile Optimized */}
+        <header className="bg-gray-800 border-b border-gray-700 px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between min-w-0">
-            <div className="flex items-center space-x-3 flex-shrink-0">
-              <Terminal className="w-6 h-6 text-blue-400" />
-              <div>
-                <h1 className="text-xl font-semibold">Code Crucible
-</h1>
-                <p className="text-sm text-gray-400">Multi-Voice AI Coding Assistant</p>
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+              <Terminal className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+              <div className="hidden sm:block">
+                <h1 className="text-lg sm:text-xl font-semibold">Code Crucible</h1>
+                <p className="text-xs sm:text-sm text-gray-400">Multi-Voice AI Coding Assistant</p>
+              </div>
+              <div className="block sm:hidden">
+                <h1 className="text-base font-semibold">Crucible</h1>
               </div>
             </div>
-            <div className="flex items-center space-x-2 overflow-x-auto flex-shrink-0 min-w-0 nav-scroll-container">
-              <div className="flex items-center space-x-2 whitespace-nowrap min-w-max pr-4">
+            <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto flex-shrink-0 min-w-0 nav-scroll-container">
+              <div className="flex items-center space-x-1 sm:space-x-2 whitespace-nowrap min-w-max pr-2 sm:pr-4">
                 <FeatureGate feature="voice_profiles" fallback={
                   <Button
                     variant="outline"
@@ -464,9 +466,10 @@ export default function Dashboard() {
                     onClick={() => setShowUpgradeModal(true)}
                     className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   >
-                    <User className="w-4 h-4 mr-2" />
-                    <Crown className="w-3 h-3 mr-1" />
-                    Voice Profiles (Pro)
+                    <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    <Crown className="w-2 h-2 sm:w-3 sm:h-3 mr-0.5 sm:mr-1" />
+                    <span className="hidden sm:inline">Voice Profiles (Pro)</span>
+                    <span className="sm:hidden">Voices</span>
                   </Button>
                 }>
                   <Button
@@ -475,8 +478,9 @@ export default function Dashboard() {
                     onClick={() => setShowAvatarCustomizer(true)}
                     className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   >
-                    <User className="w-4 h-4 mr-2" />
-                    Voice Profiles
+                    <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Voice Profiles</span>
+                    <span className="sm:hidden">Voices</span>
                   </Button>
                 </FeatureGate>
                 <Button
@@ -488,8 +492,9 @@ export default function Dashboard() {
                   }}
                   className="text-gray-400 hover:text-blue-400 border-gray-600/50 hover:border-blue-500/50 hover:bg-blue-500/10 whitespace-nowrap transition-all duration-200"
                 >
-                  <FolderOpen className="w-4 h-4 mr-2" />
-                  Projects
+                  <FolderOpen className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Projects</span>
+                  <span className="sm:hidden">Files</span>
                 </Button>
 
                 <Button
@@ -499,10 +504,11 @@ export default function Dashboard() {
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap relative"
                   data-tour="learning-button"
                 >
-                  <GraduationCap className="w-4 h-4 mr-2" />
-                  Learning
+                  <GraduationCap className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Learning</span>
+                  <span className="sm:hidden">Learn</span>
                   {shouldShowVoiceProfileTutorial && (
-                    <span className="ml-2 px-2 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
+                    <span className="ml-1 sm:ml-2 px-1 sm:px-2 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30 hidden sm:inline">
                       Tutorial Available
                     </span>
                   )}
@@ -516,9 +522,20 @@ export default function Dashboard() {
                   }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                 >
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  Analytics
+                  <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Analytics</span>
+                  <span className="sm:hidden">Stats</span>
                 </Button>
+                {/* Mobile Menu Toggle */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRightPanel(!showRightPanel)}
+                  className="md:hidden text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500"
+                >
+                  <Menu className="w-4 h-4" />
+                </Button>
+                
                 <Button
                   variant="outline"
                   size="sm"
@@ -575,8 +592,8 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col p-6 space-y-6">
+        {/* Chat Area - Mobile Optimized */}
+        <div className="flex-1 flex flex-col p-3 sm:p-6 space-y-4 sm:space-y-6">
 
           {/* Project Context */}
           {projectContext && (
@@ -620,7 +637,7 @@ export default function Dashboard() {
                 {isFrontendDevModeEnabled() ? 'DEV 🔧' : 'Suggestions'}
               </Badge>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
                 {
                   category: "React Components",
@@ -656,13 +673,13 @@ export default function Dashboard() {
                 <button
                   key={index}
                   onClick={() => handlePromptChange(suggestion.prompt)}
-                  className="group p-3 text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 hover:border-gray-600 rounded-lg transition-all duration-200 hover:scale-[1.02]"
+                  className="group p-2 sm:p-3 text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 hover:border-gray-600 rounded-lg transition-all duration-200 hover:scale-[1.02]"
                 >
                   <div className="flex items-start gap-2">
-                    <span className="text-lg">{suggestion.icon}</span>
+                    <span className="text-base sm:text-lg">{suggestion.icon}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-gray-400 font-medium mb-1">{suggestion.category}</div>
-                      <div className="text-sm text-gray-200 group-hover:text-white line-clamp-2 leading-relaxed">
+                      <div className="text-xs sm:text-sm text-gray-200 group-hover:text-white line-clamp-2 leading-relaxed">
                         {suggestion.prompt}
                       </div>
                     </div>
@@ -702,12 +719,12 @@ export default function Dashboard() {
               )}
             </div>
             <Card className="bg-gray-800 border-gray-700">
-              <div className="p-4">
+              <div className="p-3 sm:p-4">
                 <Textarea
                   placeholder="Describe what you want to build or the problem you need to solve..."
                   value={state.prompt}
                   onChange={(e) => handlePromptChange(e.target.value)}
-                  className="min-h-[120px] bg-transparent border-none resize-none text-gray-100 placeholder-gray-500 focus:ring-0"
+                  className="min-h-[100px] sm:min-h-[120px] bg-transparent border-none resize-none text-gray-100 placeholder-gray-500 focus:ring-0 text-sm sm:text-base"
                   data-tour="prompt-textarea"
                 />
                 {isAnalyzing && (
@@ -735,25 +752,27 @@ export default function Dashboard() {
                 <div className="text-sm text-gray-400">
                   {state.prompt.length > 0 ? `${state.prompt.length} characters` : "Start typing your request..."}
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <Button
                     onClick={handleGenerateSolutions}
                     disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-3 px-4"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 text-sm sm:text-base"
                     data-tour="generate-button"
                   >
                     {isGenerating ? (
                       <>
-                        <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
-                        <span className="font-medium">Council Generation...</span>
+                        <Loader2 className="w-4 sm:w-5 h-4 sm:h-5 animate-spin flex-shrink-0" />
+                        <span className="font-medium hidden sm:inline">Council Generation...</span>
+                        <span className="font-medium sm:hidden">Generating...</span>
                       </>
                     ) : (
                       <>
-                        <Brain className="w-5 h-5 flex-shrink-0" />
-                        <span className="font-medium">Council Generation</span>
+                        <Brain className="w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0" />
+                        <span className="font-medium hidden sm:inline">Council Generation</span>
+                        <span className="font-medium sm:hidden">Council</span>
                       </>
                     )}
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs font-medium">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs font-medium hidden sm:inline-flex">
                       {planGuard.planTier === 'free' ? `${planGuard.quotaUsed}/${planGuard.quotaLimit}` : 'UNLIMITED'}
                     </Badge>
                   </Button>
@@ -768,15 +787,16 @@ export default function Dashboard() {
                       setShowChatGPTGeneration(true);
                     }}
                     disabled={!state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-3 px-4"
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 text-sm sm:text-base"
                   >
-                    <Brain className="w-5 h-5 flex-shrink-0" />
-                    <span className="font-medium">Live Streaming</span>
-                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs font-medium">
+                    <Brain className="w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0" />
+                    <span className="font-medium hidden sm:inline">Live Streaming</span>
+                    <span className="font-medium sm:hidden">Streaming</span>
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs font-medium hidden sm:inline-flex">
                       REAL-TIME
                     </Badge>
                     {isFrontendDevModeFeatureEnabled('showDevBadges') && (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs font-medium">
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs font-medium hidden sm:inline-flex">
                         {createDevModeBadge()}
                       </Badge>
                     )}
@@ -819,23 +839,40 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Right Panel */}
+      {/* Right Panel - Mobile Optimized */}
       {showRightPanel && (
-        <div className="dashboard-right-panel w-80 lg:w-96 xl:w-[400px] min-w-[320px] max-w-[480px] bg-gray-800 border-l border-gray-700 flex flex-col flex-shrink-0">
-          <div className="p-4 border-b border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-100">Configuration</h2>
-            <p className="text-sm text-gray-400">Select code engines and configure generation settings</p>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {/* Subscription Status */}
-            <div className="p-4">
-              <SubscriptionStatus onUpgrade={() => setShowUpgradeModal(true)} />
+        <>
+          {/* Mobile Overlay */}
+          <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setShowRightPanel(false)} />
+          
+          <div className={`dashboard-right-panel w-80 lg:w-96 xl:w-[400px] min-w-[320px] max-w-[480px] bg-gray-800 border-l border-gray-700 flex flex-col flex-shrink-0 ${showRightPanel ? 'show' : ''}`}>
+            <div className="p-3 sm:p-4 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base sm:text-lg font-semibold text-gray-100">Configuration</h2>
+                  <p className="text-xs sm:text-sm text-gray-400">Select code engines and configure generation settings</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowRightPanel(false)}
+                  className="md:hidden text-gray-400 hover:text-gray-200"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
-            <div className="border-t border-gray-700" data-tour="voice-selector">
-              <PerspectiveSelector />
+            <div className="flex-1 overflow-y-auto">
+              {/* Subscription Status */}
+              <div className="p-3 sm:p-4">
+                <SubscriptionStatus onUpgrade={() => setShowUpgradeModal(true)} />
+              </div>
+              <div className="border-t border-gray-700" data-tour="voice-selector">
+                <PerspectiveSelector />
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Modals */}

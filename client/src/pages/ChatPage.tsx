@@ -117,42 +117,43 @@ export function ChatPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      {/* Header - Mobile Optimized */}
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setLocation("/dashboard")}
-              className="text-gray-600 dark:text-gray-400"
+              className="text-gray-600 dark:text-gray-400 flex-shrink-0"
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <div className="flex items-center gap-2">
-              {voiceIcon}
-              <div>
-                <h1 className="font-semibold text-gray-900 dark:text-gray-100">
-                  Chat with {voiceName}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex-shrink-0">{voiceIcon}</div>
+              <div className="min-w-0 flex-1">
+                <h1 className="font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base truncate">
+                  <span className="hidden sm:inline">Chat with </span>{voiceName}
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
                   Technical discussion and code assistance
                 </p>
               </div>
             </div>
           </div>
-          <Badge variant="secondary" className="gap-1">
+          <Badge variant="secondary" className="gap-1 flex-shrink-0">
             <Sparkles className="w-3 h-3" />
-            AI-Powered
+            <span className="hidden sm:inline">AI-Powered</span>
+            <span className="sm:hidden">AI</span>
           </Badge>
         </div>
       </header>
 
-      {/* Main Chat Area */}
+      {/* Main Chat Area - Mobile Optimized */}
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
         {/* Messages */}
-        <ScrollArea className="flex-1 px-4 py-6">
-          <div className="space-y-6">
+        <ScrollArea className="flex-1 px-3 sm:px-4 py-4 sm:py-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Welcome Message */}
             {messages.length === 0 && (
               <div className="text-center py-12">
@@ -183,13 +184,13 @@ export function ChatPage() {
                 )}
                 
                 <div
-                  className={`max-w-[70%] rounded-lg px-4 py-3 ${
+                  className={`max-w-[85%] sm:max-w-[70%] rounded-lg px-3 sm:px-4 py-2 sm:py-3 ${
                     message.role === 'user'
                       ? 'bg-blue-600 text-white'
                       : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
                   }`}
                 >
-                  <div className="text-sm whitespace-pre-wrap">
+                  <div className="text-sm whitespace-pre-wrap break-words">
                     {message.content}
                   </div>
                   <div className="text-xs opacity-70 mt-2">
@@ -225,17 +226,17 @@ export function ChatPage() {
           </div>
         </ScrollArea>
 
-        {/* Input Area */}
-        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <div className="flex gap-3">
+        {/* Input Area - Mobile Optimized */}
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4">
+          <div className="flex gap-2 sm:gap-3">
             <div className="flex-1 relative">
               <Input
                 ref={inputRef}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
-                placeholder="Ask about implementation details, improvements, or technical questions..."
-                className="pr-12"
+                placeholder="Ask about implementation details, improvements..."
+                className="pr-12 text-sm sm:text-base"
                 disabled={sendMessageMutation.isPending || isTyping}
               />
             </div>
@@ -243,7 +244,7 @@ export function ChatPage() {
               onClick={handleSendMessage}
               disabled={!message.trim() || sendMessageMutation.isPending || isTyping}
               size="icon"
-              className="shrink-0"
+              className="shrink-0 h-10 w-10 sm:h-9 sm:w-9"
             >
               {sendMessageMutation.isPending ? (
                 <Brain className="w-4 h-4 animate-spin" />
@@ -252,8 +253,11 @@ export function ChatPage() {
               )}
             </Button>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center hidden sm:block">
             Press Enter to send, Shift+Enter for new line
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center sm:hidden">
+            Tap send or press Enter
           </p>
         </div>
       </div>

@@ -25,7 +25,7 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
           </div>
           <div>
             <h1 className="text-lg font-bold">Arkane Technologies</h1>
-            <p className="text-xs text-gray-400">Multi-Voice AI Platform</p>
+            <p className="text-xs text-gray-200">Multi-Voice AI Platform</p>
           </div>
         </div>
       </div>
@@ -78,15 +78,15 @@ export function Sidebar({ activeView, onViewChange, onLedgerOpen }: SidebarProps
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">System Metrics</h3>
           <div className="space-y-2 text-xs">
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Generation Speed</span>
+              <span className="text-gray-700 dark:text-gray-200">Generation Speed</span>
               <span className="font-medium">2.3s</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Success Rate</span>
+              <span className="text-gray-700 dark:text-gray-200">Success Rate</span>
               <span className="font-medium text-steward">94%</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Ethical Score</span>
+              <span className="text-gray-700 dark:text-gray-200">Ethical Score</span>
               <span className="font-medium text-steward">96%</span>
             </div>
           </div>

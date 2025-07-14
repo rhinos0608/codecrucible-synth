@@ -36,7 +36,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
           <div className="text-center">
             <Brain className="w-16 h-16 mx-auto mb-4 text-blue-500" />
             <h3 className="text-lg font-semibold mb-2">Transform Your AI Experience</h3>
-            <p className="text-gray-600 dark:text-gray-300">
+            <p className="text-gray-700 dark:text-gray-200">
               Voice profiles let you create custom AI personalities that understand your coding style, 
               preferences, and project needs. Each profile becomes a specialized coding partner.
             </p>
@@ -46,17 +46,17 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
             <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <Wand2 className="w-8 h-8 mx-auto mb-2 text-blue-600" />
               <h4 className="font-medium">Personalized</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Tailored to your style</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200">Tailored to your style</p>
             </div>
             <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
               <Code className="w-8 h-8 mx-auto mb-2 text-green-600" />
               <h4 className="font-medium">Specialized</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Expert in your domains</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200">Expert in your domains</p>
             </div>
             <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
               <Users className="w-8 h-8 mx-auto mb-2 text-purple-600" />
               <h4 className="font-medium">Team Ready</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Share with your team</p>
+              <p className="text-sm text-gray-700 dark:text-gray-200">Share with your team</p>
             </div>
           </div>
         </div>
@@ -126,7 +126,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
           
           <div className="border-l-4 border-blue-500 pl-4">
             <h4 className="font-medium">Multiple Specializations</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-gray-700 dark:text-gray-200">
               Select multiple areas to create full-stack specialists. 
               Your AI will provide domain-specific insights and best practices.
             </p>
@@ -134,10 +134,10 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
           
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
             <h4 className="font-medium mb-2">Example: React Security Specialist</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-sm text-gray-700 dark:text-gray-200">
               Specializations: React Development + Security + Performance
             </p>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+            <p className="text-sm text-gray-700 dark:text-gray-200 mt-2">
               Result: AI that generates React components with built-in security patterns 
               and performance optimizations.
             </p>
@@ -161,7 +161,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
                 </div>
                 <div>
                   <p className="font-medium">Select Core Voices</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-gray-700 dark:text-gray-200">
                     Choose Explorer, Maintainer, Analyzer, etc.
                   </p>
                 </div>
@@ -172,7 +172,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
                 </div>
                 <div>
                   <p className="font-medium">Apply Custom Profile</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-gray-700 dark:text-gray-200">
                     Your profile enhances the selected voice
                   </p>
                 </div>
@@ -183,7 +183,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
                 </div>
                 <div>
                   <p className="font-medium">Enhanced Generation</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-gray-700 dark:text-gray-200">
                     AI generates with your custom characteristics
                   </p>
                 </div>
@@ -216,7 +216,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
           <div className="text-center">
             <Sparkles className="w-16 h-16 mx-auto mb-4 text-purple-500" />
             <h3 className="text-lg font-semibold mb-2">Let's Create Your Profile</h3>
-            <p className="text-gray-600 dark:text-gray-300">
+            <p className="text-gray-700 dark:text-gray-200">
               Navigate to the Voice Profiles tab and click "Create New Profile" to start building 
               your personalized AI coding assistant.
             </p>
@@ -243,7 +243,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
           
           <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
             <h4 className="font-medium mb-2">What Happens Next?</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-sm text-gray-700 dark:text-gray-200">
               Your custom profile will appear in the "My Profiles" tab. Click "Apply" to use it 
               in council generation and live streaming for personalized AI assistance.
             </p>

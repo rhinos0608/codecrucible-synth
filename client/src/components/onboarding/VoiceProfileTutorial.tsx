@@ -133,7 +133,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
           </div>
           
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">Example: React Security Specialist</h4>
+            <h4 className="font-medium mb-2 text-[#484a52]">Example: React Security Specialist</h4>
             <p className="text-sm text-gray-800 dark:text-gray-100">
               Specializations: React Development + Security + Performance
             </p>
@@ -171,7 +171,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
                   <span className="text-sm">2</span>
                 </div>
                 <div>
-                  <p className="font-medium">Apply Custom Profile</p>
+                  <p className="font-medium text-[#484a52]">Apply Custom Profile</p>
                   <p className="text-sm text-gray-800 dark:text-gray-100">
                     Your profile enhances the selected voice
                   </p>

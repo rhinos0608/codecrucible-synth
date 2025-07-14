@@ -1,4 +1,4 @@
-import { openai } from './openai.js';
+import { openai } from './openai-service';
 
 // AI-powered dropdown suggestion service following AI_INSTRUCTIONS.md and CodingPhilosophy.md
 export interface AIDropdownSuggestion {

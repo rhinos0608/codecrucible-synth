@@ -1015,61 +1015,7 @@ Following CodingPhilosophy.md consciousness principles:
     return Math.max(0, 100 - (standardDeviation * 2));
   }
 
-  // AI Chat response generation for file assistance - Following AI_INSTRUCTIONS.md patterns
-  async generateChatResponse(options: {
-    messages: Array<{role: string; content: string}>;
-    context?: string;
-    temperature?: number;
-    maxTokens?: number;
-  }): Promise<string> {
-    try {
-      const { messages, context = 'general', temperature = 0.7, maxTokens = 1000 } = options;
-      
-      console.log('🧠 Generating AI chat response:', {
-        messageCount: messages.length,
-        context,
-        temperature,
-        maxTokens
-      });
 
-      // Enhanced system prompt for file assistance following CodingPhilosophy.md
-      const systemPrompt = context === 'file_assistance' 
-        ? `You are an expert coding assistant following consciousness-driven development principles. 
-           When analyzing code files, provide insights that embody:
-           - Jung's Descent Protocol: Deep analysis revealing hidden patterns and potential issues
-           - Alexander's Pattern Language: Timeless design principles and architectural wisdom
-           - Bateson's Recursive Learning: Meta-level understanding of code structure and intent
-           - Campbell's Mythic Journey: Transformational suggestions that elevate code quality
-           
-           Always provide practical, actionable advice with specific examples.`
-        : "You are a helpful AI assistant focused on providing clear, accurate, and actionable responses.";
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          ...messages
-        ],
-        temperature,
-        max_tokens: maxTokens
-      });
-
-      const chatResponse = response.choices[0]?.message?.content || '';
-      
-      console.log('✅ AI chat response generated:', {
-        context,
-        responseLength: chatResponse.length
-      });
-
-      return chatResponse;
-    } catch (error) {
-      logger.error('AI chat response generation failed', error as Error);
-      throw new Error('Failed to generate AI chat response');
-    }
-  }
 
   // Chat Response Generation - Following CodingPhilosophy.md consciousness principles
   async generateChatResponse(
@@ -1150,3 +1096,6 @@ export { realOpenAIService as default };
 // Export for compatibility
 export const optimizedOpenAIService = realOpenAIService;
 export const openaiService = realOpenAIService;
+
+// Export openai instance for ai-dropdown-service.ts
+export { openai };

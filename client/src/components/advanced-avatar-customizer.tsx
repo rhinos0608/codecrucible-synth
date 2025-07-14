@@ -48,6 +48,61 @@ interface AdvancedAvatarCustomizerProps {
   mode?: 'create' | 'edit';
 }
 
+// Jung's Descent Protocol: Predefined Examples for Voice Creation
+const ENGINE_NAME_EXAMPLES = [
+  "Senior React Architect Voice",
+  "Backend Security Specialist",
+  "Full-Stack Performance Engine",
+  "AI-Powered Code Reviewer",
+  "Database Design Expert",
+  "DevOps Automation Engineer",
+  "TypeScript Code Quality Guide",
+  "API Security Validator",
+  "Cloud Infrastructure Specialist",
+  "Mobile App Development Pro"
+];
+
+const SPECIALIZATION_EXAMPLES = [
+  "React, TypeScript, Next.js performance optimization",
+  "Node.js backend security and API design",
+  "Database schema design and query optimization",
+  "AWS cloud architecture and microservices",
+  "Full-stack testing strategies and automation",
+  "Mobile-first responsive UI/UX development",
+  "AI/ML integration with real-time analytics",
+  "DevOps CI/CD pipelines and container orchestration",
+  "Blockchain smart contract development",
+  "Game development with Unity and performance tuning"
+];
+
+// Alexander's Pattern Language: Four Distinct Personality Approaches
+const PERSONALITY_APPROACHES = [
+  {
+    id: 'analytical',
+    name: 'Analytical Architect',
+    description: 'Systematic, methodical approach with detailed code analysis',
+    example: 'I analyze code patterns deeply, identify structural improvements, and provide comprehensive explanations with examples. My responses include performance metrics, best practices, and alternative approaches with trade-off analysis.'
+  },
+  {
+    id: 'friendly',
+    name: 'Collaborative Mentor',
+    description: 'Supportive, encouraging style focused on learning and growth',
+    example: 'I love helping developers grow! I explain concepts in an approachable way, provide encouraging feedback, and suggest improvements while celebrating what\'s working well. I focus on building confidence while teaching best practices.'
+  },
+  {
+    id: 'direct',
+    name: 'Efficient Implementor',
+    description: 'Concise, action-oriented with focus on quick solutions',
+    example: 'I provide clear, immediate solutions with minimal explanation. Here\'s the fix, here\'s why it works, here\'s how to implement it. I focus on getting things done efficiently with practical, tested approaches.'
+  },
+  {
+    id: 'detailed',
+    name: 'Comprehensive Guide',
+    description: 'Thorough, educational approach with extensive documentation',
+    example: 'I provide complete solutions with step-by-step explanations, edge case handling, error scenarios, and comprehensive documentation. Every response includes context, reasoning, alternatives, and future considerations.'
+  }
+];
+
 const SPECIALIZATION_OPTIONS = [
   'React Development', 'TypeScript', 'Node.js', 'Database Design',
   'API Development', 'Security', 'Performance Optimization', 'UI/UX',
@@ -470,13 +525,31 @@ export function AdvancedAvatarCustomizer({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="name">Voice Name *</Label>
-                      <AIDropdownSelector
-                        field="profile_name"
-                        placeholder="e.g., Security-First Architect"
-                        value={voiceData.name}
-                        onValueChange={(value) => setVoiceData(prev => ({ ...prev, name: value }))}
-                        context={`Specializations: ${voiceData.specialization.join(', ')}, Role: ${voiceData.role}, Personality: ${voiceData.personality}`}
-                      />
+                      <div className="space-y-2">
+                        <Select 
+                          value={voiceData.name} 
+                          onValueChange={(value) => setVoiceData(prev => ({ ...prev, name: value }))}
+                        >
+                          <SelectTrigger className="bg-gray-50 dark:bg-gray-800">
+                            <SelectValue placeholder="Choose from examples or enter custom name" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-gray-800">
+                            {ENGINE_NAME_EXAMPLES.map((name, index) => (
+                              <SelectItem key={index} value={name} className="dark:text-gray-100">
+                                {name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <AIDropdownSelector
+                          field="engine_name"
+                          placeholder="Or enter your custom engine name"
+                          value={voiceData.name}
+                          onValueChange={(value) => setVoiceData(prev => ({ ...prev, name: value }))}
+                          context={`Specializations: ${voiceData.specialization.join(', ')}, Role: ${voiceData.role}, Personality: ${voiceData.chatStyle}`}
+                          examples={ENGINE_NAME_EXAMPLES}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="avatar">Avatar Theme</Label>
@@ -562,17 +635,41 @@ export function AdvancedAvatarCustomizer({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>AI-Powered Specializations</Label>
+                    <Label>Quick Specialization Examples</Label>
+                    <Select 
+                      onValueChange={(value) => {
+                        setVoiceData(prev => ({ 
+                          ...prev, 
+                          specialization: value.split(',').map(s => s.trim()).filter(Boolean)
+                        }));
+                      }}
+                    >
+                      <SelectTrigger className="bg-gray-50 dark:bg-gray-800">
+                        <SelectValue placeholder="Choose from predefined specializations" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-gray-800">
+                        {SPECIALIZATION_EXAMPLES.map((spec, index) => (
+                          <SelectItem key={index} value={spec} className="dark:text-gray-100">
+                            {spec}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Custom Specializations</Label>
                     <AIDropdownSelector
                       field="specialization"
-                      placeholder="e.g., Security architect specialising in React"
-                      value=""
-                      onValueChange={() => {}} // Handled by multi-select
-                      context={`Role: ${voiceData.role}, Perspective: ${voiceData.perspective}`}
-                      isMultiSelect={true}
-                      selectedValues={voiceData.specialization}
-                      onMultiValueChange={(values) => setVoiceData(prev => ({ ...prev, specialization: values }))}
-                      maxSelections={5}
+                      placeholder="Enter custom specializations (comma-separated)"
+                      value={voiceData.specialization.join(', ')}
+                      onValueChange={(value) => setVoiceData(prev => ({ 
+                        ...prev, 
+                        specialization: value.split(',').map(s => s.trim()).filter(Boolean)
+                      }))}
+                      context={`Role: ${voiceData.role}, Perspective: ${voiceData.perspective}, Name: ${voiceData.name}`}
+                      examples={SPECIALIZATION_EXAMPLES}
+                      className="w-full"
                     />
                   </div>
                   
@@ -601,15 +698,60 @@ export function AdvancedAvatarCustomizer({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="personality">Personality Description</Label>
-                    <AIDropdownSelector
-                      field="personality"
-                      placeholder="e.g., Analytical guardian focused on security patterns and defensive coding practices"
-                      value={voiceData.personality}
-                      onValueChange={(value) => setVoiceData(prev => ({ ...prev, personality: value }))}
-                      context={`Specializations: ${voiceData.specialization.join(', ')}, Role: ${voiceData.role}`}
-                    />
+                  <div className="space-y-4">
+                    <Label htmlFor="personality">Personality & Approach</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {PERSONALITY_APPROACHES.map((approach) => (
+                        <Card 
+                          key={approach.id}
+                          className={`cursor-pointer transition-all ${
+                            voiceData.chatStyle === approach.id
+                              ? 'ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-900/20' 
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                          }`}
+                          onClick={() => {
+                            setVoiceData(prev => ({ 
+                              ...prev, 
+                              chatStyle: approach.id,
+                              personality: approach.example
+                            }));
+                          }}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm text-purple-600 dark:text-purple-400">
+                                  {approach.name}
+                                </h4>
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                  {approach.description}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 italic">
+                                  "{approach.example.slice(0, 100)}..."
+                                </p>
+                              </div>
+                              {voiceData.chatStyle === approach.id && (
+                                <div className="w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
+                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="customPersonality">Custom Personality (Optional)</Label>
+                      <Textarea
+                        id="customPersonality"
+                        value={voiceData.personality}
+                        onChange={(e) => setVoiceData(prev => ({ ...prev, personality: e.target.value }))}
+                        placeholder="Or describe your custom personality and approach..."
+                        rows={3}
+                        className="bg-gray-50 dark:bg-gray-800"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

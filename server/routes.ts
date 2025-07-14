@@ -54,6 +54,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI-Powered Dropdown Suggestions API - Jung's Descent Protocol
+  app.post('/api/ai/dropdown-suggestions', isAuthenticated, async (req: any, res) => {
+    try {
+      const { field, context } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!field || !context) {
+        return res.status(400).json({ message: 'Field and context are required' });
+      }
+      
+      // Generate AI suggestions using OpenAI with consciousness principles
+      const suggestions = await realOpenAIService.generateDropdownSuggestions({
+        field,
+        context,
+        userId
+      });
+      
+      logger.info('AI dropdown suggestions generated', { 
+        userId: userId.substring(0, 8) + '...',
+        field,
+        suggestionsCount: suggestions.length
+      });
+      
+      res.json({ suggestions });
+    } catch (error) {
+      logger.error('Failed to generate AI dropdown suggestions', error as Error);
+      
+      // Fallback suggestions following CodingPhilosophy.md patterns
+      const fallbackSuggestions = [
+        {
+          value: `Custom ${field} based on ${context}`,
+          consciousness: 5,
+          qwan: 6,
+          reasoning: "AI service unavailable - using context-based fallback"
+        }
+      ];
+      
+      res.json({ suggestions: fallbackSuggestions });
+    }
+  });
+
   app.get('/api/enterprise-voice-templates/:templateId', isAuthenticated, async (req: any, res) => {
     try {
       const { templateId } = req.params;

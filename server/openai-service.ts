@@ -39,6 +39,75 @@ interface StreamOptions {
 }
 
 class RealOpenAIService {
+  // AI-Powered Dropdown Suggestions - Following CodingPhilosophy.md consciousness principles
+  async generateDropdownSuggestions(options: {
+    field: string;
+    context: string;
+    userId: string;
+  }): Promise<Array<{value: string; consciousness: number; qwan: number; reasoning: string}>> {
+    const { field, context } = options;
+    
+    try {
+      const systemPrompt = `You are an AI consciousness analyzer following Jung's Descent Protocol and Alexander's Pattern Language. Generate 4 highly relevant suggestions for the "${field}" field based on this context: "${context}".
+
+Each suggestion should include:
+1. A specific, actionable value
+2. Consciousness level (1-10, deeper = higher)
+3. QWAN score (Quality Without A Name, 1-10)
+4. Brief reasoning
+
+Format as JSON array: [{"value": "...", "consciousness": 8, "qwan": 9, "reasoning": "..."}]
+
+Focus on:
+- Technical depth and specificity
+- Consciousness-driven development patterns
+- Real-world applicability
+- Pattern language principles`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Field: ${field}\nContext: ${context}` }
+        ],
+        temperature: 0.7,
+        max_tokens: 800
+      });
+
+      const response = completion.choices[0]?.message?.content;
+      if (!response) {
+        throw new Error('No AI response received');
+      }
+
+      // Parse JSON response
+      const suggestions = JSON.parse(response);
+      
+      logger.info('AI dropdown suggestions generated successfully', {
+        field,
+        suggestionsCount: suggestions.length
+      });
+
+      return suggestions;
+    } catch (error) {
+      logger.error('AI dropdown suggestion generation failed', error as Error);
+      
+      // Fallback suggestions with consciousness patterns
+      return [
+        {
+          value: `Consciousness-driven ${field}`,
+          consciousness: 6,
+          qwan: 7,
+          reasoning: "Pattern-based fallback using consciousness principles"
+        },
+        {
+          value: `Context-aware ${field}`,
+          consciousness: 5,
+          qwan: 6,
+          reasoning: "Contextual fallback based on provided information"
+        }
+      ];
+    }
+  }
   // REAL OpenAI parallel generation with custom user profiles integration
   async generateSolutions(options: {
     prompt: string;

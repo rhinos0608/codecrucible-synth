@@ -153,7 +153,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
       content: (
         <div className="space-y-4">
           <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 p-6 rounded-lg">
-            <h4 className="font-medium mb-3">Voice Council Assembly</h4>
+            <h4 className="font-medium mb-3 text-[#393b42]">Voice Council Assembly</h4>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-purple-100 dark:bg-purple-800 rounded-full flex items-center justify-center">

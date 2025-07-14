@@ -215,7 +215,7 @@ export function VoiceProfileTutorial({ onComplete, onSkip }: VoiceProfileTutoria
         <div className="space-y-4">
           <div className="text-center">
             <Sparkles className="w-16 h-16 mx-auto mb-4 text-purple-500" />
-            <h3 className="text-lg font-semibold mb-2">Let's Create Your Profile</h3>
+            <h3 className="text-lg font-semibold mb-2 text-[#393b42]">Let's Create Your Profile</h3>
             <p className="text-gray-800 dark:text-gray-100">
               Navigate to the Voice Profiles tab and click "Create New Profile" to start building 
               your personalized AI coding assistant.

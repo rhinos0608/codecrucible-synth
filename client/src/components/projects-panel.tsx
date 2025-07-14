@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Code, Calendar, Tag, ExternalLink, Trash2, Eye, Copy } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -132,6 +132,9 @@ export function ProjectsPanel({ isOpen, onClose, onUseAsContext }: ProjectsPanel
               </div>
             </div>
           </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Manage your saved synthesized solutions and export code snippets.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-1 min-h-0 max-h-[calc(90vh-120px)]">

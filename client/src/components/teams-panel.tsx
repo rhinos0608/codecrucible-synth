@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,9 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
               </Badge>
             </div>
           </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Manage team members, share voice profiles, and collaborate on coding sessions.
+          </DialogDescription>
         </DialogHeader>
         <div id="teams-collaboration-description" className="sr-only">
           Manage team members, share voice profiles, and collaborate on coding sessions

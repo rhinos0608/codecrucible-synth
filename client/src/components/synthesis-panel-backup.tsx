@@ -1,5 +1,5 @@
 import { X, CheckCircle, Loader2, Copy, Save } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -168,6 +168,9 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: CodeMe
               <p className="text-sm text-gray-600 dark:text-gray-400">Recursive solution integration and refinement</p>
             </div>
           </DialogTitle>
+          <DialogDescription>
+            Combining multiple AI voice solutions into a comprehensive code solution.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-1">

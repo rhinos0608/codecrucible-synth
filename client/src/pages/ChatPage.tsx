@@ -70,7 +70,7 @@ export function ChatPage() {
     sendMessageMutation.mutate(message.trim());
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: any) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();

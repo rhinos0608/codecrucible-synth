@@ -1,5 +1,5 @@
 // Comprehensive Real-Time Synthesis Panel - Following AI_INSTRUCTIONS.md & CodingPhilosophy.md
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -116,6 +116,9 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
               )}
             </div>
           </DialogTitle>
+          <DialogDescription className="text-gray-600 dark:text-gray-400">
+            Combine multiple AI voice solutions into a unified, optimized solution.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-1">

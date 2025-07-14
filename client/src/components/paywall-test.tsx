@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +125,9 @@ export default function PaywallTest({ isOpen, onClose }: PaywallTestProps) {
             <Shield className="h-6 w-6 mr-2 text-orange-500" />
             Security & Paywall Enforcement Test
           </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Comprehensive testing of subscription tier enforcement and quota management.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

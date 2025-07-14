@@ -34,7 +34,7 @@ interface OnboardingPath {
   difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'master';
   prerequisites: string[];
   outcomes: string[];
-  component: React.ComponentType;
+  component: any;
   unlocked: boolean;
 }
 

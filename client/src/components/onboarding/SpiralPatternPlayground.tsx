@@ -14,7 +14,7 @@ interface SpiralPhase {
   title: string;
   description: string;
   color: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: any;
 }
 
 interface SpiralState {

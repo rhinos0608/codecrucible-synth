@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -143,6 +143,9 @@ export function AvatarCustomizer({ isOpen, onClose, editingProfile }: AvatarCust
             <User className="w-5 h-5 text-purple-400" />
             {editingProfile ? "Edit Code Engine Profile" : "Create Custom Code Engine Profile"}
           </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Configure a custom AI voice profile with specialized coding perspectives and technical expertise.
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">

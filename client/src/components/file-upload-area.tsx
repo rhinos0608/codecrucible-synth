@@ -38,19 +38,19 @@ export function FileUploadArea({
   const { processAndUploadFile, isUploading } = useFileUpload();
 
   // Handle drag and drop events
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: any) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(true);
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: any) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: any) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
@@ -66,7 +66,7 @@ export function FileUploadArea({
   };
 
   // Handle file input change
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (e: any) => {
     if (e.target.files) {
       handleFileSelection(Array.from(e.target.files));
     }

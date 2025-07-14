@@ -25,7 +25,7 @@ function CheckoutForm({ tier, price, onSuccess, onCancel }: StripeCheckoutProps)
   const elements = useElements();
   const { toast } = useToast();
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: any) => {
     event.preventDefault();
 
     if (!stripe || !elements) {

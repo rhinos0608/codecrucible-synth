@@ -10,8 +10,8 @@ const THEMES = { light: "", dark: ".dark" } as const
 
 export type ChartConfig = {
   [k in string]: {
-    label?: ReactNode
-    icon?: React.ComponentType
+    label?: any
+    icon?: any
   } & (
     | { color?: string; theme?: never }
     | { color?: never; theme: Record<keyof typeof THEMES, string> }
@@ -221,7 +221,7 @@ const ChartTooltipContent = forwardRef<
                             {
                               "--color-bg": indicatorColor,
                               "--color-border": indicatorColor,
-                            } as React.CSSProperties
+                            } as any
                           }
                         />
                       )

@@ -1,5 +1,6 @@
 // Frontend Feature Gate Component - AI_INSTRUCTIONS.md Security Patterns
 
+import { ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlanGuard } from '@/hooks/usePlanGuard';
 import { isFrontendDevModeEnabled } from '@/lib/dev-mode';
@@ -102,10 +103,13 @@ const getTierIcon = (tier: SubscriptionTier) => {
 /**
  * Upgrade prompt component
  */
-const UpgradePrompt: React.FC<{ 
+const UpgradePrompt = ({ 
+  feature, 
+  className = "" 
+}: { 
   feature: FeatureName; 
   className?: string;
-}> = ({ feature, className = "" }) => {
+}) => {
   const requiredTier = getMinimumTier(feature);
   const pricing = getTierPricing(requiredTier);
   const icon = getTierIcon(requiredTier);
@@ -170,7 +174,7 @@ const UpgradePrompt: React.FC<{
 /**
  * Feature gate component that conditionally renders content based on subscription tier
  */
-export const FeatureGate: React.FC<FeatureGateProps> = ({ 
+export const FeatureGate = ({ 
   feature, 
   children, 
   fallback, 
@@ -228,11 +232,15 @@ export const useFeatureAccess = (feature: FeatureName) => {
 /**
  * Inline feature lock component for buttons and UI elements
  */
-export const FeatureLock: React.FC<{
+export const FeatureLock = ({ 
+  feature, 
+  children, 
+  disabled = false 
+}: { 
   feature: FeatureName;
-  children: ReactNode;
+  children: any;
   disabled?: boolean;
-}> = ({ feature, children, disabled = false }) => {
+}) => {
   const { hasAccess, upgradeUrl } = useFeatureAccess(feature);
   
   if (!hasAccess) {

@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
@@ -259,6 +260,9 @@ export function FolderFileManager({ folderId, folderName }: FolderFileManagerPro
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New File</DialogTitle>
+              <DialogDescription>
+                Add a new code file to this project folder with syntax highlighting and AI context integration.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">

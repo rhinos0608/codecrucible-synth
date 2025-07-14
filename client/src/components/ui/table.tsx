@@ -1,4 +1,4 @@
-import { forwardRef, ElementRef, ComponentPropsWithoutRef, HTMLAttributes, ComponentProps, ReactElement, ReactNode } from "react"
+import { forwardRef, ElementRef, ComponentPropsWithoutRef, HTMLAttributes, ComponentProps } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -68,7 +68,7 @@ TableRow.displayName = "TableRow"
 
 const TableHead = forwardRef<
   HTMLTableCellElement,
-  React.ThHTMLAttributes<HTMLTableCellElement>
+  any
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
@@ -83,7 +83,7 @@ TableHead.displayName = "TableHead"
 
 const TableCell = forwardRef<
   HTMLTableCellElement,
-  React.TdHTMLAttributes<HTMLTableCellElement>
+  any
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}

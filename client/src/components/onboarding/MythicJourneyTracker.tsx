@@ -26,7 +26,7 @@ interface JourneyStage {
   name: string;
   mythicPhase: 'call' | 'descent' | 'initiation' | 'return' | 'mastery';
   description: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: any;
   color: string;
   requirements: string[];
   rewards: string[];
@@ -39,7 +39,7 @@ interface Achievement {
   id: string;
   title: string;
   description: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: any;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   unlockedAt?: Date;
 }

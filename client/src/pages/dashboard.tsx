@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2, Target, X, Menu, ChevronRight, HelpCircle } from "lucide-react";
+import { AppleStyleButton } from "@/components/modern-ui/AppleStyleButton";
+import { ModernVoiceSelector } from "@/components/modern-ui/ModernVoiceSelector";
+import { ModernSolutionStack } from "@/components/modern-ui/ModernSolutionStack";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -879,7 +882,7 @@ export default function Dashboard() {
                 <SubscriptionStatus onUpgrade={() => setShowUpgradeModal(true)} />
               </div>
               <div className="border-t border-gray-700" data-tour="voice-selector">
-                <PerspectiveSelector />
+                <ModernVoiceSelector />
               </div>
             </div>
           </div>
@@ -887,12 +890,12 @@ export default function Dashboard() {
       )}
 
       {/* Modals */}
-      <SolutionStack
+      <ModernSolutionStack
         isOpen={showSolutionStack}
         onClose={() => setShowSolutionStack(false)}
         sessionId={currentSessionId}
-        onMergeClick={handleMergeClick}
-        data-tour="solution-stack"
+        solutions={[]}
+        onSynthesize={() => setShowSynthesisPanel(true)}
       />
 
       <SynthesisPanel

@@ -112,7 +112,7 @@ export function ConfirmationDialog({
             </h4>
             <div className="space-y-2 text-sm">
               {context.feature && (
-                <div className="flex justify-between">
+                <div className="flex justify-between text-[#484a52]">
                   <span className="text-gray-600 dark:text-gray-400">Feature:</span>
                   <span className="font-medium">{context.feature}</span>
                 </div>

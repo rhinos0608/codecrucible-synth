@@ -1417,6 +1417,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI-powered dropdown suggestions endpoint following AI_INSTRUCTIONS.md and CodingPhilosophy.md
+  app.post('/api/ai/dropdown-suggestions', isAuthenticated, async (req: any, res) => {
+    try {
+      const { field, context, consciousness_framework, pattern_language, learning_mode } = req.body;
+      const userId = req.user.claims.sub;
+
+      // Security validation following AI_INSTRUCTIONS.md patterns
+      if (!field || typeof field !== 'string' || field.length > 50) {
+        return res.status(400).json({ error: 'Invalid field parameter' });
+      }
+
+      if (context && (typeof context !== 'string' || context.length > 1000)) {
+        return res.status(400).json({ error: 'Invalid context parameter' });
+      }
+
+      console.log('🤖 AI Dropdown Suggestions Request:', {
+        userId: userId.substring(0, 8) + '...',
+        field,
+        context: context?.substring(0, 100) + '...',
+        consciousness_framework,
+        pattern_language,
+        learning_mode
+      });
+
+      const { aiDropdownService } = await import('./ai-dropdown-service.js');
+      
+      const suggestions = await aiDropdownService.generateSuggestions({
+        field,
+        context: context || '',
+        consciousness_framework: consciousness_framework || 'jung_descent_protocol',
+        pattern_language: pattern_language || 'alexander_timeless_patterns',
+        learning_mode: learning_mode || 'bateson_recursive_enhancement'
+      });
+
+      console.log('✅ AI Suggestions generated:', suggestions.length, 'items for field:', field);
+
+      // Audit logging following AI_INSTRUCTIONS.md security patterns
+      console.log('🔍 AI Dropdown Audit:', {
+        userId: userId.substring(0, 8) + '...',
+        timestamp: new Date().toISOString(),
+        field,
+        suggestionsCount: suggestions.length,
+        consciousness_framework,
+        pattern_language
+      });
+
+      res.json({ 
+        suggestions,
+        metadata: {
+          field,
+          count: suggestions.length,
+          consciousness_framework,
+          pattern_language,
+          generated_at: new Date().toISOString()
+        }
+      });
+    } catch (error: any) {
+      console.error('❌ AI Dropdown Service error:', error);
+      res.status(500).json({ 
+        error: 'Failed to generate AI suggestions',
+        details: error.message 
+      });
+    }
+  });
+
   // Critical session endpoints - REAL OpenAI integration following AI_INSTRUCTIONS.md patterns
   app.post("/api/sessions", isAuthenticated, enforcePlanRestrictions(), async (req: any, res) => {
     try {

@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { FeatureGate } from "@/components/FeatureGate";
+import { AIDropdownSelector } from "@/components/ai-dropdown-selector";
 
 interface CustomVoiceData {
   name: string;
@@ -437,12 +438,12 @@ export function AdvancedAvatarCustomizer({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="name">Voice Name *</Label>
-                      <Input
-                        id="name"
-                        value={voiceData.name}
-                        onChange={(e) => setVoiceData(prev => ({ ...prev, name: e.target.value }))}
+                      <AIDropdownSelector
+                        field="profile_name"
                         placeholder="e.g., Security-First Architect"
-                        maxLength={100}
+                        value={voiceData.name}
+                        onValueChange={(value) => setVoiceData(prev => ({ ...prev, name: value }))}
+                        context={`Specializations: ${voiceData.specialization.join(', ')}, Role: ${voiceData.role}, Personality: ${voiceData.personality}`}
                       />
                     </div>
                     <div className="space-y-2">
@@ -527,25 +528,26 @@ export function AdvancedAvatarCustomizer({
                     Select the technologies and domains this voice specializes in
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-3">
-                    {SPECIALIZATION_OPTIONS.map(spec => (
-                      <div key={spec} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={spec}
-                          checked={voiceData.specialization.includes(spec)}
-                          onCheckedChange={() => handleSpecializationToggle(spec)}
-                        />
-                        <Label htmlFor={spec} className="text-sm">
-                          {spec}
-                        </Label>
-                      </div>
-                    ))}
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>AI-Powered Specializations</Label>
+                    <AIDropdownSelector
+                      field="specialization"
+                      placeholder="e.g., Security architect specialising in React"
+                      value=""
+                      onValueChange={() => {}} // Handled by multi-select
+                      context={`Role: ${voiceData.role}, Perspective: ${voiceData.perspective}`}
+                      isMultiSelect={true}
+                      selectedValues={voiceData.specialization}
+                      onMultiValueChange={(values) => setVoiceData(prev => ({ ...prev, specialization: values }))}
+                      maxSelections={5}
+                    />
                   </div>
+                  
                   {voiceData.specialization.length > 0 && (
-                    <div className="mt-4">
+                    <div className="space-y-2">
                       <Label>Selected Specializations:</Label>
-                      <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex flex-wrap gap-2">
                         {voiceData.specialization.map(spec => (
                           <Badge key={spec} variant="secondary">
                             {spec}
@@ -569,13 +571,12 @@ export function AdvancedAvatarCustomizer({
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="personality">Personality Description</Label>
-                    <Textarea
-                      id="personality"
+                    <AIDropdownSelector
+                      field="personality"
+                      placeholder="e.g., Analytical guardian focused on security patterns and defensive coding practices"
                       value={voiceData.personality}
-                      onChange={(e) => setVoiceData(prev => ({ ...prev, personality: e.target.value }))}
-                      placeholder="Describe the voice's personality, approach, and unique characteristics..."
-                      maxLength={500}
-                      rows={4}
+                      onValueChange={(value) => setVoiceData(prev => ({ ...prev, personality: value }))}
+                      context={`Specializations: ${voiceData.specialization.join(', ')}, Role: ${voiceData.role}`}
                     />
                   </div>
 

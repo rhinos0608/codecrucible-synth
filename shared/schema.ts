@@ -175,6 +175,32 @@ export const folderFiles = pgTable("folder_files", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Chat sessions table - Following AI_INSTRUCTIONS.md security patterns and Jung's consciousness principles
+export const chatSessions = pgTable("chat_sessions", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").references(() => voiceSessions.id).notNull(), // Link to original generation session
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  selectedVoice: varchar("selected_voice", { length: 100 }).notNull(), // The voice chosen for conversation
+  initialSolutionId: integer("initial_solution_id").references(() => solutions.id), // The solution that started the chat
+  contextData: jsonb("context_data").notNull(), // Store initial code and solution context
+  isActive: boolean("is_active").default(true),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Chat messages table - Multi-voice consciousness tracking following CodingPhilosophy.md
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  chatSessionId: integer("chat_session_id").references(() => chatSessions.id).notNull(),
+  messageType: varchar("message_type", { length: 20 }).notNull(), // 'user', 'assistant', 'system'
+  content: text("content").notNull(),
+  voiceType: varchar("voice_type", { length: 100 }), // The voice that generated this message
+  metadata: jsonb("metadata"), // Store code suggestions, confidence scores, etc.
+  messageIndex: integer("message_index").notNull(), // Order in conversation
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // User uploaded files table - Following Jung's Descent Protocol for consciousness-driven file management
 export const userFiles = pgTable("user_files", {
   id: serial("id").primaryKey(),
@@ -404,11 +430,48 @@ export const insertSessionFileAttachmentSchema = createInsertSchema(sessionFileA
   isContextEnabled: z.boolean().default(true)
 });
 
+// Chat schema validation following AI_INSTRUCTIONS.md security patterns
+export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
+  sessionId: true,
+  userId: true,
+  selectedVoice: true,
+  initialSolutionId: true,
+  contextData: true,
+  isActive: true,
+}).extend({
+  sessionId: z.number().int().min(1),
+  userId: z.string().min(1),
+  selectedVoice: z.string().min(1).max(100),
+  initialSolutionId: z.number().int().min(1).optional(),
+  contextData: z.record(z.any()),
+  isActive: z.boolean().default(true)
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).pick({
+  chatSessionId: true,
+  messageType: true,
+  content: true,
+  voiceType: true,
+  metadata: true,
+  messageIndex: true,
+}).extend({
+  chatSessionId: z.number().int().min(1),
+  messageType: z.enum(['user', 'assistant', 'system']),
+  content: z.string().min(1).max(10000),
+  voiceType: z.string().max(100).optional(),
+  metadata: z.record(z.any()).optional(),
+  messageIndex: z.number().int().min(0)
+});
+
 // Type exports for TypeScript
 export type UserFile = typeof userFiles.$inferSelect;
 export type InsertUserFile = z.infer<typeof insertUserFileSchema>;
 export type SessionFileAttachment = typeof sessionFileAttachments.$inferSelect;
 export type InsertSessionFileAttachment = z.infer<typeof insertSessionFileAttachmentSchema>;
+export type ChatSession = typeof chatSessions.$inferSelect;
+export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 
 // Security-first validation schema following AI_INSTRUCTIONS.md
 export const insertVoiceSessionSchema = createInsertSchema(voiceSessions).pick({

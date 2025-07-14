@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { X, Layers3, CheckCircle, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Layers3, CheckCircle, Loader2, MessageCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import type { Solution } from "@shared/schema";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
+import { PostGenerationDecision } from "./post-generation-decision";
+import { AiChatInterface } from "./ai-chat-interface";
 
 interface ImplementationOptionsProps {
   isOpen: boolean;
@@ -84,6 +86,11 @@ const getVoiceDisplayName = (voiceCombination: string | undefined): string => {
 };
 
 export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: ImplementationOptionsProps) {
+  // State for post-generation decision modal and chat interface - Following AI_INSTRUCTIONS.md patterns
+  const [showPostGenDecision, setShowPostGenDecision] = useState(false);
+  const [showChatInterface, setShowChatInterface] = useState(false);
+  const [selectedSolution, setSelectedSolution] = useState<Solution | null>(null);
+
   const { data: solutions = [], isLoading, error } = useQuery({
     queryKey: ["/api/sessions", sessionId, "solutions"],
     enabled: !!sessionId && isOpen,
@@ -119,14 +126,44 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
         });
       }
     }
-  }, [isOpen, sessionId, isLoading, solutions, error]);
+
+    // Show post-generation decision when solutions are loaded - Jung's Descent Protocol for consciousness-driven UX
+    if (solutions.length > 0 && !isLoading && !showPostGenDecision && !showChatInterface) {
+      console.log('📋 Showing post-generation decision modal for', solutions.length, 'solutions');
+      setShowPostGenDecision(true);
+    }
+  }, [isOpen, sessionId, isLoading, solutions, error, showPostGenDecision, showChatInterface]);
 
   const handleMergeClick = () => {
     onMergeClick(solutions);
+    setShowPostGenDecision(false);
     onClose();
   };
 
+  // Handle voice selection for chat - Alexander's Pattern Language for consistent interaction patterns
+  const handleContinueWithVoice = (solution: Solution) => {
+    console.log('🧠 Starting chat with', getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName));
+    setSelectedSolution(solution);
+    setShowPostGenDecision(false);
+    setShowChatInterface(true);
+  };
+
+  // Handle synthesis from post-generation decision modal
+  const handleSynthesizeAll = () => {
+    console.log('🔧 User chose to synthesize all solutions');
+    handleMergeClick();
+  };
+
+  // Handle chat interface close - return to post-generation decision
+  const handleChatClose = () => {
+    console.log('💬 Closing chat interface');
+    setShowChatInterface(false);
+    setSelectedSolution(null);
+    setShowPostGenDecision(true);
+  };
+
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
@@ -238,5 +275,27 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Post-Generation Decision Modal - Following CodingPhilosophy.md consciousness principles */}
+    {showPostGenDecision && (
+      <PostGenerationDecision
+        isOpen={showPostGenDecision}
+        onClose={() => setShowPostGenDecision(false)}
+        solutions={solutions}
+        onContinueWithVoice={handleContinueWithVoice}
+        onSynthesizeAll={handleSynthesizeAll}
+      />
+    )}
+
+    {/* AI Chat Interface for continuing conversation with selected voice */}
+    {showChatInterface && selectedSolution && sessionId && (
+      <AiChatInterface
+        isOpen={showChatInterface}
+        onClose={handleChatClose}
+        solution={selectedSolution}
+        sessionId={sessionId}
+      />
+    )}
+    </>
   );
 }

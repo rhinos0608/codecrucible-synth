@@ -13,6 +13,8 @@ import { enforcePlanRestrictions } from "./middleware/enforcePlan";
 import { incrementUsageQuota } from "./lib/utils/checkQuota";
 import { getDevModeConfig } from "./lib/dev-mode";
 import { analyticsService } from "./analytics-service";
+import { chatService } from "./chat-service";
+import { insertChatSessionSchema, insertChatMessageSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -866,6 +868,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: 'AI chat temporarily unavailable',
         fallback: 'Please try again or contact support for file analysis assistance'
       });
+    }
+  });
+
+  // Post-Generation Chat API Endpoints - Following AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles
+  
+  // Create chat session with specific AI voice
+  app.post('/api/chat/sessions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertChatSessionSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const chatSession = await storage.createChatSession(validatedData);
+      
+      logger.info('Chat session created', { 
+        chatSessionId: chatSession.id,
+        selectedVoice: chatSession.selectedVoice,
+        userId: userId.substring(0, 8) + '...'
+      });
+      
+      res.json(chatSession);
+    } catch (error) {
+      logger.error('Error creating chat session', error as Error, { 
+        userId: req.user?.claims?.sub,
+        requestBody: req.body 
+      });
+      
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: 'Invalid chat session data', details: error.errors });
+      } else {
+        res.status(500).json({ error: 'Failed to create chat session' });
+      }
+    }
+  });
+
+  // Get chat messages for a session
+  app.get('/api/chat/sessions/:chatSessionId/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const { chatSessionId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify chat session ownership
+      const chatSession = await storage.getChatSession(parseInt(chatSessionId));
+      if (!chatSession || chatSession.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied to chat session' });
+      }
+      
+      const messages = await storage.getChatMessages(parseInt(chatSessionId));
+      res.json(messages);
+    } catch (error) {
+      logger.error('Error fetching chat messages', error as Error, { 
+        userId: req.user?.claims?.sub,
+        chatSessionId: req.params.chatSessionId 
+      });
+      res.status(500).json({ error: 'Failed to fetch chat messages' });
+    }
+  });
+
+  // Send message and get AI response
+  app.post('/api/chat/sessions/:chatSessionId/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const { chatSessionId } = req.params;
+      const userId = req.user.claims.sub;
+      const { content, messageType } = req.body;
+      
+      // Verify chat session ownership
+      const chatSession = await storage.getChatSession(parseInt(chatSessionId));
+      if (!chatSession || chatSession.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied to chat session' });
+      }
+      
+      if (messageType !== 'user') {
+        return res.status(400).json({ error: 'Only user messages can be sent' });
+      }
+      
+      // Process user message and generate AI response using chat service
+      const result = await chatService.processUserMessage(parseInt(chatSessionId), content);
+      
+      logger.info('Chat message processed', {
+        chatSessionId: parseInt(chatSessionId),
+        userId: userId.substring(0, 8) + '...',
+        voice: chatSession.selectedVoice,
+        userMessageLength: content.length
+      });
+      
+      res.json({
+        userMessage: result.userMsg,
+        assistantResponse: result.assistantMsg
+      });
+      
+    } catch (error) {
+      logger.error('Error processing chat message', error as Error, { 
+        userId: req.user?.claims?.sub,
+        chatSessionId: req.params.chatSessionId 
+      });
+      res.status(500).json({ error: 'Failed to process message' });
+    }
+  });
+
+  // Get chat sessions for user
+  app.get('/api/chat/sessions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const chatSessions = await storage.getChatSessionsByUser(userId);
+      res.json(chatSessions);
+    } catch (error) {
+      logger.error('Error fetching chat sessions', error as Error, { 
+        userId: req.user?.claims?.sub 
+      });
+      res.status(500).json({ error: 'Failed to fetch chat sessions' });
     }
   });
 

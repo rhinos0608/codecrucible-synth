@@ -10,6 +10,8 @@ import {
   folderFiles,
   userFiles,
   sessionFileAttachments,
+  chatSessions,
+  chatMessages,
   teams,
   teamMembers,
   usageLimits,
@@ -43,6 +45,10 @@ import {
   type InsertUserFile,
   type SessionFileAttachment,
   type InsertSessionFileAttachment,
+  type ChatSession,
+  type InsertChatSession,
+  type ChatMessage,
+  type InsertChatMessage,
   type Team,
   type InsertTeam,
   type TeamMember,
@@ -190,6 +196,17 @@ export interface IStorage {
   
   upsertDailyUsageMetrics(metrics: InsertDailyUsageMetrics): Promise<DailyUsageMetrics>;
   getDailyUsageMetrics(userId: string, startDate?: string, endDate?: string): Promise<DailyUsageMetrics[]>;
+
+  // Chat operations - Following AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles
+  createChatSession(chatSession: InsertChatSession): Promise<ChatSession>;
+  getChatSession(id: number): Promise<ChatSession | undefined>;
+  getChatSessionsByUser(userId: string): Promise<ChatSession[]>;
+  updateChatSessionActivity(id: number): Promise<void>;
+  
+  // Chat message operations - Multi-voice consciousness tracking
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  getChatMessages(chatSessionId: number): Promise<ChatMessage[]>;
+  getChatMessagesByUser(userId: string): Promise<ChatMessage[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1022,6 +1039,79 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return !!updated;
+  }
+
+  // Chat operations - Following AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles
+  async createChatSession(chatSession: InsertChatSession): Promise<ChatSession> {
+    const [created] = await db.insert(chatSessions).values({
+      ...chatSession,
+      userId: chatSession.userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastActivityAt: new Date()
+    }).returning();
+    return created;
+  }
+
+  async getChatSession(id: number): Promise<ChatSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(chatSessions)
+      .where(eq(chatSessions.id, id));
+    return session;
+  }
+
+  async getChatSessionsByUser(userId: string): Promise<ChatSession[]> {
+    return await db
+      .select()
+      .from(chatSessions)
+      .where(eq(chatSessions.userId, userId))
+      .orderBy(desc(chatSessions.lastActivityAt));
+  }
+
+  async updateChatSessionActivity(id: number): Promise<void> {
+    await db
+      .update(chatSessions)
+      .set({ 
+        lastActivityAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(chatSessions.id, id));
+  }
+
+  // Chat message operations - Multi-voice consciousness tracking following CodingPhilosophy.md
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const [created] = await db.insert(chatMessages).values({
+      ...message,
+      createdAt: new Date()
+    }).returning();
+    
+    // Update chat session activity
+    await this.updateChatSessionActivity(message.chatSessionId);
+    
+    return created;
+  }
+
+  async getChatMessages(chatSessionId: number): Promise<ChatMessage[]> {
+    return await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.chatSessionId, chatSessionId))
+      .orderBy(chatMessages.messageIndex);
+  }
+
+  async getChatMessagesByUser(userId: string): Promise<ChatMessage[]> {
+    const messages = await db
+      .select({
+        message: chatMessages,
+        session: chatSessions
+      })
+      .from(chatMessages)
+      .innerJoin(chatSessions, eq(chatMessages.chatSessionId, chatSessions.id))
+      .where(eq(chatSessions.userId, userId))
+      .orderBy(desc(chatMessages.createdAt));
+    
+    return messages.map(row => row.message);
   }
 }
 

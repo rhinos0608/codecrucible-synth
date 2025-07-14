@@ -175,6 +175,44 @@ export const folderFiles = pgTable("folder_files", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// User uploaded files table - Following Jung's Descent Protocol for consciousness-driven file management
+export const userFiles = pgTable("user_files", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  originalName: varchar("original_name", { length: 500 }).notNull(),
+  fileName: varchar("file_name", { length: 500 }).notNull(), // Sanitized filename
+  content: text("content").notNull(), // File content as text
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  fileSize: integer("file_size").notNull(), // Size in bytes
+  encoding: varchar("encoding", { length: 50 }).default("utf-8"),
+  language: varchar("language", { length: 50 }),
+  isContextAvailable: boolean("is_context_available").default(true), // Can be used as AI context
+  usageCount: integer("usage_count").default(0), // Track how often file is used in prompts
+  projectId: integer("project_id").references(() => projects.id), // Optional link to project
+  sessionId: integer("session_id").references(() => voiceSessions.id), // Optional link to session
+  tags: jsonb("tags").default([]),
+  metadata: jsonb("metadata").default({}), // File-specific metadata (line count, complexity, etc.)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("user_files_user_idx").on(table.userId),
+  index("user_files_project_idx").on(table.projectId),
+  index("user_files_session_idx").on(table.sessionId),
+]);
+
+// Session file attachments table - Link files to specific voice sessions
+export const sessionFileAttachments = pgTable("session_file_attachments", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => voiceSessions.id, { onDelete: "cascade" }),
+  fileId: integer("file_id").notNull().references(() => userFiles.id, { onDelete: "cascade" }),
+  attachmentOrder: integer("attachment_order").default(0), // Order files were attached
+  isContextEnabled: boolean("is_context_enabled").default(true), // Whether to include in AI context
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("session_files_session_idx").on(table.sessionId),
+  index("session_files_file_idx").on(table.fileId),
+]);
+
 // Analytics tables for tracking user behavior and preferences
 export const userAnalytics = pgTable("user_analytics", {
   id: serial("id").primaryKey(),
@@ -323,6 +361,54 @@ export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).pick({
   perspective: z.string().min(1).max(50),
   role: z.string().min(1).max(50)
 });
+
+// File upload schemas - Following AI_INSTRUCTIONS.md security patterns
+export const insertUserFileSchema = createInsertSchema(userFiles).pick({
+  originalName: true,
+  fileName: true,
+  content: true,
+  mimeType: true,
+  fileSize: true,
+  encoding: true,
+  language: true,
+  isContextAvailable: true,
+  projectId: true,
+  sessionId: true,
+  tags: true,
+  metadata: true,
+}).extend({
+  // Security validation with file size limits and content sanitization
+  originalName: z.string().min(1).max(500),
+  fileName: z.string().min(1).max(500),
+  content: z.string().max(10000000), // 10MB text content limit
+  mimeType: z.string().min(1).max(100),
+  fileSize: z.number().int().min(0).max(10485760), // 10MB limit
+  encoding: z.string().max(50).optional(),
+  language: z.string().max(50).optional(),
+  isContextAvailable: z.boolean().default(true),
+  projectId: z.number().int().optional(),
+  sessionId: z.number().int().optional(),
+  tags: z.array(z.string()).default([]),
+  metadata: z.record(z.any()).default({})
+});
+
+export const insertSessionFileAttachmentSchema = createInsertSchema(sessionFileAttachments).pick({
+  sessionId: true,
+  fileId: true,
+  attachmentOrder: true,
+  isContextEnabled: true,
+}).extend({
+  sessionId: z.number().int().min(1),
+  fileId: z.number().int().min(1),
+  attachmentOrder: z.number().int().min(0).default(0),
+  isContextEnabled: z.boolean().default(true)
+});
+
+// Type exports for TypeScript
+export type UserFile = typeof userFiles.$inferSelect;
+export type InsertUserFile = z.infer<typeof insertUserFileSchema>;
+export type SessionFileAttachment = typeof sessionFileAttachments.$inferSelect;
+export type InsertSessionFileAttachment = z.infer<typeof insertSessionFileAttachmentSchema>;
 
 // Security-first validation schema following AI_INSTRUCTIONS.md
 export const insertVoiceSessionSchema = createInsertSchema(voiceSessions).pick({

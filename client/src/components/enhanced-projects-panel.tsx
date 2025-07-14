@@ -47,6 +47,7 @@ import { Project, ProjectFolder } from '@/shared/schema';
 import { FileSelectionModal } from './file-selection-modal';
 import { FeatureGate } from './FeatureGate';
 import { FileManager } from './file-manager';
+import { FileUploadArea } from './file-upload-area';
 
 const FOLDER_COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
@@ -73,6 +74,7 @@ export function EnhancedProjectsPanel({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProjects, setSelectedProjects] = useState<Set<number>>(new Set());
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
+  const [activeTab, setActiveTab] = useState<'projects' | 'files'>('projects');
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   
   // Dialog states
@@ -425,6 +427,30 @@ export function EnhancedProjectsPanel({
             </DialogDescription>
           </DialogHeader>
 
+          {/* Tab Navigation */}
+          <div className="flex space-x-1 mb-4 bg-gray-800 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('projects')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'projects'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Projects & Folders
+            </button>
+            <button
+              onClick={() => setActiveTab('files')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'files'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              File Manager
+            </button>
+          </div>
+
           <div className="flex flex-col h-[70vh]">
             {/* Context Summary */}
             {selectedProjects.size > 0 && (
@@ -476,10 +502,11 @@ export function EnhancedProjectsPanel({
 
             {/* Main Content */}
             <div className="flex-1 overflow-auto">
-              {projectsLoading || foldersLoading ? (
-                <div className="text-center py-8">Loading projects...</div>
-              ) : (
-                <div className="space-y-4">
+              {activeTab === 'projects' ? (
+                projectsLoading || foldersLoading ? (
+                  <div className="text-center py-8">Loading projects...</div>
+                ) : (
+                  <div className="space-y-4">
                   {/* Debug Information */}
                   {process.env.NODE_ENV === 'development' && (
                     <div className="text-xs text-gray-500 p-2 bg-gray-100 dark:bg-gray-800 rounded">
@@ -589,6 +616,21 @@ export function EnhancedProjectsPanel({
                       <p className="text-xs mt-1">Try adjusting your search or check different folders</p>
                     </div>
                   )}
+                </div>
+                )
+              ) : (
+                /* File Manager Tab */
+                <div className="space-y-4">
+                  <FileUploadArea
+                    variant="dropzone"
+                    maxFiles={10}
+                    showAttachedFiles={true}
+                    className="border-2 border-dashed border-gray-600 hover:border-gray-500 transition-colors"
+                  />
+                  <FileManager
+                    selectionMode={false}
+                    className="bg-gray-800 rounded-lg p-4"
+                  />
                 </div>
               )}
             </div>

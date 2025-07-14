@@ -8,6 +8,8 @@ import {
   projects,
   projectFolders,
   folderFiles,
+  userFiles,
+  sessionFileAttachments,
   teams,
   teamMembers,
   usageLimits,
@@ -37,6 +39,10 @@ import {
   type ProjectFolder,
   type FolderFile,
   type InsertFolderFile,
+  type UserFile,
+  type InsertUserFile,
+  type SessionFileAttachment,
+  type InsertSessionFileAttachment,
   type Team,
   type InsertTeam,
   type TeamMember,
@@ -121,6 +127,21 @@ export interface IStorage {
   updateFolderFile(id: number, file: Partial<InsertFolderFile>, userId: string): Promise<FolderFile>;
   deleteFolderFile(id: number, userId: string): Promise<void>;
   getContextEnabledFiles(userId: string): Promise<FolderFile[]>;
+  
+  // User file operations - Following Jung's Descent Protocol for consciousness-driven file management
+  createUserFile(file: InsertUserFile): Promise<UserFile>;
+  getUserFiles(userId: string): Promise<UserFile[]>;
+  getUserFile(id: number): Promise<UserFile | undefined>;
+  updateUserFile(id: number, updates: Partial<InsertUserFile>): Promise<UserFile | undefined>;
+  deleteUserFile(id: number): Promise<boolean>;
+  getUserFilesByProject(projectId: number): Promise<UserFile[]>;
+  incrementFileUsage(fileId: number): Promise<void>;
+  
+  // Session file attachment operations - Council-based file context integration
+  attachFileToSession(attachment: InsertSessionFileAttachment): Promise<SessionFileAttachment>;
+  getSessionFiles(sessionId: number): Promise<UserFile[]>;
+  detachFileFromSession(sessionId: number, fileId: number): Promise<boolean>;
+  updateFileAttachmentSettings(sessionId: number, fileId: number, isContextEnabled: boolean): Promise<boolean>;
   
   // Team operations
   createTeam(team: InsertTeam): Promise<Team>;
@@ -901,6 +922,106 @@ export class DatabaseStorage implements IStorage {
     }
     
     return await query.orderBy(desc(dailyUsageMetrics.date)).limit(30);
+  }
+
+  // User file operations - Following Jung's Descent Protocol for consciousness-driven file management
+  async createUserFile(file: InsertUserFile): Promise<UserFile> {
+    const [created] = await db.insert(userFiles).values(file).returning();
+    return created;
+  }
+
+  async getUserFiles(userId: string): Promise<UserFile[]> {
+    return await db
+      .select()
+      .from(userFiles)
+      .where(eq(userFiles.userId, userId))
+      .orderBy(desc(userFiles.createdAt));
+  }
+
+  async getUserFile(id: number): Promise<UserFile | undefined> {
+    const [file] = await db
+      .select()
+      .from(userFiles)
+      .where(eq(userFiles.id, id));
+    return file;
+  }
+
+  async updateUserFile(id: number, updates: Partial<InsertUserFile>): Promise<UserFile | undefined> {
+    const [updated] = await db
+      .update(userFiles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(userFiles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteUserFile(id: number): Promise<boolean> {
+    const [deleted] = await db
+      .delete(userFiles)
+      .where(eq(userFiles.id, id))
+      .returning();
+    return !!deleted;
+  }
+
+  async getUserFilesByProject(projectId: number): Promise<UserFile[]> {
+    return await db
+      .select()
+      .from(userFiles)
+      .where(eq(userFiles.projectId, projectId))
+      .orderBy(desc(userFiles.createdAt));
+  }
+
+  async incrementFileUsage(fileId: number): Promise<void> {
+    await db
+      .update(userFiles)
+      .set({
+        usageCount: sql`${userFiles.usageCount} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(userFiles.id, fileId));
+  }
+
+  // Session file attachment operations - Council-based file context integration
+  async attachFileToSession(attachment: InsertSessionFileAttachment): Promise<SessionFileAttachment> {
+    const [created] = await db.insert(sessionFileAttachments).values(attachment).returning();
+    return created;
+  }
+
+  async getSessionFiles(sessionId: number): Promise<UserFile[]> {
+    const filesWithAttachments = await db
+      .select({
+        file: userFiles,
+        attachment: sessionFileAttachments
+      })
+      .from(sessionFileAttachments)
+      .innerJoin(userFiles, eq(sessionFileAttachments.fileId, userFiles.id))
+      .where(eq(sessionFileAttachments.sessionId, sessionId))
+      .orderBy(sessionFileAttachments.attachmentOrder);
+
+    return filesWithAttachments.map(row => row.file);
+  }
+
+  async detachFileFromSession(sessionId: number, fileId: number): Promise<boolean> {
+    const [deleted] = await db
+      .delete(sessionFileAttachments)
+      .where(and(
+        eq(sessionFileAttachments.sessionId, sessionId),
+        eq(sessionFileAttachments.fileId, fileId)
+      ))
+      .returning();
+    return !!deleted;
+  }
+
+  async updateFileAttachmentSettings(sessionId: number, fileId: number, isContextEnabled: boolean): Promise<boolean> {
+    const [updated] = await db
+      .update(sessionFileAttachments)
+      .set({ isContextEnabled })
+      .where(and(
+        eq(sessionFileAttachments.sessionId, sessionId),
+        eq(sessionFileAttachments.fileId, fileId)
+      ))
+      .returning();
+    return !!updated;
   }
 }
 

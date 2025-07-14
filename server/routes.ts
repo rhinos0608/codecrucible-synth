@@ -5,7 +5,7 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { logger, APIError } from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertProjectFolderSchema, insertProjectSchema } from "@shared/schema";
+import { insertProjectFolderSchema, insertProjectSchema, insertUserFileSchema, insertSessionFileAttachmentSchema } from "@shared/schema";
 import { contextAwareOpenAI } from "./context-aware-openai-service";
 import { realOpenAIService } from "./openai-service";
 import { enforceSubscriptionLimits } from "./middleware/subscription-enforcement";
@@ -2119,6 +2119,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+
+  // File Upload API endpoints - Following Jung's Descent Protocol for consciousness-driven file management
+  
+  // Upload a file to the user's file storage
+  app.post('/api/files/upload', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { fileName, content, mimeType, projectId, sessionId } = req.body;
+      
+      // Security validation following AI_INSTRUCTIONS.md patterns
+      if (!fileName || !content || !mimeType) {
+        return res.status(400).json({ 
+          error: 'Missing required fields: fileName, content, mimeType' 
+        });
+      }
+      
+      // File size validation (10MB limit)
+      const fileSize = Buffer.byteLength(content, 'utf8');
+      if (fileSize > 10485760) {
+        return res.status(413).json({ 
+          error: 'File too large. Maximum size is 10MB.' 
+        });
+      }
+      
+      // Sanitize filename for security
+      const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      
+      // Detect programming language from file extension
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      const languageMap: Record<string, string> = {
+        'js': 'javascript', 'jsx': 'javascript', 'ts': 'typescript', 'tsx': 'typescript',
+        'py': 'python', 'java': 'java', 'cpp': 'cpp', 'c': 'c', 'cs': 'csharp',
+        'php': 'php', 'rb': 'ruby', 'go': 'go', 'rs': 'rust', 'kt': 'kotlin',
+        'swift': 'swift', 'html': 'html', 'css': 'css', 'scss': 'scss',
+        'json': 'json', 'xml': 'xml', 'yaml': 'yaml', 'yml': 'yaml',
+        'md': 'markdown', 'txt': 'text', 'log': 'text'
+      };
+      
+      const detectedLanguage = languageMap[ext || ''] || 'text';
+      
+      // Create metadata with line count and complexity analysis
+      const lines = content.split('\n');
+      const metadata = {
+        lineCount: lines.length,
+        extension: ext,
+        complexity: lines.length > 100 ? 'high' : lines.length > 30 ? 'medium' : 'low',
+        hasCode: /[{}();]/.test(content),
+        uploadedAt: new Date().toISOString()
+      };
+      
+      const fileData = {
+        userId,
+        originalName: fileName,
+        fileName: sanitizedFileName,
+        content,
+        mimeType,
+        fileSize,
+        encoding: 'utf-8',
+        language: detectedLanguage,
+        isContextAvailable: true,
+        projectId: projectId || null,
+        sessionId: sessionId || null,
+        tags: [],
+        metadata
+      };
+      
+      // Validate with Zod schema
+      const validatedFile = insertUserFileSchema.parse(fileData);
+      
+      // Create file in database
+      const createdFile = await storage.createUserFile(validatedFile);
+      
+      logger.info('File uploaded successfully', { 
+        userId: userId.substring(0, 8) + '...',
+        fileName: sanitizedFileName,
+        fileSize,
+        language: detectedLanguage
+      });
+      
+      res.json(createdFile);
+    } catch (error) {
+      logger.error('Failed to upload file', error as Error);
+      res.status(500).json({ error: 'Failed to upload file' });
+    }
+  });
+  
+  // Get user's uploaded files
+  app.get('/api/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const files = await storage.getUserFiles(userId);
+      
+      logger.info('User files retrieved', { 
+        userId: userId.substring(0, 8) + '...',
+        fileCount: files.length
+      });
+      
+      res.json(files);
+    } catch (error) {
+      logger.error('Failed to get user files', error as Error);
+      res.status(500).json({ error: 'Failed to get files' });
+    }
+  });
+  
+  // Get a specific file
+  app.get('/api/files/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const fileId = parseInt(req.params.id);
+      
+      const file = await storage.getUserFile(fileId);
+      if (!file || file.userId !== userId) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      
+      // Increment usage count for analytics
+      await storage.incrementFileUsage(fileId);
+      
+      res.json(file);
+    } catch (error) {
+      logger.error('Failed to get file', error as Error);
+      res.status(500).json({ error: 'Failed to get file' });
+    }
+  });
+  
+  // Delete a file
+  app.delete('/api/files/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const fileId = parseInt(req.params.id);
+      
+      // Verify ownership
+      const file = await storage.getUserFile(fileId);
+      if (!file || file.userId !== userId) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      
+      const deleted = await storage.deleteUserFile(fileId);
+      
+      if (deleted) {
+        logger.info('File deleted successfully', { 
+          userId: userId.substring(0, 8) + '...',
+          fileId,
+          fileName: file.fileName
+        });
+        res.json({ success: true });
+      } else {
+        res.status(500).json({ error: 'Failed to delete file' });
+      }
+    } catch (error) {
+      logger.error('Failed to delete file', error as Error);
+      res.status(500).json({ error: 'Failed to delete file' });
+    }
+  });
+  
+  // Attach files to a session for AI context
+  app.post('/api/sessions/:sessionId/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessionId = parseInt(req.params.sessionId);
+      const { fileId, isContextEnabled = true } = req.body;
+      
+      if (!fileId) {
+        return res.status(400).json({ error: 'fileId is required' });
+      }
+      
+      // Verify file ownership
+      const file = await storage.getUserFile(fileId);
+      if (!file || file.userId !== userId) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      
+      // Verify session ownership
+      const session = await storage.getVoiceSession(sessionId);
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      // Get current attachments to determine order
+      const existingFiles = await storage.getSessionFiles(sessionId);
+      const attachmentOrder = existingFiles.length;
+      
+      const attachmentData = {
+        sessionId,
+        fileId,
+        attachmentOrder,
+        isContextEnabled
+      };
+      
+      const validatedAttachment = insertSessionFileAttachmentSchema.parse(attachmentData);
+      const attachment = await storage.attachFileToSession(validatedAttachment);
+      
+      logger.info('File attached to session', { 
+        userId: userId.substring(0, 8) + '...',
+        sessionId,
+        fileId,
+        fileName: file.fileName
+      });
+      
+      res.json(attachment);
+    } catch (error) {
+      logger.error('Failed to attach file to session', error as Error);
+      res.status(500).json({ error: 'Failed to attach file to session' });
+    }
+  });
+  
+  // Get files attached to a session
+  app.get('/api/sessions/:sessionId/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessionId = parseInt(req.params.sessionId);
+      
+      // Verify session ownership
+      const session = await storage.getVoiceSession(sessionId);
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      const files = await storage.getSessionFiles(sessionId);
+      res.json(files);
+    } catch (error) {
+      logger.error('Failed to get session files', error as Error);
+      res.status(500).json({ error: 'Failed to get session files' });
+    }
+  });
+  
+  // Detach file from session
+  app.delete('/api/sessions/:sessionId/files/:fileId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessionId = parseInt(req.params.sessionId);
+      const fileId = parseInt(req.params.fileId);
+      
+      // Verify session ownership
+      const session = await storage.getVoiceSession(sessionId);
+      if (!session || session.userId !== userId) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      const detached = await storage.detachFileFromSession(sessionId, fileId);
+      
+      if (detached) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'File attachment not found' });
+      }
+    } catch (error) {
+      logger.error('Failed to detach file from session', error as Error);
+      res.status(500).json({ error: 'Failed to detach file from session' });
+    }
+  });
 
   // Error tracking endpoint
   app.post("/api/errors/track", async (req, res) => {

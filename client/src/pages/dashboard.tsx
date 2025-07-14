@@ -38,6 +38,9 @@ import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { VoiceProfileTutorial } from "@/components/onboarding/VoiceProfileTutorial";
 import { useNewUserDetection } from "@/hooks/useNewUserDetection";
 import { useToast } from "@/hooks/use-toast";
+import { FileUploadArea } from "@/components/file-upload-area";
+import { useSessionFiles } from "@/hooks/useFileUpload";
+import type { UserFile } from "@shared/schema";
 
 export default function Dashboard() {
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -71,6 +74,8 @@ export default function Dashboard() {
   const [projectContext, setProjectContext] = useState<Project | null>(null);
   const [selectedContextProjects, setSelectedContextProjects] = useState<Project[]>([]);
   const [contextFileCount, setContextFileCount] = useState(0);
+  const [attachedFiles, setAttachedFiles] = useState<UserFile[]>([]);
+  const [sessionId, setSessionId] = useState<number | null>(null);
   const [showEnhancedProjectsPanel, setShowEnhancedProjectsPanel] = useState(false);
 
   const { user } = useAuth();
@@ -78,6 +83,23 @@ export default function Dashboard() {
   const { recommendations, isAnalyzing, analyzePrompt } = useVoiceRecommendations();
   const planGuard = usePlanGuard();
   const { toast } = useToast();
+
+  // File upload handlers for session context
+  const handleFileUploaded = (file: UserFile) => {
+    setAttachedFiles(prev => [...prev, file]);
+    toast({
+      title: "File uploaded",
+      description: `${file.fileName} has been added to your workspace and will be included in AI context.`,
+    });
+  };
+
+  const handleFilesAttached = (files: UserFile[]) => {
+    setAttachedFiles(prev => [...prev, ...files]);
+    toast({
+      title: "Files attached",
+      description: `${files.length} file${files.length > 1 ? 's' : ''} attached to current session.`,
+    });
+  };
   
   // Upgrade success detection - following AI_INSTRUCTIONS.md patterns
   useEffect(() => {
@@ -694,6 +716,20 @@ export default function Dashboard() {
                     <span>Analyzing prompt for voice recommendations...</span>
                   </div>
                 )}
+                
+                {/* File Upload Area */}
+                <div className="mt-4 border-t border-gray-700 pt-4">
+                  <FileUploadArea
+                    sessionId={sessionId}
+                    onFileUploaded={handleFileUploaded}
+                    onFilesAttached={handleFilesAttached}
+                    variant="compact"
+                    maxFiles={3}
+                    showAttachedFiles={true}
+                    attachedFiles={attachedFiles}
+                    className="mb-2"
+                  />
+                </div>
               </div>
               <div className="border-t border-gray-700 p-4 flex items-center justify-between">
                 <div className="text-sm text-gray-400">

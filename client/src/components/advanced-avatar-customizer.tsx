@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -426,6 +426,9 @@ export function AdvancedAvatarCustomizer({
             {editingProfile ? 'Edit Custom Voice' : 'Create Custom Voice Profile'}
             <Badge variant="secondary">Pro Feature</Badge>
           </DialogTitle>
+          <DialogDescription>
+            Create a specialized AI voice engine with custom personality, expertise, and coding approach following Jung's Descent Protocol.
+          </DialogDescription>
         </DialogHeader>
 
         <FeatureGate feature="custom_voices" className="min-h-[400px]">

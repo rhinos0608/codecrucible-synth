@@ -17,16 +17,16 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  messages: Message[];
-  onSendMessage: (message: string) => void;
+  messages?: Message[];
+  onSendMessage?: (message: string) => void;
   isLoading?: boolean;
   placeholder?: string;
   className?: string;
 }
 
 export function ChatInterface({ 
-  messages, 
-  onSendMessage, 
+  messages = [], 
+  onSendMessage = () => {}, 
   isLoading = false,
   placeholder = "Ask anything about your code...",
   className
@@ -57,7 +57,7 @@ export function ChatInterface({
     }
   };
 
-  const handleKeyDown = (e: any) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault();
       handleSend();
@@ -65,7 +65,7 @@ export function ChatInterface({
   };
 
   return (
-    <div className={cn("flex flex-col h-full max-h-[600px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg", className)}>
+    <div className={cn("flex flex-col h-full max-h-[600px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg modern-card", className)}>
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
@@ -73,79 +73,75 @@ export function ChatInterface({
         </div>
         <div>
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">AI Assistant</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Powered by consciousness-driven AI</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Ready to help with your code</p>
         </div>
       </div>
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
-          {messages.length === 0 && (
+          {messages.length === 0 ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900 dark:to-blue-900 flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-              </div>
-              <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Start a conversation</h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Ask questions about your code, get suggestions, or explore ideas</p>
+              <Sparkles className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">Start a conversation with your AI assistant</p>
             </div>
-          )}
-
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex gap-3 max-w-full",
-                message.role === 'user' ? "justify-end" : "justify-start"
-              )}
-            >
-              {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-              )}
-
-              <div className={cn(
-                "max-w-[80%] rounded-2xl px-4 py-3",
-                message.role === 'user' 
-                  ? "bg-blue-500 text-white" 
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+          ) : (
+            messages.map((message) => (
+              <div key={message.id} className={cn(
+                "flex gap-3",
+                message.role === 'user' ? 'justify-end' : 'justify-start'
               )}>
-                {message.voice && (
-                  <div className="text-xs opacity-75 mb-1">{message.voice}</div>
+                {message.role === 'assistant' && (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-4 h-4 text-white" />
+                  </div>
                 )}
                 
-                {message.isCode ? (
-                  <SyntaxHighlighter
-                    style={oneDark}
-                    language="typescript"
-                    className="!bg-transparent !p-0 !m-0 text-sm"
-                  >
-                    {message.content}
-                  </SyntaxHighlighter>
-                ) : (
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {message.content}
-                  </p>
+                <div className={cn(
+                  "max-w-[80%] rounded-xl p-3 break-words",
+                  message.role === 'user' 
+                    ? "bg-blue-500 text-white" 
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                )}>
+                  {message.isCode ? (
+                    <SyntaxHighlighter
+                      style={oneDark}
+                      language="typescript"
+                      className="!text-sm !rounded-lg !bg-transparent"
+                    >
+                      {message.content}
+                    </SyntaxHighlighter>
+                  ) : (
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  )}
+                  
+                  <div className={cn(
+                    "text-xs mt-2 opacity-70",
+                    message.role === 'user' ? "text-blue-100" : "text-gray-500"
+                  )}>
+                    {message.timestamp.toLocaleTimeString()}
+                    {message.voice && ` • ${message.voice}`}
+                  </div>
+                </div>
+
+                {message.role === 'user' && (
+                  <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                  </div>
                 )}
               </div>
-
-              {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                </div>
-              )}
-            </div>
-          ))}
-
+            ))
+          )}
+          
           {isLoading && (
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
                 <Bot className="w-4 h-4 text-white" />
               </div>
-              <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-3">
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Thinking...</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">AI is thinking...</span>
                 </div>
               </div>
             </div>
@@ -167,33 +163,22 @@ export function ChatInterface({
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
               placeholder={placeholder}
-              rows={1}
-              className={cn(
-                "w-full resize-none rounded-xl border border-gray-200 dark:border-gray-700",
-                "bg-gray-50 dark:bg-gray-800 px-4 py-3 pr-12",
-                "text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400",
-                "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-                "transition-all duration-200"
-              )}
-              style={{ minHeight: '44px' }}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm modern-focus"
+              style={{ minHeight: '44px', maxHeight: '200px' }}
+              disabled={isLoading}
             />
-            
-            {input.trim() && (
-              <AppleStyleButton
-                size="icon"
-                onClick={handleSend}
-                disabled={isLoading}
-                className="absolute right-2 bottom-2 h-8 w-8 rounded-lg bg-blue-500 hover:bg-blue-600"
-              >
-                <ArrowUp className="w-4 h-4" />
-              </AppleStyleButton>
-            )}
           </div>
-        </div>
-        
-        <div className="flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
-          <span>Press Enter to send, Shift+Enter for new line</span>
-          <span>{input.length}/4000</span>
+          
+          <AppleStyleButton
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+            loading={isLoading}
+            variant="consciousness"
+            size="icon"
+            className="flex-shrink-0"
+          >
+            <Send className="w-4 h-4" />
+          </AppleStyleButton>
         </div>
       </div>
     </div>

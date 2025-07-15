@@ -208,7 +208,7 @@ export function ModernVoiceSelector() {
     }
   };
 
-  const totalSelected = selectedPerspectives.length + selectedRoles.length;
+  const totalSelected = (selectedPerspectives?.length || 0) + (selectedRoles?.length || 0);
   const voiceLimit = getVoiceLimit();
   const canSelectMore = totalSelected < voiceLimit;
 
@@ -271,9 +271,9 @@ export function ModernVoiceSelector() {
               <VoiceCard
                 key={voice.id}
                 voice={voice}
-                isSelected={selectedPerspectives.includes(voice.id)}
+                isSelected={selectedPerspectives?.includes(voice.id) || false}
                 onToggle={() => togglePerspective(voice.id)}
-                disabled={!canSelectMore && !selectedPerspectives.includes(voice.id)}
+                disabled={!canSelectMore && !(selectedPerspectives?.includes(voice.id) || false)}
               />
             ))}
           </div>
@@ -286,9 +286,9 @@ export function ModernVoiceSelector() {
               <VoiceCard
                 key={voice.id}
                 voice={voice}
-                isSelected={selectedRoles.includes(voice.id)}
+                isSelected={selectedRoles?.includes(voice.id) || false}
                 onToggle={() => toggleRole(voice.id)}
-                disabled={!canSelectMore && !selectedRoles.includes(voice.id)}
+                disabled={!canSelectMore && !(selectedRoles?.includes(voice.id) || false)}
               />
             ))}
           </div>
@@ -315,7 +315,7 @@ export function ModernVoiceSelector() {
           >
             <ScrollArea className="h-[400px]">
               <div className="space-y-3">
-                {voiceProfiles.map((profile) => (
+                {(voiceProfiles || []).map((profile) => (
                   <Card
                     key={profile.id}
                     className="cursor-pointer hover:shadow-sm transition-all duration-200 border border-gray-200 dark:border-gray-700"
@@ -342,7 +342,7 @@ export function ModernVoiceSelector() {
                   </Card>
                 ))}
 
-                {voiceProfiles.length === 0 && (
+                {(!voiceProfiles || voiceProfiles.length === 0) && (
                   <Card className="p-6 text-center border-dashed">
                     <Plus className="w-8 h-8 mx-auto mb-3 text-gray-400" />
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
@@ -360,7 +360,7 @@ export function ModernVoiceSelector() {
       </Tabs>
 
       {/* Voice Recommendations */}
-      {recommendations && recommendations.suggestions.length > 0 && (
+      {recommendations && recommendations.suggestions && recommendations.suggestions.length > 0 && (
         <Card className="border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -374,7 +374,7 @@ export function ModernVoiceSelector() {
             </p>
             
             <div className="flex flex-wrap gap-2">
-              {recommendations.suggestions.map((suggestion, idx) => (
+              {(recommendations.suggestions || []).map((suggestion, idx) => (
                 <Badge 
                   key={idx}
                   variant="secondary"

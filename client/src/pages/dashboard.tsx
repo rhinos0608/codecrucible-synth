@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2, Target, X, Menu, ChevronRight, HelpCircle } from "lucide-react";
-import { AppleStyleButton } from "@/components/modern-ui/AppleStyleButton";
-import { ModernVoiceSelector } from "@/components/modern-ui/ModernVoiceSelector";
-import { ModernSolutionStack } from "@/components/modern-ui/ModernSolutionStack";
+import { AppleStyleButton, ModernVoiceSelector, ModernSolutionStack } from "@/components/modern-ui";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";

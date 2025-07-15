@@ -9,3 +9,6 @@ export { ModernSolutionStack } from './ModernSolutionStack';
 
 // Export types for modern UI components
 export type { ButtonProps } from './AppleStyleButton';
+
+// Re-export button variants for external use
+export { buttonVariants } from './AppleStyleButton';

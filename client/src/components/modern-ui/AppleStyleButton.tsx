@@ -10,7 +10,7 @@ const buttonVariants = cva(
   "inline-flex items-center justify-center font-medium transition-all duration-200 ease-out " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:pointer-events-none " +
-  "active:scale-[0.98] hover:shadow-sm",
+  "active:scale-[0.98] hover:shadow-sm apple-button",
   {
     variants: {
       variant: {
@@ -46,7 +46,7 @@ const buttonVariants = cva(
           "bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-500 text-white " +
           "hover:shadow-lg hover:shadow-purple-500/25 " +
           "focus-visible:ring-purple-500 " +
-          "relative overflow-hidden",
+          "relative overflow-hidden consciousness-button",
       },
       size: {
         sm: "h-8 px-3 text-xs rounded-md",
@@ -67,7 +67,7 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   loading?: boolean;
-  icon?: any;
+  icon?: React.ReactNode;
 }
 
 const AppleStyleButton = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -81,13 +81,19 @@ const AppleStyleButton = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         {...props}
       >
-        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-        {!loading && icon && <span className="w-4 h-4 mr-2">{icon}</span>}
-        {children}
-        
-        {/* Consciousness variant shimmer effect */}
-        {variant === "consciousness" && (
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            {children}
+          </>
+        ) : (
+          <>
+            {icon && <span className="mr-2">{icon}</span>}
+            {children}
+            {variant === "consciousness" && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 shimmer-effect" />
+            )}
+          </>
         )}
       </Comp>
     );
@@ -97,3 +103,4 @@ const AppleStyleButton = forwardRef<HTMLButtonElement, ButtonProps>(
 AppleStyleButton.displayName = "AppleStyleButton";
 
 export { AppleStyleButton, buttonVariants };
+export type { ButtonProps };

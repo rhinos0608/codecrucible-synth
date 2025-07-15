@@ -445,9 +445,14 @@ export default function Dashboard() {
       
       {/* Modern Layout Integration - Replacing traditional dashboard */}
       <ModernLayout />
-      
-      {/* Keep existing modal states for backward compatibility */}
-      <div className="hidden">{/* Original dashboard content preserved but hidden */}
+    </>
+  );
+  
+  // Original dashboard return preserved but disabled
+  const originalDashboardReturn = (
+    <>
+      {confirmationDialog}
+      <div className="dashboard-container min-h-screen flex bg-gray-900 text-gray-100 main-content overflow-hidden">
       {/* Main Chat Interface */}
       <div className="dashboard-main flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header - Mobile Optimized */}
@@ -885,7 +890,7 @@ export default function Dashboard() {
                 <SubscriptionStatus onUpgrade={() => setShowUpgradeModal(true)} />
               </div>
               <div className="border-t border-gray-700" data-tour="voice-selector">
-                <ModernVoiceSelector />
+                <PerspectiveSelector />
               </div>
             </div>
           </div>
@@ -893,7 +898,7 @@ export default function Dashboard() {
       )}
 
       {/* Modals */}
-      <ModernSolutionStack
+      <SolutionStack
         isOpen={showSolutionStack}
         onClose={() => setShowSolutionStack(false)}
         sessionId={currentSessionId}

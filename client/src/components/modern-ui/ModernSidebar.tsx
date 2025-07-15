@@ -22,10 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
-import { usePlanGuard } from "@/hooks/usePlanGuard";
-import { useProjects } from "@/hooks/use-projects";
-import { useProjectFolders } from "@/hooks/use-project-folders";
+// Simplified imports for initial implementation
+// Will restore full integration once core layout works
 import type { Project, ProjectFolder } from "@shared/schema";
 
 interface ModernSidebarProps {
@@ -42,10 +40,15 @@ export function ModernSidebar({
   className 
 }: ModernSidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
-  const { user, logout } = useAuth();
-  const { planTier } = usePlanGuard();
-  const { data: projects = [] } = useProjects();
-  const { data: folders = [] } = useProjectFolders();
+  // Mock data for initial layout implementation
+  const user = { username: 'Demo User' };
+  const planTier = 'free';
+  const projects = [];
+  const folders = [];
+  
+  const logout = () => {
+    window.location.href = '/api/logout';
+  };
 
   const toggleFolder = (folderId: number) => {
     const newExpanded = new Set(expandedFolders);

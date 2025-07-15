@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ModernVoiceSelector } from "./ModernVoiceSelector";
 import { AppleStyleButton } from "./AppleStyleButton";
 import { cn } from "@/lib/utils";
-import { useVoiceSelection } from "@/contexts/voice-selection-context";
-import { usePlanGuard } from "@/hooks/usePlanGuard";
+// Simplified imports for initial implementation
 
 interface ModernMainContentProps {
   onGenerate?: (prompt: string) => void;
@@ -23,8 +22,11 @@ export function ModernMainContent({
 }: ModernMainContentProps) {
   const [prompt, setPrompt] = useState("");
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const { selectedPerspectives, selectedRoles, isValidSelection } = useVoiceSelection();
-  const { canGenerate, planTier } = usePlanGuard();
+  // Simplified voice selection for initial implementation
+  const selectedVoices = ['explorer', 'architect'];
+  // Mock data for initial implementation
+  const canGenerate = true;
+  const planTier = 'free';
 
   const handleGenerate = () => {
     if (!canGenerate || !prompt.trim()) return;
@@ -62,7 +64,7 @@ export function ModernMainContent({
           <div className="flex items-center justify-center gap-4 mb-6">
             <Badge variant="outline" className="flex items-center gap-1">
               <Brain className="w-3 h-3" />
-              {selectedPerspectives.length + selectedRoles.length} voices selected
+              {selectedVoices.length} voices selected
             </Badge>
             <Button
               variant="ghost"

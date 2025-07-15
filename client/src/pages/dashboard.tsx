@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Terminal, Play, Settings, FolderOpen, User, LogOut, BarChart3, Crown, Users, GraduationCap, Brain, Loader2, Target, X, Menu, ChevronRight, HelpCircle } from "lucide-react";
-import { AppleStyleButton, ModernVoiceSelector, ModernSolutionStack } from "@/components/modern-ui";
+import { ModernLayout } from "@/components/modern-ui";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -442,7 +442,12 @@ export default function Dashboard() {
   return (
     <>
       {confirmationDialog}
-      <div className="dashboard-container min-h-screen flex bg-gray-900 text-gray-100 main-content overflow-hidden">
+      
+      {/* Modern Layout Integration - Replacing traditional dashboard */}
+      <ModernLayout />
+      
+      {/* Keep existing modal states for backward compatibility */}
+      <div className="hidden">{/* Original dashboard content preserved but hidden */}
       {/* Main Chat Interface */}
       <div className="dashboard-main flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header - Mobile Optimized */}

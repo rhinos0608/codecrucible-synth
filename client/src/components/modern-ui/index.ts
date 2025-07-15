@@ -6,6 +6,9 @@ export { ChatInterface } from './ChatInterface';
 export { ModernDashboard } from './ModernDashboard';
 export { ModernVoiceSelector } from './ModernVoiceSelector';
 export { ModernSolutionStack } from './ModernSolutionStack';
+export { ModernSidebar } from './ModernSidebar';
+export { ModernMainContent } from './ModernMainContent';
+export { ModernLayout } from './ModernLayout';
 
 // Export types for modern UI components
 export type { ButtonProps } from './AppleStyleButton';

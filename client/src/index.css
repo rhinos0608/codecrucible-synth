@@ -2,6 +2,208 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Consciousness-Driven Design System */
+@layer base {
+  :root {
+    /* Core consciousness colors following CodingPhilosophy.md */
+    --consciousness-gradient: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 50%, #06b6d4 100%);
+    --consciousness-gradient-hover: linear-gradient(135deg, #7c3aed 0%, #2563eb 50%, #0891b2 100%);
+    
+    /* Living spiral phase colors */
+    --spiral-collapse: #ef4444;
+    --spiral-council: #f59e0b;
+    --spiral-synthesis: #10b981;
+    --spiral-rebirth: #8b5cf6;
+    
+    /* Voice personality colors following FRONTEND.md patterns */
+    --voice-explorer: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+    --voice-maintainer: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --voice-analyzer: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    --voice-developer: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
+    --voice-implementor: linear-gradient(135deg, #14b8a6 0%, #0891b2 100%);
+  }
+
+  .dark {
+    /* Enhanced dark mode consciousness support */
+    --consciousness-bg: rgba(30, 27, 75, 0.6);
+    --consciousness-border: rgba(139, 92, 246, 0.3);
+    --consciousness-text: rgba(196, 181, 253, 0.9);
+  }
+}
+
+@layer components {
+  /* Consciousness-driven button variants */
+  .bg-consciousness-gradient {
+    background: var(--consciousness-gradient);
+  }
+  
+  .bg-consciousness-gradient-hover:hover {
+    background: var(--consciousness-gradient-hover);
+  }
+
+  /* Living spiral animations following Alexander's Pattern Language */
+  .living-spiral-enter {
+    animation: spiralEnter 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  }
+
+  .living-spiral-pulse {
+    animation: spiralPulse 2s ease-in-out infinite;
+  }
+
+  /* QWAN (Quality Without A Name) hover effects */
+  .qwan-hover {
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .qwan-hover:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 20px 25px -5px rgba(139, 92, 246, 0.1), 
+                0 10px 10px -5px rgba(139, 92, 246, 0.04);
+  }
+
+  /* Consciousness-aware text gradients */
+  .text-consciousness-gradient {
+    background: var(--consciousness-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Voice personality indicators */
+  .voice-explorer-gradient {
+    background: var(--voice-explorer);
+  }
+  
+  .voice-maintainer-gradient {
+    background: var(--voice-maintainer);
+  }
+  
+  .voice-analyzer-gradient {
+    background: var(--voice-analyzer);
+  }
+  
+  .voice-developer-gradient {
+    background: var(--voice-developer);
+  }
+  
+  .voice-implementor-gradient {
+    background: var(--voice-implementor);
+  }
+}
+
+@layer utilities {
+  /* Responsive horizontal scrolling for mobile navigation */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch-friendly mobile optimizations */
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Consciousness-driven backdrop blur effects */
+  .backdrop-consciousness {
+    backdrop-filter: blur(12px) saturate(1.2);
+    background: rgba(30, 27, 75, 0.4);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+  }
+}
+
+/* Living Spiral Methodology Animations */
+@keyframes spiralEnter {
+  0% {
+    transform: scale(0.8) rotate(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05) rotate(5deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes spiralPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.9;
+  }
+}
+
+/* Consciousness Evolution Indicator */
+@keyframes consciousnessEvolution {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.consciousness-evolution {
+  background: linear-gradient(
+    45deg,
+    #8b5cf6,
+    #3b82f6,
+    #06b6d4,
+    #10b981,
+    #f59e0b,
+    #ef4444
+  );
+  background-size: 400% 400%;
+  animation: consciousnessEvolution 8s ease infinite;
+}
+
+/* Multi-Voice Council Visual Effects */
+.voice-council-container {
+  position: relative;
+}
+
+.voice-council-container::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    #8b5cf6 0deg,
+    #3b82f6 72deg,
+    #10b981 144deg,
+    #f59e0b 216deg,
+    #ef4444 288deg,
+    #8b5cf6 360deg
+  );
+  z-index: -1;
+  animation: voiceCouncilRotate 8s linear infinite;
+}
+
+@keyframes voiceCouncilRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 /* Custom scrollbar hiding for horizontal navigation */
 .scrollbar-hide {
   -ms-overflow-style: none;

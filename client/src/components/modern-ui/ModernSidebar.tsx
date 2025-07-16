@@ -6,6 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Project } from "@shared/schema";
+import { useProjects } from "@/hooks/use-projects";
+import { useChatSessions } from "@/hooks/use-chat-sessions";
+import { useLocation } from "wouter";
 
 interface ModernSidebarProps {
   onProjectSelect?: (project: Project) => void;
@@ -21,18 +24,40 @@ export function ModernSidebar({
   className 
 }: ModernSidebarProps) {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [, setLocation] = useLocation();
+  
+  // Fetch real projects from API
+  const { projects = [], isLoading, error } = useProjects();
+  
+  // Chat session management
+  const { createChatSession, isCreating } = useChatSessions();
 
-  // Mock projects for layout testing
-  const projects = [
-    { id: "1", title: "React Dashboard", language: "TypeScript", lastModified: "2 hours ago" },
-    { id: "2", title: "API Integration", language: "Node.js", lastModified: "Yesterday" },
-    { id: "3", title: "Authentication Flow", language: "React", lastModified: "3 days ago" },
-    { id: "4", title: "Database Schema", language: "SQL", lastModified: "1 week ago" },
-  ];
+  console.log('🔍 ModernSidebar Projects:', {
+    count: projects.length,
+    loading: isLoading,
+    error: error?.message,
+    projects: projects.map(p => ({ id: p.id, name: p.name, language: p.language }))
+  });
 
-  const handleProjectClick = (projectId: string) => {
-    setSelectedProject(projectId);
-    // onProjectSelect could be called here with the project
+  const handleProjectClick = (project: Project) => {
+    console.log('📁 Project clicked for chat:', project);
+    setSelectedProject(project.id.toString());
+    
+    // Navigate to chat page with project context
+    if (project.chatSessionId) {
+      setLocation(`/chat/${project.chatSessionId}`);
+    } else {
+      // Create new chat session for this project
+      console.log('🆕 Creating new chat session for project:', project.id);
+      createChatSession({
+        projectId: project.id,
+        selectedVoice: 'Developer', // Default voice for project discussions
+        initialCode: project.code,
+        projectName: project.name
+      });
+      
+      // Navigation will be handled by the mutation success callback
+    }
   };
 
   return (
@@ -60,34 +85,57 @@ export function ModernSidebar({
       {/* Chat History / Projects */}
       <ScrollArea className="flex-1 px-2">
         <div className="space-y-2 py-2">
+          {isLoading && (
+            <div className="text-center text-gray-400 py-4">
+              Loading projects...
+            </div>
+          )}
+          
+          {error && (
+            <div className="text-center text-red-400 py-4">
+              Failed to load projects
+            </div>
+          )}
+          
           {projects.map((project) => (
             <Button
               key={project.id}
-              variant={selectedProject === project.id ? "secondary" : "ghost"}
+              variant={selectedProject === project.id.toString() ? "secondary" : "ghost"}
               className={cn(
                 "w-full justify-start text-left h-auto p-3",
-                selectedProject === project.id 
+                selectedProject === project.id.toString() 
                   ? "bg-gray-800" 
                   : "hover:bg-gray-800"
               )}
               onClick={() => {
-                console.log('📁 Project selected:', project.id, project.title);
-                handleProjectClick(project.id);
+                console.log('📁 Project selected:', project.id, project.name);
+                handleProjectClick(project);
               }}
             >
               <div className="flex items-start gap-2 w-full">
                 <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm text-white truncate">
-                    {project.title}
+                    {project.name}
                   </div>
-                  <div className="text-xs text-gray-400 truncate">
-                    {project.language} • {project.lastModified}
+                  <div className="text-xs text-gray-400 truncate flex items-center gap-2">
+                    <span>{project.language} • {new Date(project.createdAt).toLocaleDateString()}</span>
+                    {isCreating && selectedProject === project.id.toString() ? (
+                      <div className="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full flex-shrink-0" />
+                    ) : project.chatSessionId ? (
+                      <Badge variant="secondary" className="text-xs px-1 py-0">Chat</Badge>
+                    ) : null}
                   </div>
                 </div>
               </div>
             </Button>
           ))}
+          
+          {projects.length === 0 && !isLoading && (
+            <div className="text-center text-gray-400 py-4">
+              No projects yet. Generate some code to get started!
+            </div>
+          )}
         </div>
       </ScrollArea>
 

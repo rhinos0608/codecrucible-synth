@@ -905,6 +905,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get chat session details
+  app.get('/api/chat/sessions/:chatSessionId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { chatSessionId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify chat session ownership
+      const chatSession = await storage.getChatSession(parseInt(chatSessionId));
+      if (!chatSession || chatSession.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied to chat session' });
+      }
+      
+      logger.info('Chat session retrieved', { 
+        chatSessionId: chatSession.id,
+        userId: userId.substring(0, 8) + '...'
+      });
+      
+      res.json(chatSession);
+    } catch (error) {
+      logger.error('Error retrieving chat session', error as Error, { 
+        chatSessionId: req.params.chatSessionId,
+        userId: req.user?.claims?.sub
+      });
+      res.status(500).json({ error: 'Failed to retrieve chat session' });
+    }
+  });
+
   // Get chat messages for a session
   app.get('/api/chat/sessions/:chatSessionId/messages', isAuthenticated, async (req: any, res) => {
     try {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Copy, Download, MessageSquare, Lightbulb, Code2, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useToast } from "@/hooks/use-toast";
+import { useSessionSolutions } from '@/hooks/api/useVoiceSessions';
 
 interface Solution {
   id: number;
@@ -38,6 +39,17 @@ export function ModernSolutionStack({
   const [activeTab, setActiveTab] = useState("solutions");
   const [selectedSolution, setSelectedSolution] = useState<number | null>(null);
   const { toast } = useToast();
+  
+  // Fetch real solutions from API when sessionId is available
+  const { data: apiSolutions = [], isLoading: loadingSolutions } = useSessionSolutions(sessionId);
+  
+  console.log('🎯 ModernSolutionStack state:', {
+    sessionId,
+    propSolutions: solutions.length,
+    apiSolutions: apiSolutions.length,
+    isLoading: loadingSolutions,
+    isOpen
+  });
 
   const handleCopyCode = (code: string, voice: string) => {
     navigator.clipboard.writeText(code);
@@ -55,25 +67,14 @@ export function ModernSolutionStack({
     });
   };
 
-  // Mock solutions if none provided (for development)
-  const displaySolutions = solutions.length > 0 ? solutions : [
-    {
-      id: 1,
-      voice: "Explorer",
-      confidence: 92,
-      code: "// Explorer's innovative approach\nconst solution = () => {\n  // Experimental implementation\n  return 'explored';\n};",
-      explanation: "This solution explores new possibilities with an innovative approach.",
-      voiceCombination: "Explorer"
-    },
-    {
-      id: 2,
-      voice: "Analyzer",
-      confidence: 88,
-      code: "// Analyzer's systematic solution\nfunction analyze() {\n  // Thorough analysis\n  return 'analyzed';\n}",
-      explanation: "A systematic analysis-driven solution with comprehensive evaluation.",
-      voiceCombination: "Analyzer"
-    }
-  ];
+  // Use real API solutions if available, otherwise use prop solutions
+  const displaySolutions = apiSolutions.length > 0 ? apiSolutions : solutions;
+  
+  console.log('✅ Final displaySolutions:', {
+    count: displaySolutions.length,
+    sources: apiSolutions.length > 0 ? 'API' : 'props',
+    sessionId
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -97,7 +98,7 @@ export function ModernSolutionStack({
               className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"
             >
               <Code2 className="w-4 h-4 mr-2" />
-              Solutions ({displaySolutions.length})
+              Solutions ({displaySolutions.length}){loadingSolutions && " (Loading...)"}
             </TabsTrigger>
             <TabsTrigger 
               value="comparison"

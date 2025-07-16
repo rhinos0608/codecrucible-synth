@@ -75,10 +75,22 @@ export function PostGenerationDecision({
       return apiRequest('/api/chat/sessions', {
         method: 'POST',
         body: {
+          sessionId: solution.sessionId,
           selectedVoice: getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName),
           initialSolutionId: solution.id,
-          voiceEngine: solution.voiceEngine || solution.voiceCombination,
-          sessionId: solution.sessionId
+          contextData: {
+            originalSolution: {
+              code: solution.code,
+              explanation: solution.explanation,
+              confidence: solution.confidence,
+              voiceEngine: solution.voiceEngine || solution.voiceCombination
+            },
+            voiceEngine: solution.voiceEngine || solution.voiceCombination,
+            sessionMetadata: {
+              sessionId: solution.sessionId,
+              generatedAt: new Date().toISOString()
+            }
+          }
         }
       });
     },
@@ -127,8 +139,8 @@ export function PostGenerationDecision({
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {solutions.map((solution) => (
-                <Card key={solution.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              {solutions.map((solution, index) => (
+                <Card key={`solution-${solution.id || index}`} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">

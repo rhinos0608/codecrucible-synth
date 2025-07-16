@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   Brain, 
   Code, 
@@ -17,14 +18,48 @@ import {
   Play,
   Zap,
   Target,
-  Infinity
+  Infinity,
+  Building,
+  Award,
+  FileText,
+  MessageSquare,
+  BookOpen,
+  TrendingUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useLocation } from "wouter";
 
 export default function LandingPage() {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
-  const { login } = useAuthContext();
+  const [showAssessmentDemo, setShowAssessmentDemo] = useState(false);
+  const [showPricingDialog, setShowPricingDialog] = useState(false);
+  const [showDocumentation, setShowDocumentation] = useState(false);
+  const [, navigate] = useLocation();
+
+  // Authentication handler - follows AI_INSTRUCTIONS.md security patterns
+  const handleAuthentication = () => {
+    window.location.href = '/api/login';
+  };
+
+  // Consciousness Assessment Demo - following CodingPhilosophy.md living spiral methodology
+  const handleAssessmentDemo = () => {
+    setShowAssessmentDemo(true);
+  };
+
+  // Enterprise Solutions - following FRONTEND.md pattern language
+  const handleEnterpriseInquiry = () => {
+    setShowPricingDialog(true);
+  };
+
+  // Documentation access - following Alexander's timeless patterns
+  const handleDocumentationAccess = () => {
+    setShowDocumentation(true);
+  };
+
+  // Pricing navigation - following consciousness-driven navigation
+  const handlePricingNavigation = () => {
+    navigate('/pricing');
+  };
 
   const testimonials = [
     {
@@ -61,16 +96,32 @@ export default function LandingPage() {
           </div>
           
           <div className="hidden md:flex items-center gap-6">
-            <Button variant="ghost" className="text-gray-300 hover:text-white">
+            <Button 
+              variant="ghost" 
+              className="text-gray-300 hover:text-white"
+              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+            >
               Features
             </Button>
-            <Button variant="ghost" className="text-gray-300 hover:text-white">
+            <Button 
+              variant="ghost" 
+              className="text-gray-300 hover:text-white"
+              onClick={() => document.getElementById('consciousness-framework')?.scrollIntoView({ behavior: 'smooth' })}
+            >
               Consciousness Framework
             </Button>
-            <Button variant="ghost" className="text-gray-300 hover:text-white">
+            <Button 
+              variant="ghost" 
+              className="text-gray-300 hover:text-white"
+              onClick={handleEnterpriseInquiry}
+            >
               Enterprise
             </Button>
-            <Button variant="ghost" className="text-gray-300 hover:text-white">
+            <Button 
+              variant="ghost" 
+              className="text-gray-300 hover:text-white"
+              onClick={handlePricingNavigation}
+            >
               Pricing
             </Button>
           </div>
@@ -79,13 +130,13 @@ export default function LandingPage() {
             <Button 
               variant="ghost" 
               className="text-gray-300 hover:text-white"
-              onClick={() => login()}
+              onClick={handleAuthentication}
             >
               Sign In
             </Button>
             <Button 
               className="bg-purple-600 hover:bg-purple-700 text-white"
-              onClick={() => login()}
+              onClick={handleAuthentication}
             >
               Get Started
             </Button>
@@ -113,7 +164,7 @@ export default function LandingPage() {
             <Button 
               size="lg" 
               className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 text-lg"
-              onClick={() => login()}
+              onClick={handleAuthentication}
             >
               <Play className="w-5 h-5 mr-2" />
               Start Free Consciousness Assessment
@@ -122,7 +173,7 @@ export default function LandingPage() {
               size="lg" 
               variant="outline" 
               className="border-purple-500 text-purple-300 hover:bg-purple-500/10 px-8 py-4 text-lg"
-              onClick={() => login()}
+              onClick={handleEnterpriseInquiry}
             >
               <Users className="w-5 h-5 mr-2" />
               Enterprise Solutions
@@ -147,7 +198,7 @@ export default function LandingPage() {
       </section>
 
       {/* Voice Assessment Demo */}
-      <section className="container mx-auto px-4 py-16">
+      <section id="features" className="container mx-auto px-4 py-16">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -191,6 +242,16 @@ export default function LandingPage() {
                   <span className="text-gray-300">Implementor ensures production readiness</span>
                 </div>
               </div>
+              
+              <div className="mt-8">
+                <Button 
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                  onClick={handleAssessmentDemo}
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Try Interactive Demo
+                </Button>
+              </div>
             </div>
 
             <div className="bg-gray-900/50 rounded-lg p-6 border border-purple-500/20">
@@ -230,7 +291,10 @@ export default function LandingPage() {
                 
                 <div className="flex justify-between items-center mt-6">
                   <div className="text-sm text-gray-400">2:15 remaining</div>
-                  <Button className="bg-purple-600 hover:bg-purple-700">
+                  <Button 
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={handleAuthentication}
+                  >
                     Next Question
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
@@ -312,7 +376,7 @@ export default function LandingPage() {
       </section>
 
       {/* Consciousness Framework */}
-      <section className="container mx-auto px-4 py-16">
+      <section id="consciousness-framework" className="container mx-auto px-4 py-16">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold mb-4">The Consciousness Framework</h2>
@@ -457,7 +521,7 @@ export default function LandingPage() {
               <Button 
                 size="lg" 
                 className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 text-lg"
-                onClick={() => login()}
+                onClick={handleAuthentication}
               >
                 <Play className="w-5 h-5 mr-2" />
                 Start Free Assessment
@@ -466,7 +530,7 @@ export default function LandingPage() {
                 size="lg" 
                 variant="outline" 
                 className="border-purple-500 text-purple-300 hover:bg-purple-500/10 px-8 py-4 text-lg"
-                onClick={() => login()}
+                onClick={handleAssessmentDemo}
               >
                 View Sample Questions
               </Button>
@@ -511,30 +575,30 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4">Platform</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Voice Archetypes</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Consciousness Assessment</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Team Collaboration</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Enterprise Solutions</a></li>
+                <li><button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">Voice Archetypes</button></li>
+                <li><button onClick={handleAssessmentDemo} className="hover:text-white transition-colors">Consciousness Assessment</button></li>
+                <li><button onClick={handleAuthentication} className="hover:text-white transition-colors">Team Collaboration</button></li>
+                <li><button onClick={handleEnterpriseInquiry} className="hover:text-white transition-colors">Enterprise Solutions</button></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-semibold mb-4">Framework</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Jung's Protocols</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Living Spiral</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Alexander's Patterns</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">QWAN Assessment</a></li>
+                <li><button onClick={handleDocumentationAccess} className="hover:text-white transition-colors">Jung's Protocols</button></li>
+                <li><button onClick={() => document.getElementById('consciousness-framework')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">Living Spiral</button></li>
+                <li><button onClick={handleDocumentationAccess} className="hover:text-white transition-colors">Alexander's Patterns</button></li>
+                <li><button onClick={handleDocumentationAccess} className="hover:text-white transition-colors">QWAN Assessment</button></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Reference</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Community</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+                <li><button onClick={handleDocumentationAccess} className="hover:text-white transition-colors">Documentation</button></li>
+                <li><button onClick={handleDocumentationAccess} className="hover:text-white transition-colors">API Reference</button></li>
+                <li><button onClick={handleAuthentication} className="hover:text-white transition-colors">Community</button></li>
+                <li><button onClick={handleEnterpriseInquiry} className="hover:text-white transition-colors">Contact</button></li>
               </ul>
             </div>
           </div>
@@ -551,6 +615,261 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Assessment Demo Dialog */}
+      <Dialog open={showAssessmentDemo} onOpenChange={setShowAssessmentDemo}>
+        <DialogContent className="max-w-2xl bg-gray-900 border-purple-500/20">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-purple-400">
+              Consciousness Assessment Demo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="text-center">
+              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                Jung's Descent Protocol Assessment
+              </Badge>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="text-lg font-medium">
+                Sample Question: How would you implement error handling in a collaborative multi-voice development environment?
+              </div>
+              
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border border-gray-500 rounded-full"></div>
+                    <span className="text-sm">Use standard try-catch blocks for all operations</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-gray-800/50 rounded-lg border border-purple-500/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-purple-500 rounded-full bg-purple-500"></div>
+                    <span className="text-sm">Implement council-based error handling where different voices contribute to error resolution patterns</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border border-gray-500 rounded-full"></div>
+                    <span className="text-sm">Log errors to console and continue execution</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-purple-500/10 p-4 rounded-lg border border-purple-500/20">
+                <div className="flex items-start gap-3">
+                  <Brain className="w-5 h-5 text-purple-400 mt-0.5" />
+                  <div>
+                    <div className="font-medium text-purple-300">Consciousness Insight</div>
+                    <div className="text-sm text-gray-300 mt-1">
+                      This question assesses your understanding of collaborative error handling patterns and Jung's descent protocol for transforming errors into learning opportunities.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-center gap-4">
+              <Button 
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                onClick={() => {
+                  setShowAssessmentDemo(false);
+                  handleAuthentication();
+                }}
+              >
+                Take Full Assessment
+              </Button>
+              <Button 
+                variant="outline" 
+                className="border-purple-500 text-purple-300"
+                onClick={() => setShowAssessmentDemo(false)}
+              >
+                Close Demo
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Enterprise Solutions Dialog */}
+      <Dialog open={showPricingDialog} onOpenChange={setShowPricingDialog}>
+        <DialogContent className="max-w-2xl bg-gray-900 border-purple-500/20">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-purple-400">
+              Enterprise Consciousness Solutions
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="text-center">
+              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                Scale Your Team's Consciousness
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-gray-800/50 border-purple-500/20">
+                <CardHeader>
+                  <CardTitle className="text-lg text-purple-300">
+                    <Building className="w-5 h-5 inline mr-2" />
+                    Team Collaboration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm text-gray-300">
+                    <li>• Multi-voice team sessions</li>
+                    <li>• Shared consciousness development</li>
+                    <li>• Real-time collaborative synthesis</li>
+                    <li>• Team consciousness metrics</li>
+                  </ul>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gray-800/50 border-purple-500/20">
+                <CardHeader>
+                  <CardTitle className="text-lg text-purple-300">
+                    <Award className="w-5 h-5 inline mr-2" />
+                    Enterprise Features
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm text-gray-300">
+                    <li>• Custom voice training</li>
+                    <li>• On-premise deployment</li>
+                    <li>• Advanced analytics</li>
+                    <li>• SSO integration</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="bg-gradient-to-r from-purple-600/10 to-blue-600/10 p-4 rounded-lg border border-purple-500/20">
+              <div className="text-center">
+                <div className="text-lg font-medium text-purple-300 mb-2">
+                  Transform Your Organization's Development Consciousness
+                </div>
+                <div className="text-sm text-gray-300">
+                  Starting at $99/month for teams of 5-20 developers
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-center gap-4">
+              <Button 
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                onClick={() => {
+                  setShowPricingDialog(false);
+                  handlePricingNavigation();
+                }}
+              >
+                <TrendingUp className="w-4 h-4 mr-2" />
+                View Pricing Plans
+              </Button>
+              <Button 
+                variant="outline" 
+                className="border-purple-500 text-purple-300"
+                onClick={() => setShowPricingDialog(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Documentation Dialog */}
+      <Dialog open={showDocumentation} onOpenChange={setShowDocumentation}>
+        <DialogContent className="max-w-2xl bg-gray-900 border-purple-500/20">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-purple-400">
+              Consciousness Framework Documentation
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="text-center">
+              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                Alexander's Timeless Patterns
+              </Badge>
+            </div>
+            
+            <div className="space-y-4">
+              <Card className="bg-gray-800/50 border-purple-500/20">
+                <CardHeader>
+                  <CardTitle className="text-lg text-purple-300">
+                    <BookOpen className="w-5 h-5 inline mr-2" />
+                    Jung's Descent Protocols
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-300">
+                    Learn how to implement psychological depth in code architecture through collective unconscious patterns and shadow integration methodologies.
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gray-800/50 border-purple-500/20">
+                <CardHeader>
+                  <CardTitle className="text-lg text-purple-300">
+                    <Target className="w-5 h-5 inline mr-2" />
+                    Alexander's Pattern Language
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-300">
+                    Discover how to create generative code structures that embody wholeness, freedom, exactness, egolessness, and eternity (QWAN qualities).
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gray-800/50 border-purple-500/20">
+                <CardHeader>
+                  <CardTitle className="text-lg text-purple-300">
+                    <Sparkles className="w-5 h-5 inline mr-2" />
+                    Living Spiral Methodology
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-300">
+                    Master the three-phase process: Collapse → Council → Synthesis → Rebirth for continuous consciousness evolution in development.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/20">
+              <div className="flex items-start gap-3">
+                <FileText className="w-5 h-5 text-blue-400 mt-0.5" />
+                <div>
+                  <div className="font-medium text-blue-300">Full Documentation Access</div>
+                  <div className="text-sm text-gray-300 mt-1">
+                    Access comprehensive guides, API references, and consciousness development tutorials after signing in.
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-center gap-4">
+              <Button 
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                onClick={() => {
+                  setShowDocumentation(false);
+                  handleAuthentication();
+                }}
+              >
+                <BookOpen className="w-4 h-4 mr-2" />
+                Access Documentation
+              </Button>
+              <Button 
+                variant="outline" 
+                className="border-purple-500 text-purple-300"
+                onClick={() => setShowDocumentation(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

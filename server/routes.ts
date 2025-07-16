@@ -2058,9 +2058,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })}\n\n`);
         }
 
-        // Store solutions for synthesis
+        // Store solutions for synthesis with sessionId included
+        // Following AI_INSTRUCTIONS.md defensive programming patterns
+        const enhancedCompletedSolutions = completedSolutions.map((solution: any, index: number) => ({
+          ...solution,
+          sessionId: sessionId, // Ensure sessionId is included for chat creation
+          id: solution.id || index + 1 // Ensure unique IDs
+        }));
+        
         global.sessionSolutions = global.sessionSolutions || new Map();
-        global.sessionSolutions.set(sessionId, completedSolutions);
+        global.sessionSolutions.set(sessionId, enhancedCompletedSolutions);
         
         // Complete streaming 
         res.write(`data: ${JSON.stringify({
@@ -2149,7 +2156,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      res.json(solutions);
+      // CRITICAL FIX: Add sessionId to each solution for chat creation
+      // Following AI_INSTRUCTIONS.md defensive programming patterns
+      const enhancedSolutions = solutions.map((solution: any, index: number) => ({
+        ...solution,
+        sessionId: sessionId, // Add the missing sessionId field
+        id: solution.id || index + 1, // Ensure each solution has an ID
+        voiceCombination: solution.voiceCombination || solution.voiceEngine || solution.voiceName || 'unknown',
+        code: solution.code || '// No code generated',
+        explanation: solution.explanation || 'No explanation available',
+        confidence: solution.confidence || 85
+      }));
+      
+      console.log('✅ Enhanced solutions with sessionId:', { 
+        sessionId, 
+        solutionCount: enhancedSolutions.length,
+        firstSolutionSessionId: enhancedSolutions[0]?.sessionId,
+        sampleSolution: enhancedSolutions[0] ? {
+          id: enhancedSolutions[0].id,
+          sessionId: enhancedSolutions[0].sessionId,
+          voiceCombination: enhancedSolutions[0].voiceCombination
+        } : null
+      });
+      
+      res.json(enhancedSolutions);
     } catch (error) {
       console.error('Error fetching solutions:', error);
       res.status(500).json({ error: 'Failed to fetch solutions' });

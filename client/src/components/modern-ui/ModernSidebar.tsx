@@ -1,30 +1,11 @@
 import { useState } from "react";
-import { 
-  Brain, 
-  FolderOpen, 
-  Plus, 
-  ChevronRight, 
-  ChevronDown,
-  FileText,
-  Settings,
-  User,
-  LogOut,
-  Crown,
-  Users,
-  BarChart3,
-  GraduationCap,
-  Sparkles,
-  Code2,
-  Target
-} from "lucide-react";
+import { MessageSquare, Plus, FolderOpen, Settings, User, LogOut, Brain, BarChart3, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-// Simplified imports for initial implementation
-// Will restore full integration once core layout works
-import type { Project, ProjectFolder } from "@shared/schema";
+import type { Project } from "@shared/schema";
 
 interface ModernSidebarProps {
   onProjectSelect?: (project: Project) => void;
@@ -39,248 +20,120 @@ export function ModernSidebar({
   onNavigate,
   className 
 }: ModernSidebarProps) {
-  const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
-  // Mock data for initial layout implementation
-  const user = { username: 'Demo User' };
-  const planTier = 'free';
-  const projects = [];
-  const folders = [];
-  
-  const logout = () => {
-    window.location.href = '/api/logout';
-  };
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
 
-  const toggleFolder = (folderId: number) => {
-    const newExpanded = new Set(expandedFolders);
-    if (newExpanded.has(folderId)) {
-      newExpanded.delete(folderId);
-    } else {
-      newExpanded.add(folderId);
-    }
-    setExpandedFolders(newExpanded);
-  };
+  // Mock projects for layout testing
+  const projects = [
+    { id: "1", title: "React Dashboard", language: "TypeScript", lastModified: "2 hours ago" },
+    { id: "2", title: "API Integration", language: "Node.js", lastModified: "Yesterday" },
+    { id: "3", title: "Authentication Flow", language: "React", lastModified: "3 days ago" },
+    { id: "4", title: "Database Schema", language: "SQL", lastModified: "1 week ago" },
+  ];
 
-  const getProjectsInFolder = (folderId: number | null) => {
-    return projects.filter(p => p.folderId === folderId);
+  const handleProjectClick = (projectId: string) => {
+    setSelectedProject(projectId);
+    // onProjectSelect could be called here with the project
   };
-
-  const ungroupedProjects = getProjectsInFolder(null);
 
   return (
-    <div className={cn(
-      "flex flex-col h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800",
-      className
-    )}>
+    <div className={cn("h-full bg-gray-900 text-white flex flex-col", className)}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
-            <Brain className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="font-semibold text-gray-900 dark:text-white">CodeCrucible</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">AI Council Workspace</p>
-          </div>
+      <div className="p-4 border-b border-gray-800">
+        <div className="flex items-center gap-2 mb-4">
+          <Brain className="w-6 h-6 text-purple-400" />
+          <span className="font-semibold text-lg">CodeCrucible</span>
         </div>
-
-        {/* New Chat Button */}
+        
         <Button 
           onClick={onNewChat}
-          className="w-full justify-start bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+          className="w-full bg-gray-800 hover:bg-gray-700 text-white border border-gray-700"
+          variant="outline"
         >
           <Plus className="w-4 h-4 mr-2" />
-          New Voice Session
+          New chat
         </Button>
       </div>
 
-      {/* Navigation & Projects */}
+      {/* Chat History / Projects */}
       <ScrollArea className="flex-1 px-2">
-        <div className="space-y-2 py-4">
-          {/* Quick Actions */}
-          <div className="px-2">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-              Workspace
-            </p>
-            <div className="space-y-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                onClick={() => onNavigate?.('voice-profiles')}
-              >
-                <User className="w-4 h-4 mr-3" />
-                Voice Profiles
-                {planTier === 'free' && <Crown className="w-3 h-3 ml-auto text-yellow-500" />}
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                onClick={() => onNavigate?.('analytics')}
-              >
-                <BarChart3 className="w-4 h-4 mr-3" />
-                Analytics
-                {planTier === 'free' && <Crown className="w-3 h-3 ml-auto text-yellow-500" />}
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                onClick={() => onNavigate?.('teams')}
-              >
-                <Users className="w-4 h-4 mr-3" />
-                Teams
-                {planTier === 'free' && <Crown className="w-3 h-3 ml-auto text-yellow-500" />}
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                onClick={() => onNavigate?.('learning')}
-              >
-                <GraduationCap className="w-4 h-4 mr-3" />
-                Learning
-                <Badge variant="outline" className="ml-auto text-xs text-orange-500 border-orange-500">
-                  Coming Soon
-                </Badge>
-              </Button>
-            </div>
-          </div>
-
-          <Separator className="my-4" />
-
-          {/* Projects Section */}
-          <div className="px-2">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Projects
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <Plus className="w-3 h-3" />
-              </Button>
-            </div>
-
-            <div className="space-y-1">
-              {/* Project Folders */}
-              {folders.map((folder) => (
-                <div key={folder.id}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 px-2"
-                    onClick={() => toggleFolder(folder.id)}
-                  >
-                    {expandedFolders.has(folder.id) ? (
-                      <ChevronDown className="w-3 h-3 mr-2" />
-                    ) : (
-                      <ChevronRight className="w-3 h-3 mr-2" />
-                    )}
-                    <FolderOpen className="w-4 h-4 mr-2" />
-                    <span className="truncate flex-1 text-left">{folder.name}</span>
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      {getProjectsInFolder(folder.id).length}
-                    </Badge>
-                  </Button>
-                  
-                  {/* Projects in folder */}
-                  {expandedFolders.has(folder.id) && (
-                    <div className="ml-6 space-y-1 mt-1">
-                      {getProjectsInFolder(folder.id).map((project) => (
-                        <Button
-                          key={project.id}
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 px-2"
-                          onClick={() => onProjectSelect?.(project)}
-                        >
-                          <FileText className="w-3 h-3 mr-2" />
-                          <span className="truncate text-left">{project.name}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Ungrouped Projects */}
-              {ungroupedProjects.map((project) => (
-                <Button
-                  key={project.id}
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 px-2"
-                  onClick={() => onProjectSelect?.(project)}
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  <span className="truncate flex-1 text-left">{project.name}</span>
-                </Button>
-              ))}
-
-              {/* Empty state */}
-              {projects.length === 0 && (
-                <div className="text-center py-8">
-                  <Code2 className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No projects yet</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">Generate your first AI solution</p>
-                </div>
+        <div className="space-y-2 py-2">
+          {projects.map((project) => (
+            <Button
+              key={project.id}
+              variant={selectedProject === project.id ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start text-left h-auto p-3",
+                selectedProject === project.id 
+                  ? "bg-gray-800" 
+                  : "hover:bg-gray-800"
               )}
-            </div>
-          </div>
+              onClick={() => handleProjectClick(project.id)}
+            >
+              <div className="flex items-start gap-2 w-full">
+                <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm text-white truncate">
+                    {project.title}
+                  </div>
+                  <div className="text-xs text-gray-400 truncate">
+                    {project.language} • {project.lastModified}
+                  </div>
+                </div>
+              </div>
+            </Button>
+          ))}
         </div>
       </ScrollArea>
 
-      {/* User Section */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center">
-            <span className="text-sm font-medium text-white">
-              {user?.username?.charAt(0).toUpperCase() || 'U'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {user?.username || 'User'}
-            </p>
-            <div className="flex items-center gap-1">
-              <Badge variant={planTier === 'free' ? 'secondary' : 'default'} className="text-xs">
-                {planTier === 'free' ? 'FREE' : planTier?.toUpperCase()}
-              </Badge>
-              {planTier === 'free' && (
-                <Button variant="ghost" size="sm" className="h-5 px-1 text-xs text-yellow-600 hover:text-yellow-700">
-                  <Crown className="w-3 h-3 mr-1" />
-                  Upgrade
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-
+      {/* Navigation */}
+      <div className="p-2 border-t border-gray-800">
         <div className="space-y-1">
           <Button
             variant="ghost"
-            size="sm"
-            className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-            onClick={() => onNavigate?.('settings')}
+            className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+            onClick={() => onNavigate?.('voice-profiles')}
           >
-            <Settings className="w-4 h-4 mr-3" />
-            Settings
+            <Settings className="w-4 h-4 mr-2" />
+            Voice Profiles
           </Button>
           
           <Button
             variant="ghost"
-            size="sm"
-            className="w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-            onClick={logout}
+            className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+            onClick={() => onNavigate?.('analytics')}
           >
-            <LogOut className="w-4 h-4 mr-3" />
-            Sign Out
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Analytics
+          </Button>
+          
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+            onClick={() => onNavigate?.('teams')}
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Teams
+          </Button>
+        </div>
+
+        <Separator className="my-2 bg-gray-800" />
+
+        {/* User Profile */}
+        <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-800">
+          <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
+            <User className="w-4 h-4" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-medium text-white">Demo User</div>
+            <div className="text-xs text-gray-400">Free Plan</div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+            onClick={() => window.location.href = '/api/logout'}
+          >
+            <LogOut className="w-3 h-3" />
           </Button>
         </div>
       </div>

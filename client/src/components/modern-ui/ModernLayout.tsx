@@ -97,9 +97,9 @@ export function ModernLayout({ className }: ModernLayoutProps) {
   };
 
   return (
-    <div className={cn("flex h-screen bg-white dark:bg-gray-950", className)}>
-      {/* Left Sidebar */}
-      <div className="w-80 flex-shrink-0">
+    <div className={cn("flex h-screen bg-gray-950", className)}>
+      {/* Left Sidebar - Enlarged width to match ChatGPT style */}
+      <div className="w-[280px] flex-shrink-0 bg-gray-900 border-r border-gray-800">
         <ModernSidebar
           onProjectSelect={handleProjectSelect}
           onNewChat={handleNewChat}
@@ -107,8 +107,8 @@ export function ModernLayout({ className }: ModernLayoutProps) {
         />
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main Content Area - Dark theme matching reference */}
+      <div className="flex-1 flex flex-col min-w-0 bg-gray-950">
         <ModernMainContent
           onGenerate={handleGenerate}
           onStreamingGenerate={handleStreamingGenerate}

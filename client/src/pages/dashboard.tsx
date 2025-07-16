@@ -444,7 +444,7 @@ export default function Dashboard() {
       {confirmationDialog}
       
       {/* Modern Layout Integration - Replacing traditional dashboard */}
-      <ModernLayout />
+      <ModernLayout className="h-screen" />
     </>
   );
   

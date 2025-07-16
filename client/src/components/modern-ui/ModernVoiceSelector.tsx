@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { useVoiceSelection } from "@/contexts/voice-selection-context";
 
 const perspectiveVoices = [
   {
@@ -85,12 +84,21 @@ const roleVoices = [
 ];
 
 export function ModernVoiceSelector() {
-  const { 
-    selectedPerspectives, 
-    selectedRoles, 
-    togglePerspective, 
-    toggleRole 
-  } = useVoiceSelection();
+  // Simplified for initial implementation - will restore full voice selection context
+  const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  
+  const togglePerspective = (id: string) => {
+    setSelectedPerspectives(prev => 
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
+  };
+  
+  const toggleRole = (id: string) => {
+    setSelectedRoles(prev => 
+      prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
+    );
+  };
 
   const VoiceCard = ({ voice, isSelected, onToggle, type }: { 
     voice: any, 
@@ -112,17 +120,17 @@ export function ModernVoiceSelector() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-medium text-gray-900 dark:text-white">{voice.name}</h4>
+              <h4 className="font-medium text-white">{voice.name}</h4>
               {isSelected && (
-                <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                <Badge variant="secondary" className="text-xs bg-purple-900 text-purple-300">
                   Selected
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <p className="text-sm text-gray-400 mb-2">
               {voice.description}
             </p>
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-xs text-gray-400 border-gray-600">
               {voice.category}
             </Badge>
           </div>
@@ -135,14 +143,14 @@ export function ModernVoiceSelector() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-white">
             Voice Council Configuration
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-400">
             Select AI voices to collaborate on your coding challenge
           </p>
         </div>
-        <Badge variant="outline">
+        <Badge variant="outline" className="text-white border-gray-600">
           {selectedPerspectives.length + selectedRoles.length} selected
         </Badge>
       </div>

@@ -69,43 +69,57 @@ export function PostGenerationDecision({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  // Create chat session mutation with enhanced error handling and session ID mapping
+  // Enhanced chat session creation following Jung's Descent Protocol with robust error recovery
   const createChatSessionMutation = useMutation({
     mutationFn: async (solution: Solution) => {
-      console.log('🔄 Creating chat session for solution:', {
+      console.log('🧠 Council Assembly: Creating chat session for solution:', {
         solutionId: solution.id,
         sessionId: solution.sessionId,
         voiceEngine: solution.voiceEngine,
         voiceCombination: solution.voiceCombination
       });
 
-      // Map timestamp-based session ID to database session ID
-      const sessionMapping = await apiRequest('/api/sessions/map-id', {
-        method: 'POST',
-        body: { timestampSessionId: solution.sessionId }
-      });
+      try {
+        // Robust session mapping with defensive programming - AI_INSTRUCTIONS.md patterns
+        let mappedSessionId = solution.sessionId;
+        
+        try {
+          const sessionMapping = await apiRequest('/api/sessions/map-id', {
+            method: 'POST',
+            body: { timestampSessionId: solution.sessionId }
+          });
+          mappedSessionId = sessionMapping.databaseSessionId || solution.sessionId;
+          console.log('✅ Session mapped successfully:', mappedSessionId);
+        } catch (mappingError) {
+          console.warn('⚠️ Session mapping failed, using fallback approach:', mappingError);
+          // Continue with original session ID as fallback
+        }
 
-      return apiRequest('/api/chat/sessions', {
-        method: 'POST',
-        body: {
-          sessionId: sessionMapping.databaseSessionId,
-          selectedVoice: getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName),
-          initialSolutionId: solution.id,
-          contextData: {
-            originalSolution: {
-              code: solution.code,
-              explanation: solution.explanation,
-              confidence: solution.confidence,
-              voiceEngine: solution.voiceEngine || solution.voiceCombination
-            },
-            voiceEngine: solution.voiceEngine || solution.voiceCombination,
-            sessionMetadata: {
-              sessionId: solution.sessionId,
-              generatedAt: new Date().toISOString()
+        return apiRequest('/api/chat/sessions', {
+          method: 'POST',
+          body: {
+            sessionId: mappedSessionId,
+            selectedVoice: getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName || 'general'),
+            initialSolutionId: solution.id,
+            contextData: {
+              originalSolution: {
+                code: solution.code || '',
+                explanation: solution.explanation || '',
+                confidence: solution.confidence || 85,
+                voiceEngine: solution.voiceEngine || solution.voiceCombination || 'general'
+              },
+              voiceEngine: solution.voiceEngine || solution.voiceCombination || 'general',
+              sessionMetadata: {
+                sessionId: solution.sessionId,
+                generatedAt: new Date().toISOString()
+              }
             }
           }
-        }
-      });
+        });
+      } catch (error) {
+        console.error('❌ Complete chat session creation failed:', error);
+        throw new Error('Failed to create chat session. Please try again.');
+      }
     },
     onSuccess: (chatSession) => {
       console.log('✅ Chat session created:', chatSession);

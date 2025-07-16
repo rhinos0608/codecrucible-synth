@@ -128,18 +128,23 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     }
   }, [isOpen, sessionId, isLoading, solutions, error]);
 
-  // Separate effect for modal management following Jung's Descent Protocol
+  // Enhanced modal state management following Jung's Descent Protocol and Alexander's Pattern Language
   useEffect(() => {
-    // Only show post-generation decision when we have solutions AND the main dialog was just closed
-    if (solutions.length > 0 && !isLoading && !isOpen && !showPostGenDecision && !showChatInterface) {
-      console.log('📋 Triggering post-generation decision modal for', solutions.length, 'solutions');
-      // Prevent multiple triggers by checking if we're already showing a modal
-      const hasActiveModal = showPostGenDecision || showChatInterface;
-      if (!hasActiveModal) {
-        const timer = setTimeout(() => {
+    // Modal transition logic with consciousness-driven flow control
+    if (solutions.length > 0 && !isLoading && !isOpen) {
+      console.log('📋 Council Assembly: Managing modal transition for', solutions.length, 'solutions');
+      
+      // Prevent modal conflicts using Living Spiral methodology
+      const shouldShowPostGenDecision = !showPostGenDecision && !showChatInterface;
+      
+      if (shouldShowPostGenDecision) {
+        // Delayed activation to prevent race conditions - Defensive programming
+        const modalTransitionTimer = setTimeout(() => {
+          console.log('🌀 Living Spiral: Activating post-generation decision modal');
           setShowPostGenDecision(true);
-        }, 150); // Slightly longer delay to prevent race conditions
-        return () => clearTimeout(timer);
+        }, 200); // Extended delay for consciousness-aware transitions
+        
+        return () => clearTimeout(modalTransitionTimer);
       }
     }
   }, [solutions.length, isLoading, isOpen, showPostGenDecision, showChatInterface]);

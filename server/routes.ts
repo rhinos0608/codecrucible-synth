@@ -956,8 +956,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { timestampSessionId } = req.body;
       const userId = req.user.claims.sub;
 
-      // First, try to find existing session
-      const existingSessions = await storage.getVoiceSessions(userId);
+      // First, try to find existing session - Defensive programming following AI_INSTRUCTIONS.md
+      const existingSessions = await storage.getVoiceSessionsByUser(userId);
       let matchedSession = existingSessions.find(session => 
         Math.abs(session.id - timestampSessionId) < 60000 // Within 1 minute
       );

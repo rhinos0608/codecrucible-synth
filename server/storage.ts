@@ -97,6 +97,9 @@ export interface IStorage {
   getVoiceSessionsByUser(userId: string): Promise<VoiceSession[]>;
   getUserSessions(userId: string): Promise<VoiceSession[]>;
   
+  // Alias for backward compatibility and defensive programming
+  getVoiceSessions(userId: string): Promise<VoiceSession[]>;
+  
   // Solution operations
   createSolution(solution: InsertSolution): Promise<Solution>;
   getSolutionsBySession(sessionId: number): Promise<Solution[]>;
@@ -344,6 +347,11 @@ export class DatabaseStorage implements IStorage {
   
   // Alias for getUserSessions (for onboarding status API)
   async getUserSessions(userId: string): Promise<VoiceSession[]> {
+    return this.getVoiceSessionsByUser(userId);
+  }
+  
+  // Alias for getVoiceSessions (backward compatibility) - Defensive programming following AI_INSTRUCTIONS.md
+  async getVoiceSessions(userId: string): Promise<VoiceSession[]> {
     return this.getVoiceSessionsByUser(userId);
   }
   

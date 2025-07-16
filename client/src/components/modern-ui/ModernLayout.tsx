@@ -2,11 +2,11 @@ import { useState } from "react";
 import { ModernSidebar } from "./ModernSidebar";
 import { ModernMainContent } from "./ModernMainContent";
 import { ModernSolutionStack } from "./ModernSolutionStack";
-import { ChatGPTStyleGeneration } from "../chatgpt-style-generation";
-import { SynthesisPanel } from "../synthesis-panel";
-import { AnalyticsPanel } from "../analytics-panel";
-import { TeamsPanel } from "../teams-panel";
-import { AvatarCustomizer } from "../avatar-customizer";
+import { ChatGPTStyleGeneration } from "@/components/chatgpt-style-generation";
+import { SynthesisPanel } from "@/components/synthesis-panel";
+import { AnalyticsPanel } from "@/components/analytics-panel";
+import { TeamsPanel } from "@/components/teams-panel";
+import { AvatarCustomizer } from "@/components/avatar-customizer";
 import { cn } from "@/lib/utils";
 import type { Project, Solution } from "@shared/schema";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
@@ -37,12 +37,30 @@ export function ModernLayout({ className }: ModernLayoutProps) {
   const { generateSession } = useSolutionGeneration();
 
   const handleGenerate = async () => {
+    // Defensive programming - validate state before proceeding
     if (!planGuard.canGenerate) {
-      // Show upgrade modal or toast
+      console.warn('Generation blocked by plan guard:', planGuard);
+      return;
+    }
+
+    if (!state.prompt.trim()) {
+      console.warn('Empty prompt detected');
+      return;
+    }
+
+    // Multi-voice consciousness validation
+    if (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0) {
+      console.warn('No voices selected for generation');
       return;
     }
 
     try {
+      console.log('🎯 Starting Council Generation with voices:', {
+        perspectives: state.selectedPerspectives,
+        roles: state.selectedRoles,
+        prompt: state.prompt.substring(0, 100) + '...'
+      });
+
       const result = await planGuard.attemptGeneration(async () => {
         return generateSession.mutateAsync({
           prompt: state.prompt,
@@ -57,18 +75,44 @@ export function ModernLayout({ className }: ModernLayoutProps) {
       });
 
       if (result.success && result.data?.session?.id) {
+        console.log('✅ Council Generation Success:', result.data.session.id);
         setCurrentSessionId(result.data.session.id);
+        setSolutions(result.data.solutions || []);
         setShowSolutionStack(true);
+      } else if (!result.success && result.reason === 'quota_exceeded') {
+        console.warn('Quota exceeded, showing upgrade modal');
+        // Show upgrade modal (implement in parent component)
+      } else {
+        console.error('Generation failed:', result);
       }
     } catch (error) {
-      console.error('Generation failed:', error);
+      console.error('Council Generation failed:', error);
     }
   };
 
   const handleStreamingGenerate = () => {
+    // Defensive programming - validate state before proceeding
     if (!planGuard.canGenerate) {
+      console.warn('Streaming generation blocked by plan guard:', planGuard);
       return;
     }
+
+    if (!state.prompt.trim()) {
+      console.warn('Empty prompt detected for streaming');
+      return;
+    }
+
+    // Multi-voice consciousness validation
+    if (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0) {
+      console.warn('No voices selected for streaming generation');
+      return;
+    }
+
+    console.log('🔥 Starting Live Streaming Generation with voices:', {
+      perspectives: state.selectedPerspectives,
+      roles: state.selectedRoles,
+      prompt: state.prompt.substring(0, 100) + '...'
+    });
     
     setShowStreamingGeneration(true);
   };
@@ -134,35 +178,56 @@ export function ModernLayout({ className }: ModernLayoutProps) {
         />
       </div>
 
-      {/* Modals and Panels - Temporarily simplified for layout testing */}
-      {showSolutionStack && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-2xl w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Generated Solutions</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">Solutions generated successfully!</p>
-            <button 
-              onClick={() => setShowSolutionStack(false)}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+      {/* Production-ready panels with proper integration */}
+      {showSolutionStack && currentSessionId && (
+        <ModernSolutionStack
+          isOpen={showSolutionStack}
+          onClose={() => setShowSolutionStack(false)}
+          sessionId={currentSessionId}
+          solutions={solutions}
+          onSynthesize={handleSynthesize}
+        />
       )}
 
       {showStreamingGeneration && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-2xl w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Live Streaming Generation</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">Streaming code generation in progress...</p>
-            <button 
-              onClick={() => setShowStreamingGeneration(false)}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+        <ChatGPTStyleGeneration
+          isOpen={showStreamingGeneration}
+          onClose={() => setShowStreamingGeneration(false)}
+          prompt={state.prompt}
+          selectedVoices={{
+            perspectives: state.selectedPerspectives,
+            roles: state.selectedRoles
+          }}
+        />
+      )}
+
+      {showSynthesisPanel && currentSessionId && (
+        <SynthesisPanel
+          isOpen={showSynthesisPanel}
+          onClose={() => setShowSynthesisPanel(false)}
+          sessionId={currentSessionId}
+        />
+      )}
+
+      {showAnalyticsPanel && (
+        <AnalyticsPanel
+          isOpen={showAnalyticsPanel}
+          onClose={() => setShowAnalyticsPanel(false)}
+        />
+      )}
+
+      {showTeamsPanel && (
+        <TeamsPanel
+          isOpen={showTeamsPanel}
+          onClose={() => setShowTeamsPanel(false)}
+        />
+      )}
+
+      {showVoiceProfilesPanel && (
+        <AvatarCustomizer
+          isOpen={showVoiceProfilesPanel}
+          onClose={() => setShowVoiceProfilesPanel(false)}
+        />
       )}
     </div>
   );

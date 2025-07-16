@@ -88,26 +88,18 @@ export function ModernVoiceSelector() {
   // Integrated with voice selection context following AI_INSTRUCTIONS.md patterns
   const { 
     state, 
-    selectPerspective, 
-    selectRole, 
-    clearPerspective, 
-    clearRole 
+    togglePerspective, 
+    toggleRole
   } = useVoiceSelection();
   
-  const togglePerspective = (id: string) => {
-    if (state.selectedPerspectives.includes(id)) {
-      clearPerspective(id);
-    } else {
-      selectPerspective(id);
-    }
+  const handleTogglePerspective = (id: string) => {
+    console.log('🎯 Toggling perspective:', id);
+    togglePerspective(id);
   };
   
-  const toggleRole = (id: string) => {
-    if (state.selectedRoles.includes(id)) {
-      clearRole(id);
-    } else {
-      selectRole(id);
-    }
+  const handleToggleRole = (id: string) => {
+    console.log('🎯 Toggling role:', id);
+    toggleRole(id);
   };
 
   const VoiceCard = ({ voice, isSelected, onToggle, type }: { 
@@ -178,7 +170,7 @@ export function ModernVoiceSelector() {
                 key={voice.id}
                 voice={voice}
                 isSelected={state.selectedPerspectives.includes(voice.id)}
-                onToggle={() => togglePerspective(voice.id)}
+                onToggle={() => handleTogglePerspective(voice.id)}
                 type="perspective"
               />
             ))}
@@ -192,7 +184,7 @@ export function ModernVoiceSelector() {
                 key={voice.id}
                 voice={voice}
                 isSelected={state.selectedRoles.includes(voice.id)}
-                onToggle={() => toggleRole(voice.id)}
+                onToggle={() => handleToggleRole(voice.id)}
                 type="role"
               />
             ))}
@@ -207,8 +199,8 @@ export function ModernVoiceSelector() {
           size="sm"
           onClick={() => {
             // Select recommended voices
-            togglePerspective('explorer');
-            toggleRole('architect');
+            handleTogglePerspective('explorer');
+            handleToggleRole('architect');
           }}
           className="flex-1"
         >
@@ -219,8 +211,8 @@ export function ModernVoiceSelector() {
           size="sm"
           onClick={() => {
             // Clear all selections
-            selectedPerspectives.forEach(id => togglePerspective(id));
-            selectedRoles.forEach(id => toggleRole(id));
+            state.selectedPerspectives.forEach(id => handleTogglePerspective(id));
+            state.selectedRoles.forEach(id => handleToggleRole(id));
           }}
           className="flex-1"
         >

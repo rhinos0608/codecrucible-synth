@@ -126,7 +126,10 @@ export function ModernSolutionStack({
                       "modern-card transition-all duration-200 hover:shadow-lg",
                       selectedSolution === solution.id && "ring-2 ring-purple-500"
                     )}
-                    onClick={() => setSelectedSolution(solution.id)}
+                    onClick={() => {
+                      console.log('📋 Solution selected:', solution.id, solution.voice);
+                      setSelectedSolution(solution.id);
+                    }}
                   >
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center justify-between">
@@ -173,6 +176,7 @@ export function ModernSolutionStack({
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
+                            console.log('📋 Copy code clicked:', solution.voice);
                             handleCopyCode(solution.code, solution.voice);
                           }}
                           icon={<Copy className="w-3 h-3" />}
@@ -185,6 +189,7 @@ export function ModernSolutionStack({
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
+                            console.log('💬 Chat started with:', solution.voice);
                             handleStartChat(solution);
                           }}
                           icon={<MessageSquare className="w-3 h-3" />}
@@ -231,7 +236,10 @@ export function ModernSolutionStack({
                   
                   <AppleStyleButton
                     variant="consciousness"
-                    onClick={onSynthesize}
+                    onClick={() => {
+                      console.log('✨ Synthesis button clicked');
+                      onSynthesize();
+                    }}
                     icon={<Sparkles className="w-4 h-4" />}
                   >
                     Synthesize Solutions

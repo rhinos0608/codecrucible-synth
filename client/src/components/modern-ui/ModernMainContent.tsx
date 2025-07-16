@@ -21,7 +21,7 @@ export function ModernMainContent({
   className 
 }: ModernMainContentProps) {
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const { state, updatePrompt } = useVoiceSelection();
+  const { state, setPrompt } = useVoiceSelection();
   const planGuard = usePlanGuard();
 
   const handleGenerate = () => {
@@ -53,7 +53,7 @@ export function ModernMainContent({
             <div className="relative">
               <Textarea
                 value={state.prompt}
-                onChange={(e) => updatePrompt(e.target.value)}
+                onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Ask anything..."
                 className="w-full min-h-[120px] resize-none bg-gray-800 border-gray-700 text-white placeholder-gray-400 rounded-xl px-4 py-3 text-base focus:border-gray-600 focus:ring-0 focus:ring-offset-0"
                 disabled={!planGuard.canGenerate}
@@ -62,7 +62,10 @@ export function ModernMainContent({
               {/* Voice Configuration Button */}
               <div className="absolute bottom-3 right-3">
                 <Button
-                  onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+                  onClick={() => {
+                    console.log('⚙️ Voice selector toggle:', !showVoiceSelector);
+                    setShowVoiceSelector(!showVoiceSelector);
+                  }}
                   variant="ghost"
                   size="sm"
                   className="text-gray-400 hover:text-white h-8 w-8 p-0"

@@ -45,7 +45,10 @@ export function ModernSidebar({
         </div>
         
         <Button 
-          onClick={onNewChat}
+          onClick={() => {
+            console.log('💬 New chat button clicked');
+            onNewChat();
+          }}
           className="w-full bg-gray-800 hover:bg-gray-700 text-white border border-gray-700"
           variant="outline"
         >
@@ -67,7 +70,10 @@ export function ModernSidebar({
                   ? "bg-gray-800" 
                   : "hover:bg-gray-800"
               )}
-              onClick={() => handleProjectClick(project.id)}
+              onClick={() => {
+                console.log('📁 Project selected:', project.id, project.title);
+                handleProjectClick(project.id);
+              }}
             >
               <div className="flex items-start gap-2 w-full">
                 <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" />
@@ -91,7 +97,10 @@ export function ModernSidebar({
           <Button
             variant="ghost"
             className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
-            onClick={() => onNavigate?.('voice-profiles')}
+            onClick={() => {
+              console.log('👤 Voice Profiles navigation clicked');
+              onNavigate?.('voice-profiles');
+            }}
           >
             <Settings className="w-4 h-4 mr-2" />
             Voice Profiles
@@ -100,7 +109,10 @@ export function ModernSidebar({
           <Button
             variant="ghost"
             className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
-            onClick={() => onNavigate?.('analytics')}
+            onClick={() => {
+              console.log('📊 Analytics navigation clicked');
+              onNavigate?.('analytics');
+            }}
           >
             <BarChart3 className="w-4 h-4 mr-2" />
             Analytics
@@ -109,7 +121,10 @@ export function ModernSidebar({
           <Button
             variant="ghost"
             className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
-            onClick={() => onNavigate?.('teams')}
+            onClick={() => {
+              console.log('👥 Teams navigation clicked');
+              onNavigate?.('teams');
+            }}
           >
             <Users className="w-4 h-4 mr-2" />
             Teams
@@ -131,7 +146,10 @@ export function ModernSidebar({
             variant="ghost"
             size="sm"
             className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-            onClick={() => window.location.href = '/api/logout'}
+            onClick={() => {
+              console.log('🚪 Logout button clicked');
+              window.location.href = '/api/logout';
+            }}
           >
             <LogOut className="w-3 h-3" />
           </Button>

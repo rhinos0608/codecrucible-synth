@@ -113,7 +113,10 @@ export function ModernVoiceSelector() {
         "cursor-pointer transition-all duration-200 hover:shadow-md",
         isSelected ? "ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-800"
       )}
-      onClick={onToggle}
+      onClick={() => {
+        console.log('🎯 Voice card clicked:', voice.name, type, 'selected:', isSelected);
+        onToggle();
+      }}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">

@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { ModernSidebar } from "./ModernSidebar";
 import { ModernMainContent } from "./ModernMainContent";
-// Temporarily simplified imports for layout testing
-// import { ModernSolutionStack } from "./ModernSolutionStack";
-// import { ChatGPTStyleGeneration } from "../chatgpt-style-generation";
-// import { SynthesisPanel } from "../synthesis-panel";
-// import { AnalyticsPanel } from "../analytics-panel";
-// import { TeamsPanel } from "../teams-panel";
-// import { AvatarCustomizer } from "../avatar-customizer";
+import { ModernSolutionStack } from "./ModernSolutionStack";
+import { ChatGPTStyleGeneration } from "../chatgpt-style-generation";
+import { SynthesisPanel } from "../synthesis-panel";
+import { AnalyticsPanel } from "../analytics-panel";
+import { TeamsPanel } from "../teams-panel";
+import { AvatarCustomizer } from "../avatar-customizer";
 import { cn } from "@/lib/utils";
 import type { Project, Solution } from "@shared/schema";
-// import { useSolutionGeneration } from "@/hooks/use-solution-generation"; // Temporarily simplified
-// Removed problematic import for now
+import { useSolutionGeneration } from "@/hooks/use-solution-generation";
+import { useVoiceSelection } from "@/contexts/voice-selection-context";
+import { usePlanGuard } from "@/hooks/usePlanGuard";
 
 interface ModernLayoutProps {
   className?: string;
@@ -31,27 +31,46 @@ export function ModernLayout({ className }: ModernLayoutProps) {
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // Simplified for initial implementation
-  const [isGenerating, setIsGenerating] = useState(false);
+  // Backend integration
+  const { state } = useVoiceSelection();
+  const planGuard = usePlanGuard();
+  const { generateSession } = useSolutionGeneration();
 
-  // Simplified streaming hook usage
-  const [isStreaming, setIsStreaming] = useState(false);
+  const handleGenerate = async () => {
+    if (!planGuard.canGenerate) {
+      // Show upgrade modal or toast
+      return;
+    }
 
-  const handleGenerate = (prompt: string) => {
-    setIsGenerating(true);
-    console.log('Generate:', prompt);
-    // Simulate generation
-    setTimeout(() => {
-      setIsGenerating(false);
-      setShowSolutionStack(true);
-    }, 2000);
+    try {
+      const result = await planGuard.attemptGeneration(async () => {
+        return generateSession.mutateAsync({
+          prompt: state.prompt,
+          selectedVoices: {
+            perspectives: state.selectedPerspectives,
+            roles: state.selectedRoles
+          },
+          recursionDepth: 2,
+          synthesisMode: "competitive",
+          ethicalFiltering: true
+        });
+      });
+
+      if (result.success && result.data?.session?.id) {
+        setCurrentSessionId(result.data.session.id);
+        setShowSolutionStack(true);
+      }
+    } catch (error) {
+      console.error('Generation failed:', error);
+    }
   };
 
-  const handleStreamingGenerate = (prompt: string) => {
-    setIsStreaming(true);
+  const handleStreamingGenerate = () => {
+    if (!planGuard.canGenerate) {
+      return;
+    }
+    
     setShowStreamingGeneration(true);
-    // Integrate with existing streaming logic
-    console.log('Streaming generation:', prompt);
   };
 
   const handleNewChat = () => {

@@ -6,12 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ModernVoiceSelector } from "./ModernVoiceSelector";
 import { AppleStyleButton } from "./AppleStyleButton";
-// Simplified for modern layout implementation
-// import { usePlanGuard } from "@/hooks/usePlanGuard";
+import { useVoiceSelection } from "@/contexts/voice-selection-context";
+import { usePlanGuard } from "@/hooks/usePlanGuard";
 
 interface ModernMainContentProps {
-  onGenerate?: (prompt: string) => void;
-  onStreamingGenerate?: (prompt: string) => void;
+  onGenerate?: () => void;
+  onStreamingGenerate?: () => void;
   className?: string;
 }
 
@@ -20,20 +20,19 @@ export function ModernMainContent({
   onStreamingGenerate,
   className 
 }: ModernMainContentProps) {
-  const [prompt, setPrompt] = useState("");
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  // Simplified for layout implementation
-  const canGenerate = true;
+  const { state, updatePrompt } = useVoiceSelection();
+  const planGuard = usePlanGuard();
 
   const handleGenerate = () => {
-    if (onGenerate && prompt.trim()) {
-      onGenerate(prompt.trim());
+    if (onGenerate && state.prompt.trim()) {
+      onGenerate();
     }
   };
 
   const handleStreamingGenerate = () => {
-    if (onStreamingGenerate && prompt.trim()) {
-      onStreamingGenerate(prompt.trim());
+    if (onStreamingGenerate && state.prompt.trim()) {
+      onStreamingGenerate();
     }
   };
 
@@ -53,11 +52,11 @@ export function ModernMainContent({
           <div className="w-full">
             <div className="relative">
               <Textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                value={state.prompt}
+                onChange={(e) => updatePrompt(e.target.value)}
                 placeholder="Ask anything..."
                 className="w-full min-h-[120px] resize-none bg-gray-800 border-gray-700 text-white placeholder-gray-400 rounded-xl px-4 py-3 text-base focus:border-gray-600 focus:ring-0 focus:ring-offset-0"
-                disabled={!canGenerate}
+                disabled={!planGuard.canGenerate}
               />
               
               {/* Voice Configuration Button */}
@@ -88,7 +87,7 @@ export function ModernMainContent({
             <AppleStyleButton
               variant="consciousness"
               onClick={handleGenerate}
-              disabled={!canGenerate || !prompt.trim()}
+              disabled={!planGuard.canGenerate || !state.prompt.trim()}
               className="flex-1"
               icon={<Brain className="w-4 h-4" />}
             >
@@ -98,7 +97,7 @@ export function ModernMainContent({
             <AppleStyleButton
               variant="primary"
               onClick={handleStreamingGenerate}
-              disabled={!canGenerate || !prompt.trim()}
+              disabled={!planGuard.canGenerate || !state.prompt.trim()}
               className="flex-1"
               icon={<Zap className="w-4 h-4" />}
             >

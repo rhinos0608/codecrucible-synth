@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useVoiceSelection } from "@/contexts/voice-selection-context";
 
 const perspectiveVoices = [
   {
@@ -84,20 +85,29 @@ const roleVoices = [
 ];
 
 export function ModernVoiceSelector() {
-  // Simplified for initial implementation - will restore full voice selection context
-  const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  // Integrated with voice selection context following AI_INSTRUCTIONS.md patterns
+  const { 
+    state, 
+    selectPerspective, 
+    selectRole, 
+    clearPerspective, 
+    clearRole 
+  } = useVoiceSelection();
   
   const togglePerspective = (id: string) => {
-    setSelectedPerspectives(prev => 
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
+    if (state.selectedPerspectives.includes(id)) {
+      clearPerspective(id);
+    } else {
+      selectPerspective(id);
+    }
   };
   
   const toggleRole = (id: string) => {
-    setSelectedRoles(prev => 
-      prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
-    );
+    if (state.selectedRoles.includes(id)) {
+      clearRole(id);
+    } else {
+      selectRole(id);
+    }
   };
 
   const VoiceCard = ({ voice, isSelected, onToggle, type }: { 
@@ -151,7 +161,7 @@ export function ModernVoiceSelector() {
           </p>
         </div>
         <Badge variant="outline" className="text-white border-gray-600">
-          {selectedPerspectives.length + selectedRoles.length} selected
+          {state.selectedPerspectives.length + state.selectedRoles.length} selected
         </Badge>
       </div>
 
@@ -167,7 +177,7 @@ export function ModernVoiceSelector() {
               <VoiceCard
                 key={voice.id}
                 voice={voice}
-                isSelected={selectedPerspectives.includes(voice.id)}
+                isSelected={state.selectedPerspectives.includes(voice.id)}
                 onToggle={() => togglePerspective(voice.id)}
                 type="perspective"
               />
@@ -181,7 +191,7 @@ export function ModernVoiceSelector() {
               <VoiceCard
                 key={voice.id}
                 voice={voice}
-                isSelected={selectedRoles.includes(voice.id)}
+                isSelected={state.selectedRoles.includes(voice.id)}
                 onToggle={() => toggleRole(voice.id)}
                 type="role"
               />

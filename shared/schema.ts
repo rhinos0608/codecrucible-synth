@@ -148,7 +148,6 @@ export const projects = pgTable("projects", {
   language: text("language").notNull().default("javascript"),
   sessionId: integer("session_id").references(() => voiceSessions.id),
   synthesisId: integer("synthesis_id").references(() => syntheses.id),
-  chatSessionId: integer("chat_session_id").references(() => chatSessions.id), // Link to chat session for project history
   folderId: integer("folder_id").references(() => projectFolders.id), // Living organizational structure
   tags: jsonb("tags").notNull().default([]),
   isPublic: boolean("is_public").notNull().default(false),
@@ -440,7 +439,7 @@ export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
   contextData: true,
   isActive: true,
 }).extend({
-  sessionId: z.number().int().min(1).optional(),
+  sessionId: z.number().int().min(1),
   userId: z.string().min(1),
   selectedVoice: z.string().min(1).max(100),
   initialSolutionId: z.number().int().min(1).optional(),
@@ -578,7 +577,6 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
   userId: z.string().min(1), // Required for project ownership
   sessionId: z.number().int().positive().nullable().optional(),
   synthesisId: z.number().int().positive().nullable().optional(),
-  chatSessionId: z.number().int().positive().nullable().optional(),
   folderId: z.number().int().positive().nullable().optional(),
   tags: z.array(z.string()).default([]),
   isPublic: z.boolean().default(false),

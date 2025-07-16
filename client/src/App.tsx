@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import Dashboard from "@/pages/dashboard";
 import Landing from "@/pages/landing";
-import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/not-found";
 import Analytics from "@/pages/analytics";
 import Pricing from "@/pages/pricing";
@@ -33,28 +32,28 @@ function Router() {
       
       {/* Protected routes - redirect to landing if not authenticated */}
       <Route path="/analytics">
-        {isAuthenticated ? <Analytics /> : <LandingPage />}
+        {isAuthenticated ? <Analytics /> : <Landing />}
       </Route>
       <Route path="/teams">
-        {isAuthenticated ? <Teams /> : <LandingPage />}
+        {isAuthenticated ? <Teams /> : <Landing />}
       </Route>
       <Route path="/onboarding">
-        {isAuthenticated ? <Onboarding /> : <LandingPage />}
+        {isAuthenticated ? <Onboarding /> : <Landing />}
       </Route>
       
       {/* Chat route - for full-page ChatGPT-like experience */}
       <Route path="/chat/:sessionId">
-        {isAuthenticated ? <ChatPage /> : <LandingPage />}
+        {isAuthenticated ? <ChatPage /> : <Landing />}
       </Route>
       
       {/* Dashboard route - for Stripe post-checkout redirects */}
       <Route path="/dashboard">
-        {isLoading ? <div>Loading...</div> : (isAuthenticated ? <Dashboard /> : <LandingPage />)}
+        {isLoading ? <div>Loading...</div> : (isAuthenticated ? <Dashboard /> : <Landing />)}
       </Route>
       
       {/* Main route */}
       <Route path="/">
-        {isLoading ? <div>Loading...</div> : (isAuthenticated ? <Dashboard /> : <LandingPage />)}
+        {isLoading ? <div>Loading...</div> : (isAuthenticated ? <Dashboard /> : <Landing />)}
       </Route>
       
       {/* 404 fallback */}

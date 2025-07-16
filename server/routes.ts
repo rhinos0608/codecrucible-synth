@@ -923,6 +923,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Post-Generation Chat API Endpoints - Following AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles
   
+  // Get specific chat session details
+  app.get('/api/chat/sessions/:chatSessionId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { chatSessionId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const chatSession = await storage.getChatSession(parseInt(chatSessionId));
+      if (!chatSession || chatSession.userId !== userId) {
+        return res.status(404).json({ error: 'Chat session not found' });
+      }
+      
+      logger.info('Chat session retrieved', { 
+        chatSessionId: parseInt(chatSessionId),
+        selectedVoice: chatSession.selectedVoice,
+        userId: userId.substring(0, 8) + '...'
+      });
+      
+      res.json(chatSession);
+    } catch (error) {
+      logger.error('Error retrieving chat session', error as Error, { 
+        userId: req.user?.claims?.sub,
+        chatSessionId: req.params.chatSessionId 
+      });
+      res.status(500).json({ error: 'Failed to retrieve chat session' });
+    }
+  });
+  
   // Create chat session with specific AI voice
   app.post('/api/chat/sessions', isAuthenticated, async (req: any, res) => {
     try {
@@ -983,7 +1010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { chatSessionId } = req.params;
       const userId = req.user.claims.sub;
-      const { content, messageType } = req.body;
+      const { content } = req.body;
       
       // Verify chat session ownership
       const chatSession = await storage.getChatSession(parseInt(chatSessionId));
@@ -991,8 +1018,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: 'Access denied to chat session' });
       }
       
-      if (messageType !== 'user') {
-        return res.status(400).json({ error: 'Only user messages can be sent' });
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ error: 'Message content is required' });
       }
       
       // Process user message and generate AI response using chat service

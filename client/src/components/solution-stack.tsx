@@ -128,7 +128,8 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     }
 
     // Show post-generation decision when solutions are loaded - Jung's Descent Protocol for consciousness-driven UX
-    if (solutions.length > 0 && !isLoading && !showPostGenDecision && !showChatInterface) {
+    // Only show if main dialog is closed to avoid overlapping modals
+    if (solutions.length > 0 && !isLoading && !showPostGenDecision && !showChatInterface && !isOpen) {
       console.log('📋 Showing post-generation decision modal for', solutions.length, 'solutions');
       setShowPostGenDecision(true);
     }
@@ -138,6 +139,13 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     onMergeClick(solutions);
     setShowPostGenDecision(false);
     onClose();
+  };
+
+  // Handle post-generation decision modal close - close both modals
+  const handlePostGenDecisionClose = () => {
+    console.log('🔄 Closing post-generation decision modal');
+    setShowPostGenDecision(false);
+    onClose(); // Also close the parent dialog
   };
 
   // Handle voice selection for chat - Alexander's Pattern Language for consistent interaction patterns
@@ -280,7 +288,7 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     {showPostGenDecision && (
       <PostGenerationDecision
         isOpen={showPostGenDecision}
-        onClose={() => setShowPostGenDecision(false)}
+        onClose={handlePostGenDecisionClose}
         solutions={solutions}
         onContinueWithVoice={handleContinueWithVoice}
         onSynthesizeAll={handleSynthesizeAll}

@@ -440,7 +440,7 @@ export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
   contextData: true,
   isActive: true,
 }).extend({
-  sessionId: z.number().int().min(1),
+  sessionId: z.number().int().min(1).optional(),
   userId: z.string().min(1),
   selectedVoice: z.string().min(1).max(100),
   initialSolutionId: z.number().int().min(1).optional(),

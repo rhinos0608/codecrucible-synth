@@ -18,10 +18,10 @@ export class ChatService {
       // Store user message
       const userMsg = await storage.createChatMessage({
         chatSessionId,
-        role: 'user',
-        content: userMessage,
         messageType: 'user',
-        createdAt: new Date()
+        content: userMessage,
+        voiceType: chatSession.selectedVoice,
+        messageIndex: recentMessages.length
       });
       
       // Get conversation history for context
@@ -43,10 +43,10 @@ export class ChatService {
       // Store AI response
       const assistantMsg = await storage.createChatMessage({
         chatSessionId,
-        role: 'assistant',
+        messageType: 'assistant',
         content: aiResponse,
-        messageType: 'ai',
-        createdAt: new Date()
+        voiceType: chatSession.selectedVoice,
+        messageIndex: recentMessages.length + 1
       });
       
       console.log(`💬 Processed message in chat ${chatSessionId}: User(${userMessage.length} chars) → ${chatSession.selectedVoice}(${aiResponse.length} chars)`);
@@ -59,19 +59,19 @@ export class ChatService {
       // Store user message even if AI fails
       const userMsg = await storage.createChatMessage({
         chatSessionId,
-        role: 'user',
-        content: userMessage,
         messageType: 'user',
-        createdAt: new Date()
+        content: userMessage,
+        voiceType: 'user',
+        messageIndex: 0
       });
       
       // Create error response
       const assistantMsg = await storage.createChatMessage({
         chatSessionId,
-        role: 'assistant',
+        messageType: 'assistant',
         content: 'I apologize, but I encountered an error while processing your message. Please try again.',
-        messageType: 'ai',
-        createdAt: new Date()
+        voiceType: 'error',
+        messageIndex: 1
       });
       
       return { userMsg, assistantMsg };

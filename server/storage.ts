@@ -208,6 +208,15 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(chatSessionId: number): Promise<ChatMessage[]>;
   getChatMessagesByUser(userId: string): Promise<ChatMessage[]>;
+  
+  // Team operations - Following AI_INSTRUCTIONS.md consciousness patterns
+  getTeamVoiceProfiles(teamId: number): Promise<any[]>;
+  getSharedVoiceProfiles(userId: string): Promise<any[]>;
+  createTeamVoiceProfile(profile: any): Promise<any>;
+  getTeamMembers(teamId: number): Promise<any[]>;
+  createTeamInvite(invite: any): Promise<any>;
+  removeTeamMember(teamId: number, memberId: string): Promise<void>;
+  updateTeamMemberRole(teamId: number, memberId: string, role: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1121,6 +1130,135 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(chatMessages.createdAt));
     
     return messages.map(row => row.message);
+  }
+
+  // Team operations - Following AI_INSTRUCTIONS.md consciousness patterns
+  async getTeamVoiceProfiles(teamId: number): Promise<any[]> {
+    try {
+      // Mock implementation - to be replaced with actual database queries
+      const mockProfiles = [
+        {
+          id: 1,
+          name: "Team Explorer Profile",
+          description: "Shared exploration voice for team collaboration",
+          teamId,
+          selectedPerspectives: ["explorer"],
+          selectedRoles: ["architect"],
+          createdAt: new Date().toISOString()
+        }
+      ];
+      return mockProfiles;
+    } catch (error) {
+      console.error('Error fetching team voice profiles:', error);
+      return [];
+    }
+  }
+
+  async getSharedVoiceProfiles(userId: string): Promise<any[]> {
+    try {
+      // Mock implementation - to be replaced with actual database queries
+      const mockSharedProfiles = [
+        {
+          id: 1,
+          name: "Shared Team Profile",
+          description: "Voice profile shared across teams",
+          userId,
+          selectedPerspectives: ["maintainer"],
+          selectedRoles: ["optimizer"],
+          createdAt: new Date().toISOString()
+        }
+      ];
+      return mockSharedProfiles;
+    } catch (error) {
+      console.error('Error fetching shared voice profiles:', error);
+      return [];
+    }
+  }
+
+  async createTeamVoiceProfile(profile: any): Promise<any> {
+    try {
+      // Mock implementation - to be replaced with actual database insertion
+      const newProfile = {
+        ...profile,
+        id: Math.floor(Math.random() * 10000),
+        createdAt: new Date().toISOString()
+      };
+      return newProfile;
+    } catch (error) {
+      console.error('Error creating team voice profile:', error);
+      throw error;
+    }
+  }
+
+  async getTeamMembers(teamId: number): Promise<any[]> {
+    try {
+      // Use existing team member query
+      const members = await db
+        .select({
+          member: teamMembers,
+          user: users
+        })
+        .from(teamMembers)
+        .innerJoin(users, eq(teamMembers.userId, users.id))
+        .where(eq(teamMembers.teamId, teamId));
+      
+      return members.map(row => ({
+        ...row.member,
+        user: row.user
+      }));
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+      return [];
+    }
+  }
+
+  async createTeamInvite(invite: any): Promise<any> {
+    try {
+      // Mock implementation - to be replaced with actual team invite table
+      const newInvite = {
+        ...invite,
+        id: Math.floor(Math.random() * 10000),
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      return newInvite;
+    } catch (error) {
+      console.error('Error creating team invite:', error);
+      throw error;
+    }
+  }
+
+  async removeTeamMember(teamId: number, memberId: string): Promise<void> {
+    try {
+      await db
+        .delete(teamMembers)
+        .where(
+          and(
+            eq(teamMembers.teamId, teamId),
+            eq(teamMembers.userId, memberId)
+          )
+        );
+    } catch (error) {
+      console.error('Error removing team member:', error);
+      throw error;
+    }
+  }
+
+  async updateTeamMemberRole(teamId: number, memberId: string, role: string): Promise<void> {
+    try {
+      await db
+        .update(teamMembers)
+        .set({ role })
+        .where(
+          and(
+            eq(teamMembers.teamId, teamId),
+            eq(teamMembers.userId, memberId)
+          )
+        );
+    } catch (error) {
+      console.error('Error updating team member role:', error);
+      throw error;
+    }
   }
 }
 

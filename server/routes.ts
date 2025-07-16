@@ -1010,6 +1010,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Team voice profiles endpoints - Following AI_INSTRUCTIONS.md consciousness patterns
+  app.get('/api/teams/:teamId/voice-profiles', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Get team voice profiles
+      const teamVoiceProfiles = await storage.getTeamVoiceProfiles(parseInt(teamId));
+      
+      logger.info('Team voice profiles fetched', {
+        teamId: parseInt(teamId),
+        userId: userId.substring(0, 8) + '...',
+        count: teamVoiceProfiles.length
+      });
+      
+      res.json(teamVoiceProfiles);
+    } catch (error) {
+      logger.error('Error fetching team voice profiles', error as Error, {
+        teamId: req.params.teamId,
+        userId: req.user?.claims?.sub
+      });
+      res.status(500).json({ error: 'Failed to fetch team voice profiles' });
+    }
+  });
+
+  app.get('/api/teams/voice-profiles/shared', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get shared voice profiles across all teams user is member of
+      const sharedVoiceProfiles = await storage.getSharedVoiceProfiles(userId);
+      
+      logger.info('Shared voice profiles fetched', {
+        userId: userId.substring(0, 8) + '...',
+        count: sharedVoiceProfiles.length
+      });
+      
+      res.json(sharedVoiceProfiles);
+    } catch (error) {
+      logger.error('Error fetching shared voice profiles', error as Error, {
+        userId: req.user?.claims?.sub
+      });
+      res.status(500).json({ error: 'Failed to fetch shared voice profiles' });
+    }
+  });
+
+  app.post('/api/teams/:teamId/voice-profiles', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      const profileData = req.body;
+      
+      // Create team voice profile
+      const teamVoiceProfile = await storage.createTeamVoiceProfile({
+        ...profileData,
+        teamId: parseInt(teamId),
+        userId
+      });
+      
+      logger.info('Team voice profile created', {
+        teamId: parseInt(teamId),
+        userId: userId.substring(0, 8) + '...',
+        profileId: teamVoiceProfile.id
+      });
+      
+      res.json(teamVoiceProfile);
+    } catch (error) {
+      logger.error('Error creating team voice profile', error as Error, {
+        teamId: req.params.teamId,
+        userId: req.user?.claims?.sub
+      });
+      res.status(500).json({ error: 'Failed to create team voice profile' });
+    }
+  });
+
+  app.get('/api/teams/:teamId/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Get team members
+      const teamMembers = await storage.getTeamMembers(parseInt(teamId));
+      
+      logger.info('Team members fetched', {
+        teamId: parseInt(teamId),
+        userId: userId.substring(0, 8) + '...',
+        count: teamMembers.length
+      });
+      
+      res.json(teamMembers);
+    } catch (error) {
+      logger.error('Error fetching team members', error as Error, {
+        teamId: req.params.teamId,
+        userId: req.user?.claims?.sub
+      });
+      res.status(500).json({ error: 'Failed to fetch team members' });
+    }
+  });
+
+  app.post('/api/teams/:teamId/invites', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user.claims.sub;
+      const inviteData = req.body;
+      
+      // Create team invitation
+      const teamInvite = await storage.createTeamInvite({
+        ...inviteData,
+        teamId: parseInt(teamId),
+        invitedBy: userId
+      });
+      
+      logger.info('Team invite created', {
+        teamId: parseInt(teamId),
+        userId: userId.substring(0, 8) + '...',
+        inviteId: teamInvite.id
+      });
+      
+      res.json(teamInvite);
+    } catch (error) {
+      logger.error('Error creating team invite', error as Error, {
+        teamId: req.params.teamId,
+        userId: req.user?.claims?.sub
+      });
+      res.status(500).json({ error: 'Failed to create team invite' });
+    }
+  });
+
+  app.delete('/api/teams/:teamId/members/:memberId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId, memberId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Remove team member
+      await storage.removeTeamMember(parseInt(teamId), memberId);
+      
+      logger.info('Team member removed', {
+        teamId: parseInt(teamId),
+        memberId: memberId.substring(0, 8) + '...',
+        removedBy: userId.substring(0, 8) + '...'
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('Error removing team member', error as Error, {
+        teamId: req.params.teamId,
+        memberId: req.params.memberId,
+        userId: req.user?.claims?.sub
+      });
+      res.status(500).json({ error: 'Failed to remove team member' });
+    }
+  });
+
+  app.patch('/api/teams/:teamId/members/:memberId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId, memberId } = req.params;
+      const userId = req.user.claims.sub;
+      const { role } = req.body;
+      
+      // Update team member role
+      await storage.updateTeamMemberRole(parseInt(teamId), memberId, role);
+      
+      logger.info('Team member role updated', {
+        teamId: parseInt(teamId),
+        memberId: memberId.substring(0, 8) + '...',
+        newRole: role,
+        updatedBy: userId.substring(0, 8) + '...'
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('Error updating team member role', error as Error, {
+        teamId: req.params.teamId,
+        memberId: req.params.memberId,
+        userId: req.user?.claims?.sub
+      });
+      res.status(500).json({ error: 'Failed to update team member role' });
+    }
+  });
+
   // File management endpoints for project folders - Following AI_INSTRUCTIONS.md patterns
   app.get('/api/folders/:folderId/files', isAuthenticated, async (req: any, res) => {
     try {

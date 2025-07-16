@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSquare, Plus, FolderOpen, Settings, User, LogOut, Brain, BarChart3, Users } from "lucide-react";
+import { MessageSquare, Plus, FolderOpen, Settings, User, LogOut, Brain, BarChart3, Users, GraduationCap, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -176,6 +176,59 @@ export function ModernSidebar({
           >
             <Users className="w-4 h-4 mr-2" />
             Teams
+          </Button>
+          
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+            onClick={() => {
+              console.log('📁 Projects navigation clicked');
+              onNavigate?.('projects');
+            }}
+          >
+            <FolderOpen className="w-4 h-4 mr-2" />
+            Projects
+          </Button>
+          
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+            onClick={() => {
+              console.log('🎓 Learning navigation clicked');
+              onNavigate?.('learning');
+            }}
+          >
+            <GraduationCap className="w-4 h-4 mr-2" />
+            Learning
+            <Badge variant="outline" className="ml-auto text-orange-400 border-orange-400 text-xs">
+              Soon
+            </Badge>
+          </Button>
+          
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+            onClick={() => {
+              console.log('👑 Premium navigation clicked');
+              onNavigate?.('premium');
+            }}
+          >
+            <Crown className="w-4 h-4 mr-2" />
+            Premium
+          </Button>
+          
+          <Separator className="my-2" />
+          
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-gray-300 hover:text-red-300 hover:bg-gray-800"
+            onClick={() => {
+              console.log('🚪 Logout clicked');
+              window.location.href = '/api/logout';
+            }}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout
           </Button>
         </div>
 

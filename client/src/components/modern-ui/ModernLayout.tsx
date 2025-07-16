@@ -7,17 +7,35 @@ import { SynthesisPanel } from "@/components/synthesis-panel";
 import { AnalyticsPanel } from "@/components/analytics-panel";
 import { TeamsPanel } from "@/components/teams-panel";
 import { AvatarCustomizer } from "@/components/avatar-customizer";
+import { EnhancedProjectsPanel } from "@/components/enhanced-projects-panel";
+import UpgradeModal from "@/components/UpgradeModal";
+import OnboardingPage from "@/pages/onboarding";
 import { cn } from "@/lib/utils";
 import type { Project, Solution } from "@shared/schema";
 import { useSolutionGeneration } from "@/hooks/use-solution-generation";
 import { useVoiceSelection } from "@/contexts/voice-selection-context";
 import { usePlanGuard } from "@/hooks/usePlanGuard";
+import { useLocation } from "wouter";
 
 interface ModernLayoutProps {
   className?: string;
+  onNavigate?: (section: string) => void;
+  onGenerate?: () => void;
+  onStreamingGenerate?: () => void;
+  onSolutionsGenerated?: (sessionId: number) => void;
+  onSynthesize?: (solutions: any[]) => void;
+  onUseProjectContext?: (projects: any[]) => void;
 }
 
-export function ModernLayout({ className }: ModernLayoutProps) {
+export function ModernLayout({ 
+  className, 
+  onNavigate, 
+  onGenerate, 
+  onStreamingGenerate, 
+  onSolutionsGenerated, 
+  onSynthesize, 
+  onUseProjectContext 
+}: ModernLayoutProps) {
   // Panel states
   const [showSolutionStack, setShowSolutionStack] = useState(false);
   const [showStreamingGeneration, setShowStreamingGeneration] = useState(false);
@@ -25,19 +43,30 @@ export function ModernLayout({ className }: ModernLayoutProps) {
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
   const [showTeamsPanel, setShowTeamsPanel] = useState(false);
   const [showVoiceProfilesPanel, setShowVoiceProfilesPanel] = useState(false);
+  const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showLearningSection, setShowLearningSection] = useState(false);
 
   // Data states
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedContextProjects, setSelectedContextProjects] = useState<Project[]>([]);
 
   // Backend integration
   const { state } = useVoiceSelection();
   const planGuard = usePlanGuard();
   const { generateSession } = useSolutionGeneration();
+  const [, setLocation] = useLocation();
 
   const handleGenerate = async () => {
-    // Defensive programming - validate state before proceeding
+    // Use parent callback if provided, otherwise use internal logic
+    if (onGenerate) {
+      onGenerate();
+      return;
+    }
+
+    // Fallback to internal generation logic
     if (!planGuard.canGenerate) {
       console.warn('Generation blocked by plan guard:', planGuard);
       return;
@@ -48,19 +77,12 @@ export function ModernLayout({ className }: ModernLayoutProps) {
       return;
     }
 
-    // Multi-voice consciousness validation
     if (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0) {
       console.warn('No voices selected for generation');
       return;
     }
 
     try {
-      console.log('🎯 Starting Council Generation with voices:', {
-        perspectives: state.selectedPerspectives,
-        roles: state.selectedRoles,
-        prompt: state.prompt.substring(0, 100) + '...'
-      });
-
       const result = await planGuard.attemptGeneration(async () => {
         return generateSession.mutateAsync({
           prompt: state.prompt,
@@ -79,11 +101,11 @@ export function ModernLayout({ className }: ModernLayoutProps) {
         setCurrentSessionId(result.data.session.id);
         setSolutions(result.data.solutions || []);
         setShowSolutionStack(true);
-      } else if (!result.success && result.reason === 'quota_exceeded') {
-        console.warn('Quota exceeded, showing upgrade modal');
-        // Show upgrade modal (implement in parent component)
-      } else {
-        console.error('Generation failed:', result);
+        
+        // Notify parent if callback provided
+        if (onSolutionsGenerated) {
+          onSolutionsGenerated(result.data.session.id);
+        }
       }
     } catch (error) {
       console.error('Council Generation failed:', error);
@@ -91,7 +113,13 @@ export function ModernLayout({ className }: ModernLayoutProps) {
   };
 
   const handleStreamingGenerate = () => {
-    // Defensive programming - validate state before proceeding
+    // Use parent callback if provided, otherwise use internal logic
+    if (onStreamingGenerate) {
+      onStreamingGenerate();
+      return;
+    }
+
+    // Fallback to internal streaming logic
     if (!planGuard.canGenerate) {
       console.warn('Streaming generation blocked by plan guard:', planGuard);
       return;
@@ -102,7 +130,6 @@ export function ModernLayout({ className }: ModernLayoutProps) {
       return;
     }
 
-    // Multi-voice consciousness validation
     if (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0) {
       console.warn('No voices selected for streaming generation');
       return;
@@ -122,23 +149,48 @@ export function ModernLayout({ className }: ModernLayoutProps) {
     setCurrentSessionId(null);
     setSolutions([]);
     setSelectedProject(null);
+    setSelectedContextProjects([]);
     setShowSolutionStack(false);
     setShowStreamingGeneration(false);
     setShowSynthesisPanel(false);
+    setShowLearningSection(false);
+    setShowProjectsPanel(false);
+    setShowUpgradeModal(false);
   };
 
   const handleProjectSelect = (project: Project) => {
     setSelectedProject(project);
-    // Could open project details or use as context
+    
+    // Use parent callback if provided for project context
+    if (onUseProjectContext) {
+      onUseProjectContext([project]);
+    }
+  };
+
+  const handleUseProjectContext = (projects: Project[]) => {
+    setSelectedContextProjects(projects);
+    
+    // Use parent callback if provided for project context
+    if (onUseProjectContext) {
+      onUseProjectContext(projects);
+    }
   };
 
   const handleNavigate = (section: string) => {
-    // Close all panels first
+    // Use parent callback if provided, otherwise use internal logic
+    if (onNavigate) {
+      onNavigate(section);
+      return;
+    }
+
+    // Fallback to internal navigation logic
     setShowAnalyticsPanel(false);
     setShowTeamsPanel(false);
     setShowVoiceProfilesPanel(false);
+    setShowProjectsPanel(false);
+    setShowUpgradeModal(false);
+    setShowLearningSection(false);
 
-    // Open requested panel
     switch (section) {
       case 'analytics':
         setShowAnalyticsPanel(true);
@@ -149,15 +201,40 @@ export function ModernLayout({ className }: ModernLayoutProps) {
       case 'voice-profiles':
         setShowVoiceProfilesPanel(true);
         break;
+      case 'projects':
+        setShowProjectsPanel(true);
+        break;
+      case 'premium':
+        setShowUpgradeModal(true);
+        break;
+      case 'learning':
+        setShowLearningSection(true);
+        break;
     }
   };
 
   const handleSynthesize = () => {
+    // Use parent callback if provided, otherwise use internal logic
+    if (onSynthesize) {
+      onSynthesize(solutions);
+      return;
+    }
+
+    // Fallback to internal synthesis logic
     if (currentSessionId) {
       setShowSolutionStack(false);
       setShowSynthesisPanel(true);
     }
   };
+
+  // Handle different view modes
+  if (showLearningSection) {
+    return (
+      <div className={cn("h-screen bg-gray-950", className)}>
+        <OnboardingPage />
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex h-screen bg-gray-950", className)}>
@@ -227,6 +304,22 @@ export function ModernLayout({ className }: ModernLayoutProps) {
         <AvatarCustomizer
           isOpen={showVoiceProfilesPanel}
           onClose={() => setShowVoiceProfilesPanel(false)}
+        />
+      )}
+
+      {showProjectsPanel && (
+        <EnhancedProjectsPanel
+          isOpen={showProjectsPanel}
+          onClose={() => setShowProjectsPanel(false)}
+          onUseAsContext={handleUseProjectContext}
+          selectedContextProjects={selectedContextProjects}
+        />
+      )}
+
+      {showUpgradeModal && (
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
         />
       )}
     </div>

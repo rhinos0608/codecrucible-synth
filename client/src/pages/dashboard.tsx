@@ -443,148 +443,104 @@ export default function Dashboard() {
     <>
       {confirmationDialog}
       
-      {/* Overlay Original Dashboard Functionality over ModernLayout */}
-      <div className="relative h-screen">
-        {/* Modern Layout Base */}
-        <ModernLayout className="h-screen" />
-        
-        {/* Overlay Navigation Panel */}
-        <div className="absolute top-4 right-4 z-50">
-          <div className="flex items-center gap-2 bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded-lg p-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowVoiceProfilesPanel(true)}
-              className="text-gray-300 hover:text-white"
-            >
-              <User className="w-4 h-4 mr-1" />
-              Voice Profiles
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowProjectsPanel(true)}
-              className="text-gray-300 hover:text-white"
-            >
-              <FolderOpen className="w-4 h-4 mr-1" />
-              Projects
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowLearningPanel(true)}
-              className="text-gray-300 hover:text-white"
-            >
-              <GraduationCap className="w-4 h-4 mr-1" />
-              Learning
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowAnalyticsPanel(true)}
-              className="text-gray-300 hover:text-white"
-            >
-              <BarChart3 className="w-4 h-4 mr-1" />
-              Analytics
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowUpgradeModal(true)}
-              className="text-gray-300 hover:text-white"
-            >
-              <Crown className="w-4 h-4 mr-1" />
-              Premium
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowTeamsPanel(true)}
-              className="text-gray-300 hover:text-white"
-            >
-              <Users className="w-4 h-4 mr-1" />
-              Teams
-            </Button>
-            <Badge variant="outline" className="text-orange-400 border-orange-400">
-              Coming Soon
-            </Badge>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => window.location.href = '/api/logout'}
-              className="text-gray-300 hover:text-red-300"
-            >
-              <LogOut className="w-4 h-4 mr-1" />
-              Logout
-            </Button>
-          </div>
-        </div>
+      {/* Integrated Dashboard with ModernLayout - Following AI_INSTRUCTIONS.md patterns */}
+      <div className="h-screen bg-gray-950 flex">
+        {/* Enhanced ModernLayout with integrated navigation */}
+        <ModernLayout 
+          className="flex-1"
+          onNavigate={(section) => {
+            // Handle navigation to different panels
+            switch (section) {
+              case 'analytics':
+                setShowAnalyticsPanel(true);
+                break;
+              case 'teams':
+                setShowTeamsPanel(true);
+                break;
+              case 'voice-profiles':
+                setShowVoiceProfilesPanel(true);
+                break;
+              case 'projects':
+                setShowProjectsPanel(true);
+                break;
+              case 'learning':
+                setShowLearningPanel(true);
+                break;
+              case 'premium':
+                setShowUpgradeModal(true);
+                break;
+            }
+          }}
+          onGenerate={handleSecureGeneration}
+          onStreamingGenerate={() => setShowChatGPTGeneration(true)}
+          onSolutionsGenerated={handleSolutionsGenerated}
+          onSynthesize={handleMergeClick}
+          onUseProjectContext={handleUseAsContext}
+        />
 
-        {/* Overlay Right Configuration Panel */}
+        {/* Right Configuration Panel - Integrated properly */}
         {showRightPanel && (
-          <div className="absolute top-0 right-0 h-full w-80 bg-gray-900/95 backdrop-blur-sm border-l border-gray-700 z-40">
-            <div className="flex flex-col h-full">
-              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-                <h3 className="font-semibold text-gray-200">Configuration</h3>
+          <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col flex-shrink-0">
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-200">Configuration</h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowRightPanel(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            {/* Subscription Status */}
+            <div className="p-4 border-b border-gray-800">
+              <SubscriptionStatus />
+            </div>
+
+            {/* Voice Profiles Section */}
+            <div className="p-4 border-b border-gray-800">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium text-gray-200">MY VOICE PROFILES</h4>
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  onClick={() => setShowRightPanel(false)}
+                  onClick={() => setShowAvatarCustomizer(true)}
                   className="text-gray-400 hover:text-white"
                 >
-                  <X className="w-4 h-4" />
+                  <Play className="w-3 h-3" />
                 </Button>
               </div>
               
-              {/* Subscription Status */}
-              <div className="p-4 border-b border-gray-800">
-                <SubscriptionStatus />
-              </div>
-
-              {/* Voice Profiles Section */}
-              <div className="p-4 border-b border-gray-800">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-200">MY VOICE PROFILES</h4>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setShowAvatarCustomizer(true)}
-                    className="text-gray-400 hover:text-white"
-                  >
-                    <Play className="w-3 h-3" />
-                  </Button>
-                </div>
-                
-                <div className="space-y-2">
-                  {profiles.slice(0, 3).map((profile) => (
-                    <div key={profile.id} className="flex items-center gap-2 p-2 bg-gray-800 rounded">
-                      <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-medium">{profile.name.charAt(0)}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{profile.name}</div>
-                        <div className="text-xs text-gray-400 truncate">{profile.specialization}</div>
-                      </div>
-                      <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                        <Settings className="w-3 h-3" />
-                      </Button>
+              <div className="space-y-2">
+                {profiles.slice(0, 3).map((profile) => (
+                  <div key={profile.id} className="flex items-center gap-2 p-2 bg-gray-800 rounded">
+                    <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                      <span className="text-xs font-medium">{profile.name.charAt(0)}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{profile.name}</div>
+                      <div className="text-xs text-gray-400 truncate">{profile.specialization}</div>
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                      <Settings className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
               </div>
+            </div>
 
-              {/* File Upload Area */}
-              <div className="p-4 border-b border-gray-800">
-                <FileUploadArea 
-                  onFileUploaded={handleFileUploaded}
-                  onFilesAttached={handleFilesAttached}
-                />
-              </div>
+            {/* File Upload Area */}
+            <div className="p-4 border-b border-gray-800">
+              <FileUploadArea 
+                onFileUploaded={handleFileUploaded}
+                onFilesAttached={handleFilesAttached}
+              />
+            </div>
 
-              {/* Legal Information */}
-              <div className="flex-1 p-4">
-                <LegalSection />
-              </div>
+            {/* Legal Information */}
+            <div className="flex-1 p-4">
+              <LegalSection />
             </div>
           </div>
         )}
@@ -602,7 +558,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Modal Panels - Following AI_INSTRUCTIONS.md patterns */}
+      {/* Essential Modals - Following AI_INSTRUCTIONS.md patterns */}
       {showProjectsPanel && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-gray-900 border border-gray-700 rounded-lg w-[90%] max-w-4xl h-[80%] max-h-[600px] overflow-hidden">
@@ -726,33 +682,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Other existing modals */}
-      {showSolutionStack && currentSessionId && (
-        <SolutionStack 
-          sessionId={currentSessionId}
-          onClose={() => setShowSolutionStack(false)}
-          onSynthesizeSelected={handleMergeClick}
-        />
-      )}
-
-      {showSynthesisPanel && (
-        <SynthesisPanel 
-          solutions={currentSolutions}
-          onClose={() => setShowSynthesisPanel(false)}
-          onSave={(project) => {
-            console.log('Project saved:', project);
-            setShowSynthesisPanel(false);
-          }}
-        />
-      )}
-
-      {showAvatarCustomizer && (
-        <AvatarCustomizer 
-          editingProfile={editingProfile}
-          onClose={() => {
-            setShowAvatarCustomizer(false);
-            setEditingProfile(null);
-          }}
+      {showUpgradeModal && (
+        <UpgradeModal 
+          onClose={() => setShowUpgradeModal(false)}
+          feature="unlimited-generations"
         />
       )}
 
@@ -768,10 +701,14 @@ export default function Dashboard() {
         />
       )}
 
-      {showUpgradeModal && (
-        <UpgradeModal 
-          onClose={() => setShowUpgradeModal(false)}
-          feature="unlimited-generations"
+      {showSynthesisPanel && (
+        <SynthesisPanel 
+          solutions={currentSolutions}
+          onClose={() => setShowSynthesisPanel(false)}
+          onSave={(project) => {
+            console.log('Project saved:', project);
+            setShowSynthesisPanel(false);
+          }}
         />
       )}
 

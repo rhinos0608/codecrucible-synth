@@ -141,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
-      console.error("Error fetching user:", error);
+      logger.error('Failed to fetch user data', error as Error, { operation: 'get_user' });
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
@@ -278,50 +278,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { folderId } = req.body;
       const userId = req.user.claims.sub;
       
-      console.log('🔧 Moving project API called:', { projectId, folderId, userId, requestBody: req.body });
+      logger.info('Project move operation initiated', { 
+        projectId, 
+        folderId, 
+        userId,
+        operation: 'move_project'
+      });
       
       // Enhanced validation following AI_INSTRUCTIONS.md defensive programming
       const projectIdNum = parseInt(projectId);
       if (isNaN(projectIdNum)) {
-        console.error('❌ Invalid project ID:', projectId);
+        logger.error('Invalid project ID for move operation', new Error('Invalid project ID'), { 
+          projectId, 
+          userId,
+          operation: 'move_project_validation'
+        });
         return res.status(400).json({ error: 'Invalid project ID' });
       }
       
       // Validate project exists and belongs to user with comprehensive logging
       const project = await storage.getProject(projectIdNum);
-      console.log('🔧 Project lookup result:', { projectFound: !!project, projectUserId: project?.userId, requestUserId: userId });
+      logger.debug('Project lookup for move operation', { 
+        projectFound: !!project, 
+        projectUserId: project?.userId, 
+        requestUserId: userId,
+        operation: 'move_project_lookup'
+      });
       
       if (!project) {
-        console.error('❌ Project not found:', projectIdNum);
+        logger.error('Project not found for move operation', new Error('Project not found'), { 
+          projectId: projectIdNum, 
+          userId,
+          operation: 'move_project_not_found'
+        });
         return res.status(404).json({ error: 'Project not found' });
       }
       
       if (project.userId !== userId) {
-        console.error('❌ Access denied - project owner mismatch:', { projectUserId: project.userId, requestUserId: userId });
+        logger.error('Access denied for project move', new Error('Ownership mismatch'), { 
+          projectUserId: project.userId, 
+          requestUserId: userId,
+          projectId: projectIdNum,
+          operation: 'move_project_access_denied'
+        });
         return res.status(403).json({ error: 'Access denied to project' });
       }
       
       // Handle null folderId properly for moving to root
       const targetFolderId = folderId ? parseInt(folderId) : null;
-      console.log('🔧 Target folder processing:', { original: folderId, parsed: targetFolderId, isNull: folderId === null });
+      logger.debug('Target folder processing for move operation', { 
+        original: folderId, 
+        parsed: targetFolderId, 
+        isNull: folderId === null,
+        operation: 'move_project_folder_parse'
+      });
       
       const moved = await storage.moveProjectToFolder(projectIdNum, targetFolderId);
-      console.log('🔧 Move operation result:', { moved, projectId: projectIdNum, targetFolderId });
+      logger.debug('Project move storage operation result', { 
+        moved, 
+        projectId: projectIdNum, 
+        targetFolderId,
+        operation: 'move_project_storage'
+      });
       
       if (!moved) {
-        console.error('❌ Move operation failed at storage layer');
+        logger.error('Project move storage operation failed', new Error('Storage operation failed'), {
+          projectId: projectIdNum,
+          targetFolderId,
+          userId,
+          operation: 'move_project_storage_failure'
+        });
         return res.status(500).json({ error: 'Failed to move project - storage operation failed' });
       }
       
-      console.log('✅ Project moved successfully:', { projectId: projectIdNum, folderId: targetFolderId, userId });
+      logger.info('Project moved successfully', { 
+        projectId: projectIdNum, 
+        folderId: targetFolderId, 
+        userId,
+        operation: 'move_project_success'
+      });
       res.json({ success: true, projectId: projectIdNum, folderId: targetFolderId });
     } catch (error) {
-      console.error('❌ Critical error moving project:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : undefined,
+      logger.error('Critical error during project move operation', error as Error, {
         projectId: req.params.projectId,
         folderId: req.body.folderId,
-        userId: req.user?.claims?.sub
+        userId: req.user?.claims?.sub,
+        operation: 'move_project_exception'
       });
       
       logger.error('Error moving project', error as Error, { 
@@ -345,15 +387,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
 
-      console.log('🔧 Deleting project API called:', {
+      logger.info('Project deletion operation initiated', {
         projectId: req.params.id,
         userId,
-        timestamp: new Date().toISOString()
+        operation: 'delete_project'
       });
 
       // Enhanced input validation following AI_INSTRUCTIONS.md defensive programming
       if (isNaN(projectId) || projectId <= 0) {
-        console.error('❌ Invalid project ID for deletion:', req.params.id);
+        logger.error('Invalid project ID for deletion', new Error('Invalid project ID'), { 
+          projectId: req.params.id, 
+          userId,
+          operation: 'delete_project_validation'
+        });
         return res.status(400).json({ 
           error: 'Invalid project ID',
           message: 'Project ID must be a positive number'
@@ -363,14 +409,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify project exists and ownership using defensive programming  
       const project = await storage.getProject(projectId);
       if (!project) {
-        console.error('❌ Project not found for deletion:', projectId);
+        logger.error('Project not found for deletion', new Error('Project not found'), { 
+          projectId, 
+          userId,
+          operation: 'delete_project_not_found'
+        });
         return res.status(404).json({ 
           error: 'Project not found',
           message: 'The requested project does not exist'
         });
       }
 
-      console.log('🔧 Project deletion verification:', {
+      logger.debug('Project deletion verification', {
         projectFound: !!project,
         projectName: project.name,
         projectUserId: project.userId,

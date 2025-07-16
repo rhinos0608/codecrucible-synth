@@ -126,14 +126,19 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
         });
       }
     }
+  }, [isOpen, sessionId, isLoading, solutions, error]);
 
-    // Show post-generation decision when solutions are loaded - Jung's Descent Protocol for consciousness-driven UX
-    // Only show if main dialog is closed to avoid overlapping modals
-    if (solutions.length > 0 && !isLoading && !showPostGenDecision && !showChatInterface && !isOpen) {
-      console.log('📋 Showing post-generation decision modal for', solutions.length, 'solutions');
-      setShowPostGenDecision(true);
+  // Separate effect for modal management following Jung's Descent Protocol
+  useEffect(() => {
+    // Only show post-generation decision when we have solutions AND the main dialog was just closed
+    if (solutions.length > 0 && !isLoading && !isOpen && !showPostGenDecision && !showChatInterface) {
+      console.log('📋 Triggering post-generation decision modal for', solutions.length, 'solutions');
+      const timer = setTimeout(() => {
+        setShowPostGenDecision(true);
+      }, 100); // Small delay to prevent race conditions
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, sessionId, isLoading, solutions, error, showPostGenDecision, showChatInterface]);
+  }, [solutions.length, isLoading, isOpen, showPostGenDecision, showChatInterface]);
 
   const handleMergeClick = () => {
     onMergeClick(solutions);

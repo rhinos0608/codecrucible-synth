@@ -1052,14 +1052,30 @@ export class DatabaseStorage implements IStorage {
 
   // Chat operations - Following AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles
   async createChatSession(chatSession: InsertChatSession): Promise<ChatSession> {
-    const [created] = await db.insert(chatSessions).values({
-      ...chatSession,
-      userId: chatSession.userId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastActivityAt: new Date()
-    }).returning();
-    return created;
+    try {
+      const [created] = await db.insert(chatSessions).values({
+        sessionId: chatSession.sessionId,
+        userId: chatSession.userId,
+        selectedVoice: chatSession.selectedVoice,
+        initialSolutionId: chatSession.initialSolutionId || null,
+        contextData: chatSession.contextData,
+        isActive: chatSession.isActive ?? true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastActivityAt: new Date()
+      }).returning();
+      
+      console.log('✅ Chat session created successfully:', { 
+        id: created.id, 
+        selectedVoice: created.selectedVoice,
+        sessionId: created.sessionId 
+      });
+      
+      return created;
+    } catch (error) {
+      console.error('❌ Error creating chat session:', error);
+      throw error;
+    }
   }
 
   async getChatSession(id: number): Promise<ChatSession | undefined> {

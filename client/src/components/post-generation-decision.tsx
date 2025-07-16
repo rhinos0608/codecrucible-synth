@@ -69,9 +69,16 @@ export function PostGenerationDecision({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  // Create chat session mutation
+  // Create chat session mutation with enhanced error handling
   const createChatSessionMutation = useMutation({
     mutationFn: async (solution: Solution) => {
+      console.log('🔄 Creating chat session for solution:', {
+        solutionId: solution.id,
+        sessionId: solution.sessionId,
+        voiceEngine: solution.voiceEngine,
+        voiceCombination: solution.voiceCombination
+      });
+
       return apiRequest('/api/chat/sessions', {
         method: 'POST',
         body: {

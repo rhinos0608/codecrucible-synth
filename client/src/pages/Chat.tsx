@@ -54,23 +54,37 @@ export function Chat() {
     enabled: !!sessionId,
   });
 
-  // Send message mutation
+  // Send message mutation with enhanced error handling
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
+      if (!sessionId) {
+        throw new Error('No chat session ID provided');
+      }
+      
+      console.log('📤 Sending message to chat session:', {
+        sessionId,
+        messageLength: content.length,
+        timestamp: new Date().toISOString()
+      });
+      
       return apiRequest(`/api/chat/sessions/${sessionId}/messages`, {
         method: 'POST',
-        body: { content }
+        body: { 
+          content,
+          messageType: 'user'
+        }
       });
     },
     onSuccess: () => {
+      console.log('✅ Message sent successfully');
       setMessage('');
       queryClient.invalidateQueries({ queryKey: [`/api/chat/sessions/${sessionId}/messages`] });
     },
     onError: (error) => {
-      console.error('Failed to send message:', error);
+      console.error('❌ Failed to send message:', error);
       toast({
         title: "Failed to send message",
-        description: "Please try again.",
+        description: "Please check your connection and try again.",
         variant: "destructive",
       });
     },

@@ -69,7 +69,7 @@ export function PostGenerationDecision({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  // Create chat session mutation with enhanced error handling
+  // Create chat session mutation with enhanced error handling and session ID mapping
   const createChatSessionMutation = useMutation({
     mutationFn: async (solution: Solution) => {
       console.log('🔄 Creating chat session for solution:', {
@@ -79,10 +79,16 @@ export function PostGenerationDecision({
         voiceCombination: solution.voiceCombination
       });
 
+      // Map timestamp-based session ID to database session ID
+      const sessionMapping = await apiRequest('/api/sessions/map-id', {
+        method: 'POST',
+        body: { timestampSessionId: solution.sessionId }
+      });
+
       return apiRequest('/api/chat/sessions', {
         method: 'POST',
         body: {
-          sessionId: solution.sessionId,
+          sessionId: sessionMapping.databaseSessionId,
           selectedVoice: getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName),
           initialSolutionId: solution.id,
           contextData: {
@@ -122,7 +128,12 @@ export function PostGenerationDecision({
     createChatSessionMutation.mutate(solution);
   };
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        console.log('🔄 Post-generation decision dialog closing via onOpenChange');
+        onClose();
+      }
+    }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">

@@ -96,7 +96,12 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        console.log('🔄 Synthesis panel dialog closing via onOpenChange');
+        onClose();
+      }
+    }}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>

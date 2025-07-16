@@ -133,10 +133,14 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     // Only show post-generation decision when we have solutions AND the main dialog was just closed
     if (solutions.length > 0 && !isLoading && !isOpen && !showPostGenDecision && !showChatInterface) {
       console.log('📋 Triggering post-generation decision modal for', solutions.length, 'solutions');
-      const timer = setTimeout(() => {
-        setShowPostGenDecision(true);
-      }, 100); // Small delay to prevent race conditions
-      return () => clearTimeout(timer);
+      // Prevent multiple triggers by checking if we're already showing a modal
+      const hasActiveModal = showPostGenDecision || showChatInterface;
+      if (!hasActiveModal) {
+        const timer = setTimeout(() => {
+          setShowPostGenDecision(true);
+        }, 150); // Slightly longer delay to prevent race conditions
+        return () => clearTimeout(timer);
+      }
     }
   }, [solutions.length, isLoading, isOpen, showPostGenDecision, showChatInterface]);
 
@@ -150,7 +154,9 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
   const handlePostGenDecisionClose = () => {
     console.log('🔄 Closing post-generation decision modal');
     setShowPostGenDecision(false);
-    onClose(); // Also close the parent dialog
+    setShowChatInterface(false);
+    setSelectedSolution(null);
+    // Clean reset of all modal states
   };
 
   // Handle voice selection for chat - Alexander's Pattern Language for consistent interaction patterns

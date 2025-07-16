@@ -950,6 +950,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Map timestamp-based session ID to database session ID for PostgreSQL compatibility
+  app.post('/api/sessions/map-id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { timestampSessionId } = req.body;
+      const userId = req.user.claims.sub;
+
+      // First, try to find existing session
+      const existingSessions = await storage.getVoiceSessions(userId);
+      let matchedSession = existingSessions.find(session => 
+        Math.abs(session.id - timestampSessionId) < 60000 // Within 1 minute
+      );
+
+      if (!matchedSession) {
+        // Create a fallback session if none found
+        matchedSession = await storage.createVoiceSession({
+          userId,
+          selectedPerspectives: ['explorer'],
+          selectedRoles: ['developer'],
+          prompt: 'Fallback session for chat',
+          analysisDepth: 2,
+          mergeStrategy: 'competitive',
+          qualityFiltering: true
+        });
+      }
+
+      res.json({ databaseSessionId: matchedSession.id });
+    } catch (error) {
+      logger.error('Error mapping session ID', error as Error);
+      res.status(500).json({ error: 'Failed to map session ID' });
+    }
+  });
+
   // Create chat session with specific AI voice
   app.post('/api/chat/sessions', isAuthenticated, async (req: any, res) => {
     try {

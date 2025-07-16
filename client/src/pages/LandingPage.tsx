@@ -20,9 +20,11 @@ import {
   Infinity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 
 export default function LandingPage() {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const { login } = useAuthContext();
 
   const testimonials = [
     {
@@ -74,10 +76,17 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" className="text-gray-300 hover:text-white">
+            <Button 
+              variant="ghost" 
+              className="text-gray-300 hover:text-white"
+              onClick={() => login()}
+            >
               Sign In
             </Button>
-            <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+            <Button 
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              onClick={() => login()}
+            >
               Get Started
             </Button>
           </div>
@@ -101,11 +110,20 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button size="lg" className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 text-lg">
+            <Button 
+              size="lg" 
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 text-lg"
+              onClick={() => login()}
+            >
               <Play className="w-5 h-5 mr-2" />
               Start Free Consciousness Assessment
             </Button>
-            <Button size="lg" variant="outline" className="border-purple-500 text-purple-300 hover:bg-purple-500/10 px-8 py-4 text-lg">
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="border-purple-500 text-purple-300 hover:bg-purple-500/10 px-8 py-4 text-lg"
+              onClick={() => login()}
+            >
               <Users className="w-5 h-5 mr-2" />
               Enterprise Solutions
             </Button>
@@ -436,11 +454,20 @@ export default function LandingPage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <Button size="lg" className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 text-lg">
+              <Button 
+                size="lg" 
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 text-lg"
+                onClick={() => login()}
+              >
                 <Play className="w-5 h-5 mr-2" />
                 Start Free Assessment
               </Button>
-              <Button size="lg" variant="outline" className="border-purple-500 text-purple-300 hover:bg-purple-500/10 px-8 py-4 text-lg">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="border-purple-500 text-purple-300 hover:bg-purple-500/10 px-8 py-4 text-lg"
+                onClick={() => login()}
+              >
                 View Sample Questions
               </Button>
             </div>

@@ -443,254 +443,87 @@ export default function Dashboard() {
     <>
       {confirmationDialog}
       
-      {/* Complete Dashboard Restoration - Following AI_INSTRUCTIONS.md patterns */}
-      <div className="h-screen bg-gray-950 text-white flex flex-col">
-        {/* Header Navigation */}
-        <header className="bg-gray-900 border-b border-gray-800 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Brain className="w-6 h-6 text-purple-400" />
-              <span className="text-xl font-bold">Code Crucible</span>
-              <span className="text-sm text-gray-400">Multi-Voice AI Assistant</span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowVoiceProfilesPanel(true)}
-                className="text-gray-300 hover:text-white"
-              >
-                <User className="w-4 h-4 mr-1" />
-                Voice Profiles
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowProjectsPanel(true)}
-                className="text-gray-300 hover:text-white"
-              >
-                <FolderOpen className="w-4 h-4 mr-1" />
-                Projects
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowLearningPanel(true)}
-                className="text-gray-300 hover:text-white"
-              >
-                <GraduationCap className="w-4 h-4 mr-1" />
-                Learning
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowAnalyticsPanel(true)}
-                className="text-gray-300 hover:text-white"
-              >
-                <BarChart3 className="w-4 h-4 mr-1" />
-                Analytics
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowUpgradeModal(true)}
-                className="text-gray-300 hover:text-white"
-              >
-                <Crown className="w-4 h-4 mr-1" />
-                Premium
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowTeamsPanel(true)}
-                className="text-gray-300 hover:text-white"
-              >
-                <Users className="w-4 h-4 mr-1" />
-                Teams
-              </Button>
-              <Badge variant="outline" className="text-orange-400 border-orange-400">
-                Coming Soon
-              </Badge>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => window.location.href = '/api/logout'}
-                className="text-gray-300 hover:text-red-300"
-              >
-                <LogOut className="w-4 h-4 mr-1" />
-                Logout
-              </Button>
-            </div>
+      {/* Overlay Original Dashboard Functionality over ModernLayout */}
+      <div className="relative h-screen">
+        {/* Modern Layout Base */}
+        <ModernLayout className="h-screen" />
+        
+        {/* Overlay Navigation Panel */}
+        <div className="absolute top-4 right-4 z-50">
+          <div className="flex items-center gap-2 bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded-lg p-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowVoiceProfilesPanel(true)}
+              className="text-gray-300 hover:text-white"
+            >
+              <User className="w-4 h-4 mr-1" />
+              Voice Profiles
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowProjectsPanel(true)}
+              className="text-gray-300 hover:text-white"
+            >
+              <FolderOpen className="w-4 h-4 mr-1" />
+              Projects
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowLearningPanel(true)}
+              className="text-gray-300 hover:text-white"
+            >
+              <GraduationCap className="w-4 h-4 mr-1" />
+              Learning
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowAnalyticsPanel(true)}
+              className="text-gray-300 hover:text-white"
+            >
+              <BarChart3 className="w-4 h-4 mr-1" />
+              Analytics
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowUpgradeModal(true)}
+              className="text-gray-300 hover:text-white"
+            >
+              <Crown className="w-4 h-4 mr-1" />
+              Premium
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowTeamsPanel(true)}
+              className="text-gray-300 hover:text-white"
+            >
+              <Users className="w-4 h-4 mr-1" />
+              Teams
+            </Button>
+            <Badge variant="outline" className="text-orange-400 border-orange-400">
+              Coming Soon
+            </Badge>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => window.location.href = '/api/logout'}
+              className="text-gray-300 hover:text-red-300"
+            >
+              <LogOut className="w-4 h-4 mr-1" />
+              Logout
+            </Button>
           </div>
-        </header>
+        </div>
 
-        {/* Main Dashboard Content */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Sidebar - Quick Start and Voice Selection */}
-          <div className="w-80 bg-gray-900 border-r border-gray-800 flex flex-col">
-            {/* Quick Start Ideas */}
-            <div className="p-4 border-b border-gray-800">
-              <h3 className="font-semibold text-gray-200 mb-3">QUICK START IDEAS</h3>
-              <div className="space-y-2">
-                <div className="p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm font-medium">React Components</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Create a responsive navigation component with dark mode toggle
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium">User Authentication</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Design a user authentication system with OAuth ORM and PostgreSQL
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-sm font-medium">Performance</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Optimize a React app for better loading and better SEO
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Voice Selection */}
-            <div className="flex-1 p-4">
-              <h3 className="font-semibold text-gray-200 mb-3">YOUR REQUEST</h3>
-              <div className="space-y-4">
-                <Textarea
-                  placeholder="Describe what you want to build or the problem you need to solve..."
-                  value={state.prompt}
-                  onChange={(e) => {
-                    setPrompt(e.target.value);
-                    if (e.target.value.length > 10) {
-                      analyzePrompt(e.target.value);
-                    }
-                  }}
-                  className="bg-gray-800 border-gray-700 text-white placeholder-gray-400 min-h-[100px] resize-none"
-                />
-                
-                {/* Voice Selection Component */}
-                <div className="mt-4">
-                  <PerspectiveSelector onVoiceChange={() => {}} />
-                </div>
-                
-                {/* Generation Buttons */}
-                <div className="space-y-2">
-                  <Button 
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
-                    onClick={handleGenerate}
-                    disabled={!state.prompt.trim() || generateSession.isPending}
-                  >
-                    {generateSession.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Brain className="w-4 h-4 mr-2" />
-                        Council Generation
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-purple-500 text-purple-300 hover:bg-purple-500/10"
-                    onClick={() => setShowChatGPTGeneration(true)}
-                    disabled={!state.prompt.trim()}
-                  >
-                    <Play className="w-4 h-4 mr-2" />
-                    Live Streaming
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-800">
-              <div className="flex items-center justify-between text-xs text-gray-400">
-                <span>© 2025 Arkane Technologies</span>
-                <div className="flex items-center gap-4">
-                  <button className="hover:text-white transition-colors">Terms of Service</button>
-                  <button className="hover:text-white transition-colors">Privacy Policy</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Center Content */}
-          <div className="flex-1 flex flex-col">
-            {/* API Integration Section */}
-            <div className="p-6 border-b border-gray-800">
-              <h3 className="font-semibold text-gray-200 mb-4">API Integration</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm font-medium">REST API</span>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Build a REST API client with error handling and TypeScript types
-                  </p>
-                </div>
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium">GraphQL</span>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Implement a dashboard with charts, filters, and real-time updates
-                  </p>
-                </div>
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-sm font-medium">Security</span>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Add authentication, input validation, and rate limiting to an API
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="flex-1 overflow-auto">
-              {currentSolutions.length > 0 ? (
-                <SolutionStack 
-                  solutions={currentSolutions}
-                  onSynthesizeSelected={() => setShowSynthesisPanel(true)}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <Terminal className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-400 mb-2">
-                      Ready for Multi-Voice Generation
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      Select your voices and describe your coding challenge to begin
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Configuration Panel */}
-          {showRightPanel && (
-            <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col">
+        {/* Overlay Right Configuration Panel */}
+        {showRightPanel && (
+          <div className="absolute top-0 right-0 h-full w-80 bg-gray-900/95 backdrop-blur-sm border-l border-gray-700 z-40">
+            <div className="flex flex-col h-full">
               <div className="p-4 border-b border-gray-800 flex items-center justify-between">
                 <h3 className="font-semibold text-gray-200">Configuration</h3>
                 <Button 
@@ -753,9 +586,215 @@ export default function Dashboard() {
                 <LegalSection />
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Toggle for Right Panel */}
+        {!showRightPanel && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setShowRightPanel(true)}
+            className="absolute top-4 right-4 text-gray-400 hover:text-white z-50"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        )}
       </div>
+
+      {/* Modal Panels - Following AI_INSTRUCTIONS.md patterns */}
+      {showProjectsPanel && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg w-[90%] max-w-4xl h-[80%] max-h-[600px] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-800">
+              <h2 className="text-lg font-semibold text-white">Projects</h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowProjectsPanel(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="h-full overflow-auto">
+              <EnhancedProjectsPanel 
+                onUseAsContext={handleUseAsContext}
+                onClose={() => setShowProjectsPanel(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showVoiceProfilesPanel && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg w-[90%] max-w-4xl h-[80%] max-h-[600px] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-800">
+              <h2 className="text-lg font-semibold text-white">Voice Profiles</h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowVoiceProfilesPanel(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="h-full overflow-auto">
+              <AvatarCustomizer 
+                editingProfile={editingProfile}
+                onClose={() => {
+                  setShowVoiceProfilesPanel(false);
+                  setEditingProfile(null);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAnalyticsPanel && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg w-[90%] max-w-4xl h-[80%] max-h-[600px] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-800">
+              <h2 className="text-lg font-semibold text-white">Analytics</h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowAnalyticsPanel(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="h-full overflow-auto">
+              <AnalyticsPanel />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTeamsPanel && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg w-[90%] max-w-4xl h-[80%] max-h-[600px] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-800">
+              <h2 className="text-lg font-semibold text-white">Teams</h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowTeamsPanel(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="h-full overflow-auto">
+              <TeamsPanel />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLearningPanel && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg w-[90%] max-w-4xl h-[80%] max-h-[600px] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-800">
+              <h2 className="text-lg font-semibold text-white">Learning</h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowLearningPanel(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="h-full overflow-auto p-4">
+              <div className="text-center">
+                <GraduationCap className="w-16 h-16 text-orange-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">Learning Center</h3>
+                <p className="text-gray-400 mb-4">
+                  Comprehensive tutorials and guides for mastering multi-voice AI development
+                </p>
+                <Badge variant="outline" className="text-orange-400 border-orange-400">
+                  Coming Soon
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Other existing modals */}
+      {showSolutionStack && currentSessionId && (
+        <SolutionStack 
+          sessionId={currentSessionId}
+          onClose={() => setShowSolutionStack(false)}
+          onSynthesizeSelected={handleMergeClick}
+        />
+      )}
+
+      {showSynthesisPanel && (
+        <SynthesisPanel 
+          solutions={currentSolutions}
+          onClose={() => setShowSynthesisPanel(false)}
+          onSave={(project) => {
+            console.log('Project saved:', project);
+            setShowSynthesisPanel(false);
+          }}
+        />
+      )}
+
+      {showAvatarCustomizer && (
+        <AvatarCustomizer 
+          editingProfile={editingProfile}
+          onClose={() => {
+            setShowAvatarCustomizer(false);
+            setEditingProfile(null);
+          }}
+        />
+      )}
+
+      {showChatGPTGeneration && (
+        <ChatGPTStyleGeneration 
+          onClose={() => setShowChatGPTGeneration(false)}
+          prompt={state.prompt}
+          selectedVoices={{
+            perspectives: state.selectedPerspectives,
+            roles: state.selectedRoles
+          }}
+          onSolutionsGenerated={handleSolutionsGenerated}
+        />
+      )}
+
+      {showUpgradeModal && (
+        <UpgradeModal 
+          onClose={() => setShowUpgradeModal(false)}
+          feature="unlimited-generations"
+        />
+      )}
+
+      {showVoiceProfileTutorial && (
+        <VoiceProfileTutorial 
+          onClose={() => setShowVoiceProfileTutorial(false)}
+          onComplete={() => setShowVoiceProfileTutorial(false)}
+        />
+      )}
+
+      {shouldShowTour && (
+        <OnboardingTour 
+          onComplete={completeTour}
+          onSkip={skipTour}
+          onMilestone={trackMilestone}
+        />
+      )}
+
+      {showErrorMonitor && (
+        <ErrorMonitor 
+          onClose={() => setShowErrorMonitor(false)}
+        />
+      )}
     </>
   );
   

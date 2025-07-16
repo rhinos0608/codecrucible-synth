@@ -443,8 +443,319 @@ export default function Dashboard() {
     <>
       {confirmationDialog}
       
-      {/* Modern Layout Integration - Replacing traditional dashboard */}
-      <ModernLayout className="h-screen" />
+      {/* Complete Dashboard Restoration - Following AI_INSTRUCTIONS.md patterns */}
+      <div className="h-screen bg-gray-950 text-white flex flex-col">
+        {/* Header Navigation */}
+        <header className="bg-gray-900 border-b border-gray-800 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Brain className="w-6 h-6 text-purple-400" />
+              <span className="text-xl font-bold">Code Crucible</span>
+              <span className="text-sm text-gray-400">Multi-Voice AI Assistant</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowVoiceProfilesPanel(true)}
+                className="text-gray-300 hover:text-white"
+              >
+                <User className="w-4 h-4 mr-1" />
+                Voice Profiles
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowProjectsPanel(true)}
+                className="text-gray-300 hover:text-white"
+              >
+                <FolderOpen className="w-4 h-4 mr-1" />
+                Projects
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowLearningPanel(true)}
+                className="text-gray-300 hover:text-white"
+              >
+                <GraduationCap className="w-4 h-4 mr-1" />
+                Learning
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowAnalyticsPanel(true)}
+                className="text-gray-300 hover:text-white"
+              >
+                <BarChart3 className="w-4 h-4 mr-1" />
+                Analytics
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowUpgradeModal(true)}
+                className="text-gray-300 hover:text-white"
+              >
+                <Crown className="w-4 h-4 mr-1" />
+                Premium
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowTeamsPanel(true)}
+                className="text-gray-300 hover:text-white"
+              >
+                <Users className="w-4 h-4 mr-1" />
+                Teams
+              </Button>
+              <Badge variant="outline" className="text-orange-400 border-orange-400">
+                Coming Soon
+              </Badge>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => window.location.href = '/api/logout'}
+                className="text-gray-300 hover:text-red-300"
+              >
+                <LogOut className="w-4 h-4 mr-1" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Dashboard Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar - Quick Start and Voice Selection */}
+          <div className="w-80 bg-gray-900 border-r border-gray-800 flex flex-col">
+            {/* Quick Start Ideas */}
+            <div className="p-4 border-b border-gray-800">
+              <h3 className="font-semibold text-gray-200 mb-3">QUICK START IDEAS</h3>
+              <div className="space-y-2">
+                <div className="p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium">React Components</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Create a responsive navigation component with dark mode toggle
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm font-medium">User Authentication</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Design a user authentication system with OAuth ORM and PostgreSQL
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-sm font-medium">Performance</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Optimize a React app for better loading and better SEO
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Voice Selection */}
+            <div className="flex-1 p-4">
+              <h3 className="font-semibold text-gray-200 mb-3">YOUR REQUEST</h3>
+              <div className="space-y-4">
+                <Textarea
+                  placeholder="Describe what you want to build or the problem you need to solve..."
+                  value={state.prompt}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    if (e.target.value.length > 10) {
+                      analyzePrompt(e.target.value);
+                    }
+                  }}
+                  className="bg-gray-800 border-gray-700 text-white placeholder-gray-400 min-h-[100px] resize-none"
+                />
+                
+                {/* Voice Selection Component */}
+                <div className="mt-4">
+                  <PerspectiveSelector onVoiceChange={() => {}} />
+                </div>
+                
+                {/* Generation Buttons */}
+                <div className="space-y-2">
+                  <Button 
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                    onClick={handleGenerate}
+                    disabled={!state.prompt.trim() || generateSession.isPending}
+                  >
+                    {generateSession.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="w-4 h-4 mr-2" />
+                        Council Generation
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-purple-500 text-purple-300 hover:bg-purple-500/10"
+                    onClick={() => setShowChatGPTGeneration(true)}
+                    disabled={!state.prompt.trim()}
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Live Streaming
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-800">
+              <div className="flex items-center justify-between text-xs text-gray-400">
+                <span>© 2025 Arkane Technologies</span>
+                <div className="flex items-center gap-4">
+                  <button className="hover:text-white transition-colors">Terms of Service</button>
+                  <button className="hover:text-white transition-colors">Privacy Policy</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Center Content */}
+          <div className="flex-1 flex flex-col">
+            {/* API Integration Section */}
+            <div className="p-6 border-b border-gray-800">
+              <h3 className="font-semibold text-gray-200 mb-4">API Integration</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium">REST API</span>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Build a REST API client with error handling and TypeScript types
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm font-medium">GraphQL</span>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Implement a dashboard with charts, filters, and real-time updates
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-sm font-medium">Security</span>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Add authentication, input validation, and rate limiting to an API
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-auto">
+              {currentSolutions.length > 0 ? (
+                <SolutionStack 
+                  solutions={currentSolutions}
+                  onSynthesizeSelected={() => setShowSynthesisPanel(true)}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <Terminal className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-400 mb-2">
+                      Ready for Multi-Voice Generation
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Select your voices and describe your coding challenge to begin
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Configuration Panel */}
+          {showRightPanel && (
+            <div className="w-80 bg-gray-900 border-l border-gray-800 flex flex-col">
+              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-200">Configuration</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowRightPanel(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              {/* Subscription Status */}
+              <div className="p-4 border-b border-gray-800">
+                <SubscriptionStatus />
+              </div>
+
+              {/* Voice Profiles Section */}
+              <div className="p-4 border-b border-gray-800">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium text-gray-200">MY VOICE PROFILES</h4>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setShowAvatarCustomizer(true)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <Play className="w-3 h-3" />
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  {profiles.slice(0, 3).map((profile) => (
+                    <div key={profile.id} className="flex items-center gap-2 p-2 bg-gray-800 rounded">
+                      <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-medium">{profile.name.charAt(0)}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{profile.name}</div>
+                        <div className="text-xs text-gray-400 truncate">{profile.specialization}</div>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                        <Settings className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* File Upload Area */}
+              <div className="p-4 border-b border-gray-800">
+                <FileUploadArea 
+                  onFileUploaded={handleFileUploaded}
+                  onFilesAttached={handleFilesAttached}
+                />
+              </div>
+
+              {/* Legal Information */}
+              <div className="flex-1 p-4">
+                <LegalSection />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
   

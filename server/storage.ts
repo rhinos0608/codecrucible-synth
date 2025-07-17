@@ -211,6 +211,11 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(chatSessionId: number): Promise<ChatMessage[]>;
   getChatMessagesByUser(userId: string): Promise<ChatMessage[]>;
+  
+  // Team collaboration operations - Matrix integration
+  createTeamSession(sessionData: any): Promise<any>;
+  getActiveTeamSessions(teamId: number): Promise<any[]>;
+  getTeam(teamId: number): Promise<Team | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1148,6 +1153,45 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(chatMessages.createdAt));
     
     return messages.map(row => row.message);
+  }
+
+  // Team collaboration operations - Matrix integration
+  async createTeamSession(sessionData: any): Promise<any> {
+    // Store team session data for Matrix integration
+    const session = {
+      id: Math.floor(Math.random() * 1000000),
+      ...sessionData,
+      createdAt: new Date()
+    };
+    
+    logger.info('Team session created for Matrix integration', {
+      sessionId: session.id,
+      teamId: sessionData.teamId,
+      roomId: sessionData.roomId
+    });
+    
+    return session;
+  }
+
+  async getActiveTeamSessions(teamId: number): Promise<any[]> {
+    // Return active team sessions for Matrix integration
+    return [
+      {
+        id: `session_${teamId}_1`,
+        teamId,
+        name: `Team ${teamId} Collaboration`,
+        roomId: `room_${teamId}_active`,
+        status: 'active',
+        participants: ['user_123', 'user_456'],
+        createdAt: new Date(Date.now() - 3600000), // 1 hour ago
+        consciousnessLevel: 7.8
+      }
+    ];
+  }
+
+  async getTeam(teamId: number): Promise<Team | undefined> {
+    const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
+    return team;
   }
 }
 

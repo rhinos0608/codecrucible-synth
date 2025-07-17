@@ -306,6 +306,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Phase 5: Consciousness Evolution Routes - Multi-Agent Research Integration
+  app.use('/api', await import('./routes-consciousness.js').then(m => m.default));
+
   // Add team voice profiles endpoint for voice selector integration
   app.get('/api/teams/voice-profiles/shared/:userId', isAuthenticated, async (req: any, res, next) => {
     try {

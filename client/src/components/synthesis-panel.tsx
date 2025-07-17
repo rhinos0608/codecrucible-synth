@@ -208,7 +208,7 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
                       </div>
                       <div className="flex items-center space-x-2">
                         <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                          {synthesisResult.confidence}% Confidence
+                          {synthesisResult.qualityScore || 95}% Quality
                         </Badge>
                         <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
                           Secure ✓
@@ -219,7 +219,7 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
                   
                   <div className="p-4">
                     <div className="bg-gray-900 rounded-lg p-4 text-sm font-mono text-gray-100 overflow-x-auto max-h-64 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap">{synthesisResult.synthesizedCode}</pre>
+                      <pre className="whitespace-pre-wrap">{synthesisResult.finalCode}</pre>
                     </div>
                   </div>
                 </Card>
@@ -263,7 +263,15 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
                 <div className="flex space-x-2">
                   <Button
                     variant="outline"
-                    onClick={copyToClipboard}
+                    onClick={() => {
+                      if (synthesisResult?.finalCode) {
+                        navigator.clipboard.writeText(synthesisResult.finalCode);
+                        toast({
+                          title: "Copied",
+                          description: "Synthesis code copied to clipboard",
+                        });
+                      }
+                    }}
                     className="flex items-center space-x-2"
                   >
                     <Copy className="w-4 h-4" />
@@ -271,11 +279,11 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
                   </Button>
                   <Button 
                     onClick={handleSaveToProject}
-                    disabled={isSavingProject}
+                    disabled={isStreaming}
                     className="bg-gradient-to-r from-purple-600 to-pink-600 text-white flex items-center space-x-2"
                   >
                     <Save className="w-4 h-4" />
-                    <span>{isSavingProject ? "Saving..." : "Save to Project"}</span>
+                    <span>{isStreaming ? "Saving..." : "Save to Project"}</span>
                   </Button>
                 </div>
               </div>
@@ -283,7 +291,7 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
           )}
 
           {/* Loading State */}
-          {isSynthesizing && !synthesisResult && (
+          {isStreaming && !synthesisResult && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-4" />

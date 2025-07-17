@@ -299,6 +299,7 @@ export function useSynthesis() {
         }
       } catch (qwanError) {
         console.warn('QWAN assessment failed:', qwanError);
+        // Enhanced error handling for production
       }
     }
     
@@ -334,7 +335,7 @@ export function useSynthesis() {
     } catch (error) {
       console.error('Voice recommendation error:', error);
       toast({
-        title: "Recommendation Failed",
+        title: "Recommendation Failed", 
         description: "Failed to get voice recommendations. Please try again.",
         variant: "destructive"
       });

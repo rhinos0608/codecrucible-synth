@@ -357,7 +357,7 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
                           body: { members: ['user_123', 'user_456'] }
                         });
                         setActiveRoomId(response.roomId);
-                        setShowMatrixChat(true);
+                        setActiveTab("chat");
                         toast({
                           title: "Matrix Room Created",
                           description: "Team consciousness collaboration space initialized",
@@ -368,7 +368,8 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
                           description: "Initializing with local fallback",
                         });
                         setActiveRoomId(`room_${Date.now()}`);
-                        setShowMatrixChat(true);
+                        setActiveTab("chat");
+                        initializeMatrixRoom();
                       }
                     }}
                   >
@@ -469,6 +470,132 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
                       Matrix integration enables AI voice council discussions with team consciousness tracking
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Matrix Chat Tab - Integrated Implementation */}
+            <TabsContent value="chat" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <h3 className="text-lg font-semibold text-gray-200">Matrix Chat</h3>
+                  <Badge variant="secondary" className="flex items-center space-x-1">
+                    <Brain className="w-3 h-3" />
+                    <span>Consciousness: {consciousnessLevel.toFixed(1)}/10</span>
+                  </Badge>
+                </div>
+                <Button 
+                  size="sm" 
+                  className="bg-purple-600 hover:bg-purple-700"
+                  onClick={() => {
+                    setActiveTab("sessions");
+                  }}
+                >
+                  Back to Sessions
+                </Button>
+              </div>
+
+              <Card className="bg-gray-800 border-gray-600 h-96 flex flex-col">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-gray-200 flex items-center space-x-2">
+                    <MessageSquare className="w-5 h-5 text-purple-400" />
+                    <span>Team {activeTeamId} Consciousness Chat</span>
+                    {activeRoomId && (
+                      <Badge variant="outline" className="border-purple-500/50 text-purple-200">
+                        Room: {activeRoomId}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                
+                <CardContent className="flex-1 flex flex-col p-4 space-y-4">
+                  {/* Messages Area */}
+                  <ScrollArea className="flex-1 border border-gray-600 rounded-lg p-4" ref={scrollAreaRef}>
+                    <div className="space-y-4">
+                      {messages.length === 0 ? (
+                        <div className="text-center text-gray-400 py-8">
+                          <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                          <p>Matrix chat room ready</p>
+                          <p className="text-sm">Start a conversation with AI voices and team members</p>
+                        </div>
+                      ) : (
+                        messages.map((message) => (
+                          <div key={message.id} className="flex space-x-3">
+                            <div className="flex-shrink-0">
+                              {message.senderType === 'system' ? (
+                                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                                  <Sparkles className="w-4 h-4 text-white" />
+                                </div>
+                              ) : message.senderType === 'ai_voice' ? (
+                                <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                                  <Bot className="w-4 h-4 text-white" />
+                                </div>
+                              ) : (
+                                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+                                  <User className="w-4 h-4 text-white" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className="font-medium text-gray-200 text-sm">{message.sender}</span>
+                                {message.voiceArchetype && (
+                                  <Badge variant="outline" className="text-xs border-purple-500/50 text-purple-200">
+                                    {message.voiceArchetype}
+                                  </Badge>
+                                )}
+                                {message.consciousnessLevel && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    C: {message.consciousnessLevel.toFixed(1)}
+                                  </Badge>
+                                )}
+                                <span className="text-xs text-gray-500">
+                                  {formatTimestamp(message.timestamp)}
+                                </span>
+                              </div>
+                              <div className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
+                                {message.content}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+
+                  {/* Message Input */}
+                  <div className="flex space-x-2">
+                    <Input
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type a message or /invoke-council [prompt] to summon AI voices..."
+                      className="flex-1 bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      disabled={isLoading}
+                    />
+                    <Button 
+                      onClick={handleSendMessage}
+                      disabled={!newMessage.trim() || isLoading}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Matrix Commands Help */}
+                  {messages.length === 0 && (
+                    <div className="text-xs text-gray-500 border-t border-gray-600 pt-2">
+                      <p><strong>Available Commands:</strong></p>
+                      <p>• /invoke-council [prompt] - Summon AI council for collaboration</p>
+                      <p>• /synthesis [description] - Trigger real-time synthesis</p>
+                      <p>• /consciousness-check - View team evolution metrics</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

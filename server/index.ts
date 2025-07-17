@@ -2,10 +2,66 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { errorHandler, requestLogger, logger } from "./logger";
+import helmet from "helmet";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Security headers implementation following SECURITY_REPORT.md recommendations
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.openai.com", "https://api.stripe.com"],
+      fontSrc: ["'self'", "https:", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow for development
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// CORS configuration for API security
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'http://localhost:5000',
+    'https://*.replit.dev',
+    'https://*.replit.app'
+  ];
+  
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.some(allowed => {
+    if (allowed.includes('*')) {
+      const pattern = allowed.replace('*', '.*');
+      return new RegExp(pattern).test(origin);
+    }
+    return allowed === origin;
+  })) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
+});
+
+app.use(express.json({ limit: '10mb' })); // Add payload size limit
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Add logging middleware
 app.use(requestLogger);

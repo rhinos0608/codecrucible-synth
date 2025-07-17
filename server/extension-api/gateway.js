@@ -419,7 +419,7 @@ class ExtensionApiGateway {
   }
 }
 
-module.exports = {
+export {
   ExtensionApiGateway,
   authenticateExtension,
   extensionRateLimit

@@ -1,146 +1,112 @@
-import { Component, ErrorInfo, ReactNode, ComponentType } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, RefreshCw, Bug } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React from 'react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ErrorBoundaryState {
   hasError: boolean;
-  error?: Error;
-  errorInfo?: ErrorInfo;
+  error: Error | null;
+  errorInfo: React.ErrorInfo | null;
 }
 
 interface ErrorBoundaryProps {
-  children: ReactNode;
-  fallback?: ComponentType<{ error: Error; retry: () => void }>;
+  children: React.ReactNode;
+  fallback?: React.ComponentType<{ error: Error; retry: () => void }>;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null
+    };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    // Update state so the next render will show the fallback UI
-    return { hasError: true, error };
+    return {
+      hasError: true,
+      error,
+      errorInfo: null
+    };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error for debugging
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
-    // Track error for monitoring
-    try {
-      const errorEvent = {
-        errorType: 'component_error' as const,
-        errorMessage: error.message,
-        errorStack: error.stack,
-        severity: 'high' as const,
-        metadata: {
-          componentStack: errorInfo.componentStack,
-          errorBoundary: true
-        }
-      };
-      
-      // Store locally since we can't use hooks in class components
-      const localErrors = JSON.parse(localStorage.getItem('error_log') || '[]');
-      localErrors.push({
-        ...errorEvent,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: window.location.href
-      });
-      localStorage.setItem('error_log', JSON.stringify(localErrors.slice(-50)));
-    } catch (trackingError) {
-      console.warn('Failed to track error:', trackingError);
-    }
-    
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({
       error,
       errorInfo
     });
+
+    // Log error to console for development
+    console.error('Error Boundary caught an error:', error, errorInfo);
+    
+    // TODO: In production, send to error reporting service
+    // reportError(error, errorInfo);
   }
 
-  retry = () => {
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+  handleRetry = () => {
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null
+    });
   };
 
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         const FallbackComponent = this.props.fallback;
-        return <FallbackComponent error={this.state.error!} retry={this.retry} />;
+        return <FallbackComponent error={this.state.error!} retry={this.handleRetry} />;
       }
 
       return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-gray-800 p-4">
-          <Card className="w-full max-w-md">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <AlertTriangle className="h-8 w-8 text-red-500" />
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                    Something went wrong
-                  </h1>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    An unexpected error occurred
-                  </p>
-                </div>
-              </div>
-
-              {this.state.error && (
-                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
-                  <p className="text-sm text-red-700 dark:text-red-300 font-mono">
-                    {this.state.error.message}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button 
-                  onClick={this.retry}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Try Again
-                </Button>
-                <Button 
-                  onClick={() => window.location.reload()}
-                  size="sm"
-                >
-                  Reload Page
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-md w-full space-y-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Something went wrong. The application encountered an unexpected error.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="space-y-2">
+              <Button 
+                onClick={this.handleRetry}
+                className="w-full"
+                variant="outline"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+              
+              <Button 
+                onClick={() => window.location.reload()}
+                className="w-full"
+                variant="secondary"
+              >
+                Reload Page
+              </Button>
+            </div>
+            
+            {process.env.NODE_ENV === 'development' && this.state.error && (
+              <details className="mt-4 p-4 bg-gray-100 rounded-lg">
+                <summary className="cursor-pointer font-medium">
+                  Error Details (Development Only)
+                </summary>
+                <pre className="mt-2 text-sm text-gray-700 overflow-auto max-h-64">
+                  {this.state.error.toString()}
+                  {this.state.errorInfo?.componentStack}
+                </pre>
+              </details>
+            )}
+          </div>
         </div>
       );
     }
 
     return this.props.children;
   }
-}
-
-// Hook version for functional components
-export function useErrorBoundary() {
-  const [error, setError] = useState<Error | null>(null);
-
-  const resetError = () => setError(null);
-  
-  const captureError = (error: Error) => {
-    console.error('useErrorBoundary caught an error:', error);
-    setError(error);
-  };
-
-  useEffect(() => {
-    if (error) {
-      throw error;
-    }
-  }, [error]);
-
-  return { captureError, resetError };
 }
 
 export default ErrorBoundary;

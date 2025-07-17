@@ -62,14 +62,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { field, context } = req.body;
       const userId = req.user.claims.sub;
       
-      if (!field || !context) {
-        return res.status(400).json({ message: 'Field and context are required' });
-      }
+      // Input validation following AI_INSTRUCTIONS.md security patterns
+      const validationSchema = z.object({
+        field: z.string().min(1).max(50),
+        context: z.string().min(1).max(5000)
+      });
+      
+      const validated = validationSchema.parse({ field, context });
       
       // Generate AI suggestions using OpenAI with consciousness principles
       const suggestions = await realOpenAIService.generateDropdownSuggestions({
-        field,
-        context,
+        field: validated.field,
+        context: validated.context,
         userId
       });
       
@@ -81,12 +85,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ suggestions });
     } catch (error) {
-      logger.error('Failed to generate AI dropdown suggestions', error as Error);
+      logger.error('Failed to generate AI dropdown suggestions', error as Error, { 
+        userId: req.user?.claims?.sub,
+        field: req.body?.field,
+        contextLength: req.body?.context?.length 
+      });
+      
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: 'Invalid input data', 
+          errors: error.errors 
+        });
+      }
       
       // Fallback suggestions following CodingPhilosophy.md patterns
       const fallbackSuggestions = [
         {
-          value: `Custom ${field} based on ${context}`,
+          value: `Custom ${req.body?.field || 'field'} based on context`,
           consciousness: 5,
           qwan: 6,
           reasoning: "AI service unavailable - using context-based fallback"
@@ -882,36 +897,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasFileContent: messages?.[1]?.content?.includes('File content:') || false
       });
       
-      // Validate request structure following Alexander's Pattern Language
-      if (!messages || !Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({ error: 'Messages array is required' });
-      }
+      // Enhanced validation following AI_INSTRUCTIONS.md security patterns
+      const validationSchema = z.object({
+        messages: z.array(z.object({
+          role: z.enum(['user', 'assistant', 'system']),
+          content: z.string().min(1).max(10000)
+        })).min(1, 'At least one message is required'),
+        context: z.string().optional()
+      });
+      
+      const validated = validationSchema.parse({ messages, context });
       
       // Generate AI response using real OpenAI integration
       const response = await realOpenAIService.generateChatResponse({
-        messages,
-        context: context || 'file_assistance',
+        messages: validated.messages,
+        context: validated.context || 'file_assistance',
         temperature: 0.7,
         maxTokens: 1000
       });
       
       logger.info('AI chat response generated', {
         userId: userId.substring(0, 8) + '...',
-        context,
+        context: validated.context,
         responseLength: response?.length || 0
       });
       
       res.json({ 
         response,
-        context,
+        context: validated.context,
         timestamp: new Date().toISOString()
       });
       
     } catch (error) {
       logger.error('AI chat failed', error as Error, {
         userId: req.user?.claims?.sub,
-        context: req.body?.context
+        context: req.body?.context,
+        messageCount: req.body?.messages?.length
       });
+      
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: 'Invalid input data', 
+          details: error.errors 
+        });
+      }
       
       // Fallback response following CodingPhilosophy.md consciousness principles
       res.status(500).json({ 

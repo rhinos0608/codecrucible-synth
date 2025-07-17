@@ -16,7 +16,7 @@ import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
 import SubscriptionCancel from "@/pages/subscription-cancel";
 import { VoiceSelectionProvider } from "@/contexts/voice-selection-context";
 import { AuthProvider } from "@/components/auth/AuthProvider";
-import ErrorBoundary from "@/components/error-boundary";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { Chat } from "@/pages/Chat";
 
 function Router() {

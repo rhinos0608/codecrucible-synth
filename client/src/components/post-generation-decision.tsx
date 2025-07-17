@@ -80,25 +80,13 @@ export function PostGenerationDecision({
       });
 
       try {
-        // Robust session mapping with defensive programming - AI_INSTRUCTIONS.md patterns
-        let mappedSessionId = solution.sessionId;
+        // Enhanced PostgreSQL-compatible chat session creation following consciousness principles
+        console.log('🧠 Council Assembly: Creating chat session with database-compatible approach');
         
-        try {
-          const sessionMapping = await apiRequest('/api/sessions/map-id', {
-            method: 'POST',
-            body: { timestampSessionId: solution.sessionId }
-          });
-          mappedSessionId = sessionMapping.databaseSessionId || solution.sessionId;
-          console.log('✅ Session mapped successfully:', mappedSessionId);
-        } catch (mappingError) {
-          console.warn('⚠️ Session mapping failed, using fallback approach:', mappingError);
-          // Continue with original session ID as fallback
-        }
-
         return apiRequest('/api/chat/sessions', {
           method: 'POST',
           body: {
-            sessionId: mappedSessionId,
+            sessionId: solution.sessionId, // Backend will handle mapping automatically
             selectedVoice: getVoiceDisplayName(solution.voiceCombination || solution.voiceEngine || solution.voiceName || 'general'),
             initialSolutionId: solution.id,
             contextData: {
@@ -110,8 +98,9 @@ export function PostGenerationDecision({
               },
               voiceEngine: solution.voiceEngine || solution.voiceCombination || 'general',
               sessionMetadata: {
-                sessionId: solution.sessionId,
-                generatedAt: new Date().toISOString()
+                originalSessionId: solution.sessionId,
+                generatedAt: new Date().toISOString(),
+                consciousness: 'living_spiral_methodology'
               }
             }
           }

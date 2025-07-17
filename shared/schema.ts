@@ -430,7 +430,7 @@ export const insertSessionFileAttachmentSchema = createInsertSchema(sessionFileA
   isContextEnabled: z.boolean().default(true)
 });
 
-// Chat schema validation following AI_INSTRUCTIONS.md security patterns
+// Chat schema validation following AI_INSTRUCTIONS.md security patterns with PostgreSQL compatibility
 export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
   sessionId: true,
   userId: true,
@@ -439,7 +439,7 @@ export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
   contextData: true,
   isActive: true,
 }).extend({
-  sessionId: z.number().int().min(1),
+  sessionId: z.number().int().min(1).max(2147483647), // PostgreSQL integer range enforcement
   userId: z.string().min(1),
   selectedVoice: z.string().min(1).max(100),
   initialSolutionId: z.number().int().min(1).optional(),

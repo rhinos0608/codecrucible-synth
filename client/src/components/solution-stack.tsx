@@ -128,23 +128,28 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     }
   }, [isOpen, sessionId, isLoading, solutions, error]);
 
-  // Enhanced modal state management following Jung's Descent Protocol and Alexander's Pattern Language
+  // Consciousness-driven modal state management following Living Spiral methodology
   useEffect(() => {
-    // Modal transition logic with consciousness-driven flow control
+    // Enhanced modal flow control preventing duplicate activations
     if (solutions.length > 0 && !isLoading && !isOpen) {
-      console.log('📋 Council Assembly: Managing modal transition for', solutions.length, 'solutions');
+      console.log('📋 Council Assembly: Processing', solutions.length, 'solutions for modal transition');
       
-      // Prevent modal conflicts using Living Spiral methodology
-      const shouldShowPostGenDecision = !showPostGenDecision && !showChatInterface;
+      // Alexander's Pattern Language: Single responsibility principle for modal activation
+      const canActivateModal = !showPostGenDecision && !showChatInterface;
       
-      if (shouldShowPostGenDecision) {
-        // Delayed activation to prevent race conditions - Defensive programming
-        const modalTransitionTimer = setTimeout(() => {
-          console.log('🌀 Living Spiral: Activating post-generation decision modal');
-          setShowPostGenDecision(true);
-        }, 200); // Extended delay for consciousness-aware transitions
+      if (canActivateModal) {
+        console.log('🌀 Living Spiral: Initiating modal activation sequence');
         
-        return () => clearTimeout(modalTransitionTimer);
+        // Jung's Descent Protocol: Consciousness-aware timing
+        const activationTimer = setTimeout(() => {
+          console.log('✨ Alexander\'s Pattern: Modal activation complete');
+          setShowPostGenDecision(true);
+        }, 300); // Consciousness-driven delay for seamless transitions
+        
+        return () => {
+          console.log('🔄 Cleanup: Modal activation timer cleared');
+          clearTimeout(activationTimer);
+        };
       }
     }
   }, [solutions.length, isLoading, isOpen, showPostGenDecision, showChatInterface]);

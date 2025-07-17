@@ -950,44 +950,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Map timestamp-based session ID to database session ID for PostgreSQL compatibility
-  app.post('/api/sessions/map-id', isAuthenticated, async (req: any, res) => {
-    try {
-      const { timestampSessionId } = req.body;
-      const userId = req.user.claims.sub;
+  // Legacy endpoint removed - session mapping now handled directly in chat creation
 
-      // First, try to find existing session - Defensive programming following AI_INSTRUCTIONS.md
-      const existingSessions = await storage.getVoiceSessionsByUser(userId);
-      let matchedSession = existingSessions.find(session => 
-        Math.abs(session.id - timestampSessionId) < 60000 // Within 1 minute
-      );
-
-      if (!matchedSession) {
-        // Create a fallback session if none found
-        matchedSession = await storage.createVoiceSession({
-          userId,
-          selectedPerspectives: ['explorer'],
-          selectedRoles: ['developer'],
-          prompt: 'Fallback session for chat',
-          analysisDepth: 2,
-          mergeStrategy: 'competitive',
-          qualityFiltering: true
-        });
-      }
-
-      res.json({ databaseSessionId: matchedSession.id });
-    } catch (error) {
-      logger.error('Error mapping session ID', error as Error);
-      res.status(500).json({ error: 'Failed to map session ID' });
-    }
-  });
-
-  // Create chat session with specific AI voice
+  // Create chat session with enhanced PostgreSQL compatibility and session mapping
   app.post('/api/chat/sessions', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      // Enhanced session ID mapping for PostgreSQL compatibility following AI_INSTRUCTIONS.md
+      let databaseSessionId = req.body.sessionId;
+      
+      // If session ID is a timestamp (> integer range), map it to database ID
+      if (req.body.sessionId > 2147483647) {
+        console.log('🔧 Mapping timestamp session ID to database ID:', req.body.sessionId);
+        
+        // Find matching database session by proximity (within 5 minutes)
+        const recentSessions = await storage.getVoiceSessionsByUser(userId);
+        const matchingSession = recentSessions.find(session => {
+          const timeDiff = Math.abs(session.id - req.body.sessionId);
+          return timeDiff < 300000; // 5 minutes tolerance
+        });
+        
+        if (matchingSession) {
+          databaseSessionId = matchingSession.id;
+          console.log('✅ Found matching database session:', databaseSessionId);
+        } else {
+          // Create fallback session for orphaned chat creation
+          console.log('⚡ Creating fallback session for chat');
+          const fallbackSession = await storage.createVoiceSession({
+            userId,
+            selectedPerspectives: ['developer'],
+            selectedRoles: ['general'],
+            prompt: 'Chat session created without matching voice session',
+            analysisDepth: 2,
+            mergeStrategy: 'competitive',
+            qualityFiltering: true
+          });
+          databaseSessionId = fallbackSession.id;
+        }
+      }
+      
       const validatedData = insertChatSessionSchema.parse({
         ...req.body,
+        sessionId: databaseSessionId,
         userId
       });
       

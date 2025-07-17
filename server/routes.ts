@@ -2766,14 +2766,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Real-time synthesis streaming endpoint - Following OpenAI Realtime API research
+  // Comprehensive synthesis endpoints following AI_INSTRUCTIONS.md consciousness patterns
   app.post('/api/synthesis/stream', isAuthenticated, enforceSubscriptionLimits, async (req: any, res) => {
     try {
-      const { handleSynthesisStream } = await import('./synthesis-streaming-routes');
+      logger.info('Synthesis streaming request', {
+        userId: req.user?.claims?.sub?.substring(0, 8) + '...',
+        sessionId: req.body.sessionId,
+        solutionCount: req.body.solutions?.length,
+        mode: req.body.mode || 'collaborative'
+      });
+
+      const { handleSynthesisStream } = await import('./synthesis-streaming-routes.js');
       await handleSynthesisStream(req, res);
     } catch (error) {
       logger.error('Synthesis streaming endpoint error', error as Error);
-      res.status(500).json({ error: 'Synthesis streaming service unavailable' });
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Synthesis streaming service unavailable' });
+      }
+    }
+  });
+
+  // Consciousness synthesis endpoint for multi-agent framework integration
+  app.post('/api/consciousness/synthesize', isAuthenticated, enforceSubscriptionLimits, async (req: any, res) => {
+    try {
+      const { ConsciousnessSynthesisEngine } = await import('./services/consciousness-synthesis-engine.js');
+      const synthesisEngine = new ConsciousnessSynthesisEngine();
+      
+      const { solutions, options = {} } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!solutions || solutions.length < 2) {
+        return res.status(400).json({
+          error: 'At least 2 solutions required for consciousness synthesis'
+        });
+      }
+
+      logger.info('Consciousness synthesis initiated', {
+        userId: userId.substring(0, 8) + '...',
+        solutionCount: solutions.length,
+        mode: options.mode || 'consensus'
+      });
+
+      const result = await synthesisEngine.synthesizeConsciousness({
+        prompt: solutions[0]?.explanation || 'Multi-voice synthesis request',
+        solutions,
+        mode: options.mode || 'consensus',
+        targetConsciousness: options.targetConsciousness || 7,
+        ethicalConstraints: options.ethicalConstraints || ['security', 'accessibility'],
+        architecturalPatterns: options.architecturalPatterns || ['modular', 'testable']
+      });
+
+      res.json(result);
+    } catch (error) {
+      logger.error('Consciousness synthesis error', error as Error);
+      res.status(500).json({ error: 'Consciousness synthesis service unavailable' });
+    }
+  });
+
+  // Real-time consciousness streaming synthesis
+  app.post('/api/consciousness/stream-synthesize', isAuthenticated, enforceSubscriptionLimits, async (req: any, res) => {
+    try {
+      const { solutions, options = {} } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!solutions || solutions.length < 2) {
+        return res.status(400).json({
+          error: 'At least 2 solutions required for streaming synthesis'
+        });
+      }
+
+      // Set up Server-Sent Events
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
+
+      const sendEvent = (data: any) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      logger.info('Streaming consciousness synthesis started', {
+        userId: userId.substring(0, 8) + '...',
+        solutionCount: solutions.length
+      });
+
+      sendEvent({ type: 'synthesis_start', message: 'Initiating consciousness synthesis...' });
+
+      // Import and use synthesis engine
+      const { ConsciousnessSynthesisEngine } = await import('./services/consciousness-synthesis-engine.js');
+      const synthesisEngine = new ConsciousnessSynthesisEngine();
+
+      // Perform streaming synthesis
+      const result = await synthesisEngine.streamingSynthesis(solutions, options, sendEvent);
+
+      sendEvent({ type: 'synthesis_complete', result });
+      res.end();
+
+    } catch (error) {
+      logger.error('Streaming consciousness synthesis error', error as Error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Streaming synthesis service unavailable' });
+      }
     }
   });
 

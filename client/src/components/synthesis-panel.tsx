@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useSynthesis } from "@/hooks/useSynthesis";
+import { useConsciousnessSynthesis } from "@/hooks/use-consciousness-synthesis";
 import { useState, useEffect } from "react";
 import { CheckCircle, Loader2, Copy, Save, Brain, Zap } from "lucide-react";
 import type { Solution } from "@shared/schema";

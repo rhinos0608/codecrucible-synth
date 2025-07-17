@@ -132,25 +132,27 @@ export function useSynthesis() {
         description: `Initiating ${mode} synthesis with ${solutions.length} voice solutions using consciousness-driven patterns...`,
       });
 
-      // Call backend synthesis endpoint with streaming
-      const response = await fetch('/api/synthesis/stream', {
+      // Call consciousness synthesis streaming endpoint following AI_INSTRUCTIONS.md patterns
+      const response = await fetch('/api/consciousness/stream-synthesize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sessionId,
           solutions: solutions.map(sol => ({
             id: sol.id,
+            sessionId: sol.sessionId,
             voiceCombination: sol.voiceCombination,
             code: sol.code,
             explanation: sol.explanation,
-            confidence: sol.confidence
+            confidence: sol.confidence,
+            timestamp: sol.timestamp
           })),
-          mode,
           options: {
-            consciousnessThreshold: 6,
-            timeoutMs: 60000
+            mode,
+            targetConsciousness: 7,
+            ethicalConstraints: ['security', 'accessibility'],
+            architecturalPatterns: ['modular', 'testable', 'consciousness-driven']
           }
         })
       });

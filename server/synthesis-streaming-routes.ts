@@ -56,12 +56,13 @@ export async function handleSynthesisStream(req: Request, res: Response) {
       });
     }
 
-    // Check if realtime service is ready
-    if (!realtimeSynthesisService.isReady()) {
-      return res.status(503).json({
-        error: 'Realtime synthesis service not available',
-        details: 'OpenAI Realtime API connection not established'
-      });
+    // Initialize realtime synthesis with fallback
+    let serviceReady = true;
+    try {
+      serviceReady = realtimeSynthesisService?.isReady() || false;
+    } catch (error) {
+      logger.warn('Realtime synthesis service not available, using fallback', { error: error.message });
+      serviceReady = false;
     }
 
     // Set up Server-Sent Events

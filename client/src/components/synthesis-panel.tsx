@@ -97,6 +97,7 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
+      console.log('🔄 Synthesis panel dialog onOpenChange:', open);
       if (!open) {
         console.log('🔄 Synthesis panel dialog closing via onOpenChange');
         onClose();
@@ -105,20 +106,22 @@ export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: Synthe
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
-                <Brain className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold">Real-Time Synthesis Engine</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Recursive solution integration with OpenAI</p>
-              </div>
-              {isStreaming && (
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4 text-yellow-500 animate-pulse" />
-                  <span className="text-sm text-yellow-600 dark:text-yellow-400">Live Processing</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
+                  <Brain className="w-6 h-6 text-white" />
                 </div>
-              )}
+                <div>
+                  <h3 className="text-xl font-semibold">Real-Time Synthesis Engine</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Recursive solution integration with OpenAI</p>
+                </div>
+                {isStreaming && (
+                  <div className="flex items-center space-x-2">
+                    <Zap className="w-4 h-4 text-yellow-500 animate-pulse" />
+                    <span className="text-sm text-yellow-600 dark:text-yellow-400">Live Processing</span>
+                  </div>
+                )}
+              </div>
             </div>
           </DialogTitle>
           <DialogDescription className="text-gray-600 dark:text-gray-400">

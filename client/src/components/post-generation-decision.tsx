@@ -132,6 +132,7 @@ export function PostGenerationDecision({
   };
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
+      console.log('🔄 Post-generation decision dialog onOpenChange:', open);
       if (!open) {
         console.log('🔄 Post-generation decision dialog closing via onOpenChange');
         onClose();
@@ -139,9 +140,11 @@ export function PostGenerationDecision({
     }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Brain className="w-6 h-6 text-blue-500" />
-            <span>What's your next move?</span>
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Brain className="w-6 h-6 text-blue-500" />
+              <span>What's your next move?</span>
+            </div>
           </DialogTitle>
           <DialogDescription className="text-gray-500 dark:text-gray-400">
             You've got {solutions.length} AI-generated solutions. Continue discussing with a specific AI voice or synthesize all solutions together.

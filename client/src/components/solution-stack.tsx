@@ -309,7 +309,10 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     {showPostGenDecision && (
       <PostGenerationDecision
         isOpen={showPostGenDecision}
-        onClose={handlePostGenDecisionClose}
+        onClose={() => {
+          console.log('🔄 PostGenerationDecision onClose called from solution-stack');
+          handlePostGenDecisionClose();
+        }}
         solutions={solutions}
         onContinueWithVoice={handleContinueWithVoice}
         onSynthesizeAll={handleSynthesizeAll}

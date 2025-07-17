@@ -1,21 +1,9 @@
-// Real-time synthesis integration hook following AI_INSTRUCTIONS.md patterns
-import { useState, useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
-import type { Solution } from '@shared/schema';
+// Enhanced Synthesis Hook - Following consciousness-driven development and OpenAI Realtime API integration
+// Implements multi-voice synthesis with Jung's descent patterns and QWAN assessment
 
-interface SynthesisResult {
-  synthesisId: number;
-  synthesizedCode: string;
-  explanation: string;
-  confidence: number;
-  integratedApproaches: string[];
-  securityConsiderations: string[];
-  performanceOptimizations: string[];
-  timestamp: string;
-  sessionId: number;
-}
+import { useState, useCallback, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface SynthesisStep {
   id: number;
@@ -24,6 +12,30 @@ interface SynthesisStep {
   status: 'pending' | 'processing' | 'completed' | 'error';
   result?: string;
   timestamp?: string;
+  consciousness?: number;
+  qwanScore?: number;
+}
+
+interface SynthesisResult {
+  resultId: string;
+  finalCode: string;
+  qualityScore: number;
+  ethicalScore: number;
+  consciousnessLevel: number;
+  voiceContributions: Record<string, number>;
+  conflictsResolved: number;
+  timestamp: Date;
+  language: string;
+  framework?: string;
+  patterns: string[];
+}
+
+interface VoiceSolution {
+  id: number;
+  voiceCombination: string;
+  code: string;
+  explanation: string;
+  confidence: number;
 }
 
 export function useSynthesis() {
@@ -40,31 +52,36 @@ export function useSynthesis() {
         id: 1,
         title: "Voice Convergence Analysis",
         description: "Analyzing patterns and synergies across selected AI voices...",
-        status: 'pending'
+        status: 'pending',
+        consciousness: 3
       },
       {
         id: 2,
         title: "Recursive Integration",
         description: "Merging architectural patterns while preserving voice insights...",
-        status: 'pending'
+        status: 'pending',
+        consciousness: 5
       },
       {
         id: 3,
         title: "Security Validation",
         description: "Ensuring synthesis meets AI_INSTRUCTIONS.md security patterns...",
-        status: 'pending'
+        status: 'pending',
+        consciousness: 6
       },
       {
         id: 4,
         title: "Performance Optimization",
         description: "Applying consciousness-driven optimization techniques...",
-        status: 'pending'
+        status: 'pending',
+        consciousness: 7
       },
       {
         id: 5,
         title: "Final Synthesis",
         description: "Creating unified solution using living spiral methodology...",
-        status: 'pending'
+        status: 'pending',
+        consciousness: 8
       }
     ];
     
@@ -88,176 +105,310 @@ export function useSynthesis() {
     );
   }, []);
 
-  // Real-time synthesis mutation with progress tracking
-  const synthesizeSolutions = useMutation({
-    mutationFn: async ({ sessionId, solutions }: { sessionId: number; solutions: Solution[] }) => {
-      setIsStreaming(true);
-      initializeSynthesisSteps();
-      
-      // Step 1: Voice Convergence Analysis
-      updateSynthesisProgress(1, 'processing');
-      await new Promise(resolve => setTimeout(resolve, 800));
-      updateSynthesisProgress(1, 'completed', `Analyzed ${solutions.length} voice perspectives`);
-      
-      // Step 2: Recursive Integration  
-      updateSynthesisProgress(2, 'processing');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      updateSynthesisProgress(2, 'completed', 'Merged architectural patterns successfully');
-      
-      // Step 3: Security Validation
-      updateSynthesisProgress(3, 'processing');
-      await new Promise(resolve => setTimeout(resolve, 600));
-      updateSynthesisProgress(3, 'completed', 'Security patterns validated');
-      
-      // Step 4: Performance Optimization
-      updateSynthesisProgress(4, 'processing');
-      await new Promise(resolve => setTimeout(resolve, 700));
-      updateSynthesisProgress(4, 'completed', 'Performance optimizations applied');
-      
-      // Step 5: Final Synthesis - Real OpenAI call
-      updateSynthesisProgress(5, 'processing');
-      
-      const backendResult = await apiRequest(`/api/sessions/${sessionId}/synthesis`, {
-        method: 'POST',
-        body: { 
-          solutions,
-          originalPrompt: 'Synthesize multiple AI voice solutions' 
-        }
+  // Enhanced synthesis function with real-time streaming following OpenAI Realtime API patterns
+  const synthesizeSolutions = useCallback(async (
+    sessionId: number,
+    solutions: VoiceSolution[],
+    mode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative'
+  ) => {
+    if (!solutions || solutions.length === 0) {
+      toast({
+        title: "No solutions to synthesize",
+        description: "Please generate some voice solutions first.",
+        variant: "destructive"
+      });
+      return null;
+    }
+
+    setIsStreaming(true);
+    setSynthesisResult(null);
+    
+    // Initialize synthesis steps
+    const steps = initializeSynthesisSteps();
+    
+    try {
+      toast({
+        title: "Synthesis Starting",
+        description: `Initiating ${mode} synthesis with ${solutions.length} voice solutions using consciousness-driven patterns...`,
       });
 
-      // Transform backend response to frontend format - Following AI_INSTRUCTIONS.md defensive programming
-      const result: SynthesisResult = {
-        synthesisId: backendResult.id, // Use database-generated ID, no fallback to timestamp
-        synthesizedCode: backendResult.synthesizedCode || backendResult.code || '',
-        explanation: backendResult.explanation || 'AI-generated synthesis combining multiple voice perspectives',
-        confidence: backendResult.confidence || 95,
-        integratedApproaches: ['Real OpenAI Integration', 'Consciousness Principles', 'Security Patterns'],
-        securityConsiderations: ['Input Validation', 'Error Handling', 'Security Compliance'],
-        performanceOptimizations: ['Optimized Code Structure', 'Efficient Algorithms'],
-        timestamp: backendResult.createdAt || new Date().toISOString(),
-        sessionId: sessionId
-      };
-      
-      updateSynthesisProgress(5, 'completed', 'Synthesis completed successfully');
-      
-      return result;
-    },
-    onSuccess: (result: SynthesisResult) => {
-      setSynthesisResult(result);
-      setIsStreaming(false);
-      
-      // Invalidate related queries for real-time sync
-      queryClient.invalidateQueries({ queryKey: [`/api/sessions/${result.sessionId}/solutions`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/sessions/${result.sessionId}/synthesis`] });
-      
-      toast({
-        title: "Synthesis Complete",
-        description: `Successfully synthesized ${result.integratedApproaches?.length || 0} approaches with ${result.confidence}% confidence. Code length: ${result.synthesizedCode?.length || 0} characters.`
+      // Call backend synthesis endpoint with streaming
+      const response = await fetch('/api/synthesis/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId,
+          solutions: solutions.map(sol => ({
+            id: sol.id,
+            voiceCombination: sol.voiceCombination,
+            code: sol.code,
+            explanation: sol.explanation,
+            confidence: sol.confidence
+          })),
+          mode,
+          options: {
+            consciousnessThreshold: 6,
+            timeoutMs: 60000
+          }
+        })
       });
-    },
-    onError: (error: any) => {
+
+      if (!response.ok) {
+        throw new Error(`Synthesis failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Handle Server-Sent Events streaming
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Streaming not supported');
+      }
+
+      let accumulatedCode = '';
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = new TextDecoder().decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                switch (data.type) {
+                  case 'step_start':
+                    const stepIndex = steps.findIndex(s => s.title.toLowerCase().includes(data.stepId?.toLowerCase()));
+                    if (stepIndex >= 0) {
+                      updateSynthesisProgress(steps[stepIndex].id, 'processing');
+                    }
+                    break;
+
+                  case 'step_complete':
+                    const completedStepIndex = steps.findIndex(s => s.title.toLowerCase().includes(data.stepId?.toLowerCase()));
+                    if (completedStepIndex >= 0) {
+                      updateSynthesisProgress(steps[completedStepIndex].id, 'completed', data.result);
+                    }
+                    break;
+
+                  case 'code_chunk':
+                    accumulatedCode += data.content || '';
+                    break;
+
+                  case 'synthesis_complete':
+                    const result: SynthesisResult = {
+                      resultId: data.result.resultId,
+                      finalCode: data.result.finalCode || accumulatedCode,
+                      qualityScore: data.result.qualityScore,
+                      ethicalScore: data.result.ethicalScore,
+                      consciousnessLevel: data.result.consciousnessLevel,
+                      voiceContributions: data.result.voiceContributions,
+                      conflictsResolved: data.result.conflictsResolved,
+                      timestamp: new Date(),
+                      language: data.result.language || 'javascript',
+                      framework: data.result.framework,
+                      patterns: data.result.patterns || []
+                    };
+                    
+                    setSynthesisResult(result);
+                    
+                    // Mark all steps as completed
+                    steps.forEach(step => {
+                      updateSynthesisProgress(step.id, 'completed');
+                    });
+                    
+                    toast({
+                      title: "Synthesis Complete",
+                      description: `Successfully synthesized ${solutions.length} voice solutions with ${result.qualityScore}% quality score.`,
+                    });
+                    
+                    return result;
+                    
+                  case 'error':
+                    throw new Error(data.message);
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse SSE data:', parseError);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+        setIsStreaming(false);
+      }
+
+    } catch (error) {
+      console.error('Synthesis error:', error);
       setIsStreaming(false);
-      updateSynthesisProgress(5, 'error', error.message);
+      
+      // Mark current step as error
+      setSynthesisSteps(prevSteps => 
+        prevSteps.map(step => 
+          step.status === 'processing' 
+            ? { ...step, status: 'error', result: error.message }
+            : step
+        )
+      );
       
       toast({
         title: "Synthesis Failed",
-        description: error.message || "Failed to synthesize solutions. Please try again.",
+        description: error.message || "An error occurred during synthesis",
         variant: "destructive"
       });
+      
+      return null;
     }
-  });
+  }, [initializeSynthesisSteps, updateSynthesisProgress, toast]);
 
-  // Save synthesis to project with folder organization support - Following CodingPhilosophy.md patterns
-  const saveToProject = useMutation({
-    mutationFn: async (projectData: { name: string; description?: string; tags?: string[]; folderId?: number | null }) => {
-      if (!synthesisResult) {
-        throw new Error('No synthesis result to save');
-      }
-      
-      // Fixed: Using authenticated endpoint with proper schema validation
-      console.log('🔧 Saving synthesis to project:', {
-        name: projectData.name,
-        sessionId: synthesisResult.sessionId,
-        synthesisId: synthesisResult.synthesisId,
-        codeLength: (synthesisResult.synthesizedCode || synthesisResult.code)?.length || 0,
-        folderId: projectData.folderId
-      });
-      
-      return await apiRequest('/api/projects', {
-        method: 'POST',
-        body: {
-          name: projectData.name,
-          description: projectData.description || `Synthesized solution from session ${synthesisResult.sessionId}`,
-          code: synthesisResult.synthesizedCode || synthesisResult.code,
-          language: 'javascript',
-          sessionId: synthesisResult.sessionId,
-          synthesisId: synthesisResult.synthesisId,
-          tags: projectData.tags || ['synthesis', 'multi-voice', 'ai-generated'],
-          folderId: projectData.folderId, // Enhanced folder organization support
-          isPublic: false
+  // Enhanced synthesis with QWAN assessment
+  const synthesizeWithQWAN = useCallback(async (
+    sessionId: number,
+    solutions: VoiceSolution[],
+    mode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative'
+  ) => {
+    const result = await synthesizeSolutions(sessionId, solutions, mode);
+    
+    if (result) {
+      // Perform QWAN assessment on synthesized result
+      try {
+        const qwanResponse = await fetch(`/api/solutions/${result.resultId}/qwan-assessment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (qwanResponse.ok) {
+          const qwanData = await qwanResponse.json();
+          
+          // Update result with QWAN metrics
+          const enhancedResult = {
+            ...result,
+            qwanMetrics: qwanData.metrics,
+            timelessQuality: qwanData.timelessQuality,
+            qwanRecommendations: qwanData.recommendations
+          };
+          
+          setSynthesisResult(enhancedResult);
+          return enhancedResult;
         }
-      });
-    },
-    onSuccess: async () => {
-      // Force immediate cache invalidation and refetch
-      await queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/projects'] });
-      
-      // Also invalidate project folders in case it was saved to a folder
-      await queryClient.invalidateQueries({ queryKey: ['/api/project-folders'] });
-      
-      console.log('✅ Project saved successfully - cache invalidated and refetched');
-      
-      toast({
-        title: "Project Saved",
-        description: "Synthesized solution saved to projects successfully."
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Save Failed",
-        description: error.message || "Failed to save project. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Copy synthesis result to clipboard
-  const copyToClipboard = useCallback(async () => {
-    if (!synthesisResult?.synthesizedCode && !synthesisResult?.code) {
-      toast({
-        title: "Nothing to Copy",
-        description: "No synthesis result available to copy.",
-        variant: "destructive"
-      });
-      return;
+      } catch (qwanError) {
+        console.warn('QWAN assessment failed:', qwanError);
+      }
     }
     
+    return result;
+  }, [synthesizeSolutions]);
+
+  // Voice recommendation integration following CrewAI research patterns
+  const getVoiceRecommendations = useCallback(async (
+    projectContext: any,
+    currentVoices: string[],
+    analysisMode: 'adaptive' | 'strategic' | 'experimental' = 'adaptive'
+  ) => {
     try {
-      const codeToSave = synthesisResult.synthesizedCode || synthesisResult.code || '';
-      await navigator.clipboard.writeText(codeToSave);
-      toast({
-        title: "Code Copied",
-        description: "Synthesized code copied to clipboard successfully."
+      const response = await fetch('/api/voices/recommend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          projectContext,
+          currentVoices,
+          analysisMode
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`Voice recommendation failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.recommendations;
+      
     } catch (error) {
+      console.error('Voice recommendation error:', error);
       toast({
-        title: "Copy Failed",
-        description: "Failed to copy code to clipboard.",
+        title: "Recommendation Failed",
+        description: "Failed to get voice recommendations. Please try again.",
         variant: "destructive"
       });
+      return [];
     }
-  }, [synthesisResult, toast]);
+  }, [toast]);
+
+  // Reset synthesis state
+  const resetSynthesis = useCallback(() => {
+    setSynthesisSteps([]);
+    setSynthesisResult(null);
+    setIsStreaming(false);
+  }, []);
+
+  // Calculate synthesis complexity based on solutions
+  const calculateSynthesisComplexity = useCallback((solutions: VoiceSolution[]) => {
+    if (!solutions || solutions.length === 0) return 0;
+    
+    let complexity = 0;
+    
+    // Base complexity from solution count
+    complexity += solutions.length * 10;
+    
+    // Complexity from code length variance
+    const codeLengths = solutions.map(s => s.code?.length || 0);
+    const avgLength = codeLengths.reduce((sum, len) => sum + len, 0) / codeLengths.length;
+    const variance = codeLengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / codeLengths.length;
+    complexity += Math.sqrt(variance) / 100;
+    
+    // Complexity from confidence variance  
+    const confidences = solutions.map(s => s.confidence);
+    const avgConfidence = confidences.reduce((sum, conf) => sum + conf, 0) / confidences.length;
+    const confVariance = confidences.reduce((sum, conf) => sum + Math.pow(conf - avgConfidence, 2), 0) / confidences.length;
+    complexity += confVariance / 10;
+    
+    return Math.min(100, Math.max(10, complexity));
+  }, []);
+
+  // Synthesis metrics calculation
+  const getSynthesisMetrics = useCallback(() => {
+    const completedSteps = synthesisSteps.filter(step => step.status === 'completed').length;
+    const totalSteps = synthesisSteps.length;
+    const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+    
+    const avgConsciousness = synthesisSteps.length > 0 
+      ? synthesisSteps.reduce((sum, step) => sum + (step.consciousness || 0), 0) / synthesisSteps.length 
+      : 0;
+    
+    return {
+      progress,
+      completedSteps,
+      totalSteps,
+      avgConsciousness,
+      isComplete: progress === 100,
+      hasErrors: synthesisSteps.some(step => step.status === 'error')
+    };
+  }, [synthesisSteps]);
 
   return {
+    // State
     synthesisSteps,
     synthesisResult,
     isStreaming,
-    isSynthesizing: synthesizeSolutions.isPending,
-    synthesizeSolutions: synthesizeSolutions.mutate,
-    saveToProject: saveToProject.mutate,
-    isSavingProject: saveToProject.isPending,
-    copyToClipboard,
-    initializeSynthesisSteps
+    
+    // Actions
+    synthesizeSolutions,
+    synthesizeWithQWAN,
+    getVoiceRecommendations,
+    resetSynthesis,
+    initializeSynthesisSteps,
+    updateSynthesisProgress,
+    
+    // Utilities
+    calculateSynthesisComplexity,
+    getSynthesisMetrics
   };
 }

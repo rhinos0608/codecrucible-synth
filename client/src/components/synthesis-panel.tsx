@@ -17,50 +17,54 @@ interface SynthesisPanelProps {
 }
 
 export function SynthesisPanel({ isOpen, onClose, solutions, sessionId }: SynthesisPanelProps) {
+  const [quotaError, setQuotaError] = useState<string | null>(null);
+  
   const { 
     synthesisSteps, 
     synthesisResult, 
     isStreaming, 
-    isSynthesizing,
-    synthesizeSolutions,
-    saveToProject,
-    isSavingProject,
-    copyToClipboard
+    synthesizeSolutions
   } = useSynthesis();
   
   const { toast } = useToast();
-  const [quotaError, setQuotaError] = useState<string | null>(null);
 
   // Auto-start synthesis when panel opens with solutions
   useEffect(() => {
-    if (isOpen && solutions.length > 0 && !synthesisResult && !isSynthesizing) {
+    if (isOpen && solutions.length > 0 && !synthesisResult && !isStreaming) {
       setQuotaError(null);
-      synthesizeSolutions({ sessionId, solutions });
+      synthesizeSolutions(sessionId, solutions, 'collaborative');
     }
-  }, [isOpen, solutions.length, synthesisResult, isSynthesizing, synthesizeSolutions, sessionId, solutions]);
+  }, [isOpen, solutions.length, synthesisResult, isStreaming, synthesizeSolutions, sessionId]);
 
   // Handle save to project with enhanced folder selection - Following CodingPhilosophy.md patterns
   const handleSaveToProject = async () => {
     const projectName = prompt("Enter a name for your project:");
-    if (projectName && projectName.trim()) {
-      if (synthesisResult) {
-        // Enhanced save with folder support for organized project management
-        saveToProject({ 
-          name: projectName.trim(),
-          description: `Synthesized solution from ${solutions.length} AI voices`,
-          tags: ['synthesis', 'multi-voice', 'ai-generated'],
-          // Future enhancement: Add folder selection dialog
-          folderId: null // Will be enhanced with folder selection UI
+    if (projectName && projectName.trim() && synthesisResult) {
+      try {
+        const response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: projectName.trim(),
+            description: `Synthesized solution from ${solutions.length} AI voices`,
+            code: synthesisResult.finalCode
+          })
         });
-        
+
+        if (response.ok) {
+          toast({
+            title: "Project Saved",
+            description: `"${projectName}" has been saved to your projects.`,
+          });
+        } else {
+          throw new Error('Failed to save project');
+        }
+      } catch (error) {
         toast({
-          title: "Project Saved",
-          description: `"${projectName}" has been saved to your projects. You can organize it into folders from the Projects panel.`,
-        });
-      } else {
-        toast({
-          title: "No Synthesis Available",
-          description: "Please wait for synthesis to complete before saving.",
+          title: "Save Failed",
+          description: "Failed to save project. Please try again.",
           variant: "destructive"
         });
       }

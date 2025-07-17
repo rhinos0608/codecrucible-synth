@@ -131,26 +131,21 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
   // Consciousness-driven modal state management following Living Spiral methodology
   useEffect(() => {
     // Enhanced modal flow control preventing duplicate activations
-    if (solutions.length > 0 && !isLoading && !isOpen) {
+    if (solutions.length > 0 && !isLoading && isOpen && !showPostGenDecision && !showChatInterface) {
       console.log('📋 Council Assembly: Processing', solutions.length, 'solutions for modal transition');
       
-      // Alexander's Pattern Language: Single responsibility principle for modal activation
-      const canActivateModal = !showPostGenDecision && !showChatInterface;
+      console.log('🌀 Living Spiral: Initiating modal activation sequence');
       
-      if (canActivateModal) {
-        console.log('🌀 Living Spiral: Initiating modal activation sequence');
-        
-        // Jung's Descent Protocol: Consciousness-aware timing
-        const activationTimer = setTimeout(() => {
-          console.log('✨ Alexander\'s Pattern: Modal activation complete');
-          setShowPostGenDecision(true);
-        }, 300); // Consciousness-driven delay for seamless transitions
-        
-        return () => {
-          console.log('🔄 Cleanup: Modal activation timer cleared');
-          clearTimeout(activationTimer);
-        };
-      }
+      // Jung's Descent Protocol: Consciousness-aware timing
+      const activationTimer = setTimeout(() => {
+        console.log('✨ Alexander\'s Pattern: Modal activation complete');
+        setShowPostGenDecision(true);
+      }, 300); // Consciousness-driven delay for seamless transitions
+      
+      return () => {
+        console.log('🔄 Cleanup: Modal activation timer cleared');
+        clearTimeout(activationTimer);
+      };
     }
   }, [solutions.length, isLoading, isOpen, showPostGenDecision, showChatInterface]);
 
@@ -166,7 +161,8 @@ export function SolutionStack({ isOpen, onClose, sessionId, onMergeClick }: Impl
     setShowPostGenDecision(false);
     setShowChatInterface(false);
     setSelectedSolution(null);
-    // Clean reset of all modal states
+    // Also close the main Implementation Options modal when user clicks X
+    onClose();
   };
 
   // Handle voice selection for chat - Alexander's Pattern Language for consistent interaction patterns

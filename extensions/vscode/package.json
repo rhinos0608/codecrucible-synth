@@ -1,0 +1,266 @@
+{
+  "name": "codecrucible-multi-voice-ai",
+  "displayName": "CodeCrucible: Multi-Voice AI Assistant",
+  "description": "Consciousness-driven AI development with multi-voice council generation, synthesis, and collaboration",
+  "version": "1.0.0",
+  "publisher": "codecrucible",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "AI",
+    "Productivity"
+  ],
+  "keywords": [
+    "ai",
+    "code generation",
+    "multi-voice",
+    "synthesis",
+    "collaboration",
+    "consciousness"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codecrucible.generateWithCouncil",
+        "title": "Generate with Council",
+        "category": "CodeCrucible",
+        "icon": "$(brain)"
+      },
+      {
+        "command": "codecrucible.synthesizeSolutions",
+        "title": "Synthesize Solutions",
+        "category": "CodeCrucible",
+        "icon": "$(combine)"
+      },
+      {
+        "command": "codecrucible.openCouncilPanel",
+        "title": "Open Council Panel",
+        "category": "CodeCrucible",
+        "icon": "$(panel-left)"
+      },
+      {
+        "command": "codecrucible.reviewCurrentFile",
+        "title": "Review Current File",
+        "category": "CodeCrucible",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "codecrucible.authenticate",
+        "title": "Authenticate with CodeCrucible",
+        "category": "CodeCrucible",
+        "icon": "$(key)"
+      },
+      {
+        "command": "codecrucible.showDecisionHistory",
+        "title": "Show Decision History",
+        "category": "CodeCrucible",
+        "icon": "$(history)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "codecrucible.generateWithCouncil",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codecrucible.synthesizeSolutions",
+        "key": "ctrl+shift+s",
+        "mac": "cmd+shift+s",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codecrucible.openCouncilPanel",
+        "key": "ctrl+shift+p",
+        "mac": "cmd+shift+p"
+      },
+      {
+        "command": "codecrucible.reviewCurrentFile",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codecrucible.generateWithCouncil",
+          "group": "1_codecrucible@1",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "codecrucible.reviewCurrentFile",
+          "group": "1_codecrucible@2",
+          "when": "editorTextFocus"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "codecrucible.reviewCurrentFile",
+          "group": "navigation",
+          "when": "resourceExtname =~ /\\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt)$/"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codecrucible.generateWithCouncil",
+          "when": "true"
+        },
+        {
+          "command": "codecrucible.synthesizeSolutions",
+          "when": "true"
+        },
+        {
+          "command": "codecrucible.openCouncilPanel",
+          "when": "true"
+        },
+        {
+          "command": "codecrucible.reviewCurrentFile",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "codecrucible.authenticate",
+          "when": "true"
+        },
+        {
+          "command": "codecrucible.showDecisionHistory",
+          "when": "true"
+        }
+      ]
+    },
+    "views": {
+      "codecrucible-explorer": [
+        {
+          "id": "codecrucible.councilPanel",
+          "name": "AI Council",
+          "when": "codecrucible.authenticated"
+        },
+        {
+          "id": "codecrucible.solutionsView",
+          "name": "Generated Solutions",
+          "when": "codecrucible.authenticated && codecrucible.hasSolutions"
+        },
+        {
+          "id": "codecrucible.synthesisView",
+          "name": "Synthesis Results",
+          "when": "codecrucible.authenticated && codecrucible.hasSynthesis"
+        },
+        {
+          "id": "codecrucible.decisionHistory",
+          "name": "Decision History",
+          "when": "codecrucible.authenticated"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codecrucible-explorer",
+          "title": "CodeCrucible",
+          "icon": "$(brain)"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeCrucible",
+      "properties": {
+        "codecrucible.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "CodeCrucible extension API key",
+          "scope": "application"
+        },
+        "codecrucible.apiUrl": {
+          "type": "string",
+          "default": "https://api.codecrucible.com",
+          "description": "CodeCrucible API base URL",
+          "scope": "application"
+        },
+        "codecrucible.defaultVoices": {
+          "type": "object",
+          "default": {
+            "perspectives": ["Explorer", "Developer"],
+            "roles": ["Systems Architect", "Performance Engineer"]
+          },
+          "description": "Default voice combination for generation",
+          "scope": "resource"
+        },
+        "codecrucible.synthesisMode": {
+          "type": "string",
+          "enum": ["consensus", "competitive", "collaborative"],
+          "default": "collaborative",
+          "description": "Default synthesis mode for combining solutions",
+          "scope": "resource"
+        },
+        "codecrucible.autoSynthesis": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically synthesize when multiple solutions are generated",
+          "scope": "resource"
+        },
+        "codecrucible.showDecisionReasoning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show reasoning behind voice recommendations and decisions",
+          "scope": "resource"
+        },
+        "codecrucible.contextLines": {
+          "type": "number",
+          "default": 20,
+          "description": "Number of lines of context to include around cursor position",
+          "scope": "resource"
+        },
+        "codecrucible.enableTelemetry": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable usage analytics and telemetry",
+          "scope": "application"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4",
+    "@vscode/test-electron": "^2.2.0",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "ws": "^8.13.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codecrucible/codecrucible-extensions.git"
+  },
+  "bugs": {
+    "url": "https://github.com/codecrucible/codecrucible-extensions/issues"
+  },
+  "homepage": "https://codecrucible.com",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "license": "MIT"
+}

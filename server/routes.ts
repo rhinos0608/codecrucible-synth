@@ -2693,6 +2693,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Extension API Routes Setup - IDE/Editor Integration following AI_INSTRUCTIONS.md patterns
+  await setupExtensionRoutes(app);
+
   // Critical fix: API 404 handler - prevents HTML DOCTYPE responses causing JSON parse errors
   // Following AI_INSTRUCTIONS.md defensive programming patterns
   app.use('/api/*', (req, res, next) => {
@@ -2837,5 +2840,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .slice(0, 3);
 
     return recommendations;
+  }
+
+  // Extension API Routes Setup Function
+  async function setupExtensionRoutes(app: any) {
+    try {
+      const gatewayModule = await import('./extension-api/gateway.js');
+      const { ExtensionApiGateway, authenticateExtension, extensionRateLimit } = gatewayModule;
+
+    // Extension authentication endpoint
+    app.post('/api/extensions/auth', ExtensionApiGateway.authenticate);
+
+    // Extension API endpoints with proper authentication and rate limiting
+    app.post('/api/extensions/generate', authenticateExtension, extensionRateLimit, ExtensionApiGateway.generate);
+    app.post('/api/extensions/synthesize', authenticateExtension, extensionRateLimit, ExtensionApiGateway.synthesize);
+    app.post('/api/extensions/recommendations', authenticateExtension, extensionRateLimit, ExtensionApiGateway.recommend);
+    app.get('/api/extensions/health', authenticateExtension, ExtensionApiGateway.health);
+
+    // Extension-specific analytics and usage tracking
+    app.get('/api/extensions/usage', authenticateExtension, async (req: any, res) => {
+      try {
+        const extension = (req as any).extension;
+        
+        // Get usage statistics for the extension
+        const usage = {
+          platform: extension.platform,
+          requestCount: 42, // Would fetch from database
+          lastUsed: new Date().toISOString(),
+          features: {
+            generation: true,
+            synthesis: true,
+            recommendations: true
+          }
+        };
+
+        res.json(usage);
+      } catch (error) {
+        console.error('Extension usage endpoint error:', error);
+        res.status(500).json({ error: 'Failed to fetch usage statistics' });
+      }
+    });
+
+      console.log('✅ Extension API routes configured');
+    } catch (error) {
+      console.log('⚠️ Extension API gateway not available, skipping extension routes');
+    }
   }
 }

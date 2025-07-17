@@ -1064,9 +1064,12 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db.insert(chatSessions).values({
         sessionId: chatSession.sessionId,
         userId: chatSession.userId,
+        voiceEngine: chatSession.selectedVoice, // Use selectedVoice for voiceEngine to satisfy NOT NULL constraint
+        voiceName: chatSession.selectedVoice, // Use selectedVoice for voiceName for backward compatibility
         selectedVoice: chatSession.selectedVoice,
         initialSolutionId: chatSession.initialSolutionId || null,
-        contextData: chatSession.contextData,
+        contextData: chatSession.contextData || {},
+        status: 'active',
         isActive: chatSession.isActive ?? true,
         createdAt: new Date(),
         updatedAt: new Date(),

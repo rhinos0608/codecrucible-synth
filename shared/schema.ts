@@ -178,11 +178,14 @@ export const folderFiles = pgTable("folder_files", {
 // Chat sessions table - Following AI_INSTRUCTIONS.md security patterns and Jung's consciousness principles
 export const chatSessions = pgTable("chat_sessions", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => voiceSessions.id).notNull(), // Link to original generation session
+  sessionId: integer("session_id").references(() => voiceSessions.id), // Link to original generation session
   userId: varchar("user_id").references(() => users.id).notNull(),
-  selectedVoice: varchar("selected_voice", { length: 100 }).notNull(), // The voice chosen for conversation
+  voiceEngine: varchar("voice_engine", { length: 100 }), // Legacy column for backward compatibility
+  voiceName: varchar("voice_name", { length: 100 }), // Legacy column for backward compatibility
+  selectedVoice: varchar("selected_voice", { length: 100 }), // The voice chosen for conversation
   initialSolutionId: integer("initial_solution_id").references(() => solutions.id), // The solution that started the chat
-  contextData: jsonb("context_data").notNull(), // Store initial code and solution context
+  contextData: jsonb("context_data"), // Store initial code and solution context
+  status: varchar("status").default("active"), // Legacy column for backward compatibility
   isActive: boolean("is_active").default(true),
   lastActivityAt: timestamp("last_activity_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -434,16 +437,22 @@ export const insertSessionFileAttachmentSchema = createInsertSchema(sessionFileA
 export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
   sessionId: true,
   userId: true,
+  voiceEngine: true,
+  voiceName: true,
   selectedVoice: true,
   initialSolutionId: true,
   contextData: true,
+  status: true,
   isActive: true,
 }).extend({
-  sessionId: z.number().int().min(1).max(2147483647), // PostgreSQL integer range enforcement
+  sessionId: z.number().int().min(1).max(2147483647).optional(), // PostgreSQL integer range enforcement
   userId: z.string().min(1),
+  voiceEngine: z.string().min(1).max(100).optional(),
+  voiceName: z.string().min(1).max(100).optional(),
   selectedVoice: z.string().min(1).max(100),
   initialSolutionId: z.number().int().min(1).optional(),
-  contextData: z.record(z.any()),
+  contextData: z.record(z.any()).optional(),
+  status: z.string().default("active"),
   isActive: z.boolean().default(true)
 });
 

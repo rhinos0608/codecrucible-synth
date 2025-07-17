@@ -15,6 +15,9 @@ export class ChatService {
         throw new Error('Chat session not found');
       }
       
+      // Get conversation history for context
+      const recentMessages = await storage.getChatMessages(chatSessionId);
+      
       // Store user message
       const userMsg = await storage.createChatMessage({
         chatSessionId,
@@ -24,9 +27,6 @@ export class ChatService {
         metadata: {},
         messageIndex: recentMessages.length
       });
-      
-      // Get conversation history for context
-      const recentMessages = await storage.getChatMessages(chatSessionId);
       
       // Get initial solution context if available
       let initialSolution = null;

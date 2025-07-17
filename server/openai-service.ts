@@ -1024,9 +1024,9 @@ Following CodingPhilosophy.md consciousness principles:
     initialSolution?: any
   ): Promise<string> {
     try {
-      // Build conversation context
+      // Build conversation context - map database messageType to OpenAI role
       const messagesForAPI = recentMessages.map(msg => ({
-        role: msg.role,
+        role: msg.messageType === 'user' ? 'user' : 'assistant',
         content: msg.content
       }));
 

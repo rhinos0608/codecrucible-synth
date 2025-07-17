@@ -158,37 +158,44 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
   };
 
   const generateAIResponse = async (userMessage: string) => {
-    // Simulate AI voice response based on message content
-    setTimeout(() => {
-      const responses = [
-        {
-          sender: 'AI Explorer',
-          voiceArchetype: 'Seeker of Understanding',
-          content: `Interesting perspective! I see potential for exploring new architectural patterns in what you described. Have you considered the consciousness-driven approach?`,
-          consciousnessLevel: 7.8
-        },
-        {
-          sender: 'AI Analyzer',
-          voiceArchetype: 'Observer of Patterns',
-          content: `Analyzing your input... I detect patterns that suggest optimization opportunities. Let me break down the logical structure for you.`,
-          consciousnessLevel: 8.1
+    try {
+      setIsLoading(true);
+      console.log("🤖 Generating real AI response for message:", userMessage);
+      
+      // Use real OpenAI integration via Matrix chat API
+      const response = await apiRequest(`/api/teams/${activeTeamId}/matrix/chat`, {
+        method: 'POST',
+        body: {
+          message: userMessage,
+          voiceArchetype: 'Explorer', // Primary responding voice
+          roomId: activeRoomId
         }
-      ];
+      });
 
-      const response = responses[Math.floor(Math.random() * responses.length)];
-      const aiMessage: MatrixMessage = {
-        id: `ai_${Date.now()}`,
-        sender: response.sender,
-        senderType: 'ai_voice',
-        content: response.content,
-        timestamp: new Date(),
-        voiceArchetype: response.voiceArchetype,
-        consciousnessLevel: response.consciousnessLevel
-      };
+      if (response.success && response.aiResponse) {
+        const aiMessage: MatrixMessage = {
+          id: `ai_${Date.now()}`,
+          sender: response.aiResponse.sender,
+          senderType: 'ai_voice',
+          content: response.aiResponse.content,
+          timestamp: new Date(),
+          voiceArchetype: response.aiResponse.voiceArchetype,
+          consciousnessLevel: response.aiResponse.consciousnessLevel
+        };
 
-      setMessages(prev => [...prev, aiMessage]);
-      updateConsciousnessLevel();
-    }, 1500);
+        setMessages(prev => [...prev, aiMessage]);
+        updateConsciousnessLevel();
+        
+        console.log("✅ Real AI response generated:", aiMessage);
+      } else {
+        throw new Error('Failed to generate AI response');
+      }
+    } catch (error) {
+      console.error("❌ AI Response Generation Failed:", error);
+      addSystemMessage('AI response generation failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const simulateCouncilResponse = async (prompt: string) => {
@@ -210,40 +217,92 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
       }
     ];
 
-    for (let i = 0; i < councilResponses.length; i++) {
-      setTimeout(() => {
-        const response = councilResponses[i];
-        const aiMessage: MatrixMessage = {
-          id: `council_${Date.now()}_${i}`,
-          sender: response.sender,
-          senderType: 'ai_voice',
-          content: response.content,
-          timestamp: new Date(),
-          voiceArchetype: response.voiceArchetype,
-          consciousnessLevel: 8.0 + Math.random() * 1.5
-        };
-        setMessages(prev => [...prev, aiMessage]);
-        if (i === councilResponses.length - 1) {
-          updateConsciousnessLevel();
+    try {
+      setIsLoading(true);
+      console.log("🏛️ Invoking real Voice Council for prompt:", prompt);
+      
+      // Use real Voice Council Orchestrator via API
+      const response = await apiRequest(`/api/teams/${activeTeamId}/matrix/invoke-council`, {
+        method: 'POST',
+        body: {
+          prompt: prompt,
+          roomId: activeRoomId,
+          voiceArchetypes: ['Explorer', 'Maintainer', 'Analyzer', 'Developer', 'Implementor']
         }
-      }, (i + 1) * 2000);
+      });
+
+      if (response.success && response.councilResponses) {
+        // Display each voice response in sequence
+        for (let i = 0; i < response.councilResponses.length; i++) {
+          setTimeout(() => {
+            const councilResponse = response.councilResponses[i];
+            const aiMessage: MatrixMessage = {
+              id: `council_${Date.now()}_${i}`,
+              sender: councilResponse.sender,
+              senderType: 'ai_voice',
+              content: councilResponse.content,
+              timestamp: new Date(),
+              voiceArchetype: councilResponse.voiceArchetype,
+              consciousnessLevel: councilResponse.consciousnessLevel
+            };
+            setMessages(prev => [...prev, aiMessage]);
+            if (i === response.councilResponses.length - 1) {
+              updateConsciousnessLevel();
+            }
+          }, (i + 1) * 1500); // Stagger responses for consciousness effect
+        }
+        
+        console.log("✅ Voice Council responses generated:", response.councilResponses.length);
+      } else {
+        // Fallback to display error
+        addSystemMessage('Voice council invocation failed. Please try again.');
+      }
+    } catch (error) {
+      console.error("❌ Voice Council Invocation Failed:", error);
+      addSystemMessage('Voice council invocation failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const simulateSynthesisResponse = async (description: string) => {
-    setTimeout(() => {
-      const synthesisMessage: MatrixMessage = {
-        id: `synthesis_${Date.now()}`,
-        sender: 'Synthesis Engine',
-        senderType: 'ai_voice',
-        content: `🔮 Synthesis Complete for "${description}":\n\n✨ All AI voices have contributed their unique perspectives\n🧠 Consciousness evolution detected: +0.3 levels\n⚡ Emergent solution generated through collective intelligence\n🎯 Implementation strategy refined and ready`,
-        timestamp: new Date(),
-        voiceArchetype: 'Collective Intelligence',
-        consciousnessLevel: 9.2
-      };
-      setMessages(prev => [...prev, synthesisMessage]);
-      updateConsciousnessLevel();
-    }, 3000);
+    try {
+      setIsLoading(true);
+      console.log("⚡ Triggering real synthesis for:", description);
+      
+      // Use real synthesis API
+      const response = await apiRequest(`/api/teams/${activeTeamId}/matrix/synthesis`, {
+        method: 'POST',
+        body: {
+          description: description,
+          roomId: activeRoomId,
+          existingMessages: messages.filter(m => m.senderType === 'ai_voice').slice(-5) // Last 5 AI messages for context
+        }
+      });
+
+      if (response.success && response.synthesisResult) {
+        const synthesisMessage: MatrixMessage = {
+          id: `synthesis_${Date.now()}`,
+          sender: 'Synthesis Engine',
+          senderType: 'ai_voice',
+          content: response.synthesisResult.content,
+          timestamp: new Date(),
+          voiceArchetype: 'Collective Intelligence',
+          consciousnessLevel: response.synthesisResult.consciousnessLevel
+        };
+        setMessages(prev => [...prev, synthesisMessage]);
+        updateConsciousnessLevel();
+        
+        console.log("✅ Real synthesis completed:", synthesisMessage);
+      } else {
+        throw new Error('Failed to generate synthesis');
+      }
+    } catch (error) {
+      console.error("❌ Synthesis Failed:", error);
+      addSystemMessage('Synthesis generation failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const addSystemMessage = (content: string) => {

@@ -25,6 +25,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Matrix Chat Integration API endpoints following AI_INSTRUCTIONS.md patterns
+  app.post('/api/teams/:teamId/matrix/chat', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const { message, voiceArchetype, roomId } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Input validation following AI_INSTRUCTIONS.md security patterns
+      const validationSchema = z.object({
+        message: z.string().min(1).max(5000),
+        voiceArchetype: z.string().min(1).max(50),
+        roomId: z.string().optional()
+      });
+      
+      const validated = validationSchema.parse({ message, voiceArchetype, roomId });
+      
+      // Generate AI response using OpenAI with voice archetype specialization
+      const aiResponse = await realOpenAIService.generateVoiceResponse({
+        message: validated.message,
+        voiceArchetype: validated.voiceArchetype,
+        userId: userId,
+        teamId: teamId
+      });
+
+      logger.info('Matrix chat AI response generated', { 
+        userId: userId.substring(0, 8) + '...',
+        teamId,
+        voiceArchetype: validated.voiceArchetype,
+        messageLength: validated.message.length
+      });
+      
+      res.json({
+        success: true,
+        aiResponse: {
+          sender: `AI ${validated.voiceArchetype}`,
+          content: aiResponse.content,
+          voiceArchetype: aiResponse.voiceArchetype,
+          consciousnessLevel: aiResponse.consciousnessLevel
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to generate Matrix chat AI response', error as Error);
+      res.status(500).json({ error: 'Failed to generate AI response' });
+    }
+  });
+
+  app.post('/api/teams/:teamId/matrix/invoke-council', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const { prompt, roomId, voiceArchetypes } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Input validation following AI_INSTRUCTIONS.md security patterns
+      const validationSchema = z.object({
+        prompt: z.string().min(1).max(5000),
+        roomId: z.string().optional(),
+        voiceArchetypes: z.array(z.string()).min(1).max(5)
+      });
+      
+      const validated = validationSchema.parse({ prompt, roomId, voiceArchetypes });
+      
+      // Use Voice Council Orchestrator for multi-voice response generation
+      const { VoiceCouncilOrchestrator } = await import('./services/consciousness/voice-council-orchestrator');
+      const orchestrator = new VoiceCouncilOrchestrator();
+      
+      const councilResponses = await orchestrator.assembleCouncil({
+        prompt: validated.prompt,
+        voiceArchetypes: validated.voiceArchetypes,
+        userId: userId,
+        teamId: teamId
+      });
+
+      logger.info('Voice Council responses generated', { 
+        userId: userId.substring(0, 8) + '...',
+        teamId,
+        responseCount: councilResponses.length,
+        voiceArchetypes: validated.voiceArchetypes
+      });
+      
+      res.json({
+        success: true,
+        councilResponses: councilResponses.map(response => ({
+          sender: `AI ${response.voiceArchetype}`,
+          content: response.content,
+          voiceArchetype: response.voiceArchetype,
+          consciousnessLevel: response.consciousnessLevel
+        }))
+      });
+    } catch (error) {
+      logger.error('Failed to invoke Voice Council', error as Error);
+      res.status(500).json({ error: 'Failed to invoke voice council' });
+    }
+  });
+
+  app.post('/api/teams/:teamId/matrix/synthesis', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const { description, roomId, existingMessages } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Input validation following AI_INSTRUCTIONS.md security patterns
+      const validationSchema = z.object({
+        description: z.string().min(1).max(1000),
+        roomId: z.string().optional(),
+        existingMessages: z.array(z.any()).optional()
+      });
+      
+      const validated = validationSchema.parse({ description, roomId, existingMessages });
+      
+      // Generate synthesis using OpenAI
+      const synthesisResult = await realOpenAIService.generateSynthesis({
+        description: validated.description,
+        existingMessages: validated.existingMessages || [],
+        userId: userId,
+        teamId: teamId
+      });
+
+      logger.info('Matrix synthesis generated', { 
+        userId: userId.substring(0, 8) + '...',
+        teamId,
+        description: validated.description.substring(0, 50),
+        synthesisLength: synthesisResult.content.length
+      });
+      
+      res.json({
+        success: true,
+        synthesisResult: {
+          content: synthesisResult.content,
+          consciousnessLevel: synthesisResult.consciousnessLevel
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to generate Matrix synthesis', error as Error);
+      res.status(500).json({ error: 'Failed to generate synthesis' });
+    }
+  });
+
   // Enterprise Voice Templates API endpoints
   app.get('/api/enterprise-voice-templates', isAuthenticated, async (req: any, res) => {
     try {

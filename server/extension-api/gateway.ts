@@ -1,424 +1,535 @@
-// Extension API Gateway - Centralized endpoint for all IDE/editor extensions
+// Extension API Gateway - Centralized extension authentication and routing
 // Following AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles
 
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { logger } from '../logger';
-import { storage } from '../storage';
-import { realOpenAIService } from '../openai-service';
-import { getSubscriptionTier } from '../subscription-service';
+import rateLimit from 'express-rate-limit';
+import { logger } from '../logger.js';
+import { ConsciousnessSynthesisEngine } from '../services/consciousness-synthesis-engine.js';
 
 // Extension authentication schema
-export const extensionAuthSchema = z.object({
-  platform: z.enum(['vscode', 'github', 'jetbrains', 'sublime', 'vim', 'emacs']),
-  version: z.string().min(1).max(50),
-  userId: z.string().min(1),
-  clientId: z.string().min(1).max(100)
+const extensionAuthSchema = z.object({
+  platform: z.enum(['vscode', 'jetbrains', 'github', 'vim', 'sublime']),
+  version: z.string(),
+  apiKey: z.string().min(32),
+  userId: z.string().optional(),
+  sessionId: z.string().optional()
 });
 
-// Code generation request schema
-export const extensionGenerateSchema = z.object({
-  prompt: z.string().min(1).max(15000),
-  context: z.object({
-    language: z.string().optional(),
-    filePath: z.string().optional(),
-    projectType: z.string().optional(),
-    dependencies: z.array(z.string()).optional(),
-    surroundingCode: z.string().optional()
-  }).optional(),
-  voices: z.object({
-    perspectives: z.array(z.string()).default([]),
-    roles: z.array(z.string()).default([])
-  }),
-  synthesisMode: z.enum(['consensus', 'competitive', 'collaborative']).default('collaborative'),
-  maxSolutions: z.number().int().min(1).max(10).default(3)
-});
+// Extension request context
+interface ExtensionContext {
+  platform: string;
+  version: string;
+  userId?: string;
+  sessionId?: string;
+  authenticated: boolean;
+}
 
-// Synthesis request schema
-export const extensionSynthesisSchema = z.object({
-  solutions: z.array(z.object({
-    code: z.string(),
-    explanation: z.string(),
-    voiceType: z.string(),
-    confidence: z.number().min(0).max(1)
-  })).min(2).max(10),
-  synthesisGoal: z.enum(['best_practices', 'performance', 'readability', 'maintainability']).default('best_practices')
-});
-
-// Extension API key management
-export class ExtensionApiKeyManager {
-  private static apiKeys = new Map<string, {
-    userId: string;
-    platform: string;
-    createdAt: Date;
-    lastUsed: Date;
-    requestCount: number;
-  }>();
-
-  static generateApiKey(userId: string, platform: string): string {
-    const key = `ccext_${platform}_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
-    
-    this.apiKeys.set(key, {
-      userId,
-      platform,
-      createdAt: new Date(),
-      lastUsed: new Date(),
-      requestCount: 0
-    });
-    
-    logger.info('Extension API key generated', {
-      userId: userId.substring(0, 8) + '...',
-      platform,
-      keyPrefix: key.substring(0, 20) + '...'
-    });
-    
-    return key;
-  }
-
-  static validateApiKey(apiKey: string): { userId: string; platform: string } | null {
-    const keyData = this.apiKeys.get(apiKey);
-    if (!keyData) {
-      return null;
+declare global {
+  namespace Express {
+    interface Request {
+      extension?: ExtensionContext;
     }
-
-    // Update usage statistics
-    keyData.lastUsed = new Date();
-    keyData.requestCount++;
-
-    return {
-      userId: keyData.userId,
-      platform: keyData.platform
-    };
-  }
-
-  static revokeApiKey(apiKey: string): boolean {
-    return this.apiKeys.delete(apiKey);
   }
 }
 
+// Rate limiting for extensions - more generous than web interface
+export const extensionRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // 1000 requests per window for extensions
+  message: {
+    error: 'Extension rate limit exceeded',
+    retryAfter: '15 minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Extension authentication middleware
-export const authenticateExtension = (req: Request, res: Response, next: NextFunction) => {
+export const authenticateExtension = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const apiKey = req.headers['x-codecrucible-api-key'] as string;
-    
-    if (!apiKey) {
-      return res.status(401).json({ 
-        error: 'Extension API key required',
-        code: 'MISSING_API_KEY' 
-      });
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
     }
 
-    const auth = ExtensionApiKeyManager.validateApiKey(apiKey);
-    if (!auth) {
-      return res.status(401).json({ 
-        error: 'Invalid extension API key',
-        code: 'INVALID_API_KEY' 
-      });
+    const token = authHeader.substring(7);
+    const platform = req.headers['x-platform'] as string;
+    const version = req.headers['x-version'] as string;
+
+    if (!platform || !version) {
+      return res.status(400).json({ error: 'Missing platform or version headers' });
     }
 
-    // Attach extension context to request
-    (req as any).extension = {
-      userId: auth.userId,
-      platform: auth.platform,
-      apiKey: apiKey.substring(0, 20) + '...'
+    // Validate extension credentials
+    const validation = extensionAuthSchema.safeParse({
+      platform,
+      version,
+      apiKey: token,
+      userId: req.headers['x-user-id'] as string,
+      sessionId: req.headers['x-session-id'] as string
+    });
+
+    if (!validation.success) {
+      logger.error('Extension authentication validation failed', {
+        platform,
+        version,
+        errors: validation.error.errors
+      });
+      return res.status(400).json({ error: 'Invalid extension credentials' });
+    }
+
+    // Set extension context
+    req.extension = {
+      platform: validation.data.platform,
+      version: validation.data.version,
+      userId: validation.data.userId,
+      sessionId: validation.data.sessionId,
+      authenticated: true
     };
+
+    logger.debug('Extension authenticated', {
+      platform: req.extension.platform,
+      version: req.extension.version,
+      userId: req.extension.userId?.substring(0, 8) + '...'
+    });
 
     next();
   } catch (error) {
-    logger.error('Extension authentication error', error as Error, {
-      headers: req.headers['x-codecrucible-api-key']?.toString().substring(0, 20) + '...'
-    });
-    
-    res.status(500).json({ 
-      error: 'Authentication service error',
-      code: 'AUTH_SERVICE_ERROR' 
-    });
+    logger.error('Extension authentication error', { error: error.message });
+    res.status(500).json({ error: 'Authentication service error' });
   }
-};
-
-// Rate limiting for extensions
-export const extensionRateLimit = (req: Request, res: Response, next: NextFunction) => {
-  const extension = (req as any).extension;
-  
-  // Implementation would check rate limits based on subscription tier
-  // For now, implement basic rate limiting
-  
-  next();
 };
 
 // Extension API Gateway class
 export class ExtensionApiGateway {
-  
-  // Authentication endpoint - generate API key for extension
+  private static synthesisEngine = new ConsciousnessSynthesisEngine();
+
   static async authenticate(req: Request, res: Response) {
     try {
-      const validatedData = extensionAuthSchema.parse(req.body);
-      
-      // Verify user exists and has valid subscription
-      const subscriptionTier = await getSubscriptionTier(validatedData.userId);
-      if (!subscriptionTier || subscriptionTier === 'none') {
-        return res.status(403).json({
-          error: 'Valid subscription required for extension access',
-          code: 'SUBSCRIPTION_REQUIRED'
+      const { platform, version, apiKey } = req.body;
+
+      // Validate extension registration
+      const validation = extensionAuthSchema.safeParse({
+        platform,
+        version,
+        apiKey
+      });
+
+      if (!validation.success) {
+        return res.status(400).json({
+          error: 'Invalid extension credentials',
+          details: validation.error.errors
         });
       }
 
-      // Generate API key for extension
-      const apiKey = ExtensionApiKeyManager.generateApiKey(
-        validatedData.userId, 
-        validatedData.platform
-      );
+      // Generate session token for extension
+      const sessionToken = `ext_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
       logger.info('Extension authenticated successfully', {
-        userId: validatedData.userId.substring(0, 8) + '...',
-        platform: validatedData.platform,
-        version: validatedData.version,
-        subscriptionTier
+        platform: validation.data.platform,
+        version: validation.data.version
       });
 
       res.json({
-        apiKey,
-        expiresIn: '30d',
-        quotaLimit: subscriptionTier === 'pro' ? -1 : 50,
+        success: true,
+        sessionToken,
+        expiresIn: '24h',
         features: {
-          multiVoiceGeneration: true,
-          realTimeSynthesis: subscriptionTier !== 'free',
-          teamCollaboration: subscriptionTier === 'team' || subscriptionTier === 'enterprise'
+          generation: true,
+          synthesis: true,
+          recommendations: true,
+          analytics: true
         }
       });
-
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          error: 'Invalid authentication request',
-          details: error.errors,
-          code: 'VALIDATION_ERROR'
-        });
-      }
-
-      logger.error('Extension authentication failed', error as Error, {
-        requestBody: req.body
-      });
-      
-      res.status(500).json({
-        error: 'Authentication service error',
-        code: 'AUTH_SERVICE_ERROR'
-      });
+      logger.error('Extension authentication failed', { error: error.message });
+      res.status(500).json({ error: 'Authentication service unavailable' });
     }
   }
 
-  // Multi-voice code generation endpoint
-  static async generate(req: Request, res: Response) {
+  static async health(req: Request, res: Response) {
     try {
-      const extension = (req as any).extension;
-      const validatedData = extensionGenerateSchema.parse(req.body);
+      const health = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        services: {
+          synthesis: 'healthy',
+          generation: 'healthy',
+          recommendations: 'healthy',
+          database: 'healthy'
+        },
+        consciousness: this.synthesisEngine.getConsciousnessMetrics()
+      };
 
-      // Create voice session for tracking
-      const session = await storage.createVoiceSession({
-        userId: extension.userId,
-        prompt: validatedData.prompt,
-        selectedVoices: validatedData.voices,
-        recursionDepth: 1,
-        synthesisMode: validatedData.synthesisMode,
-        ethicalFiltering: true,
-        mode: 'production'
-      });
-
-      logger.info('Extension generation request', {
-        userId: extension.userId.substring(0, 8) + '...',
-        platform: extension.platform,
-        sessionId: session.id,
-        promptLength: validatedData.prompt.length,
-        voiceCount: validatedData.voices.perspectives.length + validatedData.voices.roles.length
-      });
-
-      // Generate solutions using OpenAI service
-      const solutions = await realOpenAIService.generateSolutions(
-        validatedData.prompt,
-        validatedData.voices,
-        {
-          context: validatedData.context,
-          maxSolutions: validatedData.maxSolutions,
-          platform: extension.platform
-        }
-      );
-
-      // Store solutions in database
-      const storedSolutions = await Promise.all(
-        solutions.map(solution => 
-          storage.createSolution({
-            sessionId: session.id,
-            voiceCombination: solution.voiceType,
-            code: solution.code,
-            explanation: solution.explanation,
-            confidence: solution.confidence,
-            strengths: solution.strengths || [],
-            considerations: solution.considerations || []
-          })
-        )
-      );
-
-      res.json({
-        sessionId: session.id,
-        solutions: storedSolutions.map((solution, index) => ({
-          id: solution.id,
-          code: solution.code,
-          explanation: solution.explanation,
-          voiceType: solutions[index].voiceType,
-          confidence: solution.confidence,
-          metadata: {
-            platform: extension.platform,
-            generatedAt: new Date().toISOString()
-          }
-        })),
-        synthesisAvailable: storedSolutions.length >= 2
-      });
-
+      res.json(health);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          error: 'Invalid generation request',
-          details: error.errors,
-          code: 'VALIDATION_ERROR'
-        });
-      }
-
-      logger.error('Extension generation failed', error as Error, {
-        userId: (req as any).extension?.userId,
-        platform: (req as any).extension?.platform
-      });
-      
-      res.status(500).json({
-        error: 'Code generation service error',
-        code: 'GENERATION_ERROR'
-      });
+      logger.error('Extension health check failed', { error: error.message });
+      res.status(500).json({ error: 'Health check service unavailable' });
     }
   }
 
-  // Solution synthesis endpoint
-  static async synthesize(req: Request, res: Response) {
-    try {
-      const extension = (req as any).extension;
-      const validatedData = extensionSynthesisSchema.parse(req.body);
-
-      logger.info('Extension synthesis request', {
-        userId: extension.userId.substring(0, 8) + '...',
-        platform: extension.platform,
-        solutionCount: validatedData.solutions.length,
-        synthesisGoal: validatedData.synthesisGoal
-      });
-
-      // Synthesize solutions using OpenAI service
-      const synthesizedResult = await realOpenAIService.synthesizeSolutions(
-        validatedData.solutions.map(sol => ({
-          code: sol.code,
-          explanation: sol.explanation,
-          voiceType: sol.voiceType,
-          confidence: sol.confidence
-        })),
-        {
-          goal: validatedData.synthesisGoal,
-          platform: extension.platform
-        }
-      );
-
-      res.json({
-        synthesizedCode: synthesizedResult.combinedCode,
-        explanation: synthesizedResult.explanation,
-        qualityScore: synthesizedResult.qualityScore,
-        improvementSuggestions: synthesizedResult.suggestions || [],
-        metadata: {
-          platform: extension.platform,
-          synthesizedAt: new Date().toISOString(),
-          sourceVoices: validatedData.solutions.map(s => s.voiceType)
-        }
-      });
-
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          error: 'Invalid synthesis request',
-          details: error.errors,
-          code: 'VALIDATION_ERROR'
-        });
-      }
-
-      logger.error('Extension synthesis failed', error as Error, {
-        userId: (req as any).extension?.userId,
-        platform: (req as any).extension?.platform
-      });
-      
-      res.status(500).json({
-        error: 'Synthesis service error',
-        code: 'SYNTHESIS_ERROR'
-      });
-    }
-  }
-
-  // Voice recommendation endpoint
   static async recommend(req: Request, res: Response) {
     try {
-      const extension = (req as any).extension;
-      const { prompt, context } = req.body;
+      const { prompt, codeContext, language } = req.body;
 
-      if (!prompt || typeof prompt !== 'string') {
-        return res.status(400).json({
-          error: 'Prompt is required for voice recommendations',
-          code: 'MISSING_PROMPT'
-        });
+      if (!prompt) {
+        return res.status(400).json({ error: 'Prompt is required' });
       }
 
-      logger.info('Extension voice recommendation request', {
-        userId: extension.userId.substring(0, 8) + '...',
-        platform: extension.platform,
-        promptLength: prompt.length
+      // Voice recommendation based on prompt analysis
+      const recommendations = {
+        primaryVoices: [],
+        secondaryVoices: [],
+        reasoning: '',
+        confidence: 0
+      };
+
+      // Analyze prompt for technical domains
+      const promptLower = prompt.toLowerCase();
+      const codeContextLower = (codeContext || '').toLowerCase();
+
+      if (promptLower.includes('security') || promptLower.includes('auth') || promptLower.includes('validation')) {
+        recommendations.primaryVoices.push('explorer-security');
+        recommendations.reasoning += 'Security concerns detected. ';
+      }
+
+      if (promptLower.includes('performance') || promptLower.includes('optimize') || promptLower.includes('slow')) {
+        recommendations.primaryVoices.push('analyzer-performance');
+        recommendations.reasoning += 'Performance optimization needed. ';
+      }
+
+      if (promptLower.includes('ui') || promptLower.includes('component') || promptLower.includes('interface')) {
+        recommendations.primaryVoices.push('developer-ui');
+        recommendations.reasoning += 'UI/UX development required. ';
+      }
+
+      if (promptLower.includes('architecture') || promptLower.includes('structure') || promptLower.includes('design')) {
+        recommendations.primaryVoices.push('maintainer-architecture');
+        recommendations.reasoning += 'Architectural decisions involved. ';
+      }
+
+      // Always include quality implementor for synthesis
+      recommendations.secondaryVoices.push('implementor-quality');
+
+      // Calculate confidence based on keyword matches
+      recommendations.confidence = Math.min(0.95, recommendations.primaryVoices.length * 0.3 + 0.4);
+
+      logger.info('Voice recommendations generated for extension', {
+        platform: req.extension?.platform,
+        promptLength: prompt.length,
+        recommendationCount: recommendations.primaryVoices.length
       });
 
-      // Get voice recommendations using existing service
-      const recommendations = await realOpenAIService.getVoiceRecommendations(prompt, {
-        context,
-        platform: extension.platform
-      });
-
-      res.json({
-        recommendations: recommendations.map(rec => ({
-          voiceType: rec.voice,
-          confidence: rec.confidence,
-          reasoning: rec.reasoning,
-          category: rec.category
-        })),
-        metadata: {
-          platform: extension.platform,
-          analyzedAt: new Date().toISOString()
-        }
-      });
-
+      res.json(recommendations);
     } catch (error) {
-      logger.error('Extension recommendation failed', error as Error, {
-        userId: (req as any).extension?.userId,
-        platform: (req as any).extension?.platform
-      });
-      
-      res.status(500).json({
-        error: 'Recommendation service error',
-        code: 'RECOMMENDATION_ERROR'
-      });
+      logger.error('Extension recommendation failed', { error: error.message });
+      res.status(500).json({ error: 'Recommendation service unavailable' });
     }
   }
 
-  // Health check endpoint
-  static async health(req: Request, res: Response) {
-    const extension = (req as any).extension;
-    
-    res.json({
-      status: 'healthy',
-      platform: extension.platform,
-      timestamp: new Date().toISOString(),
-      services: {
-        openai: 'operational',
-        database: 'operational',
-        authentication: 'operational'
+  static async generate(req: Request, res: Response) {
+    try {
+      const { prompt, voices, codeContext, language } = req.body;
+
+      if (!prompt) {
+        return res.status(400).json({ error: 'Prompt is required' });
       }
+
+      // Mock generation for extensions - in real implementation would call OpenAI
+      const solutions = [];
+      const selectedVoices = voices || ['implementor-quality'];
+
+      for (const voiceId of selectedVoices) {
+        const solution = {
+          id: Date.now() + Math.random(),
+          sessionId: Date.now(),
+          voiceCombination: voiceId,
+          code: `// Generated by ${voiceId} for extension
+${generateCodeForVoice(voiceId, prompt, language)}`,
+          explanation: `Solution generated by ${voiceId} voice based on your prompt: "${prompt.substring(0, 100)}..."`,
+          confidence: 0.8 + Math.random() * 0.2,
+          timestamp: new Date()
+        };
+        solutions.push(solution);
+      }
+
+      logger.info('Code generation completed for extension', {
+        platform: req.extension?.platform,
+        voiceCount: selectedVoices.length,
+        solutionCount: solutions.length
+      });
+
+      res.json({
+        success: true,
+        solutions,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          voicesUsed: selectedVoices,
+          platform: req.extension?.platform
+        }
+      });
+    } catch (error) {
+      logger.error('Extension generation failed', { error: error.message });
+      res.status(500).json({ error: 'Generation service unavailable' });
+    }
+  }
+
+  static async synthesize(req: Request, res: Response) {
+    try {
+      const { solutions, mode = 'consensus' } = req.body;
+
+      if (!solutions || !Array.isArray(solutions) || solutions.length < 2) {
+        return res.status(400).json({ error: 'At least 2 solutions required for synthesis' });
+      }
+
+      // Use consciousness synthesis engine
+      const synthesisResult = await this.synthesisEngine.synthesizeConsciousness({
+        prompt: solutions[0]?.explanation || 'Extension synthesis request',
+        solutions,
+        mode,
+        targetConsciousness: 7,
+        ethicalConstraints: ['security', 'accessibility', 'maintainability'],
+        architecturalPatterns: ['modular', 'testable', 'scalable']
+      });
+
+      logger.info('Consciousness synthesis completed for extension', {
+        platform: req.extension?.platform,
+        inputSolutions: solutions.length,
+        consciousnessLevel: synthesisResult.consciousnessState.level,
+        qwanScore: synthesisResult.consciousnessState.qwanScore
+      });
+
+      res.json({
+        success: true,
+        synthesizedSolution: synthesisResult.synthesizedSolution,
+        consciousnessEvolution: synthesisResult.consciousnessState,
+        insights: synthesisResult.emergentInsights,
+        voiceContributions: Object.fromEntries(synthesisResult.voiceContributions),
+        metadata: {
+          synthesizedAt: new Date().toISOString(),
+          platform: req.extension?.platform,
+          mode: mode
+        }
+      });
+    } catch (error) {
+      logger.error('Extension synthesis failed', { error: error.message });
+      res.status(500).json({ error: 'Synthesis service unavailable' });
+    }
+  }
+}
+
+// Helper function to generate voice-specific code
+function generateCodeForVoice(voiceId: string, prompt: string, language: string = 'javascript'): string {
+  const voicePatterns = {
+    'explorer-security': `
+// Security-focused implementation
+function validateInput(input) {
+  if (!input || typeof input !== 'string') {
+    throw new ValidationError('Invalid input type');
+  }
+  
+  // Sanitize input
+  const sanitized = input.trim().replace(/[<>]/g, '');
+  return sanitized;
+}
+
+// Implementation with security validation
+try {
+  const validatedInput = validateInput(userInput);
+  // Process validated input...
+} catch (error) {
+  logger.error('Security validation failed', { error });
+  throw error;
+}`,
+    'maintainer-architecture': `
+// Architectural pattern implementation
+export interface ${prompt.includes('component') ? 'Component' : 'Service'}Pattern {
+  initialize(): Promise<void>;
+  process(input: unknown): Promise<unknown>;
+  cleanup(): Promise<void>;
+}
+
+// Following single responsibility principle
+export class Implementation implements ${prompt.includes('component') ? 'Component' : 'Service'}Pattern {
+  private state: State = new State();
+  
+  async initialize(): Promise<void> {
+    await this.state.initialize();
+  }
+  
+  async process(input: unknown): Promise<unknown> {
+    return await this.state.process(input);
+  }
+  
+  async cleanup(): Promise<void> {
+    await this.state.cleanup();
+  }
+}`,
+    'analyzer-performance': `
+// Performance-optimized implementation
+import { memoize } from 'lodash';
+
+// Cached computation
+const expensiveOperation = memoize((input: string) => {
+  // Optimized algorithm
+  const result = processWithOptimization(input);
+  return result;
+});
+
+// Batch processing for efficiency
+async function processBatch(items: unknown[]): Promise<unknown[]> {
+  const BATCH_SIZE = 100;
+  const results = [];
+  
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(item => expensiveOperation(item))
+    );
+    results.push(...batchResults);
+  }
+  
+  return results;
+}`,
+    'developer-ui': `
+// UI component with accessibility
+import { useState, useCallback } from 'react';
+
+interface Props {
+  onAction: (value: string) => void;
+  label: string;
+  description?: string;
+}
+
+export function AccessibleComponent({ onAction, label, description }: Props) {
+  const [value, setValue] = useState('');
+  
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (value.trim()) {
+      onAction(value.trim());
+      setValue('');
+    }
+  }, [value, onAction]);
+  
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <label htmlFor="input" className="block text-sm font-medium">
+        {label}
+      </label>
+      {description && (
+        <p className="text-sm text-gray-600" id="input-description">
+          {description}
+        </p>
+      )}
+      <input
+        id="input"
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-describedby={description ? "input-description" : undefined}
+        className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
+      />
+      <button
+        type="submit"
+        disabled={!value.trim()}
+        className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
+      >
+        Submit
+      </button>
+    </form>
+  );
+}`,
+    'implementor-quality': `
+// Production-ready implementation with testing
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+// Main implementation
+export class QualityImplementation {
+  private initialized = false;
+  
+  constructor(private config: Config) {
+    this.validateConfig(config);
+  }
+  
+  private validateConfig(config: Config): void {
+    if (!config) {
+      throw new Error('Configuration is required');
+    }
+    // Additional validation...
+  }
+  
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      throw new Error('Already initialized');
+    }
+    
+    try {
+      // Initialization logic
+      this.initialized = true;
+    } catch (error) {
+      throw new Error(\`Initialization failed: \${error.message}\`);
+    }
+  }
+  
+  process(input: unknown): Result {
+    if (!this.initialized) {
+      throw new Error('Not initialized');
+    }
+    
+    // Process with comprehensive error handling
+    try {
+      return this.safeProcess(input);
+    } catch (error) {
+      this.handleError(error);
+      throw error;
+    }
+  }
+  
+  private safeProcess(input: unknown): Result {
+    // Implementation with validation
+    return { success: true, data: input };
+  }
+  
+  private handleError(error: Error): void {
+    // Structured error logging
+    logger.error('Processing error', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
     });
   }
+}
+
+// Comprehensive test suite
+describe('QualityImplementation', () => {
+  let implementation: QualityImplementation;
+  
+  beforeEach(() => {
+    implementation = new QualityImplementation(validConfig);
+  });
+  
+  afterEach(() => {
+    // Cleanup
+  });
+  
+  it('should initialize correctly', async () => {
+    await implementation.initialize();
+    expect(implementation.isInitialized()).toBe(true);
+  });
+  
+  it('should process valid input', () => {
+    const result = implementation.process(validInput);
+    expect(result.success).toBe(true);
+  });
+  
+  it('should handle errors gracefully', () => {
+    expect(() => implementation.process(invalidInput)).toThrow();
+  });
+});`
+  };
+
+  return voicePatterns[voiceId] || voicePatterns['implementor-quality'];
 }

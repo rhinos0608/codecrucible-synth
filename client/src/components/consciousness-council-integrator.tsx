@@ -283,7 +283,7 @@ export function ConsciousnessCouncilIntegrator({
       decisionType: determineDecisionType(councilResult),
       complexity: councilResult.complexity,
       consensus: councilResult.consensus,
-      dissent: [], // TODO: Implement dissent tracking
+      dissent: await trackVoiceDissentPatterns(councilResult),
       implementation: generateImplementationPlan(councilResult),
       consciousnessImpact: calculateConsciousnessImpact(councilResult),
       qwanAssessment: assessQWAN(councilResult)
@@ -336,6 +336,38 @@ export function ConsciousnessCouncilIntegrator({
       egolessness: Math.round(base + factor * 3.5),
       eternity: Math.round(base + factor * 4)
     };
+  };
+
+  // Track voice dissent patterns for consciousness evolution
+  const trackVoiceDissentPatterns = async (councilResult: any): Promise<string[]> => {
+    const dissent: string[] = [];
+    
+    if (councilResult.consensus < 60) {
+      dissent.push('Low consensus detected - voices show significant disagreement');
+    }
+    
+    if (councilResult.ethical < 70) {
+      dissent.push('Ethical concerns raised by multiple voices');
+    }
+    
+    if (councilResult.architectural < 65) {
+      dissent.push('Architectural approach disputed between voices');
+    }
+    
+    // Analyze solution confidence variance for dissent
+    if (solutions.length > 2) {
+      const confidences = solutions.map(s => s.confidence);
+      const variance = confidences.reduce((sum, conf) => {
+        const avg = confidences.reduce((a, b) => a + b, 0) / confidences.length;
+        return sum + Math.pow(conf - avg, 2);
+      }, 0) / confidences.length;
+      
+      if (variance > 0.15) {
+        dissent.push('High confidence variance indicates voice uncertainty');
+      }
+    }
+    
+    return dissent;
   };
 
   // Evolve consciousness based on decision

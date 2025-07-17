@@ -41,9 +41,38 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // Log error to console for development
     console.error('Error Boundary caught an error:', error, errorInfo);
     
-    // TODO: In production, send to error reporting service
-    // reportError(error, errorInfo);
+    // Production error reporting integration
+    this.reportToService(error, errorInfo);
   }
+
+  reportToService = async (error: Error, errorInfo: ErrorInfo) => {
+    try {
+      // Enhanced error reporting with consciousness context
+      const errorReport = {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        consciousness: {
+          sessionActive: sessionStorage.getItem('activeSession') !== null,
+          voicesSelected: sessionStorage.getItem('selectedVoices') !== null,
+          synthesisInProgress: sessionStorage.getItem('synthesisState') === 'active'
+        }
+      };
+
+      // Send to error tracking API
+      await fetch('/api/errors/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(errorReport)
+      });
+    } catch (reportingError) {
+      // Fallback to console if error reporting fails
+      console.error('Failed to report error:', reportingError);
+    }
+  };
 
   handleRetry = () => {
     this.setState({

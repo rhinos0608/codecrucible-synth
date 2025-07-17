@@ -3,7 +3,7 @@
 // Integrating multi-agent research from CrewAI, AutoGen, LangGraph, GitHub Copilot Workspace, Cursor IDE
 
 import { logger } from '../../logger';
-import { openaiService } from '../../openai';
+import { openaiService } from '../../openai-service';
 
 interface ConsciousnessAgent {
   archetype: 'Explorer' | 'Maintainer' | 'Analyzer' | 'Developer' | 'Implementor';

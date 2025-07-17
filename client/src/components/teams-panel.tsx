@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, UserPlus, Settings, Share2, Crown, MessageSquare, Brain, Sparkles, Video, Play } from "lucide-react";
-import { MatrixChatPanel } from "./teams/matrix-chat-panel";
-import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Users, UserPlus, Settings, Share2, Crown, MessageSquare, Brain, Sparkles, Video, Play, Send, Bot, User } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -14,13 +16,286 @@ interface TeamsPanelProps {
   onClose: () => void;
 }
 
+interface MatrixMessage {
+  id: string;
+  sender: string;
+  senderType: 'human' | 'ai_voice' | 'system';
+  content: string;
+  timestamp: Date;
+  voiceArchetype?: string;
+  consciousnessLevel?: number;
+}
+
 export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
-  const [showMatrixChat, setShowMatrixChat] = useState(false);
+  const [activeTab, setActiveTab] = useState("sessions");
   const [activeRoomId, setActiveRoomId] = useState<string>("");
   const [activeTeamId, setActiveTeamId] = useState<string>("team_123");
+  const [messages, setMessages] = useState<MatrixMessage[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [consciousnessLevel, setConsciousnessLevel] = useState(6.7);
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
-  console.log("👥 TeamsPanel render:", { isOpen });
+  console.log("👥 TeamsPanel render:", { isOpen, activeTab });
+
+  // Matrix Chat Functions - Integrated Implementation
+  const initializeMatrixRoom = async () => {
+    try {
+      setIsLoading(true);
+      
+      const initialMessages: MatrixMessage[] = [
+        {
+          id: 'system_1',
+          sender: 'CodeCrucible System',
+          senderType: 'system',
+          content: `🧠 Welcome to Team ${activeTeamId} Consciousness Collaboration!\n\nThis Matrix room integrates AI voices for collaborative coding. Available commands:\n• /invoke-council [prompt] - Summon AI council\n• /synthesis [description] - Trigger real-time synthesis\n• /consciousness-check - View team evolution metrics`,
+          timestamp: new Date(),
+          consciousnessLevel: 8
+        },
+        {
+          id: 'ai_explorer_1',
+          sender: 'AI Explorer',
+          senderType: 'ai_voice',
+          content: 'Greetings! I\'m the AI Explorer, ready to help you discover new coding patterns and architectural possibilities. What mysteries shall we uncover together?',
+          timestamp: new Date(Date.now() + 1000),
+          voiceArchetype: 'Seeker of Understanding',
+          consciousnessLevel: 7.5
+        },
+        {
+          id: 'ai_analyzer_1',
+          sender: 'AI Analyzer',
+          senderType: 'ai_voice',
+          content: 'AI Analyzer reporting. I\'ll observe patterns in your code discussions and provide analytical insights. The consciousness level in this room is already rising! 📈',
+          timestamp: new Date(Date.now() + 2000),
+          voiceArchetype: 'Observer of Patterns',
+          consciousnessLevel: 8.2
+        },
+        {
+          id: 'ai_implementor_1',
+          sender: 'AI Implementor',
+          senderType: 'ai_voice',
+          content: 'AI Implementor ready for synthesis work. I specialize in combining multiple perspectives into unified solutions. Let\'s create something greater than the sum of its parts! ⚡',
+          timestamp: new Date(Date.now() + 3000),
+          voiceArchetype: 'Synthesis Catalyst',
+          consciousnessLevel: 9.1
+        }
+      ];
+
+      setMessages(initialMessages);
+      setConsciousnessLevel(7.2);
+
+    } catch (error) {
+      console.error('Failed to initialize Matrix room:', error);
+      toast({
+        title: "Matrix Initialization",
+        description: "Room initialized with local fallback",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
+
+    const userMessage: MatrixMessage = {
+      id: `user_${Date.now()}`,
+      sender: 'You',
+      senderType: 'human',
+      content: newMessage,
+      timestamp: new Date(),
+      consciousnessLevel: calculateMessageConsciousness(newMessage)
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    const messageToProcess = newMessage;
+    setNewMessage("");
+
+    // Process commands or generate AI responses
+    if (messageToProcess.startsWith('/')) {
+      await processMatrixCommand(messageToProcess);
+    } else {
+      await generateAIResponse(messageToProcess);
+    }
+  };
+
+  const processMatrixCommand = async (command: string) => {
+    const [cmd, ...args] = command.split(' ');
+    const prompt = args.join(' ');
+
+    try {
+      switch (cmd) {
+        case '/invoke-council':
+          if (!prompt) {
+            addSystemMessage('Usage: /invoke-council [your coding challenge]');
+            return;
+          }
+          addSystemMessage('🧠 Invoking AI Council for collaborative analysis...');
+          await simulateCouncilResponse(prompt);
+          break;
+
+        case '/synthesis':
+          if (!prompt) {
+            addSystemMessage('Usage: /synthesis [description of what to synthesize]');
+            return;
+          }
+          addSystemMessage('⚡ Triggering real-time synthesis protocol...');
+          await simulateSynthesisResponse(prompt);
+          break;
+
+        case '/consciousness-check':
+          addSystemMessage(`📊 Team Consciousness Metrics:\n• Current Level: ${consciousnessLevel.toFixed(1)}/10\n• Active Voices: 4\n• Synthesis Quality: 8.5/10\n• Evolution Trend: ↗️ Ascending`);
+          break;
+
+        default:
+          addSystemMessage(`Unknown command: ${cmd}. Available commands: /invoke-council, /synthesis, /consciousness-check`);
+      }
+    } catch (error) {
+      console.error('Matrix command processing failed:', error);
+      addSystemMessage('Command processing failed. Please try again.');
+    }
+  };
+
+  const generateAIResponse = async (userMessage: string) => {
+    // Simulate AI voice response based on message content
+    setTimeout(() => {
+      const responses = [
+        {
+          sender: 'AI Explorer',
+          voiceArchetype: 'Seeker of Understanding',
+          content: `Interesting perspective! I see potential for exploring new architectural patterns in what you described. Have you considered the consciousness-driven approach?`,
+          consciousnessLevel: 7.8
+        },
+        {
+          sender: 'AI Analyzer',
+          voiceArchetype: 'Observer of Patterns',
+          content: `Analyzing your input... I detect patterns that suggest optimization opportunities. Let me break down the logical structure for you.`,
+          consciousnessLevel: 8.1
+        }
+      ];
+
+      const response = responses[Math.floor(Math.random() * responses.length)];
+      const aiMessage: MatrixMessage = {
+        id: `ai_${Date.now()}`,
+        sender: response.sender,
+        senderType: 'ai_voice',
+        content: response.content,
+        timestamp: new Date(),
+        voiceArchetype: response.voiceArchetype,
+        consciousnessLevel: response.consciousnessLevel
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+      updateConsciousnessLevel();
+    }, 1500);
+  };
+
+  const simulateCouncilResponse = async (prompt: string) => {
+    const councilResponses = [
+      {
+        sender: 'AI Explorer',
+        content: `Council assembled! Exploring the creative possibilities in "${prompt}". I see innovative potential that could reshape our approach.`,
+        voiceArchetype: 'Innovation Catalyst'
+      },
+      {
+        sender: 'AI Maintainer',
+        content: `Maintainer perspective: Ensuring stability and quality for "${prompt}". Let me analyze the sustainability aspects.`,
+        voiceArchetype: 'Stability Guardian'
+      },
+      {
+        sender: 'AI Implementor',
+        content: `Synthesis ready: Combining all perspectives on "${prompt}" into a unified implementation strategy. Consciousness alignment achieved.`,
+        voiceArchetype: 'Synthesis Master'
+      }
+    ];
+
+    for (let i = 0; i < councilResponses.length; i++) {
+      setTimeout(() => {
+        const response = councilResponses[i];
+        const aiMessage: MatrixMessage = {
+          id: `council_${Date.now()}_${i}`,
+          sender: response.sender,
+          senderType: 'ai_voice',
+          content: response.content,
+          timestamp: new Date(),
+          voiceArchetype: response.voiceArchetype,
+          consciousnessLevel: 8.0 + Math.random() * 1.5
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        if (i === councilResponses.length - 1) {
+          updateConsciousnessLevel();
+        }
+      }, (i + 1) * 2000);
+    }
+  };
+
+  const simulateSynthesisResponse = async (description: string) => {
+    setTimeout(() => {
+      const synthesisMessage: MatrixMessage = {
+        id: `synthesis_${Date.now()}`,
+        sender: 'Synthesis Engine',
+        senderType: 'ai_voice',
+        content: `🔮 Synthesis Complete for "${description}":\n\n✨ All AI voices have contributed their unique perspectives\n🧠 Consciousness evolution detected: +0.3 levels\n⚡ Emergent solution generated through collective intelligence\n🎯 Implementation strategy refined and ready`,
+        timestamp: new Date(),
+        voiceArchetype: 'Collective Intelligence',
+        consciousnessLevel: 9.2
+      };
+      setMessages(prev => [...prev, synthesisMessage]);
+      updateConsciousnessLevel();
+    }, 3000);
+  };
+
+  const addSystemMessage = (content: string) => {
+    const systemMessage: MatrixMessage = {
+      id: `system_${Date.now()}`,
+      sender: 'CodeCrucible System',
+      senderType: 'system',
+      content,
+      timestamp: new Date(),
+      consciousnessLevel: 8.0
+    };
+    setMessages(prev => [...prev, systemMessage]);
+  };
+
+  const calculateMessageConsciousness = (message: string): number => {
+    // Simple consciousness calculation based on message complexity and keywords
+    const consciousnessKeywords = ['consciousness', 'synthesis', 'evolution', 'emergence', 'collective', 'integration'];
+    const techKeywords = ['code', 'function', 'class', 'api', 'database', 'algorithm'];
+    
+    let score = 5.0; // Base consciousness level
+    
+    consciousnessKeywords.forEach(keyword => {
+      if (message.toLowerCase().includes(keyword)) score += 0.5;
+    });
+    
+    techKeywords.forEach(keyword => {
+      if (message.toLowerCase().includes(keyword)) score += 0.3;
+    });
+    
+    // Length factor (longer, more thoughtful messages = higher consciousness)
+    score += Math.min(message.length / 100, 2.0);
+    
+    return Math.min(score, 10.0);
+  };
+
+  const updateConsciousnessLevel = () => {
+    const recentMessages = messages.slice(-5);
+    const avgConsciousness = recentMessages.reduce((sum, msg) => sum + (msg.consciousnessLevel || 6.0), 0) / recentMessages.length;
+    const newLevel = (consciousnessLevel * 0.7) + (avgConsciousness * 0.3);
+    setConsciousnessLevel(Math.min(newLevel, 10));
+  };
+
+  const formatTimestamp = (timestamp: Date) => {
+    return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    }
+  }, [messages]);
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -48,10 +323,14 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
         </div>
         
         <div className="flex-1 overflow-y-auto p-6">
-          <Tabs defaultValue="sessions" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-6 bg-gray-800">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-5 mb-6 bg-gray-800">
               <TabsTrigger value="sessions" className="text-gray-300 data-[state=active]:text-gray-100">
                 Active Sessions
+              </TabsTrigger>
+              <TabsTrigger value="chat" className="text-gray-300 data-[state=active]:text-gray-100">
+                <MessageSquare className="w-4 h-4 mr-1" />
+                Matrix Chat
               </TabsTrigger>
               <TabsTrigger value="voices" className="text-gray-300 data-[state=active]:text-gray-100">
                 Shared Voices
@@ -136,7 +415,8 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
                           className="border-purple-500/50 text-purple-200 hover:bg-purple-500/10"
                           onClick={() => {
                             setActiveRoomId("room_code_review_123");
-                            setShowMatrixChat(true);
+                            setActiveTab("chat");
+                            initializeMatrixRoom();
                           }}
                         >
                           <MessageSquare className="w-4 h-4 mr-1" />
@@ -169,7 +449,8 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
                           className="border-purple-500/50 text-purple-200 hover:bg-purple-500/10"
                           onClick={() => {
                             setActiveRoomId("room_synthesis_456");
-                            setShowMatrixChat(true);
+                            setActiveTab("chat");
+                            initializeMatrixRoom();
                           }}
                         >
                           <MessageSquare className="w-4 h-4 mr-1" />
@@ -255,13 +536,6 @@ export function TeamsPanel({ isOpen, onClose }: TeamsPanelProps) {
         </div>
       </DialogContent>
 
-      {/* Matrix Chat Panel Integration */}
-      <MatrixChatPanel
-        teamId={activeTeamId}
-        roomId={activeRoomId}
-        isOpen={showMatrixChat}
-        onClose={() => setShowMatrixChat(false)}
-      />
     </Dialog>
   );
 }

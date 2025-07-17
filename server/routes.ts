@@ -975,16 +975,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           databaseSessionId = matchingSession.id;
           console.log('✅ Found matching database session:', databaseSessionId);
         } else {
-          // Create fallback session for orphaned chat creation
+          // Create fallback session for orphaned chat creation with proper schema structure
           console.log('⚡ Creating fallback session for chat');
           const fallbackSession = await storage.createVoiceSession({
             userId,
-            selectedPerspectives: ['developer'],
-            selectedRoles: ['general'],
             prompt: 'Chat session created without matching voice session',
-            analysisDepth: 2,
-            mergeStrategy: 'competitive',
-            qualityFiltering: true
+            selectedVoices: {
+              perspectives: ['developer'],
+              roles: ['general']
+            },
+            recursionDepth: 2,
+            synthesisMode: 'competitive',
+            ethicalFiltering: true,
+            mode: 'production'
           });
           databaseSessionId = fallbackSession.id;
         }

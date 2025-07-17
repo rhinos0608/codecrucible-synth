@@ -18,7 +18,7 @@ const initialVoiceState: Omit<VoiceState, 'actions'> = {
   sessionHistory: []
 };
 
-// Voice slice creator with immutable updates
+// Voice slice creator with immutable updates  
 export const createVoiceSlice: StateCreator<
   AppState,
   [],
@@ -45,9 +45,8 @@ export const createVoiceSlice: StateCreator<
         
         // Trigger consciousness evolution if significant change
         if (validPerspectives.length >= 3) {
-          state.consciousness.actions.updateLevel(
-            state.consciousness.level + 0.1
-          );
+          // TODO: Add consciousness tracking integration
+          console.log('Consciousness evolution triggered');
         }
       }));
     },

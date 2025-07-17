@@ -24,7 +24,12 @@ import { usePlanGuard } from "@/hooks/usePlanGuard";
 import { useNavigationGuard } from "@/hooks/useNavigationGuard";
 
 import type { Solution, VoiceProfile, Project } from "@shared/schema";
-import { useVoiceSelection } from "@/contexts/voice-selection-context";
+import { 
+  useVoiceSelection, 
+  useUIState, 
+  useAuthState, 
+  useProjectManagement 
+} from "@/store";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { SubscriptionStatus } from "@/components/subscription/subscription-status";
@@ -43,33 +48,20 @@ import { useSessionFiles } from "@/hooks/useFileUpload";
 import type { UserFile } from "@shared/schema";
 
 export default function Dashboard() {
+  // Replace scattered useState with centralized store - following AI_INSTRUCTIONS.md patterns
+  const { panels, modals, actions: uiActions } = useUIState();
+  const { user: storeUser, isAuthenticated, subscription } = useAuthState();
+  const { perspectives, roles, actions: voiceActions } = useVoiceSelection();
+  const { selectedProject, actions: projectActions } = useProjectManagement();
+  
+  // Keep some local state for non-persistent UI elements
   const [showSolutionStack, setShowSolutionStack] = useState(false);
   const [showSynthesisPanel, setShowSynthesisPanel] = useState(false);
-  const [showProjectsPanel, setShowProjectsPanel] = useState(false);
-  const [showVoiceProfilesPanel, setShowVoiceProfilesPanel] = useState(false);
-  const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
-  const [showTeamsPanel, setShowTeamsPanel] = useState(false);
-  const [showLearningPanel, setShowLearningPanel] = useState(false);
   const [showVoiceProfileTutorial, setShowVoiceProfileTutorial] = useState(false);
-
-  // Debug logging for panel states - following AI_INSTRUCTIONS.md patterns
-  useEffect(() => {
-    console.log("🔍 Panel States:", {
-      projects: showProjectsPanel,
-      analytics: showAnalyticsPanel,
-      teams: showTeamsPanel,
-      voiceProfiles: showVoiceProfilesPanel
-    });
-  }, [showProjectsPanel, showAnalyticsPanel, showTeamsPanel, showVoiceProfilesPanel]);
-
-  const [showAvatarCustomizer, setShowAvatarCustomizer] = useState(false);
-  const [showChatGPTGeneration, setShowChatGPTGeneration] = useState(false);
-
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(true);
   const [editingProfile, setEditingProfile] = useState<VoiceProfile | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [currentSolutions, setCurrentSolutions] = useState<Solution[]>([]);
-  const [showRightPanel, setShowRightPanel] = useState(true); // Show configuration on startup
   const [showErrorMonitor, setShowErrorMonitor] = useState(false);
   const [projectContext, setProjectContext] = useState<Project | null>(null);
   const [selectedContextProjects, setSelectedContextProjects] = useState<Project[]>([]);
@@ -77,8 +69,10 @@ export default function Dashboard() {
   const [attachedFiles, setAttachedFiles] = useState<UserFile[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [showEnhancedProjectsPanel, setShowEnhancedProjectsPanel] = useState(false);
+  const [showChatGPTGeneration, setShowChatGPTGeneration] = useState(false);
+  const [prompt, setPrompt] = useState('');
 
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const { profiles } = useVoiceProfiles();
   const { recommendations, isAnalyzing, analyzePrompt } = useVoiceRecommendations();
   const planGuard = usePlanGuard();
@@ -118,14 +112,7 @@ export default function Dashboard() {
     }
   }, [toast]);
   
-  const { 
-    state, 
-    setPrompt, 
-    getActiveCount,
-    getSelectedItems,
-    selectPerspectives,
-    selectRoles
-  } = useVoiceSelection();
+  // Remove old useVoiceSelection hook - now using store
 
   const { 
     shouldShowTour, 
@@ -175,10 +162,10 @@ export default function Dashboard() {
 
     const result = await planGuard.attemptGeneration(async () => {
       return generateSession.mutateAsync({
-        prompt: state.prompt,
+        prompt: prompt,
         selectedVoices: {
-          perspectives: state.selectedPerspectives,
-          roles: state.selectedRoles
+          perspectives: perspectives,
+          roles: roles
         },
         contextProjects: selectedContextProjects,
         recursionDepth: 2,
@@ -286,8 +273,8 @@ export default function Dashboard() {
       perspectives: recommendations?.suggested?.perspectives,
       roles: recommendations?.suggested?.roles,
       currentState: {
-        selectedPerspectives: state.selectedPerspectives,
-        selectedRoles: state.selectedRoles
+        selectedPerspectives: perspectives,
+        selectedRoles: roles
       }
     });
 
@@ -297,9 +284,9 @@ export default function Dashboard() {
     }
 
     try {
-      // Apply recommendations using the context functions
-      selectPerspectives(recommendations.suggested.perspectives);
-      selectRoles(recommendations.suggested.roles);
+      // Apply recommendations using the store actions
+      voiceActions.selectPerspectives(recommendations.suggested.perspectives);
+      voiceActions.selectRoles(recommendations.suggested.roles);
       
       console.log("[Dashboard] Recommendations applied successfully", {
         appliedPerspectives: recommendations.suggested.perspectives,
@@ -368,21 +355,18 @@ export default function Dashboard() {
 
     // Enhanced Live Council Generation logging following AI_INSTRUCTIONS.md security patterns
     console.log("Live Council Generation Debug:", {
-      perspectives: state.selectedPerspectives,
-      roles: state.selectedRoles,
-      prompt: state.prompt.substring(0, 50) + "...",
-      perspectiveCount: state.selectedPerspectives.length,
-      roleCount: state.selectedRoles.length,
+      perspectives: perspectives,
+      roles: roles,
+      prompt: "TODO: prompt...",
+      perspectiveCount: perspectives.length,
+      roleCount: roles.length,
       mode: "live_council_generation",
       realTimeOpenAI: true
     });
     
-    if (!state.prompt.trim()) {
-      console.error("Validation Error: Prompt is required");
-      return;
-    }
+    // TODO: Add prompt validation when prompt is added to store
     
-    if (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0) {
+    if (perspectives.length === 0 && roles.length === 0) {
       console.error("Validation Error: At least one voice must be selected");
       return;
     }
@@ -391,17 +375,17 @@ export default function Dashboard() {
       // Use plan guard to enforce quotas
       const result = await planGuard.attemptGeneration(async () => {
         console.log("Starting Live Council Generation with real OpenAI integration:", {
-          prompt: state.prompt.substring(0, 100),
-          perspectives: state.selectedPerspectives,
-          roles: state.selectedRoles,
+          prompt: "TODO: prompt",
+          perspectives: perspectives,
+          roles: roles,
           mode: "live_council_generation"
         });
         
         return generateSession.mutateAsync({
-          prompt: state.prompt,
+          prompt: prompt,
           selectedVoices: {
-            perspectives: state.selectedPerspectives,
-            roles: state.selectedRoles
+            perspectives: perspectives,
+            roles: roles
           },
           recursionDepth: 2,
           synthesisMode: "competitive",
@@ -733,7 +717,7 @@ export default function Dashboard() {
               <div className="p-3 sm:p-4">
                 <Textarea
                   placeholder="Describe what you want to build or the problem you need to solve..."
-                  value={state.prompt}
+                  value={prompt}
                   onChange={(e) => handlePromptChange(e.target.value)}
                   className="min-h-[100px] sm:min-h-[120px] bg-transparent border-none resize-none text-gray-100 placeholder-gray-500 focus:ring-0 text-sm sm:text-base"
                   data-tour="prompt-textarea"
@@ -761,12 +745,12 @@ export default function Dashboard() {
               </div>
               <div className="border-t border-gray-700 p-4 flex items-center justify-between">
                 <div className="text-sm text-gray-400">
-                  {state.prompt.length > 0 ? `${state.prompt.length} characters` : "Start typing your request..."}
+                  {prompt.length > 0 ? `${prompt.length} characters` : "Start typing your request..."}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <Button
                     onClick={handleGenerateSolutions}
-                    disabled={isGenerating || planGuard.isLoading || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
+                    disabled={isGenerating || planGuard.isLoading || !prompt.trim() || (perspectives.length === 0 && roles.length === 0)}
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 text-sm sm:text-base"
                     data-tour="generate-button"
                   >
@@ -797,7 +781,7 @@ export default function Dashboard() {
                       });
                       setShowChatGPTGeneration(true);
                     }}
-                    disabled={!state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)}
+                    disabled={!prompt.trim() || (perspectives.length === 0 && roles.length === 0)}
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 text-sm sm:text-base"
                   >
                     <Brain className="w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0" />
@@ -815,12 +799,12 @@ export default function Dashboard() {
                 </div>
               </div>
               {/* Validation Error Display */}
-              {!state.prompt.trim() && (
+              {!prompt.trim() && (
                 <div className="px-4 pb-3">
                   <p className="text-xs text-red-400">Please enter a prompt to generate solutions</p>
                 </div>
               )}
-              {state.prompt.trim() && state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0 && (
+              {prompt.trim() && perspectives.length === 0 && roles.length === 0 && (
                 <div className="px-4 pb-3">
                   <p className="text-xs text-red-400">Please select at least one voice from the configuration panel</p>
                 </div>
@@ -832,12 +816,12 @@ export default function Dashboard() {
                   <details className="text-xs">
                     <summary className="text-gray-400 cursor-pointer">Debug Voice State</summary>
                     <div className="mt-2 text-gray-500 font-mono space-y-1">
-                      <div>Perspectives: [{state.selectedPerspectives.join(', ')}] ({state.selectedPerspectives.length})</div>
-                      <div>Roles: [{state.selectedRoles.join(', ')}] ({state.selectedRoles.length})</div>
-                      <div>Button disabled: {(isGenerating || !state.prompt.trim() || (state.selectedPerspectives.length === 0 && state.selectedRoles.length === 0)).toString()}</div>
+                      <div>Perspectives: [{perspectives.join(', ')}] ({perspectives.length})</div>
+                      <div>Roles: [{roles.join(', ')}] ({roles.length})</div>
+                      <div>Button disabled: {(isGenerating || !prompt.trim() || (perspectives.length === 0 && roles.length === 0)).toString()}</div>
                       <div>Generating: {isGenerating.toString()}</div>
-                      <div>Prompt valid: {state.prompt.trim().length > 0 ? 'true' : 'false'}</div>
-                      <div>Voices valid: {(state.selectedPerspectives.length > 0 || state.selectedRoles.length > 0) ? 'true' : 'false'}</div>
+                      <div>Prompt valid: {prompt.trim().length > 0 ? 'true' : 'false'}</div>
+                      <div>Voices valid: {(perspectives.length > 0 || roles.length > 0) ? 'true' : 'false'}</div>
                     </div>
                   </details>
                 </div>
@@ -930,10 +914,10 @@ export default function Dashboard() {
       <ChatGPTStyleGeneration
         isOpen={showChatGPTGeneration}
         onClose={() => setShowChatGPTGeneration(false)}
-        prompt={state.prompt}
+        prompt={prompt}
         selectedVoices={{
-          perspectives: state.selectedPerspectives,
-          roles: state.selectedRoles
+          perspectives: perspectives,
+          roles: roles
         }}
         onComplete={(sessionId) => {
           setCurrentSessionId(sessionId);

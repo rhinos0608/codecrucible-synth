@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
-import { useVoiceSelection } from "@/contexts/voice-selection-context";
+import { useVoiceSelection, useAuthState } from "@/store";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useTeamVoiceProfiles } from "@/hooks/useTeamVoiceProfiles";
-import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -19,16 +18,13 @@ import { useState } from "react";
 
 export function PerspectiveSelector() {
   const { 
-    state, 
-    appliedProfile,
-    togglePerspective, 
-    toggleRole,
-    applyVoiceProfile,
-    clearAppliedProfile
+    perspectives, 
+    roles, 
+    actions: voiceActions 
   } = useVoiceSelection();
   
+  const { user } = useAuthState();
   const { profiles, isLoading } = useVoiceProfiles();
-  const { user } = useAuthContext();
   const { data: sharedVoices, isLoading: sharedVoicesLoading } = useTeamVoiceProfiles();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -99,14 +95,19 @@ export function PerspectiveSelector() {
   };
 
   const handleApplyProfile = (profile: VoiceProfile) => {
-    if (applyVoiceProfile) {
-      applyVoiceProfile(profile);
-    }
+    // Apply custom voice profile through store actions
+    voiceActions.selectPerspectives(profile.selectedPerspectives || []);
+    voiceActions.selectRoles(profile.selectedRoles || []);
+    
+    toast({
+      title: "Profile Applied",
+      description: `${profile.name} voice profile has been applied`,
+    });
   };
 
   const renderUserProfileCard = (profile: VoiceProfile) => {
     // Jung's Descent Protocol: Visual consciousness feedback for applied profiles
-    const isApplied = appliedProfile?.id === profile.id;
+    const isApplied = false; // TODO: Track applied profile in store
     
     return (
     <Card
@@ -248,16 +249,21 @@ export function PerspectiveSelector() {
             </h3>
             <div className="space-y-2">
               {CODE_PERSPECTIVES.map((perspective) => {
-                const isSelected = state.selectedPerspectives.includes(perspective.id);
+                const isSelected = perspectives.includes(perspective.id);
                 
                 const handlePerspectiveClick = () => {
                   console.log("Perspective Toggle Debug:", {
                     id: perspective.id,
                     currentlySelected: isSelected,
-                    currentPerspectives: state.selectedPerspectives,
+                    currentPerspectives: perspectives,
                     willBecome: isSelected ? "deselected" : "selected"
                   });
-                  togglePerspective(perspective.id);
+                  
+                  // Toggle perspective through store action
+                  const newPerspectives = isSelected 
+                    ? perspectives.filter(p => p !== perspective.id)
+                    : [...perspectives, perspective.id];
+                  voiceActions.selectPerspectives(newPerspectives);
                 };
                 
                 return (
@@ -305,16 +311,21 @@ export function PerspectiveSelector() {
             </h3>
             <div className="space-y-2">
               {DEVELOPMENT_ROLES.map((role) => {
-                const isSelected = state.selectedRoles.includes(role.id);
+                const isSelected = roles.includes(role.id);
                 
                 const handleRoleClick = () => {
                   console.log("Role Toggle Debug:", {
                     id: role.id,
                     currentlySelected: isSelected,
-                    currentRoles: state.selectedRoles,
+                    currentRoles: roles,
                     willBecome: isSelected ? "deselected" : "selected"
                   });
-                  toggleRole(role.id);
+                  
+                  // Toggle role through store action
+                  const newRoles = isSelected 
+                    ? roles.filter(r => r !== role.id)
+                    : [...roles, role.id];
+                  voiceActions.selectRoles(newRoles);
                 };
                 
                 return (

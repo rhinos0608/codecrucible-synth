@@ -14,13 +14,19 @@ import Onboarding from "@/pages/onboarding";
 import Subscribe from "@/pages/subscribe";
 import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
 import SubscriptionCancel from "@/pages/subscription-cancel";
-import { VoiceSelectionProvider } from "@/contexts/voice-selection-context";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Chat } from "@/pages/Chat";
+import { initializeStore } from "@/store";
+import { useEffect } from "react";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuthContext();
+  
+  // Initialize store on app startup following AI_INSTRUCTIONS.md patterns
+  useEffect(() => {
+    initializeStore().catch(console.error);
+  }, []);
 
   return (
     <Switch>
@@ -67,12 +73,10 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <VoiceSelectionProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
-          </VoiceSelectionProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

@@ -1,108 +1,9 @@
-// Storage persistence utilities for Zustand
-// Following AI_INSTRUCTIONS.md patterns with localStorage integration
+// Store persistence utilities
+// Following AI_INSTRUCTIONS.md patterns with browser storage management
 
-import { persist, PersistOptions } from 'zustand/middleware';
-import { storeLogger } from './logger';
 import type { PersistConfig } from '../types';
 
-// Default persistence configuration
-const DEFAULT_PERSIST_CONFIG = {
-  version: 1,
-  migrate: (persistedState: any, version: number) => {
-    storeLogger.info('Store migration triggered', { version, persistedState: !!persistedState });
-    return persistedState;
-  },
-  onRehydrateStorage: (name: string) => {
-    return (state: any, error: any) => {
-      if (error) {
-        storeLogger.error('Store rehydration failed', error, { storeName: name });
-      } else {
-        storeLogger.info('Store rehydrated successfully', { storeName: name });
-      }
-    };
-  }
-} as const;
-
-// Create persistent slice with custom configuration
-export const createPersistentSlice = <T>(config: PersistConfig) => {
-  const persistOptions: PersistOptions<T> = {
-    name: config.name,
-    version: config.version || 1,
-    partialize: config.partialize,
-    merge: config.merge,
-    ...DEFAULT_PERSIST_CONFIG,
-    onRehydrateStorage: DEFAULT_PERSIST_CONFIG.onRehydrateStorage(config.name)
-  };
-
-  return persist<T>(
-    (set, get, api) => ({} as T),
-    persistOptions
-  );
-};
-
-// Storage utilities
-export const clearPersistedStore = (storeName: string): void => {
-  try {
-    localStorage.removeItem(storeName);
-    storeLogger.info('Persisted store cleared', { storeName });
-  } catch (error) {
-    storeLogger.error('Failed to clear persisted store', error as Error, { storeName });
-  }
-};
-
-export const getPersistedStoreVersion = (storeName: string): number | null => {
-  try {
-    const stored = localStorage.getItem(storeName);
-    if (!stored) return null;
-    
-    const parsed = JSON.parse(stored);
-    return parsed.version || null;
-  } catch (error) {
-    storeLogger.error('Failed to get persisted store version', error as Error, { storeName });
-    return null;
-  }
-};
-
-export const migratePersistedStore = (storeName: string, fromVersion: number, toVersion: number): boolean => {
-  try {
-    const stored = localStorage.getItem(storeName);
-    if (!stored) return false;
-    
-    const parsed = JSON.parse(stored);
-    
-    // Apply version-specific migrations
-    let migrated = parsed;
-    
-    // Example migration logic
-    if (fromVersion < 2 && toVersion >= 2) {
-      // Migration from v1 to v2
-      migrated = {
-        ...migrated,
-        version: 2,
-        // Add migration logic here
-      };
-    }
-    
-    localStorage.setItem(storeName, JSON.stringify(migrated));
-    
-    storeLogger.info('Store migration completed', {
-      storeName,
-      fromVersion,
-      toVersion
-    });
-    
-    return true;
-  } catch (error) {
-    storeLogger.error('Store migration failed', error as Error, {
-      storeName,
-      fromVersion,
-      toVersion
-    });
-    return false;
-  }
-};
-
-// Storage health check
+// Check if localStorage is available and working
 export const validateStorageHealth = (): boolean => {
   try {
     const testKey = '__storage_test__';
@@ -112,13 +13,85 @@ export const validateStorageHealth = (): boolean => {
     const retrieved = localStorage.getItem(testKey);
     localStorage.removeItem(testKey);
     
-    const isHealthy = retrieved === testValue;
-    
-    storeLogger.info('Storage health check', { isHealthy });
-    
-    return isHealthy;
-  } catch (error) {
-    storeLogger.error('Storage health check failed', error as Error);
+    return retrieved === testValue;
+  } catch {
     return false;
   }
+};
+
+// Safe localStorage operations with error handling
+export const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  
+  setItem: (key: string, value: string): boolean => {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  
+  removeItem: (key: string): boolean => {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+};
+
+// Create persistent slice with selective storage
+export const createPersistentSlice = <T>(
+  config: PersistConfig & { initialState: T }
+): { getPersistedState: () => T; persistState: (state: T) => void } => {
+  const storageKey = `codecrucible_${config.name}`;
+  
+  const getPersistedState = (): T => {
+    try {
+      const stored = safeLocalStorage.getItem(storageKey);
+      if (!stored) return config.initialState;
+      
+      const parsed = JSON.parse(stored);
+      
+      // Version check
+      if (config.version && parsed.version !== config.version) {
+        return config.initialState;
+      }
+      
+      // Merge with current state if merge function provided
+      if (config.merge) {
+        return config.merge(parsed.state, config.initialState);
+      }
+      
+      return parsed.state || config.initialState;
+    } catch {
+      return config.initialState;
+    }
+  };
+  
+  const persistState = (state: T): void => {
+    try {
+      const toStore = config.partialize ? config.partialize(state) : state;
+      
+      const persistData = {
+        state: toStore,
+        version: config.version || 1,
+        timestamp: Date.now()
+      };
+      
+      safeLocalStorage.setItem(storageKey, JSON.stringify(persistData));
+    } catch (error) {
+      console.warn(`Failed to persist ${config.name}:`, error);
+    }
+  };
+  
+  return { getPersistedState, persistState };
 };

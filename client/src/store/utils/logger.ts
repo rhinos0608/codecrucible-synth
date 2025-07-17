@@ -1,98 +1,66 @@
 // Store logging utilities
 // Following AI_INSTRUCTIONS.md patterns with structured logging
 
-interface LogEntry {
-  timestamp: string;
-  level: 'info' | 'warn' | 'error' | 'debug';
-  message: string;
-  context?: Record<string, any>;
-  error?: Error;
+interface LogContext {
+  [key: string]: any;
 }
 
-class StoreLogger {
-  private logs: LogEntry[] = [];
-  private maxLogs = 1000;
-  
-  private createLogEntry(
-    level: LogEntry['level'],
-    message: string,
-    error?: Error,
-    context?: Record<string, any>
-  ): LogEntry {
-    return {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      context,
-      error
-    };
-  }
-  
-  private addLog(entry: LogEntry): void {
-    this.logs.unshift(entry);
-    
-    // Keep only recent logs
-    if (this.logs.length > this.maxLogs) {
-      this.logs = this.logs.slice(0, this.maxLogs);
-    }
-    
-    // Console output in development
-    if (process.env.NODE_ENV === 'development') {
-      const contextStr = entry.context ? JSON.stringify(entry.context) : '';
-      const logMessage = `[Store] ${entry.message} ${contextStr}`;
-      
-      switch (entry.level) {
-        case 'error':
-          console.error(logMessage, entry.error);
-          break;
-        case 'warn':
-          console.warn(logMessage);
-          break;
-        case 'debug':
-          console.debug(logMessage);
-          break;
-        default:
-          console.log(logMessage);
-      }
-    }
-  }
-  
-  info(message: string, context?: Record<string, any>): void {
-    this.addLog(this.createLogEntry('info', message, undefined, context));
-  }
-  
-  warn(message: string, context?: Record<string, any>): void {
-    this.addLog(this.createLogEntry('warn', message, undefined, context));
-  }
-  
-  error(message: string, error: Error, context?: Record<string, any>): void {
-    this.addLog(this.createLogEntry('error', message, error, context));
-  }
-  
-  debug(message: string, context?: Record<string, any>): void {
-    this.addLog(this.createLogEntry('debug', message, undefined, context));
-  }
-  
-  // Get recent logs for debugging
-  getRecentLogs(count: number = 50): LogEntry[] {
-    return this.logs.slice(0, count);
-  }
-  
-  // Get logs by level
-  getLogsByLevel(level: LogEntry['level']): LogEntry[] {
-    return this.logs.filter(log => log.level === level);
-  }
-  
-  // Clear all logs
-  clearLogs(): void {
-    this.logs = [];
-    this.info('Store logs cleared');
-  }
-  
-  // Export logs for debugging
-  exportLogs(): string {
-    return JSON.stringify(this.logs, null, 2);
-  }
+interface Logger {
+  info: (message: string, context?: LogContext) => void;
+  warn: (message: string, context?: LogContext) => void;
+  error: (message: string, error?: Error | LogContext) => void;
+  debug: (message: string, context?: LogContext) => void;
 }
 
-export const storeLogger = new StoreLogger();
+// Structured logger for store operations
+export const storeLogger: Logger = {
+  info: (message: string, context?: LogContext) => {
+    if (import.meta.env.DEV) {
+      console.log(`[Store] ${message}`, context || '');
+    }
+  },
+  
+  warn: (message: string, context?: LogContext) => {
+    console.warn(`[Store Warning] ${message}`, context || '');
+  },
+  
+  error: (message: string, error?: Error | LogContext) => {
+    console.error(`[Store Error] ${message}`, error || '');
+  },
+  
+  debug: (message: string, context?: LogContext) => {
+    if (import.meta.env.DEV) {
+      console.debug(`[Store Debug] ${message}`, context || '');
+    }
+  }
+};
+
+// Performance monitoring for store operations
+export const measureStoreOperation = <T>(
+  operationName: string,
+  operation: () => T
+): T => {
+  const startTime = performance.now();
+  
+  try {
+    const result = operation();
+    const duration = performance.now() - startTime;
+    
+    storeLogger.debug('Store operation completed', {
+      operation: operationName,
+      duration: `${duration.toFixed(2)}ms`
+    });
+    
+    return result;
+  } catch (error) {
+    const duration = performance.now() - startTime;
+    
+    storeLogger.error('Store operation failed', {
+      operation: operationName,
+      duration: `${duration.toFixed(2)}ms`,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    throw error;
+  }
+};

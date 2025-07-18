@@ -33,7 +33,7 @@ export const createVoiceSlice: StateCreator<
       set(produce((state: AppState) => {
         // Validate perspectives against available options
         const validPerspectives = perspectives.filter(p => 
-          ['Explorer', 'Maintainer', 'Analyzer', 'Developer', 'Implementor'].includes(p)
+          ['seeker', 'steward', 'witness', 'nurturer', 'decider'].includes(p)
         );
         
         state.voice.selectedPerspectives = validPerspectives;
@@ -55,7 +55,7 @@ export const createVoiceSlice: StateCreator<
     selectRoles: (roles: string[]) => {
       set(produce((state: AppState) => {
         const validRoles = roles.filter(r => 
-          ['Security Engineer', 'Systems Architect', 'UI/UX Engineer', 'Performance Engineer'].includes(r)
+          ['guardian', 'architect', 'designer', 'optimizer'].includes(r)
         );
         
         state.voice.selectedRoles = validRoles;
@@ -153,16 +153,8 @@ export const createVoiceSlice: StateCreator<
           promptLength: newSession.prompt.length
         });
         
-        // Record consciousness evolution
-        state.consciousness.actions.recordCouncilSession({
-          id: newSession.id,
-          prompt: newSession.prompt,
-          participants: [...newSession.perspectives, ...newSession.roles],
-          responses: newSession.solutions,
-          synthesis: newSession.synthesis,
-          consciousnessGain: 0.2,
-          timestamp: new Date()
-        });
+        // Note: Consciousness tracking will be handled separately to avoid circular references
+        // TODO: Implement consciousness tracking in session management layer
       }));
     },
 

@@ -15,18 +15,14 @@ export function useProjects() {
   } = useQuery({
     queryKey: ["/api/projects"],
     queryFn: async (): Promise<Project[]> => {
-      console.log('🔍 Fetching projects from API...');
       const result = await apiRequest("/api/projects");
-      console.log('📊 Projects API Response:', {
-        count: result.length,
-        projectIds: result.map((p: any) => p.id),
-        projectNames: result.map((p: any) => p.name),
-        rawData: result
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 Projects fetched:', result.length);
+      }
       return result;
     },
-    staleTime: 0, // Always consider data stale to force fresh requests
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes stale time to prevent excessive refetching
+    refetchOnWindowFocus: false,
     refetchOnMount: true
   });
 
@@ -41,9 +37,6 @@ export function useProjects() {
     onSuccess: async () => {
       // Force immediate cache invalidation and refetch for immediate UI update
       await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/projects"] });
-      
-      console.log('✅ Project created successfully - cache invalidated and refetched');
       
       toast({
         title: "Project Created",
@@ -118,15 +111,10 @@ export function useProjects() {
     });
   };
 
-  // Enhanced debugging for hook return values
-  console.log('🔄 useProjects hook returning:', {
-    projectsCount: projects.length,
-    isLoading,
-    hasError: !!error,
-    projectIds: projects.map(p => p.id),
-    projectNames: projects.map(p => p.name),
-    returnStructure: 'projects array directly'
-  });
+  // Debug logging only in development and only when data changes
+  if (process.env.NODE_ENV === 'development' && projects.length > 0) {
+    console.log('🔄 useProjects loaded:', projects.length, 'projects');
+  }
 
   return {
     projects,

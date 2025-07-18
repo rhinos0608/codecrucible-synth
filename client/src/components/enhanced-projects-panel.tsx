@@ -101,30 +101,17 @@ export function EnhancedProjectsPanel({
   const { projects = [], isLoading: projectsLoading, error: projectsError } = useProjects();
   const { data: folders = [], isLoading: foldersLoading, error: foldersError } = useProjectFolders();
   
-  // Enhanced debugging to track hook data flow
-  console.log('🔧 Hook Data Flow Debug:', {
-    useProjectsResult: useProjects(),
-    projectsFromHook: projects,
-    projectsLength: projects.length,
-    projectsLoading,
-    projectsError: projectsError?.message || null
-  });
+  // Debug logging only in development - no hook calls in logs
+  if (process.env.NODE_ENV === 'development' && projects.length > 0) {
+    console.log('🔧 Enhanced Projects Panel loaded:', projects.length, 'projects');
+  }
 
   // Debug logging in development and force refresh when panel opens
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🎯 Enhanced Projects Panel Data:', {
-        projects: projects.length,
-        folders: folders.length,
-        projectsLoading,
-        foldersLoading,
-        projectsError: projectsError?.message || null,
-        foldersError: foldersError?.message || null,
-        projectIds: projects.map(p => p.id),
-        projectNames: projects.map(p => p.name)
-      });
+    if (process.env.NODE_ENV === 'development' && isOpen && projects.length > 0) {
+      console.log('🎯 Projects Panel opened with', projects.length, 'projects');
     }
-  }, [projects, folders, projectsLoading, foldersLoading, projectsError, foldersError]);
+  }, [isOpen, projects.length]);
   
   // Force refresh when panel opens to ensure latest data
   useEffect(() => {

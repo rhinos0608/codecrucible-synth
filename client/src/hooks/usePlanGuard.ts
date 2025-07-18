@@ -55,15 +55,13 @@ export function usePlanGuard() {
       // apiRequest already returns parsed JSON, no need to call .json() again
       const data = await apiRequest("/api/quota/check", { method: "GET" });
       
-      console.log('✅ Quota check successful:', {
-        allowed: data.allowed,
-        devMode: data.devMode,
-        planTier: data.planTier,
-        quotaUsed: data.quotaUsed,
-        quotaLimit: data.quotaLimit,
-        unlimitedGenerations: data.unlimitedGenerations,
-        reason: data.reason
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Quota check successful:', {
+          allowed: data.allowed,
+          planTier: data.planTier,
+          unlimitedGenerations: data.unlimitedGenerations
+        });
+      }
       
       return data;
     } catch (error) {
@@ -124,12 +122,12 @@ export function usePlanGuard() {
         error: null
       });
       
-      console.log('✅ Plan Guard State Updated:', {
-        canGenerate: quotaCheck.allowed,
-        actualPlanTier: actualPlanTier,
-        unlimitedGenerations: quotaCheck.unlimitedGenerations,
-        planTier: actualPlanTier
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Plan Guard State Updated:', {
+          canGenerate: quotaCheck.allowed,
+          planTier: actualPlanTier
+        });
+      }
     };
 
     updatePlanState();
@@ -140,20 +138,18 @@ export function usePlanGuard() {
     // Pre-check quota following CodingPhilosophy.md consciousness principles
     const quotaCheck = await checkQuota();
     
-    console.log('Attempt Generation - Quota Check:', quotaCheck);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Attempt Generation - Quota Check:', quotaCheck?.allowed);
+    }
     
     // Following AI_INSTRUCTIONS.md: Check actual plan permissions, not dev mode
     const actualPlanTier = subscription?.tier || quotaCheck?.planTier;
     const hasUnlimitedGenerations = quotaCheck?.unlimitedGenerations || actualPlanTier === 'pro' || actualPlanTier === 'team' || actualPlanTier === 'enterprise';
     
     if (hasUnlimitedGenerations && quotaCheck?.allowed) {
-      console.log('✅ Pro tier DETECTED - unlimited generations available in attemptGeneration:', {
-        actualPlanTier: actualPlanTier,
-        planTier: quotaCheck?.planTier,
-        unlimitedGenerations: quotaCheck?.unlimitedGenerations,
-        quotaLimit: quotaCheck?.quotaLimit,
-        bypassReason: 'pro_tier_unlimited_access'
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Pro tier unlimited access enabled');
+      }
       try {
         const result = await generationFn();
         return { success: true, data: result };

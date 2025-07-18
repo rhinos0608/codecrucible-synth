@@ -1,5 +1,14 @@
-import { ReactNode, createContext, useContext } from "react";
-import { useAuth, type AuthUser } from "@/hooks/useAuth";
+import { ReactNode, createContext, useContext, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  subscriptionTier: 'free' | 'pro' | 'team' | 'enterprise';
+}
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -12,7 +21,33 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const auth = useAuth();
+  // Simplified auth implementation without useToast to prevent infinite loops
+  const {
+    data: user,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["/api/auth/user"],
+    retry: (failureCount, error) => {
+      // Don't retry 401 errors
+      if (error?.message?.includes('401')) return false;
+      return failureCount < 3;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
+  });
+
+  const isAuthenticated = !!user && !error;
+  const isUnauthenticated = !user && !isLoading && !!error;
+
+  const auth = {
+    user: user as AuthUser | null,
+    isLoading,
+    isAuthenticated,
+    isUnauthenticated,
+    refetch,
+  };
 
   return (
     <AuthContext.Provider value={auth}>

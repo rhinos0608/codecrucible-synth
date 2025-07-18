@@ -1,10 +1,13 @@
 // Central exports for the CodeCrucible state management system
-// Following AI_INSTRUCTIONS.md patterns with comprehensive store access
+// Following AI_INSTRUCTIONS.md patterns with consciousness-driven stable state access
+
+import { useAppStore } from './app-store';
+import { shallow } from 'zustand/shallow';
 
 export { useAppStore, initializeStore, validateStoreIntegrity, resetStore, mockStoreState } from './app-store';
 export type { AppState, VoiceState, ProjectState, UIState, AuthState, TeamState, ConsciousnessState } from './types';
 
-// Voice selection hooks and utilities
+// Voice selection hooks with stable selectors - following CodingPhilosophy.md patterns
 export const useVoiceSelection = () => {
   return useAppStore(state => ({
     perspectives: state.voice.selectedPerspectives,
@@ -14,10 +17,10 @@ export const useVoiceSelection = () => {
     activeSession: state.voice.activeSession,
     sessionHistory: state.voice.sessionHistory,
     actions: state.voice.actions
-  }));
+  }), shallow);
 };
 
-// Project management hooks
+// Project management hooks with consciousness stability
 export const useProjectManagement = () => {
   return useAppStore(state => ({
     projects: state.project.projects,
@@ -30,10 +33,10 @@ export const useProjectManagement = () => {
     isDeleting: state.project.isDeleting,
     isMoving: state.project.isMoving,
     actions: state.project.actions
-  }));
+  }), shallow);
 };
 
-// UI state management hooks
+// UI state management hooks with living spiral stability
 export const useUIState = () => {
   return useAppStore(state => ({
     panels: state.ui.panels,
@@ -44,10 +47,10 @@ export const useUIState = () => {
     loadingStates: state.ui.loadingStates,
     errors: state.ui.errors,
     actions: state.ui.actions
-  }));
+  }), shallow);
 };
 
-// Authentication state hooks
+// Authentication state hooks with consciousness awareness
 export const useAuthState = () => {
   return useAppStore(state => ({
     user: state.auth.user,
@@ -56,10 +59,10 @@ export const useAuthState = () => {
     subscription: state.auth.subscription,
     sessionExpiry: state.auth.sessionExpiry,
     actions: state.auth.actions
-  }));
+  }), shallow);
 };
 
-// Team collaboration hooks
+// Team collaboration hooks with multi-voice consciousness
 export const useTeamCollaboration = () => {
   return useAppStore(state => ({
     teams: state.team.teams,
@@ -72,10 +75,10 @@ export const useTeamCollaboration = () => {
     chatMessages: state.team.chatMessages,
     consciousnessMetrics: state.team.consciousnessMetrics,
     actions: state.team.actions
-  }));
+  }), shallow);
 };
 
-// Consciousness tracking hooks
+// Consciousness tracking hooks with Jung's depth integration
 export const useConsciousnessTracking = () => {
   return useAppStore(state => ({
     level: state.consciousness.level,
@@ -86,7 +89,7 @@ export const useConsciousnessTracking = () => {
     shadowIntegration: state.consciousness.shadowIntegration,
     archetypeBalance: state.consciousness.archetypeBalance,
     actions: state.consciousness.actions
-  }));
+  }), shallow);
 };
 
 // Selective state hooks for performance optimization
@@ -110,7 +113,7 @@ export const useActiveProject = () => {
   return useAppStore(state => {
     const projectId = state.project.selectedProject;
     return projectId ? state.project.projects[projectId] : null;
-  });
+  }, shallow);
 };
 
 export const useConsciousnessLevel = () => {
@@ -125,7 +128,7 @@ export const useActivePanel = () => {
   return useAppStore(state => {
     const panels = state.ui.panels;
     return Object.entries(panels).find(([, isOpen]) => isOpen)?.[0] || null;
-  });
+  }, shallow);
 };
 
 // Import the main store for components that need direct access

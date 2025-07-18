@@ -24,12 +24,7 @@ import { usePlanGuard } from "@/hooks/usePlanGuard";
 import { useNavigationGuard } from "@/hooks/useNavigationGuard";
 
 import type { Solution, VoiceProfile, Project } from "@shared/schema";
-import { 
-  useVoiceSelection, 
-  useUIState, 
-  useAuthState, 
-  useProjectManagement 
-} from "@/store";
+import { useAppStore } from "@/store";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { SubscriptionStatus } from "@/components/subscription/subscription-status";
@@ -48,11 +43,15 @@ import { useSessionFiles } from "@/hooks/useFileUpload";
 import type { UserFile } from "@shared/schema";
 
 export default function Dashboard() {
-  // Replace scattered useState with centralized store - following AI_INSTRUCTIONS.md patterns with stable selectors
-  const uiState = useUIState();
-  const authState = useAuthState();
-  const voiceState = useVoiceSelection();
-  const projectState = useProjectManagement();
+  // Stable granular selectors - following AI_INSTRUCTIONS.md patterns to prevent infinite loops
+  const uiPanels = useAppStore(state => state.ui.panels);
+  const uiModals = useAppStore(state => state.ui.modals);
+  const uiActions = useAppStore(state => state.ui.actions);
+  const voicePerspectives = useAppStore(state => state.voice.selectedPerspectives);
+  const voiceRoles = useAppStore(state => state.voice.selectedRoles);
+  const voiceActions = useAppStore(state => state.voice.actions);
+  const authUser = useAppStore(state => state.auth.user);
+  const authSubscription = useAppStore(state => state.auth.subscription);
   
   // Keep some local state for non-persistent UI elements
   const [showSolutionStack, setShowSolutionStack] = useState(false);
@@ -72,7 +71,7 @@ export default function Dashboard() {
   const [showChatGPTGeneration, setShowChatGPTGeneration] = useState(false);
   const [prompt, setPrompt] = useState('');
 
-  const { user: authUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { profiles } = useVoiceProfiles();
   const { recommendations, isAnalyzing, analyzePrompt } = useVoiceRecommendations();
   const planGuard = usePlanGuard();
@@ -156,7 +155,7 @@ export default function Dashboard() {
   // Enhanced generation with quota enforcement - FIXED to use mutation API
   const handleSecureGeneration = async () => {
     if (!planGuard.canGenerate) {
-      uiState.actions.openModal('upgrade');
+      uiActions.openModal('upgrade');
       return;
     }
 
@@ -164,8 +163,8 @@ export default function Dashboard() {
       return generateSession.mutateAsync({
         prompt: prompt,
         selectedVoices: {
-          perspectives: voiceState.perspectives,
-          roles: voiceState.roles
+          perspectives: voicePerspectives,
+          roles: voiceRoles
         },
         contextProjects: selectedContextProjects,
         recursionDepth: 2,
@@ -273,8 +272,8 @@ export default function Dashboard() {
       perspectives: recommendations?.suggested?.perspectives,
       roles: recommendations?.suggested?.roles,
       currentState: {
-        selectedPerspectives: voiceState.perspectives,
-        selectedRoles: voiceState.roles
+        selectedPerspectives: voicePerspectives,
+        selectedRoles: voiceRoles
       }
     });
 
@@ -285,8 +284,8 @@ export default function Dashboard() {
 
     try {
       // Apply recommendations using the store actions
-      voiceState.actions.selectPerspectives(recommendations.suggested.perspectives);
-      voiceState.actions.selectRoles(recommendations.suggested.roles);
+      voiceActions.selectPerspectives(recommendations.suggested.perspectives);
+      voiceActions.selectRoles(recommendations.suggested.roles);
       
       console.log("[Dashboard] Recommendations applied successfully", {
         appliedPerspectives: recommendations.suggested.perspectives,
@@ -341,7 +340,7 @@ export default function Dashboard() {
         quotaLimit: planGuard.quotaLimit,
         isDevModeActive
       });
-      uiState.actions.openModal('upgrade');
+      uiActions.openModal('upgrade');
       return;
     }
     
@@ -355,18 +354,18 @@ export default function Dashboard() {
 
     // Enhanced Live Council Generation logging following AI_INSTRUCTIONS.md security patterns
     console.log("Live Council Generation Debug:", {
-      perspectives: voiceState.perspectives,
-      roles: voiceState.roles,
+      perspectives: voicePerspectives,
+      roles: voiceRoles,
       prompt: "TODO: prompt...",
-      perspectiveCount: voiceState.perspectives.length,
-      roleCount: voiceState.roles.length,
+      perspectiveCount: voicePerspectives.length,
+      roleCount: voiceRoles.length,
       mode: "live_council_generation",
       realTimeOpenAI: true
     });
     
     // TODO: Add prompt validation when prompt is added to store
     
-    if (voiceState.perspectives.length === 0 && voiceState.roles.length === 0) {
+    if (voicePerspectives.length === 0 && voiceRoles.length === 0) {
       console.error("Validation Error: At least one voice must be selected");
       return;
     }
@@ -376,16 +375,16 @@ export default function Dashboard() {
       const result = await planGuard.attemptGeneration(async () => {
         console.log("Starting Live Council Generation with real OpenAI integration:", {
           prompt: "TODO: prompt",
-          perspectives: voiceState.perspectives,
-          roles: voiceState.roles,
+          perspectives: voicePerspectives,
+          roles: voiceRoles,
           mode: "live_council_generation"
         });
         
         return generateSession.mutateAsync({
           prompt: prompt,
           selectedVoices: {
-            perspectives: voiceState.perspectives,
-            roles: voiceState.roles
+            perspectives: voicePerspectives,
+            roles: voiceRoles
           },
           recursionDepth: 2,
           synthesisMode: "competitive",
@@ -411,7 +410,7 @@ export default function Dashboard() {
         });
         handleSolutionsGenerated(result.data.session.id);
       } else if (!result.success && result.reason === 'quota_exceeded') {
-        uiState.actions.openModal('upgrade');
+        uiActions.openModal('upgrade');
       } else {
         console.error("Generation failed:", result);
       }
@@ -447,7 +446,7 @@ export default function Dashboard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => uiState.actions.openModal('upgrade')}
+                    onClick={() => uiActions.openModal('upgrade')}
                     className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   >
                     <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -459,7 +458,7 @@ export default function Dashboard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => uiState.actions.openModal('avatarCustomizer')}
+                    onClick={() => uiActions.openModal('avatarCustomizer')}
                     className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   >
                     <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -472,7 +471,7 @@ export default function Dashboard() {
                   size="sm"
                   onClick={() => {
                     console.log("🎯 Enhanced Projects button clicked, setting showEnhancedProjectsPanel to true");
-                    uiState.actions.togglePanel('projects');
+                    uiActions.togglePanel('projects');
                   }}
                   className="text-gray-400 hover:text-blue-400 border-gray-600/50 hover:border-blue-500/50 hover:bg-blue-500/10 whitespace-nowrap transition-all duration-200"
                 >
@@ -502,7 +501,7 @@ export default function Dashboard() {
                   size="sm"
                   onClick={() => {
                     console.log("📊 Analytics button clicked, opening analytics panel");
-                    uiState.actions.togglePanel('analytics');
+                    uiActions.togglePanel('analytics');
                   }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   data-tour="navigation-buttons"
@@ -529,7 +528,7 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => uiState.actions.openModal('upgrade')}
+                  onClick={() => uiActions.openModal('upgrade')}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                 >
                   <Crown className="w-4 h-4 mr-2" />
@@ -540,7 +539,7 @@ export default function Dashboard() {
                   size="sm"
                   onClick={() => {
                     console.log("👥 Teams button clicked, opening teams panel");
-                    uiState.actions.togglePanel('teams');
+                    uiActions.togglePanel('teams');
                   }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   data-tour="teams-button"
@@ -750,7 +749,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <Button
                     onClick={handleGenerateSolutions}
-                    disabled={isGenerating || planGuard.isLoading || !prompt.trim() || (voiceState.perspectives.length === 0 && voiceState.roles.length === 0)}
+                    disabled={isGenerating || planGuard.isLoading || !prompt.trim() || (voicePerspectives.length === 0 && voiceRoles.length === 0)}
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 text-sm sm:text-base"
                     data-tour="generate-button"
                   >
@@ -781,7 +780,7 @@ export default function Dashboard() {
                       });
                       setShowChatGPTGeneration(true);
                     }}
-                    disabled={!prompt.trim() || (voiceState.perspectives.length === 0 && voiceState.roles.length === 0)}
+                    disabled={!prompt.trim() || (voicePerspectives.length === 0 && voiceRoles.length === 0)}
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 text-sm sm:text-base"
                   >
                     <Brain className="w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0" />
@@ -804,7 +803,7 @@ export default function Dashboard() {
                   <p className="text-xs text-red-400">Please enter a prompt to generate solutions</p>
                 </div>
               )}
-              {prompt.trim() && voiceState.perspectives.length === 0 && voiceState.roles.length === 0 && (
+              {prompt.trim() && voicePerspectives.length === 0 && voiceRoles.length === 0 && (
                 <div className="px-4 pb-3">
                   <p className="text-xs text-red-400">Please select at least one voice from the configuration panel</p>
                 </div>
@@ -816,12 +815,12 @@ export default function Dashboard() {
                   <details className="text-xs">
                     <summary className="text-gray-400 cursor-pointer">Debug Voice State</summary>
                     <div className="mt-2 text-gray-500 font-mono space-y-1">
-                      <div>Perspectives: [{voiceState.perspectives.join(', ')}] ({voiceState.perspectives.length})</div>
-                      <div>Roles: [{voiceState.roles.join(', ')}] ({voiceState.roles.length})</div>
-                      <div>Button disabled: {(isGenerating || !prompt.trim() || (voiceState.perspectives.length === 0 && voiceState.roles.length === 0)).toString()}</div>
+                      <div>Perspectives: [{voicePerspectives.join(', ')}] ({voicePerspectives.length})</div>
+                      <div>Roles: [{voiceRoles.join(', ')}] ({voiceRoles.length})</div>
+                      <div>Button disabled: {(isGenerating || !prompt.trim() || (voicePerspectives.length === 0 && voiceRoles.length === 0)).toString()}</div>
                       <div>Generating: {isGenerating.toString()}</div>
                       <div>Prompt valid: {prompt.trim().length > 0 ? 'true' : 'false'}</div>
-                      <div>Voices valid: {(voiceState.perspectives.length > 0 || voiceState.roles.length > 0) ? 'true' : 'false'}</div>
+                      <div>Voices valid: {(voicePerspectives.length > 0 || voiceRoles.length > 0) ? 'true' : 'false'}</div>
                     </div>
                   </details>
                 </div>
@@ -860,7 +859,7 @@ export default function Dashboard() {
             <div className="flex-1 overflow-y-auto">
               {/* Subscription Status */}
               <div className="p-3 sm:p-4" data-tour="subscription-status">
-                <SubscriptionStatus onUpgrade={() => uiState.actions.openModal('upgrade')} />
+                <SubscriptionStatus onUpgrade={() => uiActions.openModal('upgrade')} />
               </div>
               <div className="border-t border-gray-700" data-tour="voice-selector">
                 <PerspectiveSelector />
@@ -887,12 +886,12 @@ export default function Dashboard() {
         data-tour="synthesis-button"
       />
 
-      {uiState.panels.projects && (
+      {uiPanels.projects && (
         <ProjectsPanel
-          isOpen={uiState.panels.projects}
+          isOpen={uiPanels.projects}
           onClose={() => {
             console.log("🎯 Projects panel closing");
-            uiState.actions.togglePanel('projects');
+            uiActions.togglePanel('projects');
           }}
           onUseAsContext={(project) => {
             setProjectContext(project);
@@ -903,9 +902,9 @@ export default function Dashboard() {
       )}
 
       <AvatarCustomizer
-        isOpen={uiState.modals.avatarCustomizer}
+        isOpen={uiModals.avatarCustomizer}
         onClose={() => {
-          uiState.actions.closeModal('avatarCustomizer');
+          uiActions.closeModal('avatarCustomizer');
           setEditingProfile(null);
         }}
         editingProfile={editingProfile}
@@ -916,8 +915,8 @@ export default function Dashboard() {
         onClose={() => setShowChatGPTGeneration(false)}
         prompt={prompt}
         selectedVoices={{
-          perspectives: voiceState.perspectives,
-          roles: voiceState.roles
+          perspectives: voicePerspectives,
+          roles: voiceRoles
         }}
         onComplete={(sessionId) => {
           setCurrentSessionId(sessionId);
@@ -925,30 +924,30 @@ export default function Dashboard() {
         }}
       />
 
-      {uiState.panels.analytics && (
+      {uiPanels.analytics && (
         <AnalyticsPanel
-          isOpen={uiState.panels.analytics}
+          isOpen={uiPanels.analytics}
           onClose={() => {
             console.log("📊 Analytics panel closing");
-            uiState.actions.togglePanel('analytics');
+            uiActions.togglePanel('analytics');
           }}
         />
       )}
 
-      {uiState.panels.teams && (
+      {uiPanels.teams && (
         <TeamsPanel
-          isOpen={uiState.panels.teams}
+          isOpen={uiPanels.teams}
           onClose={() => {
             console.log("👥 Teams panel closing");
-            uiState.actions.togglePanel('teams');
+            uiActions.togglePanel('teams');
           }}
         />
       )}
 
       {/* Enhanced Projects Panel with Context-Aware Features */}
       <EnhancedProjectsPanel
-        isOpen={uiState.panels.projects}
-        onClose={() => uiState.actions.togglePanel('projects')}
+        isOpen={uiPanels.projects}
+        onClose={() => uiActions.togglePanel('projects')}
         onUseAsContext={handleUseAsContext}
         selectedContextProjects={selectedContextProjects}
       />
@@ -957,8 +956,8 @@ export default function Dashboard() {
 
 
       <UpgradeModal
-        isOpen={uiState.modals.upgrade}
-        onClose={() => uiState.actions.closeModal('upgrade')}
+        isOpen={uiModals.upgrade}
+        onClose={() => uiActions.closeModal('upgrade')}
         trigger="manual"
         currentQuota={planGuard.quotaUsed}
         quotaLimit={planGuard.quotaLimit}

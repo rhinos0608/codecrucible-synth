@@ -517,32 +517,7 @@ export function PerspectiveSelector() {
         </DialogContent>
       </Dialog>
 
-      {/* Alexander's Pattern Language: Applied Profile Status with Clear Action */}
-      {appliedProfile && (
-        <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-400/40">
-                Active Profile
-              </Badge>
-              <span className="text-sm text-green-300 font-medium">{appliedProfile.name}</span>
-              <span className="text-xs text-gray-400">
-                Applied {new Date(appliedProfile.timestamp).toLocaleTimeString()}
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => clearAppliedProfile?.()}
-              className="h-6 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/20"
-              title="Clear applied profile"
-            >
-              <AlertTriangle className="w-3 h-3 mr-1" />
-              Clear
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Applied Profile Status removed - undefined variable causing crash */}
     </div>
   );
 }

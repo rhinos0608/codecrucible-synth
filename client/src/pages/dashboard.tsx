@@ -68,7 +68,7 @@ export default function Dashboard() {
   const [contextFileCount, setContextFileCount] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<UserFile[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [showEnhancedProjectsPanel, setShowEnhancedProjectsPanel] = useState(false);
+
   const [showChatGPTGeneration, setShowChatGPTGeneration] = useState(false);
   const [prompt, setPrompt] = useState('');
 
@@ -156,7 +156,7 @@ export default function Dashboard() {
   // Enhanced generation with quota enforcement - FIXED to use mutation API
   const handleSecureGeneration = async () => {
     if (!planGuard.canGenerate) {
-      setShowUpgradeModal(true);
+      uiActions.openModal('upgrade');
       return;
     }
 
@@ -341,7 +341,7 @@ export default function Dashboard() {
         quotaLimit: planGuard.quotaLimit,
         isDevModeActive
       });
-      setShowUpgradeModal(true);
+      uiActions.openModal('upgrade');
       return;
     }
     
@@ -411,7 +411,7 @@ export default function Dashboard() {
         });
         handleSolutionsGenerated(result.data.session.id);
       } else if (!result.success && result.reason === 'quota_exceeded') {
-        setShowUpgradeModal(true);
+        uiActions.openModal('upgrade');
       } else {
         console.error("Generation failed:", result);
       }
@@ -447,7 +447,7 @@ export default function Dashboard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowUpgradeModal(true)}
+                    onClick={() => uiActions.openModal('upgrade')}
                     className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   >
                     <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -459,7 +459,7 @@ export default function Dashboard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowAvatarCustomizer(true)}
+                    onClick={() => uiActions.openModal('avatarCustomizer')}
                     className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   >
                     <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -472,7 +472,7 @@ export default function Dashboard() {
                   size="sm"
                   onClick={() => {
                     console.log("🎯 Enhanced Projects button clicked, setting showEnhancedProjectsPanel to true");
-                    setShowEnhancedProjectsPanel(true);
+                    uiActions.togglePanel('projects');
                   }}
                   className="text-gray-400 hover:text-blue-400 border-gray-600/50 hover:border-blue-500/50 hover:bg-blue-500/10 whitespace-nowrap transition-all duration-200"
                 >
@@ -501,8 +501,8 @@ export default function Dashboard() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    console.log("📊 Analytics button clicked, setting showAnalyticsPanel to true");
-                    setShowAnalyticsPanel(true);
+                    console.log("📊 Analytics button clicked, opening analytics panel");
+                    uiActions.togglePanel('analytics');
                   }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   data-tour="navigation-buttons"
@@ -529,7 +529,7 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowUpgradeModal(true)}
+                  onClick={() => uiActions.openModal('upgrade')}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                 >
                   <Crown className="w-4 h-4 mr-2" />
@@ -539,8 +539,8 @@ export default function Dashboard() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    console.log("👥 Teams button clicked, setting showTeamsPanel to true");
-                    setShowTeamsPanel(true);
+                    console.log("👥 Teams button clicked, opening teams panel");
+                    uiActions.togglePanel('teams');
                   }}
                   className="text-gray-400 hover:text-gray-200 border-gray-600/50 hover:border-gray-500 whitespace-nowrap"
                   data-tour="teams-button"
@@ -860,7 +860,7 @@ export default function Dashboard() {
             <div className="flex-1 overflow-y-auto">
               {/* Subscription Status */}
               <div className="p-3 sm:p-4" data-tour="subscription-status">
-                <SubscriptionStatus onUpgrade={() => setShowUpgradeModal(true)} />
+                <SubscriptionStatus onUpgrade={() => uiActions.openModal('upgrade')} />
               </div>
               <div className="border-t border-gray-700" data-tour="voice-selector">
                 <PerspectiveSelector />
@@ -887,12 +887,12 @@ export default function Dashboard() {
         data-tour="synthesis-button"
       />
 
-      {showProjectsPanel && (
+      {panels.projects && (
         <ProjectsPanel
-          isOpen={showProjectsPanel}
+          isOpen={panels.projects}
           onClose={() => {
             console.log("🎯 Projects panel closing");
-            setShowProjectsPanel(false);
+            uiActions.togglePanel('projects');
           }}
           onUseAsContext={(project) => {
             setProjectContext(project);
@@ -903,9 +903,9 @@ export default function Dashboard() {
       )}
 
       <AvatarCustomizer
-        isOpen={showAvatarCustomizer}
+        isOpen={modals.avatarCustomizer}
         onClose={() => {
-          setShowAvatarCustomizer(false);
+          uiActions.closeModal('avatarCustomizer');
           setEditingProfile(null);
         }}
         editingProfile={editingProfile}
@@ -925,30 +925,30 @@ export default function Dashboard() {
         }}
       />
 
-      {showAnalyticsPanel && (
+      {panels.analytics && (
         <AnalyticsPanel
-          isOpen={showAnalyticsPanel}
+          isOpen={panels.analytics}
           onClose={() => {
             console.log("📊 Analytics panel closing");
-            setShowAnalyticsPanel(false);
+            uiActions.togglePanel('analytics');
           }}
         />
       )}
 
-      {showTeamsPanel && (
+      {panels.teams && (
         <TeamsPanel
-          isOpen={showTeamsPanel}
+          isOpen={panels.teams}
           onClose={() => {
             console.log("👥 Teams panel closing");
-            setShowTeamsPanel(false);
+            uiActions.togglePanel('teams');
           }}
         />
       )}
 
       {/* Enhanced Projects Panel with Context-Aware Features */}
       <EnhancedProjectsPanel
-        isOpen={showEnhancedProjectsPanel}
-        onClose={() => setShowEnhancedProjectsPanel(false)}
+        isOpen={panels.projects}
+        onClose={() => uiActions.togglePanel('projects')}
         onUseAsContext={handleUseAsContext}
         selectedContextProjects={selectedContextProjects}
       />
@@ -957,8 +957,8 @@ export default function Dashboard() {
 
 
       <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
+        isOpen={modals.upgrade}
+        onClose={() => uiActions.closeModal('upgrade')}
         trigger="manual"
         currentQuota={planGuard.quotaUsed}
         quotaLimit={planGuard.quotaLimit}

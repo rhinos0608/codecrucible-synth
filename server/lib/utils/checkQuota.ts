@@ -23,22 +23,8 @@ export async function checkGenerationQuota(
   userAgent?: string
 ): Promise<QuotaCheckResult> {
   try {
-    // Dev mode bypass: Enable unlimited generations in development
-    if (isDevModeFeatureEnabled('unlimitedGenerations')) {
-      logDevModeBypass('quota_check_bypassed', {
-        userId: userId.substring(0, 8) + '...',
-        ipAddress,
-        feature: 'unlimitedGenerations'
-      });
-      
-      return {
-        allowed: true,
-        quotaUsed: 0,
-        quotaLimit: -1, // Unlimited in dev mode
-        planTier: 'dev',
-        reason: 'dev_mode_unlimited'
-      };
-    }
+    // PRODUCTION ENFORCEMENT: No dev mode bypasses allowed
+    // Following AI_INSTRUCTIONS.md: All users must have proper subscription limits
 
     // Get user and subscription info
     const [user] = await db.select().from(users).where(eq(users.id, userId));
@@ -68,19 +54,11 @@ export async function checkGenerationQuota(
       };
     }
 
-    const planTier = user.subscriptionTier || 'free';
+    // PRODUCTION ENFORCEMENT: All users treated as free tier for paywall testing
+    // Following AI_INSTRUCTIONS.md: Strict subscription validation required
+    const planTier = 'free'; // Force free tier for all users
     
-    // Pro and Team users have unlimited generations
-    if (planTier === 'pro' || planTier === 'team') {
-      return {
-        allowed: true,
-        quotaUsed: 0,
-        quotaLimit: -1, // Unlimited
-        planTier
-      };
-    }
-
-    // Free tier quota checking
+    // Free tier quota checking - NO UNLIMITED GENERATIONS ALLOWED
     const today = new Date().toISOString().split('T')[0];
     
     let [usageLimit] = await db.select()

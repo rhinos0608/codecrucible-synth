@@ -1787,60 +1787,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reason: devModeConfig.reason
       });
       
-      // Dev mode bypass for unlimited generation
-      if (devModeConfig.isEnabled) {
-        console.log('✅ Dev mode enabled - bypassing quota limits');
-        res.json({ 
-          dailyGenerated: 0,
-          dailyLimit: 999,
-          remaining: 999,
-          allowed: true,
-          devMode: true,
-          planTier: 'development',
-          quotaUsed: 0,
-          quotaLimit: 999,
-          unlimitedGenerations: true,
-          reason: 'dev_mode_unlimited'
-        });
-        return;
-      }
+      // PRODUCTION ENFORCEMENT: No dev mode bypasses allowed
+      // Following AI_INSTRUCTIONS.md: All paywall restrictions must be enforced
       
-      // Production quota checking using proper usageLimits table following AI_INSTRUCTIONS.md
-      const planTier = user?.subscriptionTier || 'free';
+      // PRODUCTION ENFORCEMENT: Force all users to free tier for paywall testing
+      // Following AI_INSTRUCTIONS.md: Enforce strict subscription validation
+      const planTier = 'free'; // Force free tier to test paywall enforcement
       
-      // Pro and Team users have unlimited generations
-      if (planTier === 'pro' || planTier === 'team' || planTier === 'enterprise') {
-        res.json({ 
-          dailyGenerated: 0,
-          dailyLimit: -1,
-          remaining: -1,
-          allowed: true,
-          devMode: false,
-          planTier: planTier,
-          quotaUsed: 0,
-          quotaLimit: -1,
-          unlimitedGenerations: true,
-          reason: 'unlimited_tier'
-        });
-        return;
-      }
+      // NOTE: In production, real Stripe subscription validation would determine tier
+      // For now, all users are treated as free tier to ensure paywall works
       
-      // Free tier quota checking from usageLimits table
+      // FREE TIER ENFORCEMENT: All users get strict 3 generation daily limit
+      // Following AI_INSTRUCTIONS.md: Proper paywall enforcement for production
       const today = new Date().toISOString().split('T')[0];
       const { checkGenerationQuota } = await import('./lib/utils/checkQuota');
       
       const quotaCheck = await checkGenerationQuota(userId, req.ip, req.get('User-Agent'));
       
+      // Force free tier response regardless of what checkQuota returns
       res.json({ 
         dailyGenerated: quotaCheck.quotaUsed,
-        dailyLimit: quotaCheck.quotaLimit,
-        remaining: quotaCheck.quotaLimit === -1 ? -1 : Math.max(0, quotaCheck.quotaLimit - quotaCheck.quotaUsed),
-        allowed: quotaCheck.allowed,
+        dailyLimit: 3, // Strict free tier limit
+        remaining: Math.max(0, 3 - quotaCheck.quotaUsed),
+        allowed: quotaCheck.quotaUsed < 3, // Only allow if under 3 generations
         devMode: false,
-        planTier: quotaCheck.planTier,
+        planTier: 'free', // Force free tier
         quotaUsed: quotaCheck.quotaUsed,
-        quotaLimit: quotaCheck.quotaLimit,
-        reason: quotaCheck.reason || (quotaCheck.allowed ? 'quota_available' : 'quota_exceeded')
+        quotaLimit: 3, // Strict free tier limit
+        unlimitedGenerations: false, // No unlimited generations
+        reason: quotaCheck.quotaUsed < 3 ? 'quota_available' : 'quota_exceeded'
       });
     } catch (error) {
       logger.error('Error checking quota', error as Error, { userId: req.user?.claims?.sub });

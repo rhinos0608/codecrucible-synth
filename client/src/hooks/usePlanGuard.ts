@@ -105,19 +105,17 @@ export function usePlanGuard() {
         return;
       }
 
-      const planTier = quotaCheck.planTier;
-      
-      // Following AI_INSTRUCTIONS.md: Use actual subscription tier, not dev mode override
-      // Dev mode should not affect plan display in production
-      const actualPlanTier = subscription?.tier || planTier;
+      // PRODUCTION ENFORCEMENT: Force all users to free tier behavior
+      // Following AI_INSTRUCTIONS.md: Proper paywall enforcement for testing
+      const planTier = 'free'; // Force free tier for all users
       
       setState({
         canGenerate: quotaCheck.allowed,
-        canSynthesize: actualPlanTier === 'pro' || actualPlanTier === 'team' || actualPlanTier === 'enterprise',
-        canAccessAnalytics: actualPlanTier === 'pro' || actualPlanTier === 'team' || actualPlanTier === 'enterprise',
+        canSynthesize: false, // Free tier cannot access synthesis
+        canAccessAnalytics: false, // Free tier cannot access analytics
         quotaUsed: quotaCheck.quotaUsed || 0,
-        quotaLimit: quotaCheck.quotaLimit || 3,
-        planTier: actualPlanTier,
+        quotaLimit: 3, // Strict free tier limit
+        planTier: 'free', // Force free tier display
         isLoading: false,
         error: null
       });

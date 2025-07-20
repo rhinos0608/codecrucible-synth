@@ -38,16 +38,8 @@ export const enforceSubscriptionLimits = async (
       return next();
     }
 
-    // Dev mode bypass for development environment
-    if (isDevModeFeatureEnabled('unlimitedGenerations')) {
-      logger.info('Dev mode bypass: subscription_enforcement_bypassed', {
-        userId: userId.substring(0, 8) + '...',
-        feature,
-        route: req.path,
-        method: req.method
-      });
-      return next();
-    }
+    // PRODUCTION ENFORCEMENT: No dev mode bypasses allowed
+    // Following AI_INSTRUCTIONS.md: All features require proper subscription
 
     // Get user subscription information
     const subscriptionInfo = await subscriptionService.getUserSubscriptionInfo(userId);

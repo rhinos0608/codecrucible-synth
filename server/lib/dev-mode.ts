@@ -27,50 +27,35 @@ interface DevModeConfig {
 }
 
 /**
- * Determine if development mode should be enabled
- * Based on NODE_ENV, REPL_ID, and DEV_MODE environment variables
+ * PRODUCTION DEPLOYMENT: Development mode COMPLETELY DISABLED
+ * Following AI_INSTRUCTIONS.md security patterns for paywall enforcement
  * 
- * ⚠️ PRODUCTION DEPLOYMENT: Dev mode disabled for ProductLaunch
- * To re-enable: Set FORCE_PRODUCTION_MODE=false or remove the override
+ * All dev mode functionality has been permanently disabled to ensure:
+ * - Proper subscription tier enforcement
+ * - Rate limiting compliance  
+ * - Feature access control
+ * - Stripe paywall integration
  */
 function detectDevMode(): DevModeConfig {
-  const nodeEnv = process.env.NODE_ENV;
-  const replId = process.env.REPL_ID;
-  const devModeFlag = process.env.DEV_MODE;
-  const forceProduction = process.env.FORCE_PRODUCTION_MODE !== 'false'; // Default to true for ProductLaunch
-  
-  // CRITICAL SECURITY: Force production mode for deployment
-  // Dev mode should only be enabled with explicit DEV_MODE=true flag
-  if (forceProduction || (!devModeFlag || devModeFlag !== 'true')) {
-    return {
-      isEnabled: false,
-      reason: 'forced_production_mode_for_deployment',
-      features: {
-        unlimitedGenerations: false,
-        unlimitedVoiceCombinations: false,
-        bypassRateLimit: false,
-        extendedPromptLength: false,
-        unlimitedSynthesis: false,
-      },
-      metadata: {
-        environment: 'production',
-        replId: replId || undefined,
-        nodeEnv: nodeEnv || undefined,
-        timestamp: new Date().toISOString(),
-      }
-    };
-  }
-  
-  // Default to production behavior
-  let isEnabled = false;
-  let reason = 'production_mode';
-  
-  // STRICT: Only enable dev mode with explicit DEV_MODE=true flag
-  // All other conditions removed for production security
-  if (devModeFlag === 'true') {
-    isEnabled = true;
-    reason = 'explicit_dev_mode_flag_enabled';
-  }
+  // CRITICAL SECURITY: Development mode is PERMANENTLY DISABLED
+  // This ensures all paywall restrictions are enforced
+  return {
+    isEnabled: false,
+    reason: 'production_mode_enforced_paywall_active',
+    features: {
+      unlimitedGenerations: false,
+      unlimitedVoiceCombinations: false,
+      bypassRateLimit: false,
+      extendedPromptLength: false,
+      unlimitedSynthesis: false,
+    },
+    metadata: {
+      environment: 'production',
+      replId: process.env.REPL_ID || undefined,
+      nodeEnv: process.env.NODE_ENV || 'production',
+      timestamp: new Date().toISOString(),
+    }
+  };
   
   const config: DevModeConfig = {
     isEnabled,

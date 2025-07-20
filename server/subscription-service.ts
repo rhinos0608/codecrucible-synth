@@ -84,22 +84,9 @@ class SubscriptionService {
         throw new Error("User not found");
       }
 
-      // Dev mode override: Provide unlimited tier in development
-      let tier = SUBSCRIPTION_TIERS[user.subscriptionTier || "free"];
-      if (isDevModeFeatureEnabled('unlimitedGenerations')) {
-        tier = {
-          ...tier,
-          dailyGenerationLimit: -1,
-          maxVoiceCombinations: 10,
-          allowsAnalytics: true,
-          name: "dev" as any
-        };
-        logDevModeBypass('subscription_tier_overridden', {
-          userId: userId.substring(0, 8) + '...',
-          originalTier: user.subscriptionTier || "free",
-          devTier: "unlimited"
-        });
-      }
+      // PRODUCTION ENFORCEMENT: All users get actual subscription tier only
+      // Following AI_INSTRUCTIONS.md: No dev mode bypasses allowed
+      const tier = SUBSCRIPTION_TIERS[user.subscriptionTier || "free"];
       const today = new Date().toISOString().split('T')[0];
       
       // Get or create usage limits for today

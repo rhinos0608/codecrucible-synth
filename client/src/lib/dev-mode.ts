@@ -23,48 +23,33 @@ interface DevModeConfig {
 }
 
 /**
- * Detect if frontend development mode should be enabled
- * Based on Vite's import.meta.env.DEV and VITE_DEV_MODE
+ * PRODUCTION DEPLOYMENT: Frontend development mode COMPLETELY DISABLED
+ * Following AI_INSTRUCTIONS.md security patterns for frontend paywall enforcement
  * 
- * ⚠️ PRODUCTION DEPLOYMENT: Dev mode disabled for ProductLaunch
- * To re-enable: Set VITE_FORCE_PRODUCTION_MODE=false or remove the override
+ * All frontend dev mode functionality has been permanently disabled to ensure:
+ * - Proper UI feature gating
+ * - Subscription tier display
+ * - Feature access validation
+ * - Stripe integration compliance
  */
 function detectFrontendDevMode(): DevModeConfig {
-  const isDev = import.meta.env.DEV;
-  const devModeFlag = import.meta.env.VITE_DEV_MODE === 'true';
-  const forceProduction = import.meta.env.VITE_FORCE_PRODUCTION_MODE !== 'false'; // Default to true for ProductLaunch
-  
-  // ProductLaunch override: Force production mode unless explicitly disabled
-  if (forceProduction) {
-    return {
-      isEnabled: false,
-      reason: 'forced_production_mode_for_deployment',
-      features: {
-        showDevBadges: false,
-        extendedLogging: false,
-        debugPanels: false,
-        unlimitedUIFeatures: false,
-      },
-      metadata: {
-        environment: 'production',
-        isDev,
-        timestamp: new Date().toISOString(),
-      }
-    };
-  }
-  
-  // Default to production behavior
-  let isEnabled = false;
-  let reason = 'production_mode';
-  
-  // Check conditions for enabling dev mode (kept for future re-activation)
-  if (devModeFlag) {
-    isEnabled = true;
-    reason = 'vite_dev_mode_flag';
-  } else if (isDev) {
-    isEnabled = true;
-    reason = 'vite_development_mode';
-  }
+  // CRITICAL SECURITY: Frontend development mode is PERMANENTLY DISABLED
+  // This ensures all UI paywall restrictions are enforced
+  return {
+    isEnabled: false,
+    reason: 'production_mode_enforced_ui_paywall_active',
+    features: {
+      showDevBadges: false,
+      extendedLogging: false,
+      debugPanels: false,
+      unlimitedUIFeatures: false,
+    },
+    metadata: {
+      environment: 'production',
+      isDev: import.meta.env.DEV || false,
+      timestamp: new Date().toISOString(),
+    }
+  };
   
   const config: DevModeConfig = {
     isEnabled,

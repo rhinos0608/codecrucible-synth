@@ -4,19 +4,14 @@
 import { useAppStore } from './app-store';
 import { shallow } from 'zustand/shallow';
 
+import { useMemo } from 'react';
+
 export { useAppStore, initializeStore, validateStoreIntegrity, resetStore, mockStoreState } from './app-store';
 export type { AppState, VoiceState, ProjectState, UIState, AuthState, TeamState, ConsciousnessState } from './types';
 
-// Voice selection hooks with stable selectors - following CodingPhilosophy.md patterns
+// Voice selection hooks with ultra-stable selectors - following CodingPhilosophy.md patterns
 export const useVoiceSelection = () => {
-  return useAppStore(state => ({
-    perspectives: state.voice.selectedPerspectives,
-    roles: state.voice.selectedRoles,
-    customVoices: state.voice.customVoices,
-    recommendations: state.voice.recommendations,
-    activeSession: state.voice.activeSession,
-    sessionHistory: state.voice.sessionHistory
-  }), shallow);
+  return useAppStore(state => state.voice, shallow);
 };
 
 // Separate hook for voice actions to prevent infinite loops
@@ -150,5 +145,4 @@ export const useActivePanel = () => {
   }, shallow);
 };
 
-// Import the main store for components that need direct access
-import { useAppStore } from './app-store';
+// Store is already imported above, removing duplicate to prevent circular references

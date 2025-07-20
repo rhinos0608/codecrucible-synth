@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-import { PerspectiveSelector } from "@/components/voice-selector";
+import { StableVoiceSelector } from "@/components/stable-voice-selector";
 import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
@@ -862,7 +862,7 @@ export default function Dashboard() {
                 <SubscriptionStatus onUpgrade={() => uiActions.openModal('upgrade')} />
               </div>
               <div className="border-t border-gray-700" data-tour="voice-selector">
-                <PerspectiveSelector />
+                <StableVoiceSelector />
               </div>
             </div>
           </div>

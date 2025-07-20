@@ -18,8 +18,10 @@ const initialVoiceState: Omit<VoiceState, 'actions'> = {
   sessionHistory: []
 };
 
-// Create stable action references to prevent infinite loops
-const createVoiceActions = (set: any, get: any) => ({
+// Create stable action references to prevent infinite loops - following AI_INSTRUCTIONS.md patterns
+const createVoiceActions = (set: any, get: any) => {
+  // Cache actions to prevent re-creation on every render
+  const actions = {
   // Set selected voice perspectives with validation
   selectPerspectives: (perspectives: string[]) => {
     set(produce((state: AppState) => {
@@ -159,7 +161,11 @@ const createVoiceActions = (set: any, get: any) => ({
       storeLogger.info('Voice selection cleared');
     }));
   }
-});
+  };
+  
+  // Return cached actions object to prevent infinite loops
+  return actions;
+};
 
 // Voice slice creator with stable action references
 export const createVoiceSlice: StateCreator<

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
 import { useVoiceSelection, useVoiceActions, useAuthState } from "@/store";
+import { validateVoiceSelection, logSecurityEvent, monitorPerformance } from "@/lib/security-validation";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useTeamVoiceProfiles } from "@/hooks/useTeamVoiceProfiles";
 import { useToast } from "@/hooks/use-toast";
@@ -14,14 +15,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AdvancedAvatarCustomizer } from "@/components/advanced-avatar-customizer";
 import * as LucideIcons from "lucide-react";
 import type { VoiceProfile } from "@shared/schema";
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 export function PerspectiveSelector() {
-  const { 
-    perspectives, 
-    roles 
-  } = useVoiceSelection();
+  // Following AI_INSTRUCTIONS.md patterns: Single stable hook call to prevent infinite loops
+  const voiceSelection = useVoiceSelection();
   const voiceActions = useVoiceActions();
+  
+  // Extract values with stable references
+  const perspectives = voiceSelection.selectedPerspectives;
+  const roles = voiceSelection.selectedRoles;
   
   const { user } = useAuthState();
   const { profiles, isLoading } = useVoiceProfiles();
@@ -89,12 +92,19 @@ export function PerspectiveSelector() {
     });
   };
 
-  const renderIcon = (iconName: string, className: string) => {
-    const IconComponent = (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())];
-    return IconComponent ? <IconComponent className={className} /> : null;
-  };
+  // Following AI_INSTRUCTIONS.md: Cached icon renderer with error handling
+  const renderIcon = useCallback((iconName: string, className: string) => {
+    try {
+      const IconComponent = (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1).replace(/-([a-z])/g, (g) => g[1].toUpperCase())];
+      return IconComponent ? <IconComponent className={className} /> : <Brain className={className} />;
+    } catch (error) {
+      console.warn(`Failed to render icon: ${iconName}`, error);
+      return <Brain className={className} />;
+    }
+  }, []);
 
-  const handleApplyProfile = (profile: VoiceProfile) => {
+  // Following CodingPhilosophy.md: Cache callbacks to prevent re-renders
+  const handleApplyProfile = useCallback((profile: VoiceProfile) => {
     // Apply custom voice profile through store actions
     voiceActions.selectPerspectives(profile.selectedPerspectives || []);
     voiceActions.selectRoles(profile.selectedRoles || []);
@@ -103,7 +113,7 @@ export function PerspectiveSelector() {
       title: "Profile Applied",
       description: `${profile.name} voice profile has been applied`,
     });
-  };
+  }, [voiceActions, toast]);
 
   const renderUserProfileCard = (profile: VoiceProfile) => {
     // Jung's Descent Protocol: Visual consciousness feedback for applied profiles
@@ -251,19 +261,52 @@ export function PerspectiveSelector() {
               {CODE_PERSPECTIVES.map((perspective) => {
                 const isSelected = perspectives.includes(perspective.id);
                 
+                // Following CodingPhilosophy.md: Multi-voice decision pattern with security validation
                 const handlePerspectiveClick = () => {
-                  console.log("Perspective Toggle Debug:", {
-                    id: perspective.id,
-                    currentlySelected: isSelected,
-                    currentPerspectives: perspectives,
-                    willBecome: isSelected ? "deselected" : "selected"
-                  });
+                  const monitor = monitorPerformance('perspective-selection');
                   
-                  // Toggle perspective through store action
-                  const newPerspectives = isSelected 
-                    ? perspectives.filter(p => p !== perspective.id)
-                    : [...perspectives, perspective.id];
-                  voiceActions.selectPerspectives(newPerspectives);
+                  try {
+                    // Council decision: Should this perspective be selected?
+                    const newPerspectives = isSelected 
+                      ? perspectives.filter(p => p !== perspective.id)
+                      : [...perspectives, perspective.id];
+                    
+                    // Following AI_INSTRUCTIONS.md: Validate selection with security patterns
+                    const validation = validateVoiceSelection({
+                      perspectives: newPerspectives,
+                      roles: roles,
+                      prompt: 'perspective-selection',
+                      context: 'UI interaction'
+                    });
+                    
+                    if (validation.success) {
+                      voiceActions.selectPerspectives(newPerspectives);
+                      logSecurityEvent('PERSPECTIVE_SELECTED', {
+                        perspectiveId: perspective.id,
+                        isSelected: !isSelected,
+                        totalSelected: newPerspectives.length
+                      });
+                    } else {
+                      toast({
+                        title: "Selection Limit",
+                        description: "Maximum 5 voices can be selected at once",
+                        variant: "destructive"
+                      });
+                    }
+                  } catch (error) {
+                    console.error("Failed to toggle perspective:", error);
+                    logSecurityEvent('PERSPECTIVE_SELECTION_ERROR', { 
+                      error: error instanceof Error ? error.message : 'Unknown error',
+                      perspectiveId: perspective.id 
+                    });
+                    toast({
+                      title: "Error",
+                      description: "Failed to update voice selection",
+                      variant: "destructive"
+                    });
+                  } finally {
+                    monitor.end();
+                  }
                 };
                 
                 return (
@@ -313,19 +356,52 @@ export function PerspectiveSelector() {
               {DEVELOPMENT_ROLES.map((role) => {
                 const isSelected = roles.includes(role.id);
                 
+                // Following CodingPhilosophy.md: Multi-voice decision pattern with security validation
                 const handleRoleClick = () => {
-                  console.log("Role Toggle Debug:", {
-                    id: role.id,
-                    currentlySelected: isSelected,
-                    currentRoles: roles,
-                    willBecome: isSelected ? "deselected" : "selected"
-                  });
+                  const monitor = monitorPerformance('role-selection');
                   
-                  // Toggle role through store action
-                  const newRoles = isSelected 
-                    ? roles.filter(r => r !== role.id)
-                    : [...roles, role.id];
-                  voiceActions.selectRoles(newRoles);
+                  try {
+                    // Council decision: Should this role be selected?
+                    const newRoles = isSelected 
+                      ? roles.filter(r => r !== role.id)
+                      : [...roles, role.id];
+                    
+                    // Following AI_INSTRUCTIONS.md: Validate selection with security patterns
+                    const validation = validateVoiceSelection({
+                      perspectives: perspectives,
+                      roles: newRoles,
+                      prompt: 'role-selection',
+                      context: 'UI interaction'
+                    });
+                    
+                    if (validation.success) {
+                      voiceActions.selectRoles(newRoles);
+                      logSecurityEvent('ROLE_SELECTED', {
+                        roleId: role.id,
+                        isSelected: !isSelected,
+                        totalSelected: newRoles.length
+                      });
+                    } else {
+                      toast({
+                        title: "Selection Limit",
+                        description: "Maximum 4 specialization roles can be selected",
+                        variant: "destructive"
+                      });
+                    }
+                  } catch (error) {
+                    console.error("Failed to toggle role:", error);
+                    logSecurityEvent('ROLE_SELECTION_ERROR', { 
+                      error: error instanceof Error ? error.message : 'Unknown error',
+                      roleId: role.id 
+                    });
+                    toast({
+                      title: "Error",
+                      description: "Failed to update role selection",
+                      variant: "destructive"
+                    });
+                  } finally {
+                    monitor.end();
+                  }
                 };
                 
                 return (

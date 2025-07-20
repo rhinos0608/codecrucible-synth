@@ -15,7 +15,7 @@ import Subscribe from "@/pages/subscribe";
 import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
 import SubscriptionCancel from "@/pages/subscription-cancel";
 import { AuthProvider } from "@/components/auth/AuthProvider";
-import { ErrorBoundary } from "@/components/error-boundary";
+import { ConsciousnessErrorBoundary } from "@/components/consciousness-error-boundary";
 import { Chat } from "@/pages/Chat";
 import { initializeStore } from "@/store";
 import { useEffect } from "react";
@@ -70,7 +70,7 @@ function Router() {
 
 function App() {
   return (
-    <ErrorBoundary>
+    <ConsciousnessErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <TooltipProvider>
@@ -79,7 +79,7 @@ function App() {
           </TooltipProvider>
         </AuthProvider>
       </QueryClientProvider>
-    </ErrorBoundary>
+    </ConsciousnessErrorBoundary>
   );
 }
 

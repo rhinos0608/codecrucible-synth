@@ -58,7 +58,14 @@ export function usePlanGuard() {
       return data;
     } catch (error) {
       console.error('❌ Failed to check quota:', error);
-      return null;
+      // Return a default response instead of null to prevent promise rejection issues
+      return {
+        allowed: false,
+        planTier: 'free' as const,
+        quotaUsed: 3,
+        quotaLimit: 3,
+        reason: 'quota_check_failed'
+      };
     }
   };
 

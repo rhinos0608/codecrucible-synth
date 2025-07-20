@@ -356,31 +356,9 @@ export const paymentMethods = pgTable("payment_methods", {
 });
 
 // Insert schemas  
-export const insertUserSchema = createInsertSchema(users).pick({
-  id: true,
-  email: true,
-  firstName: true,
-  lastName: true,
-  profileImageUrl: true,
-});
+export const insertUserSchema = createInsertSchema(users);
 
-export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).pick({
-  name: true,
-  description: true,
-  selectedPerspectives: true,
-  selectedRoles: true,
-  analysisDepth: true,
-  mergeStrategy: true,
-  qualityFiltering: true,
-  isDefault: true,
-  avatar: true,
-  personality: true,
-  chatStyle: true,
-  specialization: true,
-  ethicalStance: true,
-  perspective: true,
-  role: true,
-}).extend({
+export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).extend({
   // Security validation following AI_INSTRUCTIONS.md patterns
   name: z.string().min(1).max(100),
   description: z.string().max(1000).optional(),
@@ -392,20 +370,7 @@ export const insertVoiceProfileSchema = createInsertSchema(voiceProfiles).pick({
 });
 
 // File upload schemas - Following AI_INSTRUCTIONS.md security patterns
-export const insertUserFileSchema = createInsertSchema(userFiles).pick({
-  originalName: true,
-  fileName: true,
-  content: true,
-  mimeType: true,
-  fileSize: true,
-  encoding: true,
-  language: true,
-  isContextAvailable: true,
-  projectId: true,
-  sessionId: true,
-  tags: true,
-  metadata: true,
-}).extend({
+export const insertUserFileSchema = createInsertSchema(userFiles).extend({
   // Security validation with file size limits and content sanitization
   originalName: z.string().min(1).max(500),
   fileName: z.string().min(1).max(500),
@@ -421,12 +386,7 @@ export const insertUserFileSchema = createInsertSchema(userFiles).pick({
   metadata: z.record(z.any()).default({})
 });
 
-export const insertSessionFileAttachmentSchema = createInsertSchema(sessionFileAttachments).pick({
-  sessionId: true,
-  fileId: true,
-  attachmentOrder: true,
-  isContextEnabled: true,
-}).extend({
+export const insertSessionFileAttachmentSchema = createInsertSchema(sessionFileAttachments).extend({
   sessionId: z.number().int().min(1),
   fileId: z.number().int().min(1),
   attachmentOrder: z.number().int().min(0).default(0),
@@ -434,17 +394,7 @@ export const insertSessionFileAttachmentSchema = createInsertSchema(sessionFileA
 });
 
 // Chat schema validation following AI_INSTRUCTIONS.md security patterns with PostgreSQL compatibility
-export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
-  sessionId: true,
-  userId: true,
-  voiceEngine: true,
-  voiceName: true,
-  selectedVoice: true,
-  initialSolutionId: true,
-  contextData: true,
-  status: true,
-  isActive: true,
-}).extend({
+export const insertChatSessionSchema = createInsertSchema(chatSessions).extend({
   sessionId: z.number().int().min(1).max(2147483647).optional(), // PostgreSQL integer range enforcement
   userId: z.string().min(1),
   voiceEngine: z.string().min(1).max(100).optional(),
@@ -456,14 +406,7 @@ export const insertChatSessionSchema = createInsertSchema(chatSessions).pick({
   isActive: z.boolean().default(true)
 });
 
-export const insertChatMessageSchema = createInsertSchema(chatMessages).pick({
-  chatSessionId: true,
-  messageType: true,
-  content: true,
-  voiceType: true,
-  metadata: true,
-  messageIndex: true,
-}).extend({
+export const insertChatMessageSchema = createInsertSchema(chatMessages).extend({
   chatSessionId: z.number().int().min(1),
   messageType: z.enum(['user', 'assistant', 'system']),
   content: z.string().min(1).max(10000),
@@ -483,15 +426,7 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 
 // Security-first validation schema following AI_INSTRUCTIONS.md
-export const insertVoiceSessionSchema = createInsertSchema(voiceSessions).pick({
-  userId: true,
-  prompt: true,
-  selectedVoices: true,
-  recursionDepth: true,
-  synthesisMode: true,
-  ethicalFiltering: true,
-  mode: true,
-}).extend({
+export const insertVoiceSessionSchema = createInsertSchema(voiceSessions).extend({
   // Secure validation of selectedVoices structure
   selectedVoices: z.object({
     perspectives: z.array(z.string().min(1).max(50)).default([]),
@@ -508,47 +443,16 @@ export const insertVoiceSessionSchema = createInsertSchema(voiceSessions).pick({
   mode: z.enum(["production", "development"]).default("production")
 });
 
-export const insertSolutionSchema = createInsertSchema(solutions).pick({
-  sessionId: true,
-  voiceCombination: true,
-  code: true,
-  explanation: true,
-  confidence: true,
-  strengths: true,
-  considerations: true,
-});
+export const insertSolutionSchema = createInsertSchema(solutions);
 
-export const insertSynthesisSchema = createInsertSchema(syntheses).pick({
-  sessionId: true,
-  combinedCode: true,
-  synthesisSteps: true,
-  qualityScore: true,
-  ethicalScore: true,
-});
+export const insertSynthesisSchema = createInsertSchema(syntheses);
 
 
 
-export const insertPhantomLedgerEntrySchema = createInsertSchema(phantomLedgerEntries).pick({
-  sessionId: true,
-  title: true,
-  voicesEngaged: true,
-  decisionOutcome: true,
-  keyLearnings: true,
-  ethicalScore: true,
-});
+export const insertPhantomLedgerEntrySchema = createInsertSchema(phantomLedgerEntries);
 
 // Project folder insert schema with Pro tier validation
-export const insertProjectFolderSchema = createInsertSchema(projectFolders).pick({
-  name: true,
-  description: true,
-  color: true,
-  icon: true,
-  userId: true,
-  parentId: true,
-  isShared: true,
-  visibility: true,
-  sortOrder: true,
-}).extend({
+export const insertProjectFolderSchema = createInsertSchema(projectFolders).extend({
   // Security validation following AI_INSTRUCTIONS.md patterns
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
@@ -562,22 +466,7 @@ export const insertProjectFolderSchema = createInsertSchema(projectFolders).pick
 });
 
 // Enhanced project insert schema with folder organization
-export const insertProjectSchema = createInsertSchema(projects).pick({
-  name: true,
-  description: true,
-  code: true,
-  language: true,
-  userId: true,
-  sessionId: true,
-  synthesisId: true,
-  folderId: true,
-  tags: true,
-  isPublic: true,
-  isTemplate: true,
-  visibility: true,
-  voiceConfiguration: true,
-  qualityScore: true,
-}).extend({
+export const insertProjectSchema = createInsertSchema(projects).extend({
   // Security validation following AI_INSTRUCTIONS.md patterns
   name: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
@@ -596,13 +485,7 @@ export const insertProjectSchema = createInsertSchema(projects).pick({
 });
 
 // Analytics insert schemas with security validation
-export const insertUserAnalyticsSchema = createInsertSchema(userAnalytics).pick({
-  userId: true,
-  eventType: true,
-  eventData: true,
-  voiceCombination: true,
-  sessionId: true,
-}).extend({
+export const insertUserAnalyticsSchema = createInsertSchema(userAnalytics).extend({
   eventType: z.enum([
     "session_created",
     "synthesis_completed", 
@@ -615,14 +498,7 @@ export const insertUserAnalyticsSchema = createInsertSchema(userAnalytics).pick(
   voiceCombination: z.array(z.string()).optional(),
 });
 
-export const insertVoiceUsageStatsSchema = createInsertSchema(voiceUsageStats).pick({
-  userId: true,
-  voiceType: true,
-  voiceName: true,
-  usageCount: true,
-  successCount: true,
-  averageRating: true,
-}).extend({
+export const insertVoiceUsageStatsSchema = createInsertSchema(voiceUsageStats).extend({
   voiceType: z.enum(["perspective", "role"]),
   voiceName: z.string().min(1).max(50),
   usageCount: z.number().int().min(0).default(0),
@@ -630,79 +506,35 @@ export const insertVoiceUsageStatsSchema = createInsertSchema(voiceUsageStats).p
   averageRating: z.number().min(0).max(5).optional(),
 });
 
-export const insertSessionAnalyticsSchema = createInsertSchema(sessionAnalytics).pick({
-  sessionId: true,
-  userId: true,
-  generationTime: true,
-  synthesisTime: true,
-  solutionCount: true,
-  userRating: true,
-  voicesUsed: true,
-  promptLength: true,
-  promptComplexity: true,
-}).extend({
+export const insertSessionAnalyticsSchema = createInsertSchema(sessionAnalytics).extend({
   userRating: z.enum(["excellent", "good", "bad", "none"]).optional(),
   voicesUsed: z.array(z.string()),
   promptComplexity: z.number().int().min(1).max(3),
 });
 
-export const insertDailyUsageMetricsSchema = createInsertSchema(dailyUsageMetrics).pick({
-  userId: true,
-  date: true,
-  generationCount: true,
-  synthesisCount: true,
-  uniqueVoiceCombinations: true,
-  totalGenerationTime: true,
-  averageSessionRating: true,
-});
+export const insertDailyUsageMetricsSchema = createInsertSchema(dailyUsageMetrics);
 
 // New table schemas for subscription management
-export const insertTeamSchema = createInsertSchema(teams).pick({
-  name: true,
-  description: true,
-  ownerId: true,
-  maxMembers: true,
-}).extend({
+export const insertTeamSchema = createInsertSchema(teams).extend({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   maxMembers: z.number().int().min(1).max(50).default(5),
 });
 
-export const insertTeamMemberSchema = createInsertSchema(teamMembers).pick({
-  teamId: true,
-  userId: true,
-  role: true,
-}).extend({
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).extend({
   role: z.enum(["admin", "member"]).default("member"),
 });
 
 // Will be defined later after usageLimits table
 
-export const insertSubscriptionHistorySchema = createInsertSchema(subscriptionHistory).pick({
-  userId: true,
-  stripeSubscriptionId: true,
-  tier: true,
-  action: true,
-  previousTier: true,
-  amount: true,
-  currency: true,
-  teamId: true,
-}).extend({
+export const insertSubscriptionHistorySchema = createInsertSchema(subscriptionHistory).extend({
   tier: z.enum(["free", "pro", "team"]),
   action: z.enum(["created", "upgraded", "downgraded", "canceled", "reactivated"]),
   previousTier: z.enum(["free", "pro", "team"]).optional(),
   currency: z.string().default("usd"),
 });
 
-export const insertVoicePreferencesSchema = createInsertSchema(voicePreferences).pick({
-  userId: true,
-  promptPattern: true,
-  preferredPerspectives: true,
-  preferredRoles: true,
-  acceptanceRate: true,
-  successRate: true,
-  sampleCount: true,
-}).extend({
+export const insertVoicePreferencesSchema = createInsertSchema(voicePreferences).extend({
   promptPattern: z.string().min(1).max(100),
   preferredPerspectives: z.array(z.string()).optional(),
   preferredRoles: z.array(z.string()).optional(),
@@ -711,28 +543,9 @@ export const insertVoicePreferencesSchema = createInsertSchema(voicePreferences)
   sampleCount: z.number().int().min(0).default(0),
 });
 
-export const insertTeamVoiceProfileSchema = createInsertSchema(teamVoiceProfiles).pick({
-  teamId: true,
-  createdBy: true,
-  name: true,
-  description: true,
-  selectedPerspectives: true,
-  selectedRoles: true,
-  analysisDepth: true,
-  mergeStrategy: true,
-  qualityFiltering: true,
-  isShared: true,
-});
+export const insertTeamVoiceProfileSchema = createInsertSchema(teamVoiceProfiles);
 
-export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).pick({
-  userId: true,
-  stripePaymentMethodId: true,
-  last4: true,
-  brand: true,
-  expiryMonth: true,
-  expiryYear: true,
-  isDefault: true,
-});
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods);
 
 // Types - consolidating duplicates
 export type UpsertUser = typeof users.$inferInsert;
@@ -757,16 +570,9 @@ export const usageLimits = pgTable("usage_limits", {
   index("usage_limits_user_date_idx").on(table.userId, table.date),
 ]);
 
-export const insertUsageLimitSchema = createInsertSchema(usageLimits).omit({
-  id: true,
-});
+export const insertUsageLimitSchema = createInsertSchema(usageLimits);
 
-export const insertUsageLimitsSchema = createInsertSchema(usageLimits).pick({
-  userId: true,
-  date: true,
-  generationsUsed: true,
-  generationsLimit: true,
-});
+export const insertUsageLimitsSchema = createInsertSchema(usageLimits);
 
 export type InsertUsageLimit = z.infer<typeof insertUsageLimitSchema>;
 export type UsageLimit = typeof usageLimits.$inferSelect;
@@ -786,20 +592,10 @@ export type Synthesis = typeof syntheses.$inferSelect;
 export type InsertPhantomLedgerEntry = z.infer<typeof insertPhantomLedgerEntrySchema>;
 export type PhantomLedgerEntry = typeof phantomLedgerEntries.$inferSelect;
 
-export type InsertProject = z.infer<typeof insertProjectSchema>;
-export type Project = typeof projects.$inferSelect;
+// Removed duplicate Project types - already defined above
 
 // Folder file insert schema with validation
-export const insertFolderFileSchema = createInsertSchema(folderFiles).pick({
-  folderId: true,
-  name: true,
-  content: true,
-  fileType: true,
-  language: true,
-  description: true,
-  tags: true,
-  isContextEnabled: true,
-}).extend({
+export const insertFolderFileSchema = createInsertSchema(folderFiles).extend({
   name: z.string().min(1).max(255),
   content: z.string().min(1),
   fileType: z.string().min(1).max(50).default("text"),
@@ -846,6 +642,4 @@ export type InsertTeamVoiceProfile = z.infer<typeof insertTeamVoiceProfileSchema
 export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
 
-// Project folder types following AI_INSTRUCTIONS.md patterns
-export type ProjectFolder = typeof projectFolders.$inferSelect;
-export type InsertProjectFolder = z.infer<typeof insertProjectFolderSchema>;
+// Removed duplicate ProjectFolder types - already defined above

@@ -43,7 +43,7 @@ router.post('/synthesize', isAuthenticated, async (req: any, res) => {
       });
     }
 
-    const { solutions, options = {} } = validation.data;
+    const { solutions, options } = validation.data;
 
     logger.info('Consciousness synthesis initiated', {
       userId: userId.substring(0, 8) + '...',
@@ -54,9 +54,16 @@ router.post('/synthesize', isAuthenticated, async (req: any, res) => {
 
     // Transform solutions to match engine interface
     const transformedSolutions = solutions.map(s => ({
-      ...s,
-      timestamp: new Date(s.timestamp)
-    })) as Solution[];
+      code: s.code || '',
+      id: s.id,
+      sessionId: s.sessionId,
+      voiceCombination: s.voiceCombination,
+      explanation: s.explanation || '',
+      confidence: s.confidence,
+      createdAt: s.timestamp ? new Date(s.timestamp) : new Date(),
+      strengths: [],
+      considerations: []
+    }));
 
     // Create synthesis context
     const context = {
@@ -119,7 +126,7 @@ router.post('/stream-synthesize', isAuthenticated, async (req: any, res) => {
       });
     }
 
-    const { solutions, options = {} } = validation.data;
+    const { solutions, options } = validation.data;
 
     // Set up Server-Sent Events
     res.writeHead(200, {
@@ -145,9 +152,16 @@ router.post('/stream-synthesize', isAuthenticated, async (req: any, res) => {
 
     // Transform solutions
     const transformedSolutions = solutions.map(s => ({
-      ...s,
-      timestamp: new Date(s.timestamp)
-    })) as Solution[];
+      code: s.code || '',
+      id: s.id,
+      sessionId: s.sessionId,
+      voiceCombination: s.voiceCombination,
+      explanation: s.explanation || '',
+      confidence: s.confidence,
+      createdAt: s.timestamp ? new Date(s.timestamp) : new Date(),
+      strengths: [],
+      considerations: []
+    }));
 
     // Create synthesis context
     const context = {

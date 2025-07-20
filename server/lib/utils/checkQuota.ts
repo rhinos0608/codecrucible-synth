@@ -23,10 +23,26 @@ export async function checkGenerationQuota(
   userAgent?: string
 ): Promise<QuotaCheckResult> {
   try {
+    // Defensive programming following AI_INSTRUCTIONS.md patterns
+    if (!userId || typeof userId !== 'string') {
+      logger.error('Invalid userId in quota check', new Error('Invalid user ID'), {
+        userId: typeof userId,
+        operation: 'checkGenerationQuota_validation'
+      });
+      
+      return {
+        allowed: false,
+        reason: 'invalid_user_id',
+        quotaUsed: 0,
+        quotaLimit: 0,
+        planTier: 'error'
+      };
+    }
+
     // PRODUCTION ENFORCEMENT: No dev mode bypasses allowed
     // Following AI_INSTRUCTIONS.md: All users must have proper subscription limits
 
-    // Get user and subscription info
+    // Get user and subscription info with defensive database access
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     
     if (!user) {
@@ -126,14 +142,8 @@ export async function checkGenerationQuota(
       severity: 'high'
     });
 
-    // Fail-safe: deny on error
-    return {
-      allowed: false,
-      reason: 'quota_check_failed',
-      quotaUsed: 0,
-      quotaLimit: 0,
-      planTier: 'error'
-    };
+    // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
+    throw new Error(`Generation quota check failed: ${error instanceof Error ? error.message : 'Unknown database error'}`);
   }
 }
 

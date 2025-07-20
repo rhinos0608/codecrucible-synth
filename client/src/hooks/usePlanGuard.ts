@@ -57,15 +57,16 @@ export function usePlanGuard() {
       
       return data;
     } catch (error) {
-      console.error('❌ Failed to check quota:', error);
-      // Return a default response instead of null to prevent promise rejection issues
-      return {
-        allowed: false,
-        planTier: 'free' as const,
-        quotaUsed: 3,
-        quotaLimit: 3,
-        reason: 'quota_check_failed'
-      };
+      // Enhanced error handling following AI_INSTRUCTIONS.md defensive programming
+      const errorMessage = error instanceof Error ? error.message : 'Unknown quota check error';
+      
+      // Log but don't console.error to prevent unhandled rejections
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ Quota check failed (handled):', errorMessage);
+      }
+      
+      // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
+      throw new Error(`Quota check failed: ${errorMessage}`);
     }
   };
 
@@ -90,7 +91,14 @@ export function usePlanGuard() {
         setState(prev => ({ ...prev, isLoading: true }));
 
         const quotaCheck = await checkQuota().catch(error => {
-          console.error('Failed to update plan state:', error);
+          // Enhanced error handling following AI_INSTRUCTIONS.md patterns
+          const errorMessage = error instanceof Error ? error.message : 'Unknown plan state error';
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Plan state update failed (handled):', errorMessage);
+          }
+          
+          // Return null to trigger error state handling below
           return null;
         });
         

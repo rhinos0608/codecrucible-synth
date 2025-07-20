@@ -235,17 +235,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Fallback suggestions following CodingPhilosophy.md patterns
-      const fallbackSuggestions = [
-        {
-          value: `Custom ${req.body?.field || 'field'} based on context`,
-          consciousness: 5,
-          qwan: 6,
-          reasoning: "AI service unavailable - using context-based fallback"
-        }
-      ];
+      logger.error('AI dropdown suggestions failed', error as Error, {
+        userId: userId?.substring(0, 8) + '...',
+        field: req.body?.field,
+        operation: 'generateAIDropdownSuggestions_failed'
+      });
       
-      res.json({ suggestions: fallbackSuggestions });
+      // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
+      return res.status(500).json({ 
+        error: 'AI suggestion service unavailable',
+        message: 'Please try again later or contact support if the issue persists'
+      });
     }
   });
 
@@ -1772,6 +1772,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/quota/check', isAuthenticated, async (req: any, res, next) => {
     try {
+      // Defensive programming following AI_INSTRUCTIONS.md patterns
+      if (!req.user || !req.user.claims || !req.user.claims.sub) {
+        logger.error('Invalid authentication in quota check', new Error('Missing user authentication'), {
+          hasUser: !!req.user,
+          hasClaims: !!req.user?.claims,
+          hasSub: !!req.user?.claims?.sub,
+          operation: 'quota_check_auth_validation'
+        });
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       

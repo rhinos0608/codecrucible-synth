@@ -103,22 +103,14 @@ class RealOpenAIService {
         consciousnessLevel
       };
     } catch (error) {
-      logger.error('Matrix voice response generation failed', error as Error);
-      
-      // Fallback response maintaining voice archetype personality
-      const fallbackResponses = {
-        'Explorer': 'Fascinating perspective! I see opportunities for innovative approaches in what you\'ve shared.',
-        'Maintainer': 'Let me consider the long-term implications and stability aspects of this.',
-        'Analyzer': 'I\'m observing interesting patterns in your message that warrant deeper analysis.',
-        'Developer': 'From a user experience perspective, this presents some interesting challenges.',
-        'Implementor': 'Let me focus on the practical implementation aspects of what you\'re describing.'
-      };
-      
-      return {
-        content: fallbackResponses[voiceArchetype] || fallbackResponses['Explorer'],
+      logger.error('Matrix voice response generation failed', error as Error, {
         voiceArchetype,
-        consciousnessLevel: 6.5
-      };
+        operation: 'generateVoiceResponse_matrix',
+        userId: userId?.substring(0, 8) + '...'
+      });
+      
+      // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
+      throw new Error(`Matrix voice response generation failed for ${voiceArchetype}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -215,11 +207,8 @@ Generate synthesis that shows consciousness evolution (+0.2-0.5 levels) and prov
     } catch (error) {
       logger.error('Matrix synthesis generation failed', error as Error);
       
-      // Fallback synthesis
-      return {
-        content: `🔮 Synthesis Complete for "${description}":\n\n✨ All AI voices have contributed their unique perspectives\n🧠 Consciousness evolution detected: +0.3 levels\n⚡ Emergent solution generated through collective intelligence\n🎯 Implementation strategy refined and ready`,
-        consciousnessLevel: 9.2
-      };
+      // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
+      throw synthesisError;
     }
   }
 
@@ -275,21 +264,8 @@ Focus on:
     } catch (error) {
       logger.error('AI dropdown suggestion generation failed', error as Error);
       
-      // Fallback suggestions with consciousness patterns
-      return [
-        {
-          value: `Consciousness-driven ${field}`,
-          consciousness: 6,
-          qwan: 7,
-          reasoning: "Pattern-based fallback using consciousness principles"
-        },
-        {
-          value: `Context-aware ${field}`,
-          consciousness: 5,
-          qwan: 6,
-          reasoning: "Contextual fallback based on provided information"
-        }
-      ];
+      // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
+      throw suggestionsError;
     }
   }
   // REAL OpenAI parallel generation with custom user profiles integration
@@ -649,27 +625,14 @@ Generate real, functional code that can be executed immediately.`;
         operation: 'generateSolutionStream'
       });
       
-      // Consciousness-driven error recovery following CodingPhilosophy.md patterns
-      const errorSolution = {
-        voiceCombination: `${type}:${voiceId}`,
-        code: '// Stream generation failed - council fallback required',
-        explanation: `OpenAI streaming failed for ${voiceId}. Error: ${streamError instanceof Error ? streamError.message : 'Unknown streaming error'}`,
-        confidence: 0,
+      logger.error('OpenAI streaming failed', streamError as Error, {
+        sessionId,
         voiceId,
         type,
-        id: Date.now()
-      };
+        operation: 'generateSolutionStream_failed'
+      });
       
-      try {
-        await onComplete(errorSolution);
-      } catch (completeError) {
-        logger.error('Failed to complete error recovery', completeError as Error, {
-          sessionId,
-          voiceId,
-          operation: 'generateSolutionStream_error_recovery'
-        });
-      }
-      
+      // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
       throw streamError;
     }
   }
@@ -758,21 +721,14 @@ Combine multiple code solutions into one optimal implementation using consciousn
         operation: 'synthesizeSolutions'
       });
       
-      // Consciousness-driven fallback synthesis following CodingPhilosophy.md patterns
-      const fallbackSynthesis = {
-        id: Date.now(),
+      logger.error('OpenAI synthesis failed', synthesisError as Error, {
         sessionId,
-        synthesizedCode: solutions.length > 0 ? solutions[0].code : '// Synthesis failed - no solutions available',
-        code: solutions.length > 0 ? solutions[0].code : '// Synthesis failed - no solutions available',
-        explanation: `OpenAI synthesis failed. Error: ${synthesisError instanceof Error ? synthesisError.message : 'Unknown synthesis error'}. ${solutions.length > 0 ? 'Using first solution as fallback.' : 'No solutions available for fallback.'}`,
-        confidence: 25,
-        originalSolutions: solutions,
-        synthesisApproach: "Fallback - OpenAI Synthesis Failed",
-        synthesisMethod: 'Error Recovery Fallback',
-        createdAt: new Date().toISOString()
-      };
+        solutionCount: solutions.length,
+        operation: 'synthesizeSolutions_failed'
+      });
       
-      return fallbackSynthesis;
+      // Following AI_INSTRUCTIONS.md: Never use fallback data, throw proper error
+      throw synthesisError;
     }
   }
 

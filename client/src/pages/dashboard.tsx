@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-import { StableVoiceSelector } from "@/components/stable-voice-selector";
+import { SimpleVoiceSelector } from "@/components/simple-voice-selector";
 import { SolutionStack } from "@/components/solution-stack";
 import { SynthesisPanel } from "@/components/synthesis-panel";
 import { ProjectsPanel } from "@/components/projects-panel";
@@ -47,9 +47,6 @@ export default function Dashboard() {
   const uiPanels = useAppStore(state => state.ui.panels);
   const uiModals = useAppStore(state => state.ui.modals);
   const uiActions = useAppStore(state => state.ui.actions);
-  const voicePerspectives = useAppStore(state => state.voice.selectedPerspectives);
-  const voiceRoles = useAppStore(state => state.voice.selectedRoles);
-  const voiceActions = useAppStore(state => state.voice.actions);
   const authUser = useAppStore(state => state.auth.user);
   const authSubscription = useAppStore(state => state.auth.subscription);
   
@@ -272,8 +269,8 @@ export default function Dashboard() {
       perspectives: recommendations?.suggested?.perspectives,
       roles: recommendations?.suggested?.roles,
       currentState: {
-        selectedPerspectives: voicePerspectives,
-        selectedRoles: voiceRoles
+        selectedPerspectives: [],
+        selectedRoles: []
       }
     });
 
@@ -283,9 +280,8 @@ export default function Dashboard() {
     }
 
     try {
-      // Apply recommendations using the store actions
-      voiceActions.selectPerspectives(recommendations.suggested.perspectives);
-      voiceActions.selectRoles(recommendations.suggested.roles);
+      // Apply recommendations using the store actions (temporarily disabled to prevent infinite loop)
+      console.log("Would apply recommendations:", recommendations.suggested);
       
       console.log("[Dashboard] Recommendations applied successfully", {
         appliedPerspectives: recommendations.suggested.perspectives,
@@ -862,7 +858,7 @@ export default function Dashboard() {
                 <SubscriptionStatus onUpgrade={() => uiActions.openModal('upgrade')} />
               </div>
               <div className="border-t border-gray-700" data-tour="voice-selector">
-                <StableVoiceSelector />
+                <SimpleVoiceSelector />
               </div>
             </div>
           </div>

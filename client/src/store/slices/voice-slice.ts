@@ -19,7 +19,14 @@ const initialVoiceState: Omit<VoiceState, 'actions'> = {
 };
 
 // Create stable action references to prevent infinite loops - following AI_INSTRUCTIONS.md patterns
+let cachedActions: any = null;
+
 const createVoiceActions = (set: any, get: any) => {
+  // Return cached actions if they exist to prevent infinite loops
+  if (cachedActions) {
+    return cachedActions;
+  }
+  
   // Cache actions to prevent re-creation on every render
   const actions = {
   // Set selected voice perspectives with validation
@@ -163,7 +170,8 @@ const createVoiceActions = (set: any, get: any) => {
   }
   };
   
-  // Return cached actions object to prevent infinite loops
+  // Cache and return actions object to prevent infinite loops
+  cachedActions = actions;
   return actions;
 };
 

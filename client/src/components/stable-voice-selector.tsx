@@ -23,14 +23,8 @@ import { validateVoiceSelection, logSecurityEvent, monitorPerformance } from "@/
 
 export function StableVoiceSelector() {
   // Following AI_INSTRUCTIONS.md patterns: Use the stable store selectors to prevent infinite loops
-  const { selectedPerspectives: perspectives, selectedRoles: roles } = useAppStore(
-    state => ({
-      selectedPerspectives: state.voice.selectedPerspectives || [],
-      selectedRoles: state.voice.selectedRoles || []
-    }), 
-    shallow
-  );
-  
+  const perspectives = useAppStore(state => state.voice.selectedPerspectives || [], shallow);
+  const roles = useAppStore(state => state.voice.selectedRoles || [], shallow);
   const user = useAppStore(state => state.auth.user);
   
   // Extract actions with stable reference - these are cached in the voice slice

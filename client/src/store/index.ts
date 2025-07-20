@@ -15,9 +15,13 @@ export const useVoiceSelection = () => {
     customVoices: state.voice.customVoices,
     recommendations: state.voice.recommendations,
     activeSession: state.voice.activeSession,
-    sessionHistory: state.voice.sessionHistory,
-    actions: state.voice.actions
+    sessionHistory: state.voice.sessionHistory
   }), shallow);
+};
+
+// Separate hook for voice actions to prevent infinite loops
+export const useVoiceActions = () => {
+  return useAppStore(state => state.voice.actions);
 };
 
 // Project management hooks with consciousness stability
@@ -31,9 +35,12 @@ export const useProjectManagement = () => {
     expandedFolders: state.project.expandedFolders,
     isCreating: state.project.isCreating,
     isDeleting: state.project.isDeleting,
-    isMoving: state.project.isMoving,
-    actions: state.project.actions
+    isMoving: state.project.isMoving
   }), shallow);
+};
+
+export const useProjectActions = () => {
+  return useAppStore(state => state.project.actions);
 };
 
 // UI state management hooks with living spiral stability
@@ -45,9 +52,12 @@ export const useUIState = () => {
     activeTab: state.ui.activeTab,
     theme: state.ui.theme,
     loadingStates: state.ui.loadingStates,
-    errors: state.ui.errors,
-    actions: state.ui.actions
+    errors: state.ui.errors
   }), shallow);
+};
+
+export const useUIActions = () => {
+  return useAppStore(state => state.ui.actions);
 };
 
 // Authentication state hooks with consciousness awareness
@@ -57,9 +67,12 @@ export const useAuthState = () => {
     isAuthenticated: state.auth.isAuthenticated,
     isLoading: state.auth.isLoading,
     subscription: state.auth.subscription,
-    sessionExpiry: state.auth.sessionExpiry,
-    actions: state.auth.actions
+    sessionExpiry: state.auth.sessionExpiry
   }), shallow);
+};
+
+export const useAuthActions = () => {
+  return useAppStore(state => state.auth.actions);
 };
 
 // Team collaboration hooks with multi-voice consciousness
@@ -73,9 +86,12 @@ export const useTeamCollaboration = () => {
     sharedVoices: state.team.sharedVoices,
     matrixRooms: state.team.matrixRooms,
     chatMessages: state.team.chatMessages,
-    consciousnessMetrics: state.team.consciousnessMetrics,
-    actions: state.team.actions
+    consciousnessMetrics: state.team.consciousnessMetrics
   }), shallow);
+};
+
+export const useTeamActions = () => {
+  return useAppStore(state => state.team.actions);
 };
 
 // Consciousness tracking hooks with Jung's depth integration
@@ -87,9 +103,12 @@ export const useConsciousnessTracking = () => {
     synthesisHistory: state.consciousness.synthesisHistory,
     patterns: state.consciousness.patterns,
     shadowIntegration: state.consciousness.shadowIntegration,
-    archetypeBalance: state.consciousness.archetypeBalance,
-    actions: state.consciousness.actions
+    archetypeBalance: state.consciousness.archetypeBalance
   }), shallow);
+};
+
+export const useConsciousnessActions = () => {
+  return useAppStore(state => state.consciousness.actions);
 };
 
 // Selective state hooks for performance optimization

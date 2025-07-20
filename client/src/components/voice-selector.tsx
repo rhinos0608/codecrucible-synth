@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
-import { useVoiceSelection, useAuthState } from "@/store";
+import { useVoiceSelection, useVoiceActions, useAuthState } from "@/store";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useTeamVoiceProfiles } from "@/hooks/useTeamVoiceProfiles";
 import { useToast } from "@/hooks/use-toast";
@@ -19,9 +19,9 @@ import { useState } from "react";
 export function PerspectiveSelector() {
   const { 
     perspectives, 
-    roles, 
-    actions: voiceActions 
+    roles 
   } = useVoiceSelection();
+  const voiceActions = useVoiceActions();
   
   const { user } = useAuthState();
   const { profiles, isLoading } = useVoiceProfiles();

@@ -18,159 +18,162 @@ const initialVoiceState: Omit<VoiceState, 'actions'> = {
   sessionHistory: []
 };
 
-// Voice slice creator with immutable updates  
+// Create stable action references to prevent infinite loops
+const createVoiceActions = (set: any, get: any) => ({
+  // Set selected voice perspectives with validation
+  selectPerspectives: (perspectives: string[]) => {
+    set(produce((state: AppState) => {
+      // Validate perspectives against available options
+      const validPerspectives = perspectives.filter(p => 
+        ['seeker', 'steward', 'witness', 'nurturer', 'decider'].includes(p)
+      );
+      
+      state.voice.selectedPerspectives = validPerspectives;
+      
+      storeLogger.info('Voice perspectives selected', {
+        perspectives: validPerspectives,
+        count: validPerspectives.length
+      });
+      
+      // Trigger consciousness evolution if significant change
+      if (validPerspectives.length >= 3) {
+        // TODO: Add consciousness tracking integration
+        console.log('Consciousness evolution triggered');
+      }
+    }));
+  },
+
+  // Set selected voice roles with validation
+  selectRoles: (roles: string[]) => {
+    set(produce((state: AppState) => {
+      const validRoles = roles.filter(r => 
+        ['guardian', 'architect', 'designer', 'optimizer'].includes(r)
+      );
+      
+      state.voice.selectedRoles = validRoles;
+      
+      storeLogger.info('Voice roles selected', {
+        roles: validRoles,
+        count: validRoles.length
+      });
+    }));
+  },
+
+  // Add custom voice with validation
+  addCustomVoice: (voice: CustomVoice) => {
+    set(produce((state: AppState) => {
+      // Validate custom voice data
+      if (!voice.name || !voice.description) {
+        storeLogger.error('Invalid custom voice data', voice);
+        return;
+      }
+      
+      // Check for duplicate names
+      const exists = state.voice.customVoices.some(v => v.name === voice.name);
+      if (exists) {
+        storeLogger.warn('Custom voice with this name already exists', { name: voice.name });
+        return;
+      }
+      
+      state.voice.customVoices.push({
+        ...voice,
+        id: voice.id || `voice_${Date.now()}`,
+        userId: state.auth.user?.id || 'anonymous'
+      });
+      
+      storeLogger.info('Custom voice added', {
+        voiceId: voice.id,
+        name: voice.name,
+        specialization: voice.specialization
+      });
+    }));
+  },
+
+  // Update recommendations with scoring
+  updateRecommendations: (recommendations: VoiceRecommendation[]) => {
+    set(produce((state: AppState) => {
+      state.voice.recommendations = recommendations.slice(0, 5); // Keep top 5
+      
+      storeLogger.info('Voice recommendations updated', {
+        count: recommendations.length,
+        topScore: recommendations[0]?.score || 0
+      });
+    }));
+  },
+
+  // Set analysis context for voice recommendations
+  setAnalysisContext: (context: string) => {
+    set(produce((state: AppState) => {
+      state.voice.analysisContext = context;
+      
+      // Trigger recommendation update if context is substantial
+      if (context.length > 10) {
+        // TODO: Trigger voice recommendation analysis
+        console.log('Analysis context updated:', context.slice(0, 50) + '...');
+      }
+    }));
+  },
+
+  // Create new voice session
+  createSession: (perspectives: string[], roles: string[], prompt: string) => {
+    set(produce((state: AppState) => {
+      const newSession: VoiceSession = {
+        id: `session_${Date.now()}`,
+        perspectives,
+        roles,
+        prompt,
+        timestamp: Date.now(),
+        solutions: [],
+        synthesisResult: null
+      };
+      
+      // Set as active session
+      state.voice.activeSession = newSession;
+      
+      // Add to history (keep last 50 sessions)
+      state.voice.sessionHistory.unshift(newSession);
+      if (state.voice.sessionHistory.length > 50) {
+        state.voice.sessionHistory = state.voice.sessionHistory.slice(0, 50);
+      }
+      
+      storeLogger.info('Voice session created', {
+        sessionId: newSession.id,
+        perspectives: newSession.perspectives,
+        roles: newSession.roles,
+        promptLength: newSession.prompt.length
+      });
+      
+      // Note: Consciousness tracking will be handled separately to avoid circular references
+      // TODO: Implement consciousness tracking in session management layer
+    }));
+  },
+
+  // Clear voice selection
+  clearSelection: () => {
+    set(produce((state: AppState) => {
+      state.voice.selectedPerspectives = [];
+      state.voice.selectedRoles = [];
+      state.voice.recommendations = [];
+      state.voice.analysisContext = '';
+      
+      storeLogger.info('Voice selection cleared');
+    }));
+  }
+});
+
+// Voice slice creator with stable action references
 export const createVoiceSlice: StateCreator<
   AppState,
   [],
   [],
   VoiceState
-> = (set, get) => ({
-  ...initialVoiceState,
-  
-  actions: {
-    // Set selected voice perspectives with validation
-    selectPerspectives: (perspectives: string[]) => {
-      set(produce((state: AppState) => {
-        // Validate perspectives against available options
-        const validPerspectives = perspectives.filter(p => 
-          ['seeker', 'steward', 'witness', 'nurturer', 'decider'].includes(p)
-        );
-        
-        state.voice.selectedPerspectives = validPerspectives;
-        
-        storeLogger.info('Voice perspectives selected', {
-          perspectives: validPerspectives,
-          count: validPerspectives.length
-        });
-        
-        // Trigger consciousness evolution if significant change
-        if (validPerspectives.length >= 3) {
-          // TODO: Add consciousness tracking integration
-          console.log('Consciousness evolution triggered');
-        }
-      }));
-    },
-
-    // Set selected voice roles with validation
-    selectRoles: (roles: string[]) => {
-      set(produce((state: AppState) => {
-        const validRoles = roles.filter(r => 
-          ['guardian', 'architect', 'designer', 'optimizer'].includes(r)
-        );
-        
-        state.voice.selectedRoles = validRoles;
-        
-        storeLogger.info('Voice roles selected', {
-          roles: validRoles,
-          count: validRoles.length
-        });
-      }));
-    },
-
-    // Add custom voice with validation
-    addCustomVoice: (voice: CustomVoice) => {
-      set(produce((state: AppState) => {
-        // Validate custom voice data
-        if (!voice.name || !voice.description) {
-          storeLogger.error('Invalid custom voice data', voice);
-          return;
-        }
-        
-        // Check for duplicate names
-        const exists = state.voice.customVoices.some(v => v.name === voice.name);
-        if (exists) {
-          storeLogger.warn('Custom voice with this name already exists', { name: voice.name });
-          return;
-        }
-        
-        state.voice.customVoices.push({
-          ...voice,
-          id: voice.id || `voice_${Date.now()}`,
-          userId: state.auth.user?.id || 'anonymous'
-        });
-        
-        storeLogger.info('Custom voice added', {
-          voiceId: voice.id,
-          name: voice.name,
-          specialization: voice.specialization
-        });
-      }));
-    },
-
-    // Remove custom voice
-    removeCustomVoice: (voiceId: string) => {
-      set(produce((state: AppState) => {
-        const index = state.voice.customVoices.findIndex(v => v.id === voiceId);
-        if (index === -1) {
-          storeLogger.warn('Custom voice not found for removal', { voiceId });
-          return;
-        }
-        
-        const removedVoice = state.voice.customVoices[index];
-        state.voice.customVoices.splice(index, 1);
-        
-        storeLogger.info('Custom voice removed', {
-          voiceId,
-          name: removedVoice.name
-        });
-      }));
-    },
-
-    // Set AI voice recommendations
-    setRecommendations: (recommendations: VoiceRecommendation[]) => {
-      set(produce((state: AppState) => {
-        state.voice.recommendations = recommendations;
-        
-        storeLogger.info('Voice recommendations updated', {
-          count: recommendations.length,
-          avgConfidence: recommendations.reduce((sum, r) => sum + r.confidence, 0) / recommendations.length
-        });
-      }));
-    },
-
-    // Create new voice session
-    createSession: (sessionData: Omit<VoiceSession, 'id'>) => {
-      set(produce((state: AppState) => {
-        const newSession: VoiceSession = {
-          ...sessionData,
-          id: `session_${Date.now()}`,
-          createdAt: new Date()
-        };
-        
-        // Set as active session
-        state.voice.activeSession = newSession;
-        
-        // Add to history (keep last 50 sessions)
-        state.voice.sessionHistory.unshift(newSession);
-        if (state.voice.sessionHistory.length > 50) {
-          state.voice.sessionHistory = state.voice.sessionHistory.slice(0, 50);
-        }
-        
-        storeLogger.info('Voice session created', {
-          sessionId: newSession.id,
-          perspectives: newSession.perspectives,
-          roles: newSession.roles,
-          promptLength: newSession.prompt.length
-        });
-        
-        // Note: Consciousness tracking will be handled separately to avoid circular references
-        // TODO: Implement consciousness tracking in session management layer
-      }));
-    },
-
-    // Clear voice selection
-    clearSelection: () => {
-      set(produce((state: AppState) => {
-        state.voice.selectedPerspectives = [];
-        state.voice.selectedRoles = [];
-        state.voice.recommendations = [];
-        state.voice.analysisContext = '';
-        
-        storeLogger.info('Voice selection cleared');
-      }));
-    }
-  }
-});
+> = (set, get) => {
+  const actions = createVoiceActions(set, get);
+  return {
+    ...initialVoiceState,
+    actions
+  };
+};
 
 // Voice slice with persistence
 export const useVoiceStore = createPersistentSlice<VoiceState>({

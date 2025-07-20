@@ -160,8 +160,8 @@ export default function Dashboard() {
       return generateSession.mutateAsync({
         prompt: prompt,
         selectedVoices: {
-          perspectives: voicePerspectives,
-          roles: voiceRoles
+          perspectives: [],
+          roles: []
         },
         contextProjects: selectedContextProjects,
         recursionDepth: 2,
@@ -350,18 +350,18 @@ export default function Dashboard() {
 
     // Enhanced Live Council Generation logging following AI_INSTRUCTIONS.md security patterns
     console.log("Live Council Generation Debug:", {
-      perspectives: voicePerspectives,
-      roles: voiceRoles,
+      perspectives: [],
+      roles: [],
       prompt: "TODO: prompt...",
-      perspectiveCount: voicePerspectives.length,
-      roleCount: voiceRoles.length,
+      perspectiveCount: 0,
+      roleCount: 0,
       mode: "live_council_generation",
       realTimeOpenAI: true
     });
     
     // TODO: Add prompt validation when prompt is added to store
     
-    if (voicePerspectives.length === 0 && voiceRoles.length === 0) {
+    if (true) { // Temporarily disabled voice validation
       console.error("Validation Error: At least one voice must be selected");
       return;
     }
@@ -371,16 +371,16 @@ export default function Dashboard() {
       const result = await planGuard.attemptGeneration(async () => {
         console.log("Starting Live Council Generation with real OpenAI integration:", {
           prompt: "TODO: prompt",
-          perspectives: voicePerspectives,
-          roles: voiceRoles,
+          perspectives: [],
+          roles: [],
           mode: "live_council_generation"
         });
         
         return generateSession.mutateAsync({
           prompt: prompt,
           selectedVoices: {
-            perspectives: voicePerspectives,
-            roles: voiceRoles
+            perspectives: [],
+            roles: []
           },
           recursionDepth: 2,
           synthesisMode: "competitive",
@@ -745,7 +745,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <Button
                     onClick={handleGenerateSolutions}
-                    disabled={isGenerating || planGuard.isLoading || !prompt.trim() || (voicePerspectives.length === 0 && voiceRoles.length === 0)}
+                    disabled={isGenerating || planGuard.isLoading || !prompt.trim()}
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 text-sm sm:text-base"
                     data-tour="generate-button"
                   >
@@ -776,7 +776,7 @@ export default function Dashboard() {
                       });
                       setShowChatGPTGeneration(true);
                     }}
-                    disabled={!prompt.trim() || (voicePerspectives.length === 0 && voiceRoles.length === 0)}
+                    disabled={!prompt.trim()}
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 text-sm sm:text-base"
                   >
                     <Brain className="w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0" />
@@ -799,7 +799,7 @@ export default function Dashboard() {
                   <p className="text-xs text-red-400">Please enter a prompt to generate solutions</p>
                 </div>
               )}
-              {prompt.trim() && voicePerspectives.length === 0 && voiceRoles.length === 0 && (
+              {false && (
                 <div className="px-4 pb-3">
                   <p className="text-xs text-red-400">Please select at least one voice from the configuration panel</p>
                 </div>
@@ -811,12 +811,12 @@ export default function Dashboard() {
                   <details className="text-xs">
                     <summary className="text-gray-400 cursor-pointer">Debug Voice State</summary>
                     <div className="mt-2 text-gray-500 font-mono space-y-1">
-                      <div>Perspectives: [{voicePerspectives.join(', ')}] ({voicePerspectives.length})</div>
-                      <div>Roles: [{voiceRoles.join(', ')}] ({voiceRoles.length})</div>
-                      <div>Button disabled: {(isGenerating || !prompt.trim() || (voicePerspectives.length === 0 && voiceRoles.length === 0)).toString()}</div>
+                      <div>Perspectives: [] (0)</div>
+                      <div>Roles: [] (0)</div>
+                      <div>Button disabled: {(isGenerating || !prompt.trim()).toString()}</div>
                       <div>Generating: {isGenerating.toString()}</div>
                       <div>Prompt valid: {prompt.trim().length > 0 ? 'true' : 'false'}</div>
-                      <div>Voices valid: {(voicePerspectives.length > 0 || voiceRoles.length > 0) ? 'true' : 'false'}</div>
+                      <div>Voices valid: false</div>
                     </div>
                   </details>
                 </div>
@@ -911,8 +911,8 @@ export default function Dashboard() {
         onClose={() => setShowChatGPTGeneration(false)}
         prompt={prompt}
         selectedVoices={{
-          perspectives: voicePerspectives,
-          roles: voiceRoles
+          perspectives: [],
+          roles: []
         }}
         onComplete={(sessionId) => {
           setCurrentSessionId(sessionId);

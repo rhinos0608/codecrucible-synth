@@ -33,18 +33,40 @@ export async function apiRequest(
   }
 ): Promise<any> {
   const method = options?.method || 'GET';
-  const res = await fetch(url, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers
-    },
-    body: options?.body ? JSON.stringify(options.body) : undefined,
-    credentials: "include",
-  });
+  
+  try {
+    // Following AI_INSTRUCTIONS.md: Enhanced error handling for network failures
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers
+      },
+      body: options?.body ? JSON.stringify(options.body) : undefined,
+      credentials: "include",
+    });
 
-  await throwIfResNotOk(res);
-  return res.json();
+    await throwIfResNotOk(res);
+    return res.json();
+  } catch (error) {
+    // Following AI_INSTRUCTIONS.md: Proper error handling without fallback data
+    const errorMessage = error instanceof Error ? error.message : 'Unknown network error';
+    
+    // Enhanced error logging for different failure types
+    if (errorMessage.includes('Failed to fetch')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Network fetch failed for ${method} ${url} (handled):`, errorMessage);
+      }
+      throw new Error(`Network connection failed for ${method} ${url}`);
+    } else if (errorMessage.includes('NetworkError')) {
+      throw new Error(`Network error for ${method} ${url}: ${errorMessage}`);
+    } else if (errorMessage.includes('AbortError')) {
+      throw new Error(`Request aborted for ${method} ${url}`);
+    }
+    
+    // Re-throw the original error for other cases
+    throw error;
+  }
 }
 
 // Legacy overload for backward compatibility
@@ -70,16 +92,32 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-    });
+    try {
+      // Following AI_INSTRUCTIONS.md: Enhanced error handling for query functions
+      const res = await fetch(queryKey.join("/") as string, {
+        credentials: "include",
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error) {
+      // Following AI_INSTRUCTIONS.md: Proper error handling without fallback data
+      const errorMessage = error instanceof Error ? error.message : 'Unknown query error';
+      
+      if (errorMessage.includes('Failed to fetch')) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Query fetch failed for ${queryKey.join("/")} (handled):`, errorMessage);
+        }
+        throw new Error(`Network connection failed for query ${queryKey.join("/")}`);
+      }
+      
+      // Re-throw the original error
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

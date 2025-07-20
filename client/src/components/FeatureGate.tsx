@@ -57,7 +57,14 @@ const hasFeatureAccess = (userTier: string, feature: FeatureName): boolean => {
   
   const allowedTiers = FEATURE_MATRIX[feature];
   if (!allowedTiers) return false;
-  return allowedTiers.includes(userTier as SubscriptionTier);
+  
+  // Type-safe tier validation
+  const validTiers: SubscriptionTier[] = ['free', 'pro', 'team', 'enterprise'];
+  const typedTier = validTiers.includes(userTier as SubscriptionTier) 
+    ? userTier as SubscriptionTier 
+    : 'free';
+  
+  return allowedTiers.includes(typedTier);
 };
 
 /**
@@ -136,6 +143,7 @@ const UpgradePrompt = ({
     'extended_analytics': 'Extended Analytics',
     'team_analytics': 'Team Analytics',
     'unlimited_daily_generations': 'Unlimited Daily Generations',
+    'project_folders': 'Project Folders & Organization',
   };
 
   const handleUpgrade = () => {
@@ -174,13 +182,14 @@ const UpgradePrompt = ({
 /**
  * Feature gate component that conditionally renders content based on subscription tier
  */
+
 export const FeatureGate = ({ 
   feature, 
   children, 
   fallback, 
   showUpgrade = true,
   className = ""
-}) => {
+}: FeatureGateProps) => {
   const { user } = useAuth();
   const { planTier } = usePlanGuard();
   
@@ -189,7 +198,7 @@ export const FeatureGate = ({
     ? planTier 
     : user?.subscriptionTier || 'free';
   
-  const hasAccess = hasFeatureAccess(userTier, feature);
+  const hasAccess = hasFeatureAccess(userTier, feature as FeatureName);
   
   if (!hasAccess) {
     if (fallback) {

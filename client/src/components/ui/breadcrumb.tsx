@@ -1,4 +1,5 @@
-import { forwardRef, ComponentPropsWithoutRef, ReactNode, ComponentProps } from "react"
+import { forwardRef } from "react"
+import type { ComponentPropsWithoutRef, ReactNode, ComponentProps } from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { ChevronRight, MoreHorizontal } from "lucide-react"
 

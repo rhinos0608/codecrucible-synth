@@ -193,6 +193,7 @@ Provide solutions that demonstrate your unique perspective while maintaining hig
     `.trim();
     
     return promptTemplate;
+    }
   }
   
   /**

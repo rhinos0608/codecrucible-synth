@@ -42,7 +42,7 @@ function ChatMessageComponent({ message }: { message: ChatMessage }) {
           )}
           <div className="text-sm whitespace-pre-wrap">{message.content}</div>
           <div className="text-xs opacity-50 mt-1">
-            {new Date(message.createdAt).toLocaleTimeString()}
+            {new Date(message.createdAt || Date.now()).toLocaleTimeString()}
           </div>
         </div>
       </div>

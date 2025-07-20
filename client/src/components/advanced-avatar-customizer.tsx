@@ -396,8 +396,8 @@ export function AdvancedAvatarCustomizer({
           description: templateData.description,
           personality: templateData.personality,
           specialization: templateData.specialization,
-          chatStyle: templateData.chatStyle,
-          ethicalStance: templateData.ethicalStance,
+          chatStyle: templateData.chatStyle as 'analytical' | 'friendly' | 'direct' | 'detailed',
+          ethicalStance: templateData.ethicalStance as 'progressive' | 'neutral' | 'conservative',
           perspective: templateData.perspective,
           role: templateData.role,
           avatar: templateData.avatar
@@ -431,7 +431,7 @@ export function AdvancedAvatarCustomizer({
           </DialogDescription>
         </DialogHeader>
 
-        <FeatureGate feature="custom_voices" className="min-h-[400px]">
+        <FeatureGate feature="custom_voices" className="min-h-[400px]" fallback={null}>
           <Tabs defaultValue="templates" className="w-full">
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="templates">Templates</TabsTrigger>
@@ -715,7 +715,7 @@ export function AdvancedAvatarCustomizer({
                           onClick={() => {
                             setVoiceData(prev => ({ 
                               ...prev, 
-                              chatStyle: approach.id,
+                              chatStyle: approach.id as 'analytical' | 'friendly' | 'direct' | 'detailed',
                               personality: approach.example
                             }));
                           }}

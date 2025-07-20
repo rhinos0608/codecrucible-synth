@@ -1,6 +1,7 @@
 "use client"
 
-import { forwardRef, ComponentPropsWithoutRef, ElementRef, HTMLAttributes } from "react"
+import { forwardRef } from "react"
+import type { ComponentPropsWithoutRef, ElementRef, HTMLAttributes } from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 

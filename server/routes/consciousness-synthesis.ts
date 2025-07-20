@@ -48,8 +48,8 @@ router.post('/synthesize', isAuthenticated, async (req: any, res) => {
     logger.info('Consciousness synthesis initiated', {
       userId: userId.substring(0, 8) + '...',
       solutionCount: solutions.length,
-      mode: options.mode || 'consensus',
-      targetConsciousness: options.targetConsciousness || 7
+      mode: options?.mode || 'consensus',
+      targetConsciousness: options?.targetConsciousness || 7
     });
 
     // Transform solutions to match engine interface
@@ -62,10 +62,10 @@ router.post('/synthesize', isAuthenticated, async (req: any, res) => {
     const context = {
       prompt: solutions[0]?.explanation || 'Multi-voice synthesis request',
       solutions: transformedSolutions,
-      mode: options.mode || 'consensus',
-      targetConsciousness: options.targetConsciousness || 7,
-      ethicalConstraints: options.ethicalConstraints || ['security', 'accessibility'],
-      architecturalPatterns: options.architecturalPatterns || ['modular', 'testable']
+      mode: options?.mode || 'consensus',
+      targetConsciousness: options?.targetConsciousness || 7,
+      ethicalConstraints: options?.ethicalConstraints || ['security', 'accessibility'],
+      architecturalPatterns: options?.architecturalPatterns || ['modular', 'testable']
     };
 
     // Perform consciousness synthesis
@@ -93,14 +93,15 @@ router.post('/synthesize', isAuthenticated, async (req: any, res) => {
     });
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown synthesis error';
     logger.error('Consciousness synthesis failed', { 
-      error: error.message,
+      message: errorMessage,
       userId: req.user?.claims?.sub?.substring(0, 8) + '...'
     });
     
     res.status(500).json({
       error: 'Synthesis failed',
-      message: error.message
+      message: errorMessage
     });
   }
 });
@@ -139,7 +140,7 @@ router.post('/stream-synthesize', isAuthenticated, async (req: any, res) => {
     logger.info('Streaming consciousness synthesis initiated', {
       userId: userId.substring(0, 8) + '...',
       solutionCount: solutions.length,
-      mode: options.mode || 'consensus'
+      mode: options?.mode || 'consensus'
     });
 
     // Transform solutions
@@ -152,10 +153,10 @@ router.post('/stream-synthesize', isAuthenticated, async (req: any, res) => {
     const context = {
       prompt: solutions[0]?.explanation || 'Streaming multi-voice synthesis',
       solutions: transformedSolutions,
-      mode: options.mode || 'consensus',
-      targetConsciousness: options.targetConsciousness || 7,
-      ethicalConstraints: options.ethicalConstraints || ['security', 'accessibility'],
-      architecturalPatterns: options.architecturalPatterns || ['modular', 'testable']
+      mode: options?.mode || 'consensus',
+      targetConsciousness: options?.targetConsciousness || 7,
+      ethicalConstraints: options?.ethicalConstraints || ['security', 'accessibility'],
+      architecturalPatterns: options?.architecturalPatterns || ['modular', 'testable']
     };
 
     // Simulate streaming progress with real synthesis

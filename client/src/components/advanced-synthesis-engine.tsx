@@ -310,7 +310,7 @@ export function AdvancedSynthesisEngine({
       setIsStreaming(false);
       setCurrentStep(null);
       
-      if (error.name !== 'AbortError') {
+      if (error instanceof Error && error.name !== 'AbortError') {
         toast({
           title: "Synthesis Failed",
           description: error.message || "An error occurred during synthesis",

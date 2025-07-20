@@ -2,6 +2,7 @@
 // Following AI_INSTRUCTIONS.md patterns - NO mock/simulation/fallback data allowed
 import OpenAI from "openai";
 import { logger, APIError } from './logger';
+import type { VoiceProfile as CustomVoiceProfile } from '../shared/schema';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_API_KEY) {
@@ -303,7 +304,7 @@ Focus on:
     sessionId: number;
     mode?: string;
     userId?: string;
-    customProfiles?: any[];
+    customProfiles?: CustomVoiceProfile[];
   }): Promise<FastSolution[]> {
     const { prompt, selectedVoices, perspectives: directPerspectives, roles: directRoles, sessionId, userId, customProfiles } = options;
     
@@ -329,7 +330,7 @@ Focus on:
     }
     
     // Fetch custom user profiles if userId provided - Following AI_INSTRUCTIONS.md patterns
-    let userCustomProfiles: any[] = [];
+    let userCustomProfiles: CustomVoiceProfile[] = [];
     if (userId && customProfiles) {
       userCustomProfiles = customProfiles;
       logger.info('Using custom user profiles for code generation', {

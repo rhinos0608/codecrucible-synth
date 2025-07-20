@@ -82,7 +82,10 @@ export function usePlanGuard() {
 
         setState(prev => ({ ...prev, isLoading: true }));
 
-        const quotaCheck = await checkQuota();
+        const quotaCheck = await checkQuota().catch(error => {
+          console.error('Failed to update plan state:', error);
+          return null;
+        });
         
         if (!quotaCheck) {
           setState({

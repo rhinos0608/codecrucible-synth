@@ -179,44 +179,81 @@ export function setupGlobalNetworkErrorHandling() {
     const error = event.reason;
     
     if (error instanceof Error && error.message.includes('Failed to fetch')) {
-      console.warn('[Global] Unhandled network error:', error.message);
-      
       // Prevent the error from showing in console as unhandled
       event.preventDefault();
       
-      // Show user-friendly notification
-      toast({
-        title: 'Connection Issue',
-        description: 'Lost connection to server. Please refresh if the issue persists.',
-        variant: 'destructive'
-      });
+      // Silent handling - log only in development
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Network] Handled unhandled fetch error:', error.message);
+      }
+      
+      // Optional: Show user-friendly notification only for persistent failures
+      // Commented out to reduce UI noise for temporary network issues
+      // toast({
+      //   title: 'Connection Issue',
+      //   description: 'Lost connection to server. Please refresh if the issue persists.',
+      //   variant: 'destructive'
+      // });
     }
   });
   
-  // Handle global fetch errors
+  // Suppress console errors for network failures in development
+  if (process.env.NODE_ENV === 'development') {
+    const originalError = console.error;
+    console.error = (...args) => {
+      const message = args[0];
+      
+      // Suppress common network error console spam
+      if (typeof message === 'string' && (
+        message.includes('Failed to fetch') ||
+        message.includes('NetworkError') ||
+        message.includes('net::ERR_')
+      )) {
+        // Convert to debug level to reduce console noise
+        console.debug('[Network Error Suppressed]', ...args);
+        return;
+      }
+      
+      // Let other errors pass through normally
+      originalError.apply(console, args);
+    };
+  }
+  
+  // Handle global fetch errors with enhanced classification
   const originalFetch = window.fetch;
   window.fetch = async (...args) => {
     try {
       return await originalFetch(...args);
     } catch (error) {
-      // Log but don't modify the error - let components handle it
+      // Enhanced error classification and silent handling
       if (error instanceof Error && error.message.includes('Failed to fetch')) {
-        console.debug('[Global] Fetch error intercepted:', args[0]);
+        // Create a classified NetworkError for consistent handling
+        const networkError = classifyNetworkError(error);
+        
+        // Log only in development for debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[Global Fetch]', networkError.type, 'for', args[0]);
+        }
+        
+        // Throw the classified error
+        throw networkError;
       }
       throw error;
     }
   };
 }
 
-// Error reporting for consciousness tracking
+// Error reporting for consciousness tracking - NO RECURSIVE DEPENDENCIES
 export async function reportNetworkError(
   error: NetworkError,
   context: string,
   additionalData?: Record<string, any>
 ) {
   try {
-    await safeFetch('/api/errors/track', {
+    // Use native fetch directly to avoid circular dependency with safeFetch
+    const response = await fetch('/api/errors/track', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'network_error',
@@ -232,9 +269,15 @@ export async function reportNetworkError(
         url: window.location.href,
         ...additionalData
       })
-    }, { logError: false }); // Don't log errors for error reporting itself
+    });
+    
+    // Don't throw on error reporting failures - just log
+    if (!response.ok) {
+      console.debug('[Error Reporting] HTTP', response.status, 'for network error reporting');
+    }
   } catch (reportingError) {
-    // Fail silently if error reporting fails
-    console.debug('[Error Reporting] Failed to report network error:', reportingError);
+    // Fail silently if error reporting fails - no recursive calls
+    console.debug('[Error Reporting] Failed to report network error:', 
+      reportingError instanceof Error ? reportingError.message : 'Unknown error');
   }
 }

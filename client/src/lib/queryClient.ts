@@ -55,8 +55,10 @@ export async function apiRequest(
   } catch (error) {
     // Following AI_INSTRUCTIONS.md: Consciousness-driven error handling
     if (error.name === 'NetworkError') {
-      // Report network errors for consciousness tracking
-      reportNetworkError(error as any, `API Request: ${method} ${url}`);
+      // Report network errors for consciousness tracking (non-blocking)
+      reportNetworkError(error as any, `API Request: ${method} ${url}`).catch(() => {
+        // Ignore error reporting failures to prevent recursive issues
+      });
     }
     
     // Re-throw the classified error
@@ -106,8 +108,10 @@ export const getQueryFn: <T>(options: {
     } catch (error) {
       // Following AI_INSTRUCTIONS.md: Consciousness-driven error handling
       if (error.name === 'NetworkError') {
-        // Report network errors for consciousness tracking
-        reportNetworkError(error as any, `Query: ${queryKey.join("/")}`);
+        // Report network errors for consciousness tracking (non-blocking)
+        reportNetworkError(error as any, `Query: ${queryKey.join("/")}`).catch(() => {
+          // Ignore error reporting failures to prevent recursive issues
+        });
       }
       
       // Re-throw the classified error

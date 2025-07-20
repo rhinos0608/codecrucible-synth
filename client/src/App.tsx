@@ -18,14 +18,16 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ConsciousnessErrorBoundary } from "@/components/consciousness-error-boundary";
 import { Chat } from "@/pages/Chat";
 import { initializeStore } from "@/store";
+import { setupGlobalNetworkErrorHandling } from "@/lib/network-error-handler";
 import { useEffect } from "react";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuthContext();
   
-  // Initialize store on app startup following AI_INSTRUCTIONS.md patterns
+  // Initialize store and global error handling following AI_INSTRUCTIONS.md patterns
   useEffect(() => {
     initializeStore().catch(console.error);
+    setupGlobalNetworkErrorHandling();
   }, []);
 
   return (

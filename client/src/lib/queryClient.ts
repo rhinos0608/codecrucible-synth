@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { safeFetch, classifyNetworkError, reportNetworkError } from './network-error-handler';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -35,36 +36,30 @@ export async function apiRequest(
   const method = options?.method || 'GET';
   
   try {
-    // Following AI_INSTRUCTIONS.md: Enhanced error handling for network failures
-    const res = await fetch(url, {
+    // Following AI_INSTRUCTIONS.md: Enhanced error handling with consciousness patterns
+    const res = await safeFetch(url, {
       method,
       headers: {
         "Content-Type": "application/json",
         ...options?.headers
       },
       body: options?.body ? JSON.stringify(options.body) : undefined,
-      credentials: "include",
+    }, {
+      context: `${method} ${url}`,
+      logError: true,
+      showToast: false // Let components handle UI feedback
     });
 
     await throwIfResNotOk(res);
     return res.json();
   } catch (error) {
-    // Following AI_INSTRUCTIONS.md: Proper error handling without fallback data
-    const errorMessage = error instanceof Error ? error.message : 'Unknown network error';
-    
-    // Enhanced error logging for different failure types
-    if (errorMessage.includes('Failed to fetch')) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Network fetch failed for ${method} ${url} (handled):`, errorMessage);
-      }
-      throw new Error(`Network connection failed for ${method} ${url}`);
-    } else if (errorMessage.includes('NetworkError')) {
-      throw new Error(`Network error for ${method} ${url}: ${errorMessage}`);
-    } else if (errorMessage.includes('AbortError')) {
-      throw new Error(`Request aborted for ${method} ${url}`);
+    // Following AI_INSTRUCTIONS.md: Consciousness-driven error handling
+    if (error.name === 'NetworkError') {
+      // Report network errors for consciousness tracking
+      reportNetworkError(error as any, `API Request: ${method} ${url}`);
     }
     
-    // Re-throw the original error for other cases
+    // Re-throw the classified error
     throw error;
   }
 }
@@ -93,9 +88,13 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      // Following AI_INSTRUCTIONS.md: Enhanced error handling for query functions
-      const res = await fetch(queryKey.join("/") as string, {
+      // Following AI_INSTRUCTIONS.md: Enhanced error handling with consciousness patterns
+      const res = await safeFetch(queryKey.join("/") as string, {
         credentials: "include",
+      }, {
+        context: `Query: ${queryKey.join("/")}`,
+        logError: true,
+        showToast: false
       });
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -105,17 +104,13 @@ export const getQueryFn: <T>(options: {
       await throwIfResNotOk(res);
       return await res.json();
     } catch (error) {
-      // Following AI_INSTRUCTIONS.md: Proper error handling without fallback data
-      const errorMessage = error instanceof Error ? error.message : 'Unknown query error';
-      
-      if (errorMessage.includes('Failed to fetch')) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`Query fetch failed for ${queryKey.join("/")} (handled):`, errorMessage);
-        }
-        throw new Error(`Network connection failed for query ${queryKey.join("/")}`);
+      // Following AI_INSTRUCTIONS.md: Consciousness-driven error handling
+      if (error.name === 'NetworkError') {
+        // Report network errors for consciousness tracking
+        reportNetworkError(error as any, `Query: ${queryKey.join("/")}`);
       }
       
-      // Re-throw the original error
+      // Re-throw the classified error
       throw error;
     }
   };

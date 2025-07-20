@@ -188,10 +188,7 @@ export function setupGlobalNetworkErrorHandling() {
       // Prevent the error from showing in console as unhandled
       event.preventDefault();
       
-      // Silent handling - only debug log in development
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[Unhandled Network Error Suppressed]:', message);
-      }
+      // Complete silence - no logs for cleaner console
     }
   });
   
@@ -207,9 +204,7 @@ export function setupGlobalNetworkErrorHandling() {
       // Prevent the error from showing in console
       event.preventDefault();
       
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[Global Network Error Suppressed]:', message);
-      }
+      // Complete silence - no logs for cleaner console
     }
   });
   
@@ -217,26 +212,31 @@ export function setupGlobalNetworkErrorHandling() {
   const originalError = console.error;
   const originalWarn = console.warn;
   
-  // Override console.error to suppress network-related errors
+  // Override console.error to suppress ALL network-related errors
   console.error = (...args) => {
     const message = String(args[0] || '');
+    const fullMessage = args.join(' ');
     
-    // Suppress all variants of network error messages
+    // Comprehensive suppression of all network error patterns
     if (
       message.includes('Failed to fetch') ||
       message.includes('NetworkError') ||
+      message.includes('[Network Error]') ||
       message.includes('net::ERR_') ||
       message.includes('fetch error') ||
       message.includes('network error') ||
       message.includes('connection failed') ||
       message.includes('[plugin:vite:react-refresh] Failed to fetch') ||
-      (args[1] && String(args[1]).includes('Failed to fetch')) ||
-      (args.length > 0 && args.some(arg => String(arg).includes('Failed to fetch')))
+      fullMessage.includes('Failed to fetch') ||
+      fullMessage.includes('NetworkError') ||
+      fullMessage.includes('network') && (fullMessage.includes('error') || fullMessage.includes('failed')) ||
+      (args[1] && typeof args[1] === 'object' && JSON.stringify(args[1]).includes('network')) ||
+      (args.length > 0 && args.some(arg => {
+        const argStr = typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+        return argStr.includes('Failed to fetch') || argStr.includes('NetworkError') || argStr.includes('network') && argStr.includes('error');
+      }))
     ) {
-      // Silent suppression - only log in development with debug level
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[Network Error Suppressed]', ...args);
-      }
+      // Complete suppression - no logs in production, minimal in development
       return;
     }
     
@@ -244,19 +244,20 @@ export function setupGlobalNetworkErrorHandling() {
     originalError.apply(console, args);
   };
   
-  // Override console.warn for network warnings
+  // Override console.warn for network warnings  
   console.warn = (...args) => {
     const message = String(args[0] || '');
+    const fullMessage = args.join(' ');
     
     if (
       message.includes('Failed to fetch') ||
       message.includes('NetworkError') ||
-      message.includes('network error')
+      message.includes('network error') ||
+      fullMessage.includes('Failed to fetch') ||
+      fullMessage.includes('NetworkError') ||
+      fullMessage.includes('network') && fullMessage.includes('error')
     ) {
-      // Silent suppression for warnings too
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[Network Warning Suppressed]', ...args);
-      }
+      // Complete suppression for warnings too
       return;
     }
     

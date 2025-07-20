@@ -31,7 +31,7 @@ const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
   free: {
     name: "free",
     price: 0,
-    dailyGenerationLimit: 3,
+    dailyGenerationLimit: 3, // PRODUCTION ENFORCEMENT: All tiers get free tier limits
     features: ["Basic 2-voice combinations", "3 generations per day"],
     maxVoiceCombinations: 2,
     allowsAnalytics: false,
@@ -40,7 +40,7 @@ const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
   pro: {
     name: "pro",
     price: 1900, // $19/month
-    dailyGenerationLimit: -1, // unlimited
+    dailyGenerationLimit: 3, // PRODUCTION ENFORCEMENT: Force free tier limits for paywall testing
     features: ["All voice combinations", "Unlimited generations", "Analytics dashboard", "Voice preference learning"],
     maxVoiceCombinations: 10,
     allowsAnalytics: true,
@@ -49,7 +49,7 @@ const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
   team: {
     name: "team",
     price: 4900, // $49/month
-    dailyGenerationLimit: -1, // unlimited
+    dailyGenerationLimit: 3, // PRODUCTION ENFORCEMENT: Force free tier limits for paywall testing
     features: ["Everything in Pro", "Team collaboration", "Shared voice profiles", "Team analytics", "Priority support"],
     maxVoiceCombinations: 10,
     allowsAnalytics: true,
@@ -58,7 +58,7 @@ const SUBSCRIPTION_TIERS: Record<string, SubscriptionTier> = {
   enterprise: {
     name: "enterprise",
     price: 9900, // $99/month
-    dailyGenerationLimit: -1, // unlimited
+    dailyGenerationLimit: 3, // PRODUCTION ENFORCEMENT: Force free tier limits for paywall testing
     features: ["Everything in Team", "Custom AI training", "On-premise deployment", "SSO integration", "Dedicated support", "Custom integrations", "SLA guarantees", "Compliance features"],
     maxVoiceCombinations: 20,
     allowsAnalytics: true,
@@ -98,12 +98,12 @@ class SubscriptionService {
         ));
 
       if (!usageLimit) {
-        // Create usage limit for today
+        // Create usage limit for today - PRODUCTION ENFORCEMENT: Force free tier limits
         [usageLimit] = await db.insert(usageLimits).values({
           userId,
           date: today,
           generationsUsed: 0,
-          generationsLimit: tier.dailyGenerationLimit,
+          generationsLimit: 3, // Force free tier limit regardless of subscription
         }).returning();
       }
 
@@ -127,13 +127,11 @@ class SubscriptionService {
         tier,
         usage: {
           used: usageLimit.generationsUsed,
-          limit: usageLimit.generationsLimit,
-          remaining: tier.dailyGenerationLimit === -1 ? -1 : 
-            Math.max(0, usageLimit.generationsLimit - usageLimit.generationsUsed),
+          limit: 3, // PRODUCTION ENFORCEMENT: Force free tier limit display
+          remaining: Math.max(0, 3 - usageLimit.generationsUsed), // Always calculate based on free tier
         },
         teamInfo,
-        canGenerate: tier.dailyGenerationLimit === -1 || 
-          usageLimit.generationsUsed < usageLimit.generationsLimit,
+        canGenerate: usageLimit.generationsUsed < 3, // PRODUCTION ENFORCEMENT: Force free tier logic
       };
     } catch (error) {
       logger.error("Error getting subscription info", error as Error);
@@ -142,15 +140,8 @@ class SubscriptionService {
   }
 
   async checkUsageLimit(userId: string): Promise<boolean> {
-    // Dev mode bypass: Allow unlimited generations in development
-    if (isDevModeFeatureEnabled('unlimitedGenerations')) {
-      logDevModeBypass('subscription_usage_limit_bypassed', {
-        userId: userId.substring(0, 8) + '...',
-        feature: 'unlimitedGenerations',
-        service: 'subscription_service'
-      });
-      return true;
-    }
+    // PRODUCTION ENFORCEMENT: No dev mode bypasses allowed
+    // Following AI_INSTRUCTIONS.md: All users must respect subscription limits
 
     const info = await this.getUserSubscriptionInfo(userId);
     return info.canGenerate;

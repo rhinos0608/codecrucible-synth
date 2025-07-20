@@ -118,15 +118,8 @@ export function enforcePlanRestrictions() {
 export function validateFeatureAccess(requiredFeature: 'synthesis' | 'analytics' | 'teams') {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Dev mode bypass: Allow unlimited synthesis access in development
-      if (requiredFeature === 'synthesis' && isDevModeFeatureEnabled('unlimitedSynthesis')) {
-        logDevModeBypass('synthesis_access_bypassed', {
-          userId: (req as any).user?.claims?.sub?.substring(0, 8) + '...' || 'anonymous',
-          ipAddress: req.ip,
-          feature: requiredFeature
-        });
-        return next();
-      }
+      // PRODUCTION ENFORCEMENT: No dev mode bypasses allowed for any features
+      // Following AI_INSTRUCTIONS.md: All users must respect subscription tier restrictions
 
       const quotaInfo = (req as any).quotaInfo;
       const planTier = quotaInfo?.planTier || 'free';

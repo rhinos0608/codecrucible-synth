@@ -3,6 +3,7 @@ import { users, usageLimits } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { logSecurityEvent } from "../security/logSecurityEvent";
 import { isDevModeFeatureEnabled, logDevModeBypass, getDevModeMetadata } from "../dev-mode";
+import { logger } from "../../logger";
 
 export interface QuotaCheckResult {
   allowed: boolean;

@@ -562,27 +562,28 @@ Requirements:
   }): Promise<void> {
     const { prompt, sessionId, voiceId, type, customProfile, onChunk, onComplete } = options;
     
-    // Enhanced system prompt with custom profile integration - Following AI_INSTRUCTIONS.md patterns
-    let systemPrompt = this.getSystemPrompt(voiceId, type);
-    
-    // Jung's Descent Protocol: Apply custom profile to streaming if available
-    if (customProfile) {
-      const customStreamPrompt = this.buildCustomProfilePrompt(customProfile, voiceId, type);
-      if (customStreamPrompt) {
-        systemPrompt = customStreamPrompt;
+    try {
+      // Enhanced system prompt with custom profile integration - Following AI_INSTRUCTIONS.md patterns
+      let systemPrompt = this.getSystemPrompt(voiceId, type);
+      
+      // Jung's Descent Protocol: Apply custom profile to streaming if available
+      if (customProfile) {
+        const customStreamPrompt = this.buildCustomProfilePrompt(customProfile, voiceId, type);
+        if (customStreamPrompt) {
+          systemPrompt = customStreamPrompt;
+        }
+        
+        logger.info('Custom profile applied to streaming voice', {
+          voiceId,
+          profileName: customProfile.name,
+          specialization: customProfile.specialization,
+          chatStyle: customProfile.chatStyle,
+          personality: customProfile.personality,
+          ethicalStance: customProfile.ethicalStance
+        });
       }
       
-      logger.info('Custom profile applied to streaming voice', {
-        voiceId,
-        profileName: customProfile.name,
-        specialization: customProfile.specialization,
-        chatStyle: customProfile.chatStyle,
-        personality: customProfile.personality,
-        ethicalStance: customProfile.ethicalStance
-      });
-    }
-    
-    const userPrompt = `Generate complete, production-ready code for: ${prompt}
+      const userPrompt = `Generate complete, production-ready code for: ${prompt}
 
 Requirements:
 - Minimum 1200 characters of functional code
@@ -595,38 +596,38 @@ ${customProfile ? `- Apply ${customProfile.name} voice profile characteristics w
 
 Generate real, functional code that can be executed immediately.`;
 
-    logger.info('REAL OpenAI streaming generation starting', { 
-      sessionId, 
-      voiceId, 
-      type,
-      promptLength: prompt.length
-    });
+      logger.info('REAL OpenAI streaming generation starting', { 
+        sessionId, 
+        voiceId, 
+        type,
+        promptLength: prompt.length
+      });
 
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      stream: true,
-      temperature: 0.4,
-      max_tokens: 2500
-    });
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        stream: true,
+        temperature: 0.4,
+        max_tokens: 2500
+      });
 
-    let fullContent = '';
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || '';
-      if (content) {
-        fullContent += content;
-        onChunk(content);
+      let fullContent = '';
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          fullContent += content;
+          onChunk(content);
+        }
       }
-    }
 
-    const code = this.extractCode(fullContent);
-    const explanation = this.extractExplanation(fullContent);
+      const code = this.extractCode(fullContent);
+      const explanation = this.extractExplanation(fullContent);
 
-    await onComplete({
-      voiceCombination: `${type}:${voiceId}`,
+      await onComplete({
+        voiceCombination: `${type}:${voiceId}`,
       code,
       explanation,
       confidence: this.calculateConfidence(code, explanation),
@@ -634,18 +635,50 @@ Generate real, functional code that can be executed immediately.`;
       considerations: this.getConsiderations(voiceId, type)
     });
 
-    logger.info('REAL OpenAI streaming generation completed', { 
-      sessionId, 
-      voiceId, 
-      contentLength: fullContent.length 
-    });
+      logger.info('REAL OpenAI streaming generation completed', { 
+        sessionId, 
+        voiceId, 
+        contentLength: fullContent.length 
+      });
+    } catch (streamError) {
+      logger.error('OpenAI streaming generation failed', streamError as Error, {
+        sessionId,
+        voiceId,
+        type,
+        operation: 'generateSolutionStream'
+      });
+      
+      // Consciousness-driven error recovery following CodingPhilosophy.md patterns
+      const errorSolution = {
+        voiceCombination: `${type}:${voiceId}`,
+        code: '// Stream generation failed - council fallback required',
+        explanation: `OpenAI streaming failed for ${voiceId}. Error: ${streamError instanceof Error ? streamError.message : 'Unknown streaming error'}`,
+        confidence: 0,
+        voiceId,
+        type,
+        id: Date.now()
+      };
+      
+      try {
+        await onComplete(errorSolution);
+      } catch (completeError) {
+        logger.error('Failed to complete error recovery', completeError as Error, {
+          sessionId,
+          voiceId,
+          operation: 'generateSolutionStream_error_recovery'
+        });
+      }
+      
+      throw streamError;
+    }
   }
 
   // REAL OpenAI synthesis - NO mock data
   async synthesizeSolutions(solutions: any[], sessionId: number, originalPrompt?: string): Promise<any> {
-    const prompt = originalPrompt || 'Synthesize the following code solutions';
-    
-    const synthesisPrompt = `Synthesize the following code solutions into one optimal implementation:
+    try {
+      const prompt = originalPrompt || 'Synthesize the following code solutions';
+      
+      const synthesisPrompt = `Synthesize the following code solutions into one optimal implementation:
 
 Original Prompt: ${prompt}
 
@@ -662,18 +695,18 @@ Create a single, optimized solution that combines the best aspects of all soluti
 2. Clear explanation of synthesis decisions
 3. Benefits from each original solution`;
 
-    logger.info('Making REAL OpenAI synthesis call', { 
-      sessionId,
-      solutionCount: solutions.length,
-      promptLength: synthesisPrompt.length
-    });
+      logger.info('Making REAL OpenAI synthesis call', { 
+        sessionId,
+        solutionCount: solutions.length,
+        promptLength: synthesisPrompt.length
+      });
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { 
-          role: "system", 
-          content: `You are an expert code synthesizer following both AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles.
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { 
+            role: "system", 
+            content: `You are an expert code synthesizer following both AI_INSTRUCTIONS.md security patterns and CodingPhilosophy.md consciousness principles.
 
 SYNTHESIS CONSCIOUSNESS REQUIREMENTS:
 - Apply Jung's Integration Protocol: Combine perspectives through shadow integration and conscious synthesis
@@ -688,35 +721,58 @@ TECHNICAL REQUIREMENTS:
 - Apply living spiral methodology: collapse → council → synthesis → rebirth
 
 Combine multiple code solutions into one optimal implementation using consciousness-driven synthesis.` 
-        },
-        { role: "user", content: synthesisPrompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 3000
-    });
+          },
+          { role: "user", content: synthesisPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 3000
+      });
 
-    const content = response.choices[0].message.content || '';
-    
-    logger.info('REAL OpenAI synthesis completed', { 
-      sessionId,
-      responseLength: content.length
-    });
+      const content = response.choices[0].message.content || '';
+      
+      logger.info('REAL OpenAI synthesis completed', { 
+        sessionId,
+        responseLength: content.length
+      });
 
-    const extractedCode = this.extractCode(content);
-    const extractedExplanation = this.extractExplanation(content);
-    
-    return {
-      id: Date.now(),
-      sessionId,
-      synthesizedCode: extractedCode,
-      code: extractedCode, // Ensure both formats for compatibility
-      explanation: extractedExplanation,
-      confidence: 95,
-      originalSolutions: solutions,
-      synthesisApproach: "Real OpenAI GPT-4o Integration with Consciousness Principles",
-      synthesisMethod: 'Real OpenAI GPT-4o Integration',
-      createdAt: new Date().toISOString()
-    };
+      const extractedCode = this.extractCode(content);
+      const extractedExplanation = this.extractExplanation(content);
+      
+      return {
+        id: Date.now(),
+        sessionId,
+        synthesizedCode: extractedCode,
+        code: extractedCode, // Ensure both formats for compatibility
+        explanation: extractedExplanation,
+        confidence: 95,
+        originalSolutions: solutions,
+        synthesisApproach: "Real OpenAI GPT-4o Integration with Consciousness Principles",
+        synthesisMethod: 'Real OpenAI GPT-4o Integration',
+        createdAt: new Date().toISOString()
+      };
+    } catch (synthesisError) {
+      logger.error('OpenAI synthesis failed', synthesisError as Error, {
+        sessionId,
+        solutionCount: solutions.length,
+        operation: 'synthesizeSolutions'
+      });
+      
+      // Consciousness-driven fallback synthesis following CodingPhilosophy.md patterns
+      const fallbackSynthesis = {
+        id: Date.now(),
+        sessionId,
+        synthesizedCode: solutions.length > 0 ? solutions[0].code : '// Synthesis failed - no solutions available',
+        code: solutions.length > 0 ? solutions[0].code : '// Synthesis failed - no solutions available',
+        explanation: `OpenAI synthesis failed. Error: ${synthesisError instanceof Error ? synthesisError.message : 'Unknown synthesis error'}. ${solutions.length > 0 ? 'Using first solution as fallback.' : 'No solutions available for fallback.'}`,
+        confidence: 25,
+        originalSolutions: solutions,
+        synthesisApproach: "Fallback - OpenAI Synthesis Failed",
+        synthesisMethod: 'Error Recovery Fallback',
+        createdAt: new Date().toISOString()
+      };
+      
+      return fallbackSynthesis;
+    }
   }
 
   // Jung's Descent Protocol: Build custom profile-specific prompts with consciousness integration

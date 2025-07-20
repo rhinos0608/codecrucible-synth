@@ -145,59 +145,70 @@ export function LiveCodeGeneration({ isOpen, onClose, prompt, selectedVoices, on
     ));
     
     eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.type === 'chunk') {
-        // Append new content chunk
-        setVoices(prev => prev.map(v => 
-          v.id === voiceId 
-            ? { ...v, content: v.content + data.content }
-            : v
-        ));
+      try {
+        const data = JSON.parse(event.data);
         
-        // Auto-scroll to bottom
-        if (contentRefs.current[voiceId]) {
-          contentRefs.current[voiceId].scrollTop = contentRefs.current[voiceId].scrollHeight;
-        }
-      } else if (data.type === 'complete') {
-        // Voice completed generation
-        setVoices(prev => prev.map(v => 
-          v.id === voiceId 
-            ? { 
-                ...v, 
-                isTyping: false, 
-                isComplete: true,
-                confidence: data.confidence || 85
-              }
-            : v
-        ));
-        
-        eventSource.close();
-        delete streamRefs.current[voiceId];
-        
-        // Check if all voices are complete
-        setVoices(prev => {
-          const allComplete = prev.every(voice => 
-            voice.id === voiceId ? true : voice.isComplete
-          );
+        if (data.type === 'chunk') {
+          // Append new content chunk
+          setVoices(prev => prev.map(v => 
+            v.id === voiceId 
+              ? { ...v, content: v.content + data.content }
+              : v
+          ));
           
-          if (allComplete) {
-            setIsGenerating(false);
-            setTimeout(() => {
-              if (sessionId) {
-                onComplete(sessionId);
-                onClose();
-              }
-            }, 1500); // Brief pause to show completion
+          // Auto-scroll to bottom
+          if (contentRefs.current[voiceId]) {
+            contentRefs.current[voiceId].scrollTop = contentRefs.current[voiceId].scrollHeight;
           }
+        } else if (data.type === 'complete') {
+          // Voice completed generation
+          setVoices(prev => prev.map(v => 
+            v.id === voiceId 
+              ? { 
+                  ...v, 
+                  isTyping: false, 
+                  isComplete: true,
+                  confidence: data.confidence || 85
+                }
+              : v
+          ));
           
-          return prev;
-        });
-      } else if (data.type === 'error') {
-        console.error(`Voice ${voiceId} error:`, data.error);
+          eventSource.close();
+          delete streamRefs.current[voiceId];
+          
+          // Check if all voices are complete
+          setVoices(prev => {
+            const allComplete = prev.every(voice => 
+              voice.id === voiceId ? true : voice.isComplete
+            );
+            
+            if (allComplete) {
+              setIsGenerating(false);
+              setTimeout(() => {
+                if (sessionId) {
+                  onComplete(sessionId);
+                  onClose();
+                }
+              }, 1500); // Brief pause to show completion
+            }
+            
+            return prev;
+          });
+        } else if (data.type === 'error') {
+          console.error(`Voice ${voiceId} error:`, data.error);
+          setVoices(prev => prev.map(v => 
+            v.id === voiceId 
+              ? { ...v, isTyping: false, content: v.content + '\n\n[Generation error occurred]' }
+              : v
+          ));
+          eventSource.close();
+          delete streamRefs.current[voiceId];
+        }
+      } catch (parseError) {
+        console.error(`Failed to parse streaming data for voice ${voiceId}:`, parseError, 'Raw data:', event.data);
         setVoices(prev => prev.map(v => 
           v.id === voiceId 
-            ? { ...v, isTyping: false, content: v.content + '\n\n[Generation error occurred]' }
+            ? { ...v, isTyping: false, content: v.content + '\n\n[JSON parsing error occurred]' }
             : v
         ));
         eventSource.close();
@@ -207,8 +218,27 @@ export function LiveCodeGeneration({ isOpen, onClose, prompt, selectedVoices, on
     
     eventSource.onerror = (error) => {
       console.error(`Stream error for voice ${voiceId}:`, error);
-      eventSource.close();
+      
+      // Update voice to show error state
+      setVoices(prev => prev.map(v => 
+        v.id === voiceId 
+          ? { ...v, isTyping: false, content: v.content + '\n\n[Stream connection error]' }
+          : v
+      ));
+      
+      try {
+        eventSource.close();
+      } catch (closeError) {
+        console.warn(`Failed to close EventSource for voice ${voiceId}:`, closeError);
+      }
+      
       delete streamRefs.current[voiceId];
+      
+      // Check if this was the last active voice and stop generation if needed
+      const remainingStreams = Object.keys(streamRefs.current).length;
+      if (remainingStreams === 0) {
+        setIsGenerating(false);
+      }
     };
   };
 

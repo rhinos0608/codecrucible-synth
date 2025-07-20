@@ -2330,9 +2330,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Connection keepalive heartbeat to prevent browser timeout
       const heartbeat = setInterval(() => {
-        try {
-          res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`);
-        } catch (e) {
+        if (!res.destroyed && !res.writableEnded) {
+          try {
+            res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`);
+          } catch (e) {
+            console.warn('Heartbeat write failed:', e);
+            clearInterval(heartbeat);
+          }
+        } else {
           clearInterval(heartbeat);
         }
       }, 15000);

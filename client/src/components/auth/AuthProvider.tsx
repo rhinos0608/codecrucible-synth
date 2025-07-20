@@ -36,6 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: true,
+    throwOnError: false, // Prevent unhandled promise rejections
+    onError: (error) => {
+      // Handle authentication errors gracefully
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Auth error handled:', error?.message || 'Unknown auth error');
+      }
+    },
   });
 
   const isAuthenticated = !!user && !error;

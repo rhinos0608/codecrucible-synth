@@ -48,12 +48,23 @@ export function useCreateSession() {
   
   return useMutation({
     mutationFn: async (data: CreateSessionRequest) => {
-      const response = await apiRequest('POST', '/api/collaboration/sessions', data);
-      return response.json();
+      try {
+        const result = await apiRequest('/api/collaboration/sessions', {
+          method: 'POST',
+          body: data
+        });
+        return result;
+      } catch (error) {
+        console.error('Failed to create collaboration session:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/collaboration/teams'] });
     },
+    onError: (error) => {
+      console.error('Create session mutation failed:', error);
+    }
   });
 }
 
@@ -62,12 +73,23 @@ export function useJoinSession() {
   
   return useMutation({
     mutationFn: async ({ sessionId, role = 'collaborator' }: { sessionId: string; role?: string }) => {
-      const response = await apiRequest('POST', `/api/collaboration/sessions/${sessionId}/join`, { role });
-      return response.json();
+      try {
+        const result = await apiRequest(`/api/collaboration/sessions/${sessionId}/join`, {
+          method: 'POST',
+          body: { role }
+        });
+        return result;
+      } catch (error) {
+        console.error('Failed to join collaboration session:', error);
+        throw error;
+      }
     },
     onSuccess: (_, { sessionId }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/collaboration/sessions', sessionId] });
     },
+    onError: (error) => {
+      console.error('Join session mutation failed:', error);
+    }
   });
 }
 
@@ -76,12 +98,23 @@ export function useSendChatMessage() {
   
   return useMutation({
     mutationFn: async ({ sessionId, message }: { sessionId: string; message: string }) => {
-      const response = await apiRequest('POST', `/api/collaboration/sessions/${sessionId}/chat`, { message });
-      return response.json();
+      try {
+        const result = await apiRequest(`/api/collaboration/sessions/${sessionId}/chat`, {
+          method: 'POST',
+          body: { message }
+        });
+        return result;
+      } catch (error) {
+        console.error('Failed to send chat message:', error);
+        throw error;
+      }
     },
     onSuccess: (_, { sessionId }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/collaboration/sessions', sessionId] });
     },
+    onError: (error) => {
+      console.error('Send chat message mutation failed:', error);
+    }
   });
 }
 
@@ -94,14 +127,22 @@ export function useAssignVoice() {
       voiceType: string; 
       assignedTo: string; 
     }) => {
-      const response = await apiRequest('POST', `/api/collaboration/sessions/${sessionId}/assign-voice`, {
-        voiceType,
-        assignedTo,
-      });
-      return response.json();
+      try {
+        const result = await apiRequest(`/api/collaboration/sessions/${sessionId}/assign-voice`, {
+          method: 'POST',
+          body: { voiceType, assignedTo }
+        });
+        return result;
+      } catch (error) {
+        console.error('Failed to assign voice:', error);
+        throw error;
+      }
     },
     onSuccess: (_, { sessionId }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/collaboration/sessions', sessionId] });
     },
+    onError: (error) => {
+      console.error('Assign voice mutation failed:', error);
+    }
   });
 }

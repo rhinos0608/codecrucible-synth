@@ -172,52 +172,97 @@ export async function retryableFetch(
   throw lastError!;
 }
 
-// Global error handler for unhandled promise rejections
+// Global error handler for unhandled promise rejections and console errors
 export function setupGlobalNetworkErrorHandling() {
   // Handle unhandled promise rejections
   window.addEventListener('unhandledrejection', (event) => {
     const error = event.reason;
+    const message = error instanceof Error ? error.message : String(error);
     
-    if (error instanceof Error && error.message.includes('Failed to fetch')) {
+    if (
+      message.includes('Failed to fetch') ||
+      message.includes('NetworkError') ||
+      message.includes('network error') ||
+      message.includes('fetch error')
+    ) {
       // Prevent the error from showing in console as unhandled
       event.preventDefault();
       
-      // Silent handling - log only in development
+      // Silent handling - only debug log in development
       if (process.env.NODE_ENV === 'development') {
-        console.debug('[Network] Handled unhandled fetch error:', error.message);
+        console.debug('[Unhandled Network Error Suppressed]:', message);
       }
-      
-      // Optional: Show user-friendly notification only for persistent failures
-      // Commented out to reduce UI noise for temporary network issues
-      // toast({
-      //   title: 'Connection Issue',
-      //   description: 'Lost connection to server. Please refresh if the issue persists.',
-      //   variant: 'destructive'
-      // });
     }
   });
   
-  // Suppress console errors for network failures in development
-  if (process.env.NODE_ENV === 'development') {
-    const originalError = console.error;
-    console.error = (...args) => {
-      const message = args[0];
+  // Handle global JavaScript errors
+  window.addEventListener('error', (event) => {
+    const message = event.message || event.error?.message || '';
+    
+    if (
+      message.includes('Failed to fetch') ||
+      message.includes('NetworkError') ||
+      message.includes('network error')
+    ) {
+      // Prevent the error from showing in console
+      event.preventDefault();
       
-      // Suppress common network error console spam
-      if (typeof message === 'string' && (
-        message.includes('Failed to fetch') ||
-        message.includes('NetworkError') ||
-        message.includes('net::ERR_')
-      )) {
-        // Convert to debug level to reduce console noise
-        console.debug('[Network Error Suppressed]', ...args);
-        return;
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Global Network Error Suppressed]:', message);
       }
-      
-      // Let other errors pass through normally
-      originalError.apply(console, args);
-    };
-  }
+    }
+  });
+  
+  // Comprehensive console error suppression for network failures
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  
+  // Override console.error to suppress network-related errors
+  console.error = (...args) => {
+    const message = String(args[0] || '');
+    
+    // Suppress all variants of network error messages
+    if (
+      message.includes('Failed to fetch') ||
+      message.includes('NetworkError') ||
+      message.includes('net::ERR_') ||
+      message.includes('fetch error') ||
+      message.includes('network error') ||
+      message.includes('connection failed') ||
+      message.includes('[plugin:vite:react-refresh] Failed to fetch') ||
+      (args[1] && String(args[1]).includes('Failed to fetch')) ||
+      (args.length > 0 && args.some(arg => String(arg).includes('Failed to fetch')))
+    ) {
+      // Silent suppression - only log in development with debug level
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Network Error Suppressed]', ...args);
+      }
+      return;
+    }
+    
+    // Let other errors pass through normally
+    originalError.apply(console, args);
+  };
+  
+  // Override console.warn for network warnings
+  console.warn = (...args) => {
+    const message = String(args[0] || '');
+    
+    if (
+      message.includes('Failed to fetch') ||
+      message.includes('NetworkError') ||
+      message.includes('network error')
+    ) {
+      // Silent suppression for warnings too
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Network Warning Suppressed]', ...args);
+      }
+      return;
+    }
+    
+    // Let other warnings pass through normally
+    originalWarn.apply(console, args);
+  };
   
   // Handle global fetch errors with enhanced classification
   const originalFetch = window.fetch;

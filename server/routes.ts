@@ -1813,7 +1813,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const today = new Date().toISOString().split('T')[0];
       const { checkGenerationQuota } = await import('./lib/utils/checkQuota');
       
-      const quotaCheck = await checkGenerationQuota(userId, req.ip, req.get('User-Agent'));
+      const quotaCheck = await checkGenerationQuota(userId, req.ip, req.get('User-Agent')).catch(quotaError => {
+        // Following AI_INSTRUCTIONS.md: Enhanced error handling
+        logger.error('Quota check function failed', quotaError as Error, {
+          userId,
+          ip: req.ip,
+          operation: 'quota_check_endpoint_fallback'
+        });
+        
+        // Return safe fallback quota result
+        return {
+          allowed: false,
+          reason: 'quota_service_unavailable',
+          quotaUsed: 0,
+          quotaLimit: 3,
+          planTier: 'error'
+        };
+      });
       
       // Force free tier response regardless of what checkQuota returns
       res.json({ 

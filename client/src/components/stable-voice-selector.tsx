@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CODE_PERSPECTIVES, DEVELOPMENT_ROLES } from "@/types/voices";
 import { useAppStore } from "@/store";
+import { shallow } from "zustand/shallow";
 import { useVoiceProfiles } from "@/hooks/use-voice-profiles";
 import { useTeamVoiceProfiles } from "@/hooks/useTeamVoiceProfiles";
 import { useToast } from "@/hooks/use-toast";
@@ -21,12 +22,18 @@ import { useState, useCallback, useMemo } from "react";
 import { validateVoiceSelection, logSecurityEvent, monitorPerformance } from "@/lib/security-validation";
 
 export function StableVoiceSelector() {
-  // Following AI_INSTRUCTIONS.md patterns: Ultra-stable selectors with direct store access
-  const perspectives = useAppStore(state => state.voice.selectedPerspectives);
-  const roles = useAppStore(state => state.voice.selectedRoles);
+  // Following AI_INSTRUCTIONS.md patterns: Use the stable store selectors to prevent infinite loops
+  const { selectedPerspectives: perspectives, selectedRoles: roles } = useAppStore(
+    state => ({
+      selectedPerspectives: state.voice.selectedPerspectives || [],
+      selectedRoles: state.voice.selectedRoles || []
+    }), 
+    shallow
+  );
+  
   const user = useAppStore(state => state.auth.user);
   
-  // Extract actions with stable reference
+  // Extract actions with stable reference - these are cached in the voice slice
   const voiceActions = useAppStore(state => state.voice.actions);
   
   const { profiles, isLoading } = useVoiceProfiles();

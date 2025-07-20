@@ -14,6 +14,21 @@ export const useVoiceSelection = () => {
   return useAppStore(state => state.voice, shallow);
 };
 
+// Individual voice property selectors to prevent infinite loops
+export const useStableVoicePerspectives = () => {
+  return useAppStore(
+    state => state.voice.selectedPerspectives,
+    (prev, next) => prev.length === next.length && prev.every((p, i) => p === next[i])
+  );
+};
+
+export const useStableVoiceRoles = () => {
+  return useAppStore(
+    state => state.voice.selectedRoles,
+    (prev, next) => prev.length === next.length && prev.every((r, i) => r === next[i])
+  );
+};
+
 // Separate hook for voice actions to prevent infinite loops
 export const useVoiceActions = () => {
   return useAppStore(state => state.voice.actions);

@@ -12,6 +12,7 @@ import { ProjectsPanel } from "@/components/projects-panel";
 import { EnhancedProjectsPanel } from "@/components/enhanced-projects-panel";
 import { AnalyticsPanel } from "@/components/analytics-panel";
 import { TeamsPanel } from "@/components/teams-panel";
+import { RightSidebar } from "@/components/right-sidebar";
 
 import { AvatarCustomizer } from "@/components/avatar-customizer";
 import { ChatGPTStyleGeneration } from "@/components/chatgpt-style-generation";
@@ -921,8 +922,8 @@ export default function Dashboard() {
         onClose={() => setShowChatGPTGeneration(false)}
         prompt={prompt}
         selectedVoices={{
-          perspectives: voicePerspectives,
-          roles: voiceRoles
+          perspectives: voicePerspectives || [],
+          roles: voiceRoles || []
         }}
         onComplete={(sessionId) => {
           setCurrentSessionId(sessionId);
@@ -1008,6 +1009,12 @@ export default function Dashboard() {
         onSkip={() => {
           skipTour.mutate();
         }}
+      />
+
+      {/* Right Sidebar - Consciousness Panel */}
+      <RightSidebar
+        isCollapsed={!showRightPanel}
+        onToggleCollapsed={() => setShowRightPanel(!showRightPanel)}
       />
     </div>
     </>

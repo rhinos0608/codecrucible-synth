@@ -30,6 +30,7 @@ export declare class CodeCrucibleCLI {
     handleModelManagement(options: any): Promise<void>;
     handleVoiceManagement(options: any): Promise<void>;
     showExamples(): void;
+    private displayIterativeResults;
     private parseVoices;
     private getProjectContext;
     private buildProjectContext;

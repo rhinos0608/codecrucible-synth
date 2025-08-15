@@ -42,7 +42,6 @@ export declare class LocalModelClient {
     private _cachedBestModel;
     private errorHandler;
     private modelSelector;
-    private gpuOptimizer;
     private isOptimized;
     private fallbackModels;
     constructor(config: LocalModelConfig);
@@ -126,7 +125,7 @@ export declare class LocalModelClient {
     /**
      * Generate a single response from the local model with GPU optimization and error handling
      */
-    generate(prompt: string): Promise<string>;
+    generate(prompt: string, jsonSchema?: any): Promise<string>;
     /**
      * Streamlined API call for maximum speed - bypasses voice complexity
      */

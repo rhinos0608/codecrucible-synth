@@ -122,9 +122,9 @@ export class ConfigManager {
         return {
             model: {
                 endpoint: "http://localhost:11434",
-                name: "qwq:32b-preview-q4_K_M",
-                timeout: 300000,
-                maxTokens: 4096,
+                name: "llama3.2:latest",
+                timeout: 60000,
+                maxTokens: 20000,
                 temperature: 0.7
             },
             voices: {

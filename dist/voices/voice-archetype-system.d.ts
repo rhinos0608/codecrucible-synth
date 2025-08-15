@@ -15,6 +15,30 @@ export interface VoicePreset {
     mode: string;
     description: string;
 }
+export interface CodeDiff {
+    added: number;
+    removed: number;
+    modified: number;
+}
+export interface IterationLog {
+    iteration: number;
+    writerResponse: string;
+    auditFeedback: string;
+    code: string;
+    qualityScore: number;
+    diff: CodeDiff;
+    timestamp: number;
+}
+export interface IterativeResult {
+    finalCode: string;
+    finalQualityScore: number;
+    totalIterations: number;
+    iterations: IterationLog[];
+    converged: boolean;
+    writerVoice: string;
+    auditorVoice: string;
+    timestamp: number;
+}
 /**
  * Enhanced Voice Archetype System
  *
@@ -40,17 +64,41 @@ export declare class VoiceArchetypeSystem {
      */
     private initializeFallbackVoices;
     /**
-     * Generate solutions from multiple voices
+     * Intelligently select optimal voices for the task
      */
-    generateMultiVoiceSolutions(prompt: string, voiceIds: string[], context: ProjectContext): Promise<VoiceResponse[]>;
+    selectOptimalVoices(prompt: string, maxVoices?: number): string[];
+    /**
+     * Generate solutions from multiple voices with intelligent selection
+     */
+    generateMultiVoiceSolutions(prompt: string, voiceIds: string[] | 'auto', context: ProjectContext): Promise<VoiceResponse[]>;
     /**
      * Generate responses in parallel for faster results
      */
     private generateParallel;
     /**
-     * Generate responses sequentially for more stable results
+     * Generate responses sequentially for more stable results with user feedback
      */
     private generateSequential;
+    /**
+     * Generate response from a single voice (no synthesis)
+     */
+    generateSingleVoiceResponse(prompt: string, voiceId: string, context: ProjectContext): Promise<VoiceResponse>;
+    /**
+     * Iterative Writer/Auditor loop for automated code improvement
+     */
+    generateIterativeCodeImprovement(prompt: string, context: ProjectContext, maxIterations?: number, qualityThreshold?: number): Promise<IterativeResult>;
+    /**
+     * Extract code blocks from response content
+     */
+    private extractCodeBlocks;
+    /**
+     * Calculate simple diff between two code strings
+     */
+    private calculateSimpleDiff;
+    /**
+     * Extract quality score from analysis content (reuse from LocalModelClient)
+     */
+    private extractQualityScore;
     /**
      * Synthesize voice responses into a unified solution
      */

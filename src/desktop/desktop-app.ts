@@ -1,5 +1,4 @@
-import electron from 'electron';
-const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = electron;
+import { app, BrowserWindow, ipcMain, Menu, dialog, shell } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
@@ -22,7 +21,7 @@ export interface DesktopOptions {
   devMode?: boolean;
 }
 
-let mainWindow: electron.BrowserWindow | null = null;
+let mainWindow: BrowserWindow | null = null;
 let backendServer: any = null;
 
 /**

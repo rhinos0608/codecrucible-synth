@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { LocalModelClient } from './core/local-model-client.js';
-import { UnifiedModelClient } from './core/unified-model-client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { ConfigManager } from './config/config-manager.js';
@@ -24,41 +23,14 @@ async function initializeApplication() {
     try {
         // Load configuration (creates default if none exists)
         const config = await ConfigManager.load();
-        // Initialize unified model client with embedded GPT-OSS-20B
-        const unifiedClient = new UnifiedModelClient({
-            primaryModel: 'gpt-oss-20b',
-            huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY,
-            ollamaEndpoint: config.model.endpoint,
-            fallbackToOllama: true,
-            timeout: config.model.timeout,
-            maxTokens: config.model.maxTokens,
-            temperature: config.model.temperature
-        });
-        // Initialize and setup GPT-OSS-20B
-        await unifiedClient.initialize();
-        // For backward compatibility, also create LocalModelClient
+        // Initialize LocalModelClient directly with configured model
         const modelClient = new LocalModelClient({
             endpoint: config.model.endpoint,
-            model: 'gpt-oss:20b', // Force GPT-OSS-20B
+            model: config.model.name, // Use configured model
             timeout: config.model.timeout,
             maxTokens: config.model.maxTokens,
             temperature: config.model.temperature
         });
-        // Override modelClient methods to use unified client
-        modelClient.generate = unifiedClient.generate.bind(unifiedClient);
-        // Fix the generateVoiceResponse signature
-        modelClient.generateVoiceResponse = async (voice, prompt, context, retryCount) => {
-            return await unifiedClient.generateVoiceResponse(prompt, voice, context);
-        };
-        modelClient.checkConnection = unifiedClient.checkOllamaConnection.bind(unifiedClient);
-        modelClient.getAvailableModels = unifiedClient.getAvailableModels.bind(unifiedClient);
-        modelClient.getCurrentModel = unifiedClient.getCurrentModel.bind(unifiedClient);
-        modelClient.displayAvailableModels = unifiedClient.displayAvailableModels.bind(unifiedClient);
-        // Fix selectModel to return boolean
-        modelClient.selectModel = async (selection) => {
-            await unifiedClient.selectModel();
-            return true;
-        };
         // Initialize voice system
         const voiceSystem = new VoiceArchetypeSystem(modelClient, config);
         // Initialize MCP server manager
@@ -81,17 +53,20 @@ async function initializeApplication() {
 // Define CLI commands
 program
     .name('codecrucible')
-    .description('CodeCrucible Synth - Local AI-powered coding assistant')
+    .description('CodeCrucible Synth - Enhanced AI coding agent (runs agent mode by default)')
     .version('2.0.0');
 program
-    .argument('[prompt]', 'Code generation prompt')
+    .argument('[prompt]', 'Code generation prompt (if not provided, starts enhanced agent mode)')
     .option('-v, --voices <voices>', 'Comma-separated list of voices to use')
     .option('-d, --depth <level>', 'Analysis depth level (1-5)', '2')
-    .option('-m, --mode <mode>', 'Synthesis mode: consensus, competitive, collaborative', 'competitive')
+    .option('-m, --mode <mode>', 'Synthesis mode: consensus, competitive, collaborative, iterative', 'competitive')
     .option('-f, --file <path>', 'Focus on specific file')
     .option('-p, --project', 'Include project context')
     .option('-i, --interactive', 'Start interactive mode')
     .option('-c, --council', 'Use full council of voices')
+    .option('--iterative', 'Use iterative Writer/Auditor improvement loop')
+    .option('--max-iterations <num>', 'Maximum iterations for iterative mode', '5')
+    .option('--quality-threshold <num>', 'Quality threshold for iterative mode (0-100)', '85')
     .action(async (prompt, options) => {
     const context = await initializeApplication();
     const cli = new CodeCrucibleCLI(context);
@@ -264,22 +239,26 @@ process.on('SIGINT', () => {
     console.log(chalk.yellow('\n👋 Shutting down CodeCrucible Synth...'));
     process.exit(0);
 });
-// Parse arguments and run
-program.parse();
-// If no command provided, start simple two-mode client
-if (!process.argv.slice(2).length) {
-    (async () => {
+// Main function for bin entry point
+export async function main() {
+    // Parse arguments and run
+    program.parse();
+    // If no command provided, start enhanced agent mode by default
+    if (!process.argv.slice(2).length) {
         try {
-            const { SimpleTwoModeClient } = await import('./core/simple-two-mode.js');
+            console.log(chalk.cyan('🧠 Starting Enhanced CodeCrucible ReAct Agent...'));
             const context = await initializeApplication();
-            // Start the simple two-mode client (write/ask modes)
-            const client = new SimpleTwoModeClient(context);
-            await client.start();
+            const enhancedClient = new EnhancedAgenticClient(context);
+            await enhancedClient.start();
         }
         catch (error) {
             console.error('Failed to start:', error instanceof Error ? error.message : 'Unknown error');
             process.exit(1);
         }
-    })();
+    }
+}
+// Auto-run when called directly
+if (import.meta.url === `file://${process.argv[1]}` || import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
+    main();
 }
 //# sourceMappingURL=index.js.map

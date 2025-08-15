@@ -46,7 +46,7 @@ export class UnifiedModelClient {
     if (this.config.fallbackToOllama) {
       this.ollamaClient = new LocalModelClient({
         endpoint: this.config.ollamaEndpoint!,
-        model: 'gpt-oss:20b', // Try to use GPT-OSS in Ollama too
+        model: 'auto', // Let Ollama auto-detect available model
         timeout: this.config.timeout!,
         maxTokens: this.config.maxTokens!,
         temperature: this.config.temperature!
@@ -167,7 +167,20 @@ export class UnifiedModelClient {
 
     let lastError: Error | null = null;
 
-    // Try Hugging Face first (with embedded GPT-OSS-20B)
+    // If primary model is auto, prefer Ollama for immediate response
+    if (this.config.primaryModel === 'auto' && this.ollamaClient && this.config.fallbackToOllama) {
+      try {
+        logger.debug('Attempting generation with Ollama...');
+        const response = await this.ollamaClient.generate(prompt);
+        logger.info('✅ Generated with Ollama');
+        return response;
+      } catch (error) {
+        lastError = error as Error;
+        logger.debug('Ollama generation failed:', error);
+      }
+    }
+
+    // Try Hugging Face (with embedded GPT-OSS-20B) as fallback
     try {
       logger.debug('Attempting generation with Hugging Face GPT-OSS-20B...');
       const response = await this.huggingfaceClient.generate(prompt, opts);
@@ -178,7 +191,7 @@ export class UnifiedModelClient {
       logger.debug('Hugging Face generation failed:', error);
     }
 
-    // Try Ollama with GPT-OSS-20B
+    // Try Ollama with specific GPT-OSS-20B model
     if (this.ollamaClient && this.config.fallbackToOllama) {
       try {
         logger.debug('Attempting generation with Ollama GPT-OSS-20B...');
@@ -188,17 +201,6 @@ export class UnifiedModelClient {
       } catch (error) {
         lastError = error as Error;
         logger.debug('Ollama GPT-OSS generation failed:', error);
-      }
-
-      // Try other Ollama models as last resort
-      try {
-        logger.debug('Attempting generation with Ollama fallback models...');
-        const response = await this.ollamaClient.generate(prompt);
-        logger.info('✅ Generated with Ollama fallback model');
-        return response;
-      } catch (error) {
-        lastError = error as Error;
-        logger.debug('Ollama fallback generation failed:', error);
       }
     }
 

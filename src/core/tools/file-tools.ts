@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
-import { join } from 'path';
+import { join, relative, isAbsolute } from 'path';
 
 const ReadFileSchema = z.object({
   path: z.string().describe('The path to the file to read.'),
@@ -23,11 +23,26 @@ export class ReadFileTool extends BaseTool {
   }
 
   private resolvePath(path: string): string {
-    // If path is absolute, use it as-is; otherwise join with working directory
-    if (path.match(/^[a-zA-Z]:\\/) || path.startsWith('/')) {
-      return path;
+    // Convert to relative path to comply with MCP workspace restrictions
+    let resolvedPath = path;
+    
+    // If path is absolute, convert to relative to working directory
+    if (isAbsolute(path)) {
+      try {
+        resolvedPath = relative(this.agentContext.workingDirectory, path);
+        // If relative path starts with '..' it's outside working directory
+        if (resolvedPath.startsWith('..')) {
+          throw new Error(`Path ${path} is outside working directory`);
+        }
+      } catch (error) {
+        // Fallback to using the path as-is but log the issue
+        console.warn(`⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        resolvedPath = path;
+      }
     }
-    return join(this.agentContext.workingDirectory, path);
+    
+    // Join with working directory to ensure proper resolution
+    return join(this.agentContext.workingDirectory, resolvedPath);
   }
 }
 
@@ -52,11 +67,26 @@ export class WriteFileTool extends BaseTool {
   }
 
   private resolvePath(path: string): string {
-    // If path is absolute, use it as-is; otherwise join with working directory
-    if (path.match(/^[a-zA-Z]:\\/) || path.startsWith('/')) {
-      return path;
+    // Convert to relative path to comply with MCP workspace restrictions
+    let resolvedPath = path;
+    
+    // If path is absolute, convert to relative to working directory
+    if (isAbsolute(path)) {
+      try {
+        resolvedPath = relative(this.agentContext.workingDirectory, path);
+        // If relative path starts with '..' it's outside working directory
+        if (resolvedPath.startsWith('..')) {
+          throw new Error(`Path ${path} is outside working directory`);
+        }
+      } catch (error) {
+        // Fallback to using the path as-is but log the issue
+        console.warn(`⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        resolvedPath = path;
+      }
     }
-    return join(this.agentContext.workingDirectory, path);
+    
+    // Join with working directory to ensure proper resolution
+    return join(this.agentContext.workingDirectory, resolvedPath);
   }
 }
 
@@ -80,10 +110,25 @@ export class ListFilesTool extends BaseTool {
   }
 
   private resolvePath(path: string): string {
-    // If path is absolute, use it as-is; otherwise join with working directory
-    if (path.match(/^[a-zA-Z]:\\/) || path.startsWith('/')) {
-      return path;
+    // Convert to relative path to comply with MCP workspace restrictions
+    let resolvedPath = path;
+    
+    // If path is absolute, convert to relative to working directory
+    if (isAbsolute(path)) {
+      try {
+        resolvedPath = relative(this.agentContext.workingDirectory, path);
+        // If relative path starts with '..' it's outside working directory
+        if (resolvedPath.startsWith('..')) {
+          throw new Error(`Path ${path} is outside working directory`);
+        }
+      } catch (error) {
+        // Fallback to using the path as-is but log the issue
+        console.warn(`⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        resolvedPath = path;
+      }
     }
-    return join(this.agentContext.workingDirectory, path);
+    
+    // Join with working directory to ensure proper resolution
+    return join(this.agentContext.workingDirectory, resolvedPath);
   }
 }

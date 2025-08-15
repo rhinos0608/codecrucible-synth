@@ -208,7 +208,7 @@ export class GPUOptimizer {
       logger.info('🚀 High VRAM detected: Using optimized settings for large models');
     } else if (gpu.memory && gpu.memory >= 8) {
       process.env.OLLAMA_GPU_MEMORY_FRACTION = '0.8'; // Use 80% of VRAM
-      process.env.OLLAMA_CONTEXT_SIZE = '4096'; // Standard context
+      process.env.OLLAMA_CONTEXT_SIZE = '20000'; // Expanded context
       logger.info('⚡ Medium VRAM detected: Using balanced settings');
     } else {
       process.env.OLLAMA_GPU_MEMORY_FRACTION = '0.7'; // Use 70% of VRAM
@@ -225,7 +225,7 @@ export class GPUOptimizer {
     
     process.env.HSA_OVERRIDE_GFX_VERSION = '10.3.0'; // Common compatibility setting
     process.env.OLLAMA_GPU_LAYERS = '50'; // Conservative GPU layers for AMD
-    process.env.OLLAMA_CONTEXT_SIZE = '4096';
+    process.env.OLLAMA_CONTEXT_SIZE = '20000';
   }
 
   /**
@@ -242,7 +242,7 @@ export class GPUOptimizer {
       process.env.OLLAMA_CONTEXT_SIZE = '8192'; // Large context for high memory
       logger.info('🚀 High memory Apple Silicon: Using optimized settings');
     } else {
-      process.env.OLLAMA_CONTEXT_SIZE = '4096'; // Standard context
+      process.env.OLLAMA_CONTEXT_SIZE = '20000'; // Expanded context
     }
   }
 

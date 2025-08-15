@@ -50,7 +50,9 @@ function logWarning(message) {
 async function checkAutoSetup() {
   try {
     // Check if auto-setup is needed
-    const setupModule = await import('../dist/core/auto-setup.js');
+    const setupPath = join(__dirname, '../dist/core/auto-setup.js');
+    const setupUrl = new URL(`file:///${setupPath.replace(/\\/g, '/')}`);
+    const setupModule = await import(setupUrl);
     const autoSetup = setupModule.autoSetup;
     
     const setupStatus = await autoSetup.checkSetupStatus();
@@ -142,7 +144,8 @@ async function main() {
     const mainEntry = await findMainEntry();
     
     // Import and run the main CLI
-    const { main: cliMain } = await import(mainEntry);
+    const mainEntryUrl = new URL(`file:///${mainEntry.replace(/\\/g, '/')}`);
+    const { main: cliMain } = await import(mainEntryUrl);
     
     if (typeof cliMain === 'function') {
       await cliMain();

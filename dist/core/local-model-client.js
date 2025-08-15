@@ -3,7 +3,6 @@ import { logger } from './logger.js';
 import { EnhancedModelManager } from './enhanced-model-manager.js';
 import { AutonomousErrorHandler } from './autonomous-error-handler.js';
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
-import { GPUOptimizer } from './gpu-optimizer.js';
 import chalk from 'chalk';
 /**
  * Enhanced Local Model Client for Ollama integration
@@ -16,7 +15,7 @@ export class LocalModelClient {
     _cachedBestModel = null;
     errorHandler;
     modelSelector;
-    gpuOptimizer;
+    // private gpuOptimizer: GPUOptimizer; // Disabled
     isOptimized = false;
     fallbackModels = [
         'gemma2:9b', 'llama3.2:8b', 'qwen2.5:7b', 'codellama:7b', 'gemma:latest'
@@ -26,9 +25,9 @@ export class LocalModelClient {
         this.modelManager = new EnhancedModelManager(config.endpoint);
         this.errorHandler = new AutonomousErrorHandler(config.endpoint);
         this.modelSelector = new IntelligentModelSelector();
-        this.gpuOptimizer = new GPUOptimizer();
-        // Use aggressive timeout - 5 seconds for faster response
-        const adjustedTimeout = Math.min(config.timeout, 5000); // Maximum 5 seconds
+        // this.gpuOptimizer = new GPUOptimizer(); // Disabled to prevent model downloads
+        // Use configured timeout for proper generation
+        const adjustedTimeout = config.timeout; // Use full configured timeout
         this.client = axios.create({
             baseURL: config.endpoint,
             timeout: adjustedTimeout,
@@ -54,16 +53,14 @@ export class LocalModelClient {
             return;
         }
         try {
-            const gpuInfo = await this.gpuOptimizer.detectAndOptimizeGPU();
+            // Use existing Ollama models only - no GPU optimization
             this.isOptimized = true;
-            console.log(chalk.blue('🚀 Hardware Optimization:'));
-            console.log('   ' + this.gpuOptimizer.getPerformanceSummary());
-            // Update fallback models based on hardware capabilities
-            this.fallbackModels = this.gpuOptimizer.getRecommendedModels();
-            logger.info('GPU optimization completed', {
-                gpuType: gpuInfo.type,
-                available: gpuInfo.available,
-                recommendedModels: this.fallbackModels.slice(0, 3)
+            console.log(chalk.blue('🚀 Using Existing Ollama Models:'));
+            console.log('   GPU optimization disabled - using available models');
+            // Use default fallback models (already set in constructor)
+            logger.info('Using existing models only', {
+                configuredModel: this.config.model,
+                fallbackModels: this.fallbackModels.slice(0, 3)
             });
         }
         catch (error) {
@@ -383,13 +380,13 @@ export class LocalModelClient {
         for (const model of this.fallbackModels) {
             const available = await this.modelManager.isModelAvailable(model);
             if (available) {
-                const optimizedModel = this.gpuOptimizer.optimizeModelName(model, 'speed');
+                const optimizedModel = model; // Use model as-is
                 logger.info('Selected fastest GPU-optimized model:', optimizedModel);
                 return optimizedModel;
             }
         }
         // Fallback with optimization
-        const optimizedFallback = this.gpuOptimizer.optimizeModelName(this.config.model, 'speed');
+        const optimizedFallback = this.config.model; // Use configured model as-is
         return optimizedFallback;
     }
     /**
@@ -457,7 +454,7 @@ export class LocalModelClient {
     /**
      * Generate a single response from the local model with GPU optimization and error handling
      */
-    async generate(prompt) {
+    async generate(prompt, jsonSchema) {
         // Pre-flight connection check
         const isConnected = await this.checkConnection();
         if (!isConnected) {
@@ -469,7 +466,7 @@ export class LocalModelClient {
         try {
             logger.info(`Generating streamlined response with model: ${model}`);
             const requestBody = this.config.endpoint.includes('11434')
-                ? this.buildOllamaRequest(prompt, { temperature: this.config.temperature }, model)
+                ? this.buildOllamaRequest(prompt, { temperature: this.config.temperature }, model, jsonSchema)
                 : this.buildOpenAIRequest(prompt, { temperature: this.config.temperature }, model);
             const response = await this.client.post(this.config.endpoint.includes('11434') ? '/api/generate' : '/v1/chat/completions', requestBody);
             // Record successful performance
@@ -740,8 +737,8 @@ Instructions:
     /**
      * Build request for Ollama endpoint
      */
-    buildOllamaRequest(prompt, voice, model) {
-        return {
+    buildOllamaRequest(prompt, voice, model, jsonSchema) {
+        const baseRequest = {
             model: model || this.config.model,
             prompt: prompt,
             stream: false,
@@ -750,9 +747,19 @@ Instructions:
                 num_predict: this.config.maxTokens,
                 top_p: 0.9,
                 repeat_penalty: 1.1,
+                frequency_penalty: 0.1,
+                presence_penalty: 0.1,
                 stop: ['Human:', 'Assistant:', '<|endoftext|>']
             }
         };
+        // Add structured output format if schema provided
+        if (jsonSchema) {
+            return {
+                ...baseRequest,
+                format: jsonSchema
+            };
+        }
+        return baseRequest;
     }
     /**
      * Build request for OpenAI-compatible endpoint

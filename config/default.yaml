@@ -3,9 +3,9 @@
 
 model:
   endpoint: "http://localhost:11434"  # Ollama default endpoint
-  name: "qwq:32b-preview-q4_K_M"     # Use first available model
-  timeout: 300000                     # 5 minutes for large models
-  maxTokens: 4096
+  name: "llama3.2:latest"             # Use llama3.2 as default
+  timeout: 60000                      # 60 seconds for large model
+  maxTokens: 20000                    # Increased to 20k for better context
   temperature: 0.7
 
 voices:

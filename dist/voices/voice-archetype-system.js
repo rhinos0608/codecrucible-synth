@@ -163,21 +163,96 @@ export class VoiceArchetypeSystem {
         logger.info('Initialized fallback voices');
     }
     /**
-     * Generate solutions from multiple voices
+     * Intelligently select optimal voices for the task
+     */
+    selectOptimalVoices(prompt, maxVoices = 2) {
+        const promptLower = prompt.toLowerCase();
+        const selectedVoices = [];
+        // Task classification for voice selection
+        const isCodeTask = /\b(code|function|implement|write|create|build)\b/.test(promptLower);
+        const isSecurityTask = /\b(secure|security|vulnerable|attack|sanitize|validate)\b/.test(promptLower);
+        const isAnalysisTask = /\b(analyze|review|understand|explain|debug|error)\b/.test(promptLower);
+        const isDesignTask = /\b(design|ui|ux|interface|component|style)\b/.test(promptLower);
+        const isPerformanceTask = /\b(performance|optimize|speed|memory|efficiency)\b/.test(promptLower);
+        const isArchitectureTask = /\b(architecture|system|structure|pattern|scalable)\b/.test(promptLower);
+        // Always include developer for practical implementation
+        if (isCodeTask) {
+            selectedVoices.push('developer');
+        }
+        // Add security for security-related tasks
+        if (isSecurityTask) {
+            selectedVoices.push('security');
+        }
+        // Add analyzer for analysis tasks
+        if (isAnalysisTask && selectedVoices.length < maxVoices) {
+            selectedVoices.push('analyzer');
+        }
+        // Add explorer for creative/experimental tasks
+        if (/\b(creative|innovative|alternative|experimental)\b/.test(promptLower) && selectedVoices.length < maxVoices) {
+            selectedVoices.push('explorer');
+        }
+        // Add maintainer for stability/maintenance tasks
+        if (/\b(maintain|stable|robust|reliable|production)\b/.test(promptLower) && selectedVoices.length < maxVoices) {
+            selectedVoices.push('maintainer');
+        }
+        // Add specific specialists based on task
+        if (isDesignTask && selectedVoices.length < maxVoices) {
+            selectedVoices.push('designer');
+        }
+        if (isPerformanceTask && selectedVoices.length < maxVoices) {
+            selectedVoices.push('optimizer');
+        }
+        if (isArchitectureTask && selectedVoices.length < maxVoices) {
+            selectedVoices.push('architect');
+        }
+        // Fallback: if no specific voices selected, use general purpose voices
+        if (selectedVoices.length === 0) {
+            selectedVoices.push('developer');
+            if (maxVoices > 1) {
+                selectedVoices.push('analyzer');
+            }
+        }
+        // Fill remaining slots with complementary voices
+        const remainingSlots = maxVoices - selectedVoices.length;
+        const allVoices = ['developer', 'analyzer', 'maintainer', 'explorer', 'security', 'architect', 'designer', 'optimizer'];
+        const unusedVoices = allVoices.filter(v => !selectedVoices.includes(v));
+        for (let i = 0; i < remainingSlots && i < unusedVoices.length; i++) {
+            selectedVoices.push(unusedVoices[i]);
+        }
+        logger.info(`Intelligent voice selection for "${prompt.slice(0, 50)}...": ${selectedVoices.join(', ')}`);
+        return selectedVoices;
+    }
+    /**
+     * Generate solutions from multiple voices with intelligent selection
      */
     async generateMultiVoiceSolutions(prompt, voiceIds, context) {
-        logger.info(`Generating solutions with voices: ${voiceIds.join(', ')}`);
+        // Use intelligent selection if 'auto' or if too many voices requested
+        let selectedVoiceIds;
+        if (voiceIds === 'auto') {
+            selectedVoiceIds = this.selectOptimalVoices(prompt, 2);
+        }
+        else if (Array.isArray(voiceIds) && voiceIds.length > 3) {
+            // Limit to 3 voices max for performance, intelligently select best ones
+            logger.warn(`Too many voices requested (${voiceIds.length}), intelligently selecting 3 best voices`);
+            selectedVoiceIds = this.selectOptimalVoices(prompt, 3);
+        }
+        else if (Array.isArray(voiceIds)) {
+            selectedVoiceIds = voiceIds;
+        }
+        else {
+            selectedVoiceIds = this.selectOptimalVoices(prompt, 2);
+        }
+        logger.info(`Generating solutions with voices: ${selectedVoiceIds.join(', ')}`);
         // Validate and filter available voices
-        const availableVoices = voiceIds
+        const availableVoices = selectedVoiceIds
             .map(id => this.voices.get(id.toLowerCase()))
             .filter(voice => voice !== undefined);
         if (availableVoices.length === 0) {
             throw new Error('No valid voices found');
         }
-        // Generate responses in parallel or sequential based on config
-        const responses = this.config.voices.parallel
-            ? await this.generateParallel(availableVoices, prompt, context)
-            : await this.generateSequential(availableVoices, prompt, context);
+        // Generate responses sequentially for better user experience and reliability
+        // (Sequential is more stable and provides better feedback to users)
+        const responses = await this.generateSequential(availableVoices, prompt, context);
         logger.info(`Generated ${responses.length} voice responses`);
         return responses;
     }
@@ -201,21 +276,195 @@ export class VoiceArchetypeSystem {
         return allResponses;
     }
     /**
-     * Generate responses sequentially for more stable results
+     * Generate responses sequentially for more stable results with user feedback
      */
     async generateSequential(voices, prompt, context) {
         const responses = [];
-        for (const voice of voices) {
+        for (let i = 0; i < voices.length; i++) {
+            const voice = voices[i];
             try {
+                console.log(`🎭 Generating response from ${voice.name} (${i + 1}/${voices.length})...`);
                 const response = await this.modelClient.generateVoiceResponse(voice, prompt, context);
                 responses.push(response);
+                console.log(`✅ ${voice.name} completed (${response.content.length} characters)`);
             }
             catch (error) {
                 logger.warn(`Voice ${voice.name} failed:`, error);
+                console.log(`❌ ${voice.name} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 // Continue with other voices
             }
         }
         return responses;
+    }
+    /**
+     * Generate response from a single voice (no synthesis)
+     */
+    async generateSingleVoiceResponse(prompt, voiceId, context) {
+        const voice = this.voices.get(voiceId.toLowerCase());
+        if (!voice) {
+            throw new Error(`Voice '${voiceId}' not found`);
+        }
+        logger.info(`Generating single response with voice: ${voice.name}`);
+        console.log(`🎭 Generating response from ${voice.name}...`);
+        try {
+            const response = await this.modelClient.generateVoiceResponse(voice, prompt, context);
+            console.log(`✅ ${voice.name} completed (${response.content.length} characters)`);
+            return response;
+        }
+        catch (error) {
+            logger.error(`Single voice generation failed for ${voice.name}:`, error);
+            throw error;
+        }
+    }
+    /**
+     * Iterative Writer/Auditor loop for automated code improvement
+     */
+    async generateIterativeCodeImprovement(prompt, context, maxIterations = 5, qualityThreshold = 85) {
+        const iterations = [];
+        let currentCode = '';
+        let currentIteration = 0;
+        let qualityScore = 0;
+        // Get Writer and Auditor voices
+        const writerVoice = this.voices.get('developer') || this.voices.get('implementor');
+        const auditorVoice = this.voices.get('analyzer') || this.voices.get('maintainer');
+        if (!writerVoice || !auditorVoice) {
+            throw new Error('Writer or Auditor voice not available');
+        }
+        console.log(`🔄 Starting iterative Writer/Auditor loop (max ${maxIterations} iterations, target quality: ${qualityThreshold})`);
+        logger.info(`Starting iterative improvement: ${writerVoice.name} (Writer) + ${auditorVoice.name} (Auditor)`);
+        while (currentIteration < maxIterations && qualityScore < qualityThreshold) {
+            currentIteration++;
+            console.log(`\n📝 Iteration ${currentIteration}/${maxIterations}`);
+            // Writer phase
+            const writerPrompt = currentIteration === 1
+                ? prompt
+                : `Improve the following code based on the audit feedback:
+
+Previous Code:
+\`\`\`
+${currentCode}
+\`\`\`
+
+Previous Audit Results:
+${iterations[iterations.length - 1]?.auditFeedback || 'Initial generation'}
+
+Task: ${prompt}
+
+Generate improved code that addresses the audit concerns.`;
+            console.log(`🖊️  Writer (${writerVoice.name}) generating code...`);
+            const writerResponse = await this.modelClient.generateVoiceResponse(writerVoice, writerPrompt, context);
+            // Extract code from writer response
+            const codeBlocks = this.extractCodeBlocks(writerResponse.content);
+            currentCode = codeBlocks.length > 0 ? codeBlocks.join('\n\n') : writerResponse.content;
+            console.log(`✅ Writer completed (${currentCode.length} characters)`);
+            // Auditor phase
+            const auditorPrompt = `Review and audit the following code for quality, best practices, security, and performance:
+
+Code to Review:
+\`\`\`
+${currentCode}
+\`\`\`
+
+Original Requirements: ${prompt}
+
+Provide:
+1. Quality score (0-100)
+2. Specific issues found
+3. Improvement suggestions
+4. Security concerns
+5. Performance considerations
+6. Overall assessment
+
+Format your response with a clear QUALITY_SCORE: X at the beginning.`;
+            console.log(`🔍 Auditor (${auditorVoice.name}) reviewing code...`);
+            const auditorResponse = await this.modelClient.generateVoiceResponse(auditorVoice, auditorPrompt, context);
+            // Extract quality score from auditor response
+            qualityScore = this.extractQualityScore(auditorResponse.content);
+            console.log(`✅ Auditor completed - Quality Score: ${qualityScore}/100`);
+            // Calculate diff from previous iteration
+            const diff = currentIteration > 1
+                ? this.calculateSimpleDiff(iterations[iterations.length - 1].code, currentCode)
+                : { added: currentCode.split('\n').length, removed: 0, modified: 0 };
+            // Log this iteration
+            iterations.push({
+                iteration: currentIteration,
+                writerResponse: writerResponse.content,
+                auditFeedback: auditorResponse.content,
+                code: currentCode,
+                qualityScore,
+                diff,
+                timestamp: Date.now()
+            });
+            // Check if we've reached the quality threshold
+            if (qualityScore >= qualityThreshold) {
+                console.log(`🎯 Quality threshold reached! (${qualityScore} >= ${qualityThreshold})`);
+                break;
+            }
+            else if (currentIteration < maxIterations) {
+                console.log(`📊 Quality: ${qualityScore}/${qualityThreshold} - Continuing...`);
+            }
+        }
+        const finalResult = {
+            finalCode: currentCode,
+            finalQualityScore: qualityScore,
+            totalIterations: currentIteration,
+            iterations,
+            converged: qualityScore >= qualityThreshold,
+            writerVoice: writerVoice.name,
+            auditorVoice: auditorVoice.name,
+            timestamp: Date.now()
+        };
+        console.log(`\n🏁 Iterative improvement completed:`);
+        console.log(`   Final Quality Score: ${qualityScore}/100`);
+        console.log(`   Total Iterations: ${currentIteration}`);
+        console.log(`   Converged: ${finalResult.converged ? 'Yes' : 'No'}`);
+        return finalResult;
+    }
+    /**
+     * Extract code blocks from response content
+     */
+    extractCodeBlocks(content) {
+        const codeBlockRegex = /```[\w]*\n([\s\S]*?)\n```/g;
+        const matches = [];
+        let match;
+        while ((match = codeBlockRegex.exec(content)) !== null) {
+            matches.push(match[1]);
+        }
+        return matches;
+    }
+    /**
+     * Calculate simple diff between two code strings
+     */
+    calculateSimpleDiff(oldCode, newCode) {
+        const oldLines = oldCode.split('\n');
+        const newLines = newCode.split('\n');
+        // Simple line-based diff
+        const oldSet = new Set(oldLines);
+        const newSet = new Set(newLines);
+        const added = newLines.filter(line => !oldSet.has(line)).length;
+        const removed = oldLines.filter(line => !newSet.has(line)).length;
+        const common = oldLines.filter(line => newSet.has(line)).length;
+        const modified = Math.min(oldLines.length, newLines.length) - common;
+        return { added, removed, modified };
+    }
+    /**
+     * Extract quality score from analysis content (reuse from LocalModelClient)
+     */
+    extractQualityScore(content) {
+        // Look for QUALITY_SCORE: X pattern first
+        const qualityScoreMatch = content.match(/QUALITY_SCORE:\s*(\d+)/i);
+        if (qualityScoreMatch) {
+            const score = parseInt(qualityScoreMatch[1]);
+            return isNaN(score) ? 70 : Math.min(Math.max(score, 0), 100);
+        }
+        // Fallback to standard patterns
+        const scoreMatch = content.match(/(\d+)\/100|(\d+)\s*out\s*of\s*100|score.*?(\d+)/i);
+        if (scoreMatch) {
+            const score = parseInt(scoreMatch[1] || scoreMatch[2] || scoreMatch[3]);
+            return isNaN(score) ? 70 : Math.min(Math.max(score, 0), 100);
+        }
+        // Default score if no explicit score found
+        return 70;
     }
     /**
      * Synthesize voice responses into a unified solution

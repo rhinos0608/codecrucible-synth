@@ -28,14 +28,59 @@ export class CodeCrucibleCLI {
             const voices = this.parseVoices(options.voices || options.council ? 'all' : undefined);
             const synthesisMode = options.mode || 'competitive';
             const analysisDepth = parseInt(options.depth || '2');
-            console.log(chalk.cyan(`   Voices: ${voices.join(', ')}`));
+            console.log(chalk.cyan(`   Voices: ${Array.isArray(voices) ? voices.join(', ') : voices}`));
             console.log(chalk.cyan(`   Mode: ${synthesisMode}`));
             // Get project context
             const projectContext = await this.getProjectContext(options.file, options.project);
-            // Generate with spinner
-            const spinner = ora('Generating solutions from multiple voices...').start();
+            // Check for iterative mode
+            if (options.iterative || synthesisMode === 'iterative') {
+                const spinner = ora('Starting iterative Writer/Auditor improvement loop...').start();
+                try {
+                    spinner.stop();
+                    const iterativeResult = await this.context.voiceSystem.generateIterativeCodeImprovement(prompt, projectContext, parseInt(options.maxIterations || '5'), parseInt(options.qualityThreshold || '85'));
+                    this.displayIterativeResults(iterativeResult);
+                }
+                catch (error) {
+                    spinner.fail('Iterative generation failed');
+                    logger.error('Iterative generation failed:', error);
+                    console.error(chalk.red('❌ Iterative generation failed:'), error instanceof Error ? error.message : error);
+                }
+                return;
+            }
+            // Check if single voice mode
+            if (Array.isArray(voices) && voices.length === 1) {
+                // Single voice mode - no synthesis needed
+                const spinner = ora(`Generating response from ${voices[0]}...`).start();
+                try {
+                    const singleResponse = await this.context.voiceSystem.generateSingleVoiceResponse(prompt, voices[0], projectContext);
+                    spinner.succeed('Generation completed!');
+                    // Display single voice result
+                    console.log(chalk.green('\n📄 Response:\n'));
+                    console.log(singleResponse.content);
+                }
+                catch (error) {
+                    spinner.fail('Generation failed');
+                    logger.error('Single voice generation failed:', error);
+                    console.error(chalk.red('❌ Generation failed:'), error instanceof Error ? error.message : error);
+                }
+                return;
+            }
+            // Multi-voice mode with sequential processing
+            const spinner = ora('Generating solutions from multiple voices sequentially...').start();
             try {
                 const responses = await this.context.voiceSystem.generateMultiVoiceSolutions(prompt, voices, projectContext);
+                if (responses.length === 0) {
+                    spinner.fail('All voice generations failed');
+                    console.error(chalk.red('❌ All voice generations failed'));
+                    return;
+                }
+                if (responses.length === 1) {
+                    // Only one voice succeeded, display directly without synthesis
+                    spinner.succeed('Generation completed!');
+                    console.log(chalk.green('\n📄 Response:\n'));
+                    console.log(responses[0].content);
+                    return;
+                }
                 spinner.text = 'Synthesizing voice responses...';
                 const synthesis = await this.context.voiceSystem.synthesizeVoiceResponses(responses, synthesisMode);
                 spinner.succeed('Generation completed!');
@@ -57,9 +102,8 @@ export class CodeCrucibleCLI {
         }
     }
     async handleCouncilMode(prompt, options) {
-        const councilVoices = options.voices ?
-            this.parseVoices(options.voices) :
-            this.context.config.voices.available;
+        const parsedVoices = options.voices ? this.parseVoices(options.voices) : this.context.config.voices.available;
+        const councilVoices = Array.isArray(parsedVoices) ? parsedVoices : this.context.config.voices.available;
         console.log(chalk.magenta('🏛️  Convening the full Council of Voices...'));
         await this.handleGeneration(prompt, {
             ...options,
@@ -129,7 +173,7 @@ export class CodeCrucibleCLI {
                     }]
             };
             const voices = this.parseVoices(options.voices);
-            await this.handleGeneration(prompt, { ...options, voices: voices.join(',') });
+            await this.handleGeneration(prompt, { ...options, voices: Array.isArray(voices) ? voices.join(',') : voices });
         }
         catch (error) {
             logger.error('File operation failed:', error);
@@ -167,7 +211,7 @@ export class CodeCrucibleCLI {
                     return;
             }
             const voices = this.parseVoices(options.voices);
-            console.log(chalk.cyan(`Analyzing ${files.length} files with voices: ${voices.join(', ')}`));
+            console.log(chalk.cyan(`Analyzing ${files.length} files with voices: ${Array.isArray(voices) ? voices.join(', ') : voices}`));
             const responses = await this.context.voiceSystem.generateMultiVoiceSolutions(prompt, voices, projectContext);
             const synthesis = await this.context.voiceSystem.synthesizeVoiceResponses(responses, 'collaborative');
             this.displayResults(synthesis, responses);
@@ -180,7 +224,8 @@ export class CodeCrucibleCLI {
     async handleInteractiveMode(options) {
         console.log(chalk.magenta('🎯 Welcome to CodeCrucible Interactive Mode!'));
         console.log(chalk.gray('Type "exit" to quit, "help" for commands\n'));
-        const defaultVoices = this.parseVoices(options.voices);
+        const parsedVoices = this.parseVoices(options.voices);
+        const defaultVoices = Array.isArray(parsedVoices) ? parsedVoices : ['developer', 'analyzer'];
         while (true) {
             try {
                 const { action } = await inquirer.prompt([
@@ -441,12 +486,48 @@ export class CodeCrucibleCLI {
         console.log(chalk.green('  cc config --list'));
         console.log(chalk.green('  cc config --set voices.default=explorer,maintainer'));
     }
+    displayIterativeResults(result) {
+        console.log(chalk.green('\n🎉 Iterative Improvement Results:\n'));
+        // Show summary
+        console.log(chalk.cyan('📊 Summary:'));
+        console.log(chalk.cyan(`   Writer: ${result.writerVoice}`));
+        console.log(chalk.cyan(`   Auditor: ${result.auditorVoice}`));
+        console.log(chalk.cyan(`   Total Iterations: ${result.totalIterations}`));
+        console.log(chalk.cyan(`   Final Quality Score: ${result.finalQualityScore}/100`));
+        console.log(chalk.cyan(`   Converged: ${result.converged ? '✅ Yes' : '❌ No'}\n`));
+        // Show iteration details
+        console.log(chalk.blue('🔄 Iteration Log:'));
+        result.iterations.forEach((iteration, index) => {
+            const isLast = index === result.iterations.length - 1;
+            const prefix = isLast ? '└─' : '├─';
+            console.log(chalk.gray(`${prefix} Iteration ${iteration.iteration}:`));
+            console.log(chalk.gray(`   │ Quality: ${iteration.qualityScore}/100`));
+            console.log(chalk.gray(`   │ Changes: +${iteration.diff.added} -${iteration.diff.removed} ~${iteration.diff.modified} lines`));
+            console.log(chalk.gray(`   │ Code Length: ${iteration.code.length} chars`));
+            if (!isLast) {
+                console.log(chalk.gray('   │'));
+            }
+        });
+        // Display final code
+        console.log(chalk.green('\n💻 Final Optimized Code:'));
+        console.log(chalk.gray('──────────────────────────────────────────────────'));
+        console.log(result.finalCode);
+        console.log(chalk.gray('──────────────────────────────────────────────────'));
+        // Show final audit feedback
+        if (result.iterations.length > 0) {
+            const finalIteration = result.iterations[result.iterations.length - 1];
+            console.log(chalk.blue('\n🔍 Final Audit Report:'));
+            console.log(finalIteration.auditFeedback);
+        }
+    }
     // Helper methods
     parseVoices(voicesStr) {
         if (!voicesStr) {
-            const defaultVoices = this.context.config.voices.default;
-            // Ensure we always return an array
-            return Array.isArray(defaultVoices) ? defaultVoices : ['explorer', 'maintainer'];
+            // Use intelligent voice selection by default
+            return 'auto';
+        }
+        if (voicesStr === 'auto') {
+            return 'auto';
         }
         if (voicesStr === 'all') {
             const availableVoices = this.context.config.voices.available;

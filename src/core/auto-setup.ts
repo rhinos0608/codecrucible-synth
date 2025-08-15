@@ -295,9 +295,9 @@ export class AutoSetup {
       const config = {
         model: {
           endpoint: 'http://localhost:11434',
-          name: 'qwen2.5:7b',
+          name: 'llama3.2:latest',
           timeout: 30000,
-          maxTokens: 4096,
+          maxTokens: 20000,
           temperature: 0.7
         },
         features: {

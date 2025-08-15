@@ -147,10 +147,11 @@ program
       const enhancedClient = new EnhancedAgenticClient(context);
       await enhancedClient.start();
     } else {
-      console.log(chalk.blue('🤖 Starting CodeCrucible Claude Code Mode...'));
+      // Default to enhanced ReAct agent for better tool usage and analysis
+      console.log(chalk.blue('🤖 Starting CodeCrucible ReAct Agent with Tools...'));
       const context = await initializeApplication();
-      const claudeCodeClient = new ClaudeCodeClient(context);
-      await claudeCodeClient.start();
+      const enhancedClient = new EnhancedAgenticClient(context);
+      await enhancedClient.start();
     }
   });
 

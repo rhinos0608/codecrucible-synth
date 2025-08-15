@@ -44,7 +44,11 @@
       "mcp__ref-tools-ref-tools-mcp__ref_read_url",
       "Bash(sed:*)",
       "Bash(npx tsc:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(git tag:*)",
+      "Bash(codecrucible:*)",
+      "Bash(winget:*)",
+      "Bash(where gh)"
     ],
     "deny": [],
     "ask": [],

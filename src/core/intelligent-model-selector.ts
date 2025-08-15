@@ -622,9 +622,9 @@ export class IntelligentModelSelector {
   private findSimplestCompatibleModel(availableModels: string[]): string | null {
     // Ordered list of models from simplest to most complex (including what's actually installed)
     const simplicityOrder = [
-      'gemma:2b', 'llama3.2:latest', 'llama3.2:3b', 'qwen2.5:3b', 
-      'gpt-oss:20b', 'codellama:7b', 'qwen2.5:7b', 'llama3.2:8b', 
-      'gemma2:9b', 'gemma:7b', 'gemma2:27b', 'qwq:32b'
+      'gpt-oss:20b', 'codellama:7b', 'qwen2.5:7b', 'llama3.2:8b',
+      'gemma2:9b', 'gemma:7b', 'llama3.2:latest', 'llama3.2:3b', 
+      'qwen2.5:3b', 'gemma:2b', 'gemma2:27b', 'qwq:32b'
     ];
     
     logger.debug(`Looking for simple model from available: ${availableModels.join(', ')}`);
@@ -699,21 +699,31 @@ export class IntelligentModelSelector {
    */
   private getTaskSpecificModels(taskType: string): ModelCapability[] {
     const taskMappings = {
-      'coding': ['coding', 'code_generation', 'debugging'],
+      'coding': ['coding', 'code_generation', 'debugging', 'complex_coding', 'code_review'],
       'analysis': ['analysis', 'reasoning', 'complex_reasoning'],
       'planning': ['planning', 'reasoning', 'complex_reasoning'],
-      'chat': ['general', 'chat'],
-      'debugging': ['coding', 'debugging', 'code_review'],
-      'review': ['code_review', 'analysis'],
+      'chat': ['general', 'chat', 'coding'], // Include coding models for chat about code
+      'debugging': ['coding', 'debugging', 'code_review', 'complex_coding'],
+      'review': ['code_review', 'analysis', 'coding'],
       'simple': ['simple_tasks', 'quick_help', 'simple_coding'],
-      'complex': ['complex_reasoning', 'complex_coding', 'analysis']
+      'complex': ['complex_reasoning', 'complex_coding', 'analysis', 'coding']
     };
     
     const relevantTasks = taskMappings[taskType as keyof typeof taskMappings] || ['general'];
     
-    return this.modelCapabilities.filter(model =>
+    const models = this.modelCapabilities.filter(model =>
       model.recommendedFor.some(task => relevantTasks.includes(task))
     );
+    
+    // Prioritize gpt-oss:20b for coding tasks if available
+    if (taskType === 'coding' || taskType === 'debugging' || taskType === 'complex') {
+      const gptModel = models.find(m => m.name.includes('gpt-oss'));
+      if (gptModel) {
+        return [gptModel, ...models.filter(m => !m.name.includes('gpt-oss'))];
+      }
+    }
+    
+    return models;
   }
 
   /**

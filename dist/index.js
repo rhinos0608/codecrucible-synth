@@ -7,7 +7,6 @@ import { ConfigManager } from './config/config-manager.js';
 import { CodeCrucibleCLI } from './core/cli.js';
 import { logger } from './core/logger.js';
 import { EnhancedAgenticClient } from './core/enhanced-agentic-client.js';
-import { ClaudeCodeClient } from './core/claude-code-client.js';
 import chalk from 'chalk';
 const program = new Command();
 /**
@@ -129,10 +128,11 @@ program
         await enhancedClient.start();
     }
     else {
-        console.log(chalk.blue('🤖 Starting CodeCrucible Claude Code Mode...'));
+        // Default to enhanced ReAct agent for better tool usage and analysis
+        console.log(chalk.blue('🤖 Starting CodeCrucible ReAct Agent with Tools...'));
         const context = await initializeApplication();
-        const claudeCodeClient = new ClaudeCodeClient(context);
-        await claudeCodeClient.start();
+        const enhancedClient = new EnhancedAgenticClient(context);
+        await enhancedClient.start();
     }
 });
 // Desktop mode

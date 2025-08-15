@@ -63,6 +63,21 @@ export class AutonomousErrorHandler {
       actions.push(...await this.handleContextError(error));
     }
     
+    // JSON parsing errors - specific to ReAct agents
+    else if (error.errorMessage.includes('JSON') || error.errorMessage.includes('parse') || error.errorMessage.includes('SyntaxError')) {
+      actions.push(...await this.handleJsonParsingError(error));
+    }
+    
+    // Model selection/compatibility errors
+    else if (error.errorMessage.includes('compatible') || error.errorMessage.includes('requirements')) {
+      actions.push(...await this.handleModelCompatibilityError(error));
+    }
+    
+    // Tool execution errors
+    else if (error.errorMessage.includes('tool') && error.operation === 'agent_processing') {
+      actions.push(...await this.handleToolExecutionError(error));
+    }
+    
     // Unknown errors - generic recovery
     else {
       actions.push({
@@ -359,17 +374,129 @@ export class AutonomousErrorHandler {
   }
 
   /**
+   * Handle JSON parsing errors in ReAct agents
+   */
+  private async handleJsonParsingError(error: ErrorContext): Promise<RecoveryAction[]> {
+    const actions: RecoveryAction[] = [];
+    
+    logger.info('🔧 Handling JSON parsing error in ReAct agent');
+    
+    // If this is a repeated JSON parsing error, try switching to a more reliable model
+    if (error.model && this.getRetryCount(`json_parse-${error.model}`) > 2) {
+      const reliableModels = ['llama3.2:latest', 'gemma2:9b', 'qwen2.5:7b'];
+      const availableModels = await this.modelManager.getAvailableModels();
+      
+      for (const reliable of reliableModels) {
+        const found = availableModels.find((m: any) => m.name.includes(reliable.split(':')[0]));
+        if (found && found.name !== error.model) {
+          actions.push({
+            action: 'switch_model',
+            target: found.name,
+            reason: 'Switching to more reliable model for JSON parsing'
+          });
+          break;
+        }
+      }
+    }
+    
+    // Add retry with enhanced prompting guidance
+    actions.push({
+      action: 'retry',
+      reason: 'JSON parsing failed, will retry with enhanced parsing strategies'
+    });
+    
+    return actions;
+  }
+
+  /**
+   * Handle model compatibility errors
+   */
+  private async handleModelCompatibilityError(error: ErrorContext): Promise<RecoveryAction[]> {
+    const actions: RecoveryAction[] = [];
+    
+    logger.info('🔧 Handling model compatibility error');
+    
+    // Try switching to a lightweight, compatible model
+    const lightweightModels = ['llama3.2:latest', 'gemma:2b', 'qwen2.5:3b'];
+    const availableModels = await this.modelManager.getAvailableModels();
+    
+    for (const lightweight of lightweightModels) {
+      const found = availableModels.find((m: any) => 
+        m.name.includes(lightweight.split(':')[0]) || m.name === lightweight
+      );
+      if (found) {
+        actions.push({
+          action: 'switch_model',
+          target: found.name,
+          reason: `Switching to lightweight compatible model: ${found.name}`
+        });
+        break;
+      }
+    }
+    
+    // If no lightweight models found, suggest pulling one
+    if (actions.length === 0) {
+      actions.push({
+        action: 'pull_model',
+        target: 'llama3.2:latest',
+        reason: 'Pulling compatible lightweight model'
+      });
+    }
+    
+    return actions;
+  }
+
+  /**
+   * Handle tool execution errors
+   */
+  private async handleToolExecutionError(error: ErrorContext): Promise<RecoveryAction[]> {
+    const actions: RecoveryAction[] = [];
+    
+    logger.info('🔧 Handling tool execution error');
+    
+    // If tool execution keeps failing, suggest fallback approach
+    if (error.context?.iteration > 5) {
+      actions.push({
+        action: 'fallback',
+        reason: 'Tool execution repeatedly failing, using direct response mode'
+      });
+    } else {
+      actions.push({
+        action: 'retry',
+        reason: 'Tool execution failed, retrying with enhanced error context'
+      });
+    }
+    
+    return actions;
+  }
+
+  /**
+   * Get retry count for a specific operation
+   */
+  private getRetryCount(operation: string): number {
+    return this.retryAttempts.get(operation) || 0;
+  }
+
+  /**
+   * Increment retry count for an operation
+   */
+  private incrementRetryCount(operation: string): void {
+    const current = this.retryAttempts.get(operation) || 0;
+    this.retryAttempts.set(operation, current + 1);
+  }
+
+  /**
    * Get intelligent model recommendation based on task
    */
   async getRecommendedModel(taskType: 'coding' | 'chat' | 'analysis' | 'planning' | 'general'): Promise<string> {
     const availableModels = await this.modelManager.getAvailableModels();
     
     const preferences = {
-      coding: ['codellama', 'deepseek', 'qwen2.5-coder'],
+      coding: ['gpt-oss', 'codellama', 'deepseek', 'qwen2.5-coder'],
       chat: ['llama3.2', 'llama3.1', 'gemma2'],
       analysis: ['qwen2.5', 'llama3.1', 'gemma2'],
       planning: ['llama3.1', 'qwen2.5', 'gemma2'],
-      general: ['qwen2.5', 'llama3.1', 'gemma2']
+      general: ['qwen2.5', 'llama3.1', 'gemma2', 'gpt-oss']
     };
     
     const preferred = preferences[taskType] || preferences['general'];

@@ -436,10 +436,11 @@ CodeCrucible provides access to various external tools and services through MCP 
   - Usage: When working on ML/AI projects, suggests appropriate models from Hugging Face Hub
   - Example: `cc "I need a text classification model"` (will recommend suitable models)
 
-- **Documentation Search (Ref Tools)**: Search programming documentation and guides
+- **Documentation Search (ref-tools)**: Search programming documentation and guides  
   - Purpose: Find relevant documentation for libraries, frameworks, and programming concepts
   - Usage: Automatically searches documentation when you need technical references
   - Example: `cc "How to use React hooks properly"` (searches React documentation)
+  - **Note**: This is NOT a code refactoring tool - use `cc file refactor` for actual code transformation
 
 **Important Note**: These tools are research and recommendation aids, not code refactoring tools. For code refactoring, use the built-in `cc file refactor` command which provides actual code transformation.
 

@@ -7,6 +7,7 @@ import { BaseTool } from './tools/base-tool.js';
 import { ReadFileTool, WriteFileTool, ListFilesTool } from './tools/file-tools.js';
 import { LintCodeTool, GetAstTool } from './tools/code-analysis-tools.js';
 import { GitStatusTool, GitDiffTool } from './tools/git-tools.js';
+import { ResearchTool, WebSearchTool, DocSearchTool } from './tools/research-tools.js';
 import { AutonomousErrorHandler, ErrorContext } from './autonomous-error-handler.js';
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
 
@@ -78,6 +79,9 @@ export class ReActAgent {
       new GetAstTool(this.agentContext),
       new GitStatusTool(this.agentContext),
       new GitDiffTool(this.agentContext),
+      new ResearchTool(this.agentContext),
+      new WebSearchTool(this.agentContext),
+      new DocSearchTool(this.agentContext),
     ];
     
     // Initialize autonomous capabilities
@@ -181,6 +185,9 @@ export class ReActAgent {
         
         try {
           const thought = this.parseResponse(response);
+          
+          // Log the parsed thought for debugging
+          logger.debug('Parsed thought:', thought);
           
           if (thought.tool === 'final_answer') {
             let finalAnswer = thought.toolInput.answer as string;
@@ -633,8 +640,8 @@ TOOL USAGE EXAMPLES:
 - To read files: {"tool": "readFile", "toolInput": {"path": "package.json"}}
 - To list files: {"tool": "listFiles", "toolInput": {"path": "."}}
 - To check git: {"tool": "gitStatus", "toolInput": {}}
-- To analyze code: {"tool": "getAst", "toolInput": {"filePath": "src/main.ts"}}
-- To check linting: {"tool": "lintCode", "toolInput": {"filePath": "src/main.ts"}}
+- To analyze code: {"tool": "getAst", "toolInput": {"path": "src/main.ts"}}
+- To check linting: {"tool": "lintCode", "toolInput": {"path": "src/main.ts"}}
 - When finished: {"tool": "final_answer", "toolInput": {"answer": "Your complete response"}}
 
 Previous conversation:
@@ -668,16 +675,40 @@ FINAL ANSWER EXAMPLE:
       if (typeof response === 'object' && response !== null) {
         parsed = response;
       } else {
-        // Try direct parsing first (structured output case)
-        try {
-          parsed = JSON.parse(response);
-        } catch {
-          // Fallback: extract JSON from the response
-          const jsonMatch = response.match(/\{[\s\S]*\}/);
-          if (!jsonMatch) {
-            throw new Error('No JSON found in response');
+        // Attempt to find and parse JSON within the response string
+        const jsonStartIndex = response.indexOf('{');
+        const jsonEndIndex = response.lastIndexOf('}');
+
+        if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+          const jsonString = response.substring(jsonStartIndex, jsonEndIndex + 1);
+          try {
+            parsed = JSON.parse(jsonString);
+          } catch (jsonParseError) {
+            logger.warn('Failed to parse extracted JSON string:', jsonParseError);
+            // Fallback to original regex if direct extraction fails
+            const jsonMatch = response.match(/\{[\s\S]*?\}(?=\s*$|\s*\w+:)/);
+            if (!jsonMatch) {
+              const altMatch = response.match(/\{[^\{\}]*(?:\{[^\{\}]*\}[^\{\}]*)*\}/);
+              if (!altMatch) {
+                throw new Error('No valid JSON found in response after multiple attempts');
+              }
+              parsed = JSON.parse(altMatch[0]);
+            } else {
+              parsed = JSON.parse(jsonMatch[0]);
+            }
           }
-          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          // If no curly braces found, try original regex as a last resort
+          const jsonMatch = response.match(/\{[\s\S]*?\}(?=\s*$|\s*\w+:)/);
+          if (!jsonMatch) {
+            const altMatch = response.match(/\{[^\{\}]*(?:\{[^\{\}]*\}[^\{\}]*)*\}/);
+            if (!altMatch) {
+              throw new Error('No valid JSON found in response');
+            }
+            parsed = JSON.parse(altMatch[0]);
+          } else {
+            parsed = JSON.parse(jsonMatch[0]);
+          }
         }
       }
       
@@ -712,8 +743,13 @@ FINAL ANSWER EXAMPLE:
   }
 
   private fallbackParse(response: string): Thought {
-    // First try to extract JSON and thought from mixed response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    // First try to extract JSON and thought from mixed response with improved regex
+    let jsonMatch = response.match(/\{[\s\S]*?\}(?=\s*$|\s*\w+:)/);
+    if (!jsonMatch) {
+      // Try alternative regex for more complex cases
+      jsonMatch = response.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+    }
+    
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -1060,6 +1096,7 @@ Provide a direct, helpful response without using any tools.`;
       this.agentContext.messages.push({ role: 'assistant', content: response, timestamp: Date.now() });
       return response;
     } catch (error) {
+      logger.warn('Direct response generation failed:', error);
       return "I understand you're asking about the project. Let me help you with that. Could you be more specific about what aspect you'd like me to focus on?";
     }
   }

@@ -43,7 +43,8 @@
       "Bash(codecrucible model:*)",
       "mcp__ref-tools-ref-tools-mcp__ref_read_url",
       "Bash(sed:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": [],

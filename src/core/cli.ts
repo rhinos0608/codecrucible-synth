@@ -7,7 +7,7 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { readFile, stat, readdir } from 'fs/promises';
-import { join, extname, relative } from 'path';
+import { join, extname, relative, isAbsolute } from 'path';
 import { glob } from 'glob';
 
 interface CLIOptions {
@@ -189,10 +189,74 @@ export class CodeCrucibleCLI {
     const spinner = ora(`${voice} is thinking...`).start();
     
     try {
-      const projectContext = await this.getProjectContext();
+      // Improved file detection - look for common file patterns
+      const filePatterns = [
+        /\b[\w\-\.\/\\]+\.(js|ts|jsx|tsx|py|java|cpp|c|h|cs|php|rb|go|rs|md|txt|json|yaml|yml)\b/g,
+        /\b[\w\-\.\/\\]*\/[\w\-\.]+\b/g, // Unix-style paths
+        /\b[a-zA-Z]:\\(?:[^\\/:*?"<>|\r\n]+\\)*[^\\/:*?"<>|\r\n]*\.[a-zA-Z0-9]+\b/g // Windows paths
+      ];
+      
+      let detectedFiles: string[] = [];
+      let projectContext: ProjectContext = { files: [] };
+      
+      // Try each pattern to find file references
+      for (const pattern of filePatterns) {
+        const matches = prompt.match(pattern);
+        if (matches) {
+          detectedFiles.push(...matches);
+        }
+      }
+      
+      // Remove duplicates and filter valid files
+      detectedFiles = [...new Set(detectedFiles)];
+      
+      // Enhanced prompt with file content inclusion
+      let enhancedPrompt = prompt;
+      let filesFound = false;
+      
+      for (const filePath of detectedFiles) {
+        try {
+          // Try to resolve relative paths
+          let resolvedPath = filePath;
+          if (!isAbsolute(filePath)) {
+            resolvedPath = join(process.cwd(), filePath);
+          }
+          
+          const fileContent = await readFile(resolvedPath, 'utf8');
+          const fileExt = extname(resolvedPath);
+          const language = this.detectLanguage(fileExt);
+          
+          // Add file to project context
+          if (!projectContext.files) {
+            projectContext.files = [];
+          }
+          projectContext.files.push({
+            path: filePath,
+            content: fileContent,
+            language
+          });
+          
+          // Enhance prompt with file content
+          enhancedPrompt += `\n\n**File: ${filePath}**\n\`\`\`${language}\n${fileContent}\n\`\`\``;
+          filesFound = true;
+          
+          console.log(chalk.gray(`   📁 Loaded file: ${filePath}`));
+          
+        } catch (error) {
+          // Silently continue if file can't be read
+          continue;
+        }
+      }
+      
+      // If no files were detected but prompt looks like it might reference files,
+      // provide helpful guidance
+      if (!filesFound && (prompt.includes('.js') || prompt.includes('.ts') || prompt.includes('file'))) {
+        enhancedPrompt += `\n\n**Note:** If you're referencing specific files, please provide the file path in your prompt (e.g., "analyze src/index.js") and I'll include the file content in my analysis.`;
+      }
+
       const response = await this.context.modelClient.generateVoiceResponse(
         voiceArchetype,
-        prompt,
+        enhancedPrompt,
         projectContext
       );
 

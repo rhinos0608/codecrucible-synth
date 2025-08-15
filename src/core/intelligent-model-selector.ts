@@ -148,6 +148,15 @@ export class IntelligentModelSelector {
       size: 'medium',
       speed: 'medium',
       requirements: { minRam: 6144, minVram: 6144, minCores: 2 }
+    },
+    {
+      name: 'gpt-oss:20b',
+      strengths: ['code generation', 'reasoning', 'analysis', 'debugging'],
+      weaknesses: ['speed', 'resource usage'],
+      recommendedFor: ['coding', 'complex_coding', 'debugging', 'code_review', 'analysis'],
+      size: 'large',
+      speed: 'medium',
+      requirements: { minRam: 16384, minVram: 12288, minCores: 4 }
     }
   ];
 
@@ -432,26 +441,39 @@ export class IntelligentModelSelector {
    * Check if model can run on current system
    */
   private canModelRun(model: ModelCapability): boolean {
-    if (!this.systemSpecs) return true; // Conservative fallback
+    if (!this.systemSpecs) {
+      logger.warn(`No system specs available for ${model.name}, allowing model to run`);
+      return true; // Conservative fallback
+    }
     
     const specs = this.systemSpecs;
     const req = model.requirements;
     
-    // Check RAM requirement
-    if (specs.memory.available < req.minRam) {
+    // Check RAM requirement - use total instead of available for better compatibility
+    const usableRam = Math.min(specs.memory.total * 0.8, specs.memory.available); // 80% of total or available
+    if (usableRam < req.minRam) {
+      logger.debug(`${model.name} requires ${req.minRam}MB RAM, but only ${Math.round(usableRam)}MB usable`);
       return false;
     }
     
     // Check CPU cores
     if (specs.cpu.cores < req.minCores) {
+      logger.debug(`${model.name} requires ${req.minCores} cores, but only ${specs.cpu.cores} available`);
       return false;
     }
     
-    // Check VRAM if required and GPU available
+    // Check VRAM if required - only fail if GPU is available but insufficient
     if (req.minVram && specs.gpu.available && specs.gpu.vram < req.minVram) {
+      logger.debug(`${model.name} requires ${req.minVram}MB VRAM, but only ${specs.gpu.vram}MB available`);
       return false;
     }
     
+    // If VRAM required but no GPU, still allow (CPU inference)
+    if (req.minVram && !specs.gpu.available) {
+      logger.debug(`${model.name} prefers GPU but will run on CPU`);
+    }
+    
+    logger.debug(`✅ ${model.name} is compatible with system specs`);
     return true;
   }
 
@@ -486,23 +508,48 @@ export class IntelligentModelSelector {
     let candidates = this.getTaskSpecificModels(taskType);
     
     // Filter by system compatibility first
-    candidates = candidates.filter(model => this.canModelRun(model));
+    const compatibleCandidates = candidates.filter(model => this.canModelRun(model));
+    logger.debug(`Compatible models after system check: ${compatibleCandidates.map(m => m.name).join(', ')}`);
     
-    // Filter by availability
-    candidates = candidates.filter(model => 
-      availableModels.some(available => 
-        available.includes(model.name.split(':')[0]) || available === model.name
-      )
-    );
+    // Filter by availability with more robust matching
+    const availableCandidates = compatibleCandidates.filter(model => {
+      const modelBase = model.name.split(':')[0];
+      const isAvailable = availableModels.some(available => {
+        const availableBase = available.split(':')[0];
+        return available === model.name || availableBase === modelBase || available.includes(modelBase);
+      });
+      
+      if (!isAvailable) {
+        logger.debug(`❌ ${model.name} not found in available models: ${availableModels.join(', ')}`);
+      } else {
+        logger.debug(`✅ ${model.name} is available`);
+      }
+      
+      return isAvailable;
+    });
+    
+    candidates = availableCandidates;
+    logger.info(`Final candidate models: ${candidates.map(m => m.name).join(', ')}`);
     
     if (candidates.length === 0) {
       logger.warn(`⚠️ No compatible models found for task: ${taskType}`);
+      logger.info(`Available models from Ollama: ${availableModels.join(', ')}`);
+      logger.info(`Original candidates: ${this.getTaskSpecificModels(taskType).map(m => m.name).join(', ')}`);
+      
       // Fallback to any available model
       const simplestModel = this.findSimplestCompatibleModel(availableModels);
       if (simplestModel) {
         logger.info(`🔄 Using fallback model: ${simplestModel}`);
         return simplestModel;
       }
+      
+      // Ultimate fallback - use first available model
+      if (availableModels.length > 0) {
+        logger.warn(`🚨 Using first available model as last resort: ${availableModels[0]}`);
+        return availableModels[0];
+      }
+      
+      throw new Error('No models available in Ollama. Please install a model with: ollama pull llama3.2:latest');
     }
     
     // Apply requirement filters
@@ -573,19 +620,30 @@ export class IntelligentModelSelector {
    * Find the simplest model that can run on the system
    */
   private findSimplestCompatibleModel(availableModels: string[]): string | null {
-    // Ordered list of models from simplest to most complex
+    // Ordered list of models from simplest to most complex (including what's actually installed)
     const simplicityOrder = [
-      'llama3.2:latest', 'llama3.2:3b', 'qwen2.5:3b', 'gemma2:2b',
-      'codellama:7b', 'qwen2.5:7b', 'llama3.2:8b', 'gemma2:9b'
+      'gemma:2b', 'llama3.2:latest', 'llama3.2:3b', 'qwen2.5:3b', 
+      'gpt-oss:20b', 'codellama:7b', 'qwen2.5:7b', 'llama3.2:8b', 
+      'gemma2:9b', 'gemma:7b', 'gemma2:27b', 'qwq:32b'
     ];
     
+    logger.debug(`Looking for simple model from available: ${availableModels.join(', ')}`);
+    
     for (const simple of simplicityOrder) {
-      if (availableModels.some(available => available.includes(simple.split(':')[0]) || available === simple)) {
-        return simple;
+      const found = availableModels.find(available => {
+        const simpleBase = simple.split(':')[0];
+        const availableBase = available.split(':')[0];
+        return available === simple || availableBase === simpleBase || available.includes(simpleBase);
+      });
+      
+      if (found) {
+        logger.info(`📋 Selected simplest compatible model: ${found}`);
+        return found;
       }
     }
     
     // Return first available model as last resort
+    logger.warn('No models in simplicity order found, using first available');
     return availableModels[0] || null;
   }
 

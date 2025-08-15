@@ -165,7 +165,7 @@ When you have the final answer, use the tool "final_answer" with the answer in t
 Examples:
 {
   "thought": "I need to read the package.json file to understand the project structure",
-  "tool": "read_file",
+  "tool": "readFile",
   "toolInput": { "path": "package.json" }
 }
 
@@ -224,10 +224,23 @@ Remember:
     const toolMatch = response.match(/tool['":\s]+([^"'\s,\}]+)/i);
     
     if (thoughtMatch && toolMatch) {
+      const tool = toolMatch[1].trim().replace(/['"]/g, '');
+      let toolInput = {};
+      
+      // Try to extract path for file operations
+      if (tool.includes('File') || tool.includes('list')) {
+        const pathMatch = response.match(/path['":\s]+['"]*([^"'\s,\}\n]+)['"]*|path['":\s]*['"]*([^"'\n]+)['"]/i);
+        if (pathMatch) {
+          toolInput = { path: (pathMatch[1] || pathMatch[2] || '.').trim() };
+        } else {
+          toolInput = { path: '.' }; // Default to current directory
+        }
+      }
+      
       return {
         thought: thoughtMatch[1].trim(),
-        tool: toolMatch[1].trim().replace(/['"]/g, ''),
-        toolInput: {}
+        tool,
+        toolInput
       };
     }
     

@@ -18,8 +18,16 @@ export class ReadFileTool extends BaseTool {
   }
 
   async execute(args: z.infer<typeof ReadFileSchema>): Promise<string> {
-    const fullPath = join(this.agentContext.workingDirectory, args.path);
+    const fullPath = this.resolvePath(args.path);
     return await fs.readFile(fullPath, 'utf-8');
+  }
+
+  private resolvePath(path: string): string {
+    // If path is absolute, use it as-is; otherwise join with working directory
+    if (path.match(/^[a-zA-Z]:\\/) || path.startsWith('/')) {
+      return path;
+    }
+    return join(this.agentContext.workingDirectory, path);
   }
 }
 
@@ -39,13 +47,21 @@ export class WriteFileTool extends BaseTool {
   }
 
   async execute(args: z.infer<typeof WriteFileSchema>): Promise<void> {
-    const fullPath = join(this.agentContext.workingDirectory, args.path);
+    const fullPath = this.resolvePath(args.path);
     await fs.writeFile(fullPath, args.content);
+  }
+
+  private resolvePath(path: string): string {
+    // If path is absolute, use it as-is; otherwise join with working directory
+    if (path.match(/^[a-zA-Z]:\\/) || path.startsWith('/')) {
+      return path;
+    }
+    return join(this.agentContext.workingDirectory, path);
   }
 }
 
 const ListFilesSchema = z.object({
-  path: z.string().describe('The path to the directory to list.'),
+  path: z.string().optional().default('.').describe('The path to the directory to list. Defaults to current directory.'),
 });
 
 export class ListFilesTool extends BaseTool {
@@ -59,7 +75,15 @@ export class ListFilesTool extends BaseTool {
   }
 
   async execute(args: z.infer<typeof ListFilesSchema>): Promise<string[]> {
-    const fullPath = join(this.agentContext.workingDirectory, args.path);
+    const fullPath = this.resolvePath(args.path || '.');
     return await fs.readdir(fullPath);
+  }
+
+  private resolvePath(path: string): string {
+    // If path is absolute, use it as-is; otherwise join with working directory
+    if (path.match(/^[a-zA-Z]:\\/) || path.startsWith('/')) {
+      return path;
+    }
+    return join(this.agentContext.workingDirectory, path);
   }
 }

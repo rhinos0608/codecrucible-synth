@@ -18,8 +18,25 @@ export class ReadFileTool extends BaseTool {
   }
 
   async execute(args: z.infer<typeof ReadFileSchema>): Promise<string> {
+    // Validate input parameters
+    if (!args || !args.path || args.path.trim() === '') {
+      return `Error: Path parameter is required for readFile tool. Received: ${JSON.stringify(args)}`;
+    }
+
     const fullPath = this.resolvePath(args.path);
-    return await fs.readFile(fullPath, 'utf-8');
+    
+    // Check if file exists before trying to read
+    try {
+      await fs.access(fullPath);
+    } catch (error) {
+      return `Error: File not found at path '${args.path}' (resolved to '${fullPath}'). Please verify the file exists.`;
+    }
+    
+    try {
+      return await fs.readFile(fullPath, 'utf-8');
+    } catch (error) {
+      return `Error reading file '${args.path}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
   }
 
   private resolvePath(path: string): string {

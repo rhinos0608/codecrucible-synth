@@ -219,6 +219,14 @@ export class ReActAgent {
           // Track tool usage to prevent loops
           this.trackToolUsage(thought.tool, thought.toolInput);
           
+          // Validate tool input before execution
+          const validatedInput = this.validateToolInput(thought.tool, thought.toolInput);
+          if (!validatedInput.isValid) {
+            const errorMessage = `Invalid tool input for ${thought.tool}: ${validatedInput.error}`;
+            this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage }), timestamp: Date.now() });
+            continue;
+          }
+          
           // Update progress metrics
           this.updateProgressMetrics(thought.tool, thought.toolInput);
           
@@ -1130,7 +1138,18 @@ Provide a direct, helpful response without using any tools.`;
         usage.input?.path === toolInput?.path &&
         (now - usage.timestamp) < 180000 // 3 minutes
       );
-      return samePathUsage.length >= 3; // Allow up to 3 times per path
+      
+      // Be more permissive with listFiles unless it's really excessive
+      if (samePathUsage.length >= 4) {
+        return true; // Block after 4 attempts on same path
+      }
+      
+      // Also check total listFiles usage regardless of path
+      const totalListFiles = recentUsage.filter(usage => 
+        usage.tool === 'listFiles' &&
+        (now - usage.timestamp) < 300000 // 5 minutes
+      );
+      return totalListFiles.length >= 8; // Allow exploring up to 8 different paths
     }
     
     // For readFile, allow reading different files
@@ -1143,8 +1162,68 @@ Provide a direct, helpful response without using any tools.`;
       return sameFileUsage.length >= 2; // Allow reading same file twice max
     }
     
+    // For getAst, be more restrictive since it's often called on non-existent files
+    if (toolName === 'getAst') {
+      const sameFileUsage = recentUsage.filter(usage => 
+        usage.tool === 'getAst' && 
+        usage.input?.path === toolInput?.path &&
+        (now - usage.timestamp) < 300000 // 5 minutes
+      );
+      return sameFileUsage.length >= 1; // Only allow once per file unless successful
+    }
+    
     return false;
   }
+
+  /**
+   * Validate tool input before execution
+   */
+  private validateToolInput(toolName: string, toolInput: any): { isValid: boolean; error?: string } {
+    // Check if toolInput exists
+    if (!toolInput || typeof toolInput !== 'object') {
+      return { isValid: false, error: 'Tool input must be a valid object' };
+    }
+
+    // Tool-specific validation
+    switch (toolName) {
+      case 'readFile':
+      case 'getAst':
+      case 'lintCode':
+        if (!toolInput.path || typeof toolInput.path !== 'string' || toolInput.path.trim() === '') {
+          return { isValid: false, error: 'path parameter is required and must be a non-empty string' };
+        }
+        // Check for common bad paths
+        if (toolInput.path.includes('src/main.ts')) {
+          return { isValid: false, error: 'src/main.ts file does not exist in this project. Use listFiles to explore actual project structure first.' };
+        }
+        break;
+      
+      case 'listFiles':
+        // listFiles can work with or without path
+        if (toolInput.path && typeof toolInput.path !== 'string') {
+          return { isValid: false, error: 'path parameter must be a string if provided' };
+        }
+        break;
+      
+      case 'writeFile':
+        if (!toolInput.path || typeof toolInput.path !== 'string' || toolInput.path.trim() === '') {
+          return { isValid: false, error: 'path parameter is required and must be a non-empty string' };
+        }
+        if (!toolInput.content || typeof toolInput.content !== 'string') {
+          return { isValid: false, error: 'content parameter is required and must be a string' };
+        }
+        break;
+      
+      case 'runCommand':
+        if (!toolInput.command || typeof toolInput.command !== 'string' || toolInput.command.trim() === '') {
+          return { isValid: false, error: 'command parameter is required and must be a non-empty string' };
+        }
+        break;
+    }
+
+    return { isValid: true };
+  }
+
   /**
    * Rotate conversation history when it gets too long
    */

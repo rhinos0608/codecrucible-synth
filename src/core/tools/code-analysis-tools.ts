@@ -2,22 +2,101 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { join, relative, isAbsolute } from 'path';
-// Function to dynamically import eslint
+// Cache for import results to prevent circular dependency issues
+const importCache = new Map<string, any>();
+
+// Function to dynamically import eslint with enhanced error handling
 async function tryImportESLint(): Promise<any> {
+  const cacheKey = 'eslint';
+  
+  if (importCache.has(cacheKey)) {
+    const cached = importCache.get(cacheKey);
+    return cached === 'loading' ? null : cached;
+  }
+  
   try {
+    // Set loading state to prevent circular imports
+    importCache.set(cacheKey, 'loading');
+    
     const eslintModule = await import('eslint');
-    return eslintModule.ESLint;
+    
+    // Validate that ESLint was imported correctly
+    if (!eslintModule || !eslintModule.ESLint) {
+      throw new Error('ESLint module imported but ESLint class not found');
+    }
+    
+    const ESLint = eslintModule.ESLint;
+    
+    // Cache the successful result
+    importCache.set(cacheKey, ESLint);
+    return ESLint;
   } catch (error) {
+    // Cache the failure to prevent repeated attempts
+    importCache.set(cacheKey, null);
+    
+    // Provide specific error messages for common issues
+    if (error instanceof Error) {
+      if (error.message.includes('Cannot find module')) {
+        console.warn('ESLint is not installed. Install with: npm install eslint');
+      } else if (error.message.includes('circular dependency')) {
+        console.warn('Circular dependency detected when importing ESLint');
+      } else if (error.message.includes('dynamic import')) {
+        console.warn('Dynamic import not supported in this environment for ESLint');
+      } else {
+        console.warn(`Failed to import ESLint: ${error.message}`);
+      }
+    } else {
+      console.warn('Failed to import ESLint: Unknown error type');
+    }
+    
     return null;
   }
 }
 
-// Function to dynamically import typescript
+// Function to dynamically import typescript with enhanced error handling
 async function tryImportTypeScript(): Promise<any> {
+  const cacheKey = 'typescript';
+  
+  if (importCache.has(cacheKey)) {
+    const cached = importCache.get(cacheKey);
+    return cached === 'loading' ? null : cached;
+  }
+  
   try {
+    // Set loading state to prevent circular imports
+    importCache.set(cacheKey, 'loading');
+    
     const tsModule = await import('typescript');
+    
+    // Validate that TypeScript was imported correctly
+    if (!tsModule || !tsModule.createProgram) {
+      throw new Error('TypeScript module imported but createProgram function not found');
+    }
+    
+    // Cache the successful result
+    importCache.set(cacheKey, tsModule);
     return tsModule;
   } catch (error) {
+    // Cache the failure to prevent repeated attempts
+    importCache.set(cacheKey, null);
+    
+    // Provide specific error messages for common issues
+    if (error instanceof Error) {
+      if (error.message.includes('Cannot find module')) {
+        console.warn('TypeScript is not installed. Install with: npm install typescript');
+      } else if (error.message.includes('circular dependency')) {
+        console.warn('Circular dependency detected when importing TypeScript');
+      } else if (error.message.includes('dynamic import')) {
+        console.warn('Dynamic import not supported in this environment for TypeScript');
+      } else if (error.message.includes('createProgram function not found')) {
+        console.warn('Invalid TypeScript module: missing required API functions');
+      } else {
+        console.warn(`Failed to import TypeScript: ${error.message}`);
+      }
+    } else {
+      console.warn('Failed to import TypeScript: Unknown error type');
+    }
+    
     return null;
   }
 }
@@ -96,7 +175,50 @@ export class LintCodeTool extends BaseTool {
     }
     
     const fullPath = this.resolvePath(args.path);
-    return await this.eslint.lintFiles([fullPath]);
+    
+    // Check if file exists before trying to lint
+    try {
+      const { access } = await import('fs/promises');
+      await access(fullPath);
+    } catch (error) {
+      return [{
+        filePath: args.path,
+        messages: [{
+          ruleId: null,
+          severity: 2,
+          message: `File not found at path '${args.path}' (resolved to '${fullPath}'). Please verify the file exists.`,
+          line: 1,
+          column: 1
+        }],
+        errorCount: 1,
+        warningCount: 0,
+        fixableErrorCount: 0,
+        fixableWarningCount: 0,
+        source: '',
+        usedDeprecatedRules: []
+      }];
+    }
+    
+    try {
+      return await this.eslint.lintFiles([fullPath]);
+    } catch (error) {
+      return [{
+        filePath: args.path,
+        messages: [{
+          ruleId: null,
+          severity: 2,
+          message: `Error linting file '${args.path}': ${error instanceof Error ? error.message : 'Unknown error'}`,
+          line: 1,
+          column: 1
+        }],
+        errorCount: 1,
+        warningCount: 0,
+        fixableErrorCount: 0,
+        fixableWarningCount: 0,
+        source: '',
+        usedDeprecatedRules: []
+      }];
+    }
   }
 
   private resolvePath(path: string): string {
@@ -187,29 +309,72 @@ export class GetAstTool extends BaseTool {
     }
     
     const fullPath = this.resolvePath(args.path);
-    const program = this.ts.createProgram([fullPath], { allowJs: true });
-    const sourceFile = program.getSourceFile(fullPath);
-    if (!sourceFile) {
-      throw new Error(`Could not find source file: ${fullPath}`);
+    
+    // Check if file exists before trying to analyze
+    try {
+      const { access } = await import('fs/promises');
+      await access(fullPath);
+    } catch (error) {
+      return {
+        error: `File not found at path '${args.path}' (resolved to '${fullPath}'). Please verify the file exists.`,
+        fileName: args.path,
+        kind: 'FileNotFound',
+        text: 'File does not exist',
+        statements: [],
+        childCount: 0,
+        fullStart: 0,
+        start: 0,
+        end: 0
+      };
     }
     
-    // Convert AST to serializable format
-    const astSummary = {
-      fileName: sourceFile.fileName,
-      kind: this.ts.SyntaxKind[sourceFile.kind],
-      text: sourceFile.text.slice(0, 500) + (sourceFile.text.length > 500 ? '...' : ''),
-      statements: sourceFile.statements.map((stmt: any) => ({
-        kind: this.ts.SyntaxKind[stmt.kind],
-        start: stmt.getStart(),
-        end: stmt.getEnd()
-      })).slice(0, 10), // Limit to first 10 statements
-      childCount: sourceFile.getChildCount(),
-      fullStart: sourceFile.getFullStart(),
-      start: sourceFile.getStart(),
-      end: sourceFile.getEnd()
-    };
-    
-    return astSummary;
+    try {
+      const program = this.ts.createProgram([fullPath], { allowJs: true });
+      const sourceFile = program.getSourceFile(fullPath);
+      if (!sourceFile) {
+        return {
+          error: `TypeScript could not parse source file: ${fullPath}`,
+          fileName: args.path,
+          kind: 'ParseError',
+          text: 'Unable to parse file as TypeScript/JavaScript',
+          statements: [],
+          childCount: 0,
+          fullStart: 0,
+          start: 0,
+          end: 0
+        };
+      }
+      
+      // Convert AST to serializable format
+      const astSummary = {
+        fileName: sourceFile.fileName,
+        kind: this.ts.SyntaxKind[sourceFile.kind],
+        text: sourceFile.text.slice(0, 500) + (sourceFile.text.length > 500 ? '...' : ''),
+        statements: sourceFile.statements.map((stmt: any) => ({
+          kind: this.ts.SyntaxKind[stmt.kind],
+          start: stmt.getStart(),
+          end: stmt.getEnd()
+        })).slice(0, 10), // Limit to first 10 statements
+        childCount: sourceFile.getChildCount(),
+        fullStart: sourceFile.getFullStart(),
+        start: sourceFile.getStart(),
+        end: sourceFile.getEnd()
+      };
+      
+      return astSummary;
+    } catch (error) {
+      return {
+        error: `Error analyzing file '${args.path}': ${error instanceof Error ? error.message : 'Unknown error'}`,
+        fileName: args.path,
+        kind: 'AnalysisError',
+        text: 'Error during TypeScript analysis',
+        statements: [],
+        childCount: 0,
+        fullStart: 0,
+        start: 0,
+        end: 0
+      };
+    }
   }
 
   private resolvePath(path: string): string {

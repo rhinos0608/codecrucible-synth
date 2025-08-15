@@ -39,16 +39,33 @@
 ## 📋 Prerequisites
 
 1. **Node.js 18+** - [Download Node.js](https://nodejs.org)
-2. **Ollama with gpt-oss-20b** - Local AI model runtime
+2. **Ollama** - Local AI model runtime (auto-installed during setup)
 
-### Quick Ollama Setup
+### Automatic Setup ✨
+
+CodeCrucible now features **automatic setup**! Just install and run:
+
+```bash
+npm install -g codecrucible-synth
+cc
+```
+
+The app will automatically:
+- Install Ollama if needed
+- Guide you through model selection
+- Set up your preferred AI model
+- Start the enhanced agentic client
+
+### Manual Ollama Setup (Optional)
+
+If you prefer manual setup:
 
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Download the gpt-oss-20b model (requires ~12GB disk space)
-ollama pull gpt-oss:20b
+# Download a recommended model
+ollama pull qwq:32b-preview-q4_K_M
 
 # Start Ollama server
 ollama serve
@@ -456,15 +473,20 @@ npm run desktop:build
 ### Model Not Available
 
 ```bash
-# Check model status
+# Automatic setup (recommended)
+cc model --setup
+
+# Check system status
 cc model --status
 
-# Installation help
-cc model --install
+# List available models
+cc model --list
 
-# Manual setup
-ollama pull gpt-oss:20b
-ollama serve
+# Install specific model
+cc model --pull qwq:32b-preview-q4_K_M
+
+# Test model functionality
+cc model --test
 ```
 
 ### Permission Issues
@@ -487,8 +509,12 @@ cc config --set performance.responseCache.enabled=false
 # Reduce concurrent voices
 cc config --set voices.maxConcurrent=1
 
-# Use smaller model (if available)
-cc config --set model.name=gpt-oss:7b
+# Use smaller/faster model
+cc model --pull gemma2:9b
+cc config --set model.name=gemma2:9b
+
+# Check model performance
+cc model --test
 ```
 
 ## 📄 License

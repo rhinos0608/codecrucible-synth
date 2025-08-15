@@ -1,7 +1,7 @@
 {
   "name": "codecrucible-synth",
   "version": "2.0.0",
-  "description": "Standalone desktop CLI agentic coding assistant with local AI models",
+  "description": "Enhanced agentic coding assistant with ReAct pattern, tool integration, and advanced planning capabilities",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
@@ -22,7 +22,7 @@
     "package:mac": "pkg dist/index.js --targets node18-macos-x64 --output build/codecrucible-macos",
     "package:linux": "pkg dist/index.js --targets node18-linux-x64 --output build/codecrucible-linux",
     "package:all": "npm run package:win && npm run package:mac && npm run package:linux",
-    "desktop:dev": "electron dist/desktop.js",
+    "desktop:dev": "npm run build && electron dist/desktop.js",
     "desktop:build": "electron-builder",
     "desktop:package": "npm run build && npm run desktop:build",
     "prepare": "npm run build",
@@ -59,6 +59,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
     "@types/cross-spawn": "^6.0.6",
+    "@types/eslint": "^9.6.1",
     "@types/express": "^5.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.9",
@@ -90,7 +91,14 @@
     "local-ai",
     "ollama",
     "offline",
-    "agentic"
+    "agentic",
+    "react-pattern",
+    "tool-calling",
+    "planning",
+    "autonomous",
+    "ast-analysis",
+    "git-integration",
+    "code-understanding"
   ],
   "author": "CodeCrucible Team",
   "license": "MIT",

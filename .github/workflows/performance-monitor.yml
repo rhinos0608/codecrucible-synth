@@ -1,0 +1,308 @@
+name: Performance Monitoring
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance tests weekly on Mondays at 3 AM UTC
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  performance-baseline:
+    name: Performance Baseline Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build application
+        run: |
+          echo "Starting build at: $(date)"
+          START_TIME=$(date +%s)
+          npm run build
+          END_TIME=$(date +%s)
+          BUILD_TIME=$((END_TIME - START_TIME))
+          echo "Build completed in: ${BUILD_TIME} seconds"
+          echo "BUILD_TIME=${BUILD_TIME}" >> $GITHUB_ENV
+          
+      - name: Measure package sizes
+        run: |
+          echo "## Package Size Analysis" > performance-report.md
+          echo "" >> performance-report.md
+          echo "Generated on: $(date)" >> performance-report.md
+          echo "Commit: ${{ github.sha }}" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          echo "### Build Metrics:" >> performance-report.md
+          echo "- Build time: ${{ env.BUILD_TIME }} seconds" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          echo "### File Sizes:" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          # Measure dist directory
+          if [ -d "dist" ]; then
+            DIST_SIZE=$(du -sh dist | cut -f1)
+            echo "- dist/ directory: $DIST_SIZE" >> performance-report.md
+            
+            # Individual file sizes
+            echo "" >> performance-report.md
+            echo "#### Largest files in dist/:" >> performance-report.md
+            find dist -type f -name "*.js" -exec ls -lh {} \; | sort -k5 -hr | head -10 | awk '{print "- " $9 ": " $5}' >> performance-report.md
+          fi
+          
+          # Measure node_modules (installed size)
+          if [ -d "node_modules" ]; then
+            NODE_MODULES_SIZE=$(du -sh node_modules | cut -f1)
+            echo "- node_modules/ directory: $NODE_MODULES_SIZE" >> performance-report.md
+          fi
+          
+      - name: Analyze bundle composition
+        run: |
+          echo "" >> performance-report.md
+          echo "### Bundle Analysis:" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          # Count TypeScript/JavaScript files
+          TS_FILES=$(find src -name "*.ts" -o -name "*.tsx" | wc -l)
+          JS_FILES=$(find src -name "*.js" -o -name "*.jsx" | wc -l)
+          
+          echo "- TypeScript files: $TS_FILES" >> performance-report.md
+          echo "- JavaScript files: $JS_FILES" >> performance-report.md
+          
+          # Count lines of code
+          if command -v cloc &> /dev/null; then
+            echo "" >> performance-report.md
+            echo "#### Code Statistics:" >> performance-report.md
+            cloc src --quiet --csv | tail -n +2 | while IFS=, read files lang blank comment code; do
+              echo "- $lang: $code lines of code" >> performance-report.md
+            done
+          else
+            TOTAL_LINES=$(find src -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" | xargs wc -l | tail -1 | awk '{print $1}')
+            echo "- Total lines of code: $TOTAL_LINES" >> performance-report.md
+          fi
+          
+      - name: Memory usage analysis
+        run: |
+          echo "" >> performance-report.md
+          echo "### Runtime Performance:" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          # Test basic CLI startup time
+          if [ -f "dist/index.js" ]; then
+            echo "Testing CLI startup performance..."
+            START_TIME=$(date +%s%3N)
+            timeout 10s node dist/index.js --help > /dev/null 2>&1 || true
+            END_TIME=$(date +%s%3N)
+            STARTUP_TIME=$((END_TIME - START_TIME))
+            echo "- CLI startup time: ${STARTUP_TIME}ms" >> performance-report.md
+          fi
+          
+      - name: Dependency analysis
+        run: |
+          echo "" >> performance-report.md
+          echo "### Dependency Analysis:" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          # Count dependencies
+          PROD_DEPS=$(cat package.json | jq '.dependencies | length')
+          DEV_DEPS=$(cat package.json | jq '.devDependencies | length')
+          
+          echo "- Production dependencies: $PROD_DEPS" >> performance-report.md
+          echo "- Development dependencies: $DEV_DEPS" >> performance-report.md
+          
+          # Check for security vulnerabilities
+          echo "" >> performance-report.md
+          echo "#### Security Scan:" >> performance-report.md
+          npm audit --json > audit.json 2>/dev/null || true
+          
+          if [ -f "audit.json" ]; then
+            VULNERABILITIES=$(cat audit.json | jq '.metadata.vulnerabilities | to_entries | map(.value) | add // 0')
+            echo "- Total vulnerabilities: $VULNERABILITIES" >> performance-report.md
+            
+            HIGH_VULNS=$(cat audit.json | jq '.metadata.vulnerabilities.high // 0')
+            CRITICAL_VULNS=$(cat audit.json | jq '.metadata.vulnerabilities.critical // 0')
+            
+            if [ "$HIGH_VULNS" -gt 0 ] || [ "$CRITICAL_VULNS" -gt 0 ]; then
+              echo "- ⚠️ High-severity vulnerabilities: $HIGH_VULNS" >> performance-report.md
+              echo "- 🚨 Critical vulnerabilities: $CRITICAL_VULNS" >> performance-report.md
+            fi
+          fi
+          
+      - name: Performance benchmarks
+        run: |
+          echo "" >> performance-report.md
+          echo "### Performance Benchmarks:" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          # File system operations benchmark
+          if [ -f "dist/index.js" ]; then
+            echo "Running file operations benchmark..."
+            
+            # Create test files
+            mkdir -p test-perf
+            for i in {1..100}; do
+              echo "Test file $i content" > "test-perf/test$i.txt"
+            done
+            
+            # Benchmark file reading (if CLI supports it)
+            START_TIME=$(date +%s%3N)
+            find test-perf -name "*.txt" | head -10 | while read file; do
+              cat "$file" > /dev/null
+            done
+            END_TIME=$(date +%s%3N)
+            FILE_READ_TIME=$((END_TIME - START_TIME))
+            
+            echo "- File read operations (10 files): ${FILE_READ_TIME}ms" >> performance-report.md
+            
+            # Cleanup
+            rm -rf test-perf
+          fi
+          
+      - name: Compare with baseline
+        run: |
+          echo "" >> performance-report.md
+          echo "### Performance Trends:" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          # Store current metrics for future comparison
+          echo "BUILD_TIME=${{ env.BUILD_TIME }}" > current-metrics.env
+          echo "COMMIT_SHA=${{ github.sha }}" >> current-metrics.env
+          echo "TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> current-metrics.env
+          
+          # If this is not the first run, compare with previous
+          if [ -f "previous-metrics.env" ]; then
+            source previous-metrics.env
+            PREV_BUILD_TIME=${BUILD_TIME:-0}
+            CURRENT_BUILD_TIME=${{ env.BUILD_TIME }}
+            
+            if [ "$CURRENT_BUILD_TIME" -gt "$((PREV_BUILD_TIME + 10))" ]; then
+              echo "- ⚠️ Build time increased by $((CURRENT_BUILD_TIME - PREV_BUILD_TIME)) seconds" >> performance-report.md
+            elif [ "$CURRENT_BUILD_TIME" -lt "$((PREV_BUILD_TIME - 10))" ]; then
+              echo "- ✅ Build time improved by $((PREV_BUILD_TIME - CURRENT_BUILD_TIME)) seconds" >> performance-report.md
+            else
+              echo "- ➡️ Build time stable (~$CURRENT_BUILD_TIME seconds)" >> performance-report.md
+            fi
+          else
+            echo "- 📊 Baseline established for future comparisons" >> performance-report.md
+          fi
+          
+          # Save current metrics as baseline for next run
+          cp current-metrics.env previous-metrics.env
+          
+      - name: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report-${{ github.run_number }}
+          path: |
+            performance-report.md
+            current-metrics.env
+          retention-days: 90
+          
+      - name: Comment on PR with performance summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('performance-report.md', 'utf8');
+            
+            // Extract key metrics for summary
+            const buildTime = '${{ env.BUILD_TIME }}';
+            
+            const summary = `## 📊 Performance Impact
+            
+            **Build Time:** ${buildTime} seconds
+            
+            <details>
+            <summary>📋 Full Performance Report</summary>
+            
+            ${report}
+            
+            </details>
+            
+            > Performance monitoring helps maintain optimal CI/CD pipeline efficiency`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  ci-pipeline-optimization:
+    name: CI Pipeline Optimization Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Analyze GitHub Actions efficiency
+        run: |
+          echo "# CI/CD Pipeline Optimization Report" > ci-optimization-report.md
+          echo "" >> ci-optimization-report.md
+          echo "Generated on: $(date)" >> ci-optimization-report.md
+          echo "" >> ci-optimization-report.md
+          
+          echo "## Workflow Analysis:" >> ci-optimization-report.md
+          echo "" >> ci-optimization-report.md
+          
+          # Count workflow files
+          WORKFLOW_COUNT=$(find .github/workflows -name "*.yml" -o -name "*.yaml" | wc -l)
+          echo "- Total workflows: $WORKFLOW_COUNT" >> ci-optimization-report.md
+          
+          # Analyze workflow complexity
+          echo "" >> ci-optimization-report.md
+          echo "### Workflow Files:" >> ci-optimization-report.md
+          find .github/workflows -name "*.yml" -o -name "*.yaml" | while read workflow; do
+            LINES=$(wc -l < "$workflow")
+            JOBS=$(grep -c "^  [a-zA-Z].*:$" "$workflow" || echo "0")
+            echo "- $(basename $workflow): $LINES lines, $JOBS jobs" >> ci-optimization-report.md
+          done
+          
+      - name: Suggest optimizations
+        run: |
+          echo "" >> ci-optimization-report.md
+          echo "## Optimization Recommendations:" >> ci-optimization-report.md
+          echo "" >> ci-optimization-report.md
+          
+          # Check for caching opportunities
+          if ! grep -r "actions/cache" .github/workflows/ > /dev/null; then
+            echo "- ✅ Consider adding dependency caching to speed up builds" >> ci-optimization-report.md
+          else
+            echo "- ✅ Dependency caching is already implemented" >> ci-optimization-report.md
+          fi
+          
+          # Check for parallel job execution
+          if grep -r "strategy:" .github/workflows/ > /dev/null; then
+            echo "- ✅ Matrix/parallel builds are utilized" >> ci-optimization-report.md
+          else
+            echo "- 💡 Consider using matrix builds for parallel execution" >> ci-optimization-report.md
+          fi
+          
+          # Check for workflow optimization
+          echo "- 🔍 Monitor build times and optimize slow steps" >> ci-optimization-report.md
+          echo "- 📦 Consider using pre-built Docker images for faster setup" >> ci-optimization-report.md
+          echo "- 🎯 Split long workflows into focused, reusable workflows" >> ci-optimization-report.md
+          
+      - name: Upload optimization report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-optimization-report-${{ github.run_number }}
+          path: ci-optimization-report.md
+          retention-days: 30

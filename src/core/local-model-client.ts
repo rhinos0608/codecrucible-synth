@@ -1,5 +1,10 @@
 import axios, { AxiosInstance } from 'axios';
 import { logger } from './logger.js';
+import { EnhancedModelManager } from './enhanced-model-manager.js';
+import { AutonomousErrorHandler, ErrorContext } from './autonomous-error-handler.js';
+import { IntelligentModelSelector } from './intelligent-model-selector.js';
+import { GPUOptimizer } from './gpu-optimizer.js';
+import chalk from 'chalk';
 
 export interface LocalModelConfig {
   endpoint: string;
@@ -18,7 +23,7 @@ export interface VoiceResponse {
 }
 
 export interface ProjectContext {
-  files: Array<{
+  files?: Array<{
     path: string;
     content: string;
     language: string;
@@ -26,6 +31,8 @@ export interface ProjectContext {
   projectType?: string;
   dependencies?: string[];
   gitStatus?: string;
+  workingDirectory?: string;
+  recentMessages?: any[];
 }
 
 export interface VoiceArchetype {
@@ -37,22 +44,31 @@ export interface VoiceArchetype {
 }
 
 /**
- * Enhanced Local Model Client for gpt-oss-20b integration
- * Completely self-contained with no external dependencies or environment variables
+ * Enhanced Local Model Client for Ollama integration
+ * Features automatic model detection, installation, and management
  */
 export class LocalModelClient {
   private client: AxiosInstance;
   private config: LocalModelConfig;
+  private modelManager: EnhancedModelManager;
+  private _cachedBestModel: string | null = null;
+  private errorHandler: AutonomousErrorHandler;
+  private modelSelector: IntelligentModelSelector;
+  private gpuOptimizer: GPUOptimizer;
+  private isOptimized = false;
   private fallbackModels = [
-    'qwq:32b-preview-q4_K_M', 'gemma2:27b', 'gemma3n:latest', 'gemma:7b-instruct',
-    'gpt-oss:20b', 'gpt-oss:120b', 'llama3.1:70b', 'qwen2.5:72b', 'codellama:34b',
-    'qwq:32b', 'qwq', 'gemma3', 'gemma:7b', 'gemma', 'mistral', 'llama'
+    'gemma2:9b', 'llama3.2:8b', 'qwen2.5:7b', 'codellama:7b', 'gemma:latest'
   ];
 
   constructor(config: LocalModelConfig) {
     this.config = config;
-    // Set very high timeout for large models - 32B models can take 3-5 minutes
-    const adjustedTimeout = Math.max(config.timeout, 300000); // Minimum 5 minutes
+    this.modelManager = new EnhancedModelManager(config.endpoint);
+    this.errorHandler = new AutonomousErrorHandler(config.endpoint);
+    this.modelSelector = new IntelligentModelSelector();
+    this.gpuOptimizer = new GPUOptimizer();
+    
+    // Use more reasonable timeout - 30 seconds for faster response
+    const adjustedTimeout = Math.min(config.timeout, 30000); // Maximum 30 seconds
     this.client = axios.create({
       baseURL: config.endpoint,
       timeout: adjustedTimeout,
@@ -61,65 +77,76 @@ export class LocalModelClient {
       },
     });
 
-    logger.info('Local model client initialized', {
+    logger.info('Enhanced local model client initialized', {
       endpoint: config.endpoint,
       model: config.model,
       maxTokens: config.maxTokens
     });
+
+    // Initialize GPU optimization asynchronously
+    this.initializeGPUOptimization();
+  }
+
+  /**
+   * Initialize GPU optimization and hardware detection
+   */
+  private async initializeGPUOptimization(): Promise<void> {
+    try {
+      const gpuInfo = await this.gpuOptimizer.detectAndOptimizeGPU();
+      this.isOptimized = true;
+      
+      console.log(chalk.blue('🚀 Hardware Optimization:'));
+      console.log('   ' + this.gpuOptimizer.getPerformanceSummary());
+      
+      // Update fallback models based on hardware capabilities
+      this.fallbackModels = this.gpuOptimizer.getRecommendedModels();
+      
+      logger.info('GPU optimization completed', {
+        gpuType: gpuInfo.type,
+        available: gpuInfo.available,
+        recommendedModels: this.fallbackModels.slice(0, 3)
+      });
+      
+    } catch (error) {
+      logger.warn('GPU optimization failed, using CPU fallback:', error);
+      this.isOptimized = true; // Mark as complete even if failed
+    }
   }
 
   /**
    * Check if the local model is available and responding
+   * Enhanced with auto-setup capabilities
    */
   async checkConnection(): Promise<boolean> {
     try {
-      // For Ollama endpoint (detects both localhost:11434 and ollama references)
-      if (this.config.endpoint.includes('11434') || this.config.endpoint.toLowerCase().includes('ollama')) {
-        logger.info('Checking Ollama connection at:', this.config.endpoint);
-        
-        // Try to connect to Ollama API
-        const response = await this.client.get('/api/tags');
-        const models = response.data.models || [];
-        
-        logger.info('Available Ollama models:', models.map((m: any) => m.name));
-        
-        // Check for preferred models first, then accept any available model
-        const hasPreferredModel = models.some((model: any) => 
-          this.fallbackModels.some(fallback => {
-            const modelBase = fallback.split(':')[0];
-            return model.name.toLowerCase().includes(modelBase.toLowerCase());
-          })
-        );
-        
-        if (!hasPreferredModel && models.length > 0) {
-          logger.info('No preferred models found, but will use available models:', {
-            availableModels: models.map((m: any) => m.name),
-            preferredModels: this.fallbackModels 
-          });
-        } else if (hasPreferredModel) {
-          logger.info('Found compatible models');
-        }
-        
-        // Return true if any models are available
-        if (models.length === 0) {
-          logger.error('No models available in Ollama');
-          return false;
-        }
-        
-        logger.info('Compatible Ollama models found');
-        return true;
+      // Check Ollama status first
+      const status = await this.modelManager.checkOllamaStatus();
+      
+      if (!status.installed) {
+        console.log(chalk.yellow('⚠️  Ollama not installed. Run setup to install automatically.'));
+        return false;
       }
       
-      // For direct OpenAI-compatible endpoint
-      logger.info('Checking OpenAI-compatible endpoint at:', this.config.endpoint);
-      const response = await this.client.get('/v1/models');
-      const models = response.data.data || [];
-      const hasCompatibleModel = models.some((model: any) => 
-        this.fallbackModels.some(fallback => model.id.includes(fallback))
-      );
+      if (!status.running) {
+        console.log(chalk.yellow('⚠️  Ollama not running. Attempting to start...'));
+        const started = await this.modelManager.startOllama();
+        if (!started) {
+          return false;
+        }
+      }
       
-      logger.info('OpenAI-compatible endpoint check result:', hasCompatibleModel);
-      return hasCompatibleModel;
+      // Check for available models
+      const bestModel = await this.modelManager.getBestAvailableModel();
+      if (!bestModel) {
+        console.log(chalk.yellow('⚠️  No AI models found. Run setup to install a model.'));
+        return false;
+      }
+      
+      // Cache the best model for future use
+      this._cachedBestModel = bestModel;
+      logger.info('Model connection successful:', { model: bestModel });
+      return true;
+      
     } catch (error) {
       logger.error('Model connection check failed:', error);
       return false;
@@ -127,67 +154,121 @@ export class LocalModelClient {
   }
 
   /**
-   * Auto-detect and select the best available model
+   * Auto-detect and select the best available model with intelligent selection and GPU optimization
    */
-  async getAvailableModel(): Promise<string> {
+  async getAvailableModel(taskType: string = 'general'): Promise<string> {
     try {
-      if (this.config.endpoint.includes('11434')) {
-        const response = await this.client.get('/api/tags');
-        const models = response.data.models || [];
-        const modelNames = models.map((m: any) => m.name);
+      // Wait for GPU optimization to complete
+      let waitCount = 0;
+      while (!this.isOptimized && waitCount < 10) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        waitCount++;
+      }
+
+      // Use intelligent model selection for better performance
+      const optimalModel = await this.modelSelector.selectOptimalModel(taskType, {
+        speed: 'fast', // Prioritize speed to avoid timeouts
+        accuracy: 'medium',
+        complexity: 'medium',
+        resources: 'normal'
+      });
+      
+      if (optimalModel) {
+        // Apply GPU optimization to the model name
+        const optimizedModel = this.gpuOptimizer.optimizeModelName(optimalModel, 'balanced');
+        this._cachedBestModel = optimizedModel;
         
-        // First, try exact matches
-        for (const fallback of this.fallbackModels) {
-          if (modelNames.includes(fallback)) {
-            logger.info('Auto-selected exact match model:', fallback);
-            return fallback;
-          }
+        if (optimizedModel !== optimalModel) {
+          logger.info('GPU-optimized model selected:', { optimized: optimizedModel, original: optimalModel });
+        } else {
+          logger.info('Intelligently selected model:', { model: optimizedModel, taskType });
         }
         
-        // Then try partial matches with improved logic
-        for (const fallback of this.fallbackModels) {
-          const fallbackBase = fallback.split(':')[0].toLowerCase();
-          const found = models.find((model: any) => {
-            const modelBase = model.name.split(':')[0].toLowerCase();
-            return modelBase === fallbackBase || model.name.toLowerCase().includes(fallbackBase);
-          });
-          if (found) {
-            logger.info('Auto-selected compatible model:', found.name);
-            return found.name;
-          }
-        }
-        
-        // If no preferred model found, use the first available model
-        if (models.length > 0) {
-          const firstModel = models[0].name;
-          logger.info('No preferred model found, using first available:', firstModel);
-          return firstModel;
+        return optimizedModel;
+      }
+      
+      // Fallback to hardware-optimized models from our list
+      for (const model of this.fallbackModels) {
+        const available = await this.modelManager.isModelAvailable(model);
+        if (available) {
+          const optimizedModel = this.gpuOptimizer.optimizeModelName(model, 'speed');
+          this._cachedBestModel = optimizedModel;
+          logger.info('Using hardware-optimized fallback model:', optimizedModel);
+          return optimizedModel;
         }
       }
       
-      // Fallback to configured model
-      return this.config.model;
+      // Final fallback to configured model with optimization
+      const fallbackModel = this.gpuOptimizer.optimizeModelName(this.config.model, 'speed');
+      logger.warn('Using optimized configured model:', fallbackModel);
+      return fallbackModel;
+      
     } catch (error) {
-      logger.warn('Could not auto-detect model, using configured model:', this.config.model);
+      logger.warn('Model selection failed, using configured model:', this.config.model);
       return this.config.model;
     }
   }
 
   /**
-   * Check if model is ready (simple version without warmup to avoid timeouts)
+   * Check if model is ready and available
    */
   async isModelReady(model: string): Promise<boolean> {
     try {
-      // Just check if model exists in the list, don't try to generate
-      if (this.config.endpoint.includes('11434')) {
-        const response = await this.client.get('/api/tags');
-        const models = response.data.models || [];
-        return models.some((m: any) => m.name === model);
-      }
-      return true; // Assume ready for non-Ollama endpoints
+      return await this.modelManager.isModelAvailable(model);
     } catch (error) {
       logger.warn(`Model readiness check failed for ${model}:`, error);
       return false;
+    }
+  }
+
+  /**
+   * Generate a response using a specific model and voice archetype
+   */
+  async generateVoiceResponseWithModel(
+    voice: VoiceArchetype,
+    prompt: string,
+    context: ProjectContext,
+    modelName: string,
+    retryCount = 0
+  ): Promise<VoiceResponse> {
+    const maxRetries = 2;
+    
+    try {
+      const enhancedPrompt = this.enhancePromptWithVoice(voice, prompt, context);
+      
+      logger.info(`Generating response with ${voice.name} using model: ${modelName}`);
+      
+      // Check if model is ready (no warmup to avoid timeouts)
+      if (retryCount === 0) {
+        const ready = await this.isModelReady(modelName);
+        if (!ready) {
+          logger.warn(`Model ${modelName} may not be ready, but proceeding anyway`);
+        }
+      }
+      
+      const requestBody = this.config.endpoint.includes('11434') 
+        ? this.buildOllamaRequest(enhancedPrompt, voice, modelName)
+        : this.buildOpenAIRequest(enhancedPrompt, voice, modelName);
+
+      const response = await this.client.post(
+        this.config.endpoint.includes('11434') ? '/api/generate' : '/v1/chat/completions',
+        requestBody
+      );
+
+      return this.parseVoiceResponse(response.data, voice);
+    } catch (error) {
+      const isTimeout = error instanceof Error && 
+        (error.message.includes('timeout') || error.name === 'AxiosError' && error.message.includes('exceeded'));
+      
+      if (isTimeout && retryCount < maxRetries) {
+        logger.warn(`Timeout for ${voice.name} with model ${modelName}, retrying... (${retryCount + 1}/${maxRetries})`);
+        // Wait 10 seconds before retry to let model stabilize
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        return this.generateVoiceResponseWithModel(voice, prompt, context, modelName, retryCount + 1);
+      }
+      
+      logger.error(`Voice generation failed for ${voice.name} with model ${modelName}:`, error);
+      throw new Error(`Failed to generate response from ${voice.name} using ${modelName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -204,17 +285,10 @@ export class LocalModelClient {
     
     try {
       const enhancedPrompt = this.enhancePromptWithVoice(voice, prompt, context);
-      const model = await this.getAvailableModel();
+      const taskType = this.analyzeTaskType(prompt);
+      const model = await this.getAvailableModel(taskType);
       
       logger.info(`Generating response with ${voice.name} using model: ${model}`);
-      
-      // Check if model is ready (no warmup to avoid timeouts)
-      if (retryCount === 0) {
-        const ready = await this.isModelReady(model);
-        if (!ready) {
-          logger.warn(`Model ${model} may not be ready, but proceeding anyway`);
-        }
-      }
       
       const requestBody = this.config.endpoint.includes('11434') 
         ? this.buildOllamaRequest(enhancedPrompt, voice, model)
@@ -225,30 +299,97 @@ export class LocalModelClient {
         requestBody
       );
 
+      // Record success
+      this.modelSelector.recordPerformance(model, taskType, true, Date.now(), 1.0);
+      
       return this.parseVoiceResponse(response.data, voice);
     } catch (error) {
       const isTimeout = error instanceof Error && 
         (error.message.includes('timeout') || error.name === 'AxiosError' && error.message.includes('exceeded'));
       
-      if (isTimeout && retryCount < maxRetries) {
-        logger.warn(`Timeout for ${voice.name}, retrying... (${retryCount + 1}/${maxRetries})`);
-        // Wait 10 seconds before retry to let model stabilize
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        return this.generateVoiceResponse(voice, prompt, context, retryCount + 1);
+      // Use autonomous error handling for all errors, not just timeouts
+      const taskType = this.analyzeTaskType(prompt);
+      const currentModel = await this.getAvailableModel(taskType);
+      
+      const errorContext: ErrorContext = {
+        errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error occurred',
+        operation: 'voice_generation',
+        model: currentModel,
+        context: { voice: voice.name, taskType, retryCount }
+      };
+
+      // Record failure
+      this.modelSelector.recordPerformance(currentModel, taskType, false, Date.now(), 0.0);
+      
+      // Get recovery actions
+      const recoveryActions = await this.errorHandler.analyzeAndRecover(errorContext);
+      
+      // Check for model switching recommendation
+      const switchAction = recoveryActions.find(action => action.action === 'switch_model');
+      if (switchAction?.target && retryCount < maxRetries) {
+        logger.warn(`🔄 ${voice.name}: Autonomous recovery switching to ${switchAction.target}`);
+        logger.info(`   Reason: ${switchAction.reason}`);
+        
+        // Wait a moment and retry with the recommended model
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return this.generateVoiceResponseWithModel(voice, prompt, context, switchAction.target, retryCount + 1);
       }
       
-      logger.error(`Voice generation failed for ${voice.name}:`, error);
-      
-      // Try with fallback models only if not a timeout issue
-      if (!isTimeout) {
-        const fallbackModel = await this.tryFallbackModels(voice, prompt, context);
-        if (fallbackModel) {
-          return fallbackModel;
+      // If timeout and no specific recovery, try fast fallback models
+      if (isTimeout && retryCount < maxRetries) {
+        logger.warn(`⚡ ${voice.name}: Timeout, trying faster model...`);
+        const fastModel = await this.getFastestAvailableModel();
+        if (fastModel !== currentModel) {
+          return this.generateVoiceResponseWithModel(voice, prompt, context, fastModel, retryCount + 1);
         }
       }
       
       throw new Error(`Failed to generate response from ${voice.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Get the fastest available model for quick responses with GPU optimization
+   */
+  private async getFastestAvailableModel(): Promise<string> {
+    for (const model of this.fallbackModels) {
+      const available = await this.modelManager.isModelAvailable(model);
+      if (available) {
+        const optimizedModel = this.gpuOptimizer.optimizeModelName(model, 'speed');
+        logger.info('Selected fastest GPU-optimized model:', optimizedModel);
+        return optimizedModel;
+      }
+    }
+    
+    // Fallback with optimization
+    const optimizedFallback = this.gpuOptimizer.optimizeModelName(this.config.model, 'speed');
+    return optimizedFallback;
+  }
+
+  /**
+   * Analyze task type from prompt for intelligent model selection
+   */
+  private analyzeTaskType(prompt: string): string {
+    const lowerPrompt = prompt.toLowerCase();
+    
+    if (lowerPrompt.includes('code') || lowerPrompt.includes('function') || lowerPrompt.includes('implement')) {
+      return 'coding';
+    }
+    
+    if (lowerPrompt.includes('debug') || lowerPrompt.includes('fix') || lowerPrompt.includes('error')) {
+      return 'debugging';
+    }
+    
+    if (lowerPrompt.includes('analyze') || lowerPrompt.includes('review') || lowerPrompt.includes('explain')) {
+      return 'analysis';
+    }
+    
+    if (lowerPrompt.includes('plan') || lowerPrompt.includes('design') || lowerPrompt.includes('architecture')) {
+      return 'planning';
+    }
+    
+    return 'general';
   }
 
   /**
@@ -311,6 +452,132 @@ export class LocalModelClient {
     } catch (error) {
       logger.error('Multi-voice generation failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Generate a single response from the local model with GPU optimization and error handling
+   */
+  async generate(prompt: string): Promise<string> {
+    const taskType = this.analyzeTaskType(prompt);
+    const startTime = Date.now();
+    
+    try {
+      const model = await this.getAvailableModel(taskType);
+      logger.info(`Generating streamlined response with model: ${model}`);
+
+      const requestBody = this.config.endpoint.includes('11434')
+        ? this.buildOllamaRequest(prompt, { temperature: this.config.temperature } as any, model)
+        : this.buildOpenAIRequest(prompt, { temperature: this.config.temperature } as any, model);
+
+      const response = await this.client.post(
+        this.config.endpoint.includes('11434') ? '/api/generate' : '/v1/chat/completions',
+        requestBody
+      );
+
+      // Record successful performance
+      const duration = Date.now() - startTime;
+      this.modelSelector.recordPerformance(model, taskType, true, duration, 1.0);
+
+      return this.parseResponse(response.data);
+    } catch (error) {
+      logger.error('Generation failed:', error);
+      
+      // Use autonomous error handling for recovery
+      const model = await this.getAvailableModel(taskType);
+      const errorContext: ErrorContext = {
+        errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error occurred',
+        operation: 'direct_generation',
+        model,
+        context: { prompt: prompt.substring(0, 100), taskType }
+      };
+
+      // Record failure and get recovery actions
+      const duration = Date.now() - startTime;
+      this.modelSelector.recordPerformance(model, taskType, false, duration, 0.0);
+      
+      const recoveryActions = await this.errorHandler.analyzeAndRecover(errorContext);
+      
+      // Check for model switch recommendation
+      const switchAction = recoveryActions.find(action => action.action === 'switch_model');
+      if (switchAction?.target) {
+        logger.warn(`🔄 Autonomous recovery: Switching to ${switchAction.target} for retry`);
+        
+        try {
+          // Retry with recommended model
+          const retryRequestBody = this.config.endpoint.includes('11434')
+            ? this.buildOllamaRequest(prompt, { temperature: this.config.temperature } as any, switchAction.target)
+            : this.buildOpenAIRequest(prompt, { temperature: this.config.temperature } as any, switchAction.target);
+
+          const retryResponse = await this.client.post(
+            this.config.endpoint.includes('11434') ? '/api/generate' : '/v1/chat/completions',
+            retryRequestBody
+          );
+
+          logger.info(`✅ Autonomous recovery successful with ${switchAction.target}`);
+          return this.parseResponse(retryResponse.data);
+          
+        } catch (retryError) {
+          logger.error('Recovery attempt failed:', retryError);
+        }
+      }
+      
+      throw new Error(`Failed to generate response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Streamlined API call for maximum speed - bypasses voice complexity
+   */
+  async generateFast(prompt: string, maxTokens?: number): Promise<string> {
+    try {
+      // Get fastest model optimized for speed
+      const fastModel = await this.getFastestAvailableModel();
+      logger.info(`Fast generation with optimized model: ${fastModel}`);
+
+      // Streamlined request with minimal overhead
+      const requestBody = {
+        model: fastModel,
+        prompt: prompt,
+        stream: false,
+        options: {
+          temperature: 0.3, // Lower temperature for faster generation
+          num_predict: maxTokens || 512, // Limit tokens for speed
+          top_p: 0.8,
+          repeat_penalty: 1.05,
+          stop: ['\n\n', 'Human:', 'Assistant:']
+        }
+      };
+
+      const response = await this.client.post('/api/generate', requestBody);
+      
+      return this.parseResponse(response.data);
+    } catch (error) {
+      logger.error('Fast generation failed:', error);
+      
+      // Single retry with absolute fastest fallback
+      try {
+        const ultrafastModel = 'gemma:2b'; // Smallest available model
+        logger.warn(`🚀 Ultra-fast fallback: ${ultrafastModel}`);
+        
+        const fallbackBody = {
+          model: ultrafastModel,
+          prompt: prompt.length > 500 ? prompt.substring(0, 500) + '...' : prompt, // Truncate for speed
+          stream: false,
+          options: {
+            temperature: 0.1,
+            num_predict: 256, // Very limited tokens
+            top_p: 0.7
+          }
+        };
+
+        const fallbackResponse = await this.client.post('/api/generate', fallbackBody);
+        return this.parseResponse(fallbackResponse.data);
+        
+      } catch (fallbackError) {
+        throw new Error(`Fast generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -439,7 +706,7 @@ Instructions:
    */
   private sanitizeContext(context: ProjectContext): ProjectContext {
     const sanitizedContext: ProjectContext = {
-      files: context.files.map(file => ({
+      files: context.files?.map(file => ({
         path: this.sanitizeFilePath(file.path),
         content: this.sanitizeFileContent(file.content),
         language: file.language
@@ -512,7 +779,7 @@ Instructions:
       formatted += `Git Status: ${context.gitStatus}\n`;
     }
 
-    if (context.files.length > 0) {
+    if (context.files && context.files.length > 0) {
       formatted += '\nRelevant Files:\n';
       context.files.forEach(file => {
         formatted += `\n--- ${file.path} (${file.language}) ---\n`;
@@ -595,6 +862,21 @@ Instructions:
       confidence: this.calculateConfidence(content, voice),
       tokens_used: tokensUsed
     };
+  }
+
+  /**
+   * Parse a single response from the local model
+   */
+  private parseResponse(data: any): string {
+    if (data.response) {
+      // Ollama response format
+      return data.response.trim();
+    } else if (data.choices && data.choices[0]) {
+      // OpenAI-compatible response format
+      return data.choices[0].message?.content.trim() || data.choices[0].text.trim() || '';
+    } else {
+      throw new Error('Unexpected response format from local model');
+    }
   }
 
   /**

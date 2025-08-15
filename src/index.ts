@@ -7,7 +7,9 @@ import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { ConfigManager } from './config/config-manager.js';
 import { CodeCrucibleCLI, CLIContext } from './core/cli.js';
 import { logger } from './core/logger.js';
-import { SimpleAgenticClient } from './core/simple-agentic-client.js';
+import { EnhancedAgenticClient } from './core/enhanced-agentic-client.js';
+import { ClaudeCodeClient } from './core/claude-code-client.js';
+import { AutonomousClaudeClient } from './core/autonomous-claude-client.js';
 import chalk from 'chalk';
 
 const program = new Command();
@@ -18,6 +20,10 @@ const program = new Command();
  * A completely self-contained coding assistant that runs locally with no external dependencies.
  * Features multi-voice AI synthesis, MCP server integration, and both CLI and desktop interfaces.
  */
+
+export async function initializeCLIContext(): Promise<CLIContext> {
+  return initializeApplication();
+}
 
 async function initializeApplication(): Promise<CLIContext> {
   try {
@@ -142,19 +148,26 @@ program
   .description('Start agentic coding mode (like Cursor/Claude Code)')
   .option('-w, --watch', 'Watch for file changes')
   .option('-p, --port <port>', 'Port for agent server', '3000')
+  .option('-e, --enhanced', 'Use enhanced ReAct agent with advanced capabilities', false)
   .action(async (options) => {
-    console.log(chalk.blue('🤖 Starting CodeCrucible Agentic Mode...'));
-    
-    const context = await initializeApplication();
-    const agenticClient = new SimpleAgenticClient(context);
-    await agenticClient.start();
+    if (options.enhanced) {
+      console.log(chalk.blue('🧠 Starting Enhanced CodeCrucible ReAct Agent...'));
+      const context = await initializeApplication();
+      const enhancedClient = new EnhancedAgenticClient(context);
+      await enhancedClient.start();
+    } else {
+      console.log(chalk.blue('🤖 Starting CodeCrucible Claude Code Mode...'));
+      const context = await initializeApplication();
+      const claudeCodeClient = new ClaudeCodeClient(context);
+      await claudeCodeClient.start();
+    }
   });
 
 // Desktop mode
 program
   .command('desktop')
   .description('Launch desktop GUI application')
-  .option('-p, --port <port>', 'Port for desktop server', '3001')
+  .option('-p, --port <port>', 'Port for desktop server', '3007')
   .action(async (options) => {
     console.log(chalk.blue('🖥️  Starting CodeCrucible Desktop Mode...'));
     
@@ -182,9 +195,14 @@ program
 // Model management
 program
   .command('model')
-  .description('Manage local AI model')
-  .option('--status', 'Check model status')
-  .option('--install', 'Show installation instructions')
+  .description('Manage local AI models')
+  .option('--status', 'Check system and model status')
+  .option('--setup', 'Auto-setup Ollama and install a model')
+  .option('--install', 'Same as --setup (for backwards compatibility)')
+  .option('--list', 'List available models')
+  .option('--pull <model>', 'Pull/install a specific model')
+  .option('--test [model]', 'Test a model (uses best available if not specified)')
+  .option('--remove <model>', 'Remove a model')
   .action(async (options) => {
     const context = await initializeApplication();
     const cli = new CodeCrucibleCLI(context);
@@ -268,19 +286,34 @@ process.on('SIGINT', () => {
 // Parse arguments and run
 program.parse();
 
-// If no command provided, start agentic mode by default (like Claude Code)
+// If no command provided, start autonomous mode
 if (!process.argv.slice(2).length) {
-  console.log(chalk.cyan('🔥 CodeCrucible Synth v2.0.0'));
-  console.log(chalk.gray('   Autonomous AI coding agent (like Claude Code)\n'));
-  
-  // Start agentic mode automatically
   (async () => {
     try {
       const context = await initializeApplication();
-      const agenticClient = new SimpleAgenticClient(context);
-      await agenticClient.start();
+      
+      // Quick, silent model check
+      const isReady = await context.modelClient.checkConnection();
+      
+      if (!isReady) {
+        // Silently try to set up
+        const { EnhancedModelManager } = await import('./core/enhanced-model-manager.js');
+        const modelManager = new EnhancedModelManager(context.config.model.endpoint);
+        
+        const result = await modelManager.autoSetup(false); // Silent setup
+        
+        if (!result.success) {
+          console.log('Model not available. Run: cc model --setup');
+          process.exit(1);
+        }
+      }
+      
+      // Start the clean, autonomous client
+      const autonomousClient = new AutonomousClaudeClient(context);
+      await autonomousClient.start();
     } catch (error) {
-      console.error(chalk.red('❌ Failed to start:'), error);
+      console.error('Failed to start:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('Try: cc model --setup');
       process.exit(1);
     }
   })();

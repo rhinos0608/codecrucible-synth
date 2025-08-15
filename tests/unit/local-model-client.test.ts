@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { LocalModelClient, LocalModelConfig } from '../../src/core/local-model-client';
+import { LocalModelClient, LocalModelConfig } from '../../src/core/local-model-client.js';
 import axios from 'axios';
 
 // Mock axios

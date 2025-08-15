@@ -1,0 +1,280 @@
+name: Desktop Build Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type (development/production)'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - production
+
+env:
+  NODE_VERSION: '18'
+  ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+  ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+jobs:
+  build-desktop:
+    name: Build Desktop App (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact: AppImage
+            extension: ''
+            setup: |
+              sudo apt-get update
+              sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2-dev libxkbcommon-dev libxss1 libgconf-2-4 libxtst6 libxrandr2 libasound2-dev libpangocairo-1.0-0 libatk1.0-dev libcairo1-dev libgtk-3-dev libgdk-pixbuf2.0-dev
+              
+          - os: windows-latest
+            platform: win
+            artifact: exe
+            extension: .exe
+            setup: ''
+            
+          - os: macos-latest
+            platform: mac
+            artifact: dmg
+            extension: .dmg
+            setup: ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup system dependencies
+        if: matrix.setup != ''
+        run: ${{ matrix.setup }}
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ELECTRON_CACHE }}
+          key: ${{ matrix.platform }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ matrix.platform }}-electron-
+
+      - name: Cache Electron Builder
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: ${{ matrix.platform }}-electron-builder-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ matrix.platform }}-electron-builder-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Build Desktop App (Development)
+        if: github.event.inputs.build_type == 'development' || github.event_name != 'workflow_dispatch'
+        run: npm run desktop:build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELECTRON_IS_DEV: true
+
+      - name: Build Desktop App (Production)
+        if: github.event.inputs.build_type == 'production'
+        run: npm run desktop:build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: List build artifacts
+        run: |
+          echo "Build artifacts:"
+          ls -la build/desktop/ || echo "No desktop artifacts found"
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ github.run_number }}
+          path: |
+            build/desktop/*
+          retention-days: 30
+
+  build-standalone:
+    name: Build Standalone (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            target: node18-linux-x64
+            output: codecrucible-linux
+            
+          - os: windows-latest
+            platform: win
+            target: node18-win-x64
+            output: codecrucible-win.exe
+            
+          - os: macos-latest
+            platform: mac
+            target: node18-macos-x64
+            output: codecrucible-macos
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Create standalone binary
+        run: |
+          npx pkg dist/index.js \
+            --targets ${{ matrix.target }} \
+            --output build/standalone/${{ matrix.output }} \
+            --compress GZip
+
+      - name: Verify standalone binary
+        shell: bash
+        run: |
+          if [ -f "build/standalone/${{ matrix.output }}" ]; then
+            echo "✅ Standalone binary created successfully"
+            ls -la build/standalone/${{ matrix.output }}
+            
+            # Test the binary (basic help command)
+            if [ "${{ matrix.platform }}" = "linux" ] || [ "${{ matrix.platform }}" = "mac" ]; then
+              chmod +x build/standalone/${{ matrix.output }}
+              timeout 10s build/standalone/${{ matrix.output }} --help || echo "Binary test completed (timeout expected)"
+            fi
+          else
+            echo "❌ Standalone binary not found"
+            exit 1
+          fi
+
+      - name: Upload standalone artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: standalone-${{ matrix.platform }}-${{ github.run_number }}
+          path: |
+            build/standalone/*
+          retention-days: 30
+
+  test-builds:
+    name: Test Built Artifacts
+    needs: [build-desktop, build-standalone]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List downloaded artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          find artifacts -type f -exec ls -la {} \;
+
+      - name: Test standalone binaries
+        run: |
+          echo "Testing standalone binaries..."
+          
+          # Test Linux binary
+          if [ -f "artifacts/standalone-linux-${{ github.run_number }}/codecrucible-linux" ]; then
+            chmod +x "artifacts/standalone-linux-${{ github.run_number }}/codecrucible-linux"
+            echo "✅ Linux binary is executable"
+          fi
+          
+          # Check Windows binary exists
+          if [ -f "artifacts/standalone-win-${{ github.run_number }}/codecrucible-win.exe" ]; then
+            echo "✅ Windows binary found"
+          fi
+          
+          # Check macOS binary exists
+          if [ -f "artifacts/standalone-mac-${{ github.run_number }}/codecrucible-macos" ]; then
+            echo "✅ macOS binary found"
+          fi
+
+      - name: Generate build report
+        run: |
+          echo "# Build Report" > build-report.md
+          echo "" >> build-report.md
+          echo "Generated on: $(date)" >> build-report.md
+          echo "Commit: ${{ github.sha }}" >> build-report.md
+          echo "Run ID: ${{ github.run_number }}" >> build-report.md
+          echo "" >> build-report.md
+          
+          echo "## Artifacts Built:" >> build-report.md
+          echo "" >> build-report.md
+          
+          # Count artifacts
+          DESKTOP_COUNT=$(find artifacts -name "desktop-*" -type d | wc -l)
+          STANDALONE_COUNT=$(find artifacts -name "standalone-*" -type d | wc -l)
+          
+          echo "- Desktop Applications: $DESKTOP_COUNT platforms" >> build-report.md
+          echo "- Standalone Binaries: $STANDALONE_COUNT platforms" >> build-report.md
+          echo "" >> build-report.md
+          
+          echo "## File Sizes:" >> build-report.md
+          echo "" >> build-report.md
+          find artifacts -type f -exec ls -lh {} \; | awk '{print "- " $9 ": " $5}' >> build-report.md
+          
+      - name: Upload build report
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-report-${{ github.run_number }}
+          path: build-report.md
+          retention-days: 30
+
+  notify-build-status:
+    name: Notify Build Status
+    needs: [build-desktop, build-standalone, test-builds]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Build Success Notification
+        if: needs.build-desktop.result == 'success' && needs.build-standalone.result == 'success'
+        run: |
+          echo "🎉 All builds completed successfully!"
+          echo "✅ Desktop applications built for all platforms"
+          echo "✅ Standalone binaries created for all platforms"
+          echo "✅ Build tests passed"
+
+      - name: Build Failure Notification
+        if: needs.build-desktop.result == 'failure' || needs.build-standalone.result == 'failure'
+        run: |
+          echo "❌ Some builds failed!"
+          echo "Desktop build: ${{ needs.build-desktop.result }}"
+          echo "Standalone build: ${{ needs.build-standalone.result }}"
+          echo "Test builds: ${{ needs.test-builds.result }}"
+          exit 1

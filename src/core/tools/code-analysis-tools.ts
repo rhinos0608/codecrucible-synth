@@ -54,8 +54,26 @@ export class LintCodeTool extends BaseTool {
   }
 
   async execute(args: z.infer<typeof LintCodeSchema>): Promise<any[]> {
-    if (!args.path) {
-      throw new Error('Path parameter is required for lintCode tool');
+    // Log the received arguments for debugging
+    console.log('LintCodeTool received args:', JSON.stringify(args, null, 2));
+    
+    if (!args || !args.path || args.path.trim() === '') {
+      return [{
+        filePath: args?.path || 'undefined',
+        messages: [{
+          ruleId: null,
+          severity: 2,
+          message: 'Path parameter is required for lintCode tool. Received args: ' + JSON.stringify(args),
+          line: 1,
+          column: 1
+        }],
+        errorCount: 1,
+        warningCount: 0,
+        fixableErrorCount: 0,
+        fixableWarningCount: 0,
+        source: '',
+        usedDeprecatedRules: []
+      }];
     }
     
     if (!this.eslintAvailable) {
@@ -137,8 +155,21 @@ export class GetAstTool extends BaseTool {
   }
 
   async execute(args: z.infer<typeof GetAstSchema>): Promise<any> {
-    if (!args.path) {
-      throw new Error('Path parameter is required for getAst tool');
+    // Log the received arguments for debugging
+    console.log('GetAstTool received args:', JSON.stringify(args, null, 2));
+    
+    if (!args || !args.path || args.path.trim() === '') {
+      return {
+        error: 'Path parameter is required for getAst tool. Received args: ' + JSON.stringify(args),
+        fileName: args?.path || 'undefined',
+        kind: 'InvalidInput',
+        text: 'Invalid or missing path parameter',
+        statements: [],
+        childCount: 0,
+        fullStart: 0,
+        start: 0,
+        end: 0
+      };
     }
     
     if (!this.tsAvailable) {

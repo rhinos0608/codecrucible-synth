@@ -2,7 +2,6 @@ import axios, { AxiosInstance } from 'axios';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
-import ora from 'ora';
 import inquirer from 'inquirer';
 import { logger } from './logger.js';
 
@@ -141,7 +140,17 @@ export class EnhancedModelManager {
   async installOllama(): Promise<boolean> {
     console.log(chalk.blue('📦 Installing Ollama...'));
     
-    const spinner = ora('Downloading and installing Ollama...').start();
+    let spinner: any;
+    try {
+      const { default: ora } = await import('ora');
+      spinner = ora('Downloading and installing Ollama...').start();
+    } catch (error) {
+      console.log(chalk.blue('Downloading and installing Ollama...'));
+      spinner = {
+        succeed: (msg: string) => console.log(chalk.green('✓ ' + msg)),
+        fail: (msg: string) => console.log(chalk.red('✗ ' + msg))
+      };
+    }
     
     try {
       // Determine OS and run appropriate install command
@@ -198,7 +207,19 @@ export class EnhancedModelManager {
    * Start Ollama server
    */
   async startOllama(): Promise<boolean> {
-    const spinner = ora('Starting Ollama server...').start();
+    // Dynamic import for ora to handle ESM compatibility
+    let spinner: any;
+    try {
+      const { default: ora } = await import('ora');
+      spinner = ora('Starting Ollama server...').start();
+    } catch (error) {
+      // Fallback without spinner if ora import fails
+      console.log(chalk.blue('Starting Ollama server...'));
+      spinner = {
+        succeed: (msg: string) => console.log(chalk.green('✓ ' + msg)),
+        fail: (msg: string) => console.log(chalk.red('✗ ' + msg))
+      };
+    }
     
     try {
       const platform = process.platform;
@@ -288,7 +309,17 @@ export class EnhancedModelManager {
    * Pull a model with progress tracking
    */
   async pullModel(modelName: string, onProgress?: (progress: PullProgress) => void): Promise<boolean> {
-    const spinner = ora(`Pulling model: ${modelName}`).start();
+    let spinner: any;
+    try {
+      const { default: ora } = await import('ora');
+      spinner = ora(`Pulling model: ${modelName}`).start();
+    } catch (error) {
+      console.log(chalk.blue(`Pulling model: ${modelName}...`));
+      spinner = {
+        succeed: (msg: string) => console.log(chalk.green('✓ ' + msg)),
+        fail: (msg: string) => console.log(chalk.red('✗ ' + msg))
+      };
+    }
     
     try {
       const response = await this.client.post('/api/pull', {
@@ -506,7 +537,17 @@ export class EnhancedModelManager {
    * Remove a model
    */
   async removeModel(modelName: string): Promise<boolean> {
-    const spinner = ora(`Removing model: ${modelName}`).start();
+    let spinner: any;
+    try {
+      const { default: ora } = await import('ora');
+      spinner = ora(`Removing model: ${modelName}`).start();
+    } catch (error) {
+      console.log(chalk.blue(`Removing model: ${modelName}...`));
+      spinner = {
+        succeed: (msg: string) => console.log(chalk.green('✓ ' + msg)),
+        fail: (msg: string) => console.log(chalk.red('✗ ' + msg))
+      };
+    }
     
     try {
       await execAsync(`ollama rm ${modelName}`);
@@ -547,7 +588,17 @@ export class EnhancedModelManager {
    * Test model connectivity
    */
   async testModel(modelName: string): Promise<boolean> {
-    const spinner = ora(`Testing model: ${modelName}`).start();
+    let spinner: any;
+    try {
+      const { default: ora } = await import('ora');
+      spinner = ora(`Testing model: ${modelName}`).start();
+    } catch (error) {
+      console.log(chalk.blue(`Testing model: ${modelName}...`));
+      spinner = {
+        succeed: (msg: string) => console.log(chalk.green('✓ ' + msg)),
+        fail: (msg: string) => console.log(chalk.red('✗ ' + msg))
+      };
+    }
     
     try {
       const response = await this.client.post('/api/generate', {

@@ -41,13 +41,40 @@
 1. **Node.js 18+** - [Download Node.js](https://nodejs.org)
 2. **Ollama** - Local AI model runtime (auto-installed during setup)
 
-### Automatic Setup ✨
+## 🚀 One-Liner Installation
 
-CodeCrucible now features **automatic setup**! Just install and run:
-
+### npm (Recommended - Once Published)
 ```bash
 npm install -g codecrucible-synth
-cc
+crucible
+```
+
+### npx (No Installation Required)
+```bash
+npx codecrucible-synth
+```
+
+### curl + bash (Unix/macOS)
+```bash
+curl -sSL https://raw.githubusercontent.com/rhinos0608/codecrucibe-synth/main/install-from-git.sh | bash
+```
+
+### PowerShell (Windows)
+```powershell
+iwr -useb https://raw.githubusercontent.com/rhinos0608/codecrucibe-synth/main/install-from-git.ps1 | iex
+```
+
+### Manual Installation
+```bash
+git clone https://github.com/rhinos0608/codecrucibe-synth.git
+cd codecrucibe-synth
+npm install && npm run build
+npm link  # Makes 'crucible' command available globally
+```
+
+### Automatic Setup ✨
+
+CodeCrucible features **autonomous setup** with progressive model pulling:
 ```
 
 The app will automatically:

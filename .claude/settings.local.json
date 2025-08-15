@@ -26,7 +26,11 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(mv:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git pull:*)",
+      "Bash(touch:*)",
+      "Bash(npm:*)",
+      "Bash(npx codecrucible-synth@2.0.0:*)"
     ],
     "deny": [],
     "ask": [],

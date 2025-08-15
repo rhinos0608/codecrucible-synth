@@ -5,8 +5,9 @@
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "cc": "./bin/cc.js",
-    "codecrucible": "./bin/cc.js"
+    "crucible": "./bin/crucible.js",
+    "cc": "./bin/crucible.js",
+    "codecrucible": "./bin/crucible.js"
   },
   "scripts": {
     "build": "tsc && npm run copy-assets",
@@ -18,9 +19,9 @@
     "cli": "npm run build && node dist/index.js",
     "install-global": "npm run build && npm link",
     "test-install": "node scripts/install-and-test.js",
-    "package:win": "pkg dist/index.js --targets node18-win-x64 --output build/codecrucible-win.exe",
-    "package:mac": "pkg dist/index.js --targets node18-macos-x64 --output build/codecrucible-macos",
-    "package:linux": "pkg dist/index.js --targets node18-linux-x64 --output build/codecrucible-linux",
+    "package:win": "pkg dist/index.js --targets node18-win-x64 --output build/crucible-win.exe",
+    "package:mac": "pkg dist/index.js --targets node18-macos-x64 --output build/crucible-macos",
+    "package:linux": "pkg dist/index.js --targets node18-linux-x64 --output build/crucible-linux",
     "package:all": "npm run package:win && npm run package:mac && npm run package:linux",
     "desktop:dev": "npm run build && electron dist/desktop.js",
     "desktop:build": "electron-builder",
@@ -29,7 +30,8 @@
     "prepublishOnly": "npm test && npm run lint",
     "preversion": "npm run lint",
     "version": "npm run build && git add -A dist",
-    "postversion": "git push && git push --tags"
+    "postversion": "git push && git push --tags",
+    "release": "npm run build && npm run package:all && npm version patch && npm publish"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -78,6 +80,7 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.0"
   },
+  "preferGlobal": true,
   "keywords": [
     "cli",
     "ai",
@@ -107,8 +110,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/codecrucible/codecrucible-synth.git"
+    "url": "git+https://github.com/rhinos0608/codecrucibe-synth.git"
   },
+  "bugs": {
+    "url": "https://github.com/rhinos0608/codecrucibe-synth/issues"
+  },
+  "homepage": "https://github.com/rhinos0608/codecrucibe-synth#readme",
   "build": {
     "appId": "com.codecrucible.synth",
     "productName": "CodeCrucible Synth",

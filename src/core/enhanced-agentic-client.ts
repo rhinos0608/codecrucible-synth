@@ -1,6 +1,7 @@
 import { CLIContext } from './cli.js';
 import { ReActAgent } from './react-agent.js';
 import { logger } from './logger.js';
+import { FileWatcher, FileChangeEvent } from './file-watcher.js';
 import chalk from 'chalk';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -18,12 +19,120 @@ import { join } from 'path';
 export class EnhancedAgenticClient {
   private context: CLIContext;
   private agent: ReActAgent;
+  private fileWatcher: FileWatcher;
   private isActive = false;
+  private watchEnabled = true;
   private conversationHistory: Array<{ role: string; content: string; timestamp: number }> = [];
 
-  constructor(context: CLIContext) {
+  constructor(context: CLIContext, options: { enableFileWatching?: boolean } = {}) {
     this.context = context;
     this.agent = new ReActAgent(context, process.cwd());
+    this.watchEnabled = options.enableFileWatching ?? true;
+    this.fileWatcher = new FileWatcher(process.cwd(), {
+      debounceMs: 2000, // Longer debounce for less noise
+      includeContent: true,
+      maxFileSize: 512 * 1024 // 512KB max
+    });
+    this.setupFileWatcher();
+  }
+
+  /**
+   * Setup file watcher for real-time assistance
+   */
+  private setupFileWatcher(): void {
+    if (!this.watchEnabled) return;
+
+    this.fileWatcher.on('change', this.handleFileChange.bind(this));
+    this.fileWatcher.on('error', (error) => {
+      logger.error('File watcher error:', error);
+    });
+    this.fileWatcher.on('ready', () => {
+      logger.info('Real-time file watching active');
+    });
+  }
+
+  /**
+   * Handle file change events with contextual assistance
+   */
+  private async handleFileChange(event: FileChangeEvent): Promise<void> {
+    try {
+      // Only process significant code files
+      if (!this.isSignificantFile(event.relativePath, event.language)) {
+        return;
+      }
+
+      // Avoid noise from rapid changes
+      if (Date.now() - event.timestamp > 5000) {
+        return;
+      }
+
+      console.log(chalk.yellow(`\n📝 File ${event.type}: ${event.relativePath}`));
+      
+      if (event.type === 'change' && event.content) {
+        // Analyze the change for potential issues or suggestions
+        const analysis = await this.analyzeFileChange(event);
+        if (analysis) {
+          console.log(chalk.gray('💡 Suggestion:'), analysis);
+        }
+      }
+
+    } catch (error) {
+      logger.error('Error handling file change:', error);
+    }
+  }
+
+  /**
+   * Check if file is significant enough to trigger assistance
+   */
+  private isSignificantFile(filePath: string, language: string): boolean {
+    const significantLanguages = [
+      'javascript', 'typescript', 'python', 'java', 'cpp', 'c',
+      'csharp', 'php', 'ruby', 'go', 'rust'
+    ];
+    
+    // Skip test files, config files, and generated files
+    const skipPatterns = [
+      /\.test\./,
+      /\.spec\./,
+      /\.config\./,
+      /\.generated\./,
+      /node_modules/,
+      /\.min\./
+    ];
+    
+    return significantLanguages.includes(language) && 
+           !skipPatterns.some(pattern => pattern.test(filePath));
+  }
+
+  /**
+   * Analyze file changes and provide contextual suggestions
+   */
+  private async analyzeFileChange(event: FileChangeEvent): Promise<string | null> {
+    if (!event.content || event.content.length > 10000) {
+      return null;
+    }
+
+    try {
+      // Use fast model for quick analysis
+      const prompt = `Briefly analyze this ${event.language} code change for potential issues:
+
+\`\`\`${event.language}
+${event.content.slice(0, 2000)}\n\`\`\`
+
+Provide a single, concise suggestion if you see any obvious issues, otherwise respond with "Looks good".`;
+      
+      const suggestion = await this.context.modelClient.generateFast(prompt, 150);
+      
+      if (suggestion.toLowerCase().includes('looks good')) {
+        return null;
+      }
+      
+      return suggestion.trim();
+      
+    } catch (error) {
+      logger.error('Error analyzing file change:', error);
+      return null;
+    }
   }
 
   /**
@@ -37,6 +146,11 @@ export class EnhancedAgenticClient {
       // Load conversation history if it exists
       await this.loadConversationHistory();
       
+      // Start file watching if enabled
+      if (this.watchEnabled) {
+        await this.fileWatcher.start();
+      }
+      
       this.isActive = true;
       console.log(chalk.green('✅ Enhanced agent ready with the following capabilities:'));
       
@@ -49,6 +163,9 @@ export class EnhancedAgenticClient {
       
       console.log(chalk.gray('\n   Enhanced features:'));
       console.log(chalk.gray('   • Multi-step task planning'));
+      if (this.watchEnabled) {
+        console.log(chalk.gray('   • Real-time file watching'));
+      }
       console.log(chalk.gray('   • Reasoning → Acting → Observing cycles'));
       console.log(chalk.gray('   • Persistent conversation memory'));
       console.log(chalk.gray('   • Advanced code understanding'));
@@ -308,6 +425,12 @@ ${tools.reduce((acc, tool) => {
   private async handleExit(): Promise<void> {
     console.log(chalk.yellow('💾 Saving conversation history...'));
     await this.saveConversationHistory();
+    
+    if (this.watchEnabled && this.fileWatcher.isWatching()) {
+      console.log(chalk.yellow('⏹️  Stopping file watcher...'));
+      await this.fileWatcher.stop();
+    }
+    
     console.log(chalk.yellow('👋 Enhanced agent shutting down. Goodbye!'));
     this.isActive = false;
   }

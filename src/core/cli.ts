@@ -143,6 +143,14 @@ export class CodeCrucibleCLI {
 
     } catch (error) {
       spinner.fail(`${voice} encountered an error`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(chalk.red('❌ Error:', errorMessage));
+      
+      // Show troubleshooting help for common issues
+      if (errorMessage.includes('Ollama') || errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED')) {
+        const { LocalModelClient } = await import('./local-model-client.js');
+        LocalModelClient.displayTroubleshootingHelp();
+      }
       throw error;
     }
   }

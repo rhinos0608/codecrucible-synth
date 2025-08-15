@@ -13,7 +13,7 @@ export interface VoiceResponse {
     tokens_used: number;
 }
 export interface ProjectContext {
-    files: Array<{
+    files?: Array<{
         path: string;
         content: string;
         language: string;
@@ -21,6 +21,8 @@ export interface ProjectContext {
     projectType?: string;
     dependencies?: string[];
     gitStatus?: string;
+    workingDirectory?: string;
+    recentMessages?: any[];
 }
 export interface VoiceArchetype {
     id: string;
@@ -30,30 +32,53 @@ export interface VoiceArchetype {
     style: string;
 }
 /**
- * Enhanced Local Model Client for gpt-oss-20b integration
- * Completely self-contained with no external dependencies or environment variables
+ * Enhanced Local Model Client for Ollama integration
+ * Features automatic model detection, installation, and management
  */
 export declare class LocalModelClient {
     private client;
     private config;
+    private modelManager;
+    private _cachedBestModel;
+    private errorHandler;
+    private modelSelector;
+    private gpuOptimizer;
+    private isOptimized;
     private fallbackModels;
     constructor(config: LocalModelConfig);
     /**
+     * Initialize GPU optimization and hardware detection
+     */
+    private initializeGPUOptimization;
+    /**
      * Check if the local model is available and responding
+     * Enhanced with auto-setup capabilities
      */
     checkConnection(): Promise<boolean>;
     /**
-     * Auto-detect and select the best available model
+     * Auto-detect and select the best available model with intelligent selection and GPU optimization
      */
-    getAvailableModel(): Promise<string>;
+    getAvailableModel(taskType?: string): Promise<string>;
     /**
-     * Check if model is ready (simple version without warmup to avoid timeouts)
+     * Check if model is ready and available
      */
     isModelReady(model: string): Promise<boolean>;
+    /**
+     * Generate a response using a specific model and voice archetype
+     */
+    generateVoiceResponseWithModel(voice: VoiceArchetype, prompt: string, context: ProjectContext, modelName: string, retryCount?: number): Promise<VoiceResponse>;
     /**
      * Generate a response from a specific voice archetype
      */
     generateVoiceResponse(voice: VoiceArchetype, prompt: string, context: ProjectContext, retryCount?: number): Promise<VoiceResponse>;
+    /**
+     * Get the fastest available model for quick responses with GPU optimization
+     */
+    private getFastestAvailableModel;
+    /**
+     * Analyze task type from prompt for intelligent model selection
+     */
+    private analyzeTaskType;
     /**
      * Try fallback models if primary fails
      */
@@ -62,6 +87,14 @@ export declare class LocalModelClient {
      * Generate responses from multiple voices in parallel
      */
     generateMultiVoiceResponses(voices: VoiceArchetype[], prompt: string, context: ProjectContext): Promise<VoiceResponse[]>;
+    /**
+     * Generate a single response from the local model with GPU optimization and error handling
+     */
+    generate(prompt: string): Promise<string>;
+    /**
+     * Streamlined API call for maximum speed - bypasses voice complexity
+     */
+    generateFast(prompt: string, maxTokens?: number): Promise<string>;
     /**
      * Analyze code with local model
      */
@@ -107,6 +140,10 @@ export declare class LocalModelClient {
      */
     private parseVoiceResponse;
     /**
+     * Parse a single response from the local model
+     */
+    private parseResponse;
+    /**
      * Parse code analysis response
      */
     private parseAnalysisResponse;
@@ -122,4 +159,8 @@ export declare class LocalModelClient {
      * Extract recommendations from analysis content
      */
     private extractRecommendations;
+    /**
+     * Display helpful troubleshooting information for common issues
+     */
+    static displayTroubleshootingHelp(): void;
 }

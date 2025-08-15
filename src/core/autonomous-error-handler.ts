@@ -361,17 +361,18 @@ export class AutonomousErrorHandler {
   /**
    * Get intelligent model recommendation based on task
    */
-  async getRecommendedModel(taskType: 'coding' | 'chat' | 'analysis' | 'planning'): Promise<string> {
+  async getRecommendedModel(taskType: 'coding' | 'chat' | 'analysis' | 'planning' | 'general'): Promise<string> {
     const availableModels = await this.modelManager.getAvailableModels();
     
     const preferences = {
       coding: ['codellama', 'deepseek', 'qwen2.5-coder'],
       chat: ['llama3.2', 'llama3.1', 'gemma2'],
       analysis: ['qwen2.5', 'llama3.1', 'gemma2'],
-      planning: ['llama3.1', 'qwen2.5', 'gemma2']
+      planning: ['llama3.1', 'qwen2.5', 'gemma2'],
+      general: ['qwen2.5', 'llama3.1', 'gemma2']
     };
     
-    const preferred = preferences[taskType];
+    const preferred = preferences[taskType] || preferences['general'];
     
     for (const pref of preferred) {
       const model = availableModels.find((m: any) => 

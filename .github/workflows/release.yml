@@ -1,4 +1,4 @@
-name: Release Pipeline
+name: 🚀 CodeCrucible Synth - Autonomous Release Pipeline
 
 on:
   push:
@@ -10,6 +10,15 @@ on:
         description: 'Version to release (e.g., 2.0.1)'
         required: true
         type: string
+      release_type:
+        description: 'Release type'
+        required: false
+        default: 'stable'
+        type: choice
+        options:
+        - stable
+        - beta
+        - alpha
 
 env:
   NODE_VERSION: '18'
@@ -197,22 +206,103 @@ jobs:
           # Get previous tag
           PREV_TAG=$(git describe --tags --abbrev=0 $TAG^ 2>/dev/null || echo "")
           
-          echo "## What's Changed in v${VERSION}" > release-notes.md
-          echo "" >> release-notes.md
+          cat > release-notes.md << 'EOF'
+          # CodeCrucible Synth v${VERSION}
+          
+          🤖 **Autonomous AI Coding Assistant for Local Models**
+          
+          ## 🚀 One-Liner Installation (NEW!)
+          
+          ### npm (Recommended - Works Everywhere)
+          ```bash
+          npm install -g codecrucible-synth
+          crucible
+          ```
+          
+          ### npx (No Installation Required)
+          ```bash
+          npx codecrucible-synth
+          ```
+          
+          ### curl + bash (Unix/macOS)
+          ```bash
+          curl -sSL https://raw.githubusercontent.com/rhinos0608/codecrucibe-synth/main/install.sh | bash
+          ```
+          
+          ### PowerShell (Windows)
+          ```powershell
+          iwr -useb https://raw.githubusercontent.com/rhinos0608/codecrucibe-synth/main/install.ps1 | iex
+          ```
+          
+          ### Direct Binary Download
+          Download the appropriate binary below and run directly.
+          
+          ## 🔥 Key Features
+          
+          - **Progressive Model Pulling** - Intelligent timeout handling with fallback models
+          - **Multi-Voice AI System** - 9 specialized AI voices with synthesis engine
+          - **Real-time File Watching** - Automatic contextual assistance as you code
+          - **Autonomous Setup** - Zero-configuration installation with auto-detection
+          - **Multiple Interfaces** - CLI, Agentic Mode (like Claude Code), Desktop GUI, Server Mode
+          - **Local & Offline** - Uses Ollama with complete privacy
+          - **Cross-Platform Binaries** - Windows, macOS, Linux standalone executables
+          - **MCP Integration** - Advanced tool calling and file operations
+          
+          ## 📋 What's New in v${VERSION}
+          
+          EOF
           
           if [ -n "$PREV_TAG" ]; then
-            echo "### Commits since $PREV_TAG" >> release-notes.md
+            echo "### 🆕 Changes since $PREV_TAG" >> release-notes.md
             git log --pretty=format:"- %s (%h)" $PREV_TAG..$TAG >> release-notes.md
           else
-            echo "### Initial Release" >> release-notes.md
-            echo "- Complete CodeCrucible Synth application" >> release-notes.md
+            echo "### 🎉 Initial Release" >> release-notes.md
+            echo "- Complete autonomous AI coding assistant" >> release-notes.md
+            echo "- Progressive model management with timeout handling" >> release-notes.md
+            echo "- Real-time file watching and contextual assistance" >> release-notes.md
+            echo "- Multi-interface support (CLI/Desktop/Server)" >> release-notes.md
+            echo "- Cross-platform binaries and one-liner installation" >> release-notes.md
           fi
           
-          echo "" >> release-notes.md
-          echo "### Downloads" >> release-notes.md
-          echo "- **NPM Package**: \`npm install -g codecrucible-synth@${VERSION}\`" >> release-notes.md
-          echo "- **Standalone Executables**: Download platform-specific binaries below" >> release-notes.md
-          echo "- **Desktop Applications**: Download desktop apps for your platform below" >> release-notes.md
+          cat >> release-notes.md << 'EOF'
+          
+          ## 🛠️ Quick Start
+          
+          After installation:
+          ```bash
+          crucible                    # Start interactive mode
+          crucible agent              # Start agentic mode (like Claude Code)
+          crucible desktop            # Launch GUI application
+          crucible --help             # Show all commands
+          ```
+          
+          ## 🔧 Advanced Features
+          
+          - **Autonomous Error Recovery** - Automatically handles model timeouts and failures
+          - **GPU Acceleration** - Intelligent hardware detection and optimization
+          - **Voice Synthesis** - Competitive multi-voice conversations
+          - **Project Context** - Full codebase understanding and analysis
+          - **Tool Integration** - Git, filesystem, terminal, and package management
+          
+          ## 🐛 Troubleshooting
+          
+          If you encounter issues:
+          1. Ensure Node.js 18+ is installed: `node --version`
+          2. Check Ollama status: `ollama --version`
+          3. View logs in `.codecrucible/` directory
+          4. Report issues: [GitHub Issues](https://github.com/rhinos0608/codecrucibe-synth/issues)
+          
+          ## 📦 Installation Methods Summary
+          
+          | Method | Command | Best For |
+          |--------|---------|----------|
+          | npm global | `npm install -g codecrucible-synth` | Regular use |
+          | npx | `npx codecrucible-synth` | One-time testing |
+          | curl+bash | `curl -sSL https://...install.sh | bash` | Unix systems |
+          | PowerShell | `iwr -useb https://...install.ps1 | iex` | Windows |
+          | Binary | Download and run directly | No Node.js |
+          
+          EOF
           
       - name: Prepare release assets
         run: |

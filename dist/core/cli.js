@@ -87,6 +87,13 @@ export class CodeCrucibleCLI {
         }
         catch (error) {
             spinner.fail(`${voice} encountered an error`);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error(chalk.red('❌ Error:', errorMessage));
+            // Show troubleshooting help for common issues
+            if (errorMessage.includes('Ollama') || errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED')) {
+                const { LocalModelClient } = await import('./local-model-client.js');
+                LocalModelClient.displayTroubleshootingHelp();
+            }
             throw error;
         }
     }
@@ -239,19 +246,36 @@ export class CodeCrucibleCLI {
         }
     }
     async handleModelManagement(options) {
+        const { EnhancedModelManager } = await import('./enhanced-model-manager.js');
+        const modelManager = new EnhancedModelManager(this.context.config.model.endpoint);
         if (options.status) {
-            const spinner = ora('Checking model status...').start();
+            const spinner = ora('Checking system status...').start();
             try {
+                const status = await modelManager.checkOllamaStatus();
                 const isReady = await this.context.modelClient.checkConnection();
+                spinner.stop();
+                console.log(chalk.cyan('\n🔍 System Status:'));
+                console.log(chalk.gray(`   Ollama installed: ${status.installed ? '✅' : '❌'}`));
+                console.log(chalk.gray(`   Ollama running: ${status.running ? '✅' : '❌'}`));
+                if (status.version) {
+                    console.log(chalk.gray(`   Version: ${status.version}`));
+                }
                 if (isReady) {
-                    spinner.succeed('Model is ready!');
-                    console.log(chalk.green('✅ gpt-oss-20b is available and responding'));
+                    const bestModel = await modelManager.getBestAvailableModel();
+                    console.log(chalk.green(`✅ AI model ready: ${bestModel}`));
+                    // Show available models
+                    const models = await modelManager.getAvailableModels();
+                    const installed = models.filter(m => m.available);
+                    if (installed.length > 1) {
+                        console.log(chalk.cyan('\n📚 Available models:'));
+                        installed.forEach(model => {
+                            console.log(chalk.gray(`   • ${model.name} (${model.size})${model.name === bestModel ? ' ⭐ active' : ''}`));
+                        });
+                    }
                 }
                 else {
-                    spinner.fail('Model not available');
-                    console.log(chalk.red('❌ gpt-oss-20b is not available'));
-                    console.log(chalk.yellow('💡 Make sure Ollama is running: ollama serve'));
-                    console.log(chalk.yellow('💡 Install model: ollama pull gpt-oss:20b'));
+                    console.log(chalk.red('❌ No AI models available'));
+                    console.log(chalk.yellow('💡 Run: cc model --setup'));
                 }
             }
             catch (error) {
@@ -259,11 +283,110 @@ export class CodeCrucibleCLI {
                 console.error(chalk.red('❌ Status check failed:'), error instanceof Error ? error.message : error);
             }
         }
-        if (options.install) {
-            console.log(chalk.blue('📦 To install gpt-oss-20b:'));
-            console.log(chalk.gray('1. Install Ollama: curl -fsSL https://ollama.ai/install.sh | sh'));
-            console.log(chalk.gray('2. Pull model: ollama pull gpt-oss:20b'));
-            console.log(chalk.gray('3. Start server: ollama serve'));
+        if (options.setup || options.install) {
+            console.log(chalk.blue('🚀 Starting CodeCrucible setup...\n'));
+            try {
+                const result = await modelManager.autoSetup(true);
+                if (result.success) {
+                    console.log(chalk.green('🎉 Setup completed successfully!'));
+                    console.log(chalk.gray(`   Model: ${result.model}`));
+                    console.log(chalk.gray('   You can now use CodeCrucible normally.\n'));
+                    // Update config with new model
+                    if (result.model) {
+                        const { ConfigManager } = await import('../config/config-manager.js');
+                        const configManager = await ConfigManager.getInstance();
+                        await configManager.set('model.name', result.model);
+                    }
+                }
+                else {
+                    console.log(chalk.red('❌ Setup failed. Please check the instructions above.'));
+                }
+            }
+            catch (error) {
+                console.error(chalk.red('❌ Setup failed:'), error instanceof Error ? error.message : error);
+            }
+        }
+        if (options.list) {
+            console.log(chalk.cyan('📚 Available Models:\n'));
+            try {
+                const models = await modelManager.getAvailableModels();
+                models.forEach(model => {
+                    const status = model.available ? chalk.green('✅ Installed') : chalk.gray('⬇️  Available');
+                    console.log(chalk.white(`${model.name}`));
+                    console.log(chalk.gray(`   ${model.description}`));
+                    console.log(chalk.gray(`   Size: ${model.size} | Status: ${status}`));
+                    if (model.family) {
+                        console.log(chalk.gray(`   Family: ${model.family} | Parameters: ${model.parameters}`));
+                    }
+                    console.log();
+                });
+            }
+            catch (error) {
+                console.error(chalk.red('❌ Failed to list models:'), error instanceof Error ? error.message : error);
+            }
+        }
+        if (options.pull) {
+            const modelName = options.pull;
+            console.log(chalk.blue(`📥 Pulling model: ${modelName}`));
+            try {
+                const success = await modelManager.pullModel(modelName);
+                if (success) {
+                    console.log(chalk.green(`✅ Successfully installed ${modelName}!`));
+                }
+                else {
+                    console.log(chalk.red(`❌ Failed to install ${modelName}`));
+                }
+            }
+            catch (error) {
+                console.error(chalk.red('❌ Pull failed:'), error instanceof Error ? error.message : error);
+            }
+        }
+        if (options.test) {
+            const modelName = options.test === true ? await modelManager.getBestAvailableModel() : options.test;
+            if (!modelName) {
+                console.log(chalk.red('❌ No model specified and no models available'));
+                return;
+            }
+            console.log(chalk.blue(`🧪 Testing model: ${modelName}`));
+            try {
+                const success = await modelManager.testModel(modelName);
+                if (success) {
+                    console.log(chalk.green(`✅ Model ${modelName} is working correctly!`));
+                }
+                else {
+                    console.log(chalk.red(`❌ Model ${modelName} test failed`));
+                }
+            }
+            catch (error) {
+                console.error(chalk.red('❌ Test failed:'), error instanceof Error ? error.message : error);
+            }
+        }
+        if (options.remove) {
+            const modelName = options.remove;
+            console.log(chalk.yellow(`🗑️  Removing model: ${modelName}`));
+            const { confirm } = await inquirer.prompt([{
+                    type: 'confirm',
+                    name: 'confirm',
+                    message: `Are you sure you want to remove ${modelName}?`,
+                    default: false
+                }]);
+            if (confirm) {
+                try {
+                    const success = await modelManager.removeModel(modelName);
+                    if (success) {
+                        console.log(chalk.green(`✅ Successfully removed ${modelName}!`));
+                    }
+                    else {
+                        console.log(chalk.red(`❌ Failed to remove ${modelName}`));
+                    }
+                }
+                catch (error) {
+                    console.error(chalk.red('❌ Removal failed:'), error instanceof Error ? error.message : error);
+                }
+            }
+            else {
+                console.log(chalk.gray('Cancelled.'));
+            }
         }
     }
     async handleVoiceManagement(options) {
@@ -337,6 +460,7 @@ export class CodeCrucibleCLI {
             try {
                 const content = await readFile(file, 'utf8');
                 const language = this.detectLanguage(extname(file));
+                context.files = context.files || [];
                 context.files.push({ path: file, content, language });
             }
             catch (error) {
@@ -349,7 +473,10 @@ export class CodeCrucibleCLI {
                 maxDepth: 3
             });
             const projectFiles = await this.buildProjectContext(files.slice(0, 5));
-            context.files.push(...projectFiles);
+            context.files = context.files || [];
+            if (projectFiles) {
+                context.files.push(...projectFiles);
+            }
         }
         return context;
     }

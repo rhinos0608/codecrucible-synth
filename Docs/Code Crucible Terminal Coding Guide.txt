@@ -1,0 +1,975 @@
+# CodeCrucible Terminal - Local Multi-Voice AI Coding Assistant
+
+## Executive Summary
+
+**CodeCrucible Terminal** is a revolutionary local terminal-based coding application that brings the multi-voice consciousness-driven development methodology to your local development environment. Built on OpenAI's recently released gpt-oss-20b model, it provides autonomous coding assistance directly in your terminal and VS Code, with full offline capability and local MCP server integration.
+
+## Architecture Overview
+
+### Core Design Philosophy
+
+The application maintains the **Living Spiral Methodology** from the original CodeCrucibleSynth but adapts it for local, terminal-first operation:
+
+- **Collapse**: Acknowledge complexity through terminal input parsing
+- **Council**: Multi-voice parallel processing using local AI model
+- **Synthesis**: Integration of voice outputs in terminal interface  
+- **Rebirth**: Evolved code delivered to your workspace
+
+### Technology Stack
+
+```
+Local Infrastructure:
+├── OpenAI gpt-oss-20b Model (via Ollama/Local deployment)
+├── Node.js/Python CLI Framework
+├── Built-in MCP Servers
+├── VS Code Extension
+├── Terminal Integration (Shell hooks)
+└── Local File System Integration
+```
+
+## System Requirements
+
+### Minimum Requirements
+- **RAM**: 16GB (for gpt-oss-20b model)
+- **Storage**: 20GB free space (15GB for model + 5GB for application)
+- **OS**: macOS 10.15+, Ubuntu 18.04+, Windows 10 with WSL2
+- **Node.js**: v18+ or Python 3.8+
+
+### Recommended Requirements
+- **RAM**: 32GB+ (for optimal performance)
+- **Storage**: 50GB+ SSD
+- **GPU**: Optional but improves performance
+- **Network**: For initial model download only
+
+## Installation & Setup
+
+### 1. Model Installation
+
+#### Option A: Ollama (Recommended)
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Download gpt-oss-20b model
+ollama pull gpt-oss:20b
+
+# Verify installation
+ollama list
+```
+
+#### Option B: Direct Download
+```bash
+# Clone model from Hugging Face
+git clone https://huggingface.co/openai/gpt-oss-20b
+cd gpt-oss-20b
+
+# Install dependencies
+pip install gpt-oss transformers torch
+```
+
+### 2. CodeCrucible Terminal Installation
+
+```bash
+# Install via npm (when published)
+npm install -g codecrucible-terminal
+
+# Or install from source
+git clone https://github.com/your-org/codecrucible-terminal
+cd codecrucible-terminal
+npm install
+npm run build
+npm link
+```
+
+### 3. VS Code Extension Setup
+
+```bash
+# Install extension
+code --install-extension codecrucible.terminal-extension
+
+# Or install from VS Code marketplace
+# Search for "CodeCrucible Terminal" in extensions
+```
+
+## Core Features
+
+### 1. Multi-Voice Terminal Interface
+
+```bash
+# Standard single-voice mode
+cc "Create a React component for user authentication"
+
+# Multi-voice council mode
+cc --voices explorer,maintainer,security "Build a secure API endpoint"
+
+# Interactive voice selection
+cc --interactive "Refactor this function"
+```
+
+### 2. Voice Archetypes (Local Implementation)
+
+Each voice is implemented as a specialized prompt template system:
+
+#### Explorer Voice
+- **Focus**: Innovation, alternatives, edge cases
+- **Prompt Style**: "Investigate creative approaches..."
+- **Output**: Multiple solution paths with trade-offs
+
+#### Maintainer Voice  
+- **Focus**: Stability, maintainability, documentation
+- **Prompt Style**: "Ensure long-term viability..."
+- **Output**: Robust, well-documented solutions
+
+#### Analyzer Voice
+- **Focus**: Performance, patterns, optimization
+- **Prompt Style**: "Analyze patterns and optimize..."
+- **Output**: Performance-focused implementations
+
+#### Developer Voice
+- **Focus**: User experience, API design, clarity
+- **Prompt Style**: "Prioritize developer experience..."
+- **Output**: Clean, intuitive interfaces
+
+#### Security Voice
+- **Focus**: Input validation, vulnerability prevention
+- **Prompt Style**: "Implement security-first approach..."
+- **Output**: Hardened, validated code
+
+### 3. Built-in MCP Servers
+
+#### File System MCP Server
+```typescript
+// Handles file operations with consciousness tracking
+interface FileOperations {
+  read: (path: string) => Promise<string>;
+  write: (path: string, content: string) => Promise<void>;
+  analyze: (path: string) => Promise<FileAnalysis>;
+  refactor: (path: string, instructions: string) => Promise<RefactorResult>;
+}
+```
+
+#### Git MCP Server
+```typescript
+// Git operations with AI assistance
+interface GitOperations {
+  commit: (message?: string) => Promise<CommitResult>;
+  branch: (name: string, strategy: BranchStrategy) => Promise<void>;
+  merge: (branch: string, strategy: MergeStrategy) => Promise<MergeResult>;
+  review: (diff: string) => Promise<ReviewResult>;
+}
+```
+
+#### Terminal MCP Server
+```typescript
+// Terminal command execution with safeguards
+interface TerminalOperations {
+  execute: (command: string, options: ExecutionOptions) => Promise<CommandResult>;
+  explain: (command: string) => Promise<CommandExplanation>;
+  suggest: (task: string) => Promise<CommandSuggestion[]>;
+}
+```
+
+#### Package Manager MCP Server
+```typescript
+// Intelligent package management
+interface PackageOperations {
+  install: (packages: string[], options: InstallOptions) => Promise<InstallResult>;
+  audit: (project: string) => Promise<SecurityAudit>;
+  update: (strategy: UpdateStrategy) => Promise<UpdateResult>;
+  recommend: (needs: ProjectNeeds) => Promise<PackageRecommendations>;
+}
+```
+
+## Command Line Interface Design
+
+### Core Commands
+
+```bash
+# Basic code generation
+cc "Create a Python class for data validation"
+
+# Multi-voice synthesis
+cc --council "Design a microservices architecture"
+
+# File-specific operations
+cc --file src/auth.js "Add input validation"
+
+# Project-wide operations  
+cc --project "Add error handling throughout the codebase"
+
+# Interactive mode
+cc --interactive
+
+# Configuration
+cc config --set default-voices "explorer,maintainer"
+cc config --set model-endpoint "localhost:11434"
+```
+
+### Advanced Usage
+
+```bash
+# Context-aware assistance
+cc --context "I'm building a REST API" "Add rate limiting"
+
+# Voice-specific queries
+cc --voice security "Review this authentication flow"
+
+# Batch operations
+cc --batch commands.txt
+
+# Integration with shell
+alias ai='cc'
+ai "Fix the failing tests"
+```
+
+## VS Code Integration
+
+### Extension Features
+
+1. **Inline Code Generation**
+   ```typescript
+   // Comment trigger: // cc: Create user validation function
+   // Generates code directly in editor
+   ```
+
+2. **Multi-Voice Panel**
+   - Side panel showing different voice perspectives
+   - Real-time synthesis visualization
+   - Voice contribution tracking
+
+3. **Context Awareness**
+   - Automatic project context detection
+   - File dependency analysis
+   - Git status integration
+
+4. **Terminal Integration**
+   - Embedded terminal with CC commands
+   - Output formatting and syntax highlighting
+   - Command history and suggestions
+
+### Extension Commands
+
+```json
+{
+  "codecrucible.generateCode": {
+    "command": "codecrucible.generate",
+    "key": "ctrl+shift+g"
+  },
+  "codecrucible.explainCode": {
+    "command": "codecrucible.explain", 
+    "key": "ctrl+shift+e"
+  },
+  "codecrucible.refactorCode": {
+    "command": "codecrucible.refactor",
+    "key": "ctrl+shift+r"
+  }
+}
+```
+
+## Local Model Integration
+
+### OpenAI gpt-oss-20b Integration
+
+```typescript
+interface LocalModelConfig {
+  endpoint: string; // "http://localhost:11434" for Ollama
+  model: string;    // "gpt-oss:20b"
+  timeout: number;  // Request timeout
+  maxTokens: number; // Response length limit
+  temperature: number; // Creativity level
+}
+
+class LocalModelClient {
+  private config: LocalModelConfig;
+  
+  async generateVoiceResponse(
+    voice: VoiceArchetype,
+    prompt: string,
+    context: ProjectContext
+  ): Promise<VoiceResponse> {
+    const enhancedPrompt = this.enhancePromptWithVoice(voice, prompt, context);
+    
+    const response = await this.callModel({
+      prompt: enhancedPrompt,
+      model: this.config.model,
+      stream: true,
+      options: {
+        temperature: this.getVoiceTemperature(voice),
+        max_tokens: this.config.maxTokens
+      }
+    });
+    
+    return this.parseVoiceResponse(response, voice);
+  }
+  
+  private enhancePromptWithVoice(
+    voice: VoiceArchetype, 
+    prompt: string, 
+    context: ProjectContext
+  ): string {
+    const voiceInstructions = this.getVoiceInstructions(voice);
+    const contextInfo = this.formatContext(context);
+    
+    return `${voiceInstructions}\n\nContext:\n${contextInfo}\n\nTask:\n${prompt}`;
+  }
+}
+```
+
+### Model Performance Optimization
+
+```typescript
+interface PerformanceConfig {
+  // Caching strategy
+  responseCache: {
+    enabled: boolean;
+    maxAge: number; // milliseconds
+    maxSize: number; // MB
+  };
+  
+  // Parallel processing
+  voiceParallelism: {
+    maxConcurrent: number; // Max parallel voice generations
+    batchSize: number; // Voice batch processing
+  };
+  
+  // Context optimization
+  contextManagement: {
+    maxContextLength: number; // tokens
+    compressionThreshold: number; // tokens
+    retentionStrategy: 'sliding' | 'summary' | 'hierarchical';
+  };
+}
+```
+
+## MCP Server Implementation
+
+### Base MCP Server Architecture
+
+```typescript
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+
+abstract class CodeCrucibleMCPServer {
+  protected server: Server;
+  protected name: string;
+  protected version: string;
+  
+  constructor(name: string, version: string) {
+    this.name = name;
+    this.version = version;
+    this.server = new Server(
+      { name, version },
+      { capabilities: this.getCapabilities() }
+    );
+    
+    this.setupHandlers();
+  }
+  
+  protected abstract getCapabilities(): ServerCapabilities;
+  protected abstract setupHandlers(): void;
+  
+  async start(): Promise<void> {
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+  }
+}
+```
+
+### File System MCP Server
+
+```typescript
+class FileSystemMCPServer extends CodeCrucibleMCPServer {
+  constructor() {
+    super('codecrucible-filesystem', '1.0.0');
+  }
+  
+  protected getCapabilities(): ServerCapabilities {
+    return {
+      tools: {},
+      resources: {}
+    };
+  }
+  
+  protected setupHandlers(): void {
+    // File reading with consciousness tracking
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      if (request.params.name === 'read_file_with_analysis') {
+        return this.readFileWithAnalysis(request.params.arguments);
+      }
+      
+      if (request.params.name === 'write_file_with_validation') {
+        return this.writeFileWithValidation(request.params.arguments);
+      }
+      
+      if (request.params.name === 'refactor_file') {
+        return this.refactorFile(request.params.arguments);
+      }
+    });
+  }
+  
+  private async readFileWithAnalysis(args: any): Promise<CallToolResult> {
+    const { filepath } = args;
+    const content = await fs.readFile(filepath, 'utf8');
+    
+    // Analyze file with local model
+    const analysis = await this.analyzeCode(content, filepath);
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          content,
+          analysis,
+          metadata: {
+            path: filepath,
+            size: content.length,
+            lastModified: (await fs.stat(filepath)).mtime
+          }
+        })
+      }]
+    };
+  }
+  
+  private async analyzeCode(content: string, filepath: string): Promise<CodeAnalysis> {
+    // Use local model to analyze code
+    const prompt = `Analyze this code file (${filepath}):\n\n${content}\n\nProvide:
+1. Code quality assessment
+2. Potential improvements
+3. Security concerns
+4. Performance considerations`;
+    
+    return await this.modelClient.analyze(prompt);
+  }
+}
+```
+
+### Terminal MCP Server
+
+```typescript
+class TerminalMCPServer extends CodeCrucibleMCPServer {
+  private commandHistory: CommandHistory[] = [];
+  private safetyChecker: CommandSafetyChecker;
+  
+  constructor() {
+    super('codecrucible-terminal', '1.0.0');
+    this.safetyChecker = new CommandSafetyChecker();
+  }
+  
+  protected setupHandlers(): void {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      if (request.params.name === 'execute_command_safe') {
+        return this.executeCommandSafe(request.params.arguments);
+      }
+      
+      if (request.params.name === 'explain_command') {
+        return this.explainCommand(request.params.arguments);
+      }
+      
+      if (request.params.name === 'suggest_commands') {
+        return this.suggestCommands(request.params.arguments);
+      }
+    });
+  }
+  
+  private async executeCommandSafe(args: any): Promise<CallToolResult> {
+    const { command, workingDirectory, timeout = 30000 } = args;
+    
+    // Safety check
+    const safetyResult = await this.safetyChecker.checkCommand(command);
+    if (!safetyResult.safe) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            error: "Command blocked for safety",
+            reason: safetyResult.reason,
+            suggestions: safetyResult.safterAlternatives
+          })
+        }]
+      };
+    }
+    
+    // Execute with monitoring
+    const result = await this.executeWithMonitoring(command, workingDirectory, timeout);
+    
+    // Track in history
+    this.commandHistory.push({
+      command,
+      timestamp: Date.now(),
+      workingDirectory,
+      result
+    });
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify(result)
+      }]
+    };
+  }
+}
+```
+
+## Security & Safety
+
+### Local Model Safety
+
+```typescript
+interface SafetyConfig {
+  // Command execution safety
+  commandFiltering: {
+    whitelist: string[]; // Allowed commands
+    blacklist: string[]; // Blocked commands
+    requireConfirmation: string[]; // Commands requiring user confirmation
+  };
+  
+  // File system safety
+  fileSystemAccess: {
+    allowedPaths: string[]; // Writable paths
+    readOnlyPaths: string[]; // Read-only paths
+    blockedPaths: string[]; // Completely blocked paths
+  };
+  
+  // Network safety
+  networkAccess: {
+    allowedDomains: string[]; // For package installs, etc.
+    blockNetworkCommands: boolean; // Block curl, wget, etc.
+  };
+}
+
+class SafetyValidator {
+  private config: SafetyConfig;
+  
+  async validateCommand(command: string): Promise<ValidationResult> {
+    // Check against blacklist
+    if (this.isBlacklisted(command)) {
+      return { safe: false, reason: 'Command is blacklisted' };
+    }
+    
+    // Check file system access
+    const fileAccess = this.checkFileSystemAccess(command);
+    if (!fileAccess.safe) {
+      return fileAccess;
+    }
+    
+    // Check network access
+    const networkAccess = this.checkNetworkAccess(command);
+    if (!networkAccess.safe) {
+      return networkAccess;
+    }
+    
+    return { safe: true };
+  }
+}
+```
+
+### User Consent System
+
+```typescript
+interface ConsentManager {
+  // File operations requiring consent
+  fileOperationConsent: {
+    requiredFor: ('write' | 'delete' | 'execute')[];
+    autoApprove: string[]; // File patterns
+    alwaysAsk: string[]; // File patterns
+  };
+  
+  // Command execution consent  
+  commandConsent: {
+    requiredFor: string[]; // Command patterns
+    timeout: number; // Consent request timeout
+  };
+}
+```
+
+## Configuration System
+
+### Application Configuration
+
+```yaml
+# ~/.codecrucible/config.yaml
+model:
+  endpoint: "http://localhost:11434"
+  name: "gpt-oss:20b"
+  timeout: 30000
+  maxTokens: 4096
+  temperature: 0.7
+
+voices:
+  default: ["explorer", "maintainer"]
+  available: ["explorer", "maintainer", "analyzer", "developer", "security"]
+  parallel: true
+  maxConcurrent: 3
+
+safety:
+  commandValidation: true
+  fileSystemRestrictions: true
+  requireConsent: ["delete", "execute"]
+  
+terminal:
+  shell: "auto" # auto-detect or specify
+  prompt: "CC> "
+  historySize: 1000
+  
+vscode:
+  autoActivate: true
+  inlineGeneration: true
+  showVoicePanel: true
+```
+
+### Voice Configuration
+
+```yaml
+# ~/.codecrucible/voices.yaml
+explorer:
+  temperature: 0.9
+  systemPrompt: |
+    You are Explorer, a voice focused on innovation and creative solutions.
+    Always consider alternative approaches and edge cases.
+    Encourage experimentation and novel techniques.
+  style: "experimental"
+  
+maintainer:
+  temperature: 0.5
+  systemPrompt: |
+    You are Maintainer, focused on code stability and long-term maintenance.
+    Prioritize robustness, documentation, and conventional approaches.
+    Consider future maintenance burden in all recommendations.
+  style: "conservative"
+
+security:
+  temperature: 0.3
+  systemPrompt: |
+    You are Security, focused on secure coding practices.
+    Always include input validation, error handling, and security considerations.
+    Flag potential vulnerabilities and suggest security best practices.
+  style: "defensive"
+```
+
+## Performance Optimization
+
+### Caching Strategy
+
+```typescript
+interface CacheSystem {
+  // Response caching
+  responseCache: Map<string, CachedResponse>;
+  
+  // Context caching
+  contextCache: Map<string, ProjectContext>;
+  
+  // Model output caching
+  modelCache: Map<string, ModelResponse>;
+}
+
+class PerformanceOptimizer {
+  private cache: CacheSystem;
+  
+  async optimizeGeneration(
+    voices: VoiceArchetype[],
+    prompt: string,
+    context: ProjectContext
+  ): Promise<OptimizedResponse> {
+    
+    // Check cache first
+    const cacheKey = this.generateCacheKey(voices, prompt, context);
+    const cached = this.cache.responseCache.get(cacheKey);
+    
+    if (cached && !this.isExpired(cached)) {
+      return cached.response;
+    }
+    
+    // Parallel generation for multiple voices
+    const voicePromises = voices.map(voice => 
+      this.generateVoiceResponse(voice, prompt, context)
+    );
+    
+    const responses = await Promise.all(voicePromises);
+    const synthesized = await this.synthesizeResponses(responses);
+    
+    // Cache result
+    this.cache.responseCache.set(cacheKey, {
+      response: synthesized,
+      timestamp: Date.now(),
+      expiresAt: Date.now() + this.getCacheExpiry(prompt)
+    });
+    
+    return synthesized;
+  }
+}
+```
+
+### Context Management
+
+```typescript
+class ContextManager {
+  private contextWindow: number = 128000; // gpt-oss-20b context limit
+  
+  async manageContext(
+    currentContext: ProjectContext,
+    newInput: string
+  ): Promise<OptimizedContext> {
+    
+    const totalTokens = this.estimateTokens(currentContext) + 
+                       this.estimateTokens(newInput);
+    
+    if (totalTokens > this.contextWindow * 0.8) {
+      // Compress context to fit
+      return await this.compressContext(currentContext, newInput);
+    }
+    
+    return {
+      ...currentContext,
+      recentInput: newInput
+    };
+  }
+  
+  private async compressContext(
+    context: ProjectContext,
+    newInput: string
+  ): Promise<OptimizedContext> {
+    
+    // Use local model to summarize less relevant context
+    const summary = await this.modelClient.summarize(
+      context.lessRelevantParts,
+      { maxTokens: 1000 }
+    );
+    
+    return {
+      recentInput: newInput,
+      relevantContext: context.relevantContext,
+      summary: summary,
+      metadata: context.metadata
+    };
+  }
+}
+```
+
+## Testing Strategy
+
+### Unit Testing Framework
+
+```typescript
+describe('CodeCrucible Terminal Core', () => {
+  describe('Voice Generation', () => {
+    it('should generate response from single voice', async () => {
+      const response = await voiceGenerator.generate(
+        'explorer',
+        'Create a function to validate email',
+        mockContext
+      );
+      
+      expect(response.voice).toBe('explorer');
+      expect(response.code).toContain('function');
+      expect(response.confidence).toBeGreaterThan(0.7);
+    });
+    
+    it('should handle multiple voices in parallel', async () => {
+      const voices = ['explorer', 'security', 'maintainer'];
+      const responses = await voiceGenerator.generateMultiple(
+        voices,
+        'Create user authentication system',
+        mockContext
+      );
+      
+      expect(responses).toHaveLength(3);
+      expect(responses.every(r => r.confidence > 0.5)).toBe(true);
+    });
+  });
+  
+  describe('MCP Server Integration', () => {
+    it('should execute file operations safely', async () => {
+      const result = await mcpClient.callTool('read_file_with_analysis', {
+        filepath: 'test/sample.js'
+      });
+      
+      expect(result.analysis).toBeDefined();
+      expect(result.content).toContain('function');
+    });
+  });
+  
+  describe('Terminal Integration', () => {
+    it('should execute safe commands', async () => {
+      const result = await terminalServer.executeCommand('ls -la');
+      expect(result.success).toBe(true);
+      expect(result.output).toBeDefined();
+    });
+    
+    it('should block dangerous commands', async () => {
+      const result = await terminalServer.executeCommand('rm -rf /');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('blocked');
+    });
+  });
+});
+```
+
+### Integration Testing
+
+```typescript
+describe('End-to-End Workflows', () => {
+  it('should complete full coding workflow', async () => {
+    // Initialize project
+    await cc.init('test-project');
+    
+    // Generate component
+    const response = await cc.generate(
+      'Create a React component for user profile',
+      { voices: ['developer', 'security'] }
+    );
+    
+    expect(response.files).toHaveProperty('UserProfile.jsx');
+    expect(response.files).toHaveProperty('UserProfile.test.jsx');
+    
+    // Verify file creation
+    const files = await fs.readdir('test-project/src');
+    expect(files).toContain('UserProfile.jsx');
+  });
+});
+```
+
+## Deployment & Distribution
+
+### Installation Package Structure
+
+```
+codecrucible-terminal/
+├── bin/
+│   └── cc                     # Main CLI executable
+├── lib/
+│   ├── core/                  # Core functionality
+│   ├── voices/                # Voice implementations
+│   ├── mcp-servers/           # Built-in MCP servers
+│   └── integrations/          # VS Code, Git, etc.
+├── config/
+│   ├── default.yaml           # Default configuration
+│   └── voices.yaml            # Voice definitions
+├── docs/
+│   ├── README.md
+│   ├── API.md
+│   └── examples/
+└── package.json
+```
+
+### Distribution Methods
+
+1. **npm Package** (Primary)
+   ```bash
+   npm install -g codecrucible-terminal
+   ```
+
+2. **Pre-built Binaries**
+   - macOS: `codecrucible-macos-x64`
+   - Linux: `codecrucible-linux-x64`
+   - Windows: `codecrucible-windows-x64.exe`
+
+3. **Docker Container**
+   ```bash
+   docker pull codecrucible/terminal:latest
+   docker run -it -v $(pwd):/workspace codecrucible/terminal
+   ```
+
+4. **VS Code Extension Marketplace**
+   - Extension ID: `codecrucible.terminal-extension`
+   - Auto-installs CLI component
+
+## Roadmap & Future Features
+
+### Phase 1: Core Implementation (Months 1-3)
+- ✅ Basic CLI with single voice
+- ✅ OpenAI gpt-oss-20b integration
+- ✅ File system MCP server
+- ✅ VS Code extension basics
+
+### Phase 2: Multi-Voice System (Months 4-6)
+- 🔄 Parallel voice generation
+- 🔄 Voice synthesis engine
+- 🔄 Advanced MCP servers
+- 🔄 Terminal integration
+
+### Phase 3: Advanced Features (Months 7-9)
+- ⏳ Real-time collaboration
+- ⏳ Plugin system
+- ⏳ Advanced context management
+- ⏳ Performance optimization
+
+### Phase 4: Enterprise Features (Months 10-12)
+- ⏳ Team management
+- ⏳ Enterprise security
+- ⏳ Custom voice training
+- ⏳ Advanced analytics
+
+### Future Enhancements
+- **Multi-Model Support**: Integration with other local models
+- **Voice Learning**: Adaptive voice behavior based on user feedback
+- **Project Templates**: Pre-configured setups for common project types
+- **Cloud Sync**: Optional cloud backup of preferences and context
+- **Mobile App**: Companion app for remote development
+
+## Getting Started
+
+### Quick Start
+
+1. **Install Prerequisites**
+   ```bash
+   # Install Ollama
+   curl -fsSL https://ollama.ai/install.sh | sh
+   
+   # Download model
+   ollama pull gpt-oss:20b
+   ```
+
+2. **Install CodeCrucible Terminal**
+   ```bash
+   npm install -g codecrucible-terminal
+   ```
+
+3. **Initialize Your Project**
+   ```bash
+   cd your-project
+   cc init
+   ```
+
+4. **Start Coding**
+   ```bash
+   cc "Create a Python web scraper for news articles"
+   ```
+
+### First Steps Tutorial
+
+```bash
+# 1. Simple code generation
+cc "Create a function to calculate fibonacci numbers"
+
+# 2. Multi-voice consultation
+cc --voices explorer,analyzer "Optimize this sorting algorithm"
+
+# 3. File-specific assistance
+cc --file auth.py "Add error handling and logging"
+
+# 4. Project-wide operations
+cc --project "Add comprehensive test coverage"
+
+# 5. Interactive mode
+cc --interactive
+> What would you like me to help you with?
+> Refactor my React components to use hooks
+```
+
+### Best Practices
+
+1. **Start Small**: Begin with simple single-voice commands
+2. **Use Context**: Provide relevant file paths and project context
+3. **Iterate**: Use the interactive mode for complex tasks
+4. **Review Output**: Always review generated code before committing
+5. **Configure Voices**: Customize voice behavior for your preferences
+
+## Conclusion
+
+CodeCrucible Terminal represents the next evolution of AI-assisted development, bringing the power of multi-voice consciousness-driven development to your local environment. By leveraging the OpenAI gpt-oss-20b model and modern MCP server architecture, it provides a secure, fast, and intelligent coding companion that respects your privacy while enhancing your productivity.
+
+The application maintains the philosophical foundations of the original CodeCrucibleSynth while adapting them for the realities of local development. With its comprehensive VS Code integration, robust MCP server ecosystem, and focus on developer autonomy, CodeCrucible Terminal is positioned to become an essential tool for developers seeking AI assistance without compromising on security or performance.
+
+---
+
+*This documentation serves as the foundation for building CodeCrucible Terminal. The architecture is designed to be modular, extensible, and true to the consciousness-driven development principles that make CodeCrucible unique.*

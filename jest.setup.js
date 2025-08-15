@@ -1,0 +1,1 @@
+process.env.PROJECT_ROOT = process.cwd();

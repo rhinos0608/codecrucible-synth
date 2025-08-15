@@ -1,0 +1,907 @@
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeCrucible - Multi-Voice AI Coding Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        seeker: '#3B82F6',
+                        steward: '#10B981',
+                        witness: '#8B5CF6',
+                        nurturer: '#EC4899',
+                        decider: '#EF4444',
+                        architect: '#3B82F6',
+                        optimizer: '#F59E0B',
+                        guardian: '#10B981',
+                        designer: '#8B5CF6'
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="font-sans bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
+    <!-- @COMPONENT: App [main application container] -->
+    <div class="min-h-screen flex">
+        <!-- Sidebar Navigation -->
+        <!-- @COMPONENT: Sidebar [navigation and theme controls] -->
+        <aside class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-gradient-to-br from-seeker to-witness rounded-lg flex items-center justify-center">
+                        <i data-lucide="code-2" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold">CodeCrucible</h1>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Multi-Voice AI Assistant</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-4">
+                <div class="space-y-2">
+                    <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-seeker border border-blue-200 dark:border-blue-800">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        <span class="font-medium">Voice Selection</span>
+                    </a>
+                    <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        <i data-lucide="layers-3" class="w-4 h-4"></i>
+                        <span>Synthesis</span>
+                    </a>
+                    <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                        <span>Analytics</span>
+                    </a>
+                    <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        <i data-lucide="book-open" class="w-4 h-4"></i>
+                        <span>Phantom Ledger</span>
+                    </a>
+                </div>
+
+                <!-- Performance Metrics -->
+                <div class="mt-8 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">System Metrics</h3>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Generation Speed</span>
+                            <span class="font-medium">2.3s</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Success Rate</span>
+                            <span class="font-medium text-steward">94%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Ethical Score</span>
+                            <span class="font-medium text-steward">96%</span>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Theme Toggle -->
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="toggleTheme()" class="flex items-center space-x-2 w-full px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+                    <i data-lucide="sun" class="w-4 h-4 hidden dark:inline"></i>
+                    <span class="text-sm">Toggle Theme</span>
+                </button>
+            </div>
+        </aside>
+        <!-- @END_COMPONENT: Sidebar -->
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col">
+            <!-- Header -->
+            <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-semibold">Voice Selection & Prompt Engine</h2>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Configure your recursive coding synthesis</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-gray-500 dark:text-gray-400">Active Voices: <span data-bind="activeVoiceCount" class="font-medium">3</span></span>
+                        <div class="w-2 h-2 bg-steward rounded-full"></div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="flex-1 flex">
+                <!-- Left Panel: Voice Selection -->
+                <!-- @COMPONENT: VoiceSelector [voice and archetype selection interface] -->
+                <div class="w-1/2 p-6 border-r border-gray-200 dark:border-gray-700">
+                    <!-- Transisthesis Archetypes -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i data-lucide="brain" class="w-5 h-5 mr-2 text-witness"></i>
+                            Transisthesis Archetypes
+                        </h3>
+                        <div class="grid grid-cols-1 gap-3">
+                            <!-- @MAP: TRANSISTHESIS_ARCHETYPES.map(archetype => ( -->
+                            <!-- The Seeker -->
+                            <div class="p-4 border-2 border-seeker/20 bg-seeker/5 rounded-xl hover:border-seeker/40 transition-all cursor-pointer group" data-archetype="seeker">
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-10 h-10 bg-seeker/10 rounded-lg flex items-center justify-center group-hover:bg-seeker/20 transition-colors">
+                                        <i data-lucide="search" class="w-5 h-5 text-seeker"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-semibold text-seeker">The Seeker</h4>
+                                            <div class="w-4 h-4 border-2 border-seeker rounded group-hover:bg-seeker group-hover:border-seeker transition-colors" data-mock="true"></div>
+                                        </div>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Curiosity, Expansion, Inquiry</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-500 mt-2 italic">"I ask. I explore. I seek what lies just beyond the known."</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- The Steward -->
+                            <div class="p-4 border-2 border-steward/20 bg-steward/5 rounded-xl hover:border-steward/40 transition-all cursor-pointer group" data-archetype="steward">
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-10 h-10 bg-steward/10 rounded-lg flex items-center justify-center group-hover:bg-steward/20 transition-colors">
+                                        <i data-lucide="shield" class="w-5 h-5 text-steward"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-semibold text-steward">The Steward</h4>
+                                            <div class="w-4 h-4 border-2 border-steward rounded bg-steward transition-colors" data-mock="true"></div>
+                                        </div>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Responsibility, Protection, Structure</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-500 mt-2 italic">"I uphold the pattern. I protect what should not break."</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- The Witness -->
+                            <div class="p-4 border-2 border-witness/20 bg-witness/5 rounded-xl hover:border-witness/40 transition-all cursor-pointer group" data-archetype="witness">
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-10 h-10 bg-witness/10 rounded-lg flex items-center justify-center group-hover:bg-witness/20 transition-colors">
+                                        <i data-lucide="eye" class="w-5 h-5 text-witness"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-semibold text-witness">The Witness</h4>
+                                            <div class="w-4 h-4 border-2 border-witness rounded bg-witness transition-colors" data-mock="true"></div>
+                                        </div>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Observation, Pattern Detection, Neutrality</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-500 mt-2 italic">"I watch. I connect across time. I speak without urgency."</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- The Nurturer -->
+                            <div class="p-4 border-2 border-nurturer/20 bg-nurturer/5 rounded-xl hover:border-nurturer/40 transition-all cursor-pointer group" data-archetype="nurturer">
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-10 h-10 bg-nurturer/10 rounded-lg flex items-center justify-center group-hover:bg-nurturer/20 transition-colors">
+                                        <i data-lucide="heart" class="w-5 h-5 text-nurturer"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-semibold text-nurturer">The Nurturer</h4>
+                                            <div class="w-4 h-4 border-2 border-nurturer rounded group-hover:bg-nurturer group-hover:border-nurturer transition-colors" data-mock="true"></div>
+                                        </div>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Emotional Repair, Compassion, Integration</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-500 mt-2 italic">"I soften. I restore. I return warmth to what has faded."</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- The Decider -->
+                            <div class="p-4 border-2 border-decider/20 bg-decider/5 rounded-xl hover:border-decider/40 transition-all cursor-pointer group" data-archetype="decider">
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-10 h-10 bg-decider/10 rounded-lg flex items-center justify-center group-hover:bg-decider/20 transition-colors">
+                                        <i data-lucide="target" class="w-5 h-5 text-decider"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-semibold text-decider">The Decider</h4>
+                                            <div class="w-4 h-4 border-2 border-decider rounded group-hover:bg-decider group-hover:border-decider transition-colors" data-mock="true"></div>
+                                        </div>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Finality, Action, Threshold</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-500 mt-2 italic">"I act. I choose. I burn the rope where it binds."</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+
+                    <!-- Enhanced Coding Voices -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i data-lucide="code" class="w-5 h-5 mr-2 text-architect"></i>
+                            Enhanced Coding Voices
+                        </h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- @MAP: ENHANCED_CODING_VOICES.map(voice => ( -->
+                            <!-- The Architect -->
+                            <div class="p-3 border border-architect/20 bg-architect/5 rounded-lg hover:border-architect/40 transition-all cursor-pointer group" data-voice="architect">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <div class="w-8 h-8 bg-architect/10 rounded-md flex items-center justify-center">
+                                        <i data-lucide="layout-grid" class="w-4 h-4 text-architect"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h5 class="font-medium text-architect text-sm">The Architect</h5>
+                                        <p class="text-xs text-gray-500">System Design</p>
+                                    </div>
+                                    <div class="w-3 h-3 border border-architect rounded-sm bg-architect" data-mock="true"></div>
+                                </div>
+                                <p class="text-xs text-gray-600 dark:text-gray-400">Scalable Architecture & Design Patterns</p>
+                            </div>
+
+                            <!-- The Optimizer -->
+                            <div class="p-3 border border-optimizer/20 bg-optimizer/5 rounded-lg hover:border-optimizer/40 transition-all cursor-pointer group" data-voice="optimizer">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <div class="w-8 h-8 bg-optimizer/10 rounded-md flex items-center justify-center">
+                                        <i data-lucide="zap" class="w-4 h-4 text-optimizer"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h5 class="font-medium text-optimizer text-sm">The Optimizer</h5>
+                                        <p class="text-xs text-gray-500">Performance</p>
+                                    </div>
+                                    <div class="w-3 h-3 border border-optimizer rounded-sm group-hover:bg-optimizer transition-colors" data-mock="true"></div>
+                                </div>
+                                <p class="text-xs text-gray-600 dark:text-gray-400">Performance & Efficiency Excellence</p>
+                            </div>
+
+                            <!-- The Guardian -->
+                            <div class="p-3 border border-guardian/20 bg-guardian/5 rounded-lg hover:border-guardian/40 transition-all cursor-pointer group" data-voice="guardian">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <div class="w-8 h-8 bg-guardian/10 rounded-md flex items-center justify-center">
+                                        <i data-lucide="shield-check" class="w-4 h-4 text-guardian"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h5 class="font-medium text-guardian text-sm">The Guardian</h5>
+                                        <p class="text-xs text-gray-500">Security</p>
+                                    </div>
+                                    <div class="w-3 h-3 border border-guardian rounded-sm bg-guardian transition-colors" data-mock="true"></div>
+                                </div>
+                                <p class="text-xs text-gray-600 dark:text-gray-400">Security & Reliability Fortress</p>
+                            </div>
+
+                            <!-- The Designer -->
+                            <div class="p-3 border border-designer/20 bg-designer/5 rounded-lg hover:border-designer/40 transition-all cursor-pointer group" data-voice="designer">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <div class="w-8 h-8 bg-designer/10 rounded-md flex items-center justify-center">
+                                        <i data-lucide="palette" class="w-4 h-4 text-designer"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h5 class="font-medium text-designer text-sm">The Designer</h5>
+                                        <p class="text-xs text-gray-500">Experience</p>
+                                    </div>
+                                    <div class="w-3 h-3 border border-designer rounded-sm group-hover:bg-designer transition-colors" data-mock="true"></div>
+                                </div>
+                                <p class="text-xs text-gray-600 dark:text-gray-400">User Experience & Delight</p>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: VoiceSelector -->
+
+                <!-- Right Panel: Prompt Engine -->
+                <!-- @COMPONENT: PromptEngine [coding prompt input and configuration] -->
+                <div class="w-1/2 p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i data-lucide="terminal" class="w-5 h-5 mr-2 text-gray-600 dark:text-gray-400"></i>
+                        Prompt Engine
+                    </h3>
+
+                    <!-- Quick Prompts -->
+                    <div class="mb-6">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Quick Prompts</h4>
+                        <div class="grid grid-cols-1 gap-2">
+                            <!-- @MAP: ADAPTIVE_PROMPTS.slice(0, 4).map(prompt => ( -->
+                            <button class="text-left p-3 text-sm bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors" data-mock="true">
+                                Create a React component for a modern dashboard with real-time updates
+                            </button>
+                            <button class="text-left p-3 text-sm bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors" data-mock="true">
+                                Build a TypeScript utility for handling async operations with proper error boundaries
+                            </button>
+                            <button class="text-left p-3 text-sm bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors" data-mock="true">
+                                Design a responsive layout system with Tailwind CSS and dark mode support
+                            </button>
+                            <button class="text-left p-3 text-sm bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors" data-mock="true">
+                                Implement a state management solution with React Query and Zustand
+                            </button>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+
+                    <!-- Custom Prompt Input -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Custom Coding Request
+                        </label>
+                        <textarea 
+                            class="w-full h-32 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                            placeholder="Describe your coding challenge or request..."
+                            data-bind="promptText"
+                            data-mock="true"
+                        >Create a custom React hook for managing form state with validation and error handling</textarea>
+                    </div>
+
+                    <!-- Generation Settings -->
+                    <div class="mb-6">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Generation Settings</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm text-gray-600 dark:text-gray-400">Recursion Depth</label>
+                                <select class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700" data-bind="recursionDepth">
+                                    <option value="1">1 Layer</option>
+                                    <option value="2" selected>2 Layers</option>
+                                    <option value="3">3 Layers</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm text-gray-600 dark:text-gray-400">Synthesis Mode</label>
+                                <select class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700" data-bind="synthesisMode">
+                                    <option value="consensus">Consensus</option>
+                                    <option value="competitive" selected>Competitive</option>
+                                    <option value="collaborative">Collaborative</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm text-gray-600 dark:text-gray-400">Ethical Filtering</label>
+                                <button class="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-600 transition-colors" data-state="enabled" data-implementation="Toggle ethical filtering">
+                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition translate-x-6"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] flex items-center justify-center space-x-2" data-event="click:generateSolutions">
+                        <i data-lucide="play" class="w-4 h-4"></i>
+                        <span>Generate Multi-Voice Solutions</span>
+                    </button>
+
+                    <!-- Active Voice Summary -->
+                    <div class="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Active Voice Configuration</h4>
+                        <div class="space-y-1 text-xs">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 bg-steward rounded-full"></div>
+                                <span class="text-steward">The Steward</span>
+                                <span class="text-gray-500">+ The Guardian</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 bg-witness rounded-full"></div>
+                                <span class="text-witness">The Witness</span>
+                                <span class="text-gray-500">+ The Architect</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 bg-nurturer rounded-full"></div>
+                                <span class="text-nurturer">The Nurturer</span>
+                                <span class="text-gray-500">+ The Designer</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: PromptEngine -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: Solution Stack -->
+    <!-- @COMPONENT: SolutionStack [displays multiple AI-generated solutions] -->
+    <div id="solutionModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div>
+                        <h3 class="text-xl font-semibold">Solution Stack</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Multi-voice code generation results</p>
+                    </div>
+                    <button onclick="closeSolutionModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Solutions Grid -->
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- @MAP: solutions.map(solution => ( -->
+                        <!-- Solution: The Steward + Guardian -->
+                        <div class="border border-steward/20 rounded-lg overflow-hidden">
+                            <div class="bg-steward/10 p-4 border-b border-steward/20">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="flex -space-x-1">
+                                            <div class="w-8 h-8 bg-steward rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                                                <i data-lucide="shield" class="w-4 h-4 text-white"></i>
+                                            </div>
+                                            <div class="w-8 h-8 bg-guardian rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                                                <i data-lucide="shield-check" class="w-4 h-4 text-white"></i>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-semibold text-steward">Steward + Guardian</h4>
+                                            <p class="text-xs text-gray-600 dark:text-gray-400">Security-First Approach</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs px-2 py-1 bg-steward/20 text-steward rounded-full">94% Confidence</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <div class="mb-4">
+                                    <h5 class="text-sm font-medium mb-2">Generated Code</h5>
+                                    <div class="bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-100 overflow-x-auto">
+                                        <div class="text-green-400">// Security-focused form validation hook</div>
+                                        <div class="text-blue-400">import</div> <span class="text-yellow-400">{ useState, useCallback }</span> <div class="text-blue-400">from</div> <span class="text-green-300">'react'</span>;
+                                        <div class="text-blue-400">import</div> <span class="text-yellow-400">{ z }</span> <div class="text-blue-400">from</div> <span class="text-green-300">'zod'</span>;
+                                        
+                                        <div class="mt-2 text-blue-400">export</div> <div class="text-blue-400">function</div> <span class="text-yellow-400">useSecureForm</span>() {
+                                        <div class="ml-2 text-gray-300">// Implementation with input sanitization...</div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 text-xs">
+                                    <div>
+                                        <h6 class="font-medium text-gray-700 dark:text-gray-300 mb-1">Strengths</h6>
+                                        <ul class="space-y-1 text-gray-600 dark:text-gray-400">
+                                            <li>• Input sanitization</li>
+                                            <li>• XSS protection</li>
+                                            <li>• Type safety</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-medium text-gray-700 dark:text-gray-300 mb-1">Considerations</h6>
+                                        <ul class="space-y-1 text-gray-600 dark:text-gray-400">
+                                            <li>• More complex setup</li>
+                                            <li>• Performance overhead</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Solution: The Seeker + Optimizer -->
+                        <div class="border border-seeker/20 rounded-lg overflow-hidden">
+                            <div class="bg-seeker/10 p-4 border-b border-seeker/20">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="flex -space-x-1">
+                                            <div class="w-8 h-8 bg-seeker rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                                                <i data-lucide="search" class="w-4 h-4 text-white"></i>
+                                            </div>
+                                            <div class="w-8 h-8 bg-optimizer rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                                                <i data-lucide="zap" class="w-4 h-4 text-white"></i>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-semibold text-seeker">Seeker + Optimizer</h4>
+                                            <p class="text-xs text-gray-600 dark:text-gray-400">Performance-Optimized Approach</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs px-2 py-1 bg-seeker/20 text-seeker rounded-full">89% Confidence</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <div class="mb-4">
+                                    <h5 class="text-sm font-medium mb-2">Generated Code</h5>
+                                    <div class="bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-100 overflow-x-auto">
+                                        <div class="text-green-400">// High-performance form hook with debouncing</div>
+                                        <div class="text-blue-400">import</div> <span class="text-yellow-400">{ useCallback, useMemo }</span> <div class="text-blue-400">from</div> <span class="text-green-300">'react'</span>;
+                                        <div class="text-blue-400">import</div> <span class="text-yellow-400">{ debounce }</span> <div class="text-blue-400">from</div> <span class="text-green-300">'lodash'</span>;
+                                        
+                                        <div class="mt-2 text-blue-400">export</div> <div class="text-blue-400">function</div> <span class="text-yellow-400">useOptimizedForm</span>() {
+                                        <div class="ml-2 text-gray-300">// Memoized validation logic...</div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 text-xs">
+                                    <div>
+                                        <h6 class="font-medium text-gray-700 dark:text-gray-300 mb-1">Strengths</h6>
+                                        <ul class="space-y-1 text-gray-600 dark:text-gray-400">
+                                            <li>• Optimized renders</li>
+                                            <li>• Debounced validation</li>
+                                            <li>• Memory efficient</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-medium text-gray-700 dark:text-gray-300 mb-1">Considerations</h6>
+                                        <ul class="space-y-1 text-gray-600 dark:text-gray-400">
+                                            <li>• Complex optimization</li>
+                                            <li>• Debugging difficulty</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- @END_MAP )) -->
+                    </div>
+
+                    <!-- Synthesis Actions -->
+                    <div class="mt-8 flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                            Ready to synthesize solutions into final implementation?
+                        </div>
+                        <button class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg transition-all flex items-center space-x-2" onclick="openSynthesisPanel()">
+                            <i data-lucide="layers-3" class="w-4 h-4"></i>
+                            <span>Synthesize Solutions</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: SolutionStack -->
+
+    <!-- Modal: Synthesis Panel -->
+    <!-- @COMPONENT: SynthesisPanel [recursive solution synthesis interface] -->
+    <div id="synthesisModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div>
+                        <h3 class="text-xl font-semibold">Synthesis Panel</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Recursive solution integration and refinement</p>
+                    </div>
+                    <button onclick="closeSynthesisModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                    <!-- Synthesis Process -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4">Recursive Synthesis Process</h4>
+                        <div class="space-y-4">
+                            <!-- @MAP: synthesisSteps.map((step, index) => ( -->
+                            <div class="flex items-start space-x-4">
+                                <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                                    1
+                                </div>
+                                <div class="flex-1">
+                                    <h5 class="font-medium text-purple-700 dark:text-purple-300">Voice Convergence Analysis</h5>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Identifying common patterns and complementary approaches across selected voices...</p>
+                                    <div class="mt-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                                        <div class="flex items-center space-x-2 text-sm text-green-700 dark:text-green-300">
+                                            <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                            <span>Convergence detected: Security + Performance optimization patterns</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start space-x-4">
+                                <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                                    2
+                                </div>
+                                <div class="flex-1">
+                                    <h5 class="font-medium text-purple-700 dark:text-purple-300">Recursive Integration</h5>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Merging architectural patterns while maintaining voice-specific insights...</p>
+                                    <div class="mt-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                        <div class="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
+                                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+                                            <span>Processing layer 2 recursion...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start space-x-4 opacity-50">
+                                <div class="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                                    3
+                                </div>
+                                <div class="flex-1">
+                                    <h5 class="font-medium text-gray-500 dark:text-gray-400">Ethical Validation</h5>
+                                    <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">Soul-Weigher analysis for ethical compliance and considerations...</p>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+
+                    <!-- Synthesized Solution Preview -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4">Synthesized Solution</h4>
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                            <div class="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 border-b border-gray-200 dark:border-gray-700">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h5 class="font-semibold">Unified Form Management Hook</h5>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Security-conscious, performance-optimized, user-friendly implementation</p>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">96% Confidence</span>
+                                        <span class="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">Ethical ✓</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <div class="bg-gray-900 rounded-lg p-4 text-sm font-mono text-gray-100 overflow-x-auto">
+                                    <div class="text-green-400">// Synthesized form hook combining all voice insights</div>
+                                    <div class="text-blue-400">import</div> <span class="text-yellow-400">{ useState, useCallback, useMemo }</span> <div class="text-blue-400">from</div> <span class="text-green-300">'react'</span>;
+                                    <div class="text-blue-400">import</div> <span class="text-yellow-400">{ z }</span> <div class="text-blue-400">from</div> <span class="text-green-300">'zod'</span>;
+                                    <div class="text-blue-400">import</div> <span class="text-yellow-400">{ debounce }</span> <div class="text-blue-400">from</div> <span class="text-green-300">'lodash'</span>;
+                                    
+                                    <div class="mt-4 text-blue-400">export</div> <div class="text-blue-400">function</div> <span class="text-yellow-400">useUnifiedForm</span><span class="text-gray-300">&lt;</span><span class="text-yellow-400">T</span><span class="text-gray-300">&gt;</span>(schema: z.ZodSchema<span class="text-gray-300">&lt;</span><span class="text-yellow-400">T</span><span class="text-gray-300">&gt;</span>) {
+                                    <div class="ml-2 text-green-400">// Security: Input sanitization layer</div>
+                                    <div class="ml-2 text-green-400">// Performance: Memoized validation</div>
+                                    <div class="ml-2 text-green-400">// UX: Accessible error messages</div>
+                                    <div class="ml-2 text-gray-300">...</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Synthesis Metrics -->
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">2</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Recursion Layers</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-green-600 dark:text-green-400">5</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Voices Harmonized</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">98%</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Synthesis Quality</div>
+                        </div>
+                    </div>
+
+                    <!-- Export Options -->
+                    <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                            Export synthesized solution to your development environment
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                Copy Code
+                            </button>
+                            <button class="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all">
+                                Save to Project
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: SynthesisPanel -->
+
+    <!-- Modal: Phantom Ledger -->
+    <!-- @COMPONENT: LedgerLog [ethical decision tracking and analysis] -->
+    <div id="ledgerModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div>
+                        <h3 class="text-xl font-semibold">Phantom Ledger</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Ethical decision tracking and voice convergence analysis</p>
+                    </div>
+                    <button onclick="closeLedgerModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                    <!-- Recent Entries -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4">Recent Entries</h4>
+                        <div class="space-y-4">
+                            <!-- @MAP: ledgerEntries.map(entry => ( -->
+                            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                                            <i data-lucide="book-open" class="w-5 h-5 text-white"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="font-medium">Form Hook Generation Session</h5>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400" data-bind="entry.timestamp">Today, 2:34 PM</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">Ethical: 96%</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                    <div>
+                                        <h6 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Voices Engaged</h6>
+                                        <div class="flex flex-wrap gap-1">
+                                            <span class="text-xs px-2 py-1 bg-steward/20 text-steward rounded-full">Steward</span>
+                                            <span class="text-xs px-2 py-1 bg-witness/20 text-witness rounded-full">Witness</span>
+                                            <span class="text-xs px-2 py-1 bg-nurturer/20 text-nurturer rounded-full">Nurturer</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h6 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decision Outcome</h6>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400">Synthesized solution prioritizing security, performance, and accessibility</p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h6 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Key Learnings</h6>
+                                    <ul class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                                        <li>• Security considerations enhanced by Guardian voice integration</li>
+                                        <li>• Performance optimizations from Optimizer voice proved valuable</li>
+                                        <li>• Accessibility patterns from Designer voice improved usability</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
+                                            <i data-lucide="layers" class="w-5 h-5 text-white"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="font-medium">Dashboard Component Architecture</h5>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400" data-bind="entry.timestamp">Yesterday, 4:12 PM</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">Ethical: 94%</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                    <div>
+                                        <h6 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Voices Engaged</h6>
+                                        <div class="flex flex-wrap gap-1">
+                                            <span class="text-xs px-2 py-1 bg-seeker/20 text-seeker rounded-full">Seeker</span>
+                                            <span class="text-xs px-2 py-1 bg-architect/20 text-architect rounded-full">Architect</span>
+                                            <span class="text-xs px-2 py-1 bg-designer/20 text-designer rounded-full">Designer</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h6 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decision Outcome</h6>
+                                        <p class="text-xs text-gray-600 dark:text-gray-400">Modular dashboard with real-time data visualization and responsive design</p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h6 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Key Learnings</h6>
+                                    <ul class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                                        <li>• Architectural patterns emphasized modularity and scalability</li>
+                                        <li>• Design voice ensured intuitive user interactions</li>
+                                        <li>• Seeker voice explored innovative visualization techniques</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+
+                    <!-- Analytics Summary -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">24</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Total Sessions</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-green-600 dark:text-green-400">95%</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Avg Ethical Score</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">3.2</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Avg Voices/Session</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">12</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Learning Insights</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: LedgerLog -->
+
+    <script>
+        // Initialize Lucide icons
+        (function() {
+            lucide.createIcons();
+        })();
+
+        // Theme toggle functionality
+        function toggleTheme() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            lucide.createIcons(); // Reinitialize icons after theme change
+        }
+
+        // Modal controls
+        function openSolutionModal() {
+            document.getElementById('solutionModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSolutionModal() {
+            document.getElementById('solutionModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        function openSynthesisPanel() {
+            closeSolutionModal();
+            document.getElementById('synthesisModal').classList.remove('hidden');
+        }
+
+        function closeSynthesisModal() {
+            document.getElementById('synthesisModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        function openLedgerModal() {
+            document.getElementById('ledgerModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLedgerModal() {
+            document.getElementById('ledgerModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // Voice selection handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            // TODO: Implement voice selection state management
+            // TODO: Wire up archetype and coding voice selection
+            // TODO: Implement prompt generation and AI integration
+            // TODO: Add solution comparison and synthesis logic
+            // TODO: Connect to phantom ledger tracking system
+
+            // Mock interaction: Generate solutions button
+            const generateButton = document.querySelector('[data-event="click:generateSolutions"]');
+            if (generateButton) {
+                generateButton.addEventListener('click', function() {
+                    // TODO: Implement actual solution generation
+                    console.log('Generating multi-voice solutions...');
+                    setTimeout(() => {
+                        openSolutionModal();
+                    }, 1000);
+                });
+            }
+
+            // Mock interaction: Navigation
+            document.querySelector('a[href="#"]').addEventListener('click', function(e) {
+                e.preventDefault();
+                // TODO: Implement navigation state management
+            });
+
+            // Mock interaction: Quick prompts
+            document.querySelectorAll('button[data-mock="true"]').forEach(button => {
+                button.addEventListener('click', function() {
+                    const textarea = document.querySelector('textarea[data-bind="promptText"]');
+                    if (textarea) {
+                        textarea.value = this.textContent.trim();
+                    }
+                });
+            });
+        });
+
+        // IIFE for scoped functionality
+        (function() {
+            // TODO: Implement useCodeGeneration hook equivalent
+            // TODO: Add state management for voice selections
+            // TODO: Implement recursive synthesis algorithms
+            // TODO: Add phantom ledger persistence
+            console.log('CodeCrucible initialized successfully');
+        })();
+    </script>
+</body>
+</html>

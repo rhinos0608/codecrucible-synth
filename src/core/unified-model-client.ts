@@ -59,8 +59,6 @@ export class UnifiedModelClient {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
-
-    logger.info(chalk.bold.cyan('🚀 Initializing GPT-OSS-20B Embedded Model System...'));
     
     // Initialize Hugging Face client
     try {

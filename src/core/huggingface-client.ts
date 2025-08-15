@@ -97,6 +97,7 @@ export class HuggingFaceClient {
    */
   private async installTransformers(): Promise<void> {
     logger.info('📦 Installing transformers and dependencies...');
+    logger.info('This may take a few minutes on first run...');
     
     const packages = [
       'transformers',
@@ -108,12 +109,31 @@ export class HuggingFaceClient {
     ];
     
     try {
-      await execAsync(`pip install -U ${packages.join(' ')}`, {
-        env: { ...process.env, PIP_QUIET: '1' }
+      // Check if pip is available
+      try {
+        await execAsync('pip --version');
+      } catch {
+        logger.error('pip is not installed. Please install Python and pip first.');
+        logger.info('Visit: https://www.python.org/downloads/');
+        return;
+      }
+      
+      // Actually run the installation with visible output
+      const command = `pip install ${packages.join(' ')}`;
+      logger.info(`Running: ${command}`);
+      
+      const { stdout, stderr } = await execAsync(command, {
+        timeout: 300000, // 5 minute timeout for installation
+        maxBuffer: 10 * 1024 * 1024 // 10MB buffer
       });
+      
+      if (stdout) logger.debug('Install output:', stdout);
+      if (stderr && !stderr.includes('WARNING')) logger.warn('Install warnings:', stderr);
+      
       logger.info('✅ Transformers installed successfully');
     } catch (error) {
       logger.error('Failed to install transformers:', error);
+      logger.info('You can manually install with: pip install transformers torch');
       throw error;
     }
   }

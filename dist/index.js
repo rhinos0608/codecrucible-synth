@@ -9,7 +9,6 @@ import { CodeCrucibleCLI } from './core/cli.js';
 import { logger } from './core/logger.js';
 import { EnhancedAgenticClient } from './core/enhanced-agentic-client.js';
 import { ClaudeCodeClient } from './core/claude-code-client.js';
-import { AutonomousClaudeClient } from './core/autonomous-claude-client.js';
 import chalk from 'chalk';
 const program = new Command();
 /**
@@ -26,7 +25,6 @@ async function initializeApplication() {
         // Load configuration (creates default if none exists)
         const config = await ConfigManager.load();
         // Initialize unified model client with embedded GPT-OSS-20B
-        console.log(chalk.bold.cyan('🚀 Initializing GPT-OSS-20B Embedded System...'));
         const unifiedClient = new UnifiedModelClient({
             primaryModel: 'gpt-oss-20b',
             huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY,
@@ -268,30 +266,18 @@ process.on('SIGINT', () => {
 });
 // Parse arguments and run
 program.parse();
-// If no command provided, start autonomous mode
+// If no command provided, start simple two-mode client
 if (!process.argv.slice(2).length) {
     (async () => {
         try {
+            const { SimpleTwoModeClient } = await import('./core/simple-two-mode.js');
             const context = await initializeApplication();
-            // Quick, silent model check
-            const isReady = await context.modelClient.checkConnection();
-            if (!isReady) {
-                // Silently try to set up
-                const { EnhancedModelManager } = await import('./core/enhanced-model-manager.js');
-                const modelManager = new EnhancedModelManager(context.config.model.endpoint);
-                const result = await modelManager.autoSetup(false); // Silent setup
-                if (!result.success) {
-                    console.log('Model not available. Run: cc model --setup');
-                    process.exit(1);
-                }
-            }
-            // Start the clean, autonomous client
-            const autonomousClient = new AutonomousClaudeClient(context);
-            await autonomousClient.start();
+            // Start the simple two-mode client (write/ask modes)
+            const client = new SimpleTwoModeClient(context);
+            await client.start();
         }
         catch (error) {
             console.error('Failed to start:', error instanceof Error ? error.message : 'Unknown error');
-            console.log('Try: cc model --setup');
             process.exit(1);
         }
     })();

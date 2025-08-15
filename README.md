@@ -414,6 +414,35 @@ cc "Create a multi-stage Dockerfile for a Node.js application"
 cc voice architect "Design a GitHub Actions workflow for automated testing and deployment"
 ```
 
+## 🔧 Available Tools and Services
+
+CodeCrucible provides access to various external tools and services through MCP (Model Context Protocol) integrations:
+
+### Core Analysis Tools
+
+- **File Analysis Tools**: Built-in code analysis, linting, and AST parsing
+- **Git Integration**: Version control operations and change analysis  
+- **Project Structure Analysis**: Codebase organization and dependency mapping
+
+### External Service Integrations
+
+- **Exa Search Tool**: Advanced web search capabilities for research and documentation lookup
+  - Purpose: Search the web for relevant programming resources, documentation, and examples
+  - Usage: Automatically used when you need external information or research
+  - Example: `cc "How to implement OAuth 2.0 in Node.js"` (will search for current best practices)
+
+- **Hugging Face Integration**: AI model recommendations and suggestions
+  - Purpose: Discover and suggest AI models suitable for specific tasks
+  - Usage: When working on ML/AI projects, suggests appropriate models from Hugging Face Hub
+  - Example: `cc "I need a text classification model"` (will recommend suitable models)
+
+- **Documentation Search (Ref Tools)**: Search programming documentation and guides
+  - Purpose: Find relevant documentation for libraries, frameworks, and programming concepts
+  - Usage: Automatically searches documentation when you need technical references
+  - Example: `cc "How to use React hooks properly"` (searches React documentation)
+
+**Important Note**: These tools are research and recommendation aids, not code refactoring tools. For code refactoring, use the built-in `cc file refactor` command which provides actual code transformation.
+
 ## 🧪 Advanced Features
 
 ### Custom Voice Presets

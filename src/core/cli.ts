@@ -231,7 +231,33 @@ export class CodeCrucibleCLI {
           prompt = `Analyze this ${language} file and provide insights on code quality, potential issues, and improvements.`;
           break;
         case 'refactor':
-          prompt = `Refactor this ${language} code to improve readability, maintainability, and performance while preserving functionality.`;
+          prompt = `You are a senior software engineer specializing in code refactoring. Your task is to refactor the following ${language} code to improve:
+
+1. **Readability** - Make the code clearer and more self-documenting
+2. **Maintainability** - Reduce complexity and improve modularity  
+3. **Performance** - Optimize for better efficiency where applicable
+4. **Best Practices** - Apply modern ${language} patterns and conventions
+
+**CRITICAL REQUIREMENTS:**
+- Preserve ALL existing functionality and behavior
+- Maintain the same public API/interface
+- Add explanatory comments for significant changes
+- Use modern ${language} features and patterns
+- Follow established naming conventions
+- Ensure type safety (if applicable)
+
+**Original Code to Refactor:**
+\`\`\`${language}
+${fileContent}
+\`\`\`
+
+**Instructions:**
+1. Analyze the code structure and identify refactoring opportunities
+2. Provide the complete refactored code with improvements
+3. Explain the key changes made and why they improve the code
+4. Ensure the refactored code is production-ready
+
+Respond with the refactored code in a code block, followed by a detailed explanation of changes.`;
           break;
         case 'explain':
           prompt = `Explain what this ${language} code does, including its purpose, key components, and how it works.`;
@@ -253,7 +279,14 @@ export class CodeCrucibleCLI {
       };
 
       const voices = this.parseVoices(options.voices);
-      await this.handleGeneration(prompt, { ...options, voices: Array.isArray(voices) ? voices.join(',') : voices });
+      
+      // Use specialized voices for refactoring operations
+      let selectedVoices = voices;
+      if (operation === 'refactor' && (!options.voices || options.voices === 'auto')) {
+        selectedVoices = ['refactoring-specialist', 'maintainer']; // Best voices for refactoring
+      }
+      
+      await this.handleGeneration(prompt, { ...options, voices: Array.isArray(selectedVoices) ? selectedVoices.join(',') : selectedVoices });
 
     } catch (error) {
       logger.error('File operation failed:', error);
@@ -284,7 +317,38 @@ export class CodeCrucibleCLI {
           prompt = 'Analyze this project structure and provide insights on architecture, code quality, and potential improvements.';
           break;
         case 'refactor':
-          prompt = 'Suggest refactoring opportunities across this project to improve maintainability and performance.';
+          prompt = `You are a senior software architect conducting a project-wide refactoring analysis. Based on the provided codebase files, identify and prioritize refactoring opportunities.
+
+**Analysis Framework:**
+
+1. **Architecture Assessment**
+   - Evaluate overall code organization and structure
+   - Identify architectural patterns and anti-patterns
+   - Assess modularity and separation of concerns
+
+2. **Code Quality Issues**
+   - Find code duplication and opportunities for abstraction
+   - Identify overly complex functions/classes that need simplification
+   - Spot inconsistent naming conventions and coding styles
+
+3. **Performance Optimization**
+   - Identify performance bottlenecks and inefficiencies
+   - Suggest optimization opportunities
+   - Recommend better data structures or algorithms
+
+4. **Maintainability Improvements**
+   - Find tightly coupled components that need decoupling
+   - Identify missing error handling and edge case management
+   - Suggest improvements for testability
+
+**Required Output:**
+1. **Executive Summary** - Top 3-5 critical refactoring priorities
+2. **Detailed Analysis** - Specific files and code sections to refactor
+3. **Implementation Plan** - Step-by-step refactoring roadmap
+4. **Risk Assessment** - Potential impacts and mitigation strategies
+5. **Code Examples** - Before/after snippets for key improvements
+
+Focus on actionable, specific recommendations with clear business value.`;
           break;
         case 'test':
           prompt = 'Analyze the project and suggest a comprehensive testing strategy with example test cases.';
@@ -298,11 +362,18 @@ export class CodeCrucibleCLI {
       }
 
       const voices = this.parseVoices(options.voices);
-      console.log(chalk.cyan(`Analyzing ${files.length} files with voices: ${Array.isArray(voices) ? voices.join(', ') : voices}`));
+      
+      // Use specialized voices for refactoring operations
+      let selectedVoices = voices;
+      if (operation === 'refactor' && (!options.voices || options.voices === 'auto')) {
+        selectedVoices = ['refactoring-specialist', 'architect', 'maintainer']; // Best voices for project refactoring
+      }
+      
+      console.log(chalk.cyan(`Analyzing ${files.length} files with voices: ${Array.isArray(selectedVoices) ? selectedVoices.join(', ') : selectedVoices}`));
 
       const responses = await this.context.voiceSystem.generateMultiVoiceSolutions(
         prompt,
-        voices,
+        selectedVoices,
         projectContext
       );
 

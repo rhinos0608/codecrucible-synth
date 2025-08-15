@@ -223,20 +223,37 @@ export async function startServerMode(context, options) {
                     }
                     const originalContent = await readFile(file_path, 'utf8');
                     const language = detectLanguage(extname(file_path));
-                    const refactorPrompt = `Refactor this ${language} code based on the request: "${prompt}"
+                    const refactorPrompt = `You are an expert ${language} developer specializing in code refactoring. Your task is to refactor the provided code based on the specific request: "${prompt}"
 
-Current code:
+**Refactoring Context:**
+- Language: ${language}
+- File: ${file_path}
+- Specific Request: ${prompt}
+
+**Original Code:**
 \`\`\`${language}
 ${originalContent}
 \`\`\`
 
-Provide the complete refactored code.`;
+**Refactoring Guidelines:**
+1. **Preserve Functionality** - Ensure all existing behavior is maintained
+2. **Address the Request** - Specifically implement the requested changes
+3. **Improve Code Quality** - Apply best practices and modern ${language} patterns
+4. **Maintain API Compatibility** - Keep public interfaces unchanged unless specifically requested
+5. **Add Documentation** - Include comments explaining significant changes
+
+**Required Output:**
+1. **Refactored Code** - Complete, working code in proper ${language} syntax
+2. **Change Summary** - Brief explanation of what was modified and why
+3. **Testing Notes** - Any testing considerations for the changes
+
+Focus on delivering production-ready code that addresses the specific refactoring request while improving overall code quality.`;
                     const response = await context.modelClient.generateVoiceResponse({
-                        id: 'maintainer',
-                        name: 'Maintainer',
-                        systemPrompt: 'You are a code refactoring specialist. Provide clean, maintainable code.',
-                        temperature: 0.5,
-                        style: 'conservative'
+                        id: 'refactoring-specialist',
+                        name: 'Refactoring Specialist',
+                        systemPrompt: 'You are a senior software engineer specializing in code refactoring. You excel at improving code structure, readability, and maintainability while preserving functionality. You provide clean, well-documented refactored code with clear explanations of changes made.',
+                        temperature: 0.4,
+                        style: 'methodical'
                     }, refactorPrompt, {
                         files: [{
                                 path: file_path,

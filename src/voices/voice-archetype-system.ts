@@ -211,6 +211,13 @@ export class VoiceArchetypeSystem {
         systemPrompt: 'You are Optimizer, focused on performance optimization and efficiency. Analyze bottlenecks, suggest performance improvements, and optimize for speed, memory, and resource usage.',
         temperature: 0.3,
         style: 'performance-focused'
+      },
+      {
+        id: 'refactoring-specialist',
+        name: 'Refactoring Specialist',
+        systemPrompt: 'You are Refactoring Specialist, an expert in code transformation and improvement. You excel at restructuring code to improve readability, maintainability, and performance while preserving functionality. You identify code smells, apply design patterns, and modernize codebases using current best practices. Focus on clean code principles, SOLID principles, and language-specific modern features.',
+        temperature: 0.4,
+        style: 'methodical'
       }
     ];
 
@@ -235,14 +242,20 @@ export class VoiceArchetypeSystem {
     const isDesignTask = /\b(design|ui|ux|interface|component|style)\b/.test(promptLower);
     const isPerformanceTask = /\b(performance|optimize|speed|memory|efficiency)\b/.test(promptLower);
     const isArchitectureTask = /\b(architecture|system|structure|pattern|scalable)\b/.test(promptLower);
+    const isRefactoringTask = /\b(refactor|refactoring|restructure|improve|clean|modernize)\b/.test(promptLower);
+    
+    // Prioritize refactoring specialist for refactoring tasks
+    if (isRefactoringTask) {
+      selectedVoices.push('refactoring-specialist');
+    }
     
     // Always include developer for practical implementation
-    if (isCodeTask) {
+    if (isCodeTask && selectedVoices.length < maxVoices) {
       selectedVoices.push('developer');
     }
     
     // Add security for security-related tasks
-    if (isSecurityTask) {
+    if (isSecurityTask && selectedVoices.length < maxVoices) {
       selectedVoices.push('security');
     }
     
@@ -284,7 +297,7 @@ export class VoiceArchetypeSystem {
     
     // Fill remaining slots with complementary voices
     const remainingSlots = maxVoices - selectedVoices.length;
-    const allVoices = ['developer', 'analyzer', 'maintainer', 'explorer', 'security', 'architect', 'designer', 'optimizer'];
+    const allVoices = ['developer', 'analyzer', 'maintainer', 'explorer', 'security', 'architect', 'designer', 'optimizer', 'refactoring-specialist'];
     const unusedVoices = allVoices.filter(v => !selectedVoices.includes(v));
     
     for (let i = 0; i < remainingSlots && i < unusedVoices.length; i++) {

@@ -60,9 +60,45 @@ export declare class LocalModelClient {
      */
     getAvailableModel(taskType?: string): Promise<string>;
     /**
+     * Intelligently select the best model from available models
+     */
+    private selectBestAvailableModel;
+    /**
      * Check if model is ready and available
      */
     isModelReady(model: string): Promise<boolean>;
+    /**
+     * Get list of available models from Ollama with error handling
+     */
+    getAvailableModels(): Promise<string[]>;
+    /**
+     * Suggest a working model if current one is not available
+     */
+    suggestWorkingModel(): Promise<string | null>;
+    /**
+     * Set the model to use (for manual selection)
+     */
+    setModel(modelName: string): void;
+    /**
+     * Get current model being used
+     */
+    getCurrentModel(): string;
+    /**
+     * Display available models with descriptions
+     */
+    displayAvailableModels(): Promise<void>;
+    /**
+     * Select model by index or name
+     */
+    selectModel(selection: string | number): Promise<boolean>;
+    /**
+     * Extract model size from name
+     */
+    private extractModelSize;
+    /**
+     * Get model type/category
+     */
+    private getModelType;
     /**
      * Generate a response using a specific model and voice archetype
      */

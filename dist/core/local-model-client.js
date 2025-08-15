@@ -100,25 +100,65 @@ export class LocalModelClient {
             return this.config.model;
         }
         try {
-            // Reduced timeout for optimization wait - prioritize speed
-            let waitCount = 0;
-            while (!this.isOptimized && waitCount < 3) {
-                await new Promise(resolve => setTimeout(resolve, 50));
-                waitCount++;
-            }
-            // Skip intelligent model selection in favor of speed - use cached or configured model
+            // Use cached model if available
             if (this._cachedBestModel) {
                 return this._cachedBestModel;
             }
-            // Quick fallback to configured model to avoid timeouts
-            logger.info('Using configured model for speed:', this.config.model);
-            this._cachedBestModel = this.config.model;
-            return this.config.model;
+            // Get all available models from Ollama
+            const availableModels = await this.getAvailableModels();
+            if (availableModels.length === 0) {
+                logger.warn('No models found on system, using configured model');
+                return this.config.model;
+            }
+            // Check if configured model is available
+            const configModelAvailable = availableModels.some(m => m === this.config.model || m.includes(this.config.model.split(':')[0]));
+            if (configModelAvailable) {
+                const exactMatch = availableModels.find(m => m === this.config.model) ||
+                    availableModels.find(m => m.includes(this.config.model.split(':')[0]));
+                this._cachedBestModel = exactMatch;
+                logger.info('Using configured model (found on system):', exactMatch);
+                return exactMatch;
+            }
+            // Auto-select best available model from system
+            const bestModel = await this.selectBestAvailableModel(availableModels, taskType);
+            this._cachedBestModel = bestModel;
+            logger.info(`Auto-selected model from system: ${bestModel} (configured: ${this.config.model})`);
+            return bestModel;
         }
         catch (error) {
             logger.warn('Model selection failed, using configured model:', this.config.model);
             return this.config.model;
         }
+    }
+    /**
+     * Intelligently select the best model from available models
+     */
+    async selectBestAvailableModel(availableModels, taskType = 'general') {
+        // Model preferences based on task type
+        const taskPreferences = {
+            'coding': ['codellama', 'deepseek-coder', 'codegemma', 'llama3', 'qwen2.5', 'gemma'],
+            'analysis': ['qwen2.5', 'llama3', 'gemma2', 'mistral', 'phi3'],
+            'general': ['llama3.2', 'gemma', 'qwen2.5', 'phi3', 'mistral'],
+            'debugging': ['codellama', 'deepseek-coder', 'llama3', 'qwen2.5']
+        };
+        const preferences = taskPreferences[taskType] || taskPreferences['general'];
+        // Try to find preferred models for task type
+        for (const preferred of preferences) {
+            const match = availableModels.find(model => model.toLowerCase().includes(preferred.toLowerCase()));
+            if (match) {
+                return match;
+            }
+        }
+        // Fallback: prioritize smaller, faster models
+        const sizePreferences = ['1b', '2b', '3b', '7b', '8b', '13b', '34b', '70b'];
+        for (const size of sizePreferences) {
+            const match = availableModels.find(model => model.includes(size));
+            if (match) {
+                return match;
+            }
+        }
+        // Ultimate fallback: first available model
+        return availableModels[0];
     }
     /**
      * Check if model is ready and available
@@ -131,6 +171,126 @@ export class LocalModelClient {
             logger.warn(`Model readiness check failed for ${model}:`, error);
             return false;
         }
+    }
+    /**
+     * Get list of available models from Ollama with error handling
+     */
+    async getAvailableModels() {
+        try {
+            const quickCheck = axios.create({
+                baseURL: this.config.endpoint,
+                timeout: 3000
+            });
+            const response = await quickCheck.get('/api/tags');
+            const models = response.data.models || [];
+            return models.map((m) => m.name || m.model || '').filter(Boolean);
+        }
+        catch (error) {
+            logger.warn('Failed to get available models:', error);
+            return [];
+        }
+    }
+    /**
+     * Suggest a working model if current one is not available
+     */
+    async suggestWorkingModel() {
+        const availableModels = await this.getAvailableModels();
+        if (availableModels.length === 0) {
+            return null;
+        }
+        return this.selectBestAvailableModel(availableModels, 'general');
+    }
+    /**
+     * Set the model to use (for manual selection)
+     */
+    setModel(modelName) {
+        this.config.model = modelName;
+        this._cachedBestModel = modelName;
+        logger.info('Model manually set to:', modelName);
+    }
+    /**
+     * Get current model being used
+     */
+    getCurrentModel() {
+        return this._cachedBestModel || this.config.model;
+    }
+    /**
+     * Display available models with descriptions
+     */
+    async displayAvailableModels() {
+        const models = await this.getAvailableModels();
+        if (models.length === 0) {
+            console.log(chalk.red('❌ No models found on system'));
+            console.log(chalk.yellow('💡 Install a model with: ollama pull gemma:2b'));
+            return;
+        }
+        console.log(chalk.green(`\n📋 Available Models (${models.length} found):\n`));
+        models.forEach((model, index) => {
+            const size = this.extractModelSize(model);
+            const type = this.getModelType(model);
+            const current = this.getCurrentModel() === model;
+            const prefix = current ? chalk.green('→') : ' ';
+            const modelDisplay = current ? chalk.green.bold(model) : chalk.cyan(model);
+            console.log(`${prefix} ${index + 1}. ${modelDisplay}`);
+            console.log(`    Type: ${type} | Size: ${size}`);
+        });
+        console.log(chalk.yellow(`\n💡 Current model: ${this.getCurrentModel()}`));
+        console.log(chalk.gray('   Use "/model <number>" to switch models'));
+    }
+    /**
+     * Select model by index or name
+     */
+    async selectModel(selection) {
+        const models = await this.getAvailableModels();
+        if (models.length === 0) {
+            return false;
+        }
+        let selectedModel;
+        if (typeof selection === 'number') {
+            if (selection < 1 || selection > models.length) {
+                return false;
+            }
+            selectedModel = models[selection - 1];
+        }
+        else {
+            // Try exact match first
+            selectedModel = models.find(m => m === selection) ||
+                models.find(m => m.includes(selection)) ||
+                models.find(m => selection.includes(m.split(':')[0])) || '';
+            if (!selectedModel) {
+                return false;
+            }
+        }
+        this.setModel(selectedModel);
+        console.log(chalk.green(`✅ Model changed to: ${selectedModel}`));
+        return true;
+    }
+    /**
+     * Extract model size from name
+     */
+    extractModelSize(modelName) {
+        const sizeMatches = modelName.match(/(\d+\.?\d*[bmkBMK])/i);
+        return sizeMatches ? sizeMatches[0] : 'Unknown';
+    }
+    /**
+     * Get model type/category
+     */
+    getModelType(modelName) {
+        const name = modelName.toLowerCase();
+        if (name.includes('codellama') || name.includes('codegemma') || name.includes('deepseek-coder')) {
+            return 'Coding';
+        }
+        if (name.includes('llama'))
+            return 'General';
+        if (name.includes('gemma'))
+            return 'Efficient';
+        if (name.includes('qwen'))
+            return 'Multilingual';
+        if (name.includes('phi'))
+            return 'Reasoning';
+        if (name.includes('mistral'))
+            return 'Instruction';
+        return 'General';
     }
     /**
      * Generate a response using a specific model and voice archetype
@@ -305,8 +465,8 @@ export class LocalModelClient {
         }
         const taskType = this.analyzeTaskType(prompt);
         const startTime = Date.now();
+        let model = await this.getAvailableModel(taskType);
         try {
-            const model = await this.getAvailableModel(taskType);
             logger.info(`Generating streamlined response with model: ${model}`);
             const requestBody = this.config.endpoint.includes('11434')
                 ? this.buildOllamaRequest(prompt, { temperature: this.config.temperature }, model)
@@ -318,11 +478,34 @@ export class LocalModelClient {
             return this.parseResponse(response.data);
         }
         catch (error) {
-            // Fast fail for connection issues
+            // Handle specific error types with helpful guidance
             const isTimeout = error instanceof Error &&
                 (error.message.includes('timeout') || error.message.includes('ECONNREFUSED'));
+            const is404 = error instanceof Error &&
+                (error.message.includes('status code 404') || error.message.includes('404'));
+            const is500 = error instanceof Error &&
+                error.message.includes('status code 500');
             if (isTimeout) {
                 throw new Error('Ollama connection timeout. Try:\n1. Start Ollama: ollama serve\n2. Check if models are downloaded: ollama list\n3. Pull a model: ollama pull gemma:2b');
+            }
+            if (is404) {
+                // Try to suggest an available model
+                const suggestedModel = await this.suggestWorkingModel();
+                const availableModels = await this.getAvailableModels();
+                let errorMsg = `Model '${model}' not found. Try:\n1. Pull the model: ollama pull ${model}`;
+                if (availableModels.length > 0) {
+                    errorMsg += `\n2. Available models: ${availableModels.join(', ')}`;
+                    if (suggestedModel) {
+                        errorMsg += `\n3. Try using: ${suggestedModel}`;
+                    }
+                }
+                else {
+                    errorMsg += `\n2. No models found. Install one: ollama pull gemma:2b`;
+                }
+                throw new Error(errorMsg);
+            }
+            if (is500) {
+                throw new Error(`Ollama server error. The model '${model}' may be corrupted or incompatible.\nTry:\n1. Restart Ollama: Stop and run 'ollama serve'\n2. Re-pull the model: ollama pull ${model}\n3. Use a smaller model: ollama pull gemma:2b`);
             }
             logger.error('Generation failed:', error);
             throw new Error(`Failed to generate response: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -726,16 +909,27 @@ Instructions:
         console.log('   curl http://localhost:11434    # Test if Ollama is running\n');
         console.log(chalk.blue('2. Start Ollama (if not running):'));
         console.log('   ollama serve                   # Start Ollama service\n');
-        console.log(chalk.blue('3. Install Fast Models:'));
-        console.log('   ollama pull gemma:2b           # Fastest model (2GB)');
-        console.log('   ollama pull llama3.2:3b        # Good balance (3GB)');
-        console.log('   ollama pull qwen2.5:7b         # More capable (7GB)\n');
-        console.log(chalk.blue('4. Performance Tips:'));
-        console.log('   - Use smaller models (gemma:2b) for speed');
+        console.log(chalk.blue('3. Install Fast Models (Recommended):'));
+        console.log('   ollama pull gemma:2b           # Fastest model (2GB) - Best for testing');
+        console.log('   ollama pull llama3.2:1b        # Ultra-fast (1GB) - Very quick responses');
+        console.log('   ollama pull llama3.2:3b        # Good balance (3GB) - Quality + speed');
+        console.log('   ollama pull qwen2.5:7b         # More capable (7GB) - Better quality\n');
+        console.log(chalk.blue('4. Fix Model Errors:'));
+        console.log('   For "Model not found" (404 errors):');
+        console.log('   - Check config model name matches installed models');
+        console.log('   - Update config to use available model name');
+        console.log('   - Example: "gpt-oss:20b" → "gemma:2b"\n');
+        console.log(chalk.blue('5. Performance Tips:'));
+        console.log('   - Use smaller models (1b-3b parameters) for speed');
         console.log('   - Ensure sufficient RAM (8GB+ recommended)');
-        console.log('   - Close other heavy applications\n');
-        console.log(chalk.green('5. Alternative: Use OpenAI-compatible API:'));
+        console.log('   - Close other heavy applications');
+        console.log('   - Consider GPU acceleration if available\n');
+        console.log(chalk.green('6. Alternative: Use OpenAI-compatible API:'));
         console.log('   Set endpoint to OpenAI-compatible service (port 8080)\n');
+        console.log(chalk.red('Common Issues:'));
+        console.log('   • 404 errors → Model not installed or wrong name');
+        console.log('   • Timeout → Model too large for available resources');
+        console.log('   • 500 errors → Model corrupted, try re-pulling');
     }
 }
 //# sourceMappingURL=local-model-client.js.map

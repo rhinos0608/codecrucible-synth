@@ -37,6 +37,7 @@ export declare class CodeCrucibleCLI {
     private displayResults;
     private handleFileOutput;
     private handleInteractiveAction;
+    private handleModelSelection;
     private parseValue;
 }
 export {};

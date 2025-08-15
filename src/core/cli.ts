@@ -275,6 +275,7 @@ export class CodeCrucibleCLI {
               { name: '📁 Analyze file', value: 'file' },
               { name: '🏗️  Project operation', value: 'project' },
               { name: '🎭 Single voice consultation', value: 'voice' },
+              { name: '🤖 Select AI model', value: 'model' },
               { name: '⚙️  Configure settings', value: 'config' },
               { name: '🚪 Exit', value: 'exit' }
             ]
@@ -714,6 +715,67 @@ export class CodeCrucibleCLI {
           await this.handleVoiceSpecific(voice, voicePrompt);
         }
         break;
+
+      case 'model':
+        await this.handleModelSelection();
+        break;
+    }
+  }
+
+  private async handleModelSelection(): Promise<void> {
+    try {
+      // Show current model and available models
+      await this.context.modelClient.displayAvailableModels();
+      
+      const { modelAction } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'modelAction',
+          message: 'What would you like to do?',
+          choices: [
+            { name: '📋 Just show current model info', value: 'info' },
+            { name: '🔄 Switch to different model', value: 'switch' },
+            { name: '↩️  Go back', value: 'back' }
+          ]
+        }
+      ]);
+      
+      if (modelAction === 'switch') {
+        const availableModels = await this.context.modelClient.getAvailableModels();
+        
+        if (availableModels.length === 0) {
+          console.log(chalk.red('❌ No models found. Please install a model first:'));
+          console.log(chalk.yellow('   ollama pull gemma:2b'));
+          return;
+        }
+        
+        const modelChoices = availableModels.map((model, index) => ({
+          name: `${index + 1}. ${model}`,
+          value: index + 1
+        }));
+        
+        const { selectedModel } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'selectedModel',
+            message: 'Select a model:',
+            choices: [...modelChoices, { name: '↩️  Cancel', value: 'cancel' }]
+          }
+        ]);
+        
+        if (selectedModel !== 'cancel') {
+          const success = await this.context.modelClient.selectModel(selectedModel);
+          if (!success) {
+            console.log(chalk.red('❌ Failed to select model'));
+          }
+        }
+      } else if (modelAction === 'info') {
+        const currentModel = this.context.modelClient.getCurrentModel();
+        console.log(chalk.green(`\n📍 Current model: ${currentModel}`));
+      }
+      
+    } catch (error) {
+      console.error(chalk.red('❌ Model selection error:'), error instanceof Error ? error.message : error);
     }
   }
 

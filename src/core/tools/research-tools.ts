@@ -19,7 +19,20 @@ export class ResearchTool extends BaseTool {
 
   async execute(params: { query: string; type: 'error' | 'pattern' | 'documentation' | 'general'; includeCode?: boolean }): Promise<any> {
     try {
-      const { query, type, includeCode = true } = params;
+      // Validate parameters exist and are correct types
+      if (!params || typeof params !== 'object') {
+        throw new Error('Invalid parameters: expected object with query and type');
+      }
+      
+      if (!params.query || typeof params.query !== 'string') {
+        throw new Error('Invalid query parameter: expected non-empty string');
+      }
+      
+      if (!params.type || !['error', 'pattern', 'documentation', 'general'].includes(params.type)) {
+        throw new Error('Invalid type parameter: must be one of error, pattern, documentation, general');
+      }
+      
+      const { query, type = 'general', includeCode = true } = params;
       
       logger.info(`🔍 Researching: ${query} (type: ${type})`);
       
@@ -177,6 +190,15 @@ export class WebSearchTool extends BaseTool {
 
   async execute(params: { query: string; domain?: string }): Promise<any> {
     try {
+      // Validate parameters
+      if (!params || typeof params !== 'object') {
+        throw new Error('Invalid parameters: expected object with query');
+      }
+      
+      if (!params.query || typeof params.query !== 'string') {
+        throw new Error('Invalid query parameter: expected non-empty string');
+      }
+      
       const { query, domain } = params;
       
       logger.info(`🌐 Web search: ${query}${domain ? ` on ${domain}` : ''}`);
@@ -226,6 +248,15 @@ export class DocSearchTool extends BaseTool {
 
   async execute(params: { query: string; language?: string }): Promise<any> {
     try {
+      // Validate parameters
+      if (!params || typeof params !== 'object') {
+        throw new Error('Invalid parameters: expected object with query');
+      }
+      
+      if (!params.query || typeof params.query !== 'string') {
+        throw new Error('Invalid query parameter: expected non-empty string');
+      }
+      
       const { query, language } = params;
       
       logger.info(`📚 Documentation search: ${query}${language ? ` for ${language}` : ''}`);

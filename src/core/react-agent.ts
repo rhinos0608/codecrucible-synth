@@ -675,41 +675,11 @@ FINAL ANSWER EXAMPLE:
       if (typeof response === 'object' && response !== null) {
         parsed = response;
       } else {
-        // Attempt to find and parse JSON within the response string
-        const jsonStartIndex = response.indexOf('{');
-        const jsonEndIndex = response.lastIndexOf('}');
-
-        if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
-          const jsonString = response.substring(jsonStartIndex, jsonEndIndex + 1);
-          try {
-            parsed = JSON.parse(jsonString);
-          } catch (jsonParseError) {
-            logger.warn('Failed to parse extracted JSON string:', jsonParseError);
-            // Fallback to original regex if direct extraction fails
-            const jsonMatch = response.match(/\{[\s\S]*?\}(?=\s*$|\s*\w+:)/);
-            if (!jsonMatch) {
-              const altMatch = response.match(/\{[^\{\}]*(?:\{[^\{\}]*\}[^\{\}]*)*\}/);
-              if (!altMatch) {
-                throw new Error('No valid JSON found in response after multiple attempts');
-              }
-              parsed = JSON.parse(altMatch[0]);
-            } else {
-              parsed = JSON.parse(jsonMatch[0]);
-            }
-          }
-        } else {
-          // If no curly braces found, try original regex as a last resort
-          const jsonMatch = response.match(/\{[\s\S]*?\}(?=\s*$|\s*\w+:)/);
-          if (!jsonMatch) {
-            const altMatch = response.match(/\{[^\{\}]*(?:\{[^\{\}]*\}[^\{\}]*)*\}/);
-            if (!altMatch) {
-              throw new Error('No valid JSON found in response');
-            }
-            parsed = JSON.parse(altMatch[0]);
-          } else {
-            parsed = JSON.parse(jsonMatch[0]);
-          }
-        }
+        // Clean the response before parsing
+        const cleanedResponse = this.cleanJsonResponse(response);
+        
+        // Try multiple extraction strategies
+        parsed = this.tryMultipleParsingStrategies(cleanedResponse);
       }
       
       // Handle missing thought field by extracting from text before JSON
@@ -740,6 +710,166 @@ FINAL ANSWER EXAMPLE:
         throw new Error(`Failed to parse response: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
+  }
+
+  /**
+   * Clean JSON response to remove problematic characters and formatting
+   */
+  private cleanJsonResponse(response: string): string {
+    // Remove BOM and other invisible characters
+    let cleaned = response.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '');
+    
+    // Remove common prefixes that models sometimes add
+    cleaned = cleaned.replace(/^(Here's|Here is|Response:|JSON:|Output:)\s*/i, '');
+    
+    // Remove trailing text after valid JSON
+    const jsonStart = cleaned.indexOf('{');
+    if (jsonStart !== -1) {
+      // Find the matching closing brace
+      let braceCount = 0;
+      let jsonEnd = -1;
+      
+      for (let i = jsonStart; i < cleaned.length; i++) {
+        if (cleaned[i] === '{') braceCount++;
+        if (cleaned[i] === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            jsonEnd = i;
+            break;
+          }
+        }
+      }
+      
+      if (jsonEnd !== -1) {
+        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      }
+    }
+    
+    return cleaned.trim();
+  }
+
+  /**
+   * Try multiple parsing strategies in order of preference
+   */
+  private tryMultipleParsingStrategies(response: string): any {
+    const strategies = [
+      () => this.tryDirectParse(response),
+      () => this.tryBraceExtraction(response),
+      () => this.tryRegexExtraction(response),
+      () => this.tryBalancedExtraction(response),
+      () => this.tryPatternMatching(response)
+    ];
+
+    for (let i = 0; i < strategies.length; i++) {
+      try {
+        const result = strategies[i]();
+        if (result && result.tool && result.toolInput) {
+          logger.debug(`JSON parsing successful with strategy ${i + 1}`);
+          return result;
+        }
+      } catch (error) {
+        logger.debug(`Parsing strategy ${i + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
+        continue;
+      }
+    }
+    
+    throw new Error('All parsing strategies failed');
+  }
+
+  /**
+   * Strategy 1: Direct JSON parsing
+   */
+  private tryDirectParse(response: string): any {
+    return JSON.parse(response);
+  }
+
+  /**
+   * Strategy 2: Extract content between first and last braces
+   */
+  private tryBraceExtraction(response: string): any {
+    const jsonStartIndex = response.indexOf('{');
+    const jsonEndIndex = response.lastIndexOf('}');
+
+    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+      const jsonString = response.substring(jsonStartIndex, jsonEndIndex + 1);
+      return JSON.parse(jsonString);
+    }
+    
+    throw new Error('No braces found');
+  }
+
+  /**
+   * Strategy 3: Regex-based extraction
+   */
+  private tryRegexExtraction(response: string): any {
+    const jsonMatch = response.match(/\{[\s\S]*?\}(?=\s*$|\s*\w+:|$)/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    throw new Error('No regex match found');
+  }
+
+  /**
+   * Strategy 4: Balanced brace extraction
+   */
+  private tryBalancedExtraction(response: string): any {
+    const jsonStart = response.indexOf('{');
+    if (jsonStart === -1) throw new Error('No opening brace found');
+    
+    let braceCount = 0;
+    let jsonEnd = -1;
+    let inString = false;
+    let escaped = false;
+    
+    for (let i = jsonStart; i < response.length; i++) {
+      const char = response[i];
+      
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      
+      if (char === '\\' && inString) {
+        escaped = true;
+        continue;
+      }
+      
+      if (char === '"' && !escaped) {
+        inString = !inString;
+        continue;
+      }
+      
+      if (!inString) {
+        if (char === '{') braceCount++;
+        if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            jsonEnd = i;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (jsonEnd !== -1) {
+      const jsonString = response.substring(jsonStart, jsonEnd + 1);
+      return JSON.parse(jsonString);
+    }
+    
+    throw new Error('No balanced braces found');
+  }
+
+  /**
+   * Strategy 5: Pattern matching fallback
+   */
+  private tryPatternMatching(response: string): any {
+    const altMatch = response.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+    if (altMatch) {
+      return JSON.parse(altMatch[0]);
+    }
+    
+    throw new Error('No pattern match found');
   }
 
   private fallbackParse(response: string): Thought {
@@ -1229,9 +1359,34 @@ Provide a direct, helpful response without using any tools.`;
         if (!toolInput.path || typeof toolInput.path !== 'string' || toolInput.path.trim() === '') {
           return { isValid: false, error: 'path parameter is required and must be a non-empty string' };
         }
-        // Check for common bad paths
-        if (toolInput.path.includes('src/main.ts')) {
-          return { isValid: false, error: 'src/main.ts file does not exist in this project. Use listFiles to explore actual project structure first.' };
+        // Check for common bad paths that don't exist in this project
+        if (toolInput.path.includes('src/main.ts') || toolInput.path.includes('main.ts')) {
+          return { isValid: false, error: 'main.ts file does not exist in this project. Use listFiles to explore actual project structure first.' };
+        }
+        // Additional common non-existent paths
+        if (toolInput.path.includes('src/index.ts') && !toolInput.path.includes('dist')) {
+          return { isValid: false, error: 'src/index.ts may not exist. Check with listFiles first.' };
+        }
+        break;
+      
+      case 'research':
+        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
+          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
+        }
+        if (toolInput.type && !['error', 'pattern', 'documentation', 'general'].includes(toolInput.type)) {
+          return { isValid: false, error: 'type parameter must be one of: error, pattern, documentation, general' };
+        }
+        break;
+      
+      case 'webSearch':
+        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
+          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
+        }
+        break;
+      
+      case 'docSearch':
+        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
+          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
         }
         break;
       

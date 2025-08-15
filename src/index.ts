@@ -2,6 +2,7 @@
 
 import { Command } from 'commander';
 import { LocalModelClient } from './core/local-model-client.js';
+import { UnifiedModelClient } from './core/unified-model-client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { ConfigManager } from './config/config-manager.js';
@@ -30,26 +31,45 @@ async function initializeApplication(): Promise<CLIContext> {
     // Load configuration (creates default if none exists)
     const config = await ConfigManager.load();
     
-    // Initialize local model client with auto-discovery
-    const modelClient = new LocalModelClient({
-      endpoint: config.model.endpoint,
-      model: config.model.name,
+    // Initialize unified model client with embedded GPT-OSS-20B
+    console.log(chalk.bold.cyan('🚀 Initializing GPT-OSS-20B Embedded System...'));
+    const unifiedClient = new UnifiedModelClient({
+      primaryModel: 'gpt-oss-20b',
+      huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY,
+      ollamaEndpoint: config.model.endpoint,
+      fallbackToOllama: true,
       timeout: config.model.timeout,
       maxTokens: config.model.maxTokens,
       temperature: config.model.temperature
     });
 
-    // Check model availability on startup
-    const isModelReady = await modelClient.checkConnection();
-    if (!isModelReady) {
-      console.log(chalk.yellow('⚠️  Local AI model not detected'));
-      console.log(chalk.gray('   To get started:'));
-      console.log(chalk.gray('   1. Install Ollama: https://ollama.ai'));
-      console.log(chalk.gray('   2. Run: ollama pull gpt-oss:20b'));
-      console.log(chalk.gray('   3. Start: ollama serve'));
-      console.log(chalk.gray('   4. Or use: cc model --install'));
-      console.log();
-    }
+    // Initialize and setup GPT-OSS-20B
+    await unifiedClient.initialize();
+    
+    // For backward compatibility, also create LocalModelClient
+    const modelClient = new LocalModelClient({
+      endpoint: config.model.endpoint,
+      model: 'gpt-oss:20b', // Force GPT-OSS-20B
+      timeout: config.model.timeout,
+      maxTokens: config.model.maxTokens,
+      temperature: config.model.temperature
+    });
+
+    // Override modelClient methods to use unified client
+    modelClient.generate = unifiedClient.generate.bind(unifiedClient);
+    // Fix the generateVoiceResponse signature
+    modelClient.generateVoiceResponse = async (voice: any, prompt: string, context: any, retryCount?: number) => {
+      return await unifiedClient.generateVoiceResponse(prompt, voice, context);
+    };
+    modelClient.checkConnection = unifiedClient.checkOllamaConnection.bind(unifiedClient);
+    modelClient.getAvailableModels = unifiedClient.getAvailableModels.bind(unifiedClient);
+    modelClient.getCurrentModel = unifiedClient.getCurrentModel.bind(unifiedClient);
+    modelClient.displayAvailableModels = unifiedClient.displayAvailableModels.bind(unifiedClient);
+    // Fix selectModel to return boolean
+    modelClient.selectModel = async (selection: string | number) => {
+      await unifiedClient.selectModel();
+      return true;
+    };
 
     // Initialize voice system
     const voiceSystem = new VoiceArchetypeSystem(modelClient, config);

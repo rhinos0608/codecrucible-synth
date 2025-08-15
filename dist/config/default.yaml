@@ -1,0 +1,84 @@
+# CodeCrucible Terminal Default Configuration
+# Local offline AI coding assistant with gpt-oss-20b
+
+model:
+  endpoint: "http://localhost:11434"  # Ollama default endpoint
+  name: "qwq:32b-preview-q4_K_M"     # Use first available model
+  timeout: 300000                     # 5 minutes for large models
+  maxTokens: 4096
+  temperature: 0.7
+
+voices:
+  default: ["explorer", "maintainer"]
+  available: ["explorer", "maintainer", "analyzer", "developer", "implementor", "security", "architect", "designer", "optimizer"]
+  parallel: true
+  maxConcurrent: 3
+
+safety:
+  commandValidation: true
+  fileSystemRestrictions: true
+  requireConsent: ["delete", "execute"]
+  
+terminal:
+  shell: "auto"                       # auto-detect or specify: bash, zsh, cmd, powershell
+  prompt: "CC> "
+  historySize: 1000
+  colorOutput: true
+  
+vscode:
+  autoActivate: true
+  inlineGeneration: true
+  showVoicePanel: true
+
+# MCP Server Configuration
+mcp:
+  servers:
+    filesystem:
+      enabled: true
+      restrictedPaths: ["/etc", "/sys", "/proc"]
+      allowedPaths: ["~/", "./"]
+    
+    git:
+      enabled: true
+      autoCommitMessages: false
+      safeModeEnabled: true
+    
+    terminal:
+      enabled: true
+      allowedCommands: ["ls", "cat", "grep", "find", "git", "npm", "node", "python"]
+      blockedCommands: ["rm -rf", "sudo", "su", "chmod +x"]
+    
+    packageManager:
+      enabled: true
+      autoInstall: false
+      securityScan: true
+  
+  # Smithery AI Configuration (optional)
+  smithery:
+    enabled: false
+    apiKey: ""
+    profile: ""
+    baseUrl: "https://server.smithery.ai"
+
+# Performance Settings
+performance:
+  responseCache:
+    enabled: true
+    maxAge: 3600000                   # 1 hour in milliseconds
+    maxSize: 100                      # 100MB
+  
+  voiceParallelism:
+    maxConcurrent: 3
+    batchSize: 2
+  
+  contextManagement:
+    maxContextLength: 100000          # tokens
+    compressionThreshold: 80000       # tokens
+    retentionStrategy: "sliding"      # sliding, summary, hierarchical
+
+# Logging Configuration
+logging:
+  level: "info"                       # debug, info, warn, error
+  toFile: true
+  maxFileSize: "10MB"
+  maxFiles: 5

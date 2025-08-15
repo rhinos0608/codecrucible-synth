@@ -2,13 +2,21 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { join, relative, isAbsolute } from 'path';
-import * as ts from 'typescript';
-
 // Function to dynamically import eslint
 async function tryImportESLint(): Promise<any> {
   try {
     const eslintModule = await import('eslint');
     return eslintModule.ESLint;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Function to dynamically import typescript
+async function tryImportTypeScript(): Promise<any> {
+  try {
+    const tsModule = await import('typescript');
+    return tsModule;
   } catch (error) {
     return null;
   }
@@ -102,6 +110,9 @@ const GetAstSchema = z.object({
 });
 
 export class GetAstTool extends BaseTool {
+  private ts: any;
+  private tsAvailable: boolean;
+
   constructor(private agentContext: { workingDirectory: string }) {
     super({
       name: 'getAst',
@@ -109,14 +120,43 @@ export class GetAstTool extends BaseTool {
       category: 'Code Analysis',
       parameters: GetAstSchema,
     });
+    
+    this.tsAvailable = false;
+    this.ts = null;
+    
+    // Initialize typescript asynchronously
+    this.initializeTypeScript();
+  }
+  
+  private async initializeTypeScript(): Promise<void> {
+    const ts = await tryImportTypeScript();
+    if (ts) {
+      this.tsAvailable = true;
+      this.ts = ts;
+    }
   }
 
   async execute(args: z.infer<typeof GetAstSchema>): Promise<any> {
     if (!args.path) {
       throw new Error('Path parameter is required for getAst tool');
     }
+    
+    if (!this.tsAvailable) {
+      return {
+        error: 'TypeScript not available in this environment. Install typescript package for AST functionality.',
+        fileName: args.path,
+        kind: 'NotAvailable',
+        text: 'TypeScript compiler not available',
+        statements: [],
+        childCount: 0,
+        fullStart: 0,
+        start: 0,
+        end: 0
+      };
+    }
+    
     const fullPath = this.resolvePath(args.path);
-    const program = ts.createProgram([fullPath], { allowJs: true });
+    const program = this.ts.createProgram([fullPath], { allowJs: true });
     const sourceFile = program.getSourceFile(fullPath);
     if (!sourceFile) {
       throw new Error(`Could not find source file: ${fullPath}`);
@@ -125,10 +165,10 @@ export class GetAstTool extends BaseTool {
     // Convert AST to serializable format
     const astSummary = {
       fileName: sourceFile.fileName,
-      kind: ts.SyntaxKind[sourceFile.kind],
+      kind: this.ts.SyntaxKind[sourceFile.kind],
       text: sourceFile.text.slice(0, 500) + (sourceFile.text.length > 500 ? '...' : ''),
-      statements: sourceFile.statements.map(stmt => ({
-        kind: ts.SyntaxKind[stmt.kind],
+      statements: sourceFile.statements.map((stmt: any) => ({
+        kind: this.ts.SyntaxKind[stmt.kind],
         start: stmt.getStart(),
         end: stmt.getEnd()
       })).slice(0, 10), // Limit to first 10 statements

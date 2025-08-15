@@ -1,0 +1,58 @@
+
+> rest-express@1.0.0 build
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+vite v5.4.19 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 9 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 4136 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/public/index.html                     0.63 kB │ gzip:   0.39 kB
+../dist/public/assets/index-BFyCq1WB.css    114.36 kB │ gzip:  18.57 kB
+../dist/public/assets/index-BUG95zNv.js   2,812.99 kB │ gzip: 754.69 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 28.99s
+▲ [WARNING] The CommonJS "module" variable is treated as a global variable in an ECMAScript module and may not work as expected [commonjs-variable-in-esm]
+
+    server/extension-api/gateway.js:422:0:
+      422 │ module.exports = {
+          ╵ ~~~~~~
+
+  This file is considered to be an ECMAScript module because the enclosing "package.json" file sets the type of this file to "module":
+
+    package.json:4:10:
+      4 │   "type": "module",
+        ╵           ~~~~~~~~
+
+  Node's package format requires that CommonJS files in a "type": "module" package use the ".cjs" file extension.
+
+▲ [WARNING] Import "ExtensionApiGateway" will always be undefined because the file "server/extension-api/gateway.js" has no exports [import-is-undefined]
+
+    server/extension-api/routes.ts:6:9:
+      6 │ import { ExtensionApiGateway, authenticateExtension, extensionRateL...
+        ╵          ~~~~~~~~~~~~~~~~~~~
+
+▲ [WARNING] Import "authenticateExtension" will always be undefined because the file "server/extension-api/gateway.js" has no exports [import-is-undefined]
+
+    server/extension-api/routes.ts:6:30:
+      6 │ ... ExtensionApiGateway, authenticateExtension, extensionRateLimit ...
+        ╵                          ~~~~~~~~~~~~~~~~~~~~~
+
+▲ [WARNING] Import "extensionRateLimit" will always be undefined because the file "server/extension-api/gateway.js" has no exports [import-is-undefined]
+
+    server/extension-api/routes.ts:6:53:
+      6 │ ...y, authenticateExtension, extensionRateLimit } from './gateway.js';
+        ╵                              ~~~~~~~~~~~~~~~~~~
+
+4 warnings
+
+  dist/index.js  367.8kb
+
+⚡ Done in 75ms

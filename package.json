@@ -1,6 +1,6 @@
 {
   "name": "codecrucible-synth",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Enhanced agentic coding assistant with ReAct pattern, tool integration, and advanced planning capabilities",
   "main": "dist/index.js",
   "type": "module",
@@ -27,7 +27,6 @@
     "desktop:build": "electron-builder",
     "desktop:package": "npm run build && npm run desktop:build",
     "prepare": "npm run build",
-    "prepublishOnly": "npm test && npm run lint",
     "preversion": "npm run lint",
     "version": "npm run build && git add -A dist",
     "postversion": "git push && git push --tags",

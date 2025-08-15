@@ -1,16 +1,26 @@
 
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
-import { ESLint } from 'eslint';
 import { join, relative, isAbsolute } from 'path';
 import * as ts from 'typescript';
+
+// Function to dynamically import eslint
+async function tryImportESLint(): Promise<any> {
+  try {
+    const eslintModule = await import('eslint');
+    return eslintModule.ESLint;
+  } catch (error) {
+    return null;
+  }
+}
 
 const LintCodeSchema = z.object({
   path: z.string().describe('The path to the file to lint.'),
 });
 
 export class LintCodeTool extends BaseTool {
-  private eslint: ESLint;
+  private eslint: any;
+  private eslintAvailable: boolean;
 
   constructor(private agentContext: { workingDirectory: string }) {
     super({
@@ -19,13 +29,46 @@ export class LintCodeTool extends BaseTool {
       category: 'Code Analysis',
       parameters: LintCodeSchema,
     });
-    this.eslint = new ESLint({ cwd: this.agentContext.workingDirectory });
+    
+    this.eslintAvailable = false;
+    this.eslint = null;
+    
+    // Initialize eslint asynchronously
+    this.initializeESLint();
+  }
+  
+  private async initializeESLint(): Promise<void> {
+    const ESLint = await tryImportESLint();
+    if (ESLint) {
+      this.eslintAvailable = true;
+      this.eslint = new ESLint({ cwd: this.agentContext.workingDirectory });
+    }
   }
 
-  async execute(args: z.infer<typeof LintCodeSchema>): Promise<ESLint.LintResult[]> {
+  async execute(args: z.infer<typeof LintCodeSchema>): Promise<any[]> {
     if (!args.path) {
       throw new Error('Path parameter is required for lintCode tool');
     }
+    
+    if (!this.eslintAvailable) {
+      return [{
+        filePath: args.path,
+        messages: [{
+          ruleId: null,
+          severity: 1,
+          message: 'ESLint not available in this environment. Install eslint package for linting functionality.',
+          line: 1,
+          column: 1
+        }],
+        errorCount: 0,
+        warningCount: 1,
+        fixableErrorCount: 0,
+        fixableWarningCount: 0,
+        source: '',
+        usedDeprecatedRules: []
+      }];
+    }
+    
     const fullPath = this.resolvePath(args.path);
     return await this.eslint.lintFiles([fullPath]);
   }

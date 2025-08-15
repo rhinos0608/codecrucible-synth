@@ -97,7 +97,12 @@ export class LocalModelClient {
             return this.config.model;
         }
         try {
-            // Use cached model if available
+            // Clear cache for fresh selection based on current task
+            // (Only use cache for same task type in same session)
+            if (this._cachedBestModel && !this._cachedBestModel.includes(taskType)) {
+                this._cachedBestModel = null;
+            }
+            // Use cached model if available for same task type
             if (this._cachedBestModel) {
                 return this._cachedBestModel;
             }
@@ -107,16 +112,39 @@ export class LocalModelClient {
                 logger.warn('No models found on system, using configured model');
                 return this.config.model;
             }
-            // Check if configured model is available
+            // Use IntelligentModelSelector to choose the optimal model based on system specs and task
+            try {
+                const optimalModel = await this.modelSelector.selectOptimalModel(taskType, {
+                    complexity: this.assessComplexity(taskType),
+                    speed: 'medium',
+                    accuracy: 'high'
+                });
+                // Check if the intelligent selection is actually available
+                const isOptimalAvailable = availableModels.some(m => m === optimalModel || m.includes(optimalModel.split(':')[0]));
+                if (isOptimalAvailable) {
+                    const exactMatch = availableModels.find(m => m === optimalModel) ||
+                        availableModels.find(m => m.includes(optimalModel.split(':')[0]));
+                    this._cachedBestModel = exactMatch;
+                    logger.info(`🧠 Using IntelligentModelSelector choice: ${exactMatch} (task: ${taskType})`);
+                    return exactMatch;
+                }
+                else {
+                    logger.warn(`IntelligentModelSelector chose ${optimalModel} but it's not available. Falling back to alternatives.`);
+                }
+            }
+            catch (selectorError) {
+                logger.warn('IntelligentModelSelector failed:', selectorError);
+            }
+            // Check if configured model is available as fallback
             const configModelAvailable = availableModels.some(m => m === this.config.model || m.includes(this.config.model.split(':')[0]));
             if (configModelAvailable) {
                 const exactMatch = availableModels.find(m => m === this.config.model) ||
                     availableModels.find(m => m.includes(this.config.model.split(':')[0]));
                 this._cachedBestModel = exactMatch;
-                logger.info('Using configured model (found on system):', exactMatch);
+                logger.info('Using configured model as fallback (found on system):', exactMatch);
                 return exactMatch;
             }
-            // Auto-select best available model from system
+            // Auto-select best available model from system using legacy logic
             const bestModel = await this.selectBestAvailableModel(availableModels, taskType);
             this._cachedBestModel = bestModel;
             logger.info(`Auto-selected model from system: ${bestModel} (configured: ${this.config.model})`);
@@ -126,6 +154,20 @@ export class LocalModelClient {
             logger.warn('Model selection failed, using configured model:', this.config.model);
             return this.config.model;
         }
+    }
+    /**
+     * Assess task complexity for model selection
+     */
+    assessComplexity(taskType) {
+        const complexityMap = {
+            'coding': 'complex',
+            'debugging': 'complex',
+            'analysis': 'medium',
+            'planning': 'medium',
+            'testing': 'medium',
+            'general': 'simple'
+        };
+        return complexityMap[taskType] || 'simple';
     }
     /**
      * Intelligently select the best model from available models

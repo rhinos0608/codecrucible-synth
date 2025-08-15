@@ -59,6 +59,10 @@ export declare class LocalModelClient {
      */
     getAvailableModel(taskType?: string): Promise<string>;
     /**
+     * Assess task complexity for model selection
+     */
+    private assessComplexity;
+    /**
      * Intelligently select the best model from available models
      */
     private selectBestAvailableModel;

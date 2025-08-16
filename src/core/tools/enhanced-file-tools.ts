@@ -103,10 +103,11 @@ export class EnhancedReadFileTool extends BaseTool {
         const relativePath = relative(this.agentContext.workingDirectory, itemPath);
 
         // Check exclude patterns
-        if (excludePatterns?.some(pattern => 
-          relativePath.includes(pattern.replace('**', '')) || 
-          item.name.match(new RegExp(pattern.replace('*', '.*')))
-        )) {
+        if (excludePatterns?.some(pattern => {
+          if (!pattern || typeof pattern !== 'string') return false;
+          return relativePath.includes(pattern.replace('**', '')) || 
+                 item.name.match(new RegExp(pattern.replace('*', '.*')));
+        })) {
           continue;
         }
 

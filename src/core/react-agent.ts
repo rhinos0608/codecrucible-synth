@@ -1496,11 +1496,11 @@ Provide a direct, helpful response without using any tools.`;
           return { isValid: false, error: 'path parameter is required and must be a non-empty string' };
         }
         // Check for common bad paths that don't exist in this project
-        if (toolInput.path.includes('src/main.ts') || toolInput.path.includes('main.ts')) {
+        if (typeof toolInput.path === 'string' && (toolInput.path.includes('src/main.ts') || toolInput.path.includes('main.ts'))) {
           return { isValid: false, error: 'main.ts file does not exist in this project. Use listFiles to explore actual project structure first.' };
         }
         // Additional common non-existent paths
-        if (toolInput.path.includes('src/index.ts') && !toolInput.path.includes('dist')) {
+        if (typeof toolInput.path === 'string' && toolInput.path.includes('src/index.ts') && !toolInput.path.includes('dist')) {
           return { isValid: false, error: 'src/index.ts may not exist. Check with listFiles first.' };
         }
         break;

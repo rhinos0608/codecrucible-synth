@@ -1730,6 +1730,9 @@ Focus on actionable, specific recommendations with clear business value.`;
    * Check if prompt is a simple file operation that can be handled directly
    */
   private isSimpleFileOperation(prompt: string): boolean {
+    if (!prompt || typeof prompt !== 'string') {
+      return false;
+    }
     const simple = prompt.toLowerCase();
     // Only consider truly simple, single-action file operations
     return (

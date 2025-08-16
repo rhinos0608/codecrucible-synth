@@ -63,7 +63,10 @@
       "WebSearch",
       "WebFetch(domain:e2b.dev)",
       "WebFetch(domain:smcleod.net)",
-      "WebFetch(domain:gist.github.com)"
+      "WebFetch(domain:gist.github.com)",
+      "Bash(gh repo view:*)",
+      "WebFetch(domain:www.anthropic.com)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": [],

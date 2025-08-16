@@ -46,7 +46,7 @@ import { IntelligentModelSelector } from './intelligent-model-selector.js';
 import { SimplifiedReActPrompts, SimplifiedJSONParser } from './simplified-react-prompts.js';
 import { ReadCodeStructureTool } from './tools/read-code-structure-tool.js';
 import { IntelligentFileReaderTool } from './tools/intelligent-file-reader-tool.js';
-import { ImprovedReActReasoning, ReasoningOutput } from './improved-react-reasoning.js';
+import { ClaudeCodeInspiredReasoning, ReasoningOutput } from './claude-code-inspired-reasoning.js';
 
 const ThoughtSchema = z.object({
   thought: z.string().describe('Your reasoning and plan for the next action.'),
@@ -97,7 +97,7 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
   private agentContext: ReActAgentContext;
   private errorHandler: AutonomousErrorHandler;
   private modelSelector: IntelligentModelSelector;
-  private reasoning: ImprovedReActReasoning | null = null;
+  private reasoning: ClaudeCodeInspiredReasoning | null = null;
 
   constructor(context: CLIContext, workingDirectory: string) {
     // Initialize BaseAgent with configuration
@@ -296,9 +296,9 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
       return this.generateDirectResponse(input, intentAnalysis);
     }
 
-    // Initialize improved reasoning system
-    this.reasoning = new ImprovedReActReasoning(this.tools, input);
-    logger.info('🧠 Initialized improved ReAct reasoning system');
+    // Initialize Claude Code inspired reasoning system
+    this.reasoning = new ClaudeCodeInspiredReasoning(this.tools, input);
+    logger.info('🧠 Initialized Claude Code inspired reasoning system');
 
     // Use intelligent model selection for this task (temporarily disabled for stability)
     const taskType = this.analyzeTaskType(input);
@@ -318,7 +318,7 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
       }
       
       try {
-        // Use improved reasoning system
+        // Use Claude Code inspired reasoning system
         const reasoningOutput: ReasoningOutput = this.reasoning!.reason(lastObservation);
         
         logger.info(`🧠 Iteration ${i + 1}: ${reasoningOutput.reasoning}`);

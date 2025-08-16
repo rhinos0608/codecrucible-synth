@@ -50,7 +50,15 @@
       "Bash(winget:*)",
       "Bash(where gh)",
       "Bash(ollama run:*)",
-      "mcp__exa__company_research_exa"
+      "mcp__exa__company_research_exa",
+      "Bash(taskkill:*)",
+      "Bash(npx eslint:*)",
+      "Bash(ollama ps:*)",
+      "Bash(dir:*)",
+      "WebFetch(domain:github.com)",
+      "mcp__exa__crawling_exa",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)"
     ],
     "deny": [],
     "ask": [],

@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
-import { promises as fs } from 'fs';
-import { join, relative, isAbsolute } from 'path';
+import { promises as fs, existsSync, statSync } from 'fs';
+import { join, relative, isAbsolute, dirname, extname, basename, resolve } from 'path';
+import { glob } from 'glob';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const ReadFileSchema = z.object({
   path: z.string().describe('The path to the file to read.'),
@@ -14,6 +19,7 @@ export class ReadFileTool extends BaseTool {
       description: 'Reads the contents of a file.',
       category: 'File System',
       parameters: ReadFileSchema,
+      examples: ['{"path": "package.json"}', '{"path": "src/index.ts"}', '{"path": "README.md"}']
     });
   }
 
@@ -75,6 +81,7 @@ export class WriteFileTool extends BaseTool {
       description: 'Writes content to a file.',
       category: 'File System',
       parameters: WriteFileSchema,
+      examples: ['{"path": "output.txt", "content": "Hello World"}', '{"path": "src/new-file.ts", "content": "export const test = true;"}']
     });
   }
 
@@ -118,12 +125,23 @@ export class ListFilesTool extends BaseTool {
       description: 'Lists the files in a directory.',
       category: 'File System',
       parameters: ListFilesSchema,
+      examples: ['{"path": "."}', '{"path": "src"}', '{"path": "dist"}']
     });
   }
 
-  async execute(args: z.infer<typeof ListFilesSchema>): Promise<string[]> {
-    const fullPath = this.resolvePath(args.path || '.');
-    return await fs.readdir(fullPath);
+  async execute(args: z.infer<typeof ListFilesSchema>): Promise<string> {
+    try {
+      const fullPath = this.resolvePath(args.path || '.');
+      const files = await fs.readdir(fullPath);
+      
+      if (files.length === 0) {
+        return `Directory '${args.path || '.'}' is empty.`;
+      }
+      
+      return `Files in '${args.path || '.'}' (${files.length} items):\n${files.map(f => `- ${f}`).join('\n')}`;
+    } catch (error) {
+      return `Error listing files in '${args.path || '.'}': ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
   }
 
   private resolvePath(path: string): string {

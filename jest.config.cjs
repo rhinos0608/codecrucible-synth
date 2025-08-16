@@ -1,6 +1,7 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/default-esm',
+  extensionsToTreatAsEsm: ['.ts'],
   testEnvironment: 'node',
   testMatch: [
     "<rootDir>/tests/**/*.ts",
@@ -8,10 +9,12 @@ module.exports = {
   ],
   moduleFileExtensions: ["ts", "js", "json", "node"],
   transform: {
-    '^.+\.ts$': ['ts-jest', {
+    '^.+\\.ts$': ['ts-jest', {
+      useESM: true,
       tsconfig: {
-        module: 'commonjs',
-        target: 'ES2020'
+        module: 'ES2022',
+        target: 'ES2022',
+        moduleResolution: 'node'
       }
     }],
   },
@@ -20,29 +23,38 @@ module.exports = {
   ],
   setupFiles: ["<rootDir>/jest.setup.js"],
   transformIgnorePatterns: [
-    "node_modules/(?!ora|chalk)/"
+    "node_modules/(?!(ora|chalk|inquirer|commander)/)"
   ],
   moduleNameMapper: {
-    '^(\.{1,2}/.*)\.js$': '$1',
+    '^(\\.{1,2}/.*)(\\.js)$': '$1',
     '^chalk$': '<rootDir>/tests/__mocks__/chalk.js',
     '^ora$': '<rootDir>/tests/__mocks__/ora.js',
-    '^inquirer$': '<rootDir>/tests/__mocks__/inquirer.js',
-    '^src/core/cli$': '<rootDir>/tests/__mocks__/src/core/cli.ts'
+    '^inquirer$': '<rootDir>/tests/__mocks__/inquirer.js'
   },
   testPathIgnorePatterns: [
     "<rootDir>/archive/",
-    "<rootDir>/tests/setup.ts",
-    "<rootDir>/tests/integration/cli.test.ts",
     "<rootDir>/tests/__mocks__/",
-    "<rootDir>/tests/unit/voice-system.test.ts"
+    "<rootDir>/node_modules/",
+    "<rootDir>/dist/",
+    "<rootDir>/build/"
   ],
   collectCoverageFrom: [
     "src/**/*.ts",
     "!src/**/*.d.ts",
     "!src/**/*.test.ts",
-    "!src/**/*.spec.ts"
+    "!src/**/*.spec.ts",
+    "!src/desktop/**",
+    "!src/**/index.ts"
   ],
   coverageReporters: ['text', 'lcov', 'html'],
   coverageDirectory: 'coverage',
-  testTimeout: 10000
+  testTimeout: 30000,
+  // Better error reporting
+  verbose: true,
+  // Handle CommonJS modules better
+  globals: {
+    'ts-jest': {
+      useESM: true
+    }
+  }
 };

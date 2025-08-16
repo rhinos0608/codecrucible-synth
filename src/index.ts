@@ -7,9 +7,12 @@ import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { ConfigManager } from './config/config-manager.js';
 import { CodeCrucibleCLI, CLIContext } from './core/cli.js';
 import { logger } from './core/logger.js';
+import { createMultiLLMProvider } from './core/multi-llm-provider.js';
+import { globalRAGSystem } from './core/rag-system.js';
 import { EnhancedAgenticClient } from './core/enhanced-agentic-client.js';
 import { ClaudeCodeClient } from './core/claude-code-client.js';
 import { AutonomousClaudeClient } from './core/autonomous-claude-client.js';
+import { initializeEditConfirmation } from './core/edit-confirmation-system.js';
 import chalk from 'chalk';
 
 const program = new Command();
@@ -45,11 +48,52 @@ async function initializeApplication(): Promise<CLIContext> {
     // Initialize MCP server manager
     const mcpManager = new MCPServerManager(config.mcp.servers);
 
+    // Initialize Multi-LLM Provider (only if configuration exists)
+    let multiLLMProvider;
+    if (config.llmProviders && config.llmProviders.providers) {
+      const llmConfigs = Object.entries(config.llmProviders.providers)
+        .filter(([_, providerConfig]) => providerConfig.enabled)
+        .map(([name, providerConfig]) => ({ name, config: providerConfig }));
+      
+      if (llmConfigs.length > 0) {
+        multiLLMProvider = createMultiLLMProvider(llmConfigs);
+        if (config.llmProviders.default) {
+          multiLLMProvider.setDefaultProvider(config.llmProviders.default);
+        }
+        logger.info(`Initialized multi-LLM provider with ${llmConfigs.length} providers`);
+      }
+    }
+
+    // Initialize RAG system and index project files
+    try {
+      await globalRAGSystem.indexPath(process.cwd(), {
+        recursive: true,
+        includePatterns: ['**/*.ts', '**/*.js', '**/*.md', '**/*.json'],
+        excludePatterns: ['node_modules/**', '.git/**', 'dist/**', 'build/**']
+      });
+      logger.info('RAG system initialized and project files indexed');
+    } catch (error) {
+      logger.warn('Failed to initialize RAG system:', error);
+    }
+
+    // Initialize edit confirmation system
+    const editConfirmation = initializeEditConfirmation(process.cwd(), {
+      requireConfirmation: true,
+      showDiff: true,
+      autoApproveSmallChanges: false,
+      smallChangeThreshold: 5,
+      interactive: true,
+      batchMode: false
+    });
+    logger.info('Edit confirmation system initialized');
+
     const context: CLIContext = {
       modelClient,
       voiceSystem,
       mcpManager,
-      config
+      config,
+      multiLLMProvider,
+      ragSystem: globalRAGSystem
     };
 
     logger.info('CodeCrucible Synth initialized successfully');
@@ -80,11 +124,15 @@ program
   .option('--iterative', 'Use iterative Writer/Auditor improvement loop')
   .option('--max-iterations <num>', 'Maximum iterations for iterative mode', '5')
   .option('--quality-threshold <num>', 'Quality threshold for iterative mode (0-100)', '85')
+  .option('--agentic', 'Use autonomous agentic mode with multi-agent orchestration')
+  .option('--autonomous', 'Same as --agentic (alias for autonomous processing)')
   .action(async (prompt, options) => {
     const context = await initializeApplication();
     const cli = new CodeCrucibleCLI(context);
     
-    if (options.council) {
+    if (options.agentic || options.autonomous) {
+      await cli.handleAgenticMode(prompt, options);
+    } else if (options.council) {
       await cli.handleCouncilMode(prompt, options);
     } else {
       await cli.handleGeneration(prompt, options);
@@ -187,7 +235,7 @@ program
 // Model management
 program
   .command('model')
-  .description('Manage local AI models')
+  .description('Manage local AI models and API models')
   .option('--status', 'Check system and model status')
   .option('--setup', 'Auto-setup Ollama and install a model')
   .option('--install', 'Same as --setup (for backwards compatibility)')
@@ -195,6 +243,11 @@ program
   .option('--pull <model>', 'Pull/install a specific model')
   .option('--test [model]', 'Test a model (uses best available if not specified)')
   .option('--remove <model>', 'Remove a model')
+  .option('--add-api', 'Add API model configuration (Claude, GPT, Gemini)')
+  .option('--list-api', 'List configured API models')
+  .option('--test-api <model>', 'Test an API model connection')
+  .option('--remove-api <model>', 'Remove an API model configuration')
+  .option('--select', 'Select active model (local or API)')
   .action(async (options) => {
     const context = await initializeApplication();
     const cli = new CodeCrucibleCLI(context);
@@ -212,6 +265,21 @@ program
     const context = await initializeApplication();
     const cli = new CodeCrucibleCLI(context);
     await cli.handleVoiceManagement(options);
+  });
+
+// Edit confirmation management
+program
+  .command('edits')
+  .description('Manage pending file edits and confirmations')
+  .option('--pending', 'Show pending edits')
+  .option('--confirm', 'Confirm all pending edits')
+  .option('--clear', 'Clear all pending edits')
+  .option('--batch', 'Use batch confirmation mode')
+  .option('--individual', 'Use individual confirmation mode')
+  .action(async (options) => {
+    const context = await initializeApplication();
+    const cli = new CodeCrucibleCLI(context);
+    await cli.handleEditManagement(options);
   });
 
 // Examples and help

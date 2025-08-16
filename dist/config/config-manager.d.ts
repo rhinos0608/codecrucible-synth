@@ -1,3 +1,13 @@
+export interface LLMProviderConfig {
+    provider: 'openai' | 'google' | 'anthropic' | 'ollama';
+    apiKey?: string;
+    endpoint?: string;
+    model: string;
+    maxTokens?: number;
+    temperature?: number;
+    timeout?: number;
+    enabled: boolean;
+}
 export interface AppConfig {
     model: {
         endpoint: string;
@@ -5,6 +15,10 @@ export interface AppConfig {
         timeout: number;
         maxTokens: number;
         temperature: number;
+    };
+    llmProviders: {
+        default: string;
+        providers: Record<string, LLMProviderConfig>;
     };
     voices: {
         default: string[];

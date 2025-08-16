@@ -1,0 +1,336 @@
+/**
+ * Simplified ReAct prompts optimized for better JSON generation
+ * Designed to work well with codellama and other coding models
+ */
+
+export class SimplifiedReActPrompts {
+  
+  static createSimplePrompt(
+    toolDefinitions: Array<{name: string, description: string, parameters: any, examples?: string[]}>, 
+    recentMessages: Array<{role: string, content: string}>,
+    filesExplored: number
+  ): string {
+    // Enhanced context handling - show full tool results but limit user messages
+    const conversation = recentMessages
+      .slice(-6) // Include more history for better context
+      .map(msg => {
+        if (msg.role === 'tool') {
+          // Show full tool results but truncate if extremely long
+          const content = msg.content.length > 1000 ? 
+            msg.content.slice(0, 1000) + '\n[...truncated for length...]' : 
+            msg.content;
+          return `TOOL RESULT: ${content}`;
+        } else if (msg.role === 'assistant') {
+          // Show assistant actions for context
+          try {
+            const parsed = JSON.parse(msg.content);
+            return `PREVIOUS ACTION: ${parsed.thought} → Used ${parsed.tool}`;
+          } catch {
+            return `ASSISTANT: ${msg.content.slice(0, 100)}${msg.content.length > 100 ? '...' : ''}`;
+          }
+        } else {
+          // User messages
+          return `USER: ${msg.content.slice(0, 150)}${msg.content.length > 150 ? '...' : ''}`;
+        }
+      })
+      .join('\n');
+
+    // Generate comprehensive tool documentation
+    const toolDocs = this.generateToolDocumentation(toolDefinitions);
+    
+    return `You are an expert coding assistant using the ReAct pattern. You systematically explore codebases by:
+1. REASONING about what information you need next
+2. ACTING with the appropriate tool 
+3. OBSERVING the results to plan your next step
+
+CRITICAL RULES:
+- NEVER repeat the same tool call with identical parameters
+- ALWAYS examine tool results before choosing your next action
+- Use "final_answer" only when you have gathered sufficient information
+- Build on previous results - don't ignore what you've already learned
+- Always provide valid JSON with correct parameter names and types
+
+${toolDocs}
+
+REQUIRED JSON FORMAT (respond with ONLY valid JSON):
+{
+  "thought": "Based on previous results, I need to...",
+  "tool": "tool_name",
+  "toolInput": {"param1": "value1", "param2": "value2"}
+}
+
+CONTEXT:
+Files explored: ${filesExplored}
+
+CONVERSATION HISTORY:
+${conversation}
+
+Your next action (JSON only):`;
+  }
+
+  /**
+   * Generate comprehensive tool documentation with parameters and examples
+   */
+  private static generateToolDocumentation(toolDefinitions: Array<{name: string, description: string, parameters: any, examples?: string[]}>): string {
+    // Prioritize basic tools first
+    const basicTools = ['listFiles', 'readFile', 'writeFile', 'confirmedWrite', 'gitStatus', 'gitDiff'];
+    const prioritizedTools = [];
+    
+    // Add basic tools first
+    for (const basicTool of basicTools) {
+      const tool = toolDefinitions.find(t => t.name === basicTool);
+      if (tool) prioritizedTools.push(tool);
+    }
+    
+    // Add remaining tools (limit total to 8 to avoid overwhelming)
+    const remainingTools = toolDefinitions.filter(t => !basicTools.includes(t.name));
+    prioritizedTools.push(...remainingTools.slice(0, 8 - prioritizedTools.length));
+    
+    const toolDocs = prioritizedTools.map(tool => {
+      const params = this.extractParameterInfo(tool.parameters);
+      const examples = tool.examples ? `\n    Examples: ${tool.examples.join(', ')}` : '';
+      
+      return `  "${tool.name}": ${tool.description}
+    Parameters: ${params}${examples}`;
+    }).join('\n');
+
+    const basicToolNames = prioritizedTools.slice(0, 5).map(t => `"${t.name}"`).join(', ');
+    const allToolNames = toolDefinitions.map(t => `"${t.name}"`).join(', ');
+
+    return `MOST COMMON TOOLS (start with these):
+${toolDocs}
+  "final_answer": Provide final response when analysis is complete
+    Parameters: {"answer": "your complete response"}
+
+PRIORITY: Use basic tools first: ${basicToolNames}
+ALL AVAILABLE: ${allToolNames}, "final_answer"
+CRITICAL: Use EXACT tool names only - do not modify or guess names.`;
+  }
+
+  /**
+   * Extract parameter information from Zod schema
+   */
+  private static extractParameterInfo(parameters: any): string {
+    if (!parameters || !parameters.shape) {
+      return "{}";
+    }
+
+    try {
+      const paramNames = Object.keys(parameters.shape);
+      const paramInfo = paramNames.map(name => {
+        const field = parameters.shape[name];
+        let type = 'string';
+        
+        if (field._def?.typeName) {
+          switch (field._def.typeName) {
+            case 'ZodString': type = 'string'; break;
+            case 'ZodNumber': type = 'number'; break;
+            case 'ZodBoolean': type = 'boolean'; break;
+            case 'ZodObject': type = 'object'; break;
+            case 'ZodArray': type = 'array'; break;
+            default: type = 'string';
+          }
+        }
+
+        return `"${name}": ${type}`;
+      });
+
+      return `{${paramInfo.join(', ')}}`;
+    } catch (error) {
+      return "{}";
+    }
+  }
+
+  static createCodeAnalysisPrompt(
+    availableTools: string[],
+    workingDirectory: string,
+    previousActions: string
+  ): string {
+    return `You are analyzing code. Use tools systematically. Respond with JSON only.
+
+Tools: ${availableTools.join(', ')}
+
+Format: {"thought": "plan", "tool": "name", "toolInput": {"param": "value"}}
+
+Working dir: ${workingDirectory}
+Previous: ${previousActions.slice(0, 200)}
+
+JSON response:`;
+  }
+
+  static createErrorDiagnosisPrompt(
+    tools: string[],
+    errorContext: string
+  ): string {
+    return `Find and diagnose errors. JSON only.
+
+Tools: ${tools.join(', ')}
+Context: ${errorContext.slice(0, 150)}
+
+Format: {"thought": "plan", "tool": "name", "toolInput": {}}
+
+JSON:`;
+  }
+}
+
+/**
+ * Enhanced JSON parsing with better error recovery for simplified prompts
+ */
+export class SimplifiedJSONParser {
+  
+  static parseSimpleResponse(response: string): {thought: string, tool: string, toolInput: any} {
+    try {
+      // First try direct parsing
+      const parsed = JSON.parse(response);
+      if (parsed.thought && parsed.tool && parsed.toolInput) {
+        // Apply typo correction to tool name
+        const correctedTool = this.fixCommonToolNameTypos(parsed.tool);
+        return {
+          thought: parsed.thought,
+          tool: correctedTool,
+          toolInput: parsed.toolInput
+        };
+      }
+    } catch (e) {
+      // Continue to fallback strategies
+    }
+
+    // Strategy 1: Extract JSON from response
+    const jsonMatch = response.match(/\{[\s\S]*?\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.tool && parsed.toolInput) {
+          const correctedTool = this.fixCommonToolNameTypos(parsed.tool);
+          return {
+            thought: parsed.thought || `Using ${correctedTool}`,
+            tool: correctedTool,
+            toolInput: parsed.toolInput
+          };
+        }
+      } catch (e) {
+        // Continue to next strategy
+      }
+    }
+
+    // Strategy 2: Extract components using regex
+    const thoughtMatch = response.match(/"thought":\s*"([^"]+)"/);
+    const toolMatch = response.match(/"tool":\s*"([^"]+)"/);
+    const inputMatch = response.match(/"toolInput":\s*(\{[^}]*\})/);
+
+    if (toolMatch) {
+      const thought = thoughtMatch ? thoughtMatch[1] : `Using ${toolMatch[1]}`;
+      let toolInput = {};
+      
+      if (inputMatch) {
+        try {
+          toolInput = JSON.parse(inputMatch[1]);
+        } catch (e) {
+          // Use empty object if parsing fails
+        }
+      }
+
+      const correctedTool = this.fixCommonToolNameTypos(toolMatch[1]);
+      return {
+        thought,
+        tool: correctedTool,
+        toolInput
+      };
+    }
+
+    // Strategy 3: Intelligent defaults for common responses
+    if (response.includes('listFiles') || response.includes('list files')) {
+      return {
+        thought: "Listing files to understand structure",
+        tool: "listFiles",
+        toolInput: { path: "." }
+      };
+    }
+
+    if (response.includes('readFile') || response.includes('read file')) {
+      return {
+        thought: "Reading file for analysis",
+        tool: "readFile", 
+        toolInput: { path: "package.json" }
+      };
+    }
+
+    if (response.includes('gitStatus') || response.includes('git status')) {
+      return {
+        thought: "Checking git status",
+        tool: "gitStatus",
+        toolInput: {}
+      };
+    }
+
+    if (response.includes('final') || response.includes('complete') || response.includes('done')) {
+      return {
+        thought: "Analysis complete",
+        tool: "final_answer",
+        toolInput: { answer: "Analysis completed based on available information." }
+      };
+    }
+
+    // Last resort: default action
+    throw new Error(`Could not parse response: ${response.slice(0, 200)}`);
+  }
+
+  static validateAndFixToolInput(tool: string, input: any): any {
+    // Ensure input is an object
+    const safeInput = input && typeof input === 'object' ? input : {};
+    
+    // Common fixes for tool inputs
+    switch (tool) {
+      case 'listFiles':
+        return { 
+          path: safeInput.path || safeInput.directory || safeInput.folder || "." 
+        };
+      
+      case 'readFile':
+      case 'readFiles':
+        return { 
+          path: safeInput.path || safeInput.file || safeInput.filename || "package.json" 
+        };
+      
+      case 'searchFiles':
+        return { 
+          pattern: safeInput.pattern || safeInput.query || safeInput.search || "*.js",
+          path: safeInput.path || safeInput.directory || safeInput.folder || "."
+        };
+      
+      case 'gitStatus':
+      case 'gitDiff':
+        return {};
+      
+      case 'lintCode':
+      case 'getAst':
+        return { 
+          path: safeInput.path || safeInput.file || safeInput.filename || "src/index.ts" 
+        };
+      
+      case 'final_answer':
+        return { 
+          answer: safeInput.answer || safeInput.response || safeInput.result || "Analysis completed." 
+        };
+      
+      default:
+        // For unknown tools, ensure we return a valid object
+        return safeInput;
+    }
+  }
+
+  static fixCommonToolNameTypos(toolName: string): string {
+    // Fix common typos in tool names
+    const corrections: Record<string, string> = {
+      'searchhFile': 'searchFiles',
+      'searchFile': 'searchFiles', 
+      'readfiles': 'readFiles',
+      'listfiles': 'listFiles',
+      'gitSatus': 'gitStatus',
+      'final-answer': 'final_answer',
+      'finalAnswer': 'final_answer'
+    };
+    
+    return corrections[toolName] || toolName;
+  }
+}

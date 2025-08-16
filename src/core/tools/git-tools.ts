@@ -12,6 +12,7 @@ export class GitStatusTool extends BaseTool {
       description: 'Gets the current git status.',
       category: 'Git',
       parameters: GitStatusSchema,
+      examples: ['{}']
     });
   }
 
@@ -53,6 +54,7 @@ export class GitDiffTool extends BaseTool {
       description: 'Gets the current git diff.',
       category: 'Git',
       parameters: GitDiffSchema,
+      examples: ['{}']
     });
   }
 

@@ -5,6 +5,17 @@ import YAML from 'yaml';
 import { logger } from '../core/logger.js';
 import { SecurityUtils } from '../core/security-utils.js';
 
+export interface LLMProviderConfig {
+  provider: 'openai' | 'google' | 'anthropic' | 'ollama';
+  apiKey?: string;
+  endpoint?: string;
+  model: string;
+  maxTokens?: number;
+  temperature?: number;
+  timeout?: number;
+  enabled: boolean;
+}
+
 export interface AppConfig {
   model: {
     endpoint: string;
@@ -12,6 +23,10 @@ export interface AppConfig {
     timeout: number;
     maxTokens: number;
     temperature: number;
+  };
+  llmProviders: {
+    default: string;
+    providers: Record<string, LLMProviderConfig>;
   };
   voices: {
     default: string[];
@@ -208,6 +223,44 @@ export class ConfigManager {
         timeout: 180000, // 3 minutes for cold model starts
         maxTokens: 20000,
         temperature: 0.7
+      },
+      llmProviders: {
+        default: "ollama-local",
+        providers: {
+          "ollama-local": {
+            provider: "ollama",
+            endpoint: "http://localhost:11434",
+            model: "auto",
+            maxTokens: 4096,
+            temperature: 0.7,
+            timeout: 30000,
+            enabled: true
+          },
+          "openai-gpt4": {
+            provider: "openai",
+            model: "gpt-4o",
+            maxTokens: 4096,
+            temperature: 0.7,
+            timeout: 30000,
+            enabled: false
+          },
+          "anthropic-claude": {
+            provider: "anthropic",
+            model: "claude-3-5-sonnet-20241022",
+            maxTokens: 4096,
+            temperature: 0.7,
+            timeout: 30000,
+            enabled: false
+          },
+          "google-gemini": {
+            provider: "google",
+            model: "gemini-1.5-pro",
+            maxTokens: 4096,
+            temperature: 0.7,
+            timeout: 30000,
+            enabled: false
+          }
+        }
       },
       voices: {
         default: ["explorer", "maintainer"],

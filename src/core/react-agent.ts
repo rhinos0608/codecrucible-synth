@@ -5,11 +5,39 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { BaseTool } from './tools/base-tool.js';
 import { ReadFileTool, WriteFileTool, ListFilesTool } from './tools/file-tools.js';
+import { ConfirmedWriteTool, ConfirmEditsTool, ViewPendingEditsTool } from './tools/confirmed-write-tool.js';
+import { BaseAgent, BaseAgentOutput, AgentDependencies, BaseAgentConfig } from './base-agent.js';
+import { withErrorHandling, EnhancedError, ErrorCategory, ErrorSeverity } from './enhanced-error-handler.js';
+import { 
+  EnhancedReadFileTool, 
+  EnhancedWriteFileTool, 
+  FileSearchTool, 
+  FileOperationsTool 
+} from './tools/enhanced-file-tools.js';
+import { 
+  TerminalExecuteTool, 
+  ProcessManagementTool, 
+  ShellEnvironmentTool, 
+  PackageManagerTool 
+} from './tools/terminal-tools.js';
+import { 
+  GitOperationsTool, 
+  GitAnalysisTool 
+} from './tools/enhanced-git-tools.js';
+import { 
+  AdvancedProcessTool, 
+  CodeExecutionTool 
+} from './tools/process-management-tools.js';
+import { 
+  CodeAnalysisTool, 
+  CodeGenerationTool 
+} from './tools/enhanced-code-tools.js';
 import { LintCodeTool, GetAstTool } from './tools/code-analysis-tools.js';
 import { GitStatusTool, GitDiffTool } from './tools/git-tools.js';
 import { ResearchTool, WebSearchTool, DocSearchTool } from './tools/research-tools.js';
 import { AutonomousErrorHandler, ErrorContext } from './autonomous-error-handler.js';
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
+import { SimplifiedReActPrompts, SimplifiedJSONParser } from './simplified-react-prompts.js';
 
 const ThoughtSchema = z.object({
   thought: z.string().describe('Your reasoning and plan for the next action.'),
@@ -20,6 +48,17 @@ const ThoughtSchema = z.object({
 type Thought = z.infer<typeof ThoughtSchema>;
 
 type WorkflowState = 'initial' | 'exploring' | 'analyzing' | 'diagnosing' | 'concluding' | 'completed';
+
+export class ReActAgentOutput extends BaseAgentOutput {
+  constructor(
+    public success: boolean,
+    public message: string,
+    public data?: any,
+    public timestamp: number = Date.now()
+  ) {
+    super();
+  }
+}
 
 interface ProgressMetrics {
   filesExplored: Set<string>;
@@ -43,8 +82,7 @@ interface ReActAgentContext {
   currentIteration: number;
 }
 
-export class ReActAgent {
-  private context: CLIContext;
+export class ReActAgent extends BaseAgent<ReActAgentOutput> {
   private model: LocalModelClient;
   private tools: BaseTool[];
   private agentContext: ReActAgentContext;
@@ -52,8 +90,27 @@ export class ReActAgent {
   private modelSelector: IntelligentModelSelector;
 
   constructor(context: CLIContext, workingDirectory: string) {
-    this.context = context;
-    this.model = context.modelClient;
+    // Initialize BaseAgent with configuration
+    const config: BaseAgentConfig = {
+      name: 'ReActAgent',
+      description: 'Reasoning-Acting-Observing agent for autonomous code analysis and problem solving',
+      rateLimit: {
+        maxRetries: 3,
+        baseDelayMs: 1000,
+        maxDelayMs: 30000,
+        backoffMultiplier: 2
+      },
+      timeout: 120000 // 2 minutes
+    };
+
+    const dependencies: AgentDependencies = {
+      context,
+      workingDirectory,
+      sessionId: `react_${Date.now()}`
+    };
+
+    super(config, dependencies);
+    this.model = dependencies.context.modelClient;
     this.agentContext = {
       workingDirectory,
       messages: [],
@@ -72,16 +129,50 @@ export class ReActAgent {
       currentIteration: 0
     };
     this.tools = [
-      new ReadFileTool(this.agentContext),
-      new WriteFileTool(this.agentContext),
-      new ListFilesTool(this.agentContext),
+      // Enhanced File Operations
+      new EnhancedReadFileTool(this.agentContext),
+      new EnhancedWriteFileTool(this.agentContext),
+      new FileSearchTool(this.agentContext),
+      new FileOperationsTool(this.agentContext),
+      
+      // Terminal and Process Management
+      new TerminalExecuteTool(this.agentContext),
+      new ProcessManagementTool(this.agentContext),
+      new ShellEnvironmentTool(this.agentContext),
+      new PackageManagerTool(this.agentContext),
+      
+      // Comprehensive Git Operations
+      new GitOperationsTool(this.agentContext),
+      new GitAnalysisTool(this.agentContext),
+      
+      // Process Management and Code Execution
+      new AdvancedProcessTool(this.agentContext),
+      new CodeExecutionTool(this.agentContext),
+      
+      // Enhanced Code Analysis and Generation
+      new CodeAnalysisTool(this.agentContext),
+      new CodeGenerationTool(this.agentContext),
+      
+      // Legacy Code Analysis (for compatibility)
       new LintCodeTool(this.agentContext),
       new GetAstTool(this.agentContext),
-      new GitStatusTool(this.agentContext),
-      new GitDiffTool(this.agentContext),
+      
+      // Research and External
       new ResearchTool(this.agentContext),
       new WebSearchTool(this.agentContext),
       new DocSearchTool(this.agentContext),
+      
+      // Legacy tools for compatibility
+      new ReadFileTool(this.agentContext),
+      new WriteFileTool(this.agentContext),
+      new ListFilesTool(this.agentContext),
+      new GitStatusTool(this.agentContext),
+      new GitDiffTool(this.agentContext),
+      
+      // Edit confirmation tools
+      new ConfirmedWriteTool(this.agentContext),
+      new ConfirmEditsTool(this.agentContext),
+      new ViewPendingEditsTool(this.agentContext),
     ];
     
     // Initialize autonomous capabilities
@@ -89,13 +180,58 @@ export class ReActAgent {
     this.modelSelector = new IntelligentModelSelector();
   }
 
-  public getContext(): ReActAgentContext {
-    return this.agentContext;
+  /**
+   * Create the agent instance - required by BaseAgent
+   */
+  protected async createAgent(): Promise<ReActAgent> {
+    return this;
   }
 
+  /**
+   * Generate system prompt - required by BaseAgent
+   */
+  protected generateSystemPrompt(): string {
+    const toolDefinitions = this.tools.map(t => ({
+      name: t.definition.name,
+      description: t.definition.description,
+      parameters: t.definition.parameters,
+      examples: t.definition.examples
+    }));
+    const filesExplored = this.agentContext.progressMetrics.filesExplored.size;
+    const recentMessages = this.agentContext.messages.slice(-6);
+    
+    return SimplifiedReActPrompts.createSimplePrompt(
+      toolDefinitions,
+      recentMessages,
+      filesExplored
+    );
+  }
+
+  /**
+   * Get available tools - required by BaseAgent
+   */
   public getAvailableTools(): BaseTool[] {
     return this.tools;
   }
+
+  /**
+   * Execute the agent with enhanced error handling
+   */
+  protected async executeAgent(agent: ReActAgent, input: string, streaming?: boolean): Promise<ReActAgentOutput> {
+    try {
+      const result = await this.processRequest(input);
+      return new ReActAgentOutput(true, result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('ReAct agent execution failed:', error);
+      return new ReActAgentOutput(false, errorMessage, { error });
+    }
+  }
+
+  public getAgentContext(): ReActAgentContext {
+    return this.agentContext;
+  }
+
 
   public reset(): void {
     this.agentContext.messages = [];
@@ -137,15 +273,18 @@ export class ReActAgent {
       return this.generateDirectResponse(input, intentAnalysis);
     }
 
-    // Use intelligent model selection for this task
+    // Use intelligent model selection for this task (temporarily disabled for stability)
     const taskType = this.analyzeTaskType(input);
-    const optimalModel = await this.modelSelector.selectOptimalModel(taskType, {
-      complexity: this.assessComplexity(input),
-      speed: 'medium',
-      accuracy: 'high'
-    });
+    // const optimalModel = await this.modelSelector.selectOptimalModel(taskType, {
+    //   complexity: this.assessComplexity(input),
+    //   speed: 'medium',
+    //   accuracy: 'high'
+    // });
+    
+    // Temporarily use configured model for stability
+    const optimalModel = undefined; // Use default configured model
 
-    logger.info(`🧠 Selected optimal model: ${optimalModel} for task type: ${taskType}`);
+    logger.info(`🧠 Using configured model for task type: ${taskType}`);
 
     for (let i = 0; i < this.agentContext.maxIterations; i++) {
       this.agentContext.currentIteration = i;
@@ -179,15 +318,17 @@ export class ReActAgent {
           },
           required: ["thought", "tool", "toolInput"]
         };
-        // Set the selected optimal model before generating
-        this.model.setModel(optimalModel);
+        // Set the selected optimal model before generating (if specified)
+        if (optimalModel) {
+          this.model.setModel(optimalModel);
+        }
         
         // Try without structured output first to debug
         const response = await this.model.generate(prompt);
         logger.info(`Agent iteration ${i + 1} - Raw response: ${response.slice(0, 300)}...`);
         
         try {
-          const thought = this.parseResponse(response);
+          const thought = this.parseSimplifiedResponse(response);
           
           // Log the parsed thought for debugging
           logger.debug('Parsed thought:', thought);
@@ -212,7 +353,9 @@ export class ReActAgent {
             this.agentContext.messages.push({ role: 'assistant', content: finalAnswer, timestamp: Date.now() });
             
             // Record successful completion
-            this.modelSelector.recordPerformance(optimalModel, taskType, true, Date.now() - this.getLastMessageTime(), 1.0);
+            if (optimalModel) {
+              this.modelSelector.recordPerformance(optimalModel, taskType, true, Date.now() - this.getLastMessageTime(), 1.0);
+            }
             
             return finalAnswer;
           }
@@ -234,13 +377,15 @@ export class ReActAgent {
             throw new Error(`Unknown tool: ${thought.tool}. Available tools: ${availableTools}`);
           }
 
-          // Validate tool input before execution
-          const validatedInput = this.validateToolInput(thought.tool, thought.toolInput);
+          // Validate and fix tool input before execution
+          const fixedToolInput = SimplifiedJSONParser.validateAndFixToolInput(thought.tool, thought.toolInput);
+          const validatedInput = this.validateToolInput(thought.tool, fixedToolInput);
           if (!validatedInput.isValid) {
             const errorMessage = `Invalid tool input for ${thought.tool}: ${validatedInput.error}`;
             this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage }), timestamp: Date.now() });
             continue;
           }
+          thought.toolInput = fixedToolInput;
           
           // Check for repetitive tool usage with enhanced logic BEFORE tracking
           if (this.isRepetitiveToolUsage(thought.tool, thought.toolInput)) {
@@ -282,7 +427,33 @@ export class ReActAgent {
               this.agentContext.messages.push({ role: 'assistant', content: conclusion, timestamp: Date.now() });
               return conclusion;
             } else {
-              // Force tool diversification
+              // Auto-execute suggested tool instead of just warning
+              const autoAction = this.getAutoAction(thought.tool, thought.toolInput);
+              if (autoAction) {
+                logger.info(`Auto-executing suggested action: ${autoAction.tool} with ${JSON.stringify(autoAction.input)}`);
+                
+                const suggestedTool = this.tools.find(t => t.definition.name === autoAction.tool);
+                if (suggestedTool) {
+                  try {
+                    const observation = await suggestedTool.execute(autoAction.input);
+                    const toolResult = typeof observation === 'string' ? observation : JSON.stringify(observation);
+                    this.agentContext.messages.push({ role: 'tool', content: toolResult, timestamp: Date.now() });
+                    
+                    // Track the auto-executed tool usage
+                    this.trackToolUsage(autoAction.tool, autoAction.input);
+                    this.updateProgressMetrics(autoAction.tool, autoAction.input);
+                    continue;
+                  } catch (error) {
+                    this.agentContext.messages.push({ 
+                      role: 'tool', 
+                      content: JSON.stringify({ error: `Auto-action failed: ${error}` }), 
+                      timestamp: Date.now() 
+                    });
+                  }
+                }
+              }
+              
+              // Fallback: Force tool diversification warning
               const diversificationMessage = this.suggestToolDiversification(thought.tool);
               this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ warning: diversificationMessage }), timestamp: Date.now() });
               continue;
@@ -291,16 +462,40 @@ export class ReActAgent {
 
           this.agentContext.messages.push({ role: 'assistant', content: JSON.stringify(thought), timestamp: Date.now() });
           
-          const observation = await tool.execute(thought.toolInput);
-          this.agentContext.messages.push({ role: 'tool', content: JSON.stringify(observation), timestamp: Date.now() });
+          // Execute tool with enhanced error handling
+          const observation = await withErrorHandling(
+            () => tool.execute(thought.toolInput),
+            {
+              operation: `execute-tool-${thought.tool}`,
+              metadata: { 
+                toolName: thought.tool, 
+                input: thought.toolInput,
+                sessionId: this.dependencies.sessionId
+              }
+            },
+            {
+              maxAttempts: 3,
+              baseDelayMs: 500,
+              retryableErrors: [ErrorCategory.NETWORK, ErrorCategory.TIMEOUT, ErrorCategory.TOOL_EXECUTION]
+            }
+          );
+          
+          // Store tool result in a more readable format
+          const toolResult = typeof observation === 'string' ? observation : JSON.stringify(observation);
+          this.agentContext.messages.push({ role: 'tool', content: toolResult, timestamp: Date.now() });
           
           // Track successful tool usage and update progress metrics AFTER execution
           this.trackToolUsage(thought.tool, thought.toolInput);
           this.updateProgressMetrics(thought.tool, thought.toolInput);
           
           // Store file list results for context
-          if (thought.tool === 'listFiles' && Array.isArray(observation)) {
-            this.agentContext.lastFileList = observation.slice(0, 20); // Store first 20 files
+          if (thought.tool === 'listFiles' && typeof observation === 'string') {
+            // Extract file names from formatted string result
+            const fileNames = observation.split('\n')
+              .filter(line => line.startsWith('- '))
+              .map(line => line.substring(2))
+              .slice(0, 20);
+            this.agentContext.lastFileList = fileNames;
           }
 
         } catch (parseError) {
@@ -318,7 +513,7 @@ export class ReActAgent {
           errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
           errorMessage: error instanceof Error ? error.message : 'Unknown error occurred',
           operation: 'agent_processing',
-          model: optimalModel,
+          model: optimalModel || 'configured_model',
           context: { iteration: i, taskType, input }
         };
 
@@ -327,14 +522,16 @@ export class ReActAgent {
         // Check if we should switch models based on recovery actions
         for (const action of recoveryActions) {
           if (action.action === 'switch_model' && action.target) {
-            logger.info(`🔄 Autonomous model switch: ${optimalModel} → ${action.target}`);
+            logger.info(`🔄 Autonomous model switch: ${optimalModel || 'configured_model'} → ${action.target}`);
             // The model switch will be handled by the next iteration
             break;
           }
         }
 
         // Record failure for learning
-        this.modelSelector.recordPerformance(optimalModel, taskType, false, Date.now() - this.getLastMessageTime(), 0.0);
+        if (optimalModel) {
+          this.modelSelector.recordPerformance(optimalModel, taskType, false, Date.now() - this.getLastMessageTime(), 0.0);
+        }
 
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
         this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage, recovery: recoveryActions.length > 0 ? 'autonomous_recovery_attempted' : 'no_recovery' }), timestamp: Date.now() });
@@ -674,6 +871,29 @@ export class ReActAgent {
   }
 
   /**
+   * Get auto-action for repetitive tool usage
+   */
+  private getAutoAction(repeatedTool: string, toolInput: any): {tool: string, input: any} | null {
+    const userMessage = this.agentContext.messages.find(msg => msg.role === 'user')?.content || '';
+    
+    // Auto-execute specific actions based on context
+    if (repeatedTool === 'listFiles') {
+      // If user asked about src directory and agent is stuck on root, auto-execute src listing
+      if ((/src\s*(directory|dir|folder)/i.test(userMessage) || /files\s+in\s+src/i.test(userMessage)) && 
+          toolInput?.path === '.') {
+        return { tool: 'listFiles', input: { path: 'src' } };
+      }
+      
+      // If user asked for project files and we already listed root, try config files
+      if (/what\s+files/i.test(userMessage) && toolInput?.path === '.') {
+        return { tool: 'readFile', input: { path: 'package.json' } };
+      }
+    }
+    
+    return null;
+  }
+
+  /**
    * Suggest tool diversification when repetitive usage detected
    */
   private suggestToolDiversification(repeatedTool: string): string {
@@ -700,6 +920,18 @@ export class ReActAgent {
   }
 
   private getListFilesSuggestion(userMessage: string): string {
+    // Check if user asked about specific directories
+    if (/src\s*(directory|dir|folder)/i.test(userMessage)) {
+      return 'Use listFiles with path "src" to explore the source directory specifically, then read key files in src/';
+    }
+    if (/files\s+in\s+src/i.test(userMessage)) {
+      return 'Execute: listFiles with {"path": "src"} to see what files are in the src directory';
+    }
+    if (/what\s+files/i.test(userMessage) && /src/i.test(userMessage)) {
+      return 'Use listFiles with path "src" to list files in the source directory';
+    }
+    
+    // Original suggestions for other patterns
     if (/package\.json/i.test(userMessage)) {
       return 'Now read package.json file contents using readFile tool';
     }
@@ -713,7 +945,12 @@ export class ReActAgent {
       return 'Read configuration files like package.json or tsconfig.json using readFile tool';
     }
     
-    return 'Now read specific important files like package.json, README.md, or source files using readFile tool';
+    // General file listing suggestions
+    if (/files.*project|project.*files/i.test(userMessage)) {
+      return 'You already listed root directory. Now use listFiles with specific paths like "src", "dist", "config" or read important files with readFile';
+    }
+    
+    return 'You already listed the root directory. Now try listFiles with specific subdirectory paths or use readFile to examine important files';
   }
 
   /**
@@ -821,501 +1058,43 @@ export class ReActAgent {
   }
 
   private constructPrompt(): string {
-    const toolSchemas = this.tools.map(tool => zodToJsonSchema(tool.definition.parameters, tool.definition.name));
-    const toolDescriptions = this.tools.map(tool => ` - ${tool.definition.name}: ${tool.definition.description}`).join('\n');
-
-    const validTools = this.tools.map(t => t.definition.name).join(', ');
+    const toolDefinitions = this.tools.map(t => ({
+      name: t.definition.name,
+      description: t.definition.description,
+      parameters: t.definition.parameters,
+      examples: t.definition.examples
+    }));
+    // Include more recent messages for better context (especially tool results)
+    const recentMessages = this.agentContext.messages.slice(-8);
+    const filesExplored = this.agentContext.progressMetrics.filesExplored.size;
     
-    // Build progressive context from previous actions
-    const explorationProgress = this.buildExplorationContext();
-    
-    const systemPrompt = `You are a helpful AI assistant operating in a ReAct (Reasoning and Acting) framework. Your goal is to accomplish the user's request by thinking, selecting a tool, and observing the tool's output.
-
-Available tools (MUST use these exact names):
-${toolDescriptions}
-
-CRITICAL: You can ONLY use these exact tool names: ${validTools}, final_answer
-
-You MUST respond with a valid JSON object in this exact format:
-{
-  "thought": "Your reasoning and plan for the next action",
-  "tool": "exact_tool_name_from_list_above", 
-  "toolInput": { "parameter": "value" }
-}
-
-PROGRESSIVE EXPLORATION STRATEGY:
-${explorationProgress}
-
-TOOL USAGE EXAMPLES:
-- To read files: {"tool": "readFile", "toolInput": {"path": "package.json"}}
-- To list files: {"tool": "listFiles", "toolInput": {"path": "."}}
-- To check git: {"tool": "gitStatus", "toolInput": {}}
-- To analyze code: {"tool": "getAst", "toolInput": {"path": "src/main.ts"}}
-- To check linting: {"tool": "lintCode", "toolInput": {"path": "src/main.ts"}}
-- When finished: {"tool": "final_answer", "toolInput": {"answer": "Your complete response"}}
-
-Previous conversation:
-${this.agentContext.messages.slice(-15).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-
-Working directory: ${this.agentContext.workingDirectory}
-
-REQUIREMENTS:
-- Use ONLY the exact tool names listed above
-- Always provide valid JSON
-- Think step by step and BUILD UPON previous discoveries
-- Progress systematically: explore → analyze → diagnose → conclude
-- Use "final_answer" when you have thoroughly analyzed the codebase
-- When using "final_answer", provide a complete, helpful answer in the "answer" field
-- DIVERSIFY your tool usage - don't repeat the same tool unnecessarily
-- Read actual file contents to find specific errors and issues
-- NEVER use empty answers - always summarize what you found
-
-FINAL ANSWER EXAMPLE:
-{"tool": "final_answer", "toolInput": {"answer": "Based on my comprehensive analysis, I found 3 critical issues: 1) TypeScript compilation errors in src/main.ts (line 45: undefined variable), 2) ESLint violations in 5 files, 3) Missing dependencies in package.json. The project structure is well-organized with 45 files, but needs these fixes for proper functionality."}`;
-
-    return systemPrompt;
+    return SimplifiedReActPrompts.createSimplePrompt(
+      toolDefinitions,
+      recentMessages,
+      filesExplored
+    );
   }
 
-  private parseResponse(response: string): Thought {
+  private parseSimplifiedResponse(response: string): Thought {
     try {
-      // With structured output, response should be valid JSON directly
-      let parsed;
+      const parsed = SimplifiedJSONParser.parseSimpleResponse(response);
       
-      // Handle case where response is already an object
-      if (typeof response === 'object' && response !== null) {
-        parsed = response;
-      } else {
-        // Clean the response before parsing
-        const cleanedResponse = this.cleanJsonResponse(response);
-        
-        // Try multiple extraction strategies
-        parsed = this.tryMultipleParsingStrategies(cleanedResponse);
-      }
+      // Validate and fix tool input
+      const fixedInput = SimplifiedJSONParser.validateAndFixToolInput(parsed.tool, parsed.toolInput);
       
-      // Handle missing thought field by extracting from text before JSON
-      if (!parsed.thought && parsed.tool && parsed.toolInput) {
-        const textBeforeJson = response.split(/\{/)[0].trim();
-        if (textBeforeJson) {
-          parsed.thought = textBeforeJson.replace(/\n+/g, ' ').trim();
-          logger.info('Extracted thought from text before JSON:', parsed.thought);
-        } else {
-          parsed.thought = `Using ${parsed.tool} tool`;
-        }
-      }
-      
-      // Validate the structure
-      if (!parsed.thought || !parsed.tool || !parsed.toolInput) {
-        throw new Error('Invalid response structure - missing required fields');
-      }
-
-      return parsed as Thought;
+      return {
+        thought: parsed.thought,
+        tool: parsed.tool,
+        toolInput: fixedInput
+      };
     } catch (error) {
-      logger.error('Failed to parse agent response:', error);
-      logger.debug('Raw response:', response);
-      
-      // Fallback parsing attempt
-      try {
-        return this.fallbackParse(response);
-      } catch (fallbackError) {
-        throw new Error(`Failed to parse response: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+      logger.error('Simplified JSON parsing failed:', error);
+      // Final fallback - create a default response
+      throw new Error(`Could not parse response: ${response.slice(0, 200)}`);
     }
   }
 
-  /**
-   * Clean JSON response to remove problematic characters and formatting
-   */
-  private cleanJsonResponse(response: string): string {
-    // Remove BOM and other invisible characters
-    let cleaned = response.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '');
-    
-    // Remove common prefixes that models sometimes add
-    cleaned = cleaned.replace(/^(Here's|Here is|Response:|JSON:|Output:)\s*/i, '');
-    
-    // Look for complete JSON objects with thought, tool, and toolInput
-    const fullJsonPattern = /\{\s*"thought":\s*"[^"]*",\s*"tool":\s*"[^"]*",\s*"toolInput":\s*\{[^}]*\}\s*\}/;
-    const fullJsonMatch = cleaned.match(fullJsonPattern);
-    
-    if (fullJsonMatch) {
-      return fullJsonMatch[0];
-    }
-    
-    // Fallback: Find any valid JSON object
-    const jsonStart = cleaned.indexOf('{');
-    if (jsonStart !== -1) {
-      // Find the matching closing brace
-      let braceCount = 0;
-      let jsonEnd = -1;
-      
-      for (let i = jsonStart; i < cleaned.length; i++) {
-        if (cleaned[i] === '{') braceCount++;
-        if (cleaned[i] === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            jsonEnd = i;
-            break;
-          }
-        }
-      }
-      
-      if (jsonEnd !== -1) {
-        const extracted = cleaned.substring(jsonStart, jsonEnd + 1);
-        // Ensure it has the required fields before returning
-        if (extracted.includes('"tool"') && extracted.includes('"toolInput"')) {
-          return extracted;
-        }
-      }
-    }
-    
-    return cleaned.trim();
-  }
-
-  /**
-   * Try multiple parsing strategies in order of preference
-   */
-  private tryMultipleParsingStrategies(response: string): any {
-    const strategies = [
-      () => this.tryTextualParsing(response),  // Try markdown parsing first
-      () => this.tryDirectParse(response),
-      () => this.tryBraceExtraction(response),
-      () => this.tryRegexExtraction(response),
-      () => this.tryBalancedExtraction(response),
-      () => this.tryPatternMatching(response)
-    ];
-
-    for (let i = 0; i < strategies.length; i++) {
-      try {
-        const result = strategies[i]();
-        if (result && result.tool && result.toolInput) {
-          logger.debug(`JSON parsing successful with strategy ${i + 1}`);
-          return result;
-        }
-      } catch (error) {
-        logger.debug(`Parsing strategy ${i + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
-        continue;
-      }
-    }
-    
-    // Log the raw response for debugging
-    logger.warn('All parsing strategies failed. Raw response:', response.substring(0, 500));
-    throw new Error('All parsing strategies failed');
-  }
-
-  /**
-   * Strategy 1: Direct JSON parsing
-   */
-  private tryDirectParse(response: string): any {
-    return JSON.parse(response);
-  }
-
-  /**
-   * Strategy 2: Extract content between first and last braces
-   */
-  private tryBraceExtraction(response: string): any {
-    const jsonStartIndex = response.indexOf('{');
-    const jsonEndIndex = response.lastIndexOf('}');
-
-    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
-      const jsonString = response.substring(jsonStartIndex, jsonEndIndex + 1);
-      return JSON.parse(jsonString);
-    }
-    
-    throw new Error('No braces found');
-  }
-
-  /**
-   * Strategy 3: Regex-based extraction
-   */
-  private tryRegexExtraction(response: string): any {
-    const jsonMatch = response.match(/\{[\s\S]*?\}(?=\s*$|\s*\w+:|$)/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    
-    throw new Error('No regex match found');
-  }
-
-  /**
-   * Strategy 4: Balanced brace extraction
-   */
-  private tryBalancedExtraction(response: string): any {
-    const jsonStart = response.indexOf('{');
-    if (jsonStart === -1) throw new Error('No opening brace found');
-    
-    let braceCount = 0;
-    let jsonEnd = -1;
-    let inString = false;
-    let escaped = false;
-    
-    for (let i = jsonStart; i < response.length; i++) {
-      const char = response[i];
-      
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      
-      if (char === '\\' && inString) {
-        escaped = true;
-        continue;
-      }
-      
-      if (char === '"' && !escaped) {
-        inString = !inString;
-        continue;
-      }
-      
-      if (!inString) {
-        if (char === '{') braceCount++;
-        if (char === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            jsonEnd = i;
-            break;
-          }
-        }
-      }
-    }
-    
-    if (jsonEnd !== -1) {
-      const jsonString = response.substring(jsonStart, jsonEnd + 1);
-      return JSON.parse(jsonString);
-    }
-    
-    throw new Error('No balanced braces found');
-  }
-
-  /**
-   * Strategy 5: Pattern matching fallback
-   */
-  private tryPatternMatching(response: string): any {
-    const altMatch = response.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
-    if (altMatch) {
-      return JSON.parse(altMatch[0]);
-    }
-    
-    throw new Error('No pattern match found');
-  }
-
-  /**
-   * Strategy 6: Textual parsing for non-JSON responses
-   */
-  private tryTextualParsing(response: string): any {
-    const responseText = response.trim();
-    
-    // Parse markdown-style responses like **thought:** and **tool:** 
-    let markdownThoughtMatch = responseText.match(/\*\*thought:\*\*\s*(.+?)(?=\*\*|\n\*\*|$)/is);
-    let markdownToolMatch = responseText.match(/\*\*tool:\*\*\s*(.+?)(?=\*\*|\n\*\*|$)/is);
-    let markdownToolInputMatch = responseText.match(/\*\*toolInput:\*\*[\s\S]*?(\{[\s\S]*?\})/is);
-    
-    // Try alternative patterns if main ones don't match
-    if (!markdownThoughtMatch) {
-      markdownThoughtMatch = responseText.match(/thought:\s*"([^"]+)"/i) || 
-                            responseText.match(/Thought:\s*(.+?)(?=Tool:|$)/is);
-    }
-    if (!markdownToolMatch) {
-      markdownToolMatch = responseText.match(/tool:\s*"([^"]+)"/i) ||
-                         responseText.match(/Tool:\s*`?([^`\n]+)`?/i);
-    }
-    
-    // Also try to find tool input in different formats
-    if (!markdownToolInputMatch) {
-      markdownToolInputMatch = responseText.match(/\*\*Tool Input:\*\*\s*(\{[^}]*\})/is);
-    }
-    if (!markdownToolInputMatch) {
-      // Look for JSON in backticks - improved to handle multiline JSON
-      markdownToolInputMatch = responseText.match(/```json\s*(\{[\s\S]*?\})\s*```/is) ||
-                               responseText.match(/```\s*(\{[\s\S]*?\})\s*```/is);
-    }
-    // Try to match toolInput followed by code block on next lines
-    if (!markdownToolInputMatch) {
-      markdownToolInputMatch = responseText.match(/\*\*toolInput:\*\*[\s\n]*```(?:json)?\s*(\{[\s\S]*?\})\s*```/is);
-    }
-    if (!markdownToolInputMatch) {
-      // Look for any JSON object that looks like toolInput
-      markdownToolInputMatch = responseText.match(/(\{"path":\s*"[^"]*"\})/is);
-    }
-    
-    if (markdownThoughtMatch && markdownToolMatch) {
-      const thought = markdownThoughtMatch[1].trim();
-      let tool = markdownToolMatch[1].trim();
-      let toolInput = {};
-      
-      // Clean tool name of backticks, quotes, and formatting
-      tool = tool.replace(/[`*"']/g, '').trim();
-      
-      if (markdownToolInputMatch) {
-        try {
-          toolInput = JSON.parse(markdownToolInputMatch[1]);
-        } catch (e) {
-          // If JSON parsing fails, try to extract path
-          const pathMatch = markdownToolInputMatch[1].match(/"path":\s*"([^"]+)"/);
-          if (pathMatch) {
-            toolInput = { path: pathMatch[1] };
-          }
-        }
-      } else {
-        // Try to infer toolInput based on tool type
-        if (tool === 'listFiles' || tool === 'readFile' || tool === 'getAst' || tool === 'lintCode') {
-          toolInput = { path: "." };
-        }
-      }
-      
-      // Map tool names
-      const toolMappings: Record<string, string> = {
-        'listFiles': 'listFiles',
-        'readFile': 'readFile',
-        'writeFile': 'writeFile',
-        'gitStatus': 'gitStatus',
-        'gitDiff': 'gitDiff',
-        'lintCode': 'lintCode',
-        'getAst': 'getAst',
-        'research': 'research',
-        'webSearch': 'webSearch',
-        'docSearch': 'docSearch'
-      };
-      
-      const mappedTool = toolMappings[tool] || tool;
-      
-      return {
-        thought,
-        tool: mappedTool,
-        toolInput
-      };
-    }
-    
-    // Check if it's a clear textual response (not JSON)
-    if (responseText && !responseText.includes('{') && !responseText.includes('}')) {
-      return {
-        thought: "Processing textual response from model",
-        tool: "final_answer",
-        toolInput: {
-          answer: responseText
-        }
-      };
-    }
-    
-    // Check for common patterns indicating the model is trying to use tools
-    const toolPatterns = [
-      { pattern: /(?:read|reading|check|checking).*file/i, tool: "readFile", path: "." },
-      { pattern: /(?:list|listing).*files?/i, tool: "listFiles", path: "." },
-      { pattern: /(?:git|check.*status)/i, tool: "gitStatus" },
-      { pattern: /(?:analyze|ast|syntax)/i, tool: "getAst", path: "src/" },
-      { pattern: /(?:lint|linting|check.*code)/i, tool: "lintCode", path: "src/" }
-    ];
-    
-    for (const { pattern, tool, path } of toolPatterns) {
-      if (pattern.test(responseText)) {
-        const toolInput = path ? { path } : {};
-        return {
-          thought: responseText,
-          tool,
-          toolInput
-        };
-      }
-    }
-    
-    throw new Error('Cannot parse textual response');
-  }
-
-  private fallbackParse(response: string): Thought {
-    // First try to extract JSON and thought from mixed response with improved regex
-    let jsonMatch = response.match(/\{[\s\S]*?\}(?=\s*$|\s*\w+:)/);
-    if (!jsonMatch) {
-      // Try alternative regex for more complex cases
-      jsonMatch = response.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
-    }
-    
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.tool && parsed.toolInput) {
-          // Extract thought from text before JSON if missing
-          let thought = parsed.thought;
-          if (!thought) {
-            const textBeforeJson = response.split(/\{/)[0].trim();
-            thought = textBeforeJson || `Using ${parsed.tool} tool`;
-          }
-          return {
-            thought,
-            tool: parsed.tool,
-            toolInput: parsed.toolInput
-          };
-        }
-      } catch (e) {
-        // Continue to regex parsing
-      }
-    }
-    
-    // Simple pattern matching for common response patterns
-    const thoughtMatch = response.match(/thought['":\s]*["']?([^"'\n}]+)["']?/i);
-    const toolMatch = response.match(/tool['":\s]*["']?([^"'\s,\}]+)["']?/i);
-    
-    if (thoughtMatch && toolMatch) {
-      let tool = toolMatch[1].trim().replace(/['"]/g, '');
-      let toolInput = {};
-      
-      // Map common tool variations to correct names
-      const toolMappings: Record<string, string> = {
-        'read_file': 'readFile',
-        'read': 'readFile',
-        'list_files': 'listFiles',
-        'list': 'listFiles',
-        'write_file': 'writeFile', 
-        'write': 'writeFile',
-        'git_status': 'gitStatus',
-        'final': 'final_answer',
-        'answer': 'final_answer',
-        'done': 'final_answer'
-      };
-      
-      tool = toolMappings[tool.toLowerCase()] || tool;
-      
-      // Try to extract common parameters
-      if (tool === 'readFile' || tool === 'writeFile' || tool === 'listFiles') {
-        const pathMatch = response.match(/path['":\s]*["']?([^"'\s,\}\n]+)["']?/i);
-        if (pathMatch) {
-          toolInput = { path: pathMatch[1].trim().replace(/['"]/g, '') };
-        } else {
-          toolInput = { path: '.' };
-        }
-        
-        // For writeFile, also try to extract content
-        if (tool === 'writeFile') {
-          const contentMatch = response.match(/content['":\s]*["']?([^"']+)["']?/i);
-          if (contentMatch) {
-            (toolInput as any).content = contentMatch[1].trim();
-          }
-        }
-      } else if (tool === 'final_answer') {
-        const answerMatch = response.match(/answer['":\s]*["']?([^"'}]+)["']?/i);
-        if (answerMatch) {
-          toolInput = { answer: answerMatch[1].trim() };
-        } else {
-          // Use the whole response as the answer
-          toolInput = { answer: response.trim() };
-        }
-      } else {
-        toolInput = {};
-      }
-      
-      return {
-        thought: thoughtMatch[1].trim(),
-        tool,
-        toolInput
-      };
-    }
-    
-    // If no structured data found, extract thought from beginning of response
-    const lines = response.split('\n').filter(line => line.trim());
-    const thought = lines.length > 0 ? lines[0].trim() : "I'll provide a direct response based on the available information";
-    
-    return {
-      thought,
-      tool: "final_answer",
-      toolInput: { answer: response.trim() }
-    };
-  }
+  // Old complex parsing methods removed - now using SimplifiedJSONParser
 
   /**
    * Analyze the type of task based on user input

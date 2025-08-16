@@ -28,6 +28,8 @@ export interface SystemSpecs {
 
 export interface ModelCapability {
   name: string;
+  provider: 'ollama' | 'openai' | 'anthropic' | 'google' | 'huggingface';
+  type: 'local' | 'api';
   strengths: string[];
   weaknesses: string[];
   recommendedFor: string[];
@@ -38,6 +40,9 @@ export interface ModelCapability {
     minVram?: number; // MB
     minCores: number;
   };
+  apiKey?: string;
+  endpoint?: string;
+  contextWindow?: number;
 }
 
 /**
@@ -61,117 +66,372 @@ export class IntelligentModelSelector {
   private modelCapabilities: ModelCapability[] = [
     {
       name: 'codellama:34b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['code generation', 'debugging', 'code analysis', 'complex coding'],
       weaknesses: ['general chat', 'creative writing', 'slower than smaller models'],
       recommendedFor: ['complex_coding', 'debugging', 'code_review'],
       size: 'large',
       speed: 'slow',
-      requirements: { minRam: 16384, minVram: 16384, minCores: 4 }
+      requirements: { minRam: 16384, minVram: 16384, minCores: 4 },
+      contextWindow: 8192
     },
     {
       name: 'codellama:7b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['fast responses', 'lightweight'],
       weaknesses: ['complex tasks', 'accuracy'],
       recommendedFor: ['simple_coding', 'quick_help'],
       size: 'small',
       speed: 'fast',
-      requirements: { minRam: 4096, minVram: 4096, minCores: 2 }
+      requirements: { minRam: 4096, minVram: 4096, minCores: 2 },
+      contextWindow: 4096
     },
     {
       name: 'llama3.1:70b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['reasoning', 'complex tasks', 'accuracy'],
       weaknesses: ['speed', 'resource usage'],
       recommendedFor: ['planning', 'analysis', 'complex_reasoning'],
       size: 'large',
       speed: 'slow',
-      requirements: { minRam: 32768, minVram: 40960, minCores: 8 }
+      requirements: { minRam: 32768, minVram: 40960, minCores: 8 },
+      contextWindow: 128000
     },
     {
       name: 'llama3.2:latest',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['balance', 'general purpose', 'good speed'],
       weaknesses: ['not specialized'],
       recommendedFor: ['general', 'chat', 'mixed_tasks'],
       size: 'small',
       speed: 'fast',
-      requirements: { minRam: 2048, minCores: 1 }
+      requirements: { minRam: 2048, minCores: 1 },
+      contextWindow: 8192
     },
     {
       name: 'llama3.2:8b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['balance', 'general purpose', 'good speed'],
       weaknesses: ['not specialized'],
       recommendedFor: ['general', 'chat', 'mixed_tasks'],
       size: 'medium',
       speed: 'medium',
-      requirements: { minRam: 6144, minVram: 6144, minCores: 2 }
+      requirements: { minRam: 6144, minVram: 6144, minCores: 2 },
+      contextWindow: 8192
     },
     {
       name: 'qwen2.5:72b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['multilingual', 'reasoning', 'coding'],
       weaknesses: ['speed', 'resource usage'],
       recommendedFor: ['complex_coding', 'analysis', 'planning'],
       size: 'large', 
       speed: 'slow',
-      requirements: { minRam: 32768, minVram: 40960, minCores: 8 }
+      requirements: { minRam: 32768, minVram: 40960, minCores: 8 },
+      contextWindow: 32768
     },
     {
       name: 'qwen2.5:7b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['fast', 'coding', 'lightweight'],
       weaknesses: ['complex reasoning'],
       recommendedFor: ['simple_coding', 'quick_tasks'],
       size: 'small',
       speed: 'fast',
-      requirements: { minRam: 4096, minVram: 4096, minCores: 2 }
+      requirements: { minRam: 4096, minVram: 4096, minCores: 2 },
+      contextWindow: 32768
     },
     {
       name: 'gemma2:27b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['reasoning', 'safety', 'accuracy'],
       weaknesses: ['speed'],
       recommendedFor: ['analysis', 'safe_operations'],
       size: 'large',
       speed: 'slow',
-      requirements: { minRam: 16384, minVram: 20480, minCores: 4 }
+      requirements: { minRam: 16384, minVram: 20480, minCores: 4 },
+      contextWindow: 8192
     },
     {
       name: 'gemma2:9b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['balanced', 'efficient', 'safe'],
       weaknesses: ['not specialized'],
       recommendedFor: ['general', 'safe_operations'],
       size: 'medium',
       speed: 'medium',
-      requirements: { minRam: 6144, minVram: 6144, minCores: 2 }
+      requirements: { minRam: 6144, minVram: 6144, minCores: 2 },
+      contextWindow: 8192
     },
     {
       name: 'gemma:latest',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['general purpose', 'fast', 'reliable', 'good for coding', 'stable'],
       weaknesses: ['not as powerful as larger models'],
       recommendedFor: ['coding', 'general', 'chat', 'simple_tasks', 'quick_help'],
       size: 'medium',
       speed: 'fast',
-      requirements: { minRam: 4096, minVram: 4096, minCores: 2 }
+      requirements: { minRam: 4096, minVram: 4096, minCores: 2 },
+      contextWindow: 4096
     },
     {
       name: 'gemma3n:e4b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['balanced', 'coding', 'reliable', 'fast'],
       weaknesses: ['not as powerful as larger models'],
       recommendedFor: ['coding', 'general', 'mixed_tasks'],
       size: 'medium',
       speed: 'fast',
-      requirements: { minRam: 6144, minVram: 6144, minCores: 2 }
+      requirements: { minRam: 6144, minVram: 6144, minCores: 2 },
+      contextWindow: 8192
     },
     {
       name: 'gpt-oss:20b',
+      provider: 'ollama',
+      type: 'local',
       strengths: ['code generation', 'reasoning', 'analysis', 'debugging'],
       weaknesses: ['speed', 'resource usage', 'timeouts'],
       recommendedFor: ['complex_coding', 'debugging', 'code_review', 'analysis'],
       size: 'large',
       speed: 'slow',
-      requirements: { minRam: 16384, minVram: 12288, minCores: 4 }
+      requirements: { minRam: 16384, minVram: 12288, minCores: 4 },
+      contextWindow: 8192
+    },
+    // API Models
+    {
+      name: 'claude-3-5-sonnet-20241022',
+      provider: 'anthropic',
+      type: 'api',
+      strengths: ['code generation', 'reasoning', 'analysis', 'complex tasks', 'tool calling'],
+      weaknesses: ['cost per token', 'requires internet'],
+      recommendedFor: ['complex_coding', 'analysis', 'planning', 'debugging'],
+      size: 'large',
+      speed: 'medium',
+      requirements: { minRam: 1024, minCores: 1 },
+      contextWindow: 200000,
+      endpoint: 'https://api.anthropic.com/v1'
+    },
+    {
+      name: 'gpt-4o',
+      provider: 'openai',
+      type: 'api',
+      strengths: ['code generation', 'reasoning', 'multimodal', 'tool calling'],
+      weaknesses: ['cost per token', 'requires internet'],
+      recommendedFor: ['complex_coding', 'analysis', 'planning'],
+      size: 'large',
+      speed: 'medium',
+      requirements: { minRam: 1024, minCores: 1 },
+      contextWindow: 128000,
+      endpoint: 'https://api.openai.com/v1'
+    },
+    {
+      name: 'gemini-1.5-pro',
+      provider: 'google',
+      type: 'api',
+      strengths: ['reasoning', 'large context', 'multimodal'],
+      weaknesses: ['cost per token', 'requires internet'],
+      recommendedFor: ['analysis', 'planning', 'complex_reasoning'],
+      size: 'large',
+      speed: 'medium',
+      requirements: { minRam: 1024, minCores: 1 },
+      contextWindow: 1000000,
+      endpoint: 'https://generativelanguage.googleapis.com/v1'
     }
   ];
 
   constructor() {
     this.errorHandler = new AutonomousErrorHandler();
     this.initializeSystemAnalysis();
+  }
+
+  /**
+   * Add API model configuration
+   */
+  addApiModel(config: {
+    name: string;
+    provider: 'openai' | 'anthropic' | 'google' | 'huggingface';
+    apiKey: string;
+    endpoint?: string;
+  }): Promise<boolean> {
+    return new Promise((resolve) => {
+      try {
+        // Find existing model configuration to update
+        const existingModel = this.modelCapabilities.find(m => 
+          m.name === config.name || 
+          (m.provider === config.provider && m.type === 'api')
+        );
+
+        if (existingModel) {
+          existingModel.apiKey = config.apiKey;
+          if (config.endpoint) {
+            existingModel.endpoint = config.endpoint;
+          }
+          logger.info(`Updated API model configuration: ${config.name}`);
+        } else {
+          // Add new API model (basic configuration)
+          const newModel: ModelCapability = {
+            name: config.name,
+            provider: config.provider,
+            type: 'api',
+            strengths: ['api_model'],
+            weaknesses: ['requires_internet', 'cost'],
+            recommendedFor: ['general'],
+            size: 'medium',
+            speed: 'medium',
+            requirements: { minRam: 1024, minCores: 1 },
+            apiKey: config.apiKey,
+            endpoint: config.endpoint,
+            contextWindow: 8192
+          };
+          
+          this.modelCapabilities.push(newModel);
+          logger.info(`Added new API model: ${config.name}`);
+        }
+
+        resolve(true);
+      } catch (error) {
+        logger.error('Failed to add API model:', error);
+        resolve(false);
+      }
+    });
+  }
+
+  /**
+   * Test API model connection
+   */
+  async testApiModel(modelName: string): Promise<boolean> {
+    const model = this.modelCapabilities.find(m => m.name === modelName);
+    if (!model || model.type !== 'api' || !model.apiKey) {
+      return false;
+    }
+
+    try {
+      switch (model.provider) {
+        case 'anthropic':
+          return await this.testAnthropicModel(model);
+        case 'openai':
+          return await this.testOpenAIModel(model);
+        case 'google':
+          return await this.testGoogleModel(model);
+        default:
+          return false;
+      }
+    } catch (error) {
+      logger.error(`API model test failed for ${modelName}:`, error);
+      return false;
+    }
+  }
+
+  private async testAnthropicModel(model: ModelCapability): Promise<boolean> {
+    try {
+      const response = await axios.post(
+        `${model.endpoint}/messages`,
+        {
+          model: model.name,
+          max_tokens: 10,
+          messages: [{ role: 'user', content: 'Hi' }]
+        },
+        {
+          headers: {
+            'x-api-key': model.apiKey,
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01'
+          },
+          timeout: 10000
+        }
+      );
+      return response.status === 200;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private async testOpenAIModel(model: ModelCapability): Promise<boolean> {
+    try {
+      const response = await axios.post(
+        `${model.endpoint}/chat/completions`,
+        {
+          model: model.name,
+          max_tokens: 10,
+          messages: [{ role: 'user', content: 'Hi' }]
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${model.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+      return response.status === 200;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private async testGoogleModel(model: ModelCapability): Promise<boolean> {
+    try {
+      const response = await axios.post(
+        `${model.endpoint}/models/${model.name}:generateContent?key=${model.apiKey}`,
+        {
+          contents: [{ parts: [{ text: 'Hi' }] }]
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+      return response.status === 200;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get all available models (local + API)
+   */
+  async getAllAvailableModels(): Promise<ModelCapability[]> {
+    // Get local models
+    const localModels = await this.detectAvailableModels();
+    
+    // Filter model capabilities to show available ones
+    const availableModels = this.modelCapabilities.filter(model => {
+      if (model.type === 'local') {
+        return localModels.includes(model.name) || 
+               localModels.some(local => local.startsWith(model.name.split(':')[0]));
+      } else if (model.type === 'api') {
+        return !!model.apiKey; // API model is available if it has an API key
+      }
+      return false;
+    });
+
+    return availableModels;
+  }
+
+  /**
+   * Remove API model
+   */
+  removeApiModel(modelName: string): boolean {
+    const index = this.modelCapabilities.findIndex(m => m.name === modelName && m.type === 'api');
+    if (index !== -1) {
+      this.modelCapabilities.splice(index, 1);
+      logger.info(`Removed API model: ${modelName}`);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -404,6 +664,96 @@ export class IntelligentModelSelector {
   }
 
   /**
+   * Get model size information from Ollama
+   */
+  private async getModelSizes(): Promise<Map<string, number>> {
+    const modelSizes = new Map<string, number>();
+    try {
+      const { stdout } = await execAsync('ollama list');
+      const lines = stdout.split('\n').slice(1); // Skip header
+      
+      for (const line of lines) {
+        if (line.trim()) {
+          const parts = line.split(/\s+/);
+          if (parts.length >= 3) {
+            const modelName = parts[0];
+            const sizeStr = parts[2];
+            // Parse size (e.g., "5.0 GB", "19 GB")
+            const sizeMatch = sizeStr.match(/(\d+\.?\d*)\s*(GB|MB)/i);
+            if (sizeMatch) {
+              const size = parseFloat(sizeMatch[1]);
+              const unit = sizeMatch[2].toLowerCase();
+              const sizeInMB = unit === 'gb' ? size * 1024 : size;
+              modelSizes.set(modelName, sizeInMB);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to get model sizes:', error);
+    }
+    return modelSizes;
+  }
+
+  /**
+   * Check if model can actually run on the system (memory check)
+   */
+  private async canModelActuallyRun(modelName: string): Promise<boolean> {
+    try {
+      const modelSizes = await this.getModelSizes();
+      const modelSize = modelSizes.get(modelName);
+      
+      // Known problematic models that require high memory
+      const highMemoryModels: Record<string, number> = {
+        'codellama:34b': 20600,  // 20.6 GB
+        'qwq:32b': 19000,        // ~19 GB
+        'llama3.1:70b': 40000,   // ~40 GB
+        'qwen2.5:72b': 41000,    // ~41 GB
+      };
+      
+      // Check if it's a known high-memory model
+      if (highMemoryModels[modelName]) {
+        const requiredMemory = highMemoryModels[modelName];
+        const availableMemory = this.systemSpecs?.memory?.available || 0;
+        
+        if (requiredMemory > availableMemory) {
+          logger.info(`❌ ${modelName} requires ${requiredMemory}MB but only ${availableMemory.toFixed(0)}MB available`);
+          return false;
+        }
+      }
+      
+      if (!modelSize || !this.systemSpecs) {
+        logger.debug(`Cannot determine exact size for ${modelName} - checking known constraints`);
+        
+        // Conservative: reject known large models when we can't determine size
+        if (modelName.includes('34b') || modelName.includes('70b') || modelName.includes('72b')) {
+          logger.info(`⚠️ Rejecting large model ${modelName} - cannot verify memory requirements`);
+          return false;
+        }
+        
+        // Allow smaller models by default
+        return true;
+      }
+      
+      // Rule: Model should use less than 80% of available memory
+      const usableMemory = this.systemSpecs.memory.available * 0.8;
+      const canRun = modelSize <= usableMemory;
+      
+      if (!canRun) {
+        logger.info(`❌ ${modelName} (${modelSize.toFixed(1)}MB) exceeds available memory (${usableMemory.toFixed(1)}MB)`);
+      } else {
+        logger.debug(`✅ ${modelName} (${modelSize.toFixed(1)}MB) fits in memory (${usableMemory.toFixed(1)}MB available)`);
+      }
+      
+      return canRun;
+    } catch (error) {
+      logger.warn(`Error checking if ${modelName} can run:`, error);
+      // Conservative: reject if we can't check
+      return false;
+    }
+  }
+
+  /**
    * Detect available Ollama models
    */
   private async detectAvailableModels(): Promise<string[]> {
@@ -484,6 +834,53 @@ export class IntelligentModelSelector {
     
     logger.debug(`✅ ${model.name} is compatible with system specs`);
     return true;
+  }
+
+  /**
+   * Get best model that can actually run on the system
+   */
+  async getBestRunnableModel(taskType: string = 'coding'): Promise<string> {
+    await this.detectSystemSpecs();
+    const availableModels = await this.detectAvailableModels();
+    
+    // Filter models that can actually run
+    const runnableModels = [];
+    for (const model of availableModels) {
+      if (await this.canModelActuallyRun(model)) {
+        runnableModels.push(model);
+      }
+    }
+    
+    if (runnableModels.length === 0) {
+      throw new Error('No models can run on this system. Please install a smaller model.');
+    }
+    
+    // Prioritize models based on task type and quality
+    const modelPreferences = {
+      'coding': ['codellama', 'qwen', 'deepseek', 'gemma3n', 'gemma'],
+      'general': ['llama', 'gemma3n', 'qwen', 'gemma'],
+      'analysis': ['qwen', 'llama', 'gemma3n', 'codellama']
+    };
+    
+    const preferences = modelPreferences[taskType as keyof typeof modelPreferences] || modelPreferences.general;
+    
+    // Find best match
+    for (const preference of preferences) {
+      const match = runnableModels.find(model => 
+        model.toLowerCase().includes(preference) && 
+        !model.includes('2b') && // Avoid very small models
+        !model.includes('1b')
+      );
+      if (match) {
+        logger.info(`🎯 Selected best runnable model for ${taskType}: ${match}`);
+        return match;
+      }
+    }
+    
+    // Fallback to any runnable model
+    const fallback = runnableModels[0];
+    logger.warn(`⚠️ Using fallback model: ${fallback}`);
+    return fallback;
   }
 
   /**

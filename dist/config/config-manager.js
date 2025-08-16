@@ -127,6 +127,44 @@ export class ConfigManager {
                 maxTokens: 20000,
                 temperature: 0.7
             },
+            llmProviders: {
+                default: "ollama-local",
+                providers: {
+                    "ollama-local": {
+                        provider: "ollama",
+                        endpoint: "http://localhost:11434",
+                        model: "auto",
+                        maxTokens: 4096,
+                        temperature: 0.7,
+                        timeout: 30000,
+                        enabled: true
+                    },
+                    "openai-gpt4": {
+                        provider: "openai",
+                        model: "gpt-4o",
+                        maxTokens: 4096,
+                        temperature: 0.7,
+                        timeout: 30000,
+                        enabled: false
+                    },
+                    "anthropic-claude": {
+                        provider: "anthropic",
+                        model: "claude-3-5-sonnet-20241022",
+                        maxTokens: 4096,
+                        temperature: 0.7,
+                        timeout: 30000,
+                        enabled: false
+                    },
+                    "google-gemini": {
+                        provider: "google",
+                        model: "gemini-1.5-pro",
+                        maxTokens: 4096,
+                        temperature: 0.7,
+                        timeout: 30000,
+                        enabled: false
+                    }
+                }
+            },
             voices: {
                 default: ["explorer", "maintainer"],
                 available: ["explorer", "maintainer", "analyzer", "developer", "implementor", "security", "architect", "designer", "optimizer"],

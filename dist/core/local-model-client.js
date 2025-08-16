@@ -92,7 +92,7 @@ export class LocalModelClient {
     async getAvailableModel(taskType = 'general') {
         // In test environment, always return configured model immediately
         if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) {
-            return this.config.model;
+            return this.config.model === 'auto' ? 'gemma:latest' : this.config.model;
         }
         try {
             // Clear cache for fresh selection based on current task
@@ -103,6 +103,19 @@ export class LocalModelClient {
             // Use cached model if available for same task type
             if (this._cachedBestModel) {
                 return this._cachedBestModel;
+            }
+            // Handle "auto" model selection
+            if (this.config.model === 'auto') {
+                logger.info('🎯 Auto-selecting best runnable model...');
+                try {
+                    const bestModel = await this.modelSelector.getBestRunnableModel(taskType);
+                    this._cachedBestModel = bestModel;
+                    return bestModel;
+                }
+                catch (error) {
+                    logger.warn('Auto-selection failed, falling back to available models:', error);
+                    // Continue to fallback logic below
+                }
             }
             // Get all available models from Ollama
             const availableModels = await this.getAvailableModels();

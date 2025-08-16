@@ -348,7 +348,7 @@ The agent will automatically:
    * Show current agent status
    */
   private showAgentStatus(): void {
-    const agentContext = this.agent.getContext();
+    const agentContext = this.agent.getAgentContext();
     const tools = this.agent.getAvailableTools();
     
     console.log(chalk.green(`🤖 Enhanced Agent Status:
@@ -371,7 +371,7 @@ ${tools.reduce((acc, tool) => {
    * Show conversation memory
    */
   private showMemory(): void {
-    const agentContext = this.agent.getContext();
+    const agentContext = this.agent.getAgentContext();
     
     console.log(chalk.cyan('💭 Conversation Memory:'));
     

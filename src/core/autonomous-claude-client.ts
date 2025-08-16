@@ -418,7 +418,7 @@ export class AutonomousClaudeClient {
       model: this.context.config.model.name,
       directory: this.currentDirectory,
       historySize: this.conversationHistory.length,
-      agentMessages: this.agent.getContext().messages.length
+      agentMessages: this.agent.getAgentContext().messages.length
     };
     
     console.log(chalk.cyan('\nSystem Status:'));

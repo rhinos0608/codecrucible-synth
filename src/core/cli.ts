@@ -2,7 +2,11 @@ import { LocalModelClient, ProjectContext } from './local-model-client.js';
 import { VoiceArchetypeSystem, SynthesisResult, IterativeResult } from '../voices/voice-archetype-system.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
+import { AgentOrchestrator } from './agent-orchestrator.js';
 import { logger } from './logger.js';
+import { MultiLLMProvider, createMultiLLMProvider } from './multi-llm-provider.js';
+import { RAGSystem, globalRAGSystem } from './rag-system.js';
+import { globalEditConfirmation } from './edit-confirmation-system.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
@@ -18,6 +22,10 @@ interface CLIOptions {
   project?: boolean;
   interactive?: boolean;
   council?: boolean;
+  agentic?: boolean;
+  autonomous?: boolean;
+  quick?: boolean;
+  direct?: boolean;
 }
 
 export interface CLIContext {
@@ -25,6 +33,9 @@ export interface CLIContext {
   voiceSystem: VoiceArchetypeSystem;
   mcpManager: MCPServerManager;
   config: AppConfig;
+  agentOrchestrator?: AgentOrchestrator;
+  multiLLMProvider?: MultiLLMProvider;
+  ragSystem?: RAGSystem;
 }
 
 export class CodeCrucibleCLI {
@@ -32,6 +43,11 @@ export class CodeCrucibleCLI {
 
   constructor(context: CLIContext) {
     this.context = context;
+    
+    // Initialize agent orchestrator for agentic capabilities
+    if (!this.context.agentOrchestrator) {
+      this.context.agentOrchestrator = new AgentOrchestrator(context);
+    }
   }
 
   async handleGeneration(prompt: string, options: CLIOptions): Promise<void> {
@@ -41,9 +57,22 @@ export class CodeCrucibleCLI {
         return;
       }
 
+      // Check for direct/quick mode for simple operations
+      if (options.quick || options.direct || this.isSimpleFileOperation(prompt)) {
+        await this.handleDirectMode(prompt, options);
+        return;
+      }
+
+      // Check for agentic mode
+      if (options.agentic || options.autonomous) {
+        await this.handleAgenticMode(prompt, options);
+        return;
+      }
+
       if (!prompt) {
         console.log(chalk.yellow('💡 No prompt provided. Starting interactive mode...'));
         console.log(chalk.gray('   You can also use: cc "Your prompt here" for direct commands'));
+        console.log(chalk.gray('   Or try: cc --agentic "Your goal here" for autonomous processing'));
         await this.handleInteractiveMode(options);
         return;
       }
@@ -474,7 +503,8 @@ Focus on actionable, specific recommendations with clear business value.`;
               { name: '📁 Analyze file', value: 'file' },
               { name: '🏗️  Project operation', value: 'project' },
               { name: '🎭 Single voice consultation', value: 'voice' },
-              { name: '🤖 Select AI model', value: 'model' },
+              { name: '🤖 Autonomous Agentic Mode', value: 'agentic' },
+              { name: '🔧 Select AI model', value: 'model' },
               { name: '⚙️  Configure settings', value: 'config' },
               { name: '🚪 Exit', value: 'exit' }
             ]
@@ -535,7 +565,9 @@ Focus on actionable, specific recommendations with clear business value.`;
 
   async handleModelManagement(options: any): Promise<void> {
     const { EnhancedModelManager } = await import('./enhanced-model-manager.js');
+    const { IntelligentModelSelector } = await import('./intelligent-model-selector.js');
     const modelManager = new EnhancedModelManager(this.context.config.model.endpoint);
+    const modelSelector = new IntelligentModelSelector();
 
     if (options.status) {
       const spinner = ora('Checking system status...').start();
@@ -553,22 +585,30 @@ Focus on actionable, specific recommendations with clear business value.`;
           console.log(chalk.gray(`   Version: ${status.version}`));
         }
         
-        if (isReady) {
-          const bestModel = await modelManager.getBestAvailableModel();
-          console.log(chalk.green(`✅ AI model ready: ${bestModel}`));
-          
-          // Show available models
-          const models = await modelManager.getAvailableModels();
-          const installed = models.filter(m => m.available);
-          if (installed.length > 1) {
-            console.log(chalk.cyan('\n📚 Available models:'));
-            installed.forEach(model => {
-              console.log(chalk.gray(`   • ${model.name} (${model.size})${model.name === bestModel ? ' ⭐ active' : ''}`));
-            });
-          }
-        } else {
+        // Show all available models (local + API)
+        const allModels = await modelSelector.getAllAvailableModels();
+        const localModels = allModels.filter(m => m.type === 'local');
+        const apiModels = allModels.filter(m => m.type === 'api');
+        
+        console.log(chalk.cyan('\n📚 Available Models:'));
+        
+        if (localModels.length > 0) {
+          console.log(chalk.white('   Local Models (Ollama):'));
+          localModels.forEach(model => {
+            console.log(chalk.gray(`   • ${model.name} (${model.size}) - ${model.provider}`));
+          });
+        }
+        
+        if (apiModels.length > 0) {
+          console.log(chalk.white('\n   API Models:'));
+          apiModels.forEach(model => {
+            console.log(chalk.gray(`   • ${model.name} (${model.provider}) - ${model.contextWindow?.toLocaleString()} context`));
+          });
+        }
+        
+        if (allModels.length === 0) {
           console.log(chalk.red('❌ No AI models available'));
-          console.log(chalk.yellow('💡 Run: cc model --setup'));
+          console.log(chalk.yellow('💡 Run: cc model --setup or cc model --add-api'));
         }
         
       } catch (error) {
@@ -688,6 +728,179 @@ Focus on actionable, specific recommendations with clear business value.`;
         console.log(chalk.gray('Cancelled.'));
       }
     }
+
+    // API Model Management
+    if (options.addApi) {
+      console.log(chalk.blue('🔑 Adding API Model Configuration\n'));
+      
+      try {
+        const answers = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'provider',
+            message: 'Select API provider:',
+            choices: [
+              { name: 'Claude (Anthropic)', value: 'anthropic' },
+              { name: 'GPT (OpenAI)', value: 'openai' },
+              { name: 'Gemini (Google)', value: 'google' },
+              { name: 'Hugging Face', value: 'huggingface' }
+            ]
+          },
+          {
+            type: 'input',
+            name: 'apiKey',
+            message: 'Enter your API key:',
+            validate: (input: string) => input.trim().length > 0 || 'API key is required'
+          },
+          {
+            type: 'input',
+            name: 'model',
+            message: 'Enter model name (e.g., claude-3-5-sonnet-20241022, gpt-4o, gemini-1.5-pro):',
+            validate: (input: string) => input.trim().length > 0 || 'Model name is required'
+          },
+          {
+            type: 'input',
+            name: 'endpoint',
+            message: 'Custom endpoint (optional, press enter for default):',
+            default: ''
+          }
+        ]);
+
+        const config = {
+          name: answers.model,
+          provider: answers.provider,
+          apiKey: answers.apiKey,
+          ...(answers.endpoint && { endpoint: answers.endpoint })
+        };
+
+        const success = await modelSelector.addApiModel(config);
+        
+        if (success) {
+          console.log(chalk.green(`✅ Successfully added API model: ${answers.model}`));
+          
+          // Test the connection
+          const spinner = ora('Testing API connection...').start();
+          const testResult = await modelSelector.testApiModel(answers.model);
+          
+          if (testResult) {
+            spinner.succeed('API model connection successful!');
+          } else {
+            spinner.warn('API model added but connection test failed. Please check your API key and settings.');
+          }
+        } else {
+          console.log(chalk.red('❌ Failed to add API model'));
+        }
+        
+      } catch (error) {
+        console.error(chalk.red('❌ Failed to add API model:'), error instanceof Error ? error.message : error);
+      }
+    }
+
+    if (options.listApi) {
+      console.log(chalk.cyan('🔑 API Models:\n'));
+      
+      try {
+        const allModels = await modelSelector.getAllAvailableModels();
+        const apiModels = allModels.filter(m => m.type === 'api');
+        
+        if (apiModels.length === 0) {
+          console.log(chalk.yellow('No API models configured.'));
+          console.log(chalk.gray('Run: cc model --add-api'));
+        } else {
+          apiModels.forEach(model => {
+            console.log(chalk.white(`${model.name}`));
+            console.log(chalk.gray(`   Provider: ${model.provider}`));
+            console.log(chalk.gray(`   Context: ${model.contextWindow?.toLocaleString()} tokens`));
+            console.log(chalk.gray(`   API Key: ${model.apiKey ? '✅ Configured' : '❌ Missing'}`));
+            console.log();
+          });
+        }
+        
+      } catch (error) {
+        console.error(chalk.red('❌ Failed to list API models:'), error instanceof Error ? error.message : error);
+      }
+    }
+
+    if (options.removeApi) {
+      const modelName = options.removeApi;
+      console.log(chalk.yellow(`🗑️  Removing API model: ${modelName}`));
+      
+      const { confirm } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'confirm',
+        message: `Are you sure you want to remove API model ${modelName}?`,
+        default: false
+      }]);
+      
+      if (confirm) {
+        const success = modelSelector.removeApiModel(modelName);
+        if (success) {
+          console.log(chalk.green(`✅ Successfully removed API model: ${modelName}`));
+        } else {
+          console.log(chalk.red(`❌ Failed to remove API model: ${modelName}`));
+        }
+      } else {
+        console.log(chalk.gray('Cancelled.'));
+      }
+    }
+
+    if (options.testApi) {
+      const modelName = options.testApi;
+      console.log(chalk.blue(`🧪 Testing API model: ${modelName}`));
+      
+      const spinner = ora('Testing API connection...').start();
+      
+      try {
+        const success = await modelSelector.testApiModel(modelName);
+        
+        if (success) {
+          spinner.succeed(`API model ${modelName} is working correctly!`);
+        } else {
+          spinner.fail(`API model ${modelName} test failed`);
+          console.log(chalk.yellow('💡 Please check your API key and model configuration'));
+        }
+        
+      } catch (error) {
+        spinner.fail('API test failed');
+        console.error(chalk.red('❌ Test failed:'), error instanceof Error ? error.message : error);
+      }
+    }
+
+    if (options.select) {
+      console.log(chalk.blue('🎯 Select Active Model\n'));
+      
+      try {
+        const allModels = await modelSelector.getAllAvailableModels();
+        
+        if (allModels.length === 0) {
+          console.log(chalk.red('❌ No models available'));
+          console.log(chalk.yellow('💡 Run: cc model --setup or cc model --add-api'));
+          return;
+        }
+
+        const choices = allModels.map(model => ({
+          name: `${model.name} (${model.type === 'local' ? 'Local' : 'API'} - ${model.provider})`,
+          value: model.name
+        }));
+
+        const { selectedModel } = await inquirer.prompt([{
+          type: 'list',
+          name: 'selectedModel',
+          message: 'Select a model to use:',
+          choices
+        }]);
+
+        // Update configuration
+        const { ConfigManager } = await import('../config/config-manager.js');
+        const configManager = await ConfigManager.getInstance();
+        await configManager.set('model.name', selectedModel);
+        
+        console.log(chalk.green(`✅ Active model set to: ${selectedModel}`));
+        
+      } catch (error) {
+        console.error(chalk.red('❌ Model selection failed:'), error instanceof Error ? error.message : error);
+      }
+    }
   }
 
   async handleVoiceManagement(options: any): Promise<void> {
@@ -715,6 +928,104 @@ Focus on actionable, specific recommendations with clear business value.`;
     if (options.test) {
       const testPrompt = 'Create a simple function to add two numbers';
       await this.handleVoiceSpecific(options.test, testPrompt);
+    }
+  }
+
+  async handleEditManagement(options: any): Promise<void> {
+    if (!globalEditConfirmation) {
+      console.error(chalk.red('❌ Edit confirmation system not initialized'));
+      return;
+    }
+
+    if (options.pending) {
+      const pendingCount = globalEditConfirmation.getPendingEditsCount();
+      if (pendingCount === 0) {
+        console.log(chalk.yellow('📝 No pending edits'));
+        return;
+      }
+
+      console.log(chalk.cyan(`📝 ${pendingCount} pending edits found`));
+      
+      // Generate and display summary
+      const summary = globalEditConfirmation['generateEditSummary']();
+      globalEditConfirmation['displayEditSummary'](summary);
+      return;
+    }
+
+    if (options.clear) {
+      const pendingCount = globalEditConfirmation.getPendingEditsCount();
+      if (pendingCount === 0) {
+        console.log(chalk.yellow('📝 No pending edits to clear'));
+        return;
+      }
+
+      const { confirm } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirm',
+          message: `Clear all ${pendingCount} pending edits?`,
+          default: false
+        }
+      ]);
+
+      if (confirm) {
+        globalEditConfirmation.clearPendingEdits();
+        console.log(chalk.green('✅ All pending edits cleared'));
+      }
+      return;
+    }
+
+    if (options.confirm) {
+      const pendingCount = globalEditConfirmation.getPendingEditsCount();
+      if (pendingCount === 0) {
+        console.log(chalk.yellow('📝 No pending edits to confirm'));
+        return;
+      }
+
+      // Set batch or individual mode
+      if (options.batch) {
+        // Override default to batch mode
+        globalEditConfirmation['options'].batchMode = true;
+      } else if (options.individual) {
+        globalEditConfirmation['options'].batchMode = false;
+      }
+
+      console.log(chalk.cyan(`🔍 Confirming ${pendingCount} pending edits...`));
+      
+      try {
+        const { approved, rejected } = await globalEditConfirmation.confirmAllEdits();
+        const summary = await globalEditConfirmation.applyEdits(approved);
+
+        console.log(chalk.green(`\n✅ Edit operation completed:`));
+        console.log(chalk.green(`   Applied: ${approved.length} edits`));
+        console.log(chalk.yellow(`   Rejected: ${rejected.length} edits`));
+        
+        if (summary.totalFiles > 0) {
+          console.log(chalk.cyan(`\n📊 Summary:`));
+          console.log(`   Files modified: ${summary.filesModified}`);
+          console.log(`   Files created: ${summary.filesCreated}`);
+          console.log(`   Files deleted: ${summary.filesDeleted}`);
+          console.log(`   Lines added: ${summary.linesAdded}`);
+          console.log(`   Lines removed: ${summary.linesRemoved}`);
+          console.log(`   Lines changed: ${summary.linesChanged}`);
+        }
+      } catch (error) {
+        console.error(chalk.red('❌ Failed to confirm edits:'), error instanceof Error ? error.message : error);
+      }
+      return;
+    }
+
+    // Default: show help for edit command
+    console.log(chalk.cyan('📝 Edit Management Commands:\n'));
+    console.log(chalk.green('  cc edits --pending    ') + chalk.gray('Show pending edits'));
+    console.log(chalk.green('  cc edits --confirm    ') + chalk.gray('Confirm and apply all pending edits'));
+    console.log(chalk.green('  cc edits --clear      ') + chalk.gray('Clear all pending edits'));
+    console.log(chalk.green('  cc edits --batch      ') + chalk.gray('Use batch confirmation mode'));
+    console.log(chalk.green('  cc edits --individual ') + chalk.gray('Use individual confirmation mode'));
+    
+    const pendingCount = globalEditConfirmation.getPendingEditsCount();
+    if (pendingCount > 0) {
+      console.log(chalk.yellow(`\n⚠️  ${pendingCount} edits are currently pending confirmation`));
     }
   }
 
@@ -746,9 +1057,115 @@ Focus on actionable, specific recommendations with clear business value.`;
     console.log(chalk.green('  cc --interactive'));
     console.log(chalk.green('  cc i\n'));
 
+    console.log(chalk.bold('Agentic Mode (Autonomous AI):'));
+    console.log(chalk.green('  cc --agentic "Analyze and improve this codebase"'));
+    console.log(chalk.green('  cc --autonomous "Fix all issues in the project"'));
+    console.log(chalk.green('  cc --agentic "Implement comprehensive testing strategy"\n'));
+
+    console.log(chalk.bold('Edit Management:'));
+    console.log(chalk.green('  cc edits --pending          # Show pending edits'));
+    console.log(chalk.green('  cc edits --confirm          # Confirm all edits'));
+    console.log(chalk.green('  cc edits --confirm --batch  # Batch confirmation'));
+    console.log(chalk.green('  cc edits --clear            # Clear pending edits\n'));
+    
     console.log(chalk.bold('Configuration:'));
     console.log(chalk.green('  cc config --list'));
     console.log(chalk.green('  cc config --set voices.default=explorer,maintainer'));
+    console.log(chalk.gray('\n💡 Use --help with any command for detailed options'));
+    console.log(chalk.gray('🔒 File edits require confirmation for safety by default'));
+  }
+
+  /**
+   * Handle autonomous agentic mode processing
+   */
+  async handleAgenticMode(prompt: string, options: CLIOptions): Promise<void> {
+    if (!this.context.agentOrchestrator) {
+      console.error(chalk.red('❌ Agent Orchestrator not available'));
+      return;
+    }
+
+    if (!prompt) {
+      console.log(chalk.yellow('💡 Agentic mode requires a goal or objective'));
+      console.log(chalk.gray('   Example: cc --agentic "Analyze and improve code quality"'));
+      return;
+    }
+
+    console.log(chalk.magenta('🤖 Entering Autonomous Agentic Mode'));
+    console.log(chalk.cyan('━'.repeat(60)));
+    console.log(chalk.bold(`🎯 Goal: ${prompt}`));
+    console.log(chalk.gray('   The AI will autonomously plan and execute tasks to achieve this goal'));
+    console.log(chalk.cyan('━'.repeat(60)));
+
+    const spinner = ora('Initializing autonomous agent system...').start();
+    
+    try {
+      spinner.text = 'Analyzing goal and planning autonomous workflow...';
+      
+      // Get current working directory for project context
+      const projectPath = process.cwd();
+      
+      // Process the request autonomously
+      const result = await this.context.agentOrchestrator.processAgenticRequest(
+        prompt,
+        projectPath,
+        {
+          userId: 'cli_user',
+          maxComplexity: options.council ? 'high' : 'medium',
+          includeProactiveSuggestions: true,
+          ...options
+        }
+      );
+
+      spinner.succeed('Autonomous processing completed!');
+
+      // Display results with enhanced formatting
+      console.log('\n' + chalk.magenta('🤖 Autonomous Agent Results'));
+      console.log(chalk.cyan('━'.repeat(60)));
+      
+      if (typeof result === 'string') {
+        console.log(result);
+      } else {
+        console.log(JSON.stringify(result, null, 2));
+      }
+      
+      console.log(chalk.cyan('━'.repeat(60)));
+      
+      // Show agent orchestrator statistics
+      const stats = this.context.agentOrchestrator.getWorkflowStats();
+      if (stats.activeWorkflows > 0 || stats.agentPerformance.length > 0) {
+        console.log(chalk.blue('\n📊 Agent Performance Summary:'));
+        console.log(chalk.gray(`   Active Workflows: ${stats.activeWorkflows}`));
+        console.log(chalk.gray(`   Total Agents: ${stats.totalAgents}`));
+        
+        const topAgents = stats.agentPerformance
+          .sort((a: any, b: any) => b.successRate - a.successRate)
+          .slice(0, 3);
+        
+        if (topAgents.length > 0) {
+          console.log(chalk.gray('   Top Performing Agents:'));
+          topAgents.forEach((agent: any) => {
+            const successRate = Math.round(agent.successRate * 100);
+            const quality = Math.round(agent.avgQuality * 100);
+            console.log(chalk.gray(`     • ${agent.name}: ${successRate}% success, ${quality}% quality`));
+          });
+        }
+      }
+
+    } catch (error) {
+      spinner.fail('Autonomous processing failed');
+      
+      console.error(chalk.red('\n❌ Agentic Mode Error:'));
+      console.error(chalk.red(error instanceof Error ? error.message : 'Unknown error'));
+      
+      // Provide helpful guidance
+      console.log(chalk.yellow('\n💡 Troubleshooting Tips:'));
+      console.log(chalk.gray('   • Ensure you have a stable internet connection'));
+      console.log(chalk.gray('   • Try a simpler, more specific goal'));
+      console.log(chalk.gray('   • Check if local AI models are properly configured'));
+      console.log(chalk.gray('   • Use regular mode: cc "your prompt" (without --agentic)'));
+      
+      throw error;
+    }
   }
 
   private displayIterativeResults(result: IterativeResult): void {
@@ -977,6 +1394,20 @@ Focus on actionable, specific recommendations with clear business value.`;
         }
         break;
 
+      case 'agentic':
+        const { agenticGoal } = await inquirer.prompt([
+          { 
+            type: 'input', 
+            name: 'agenticGoal', 
+            message: 'Enter your goal for autonomous AI processing:',
+            transformer: (input: string) => chalk.cyan(input)
+          }
+        ]);
+        if (agenticGoal) {
+          await this.handleAgenticMode(agenticGoal, { agentic: true });
+        }
+        break;
+
       case 'model':
         await this.handleModelSelection();
         break;
@@ -1083,5 +1514,389 @@ Focus on actionable, specific recommendations with clear business value.`;
     } catch {
       return value;
     }
+  }
+
+  /**
+   * Handle direct mode for simple file operations - provides immediate, specific responses
+   */
+  private async handleDirectMode(prompt: string, options: CLIOptions): Promise<void> {
+    console.log(chalk.blue('⚡ Direct Mode - Providing immediate response...'));
+    
+    try {
+      const normalizedPrompt = prompt.toLowerCase();
+      
+      // Handle file listing requests
+      if (normalizedPrompt.includes('list') && normalizedPrompt.includes('src')) {
+        await this.handleDirectFileList('src');
+        return;
+      }
+      
+      if (normalizedPrompt.includes('list') && normalizedPrompt.includes('file')) {
+        const directory = this.extractDirectoryFromPrompt(prompt) || '.';
+        await this.handleDirectFileList(directory);
+        return;
+      }
+      
+      // Handle specific file reading
+      const filePattern = prompt.match(/read|show|view.*?([a-zA-Z0-9._/-]+\.[a-zA-Z]+)/i);
+      if (filePattern) {
+        await this.handleDirectFileRead(filePattern[1]);
+        return;
+      }
+      
+      // Handle project structure queries
+      if (normalizedPrompt.includes('structure') || normalizedPrompt.includes('organization')) {
+        await this.handleDirectProjectStructure();
+        return;
+      }
+      
+      // For complex queries that include file operations, use agentic mode
+      console.log(chalk.yellow('🔄 Switching to agentic mode for complex analysis...'));
+      await this.handleAgenticMode(prompt, options);
+      
+    } catch (error) {
+      console.error(chalk.red('❌ Direct mode failed:'), error instanceof Error ? error.message : error);
+      // Fallback to agentic processing for complex queries
+      await this.handleAgenticMode(prompt, options);
+    }
+  }
+
+  /**
+   * Handle direct file listing with specific, useful output
+   */
+  private async handleDirectFileList(directory: string): Promise<void> {
+    try {
+      const fullPath = join(process.cwd(), directory);
+      const items = await readdir(fullPath, { withFileTypes: true });
+      
+      console.log(chalk.green(`📁 Files in ${directory}:`));
+      console.log(chalk.gray('━'.repeat(50)));
+      
+      // Separate files and directories
+      const directories = items.filter(item => item.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
+      const files = items.filter(item => item.isFile()).sort((a, b) => a.name.localeCompare(b.name));
+      
+      // Show directories first
+      for (const dir of directories) {
+        console.log(chalk.blue(`📁 ${dir.name}/`));
+      }
+      
+      // Group files by extension for better organization
+      const filesByExt = new Map<string, string[]>();
+      for (const file of files) {
+        const ext = extname(file.name) || 'no-extension';
+        if (!filesByExt.has(ext)) {
+          filesByExt.set(ext, []);
+        }
+        filesByExt.get(ext)!.push(file.name);
+      }
+      
+      // Show files grouped by type
+      for (const [ext, fileList] of filesByExt.entries()) {
+        const icon = this.getFileIcon(ext);
+        console.log(chalk.gray(`\n${ext} files:`));
+        for (const fileName of fileList) {
+          console.log(`${icon} ${fileName}`);
+        }
+      }
+      
+      // Show summary
+      console.log(chalk.gray('━'.repeat(50)));
+      console.log(chalk.cyan(`📊 Summary: ${directories.length} directories, ${files.length} files`));
+      
+      // Provide actionable insights
+      const insights = this.generateDirectoryInsights(directories, files, directory);
+      if (insights.length > 0) {
+        console.log(chalk.yellow('\n💡 Quick Insights:'));
+        insights.forEach(insight => console.log(chalk.gray(`   • ${insight}`)));
+      }
+      
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to list ${directory}:`), error instanceof Error ? error.message : error);
+    }
+  }
+
+  /**
+   * Handle direct file reading with context
+   */
+  private async handleDirectFileRead(filePath: string): Promise<void> {
+    try {
+      const content = await readFile(filePath, 'utf-8');
+      const stats = await stat(filePath);
+      
+      console.log(chalk.green(`📄 ${filePath}`));
+      console.log(chalk.gray(`   Size: ${(stats.size / 1024).toFixed(1)}KB | Modified: ${stats.mtime.toLocaleDateString()}`));
+      console.log(chalk.gray('━'.repeat(80)));
+      
+      // Show content with line numbers for better readability
+      const lines = content.split('\n');
+      const maxLineNum = lines.length.toString().length;
+      
+      lines.slice(0, 50).forEach((line, index) => {
+        const lineNum = (index + 1).toString().padStart(maxLineNum, ' ');
+        console.log(chalk.gray(`${lineNum}→`) + line);
+      });
+      
+      if (lines.length > 50) {
+        console.log(chalk.yellow(`... (${lines.length - 50} more lines)`));
+      }
+      
+      // Provide analysis
+      console.log(chalk.gray('━'.repeat(80)));
+      console.log(chalk.cyan('📊 Quick Analysis:'));
+      console.log(chalk.gray(`   • Lines: ${lines.length}`));
+      console.log(chalk.gray(`   • Extension: ${extname(filePath)}`));
+      
+      const analysis = this.analyzeFileContent(content, filePath);
+      analysis.forEach(insight => console.log(chalk.gray(`   • ${insight}`)));
+      
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to read ${filePath}:`), error instanceof Error ? error.message : error);
+    }
+  }
+
+  /**
+   * Handle direct project structure overview
+   */
+  private async handleDirectProjectStructure(): Promise<void> {
+    try {
+      console.log(chalk.green('🏗️  Project Structure Overview:'));
+      console.log(chalk.gray('━'.repeat(60)));
+      
+      // Key directories to check
+      const keyDirs = ['src', 'lib', 'dist', 'build', 'config', 'docs', 'tests', 'test', '__tests__'];
+      const foundDirs: string[] = [];
+      
+      for (const dir of keyDirs) {
+        try {
+          await stat(dir);
+          foundDirs.push(dir);
+        } catch {
+          // Directory doesn't exist
+        }
+      }
+      
+      // Show found directories with purpose
+      const dirPurposes: Record<string, string> = {
+        'src': 'Source code',
+        'lib': 'Library code',
+        'dist': 'Built/compiled output',
+        'build': 'Build artifacts',
+        'config': 'Configuration files',
+        'docs': 'Documentation',
+        'tests': 'Test files',
+        'test': 'Test files',
+        '__tests__': 'Jest test files'
+      };
+      
+      console.log(chalk.blue('📁 Key Directories:'));
+      for (const dir of foundDirs) {
+        const purpose = dirPurposes[dir] || 'Unknown purpose';
+        console.log(`   📁 ${dir}/ - ${chalk.gray(purpose)}`);
+      }
+      
+      // Check for important files
+      const importantFiles = ['package.json', 'tsconfig.json', 'README.md', 'Dockerfile', '.gitignore'];
+      const foundFiles: string[] = [];
+      
+      for (const file of importantFiles) {
+        try {
+          await stat(file);
+          foundFiles.push(file);
+        } catch {
+          // File doesn't exist
+        }
+      }
+      
+      if (foundFiles.length > 0) {
+        console.log(chalk.blue('\n📄 Key Files:'));
+        foundFiles.forEach(file => {
+          const purpose = this.getFilePurpose(file);
+          console.log(`   📄 ${file} - ${chalk.gray(purpose)}`);
+        });
+      }
+      
+      // Provide project insights
+      console.log(chalk.yellow('\n💡 Project Insights:'));
+      const insights = this.generateProjectInsights(foundDirs, foundFiles);
+      insights.forEach(insight => console.log(chalk.gray(`   • ${insight}`)));
+      
+    } catch (error) {
+      console.error(chalk.red('❌ Failed to analyze project structure:'), error instanceof Error ? error.message : error);
+    }
+  }
+
+  /**
+   * Check if prompt is a simple file operation that can be handled directly
+   */
+  private isSimpleFileOperation(prompt: string): boolean {
+    const simple = prompt.toLowerCase();
+    // Only consider truly simple, single-action file operations
+    return (
+      (simple.includes('list') && simple.includes('src') && !simple.includes('purpose') && !simple.includes('analyze')) ||
+      (simple.includes('show') && simple.includes('file') && simple.split(' ').length < 8) ||
+      (simple.startsWith('list files') && simple.length < 50) ||
+      (simple === 'project structure' || simple === 'directory structure')
+    );
+  }
+
+  /**
+   * Extract directory name from prompt
+   */
+  private extractDirectoryFromPrompt(prompt: string): string | null {
+    const patterns = [
+      /in\s+([a-zA-Z0-9_/-]+)/i,
+      /from\s+([a-zA-Z0-9_/-]+)/i,
+      /([a-zA-Z0-9_/-]+)\s+directory/i,
+      /([a-zA-Z0-9_/-]+)\s+folder/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = prompt.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Get appropriate icon for file extension
+   */
+  private getFileIcon(ext: string): string {
+    const icons: Record<string, string> = {
+      '.ts': '🟦',
+      '.js': '🟨',
+      '.json': '📋',
+      '.md': '📝',
+      '.txt': '📄',
+      '.yml': '⚙️',
+      '.yaml': '⚙️',
+      '.html': '🌐',
+      '.css': '🎨',
+      '.scss': '🎨',
+      '.py': '🐍',
+      '.java': '☕',
+      '.cpp': '⚡',
+      '.c': '⚡',
+      '.rs': '🦀',
+      '.go': '🐹',
+      'no-extension': '📄'
+    };
+    
+    return icons[ext] || '📄';
+  }
+
+  /**
+   * Generate insights about directory contents
+   */
+  private generateDirectoryInsights(directories: any[], files: any[], dirName: string): string[] {
+    const insights: string[] = [];
+    
+    if (dirName === 'src' && files.length > 0) {
+      const tsFiles = files.filter(f => f.name.endsWith('.ts')).length;
+      const jsFiles = files.filter(f => f.name.endsWith('.js')).length;
+      
+      if (tsFiles > jsFiles) {
+        insights.push('TypeScript project detected');
+      } else if (jsFiles > 0) {
+        insights.push('JavaScript project detected');
+      }
+      
+      if (files.some(f => f.name.includes('test') || f.name.includes('spec'))) {
+        insights.push('Contains test files');
+      }
+    }
+    
+    if (directories.length > 10) {
+      insights.push('Large project with many subdirectories');
+    }
+    
+    if (files.length === 0 && directories.length === 0) {
+      insights.push('Empty directory');
+    }
+    
+    return insights;
+  }
+
+  /**
+   * Analyze file content and provide insights
+   */
+  private analyzeFileContent(content: string, filePath: string): string[] {
+    const insights: string[] = [];
+    const lines = content.split('\n');
+    
+    // Basic metrics
+    const nonEmptyLines = lines.filter(line => line.trim().length > 0).length;
+    insights.push(`Non-empty lines: ${nonEmptyLines}`);
+    
+    // Language-specific analysis
+    const ext = extname(filePath);
+    if (ext === '.ts' || ext === '.js') {
+      if (content.includes('export')) insights.push('Contains exports');
+      if (content.includes('import')) insights.push('Has imports');
+      if (content.includes('class')) insights.push('Defines classes');
+      if (content.includes('function')) insights.push('Contains functions');
+      if (content.includes('interface')) insights.push('Defines interfaces');
+    }
+    
+    if (ext === '.json') {
+      try {
+        const parsed = JSON.parse(content);
+        insights.push(`JSON keys: ${Object.keys(parsed).length}`);
+      } catch {
+        insights.push('Invalid JSON format');
+      }
+    }
+    
+    return insights;
+  }
+
+  /**
+   * Get file purpose description
+   */
+  private getFilePurpose(fileName: string): string {
+    const purposes: Record<string, string> = {
+      'package.json': 'Node.js dependencies and scripts',
+      'tsconfig.json': 'TypeScript configuration',
+      'README.md': 'Project documentation',
+      'Dockerfile': 'Container configuration',
+      '.gitignore': 'Git ignore rules',
+      'jest.config.js': 'Jest testing configuration',
+      'webpack.config.js': 'Webpack bundler configuration',
+      'vite.config.js': 'Vite build tool configuration'
+    };
+    
+    return purposes[fileName] || 'Configuration or documentation';
+  }
+
+  /**
+   * Generate project-level insights
+   */
+  private generateProjectInsights(dirs: string[], files: string[]): string[] {
+    const insights: string[] = [];
+    
+    // Technology detection
+    if (files.includes('package.json')) {
+      insights.push('Node.js/JavaScript project');
+    }
+    if (files.includes('tsconfig.json')) {
+      insights.push('TypeScript enabled');
+    }
+    if (dirs.includes('src')) {
+      insights.push('Organized source code structure');
+    }
+    if (dirs.includes('tests') || dirs.includes('test') || dirs.includes('__tests__')) {
+      insights.push('Has dedicated test directory');
+    }
+    if (dirs.includes('docs')) {
+      insights.push('Well-documented project');
+    }
+    if (files.includes('Dockerfile')) {
+      insights.push('Containerized application');
+    }
+    
+    return insights;
   }
 }

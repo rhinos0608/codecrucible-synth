@@ -2,6 +2,9 @@ import { LocalModelClient } from './local-model-client.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
+import { AgentOrchestrator } from './agent-orchestrator.js';
+import { MultiLLMProvider } from './multi-llm-provider.js';
+import { RAGSystem } from './rag-system.js';
 interface CLIOptions {
     voices?: string;
     depth?: string;
@@ -10,12 +13,19 @@ interface CLIOptions {
     project?: boolean;
     interactive?: boolean;
     council?: boolean;
+    agentic?: boolean;
+    autonomous?: boolean;
+    quick?: boolean;
+    direct?: boolean;
 }
 export interface CLIContext {
     modelClient: LocalModelClient;
     voiceSystem: VoiceArchetypeSystem;
     mcpManager: MCPServerManager;
     config: AppConfig;
+    agentOrchestrator?: AgentOrchestrator;
+    multiLLMProvider?: MultiLLMProvider;
+    ragSystem?: RAGSystem;
 }
 export declare class CodeCrucibleCLI {
     private context;
@@ -29,7 +39,12 @@ export declare class CodeCrucibleCLI {
     handleConfig(options: any): Promise<void>;
     handleModelManagement(options: any): Promise<void>;
     handleVoiceManagement(options: any): Promise<void>;
+    handleEditManagement(options: any): Promise<void>;
     showExamples(): void;
+    /**
+     * Handle autonomous agentic mode processing
+     */
+    handleAgenticMode(prompt: string, options: CLIOptions): Promise<void>;
     private displayIterativeResults;
     private parseVoices;
     private getProjectContext;
@@ -41,5 +56,49 @@ export declare class CodeCrucibleCLI {
     private handleModelSelection;
     private extractMentionedFiles;
     private parseValue;
+    /**
+     * Handle direct mode for simple file operations - provides immediate, specific responses
+     */
+    private handleDirectMode;
+    /**
+     * Handle direct file listing with specific, useful output
+     */
+    private handleDirectFileList;
+    /**
+     * Handle direct file reading with context
+     */
+    private handleDirectFileRead;
+    /**
+     * Handle direct project structure overview
+     */
+    private handleDirectProjectStructure;
+    /**
+     * Check if prompt is a simple file operation that can be handled directly
+     */
+    private isSimpleFileOperation;
+    /**
+     * Extract directory name from prompt
+     */
+    private extractDirectoryFromPrompt;
+    /**
+     * Get appropriate icon for file extension
+     */
+    private getFileIcon;
+    /**
+     * Generate insights about directory contents
+     */
+    private generateDirectoryInsights;
+    /**
+     * Analyze file content and provide insights
+     */
+    private analyzeFileContent;
+    /**
+     * Get file purpose description
+     */
+    private getFilePurpose;
+    /**
+     * Generate project-level insights
+     */
+    private generateProjectInsights;
 }
 export {};

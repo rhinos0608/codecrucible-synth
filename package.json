@@ -1,6 +1,6 @@
 {
   "name": "codecrucible-synth",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Enhanced agentic coding assistant with ReAct pattern, tool integration, and advanced planning capabilities",
   "main": "dist/index.js",
   "type": "module",

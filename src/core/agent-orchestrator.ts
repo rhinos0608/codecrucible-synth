@@ -8,6 +8,8 @@ import { IntentClassifier } from './intent-classifier.js';
 import { GoalDecomposer } from './goal-decomposer.js';
 import { SelfCorrectionFramework } from './self-correction-framework.js';
 import { ProactiveTaskSuggester } from './proactive-task-suggester.js';
+import { AutonomousCodebaseAnalyzer } from './autonomous-codebase-analyzer.js';
+import { timeoutManager } from './timeout-manager.js';
 
 export interface Task {
   id: string;
@@ -190,6 +192,22 @@ export class AgentOrchestrator {
       // Add tasks to workflow
       workflowContext.taskQueue.push(...tasks);
       this.workflows.set(sessionId, workflowContext);
+
+      // Check if this requires autonomous codebase analysis
+      if (this.shouldRunCodebaseAnalysis(userInput, intent)) {
+        logger.info('🔍 Running autonomous codebase analysis...');
+        
+        const analyzer = new AutonomousCodebaseAnalyzer(projectPath);
+        const analysis = await timeoutManager.executeWithRetry(
+          () => analyzer.analyzeCodebase(),
+          'autonomous_codebase_analysis',
+          { maxRetries: 2, timeoutMs: 45000 }
+        );
+        
+        // Store analysis in workflow context
+        workflowContext.memory.set('codebase_analysis', analysis);
+        logger.info('✅ Codebase analysis completed successfully');
+      }
 
       // Execute workflow autonomously
       const result = await this.executeWorkflow(sessionId);
@@ -885,6 +903,45 @@ Provide a unified, actionable response that:
 ${typeof result.result === 'string' ? result.result : JSON.stringify(result, null, 2)}
 `;
 
+    // Include codebase analysis if available
+    const codebaseAnalysis = workflowContext.memory.get('codebase_analysis');
+    if (codebaseAnalysis) {
+      response += `
+**🔍 Autonomous Codebase Analysis:**
+
+**Project Structure:**
+- Total Files: ${codebaseAnalysis.structure.totalFiles}
+- Total Lines: ${codebaseAnalysis.structure.totalLines.toLocaleString()}
+- Languages: ${Object.entries(codebaseAnalysis.structure.fileTypes)
+  .map(([lang, count]) => `${lang} (${count})`)
+  .join(', ')}
+
+**Architecture Patterns:**
+${codebaseAnalysis.architecture.patterns.length > 0 
+  ? codebaseAnalysis.architecture.patterns.map((p: string) => `- ${p}`).join('\n')
+  : '- No specific patterns detected'}
+
+**Code Quality:**
+- Modularity: ${codebaseAnalysis.architecture.modularity}
+- Test Coverage: ${codebaseAnalysis.codeQuality.testCoverage.toFixed(1)}%
+- Maintainability Index: ${codebaseAnalysis.codeQuality.maintainabilityIndex.toFixed(1)}/100
+
+**Key Directories:**
+${codebaseAnalysis.structure.directories
+  .filter((d: any) => d.importance === 'high')
+  .map((d: any) => `- ${d.path} (${d.fileCount} files) - ${d.purpose}`)
+  .join('\n')}
+
+**Improvement Suggestions:**
+${codebaseAnalysis.suggestions.length > 0
+  ? codebaseAnalysis.suggestions
+      .slice(0, 5) // Show top 5 suggestions
+      .map((s: any) => `- **${s.title}** (${s.priority}): ${s.description}`)
+      .join('\n')
+  : '- No immediate improvements suggested'}
+`;
+    }
+
     if (result.reasoning) {
       response += `\n**AI Reasoning:**
 ${result.reasoning}`;
@@ -903,6 +960,30 @@ ${workflowContext.learnings.map(l => `- ${l.summary}`).join('\n')}`;
     response += `\n\n*This analysis was performed autonomously using ${this.agents.size} specialized AI agents with self-correction and learning capabilities.*`;
 
     return response;
+  }
+
+  /**
+   * Check if request requires autonomous codebase analysis
+   */
+  private shouldRunCodebaseAnalysis(userInput: string, intent: any): boolean {
+    const analysisKeywords = [
+      'analyze', 'structure', 'architecture', 'codebase', 'project',
+      'files', 'organization', 'patterns', 'framework', 'overview',
+      'examine', 'review', 'assess', 'evaluate', 'inspect'
+    ];
+    
+    const input = userInput.toLowerCase();
+    const intentCategory = intent.category?.toLowerCase() || '';
+    
+    // Check if input contains analysis keywords
+    const hasAnalysisKeywords = analysisKeywords.some(keyword => 
+      input.includes(keyword)
+    );
+    
+    // Check if intent is related to analysis
+    const isAnalysisIntent = ['analysis', 'architecture_design', 'code_review'].includes(intentCategory);
+    
+    return hasAnalysisKeywords || isAnalysisIntent;
   }
 
   /**

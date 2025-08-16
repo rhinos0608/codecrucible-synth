@@ -61,10 +61,15 @@
       "WebFetch(domain:api.github.com)",
       "Bash(find:*)",
       "WebSearch",
-      "WebFetch(domain:e2b.dev)"
+      "WebFetch(domain:e2b.dev)",
+      "WebFetch(domain:smcleod.net)",
+      "WebFetch(domain:gist.github.com)"
     ],
     "deny": [],
     "ask": [],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\c\\Users\\Admin\\Documents\\RST"
+    ]
   }
 }

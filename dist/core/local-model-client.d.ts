@@ -1,3 +1,4 @@
+import { OptimizationConfig } from './vram-optimizer.js';
 export interface LocalModelConfig {
     endpoint: string;
     model: string;
@@ -44,7 +45,31 @@ export declare class LocalModelClient {
     private modelSelector;
     private isOptimized;
     private fallbackModels;
+    private preloadedModels;
+    private modelWarmupPromises;
+    private vramOptimizer;
+    private currentOptimization;
     constructor(config: LocalModelConfig);
+    /**
+     * Calculate adaptive timeout based on system performance and model characteristics
+     */
+    private calculateAdaptiveTimeout;
+    /**
+     * Get dynamic timeout based on operation type and model status
+     */
+    private getDynamicTimeout;
+    /**
+     * Preload primary models for faster response times
+     */
+    private preloadPrimaryModels;
+    /**
+     * Preload a specific model into memory
+     */
+    private preloadModel;
+    /**
+     * Perform the actual model warmup with optimization
+     */
+    private performModelWarmup;
     /**
      * Initialize GPU optimization and hardware detection
      */
@@ -55,7 +80,19 @@ export declare class LocalModelClient {
      */
     checkConnection(): Promise<boolean>;
     /**
-     * Smart autonomous model selection - uses configured model or first available
+     * Optimize a model for VRAM usage and apply optimizations
+     */
+    optimizeModelForVRAM(modelName: string): Promise<string>;
+    /**
+     * Get current optimization status
+     */
+    getOptimizationStatus(): OptimizationConfig | null;
+    /**
+     * Display VRAM optimization information
+     */
+    displayVRAMOptimization(modelName: string): void;
+    /**
+     * Smart autonomous model selection with VRAM optimization
      */
     getAvailableModel(taskType?: string): Promise<string>;
     /**
@@ -79,10 +116,13 @@ export declare class LocalModelClient {
      */
     isModelReady(model: string): Promise<boolean>;
     /**
-     * Get list of available models from Ollama with error handling
-     * Filters out known problematic models
+     * Get list of available models from Ollama with intelligent filtering for system capabilities
      */
     getAvailableModels(): Promise<string[]>;
+    /**
+     * Filter models based on system capabilities to prevent VRAM exhaustion
+     */
+    private filterModelsBySystemCapabilities;
     /**
      * Suggest a working model if current one is not available
      */
@@ -96,7 +136,15 @@ export declare class LocalModelClient {
      */
     getCurrentModel(): string;
     /**
-     * Display available models with descriptions
+     * Enable VRAM optimizations for large models
+     */
+    enableVRAMOptimizations(modelName?: string): Promise<void>;
+    /**
+     * Suggest optimal models for current system
+     */
+    suggestOptimalModels(): Promise<void>;
+    /**
+     * Display available models with VRAM compatibility
      */
     displayAvailableModels(): Promise<void>;
     /**
@@ -120,7 +168,7 @@ export declare class LocalModelClient {
      */
     generateVoiceResponse(voice: VoiceArchetype, prompt: string, context: ProjectContext, retryCount?: number): Promise<VoiceResponse>;
     /**
-     * Get the fastest available model for quick responses with GPU optimization
+     * Get the fastest available model prioritizing smaller models for speed and VRAM efficiency
      */
     private getFastestAvailableModel;
     /**
@@ -132,7 +180,7 @@ export declare class LocalModelClient {
      */
     private tryFallbackModels;
     /**
-     * Generate responses from multiple voices in parallel
+     * Generate responses from multiple voices with optimized concurrency control
      */
     generateMultiVoiceResponses(voices: VoiceArchetype[], prompt: string, context: ProjectContext): Promise<VoiceResponse[]>;
     /**
@@ -176,7 +224,7 @@ export declare class LocalModelClient {
      */
     private formatContext;
     /**
-     * Build request for Ollama endpoint
+     * Build request for Ollama endpoint with performance optimizations
      */
     private buildOllamaRequest;
     /**

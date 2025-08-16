@@ -14,6 +14,9 @@ export class ClaudeCodeClient {
   private errorHandler: AutonomousErrorHandler;
   private modelSelector: IntelligentModelSelector;
   private retryAttempts = new Map<string, number>();
+  private maxInteractiveTime = 30 * 60 * 1000; // 30 minutes max
+  private maxInteractiveSteps = 1000; // max 1000 interactions
+  private interactiveStepCount = 0;
 
   constructor(context: CLIContext) {
     this.context = context;
@@ -47,9 +50,27 @@ export class ClaudeCodeClient {
    */
   private async interactiveLoop(): Promise<void> {
     const inquirer = (await import('inquirer')).default;
+    const startTime = Date.now();
+    this.interactiveStepCount = 0;
     
     while (this.isActive) {
       try {
+        // Check for timeout
+        if (Date.now() - startTime > this.maxInteractiveTime) {
+          console.log(chalk.yellow('\n⏰ Interactive session timeout reached (30 minutes). Exiting...'));
+          this.handleExit();
+          break;
+        }
+        
+        // Check for step limit
+        if (this.interactiveStepCount >= this.maxInteractiveSteps) {
+          console.log(chalk.yellow('\n🔢 Maximum interaction limit reached. Exiting...'));
+          this.handleExit();
+          break;
+        }
+        
+        this.interactiveStepCount++;
+        
         const { input } = await inquirer.prompt({
           type: 'input',
           name: 'input',

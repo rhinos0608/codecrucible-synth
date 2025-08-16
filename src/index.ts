@@ -127,15 +127,27 @@ program
   .option('--agentic', 'Use autonomous agentic mode with multi-agent orchestration')
   .option('--autonomous', 'Same as --agentic (alias for autonomous processing)')
   .action(async (prompt, options) => {
-    const context = await initializeApplication();
-    const cli = new CodeCrucibleCLI(context);
-    
-    if (options.agentic || options.autonomous) {
-      await cli.handleAgenticMode(prompt, options);
-    } else if (options.council) {
-      await cli.handleCouncilMode(prompt, options);
-    } else {
-      await cli.handleGeneration(prompt, options);
+    try {
+      const context = await initializeApplication();
+      const cli = new CodeCrucibleCLI(context);
+      
+      // If no prompt and no specific mode, default to agentic mode
+      if (!prompt && !options.interactive && !options.council) {
+        console.log('💡 No prompt provided. Starting enhanced agent mode...');
+        options.agentic = true;
+      }
+      
+      if (options.agentic || options.autonomous) {
+        await cli.handleAgenticMode(prompt, options);
+      } else if (options.council) {
+        await cli.handleCouncilMode(prompt, options);
+      } else {
+        await cli.handleGeneration(prompt, options);
+      }
+    } catch (error) {
+      logger.error('Generation failed:', error);
+      console.error('❌ Generation failed:', error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
     }
   });
 
@@ -265,6 +277,21 @@ program
     const context = await initializeApplication();
     const cli = new CodeCrucibleCLI(context);
     await cli.handleVoiceManagement(options);
+  });
+
+// VRAM optimization management
+program
+  .command('vram')
+  .description('Manage VRAM optimization for large models')
+  .option('--status', 'Show VRAM status and current model analysis')
+  .option('--optimize', 'Optimize current model for available VRAM')
+  .option('--test', 'Test model with VRAM optimizations')
+  .option('--models', 'Show optimal models for your system')
+  .option('--configure', 'Configure VRAM optimization settings')
+  .action(async (options) => {
+    const context = await initializeApplication();
+    const cli = new CodeCrucibleCLI(context);
+    await cli.handleVRAMManagement(options);
   });
 
 // Edit confirmation management

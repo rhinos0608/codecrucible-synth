@@ -23,6 +23,9 @@ export class EnhancedAgenticClient {
   private isActive = false;
   private watchEnabled = true;
   private conversationHistory: Array<{ role: string; content: string; timestamp: number }> = [];
+  private maxInteractiveTime = 30 * 60 * 1000; // 30 minutes max
+  private maxInteractiveSteps = 1000; // max 1000 interactions
+  private interactiveStepCount = 0;
 
   constructor(context: CLIContext, options: { enableFileWatching?: boolean } = {}) {
     this.context = context;
@@ -187,9 +190,27 @@ Provide a single, concise suggestion if you see any obvious issues, otherwise re
    */
   private async interactiveLoop(): Promise<void> {
     const inquirer = (await import('inquirer')).default;
+    const startTime = Date.now();
+    this.interactiveStepCount = 0;
     
     while (this.isActive) {
       try {
+        // Check for timeout
+        if (Date.now() - startTime > this.maxInteractiveTime) {
+          console.log(chalk.yellow('\n⏰ Interactive session timeout reached (30 minutes). Exiting...'));
+          await this.handleExit();
+          break;
+        }
+        
+        // Check for step limit
+        if (this.interactiveStepCount >= this.maxInteractiveSteps) {
+          console.log(chalk.yellow('\n🔢 Maximum interaction limit reached. Exiting...'));
+          await this.handleExit();
+          break;
+        }
+        
+        this.interactiveStepCount++;
+        
         const { input } = await inquirer.prompt({
           type: 'input',
           name: 'input',

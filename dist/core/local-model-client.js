@@ -1,8 +1,10 @@
 import axios from 'axios';
+import { timeoutManager } from './timeout-manager.js';
 import { logger } from './logger.js';
 import { EnhancedModelManager } from './enhanced-model-manager.js';
 import { AutonomousErrorHandler } from './autonomous-error-handler.js';
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
+import { VRAMOptimizer } from './vram-optimizer.js';
 import chalk from 'chalk';
 /**
  * Enhanced Local Model Client for Ollama integration
@@ -18,14 +20,19 @@ export class LocalModelClient {
     // private gpuOptimizer: GPUOptimizer; // Disabled
     isOptimized = false;
     fallbackModels = []; // Dynamically populated from available models
+    preloadedModels = new Set(); // Track preloaded models
+    modelWarmupPromises = new Map(); // Prevent duplicate warmup
+    vramOptimizer; // VRAM optimization for large models
+    currentOptimization = null; // Current model optimization
     constructor(config) {
         this.config = config;
         this.modelManager = new EnhancedModelManager(config.endpoint);
         this.errorHandler = new AutonomousErrorHandler(config.endpoint);
-        this.modelSelector = new IntelligentModelSelector();
+        this.modelSelector = new IntelligentModelSelector(config.endpoint);
+        this.vramOptimizer = new VRAMOptimizer(config.endpoint);
         // this.gpuOptimizer = new GPUOptimizer(); // Disabled to prevent model downloads
-        // Use configured timeout for proper generation
-        const adjustedTimeout = config.timeout; // Use full configured timeout
+        // Use adaptive timeout based on model size and system performance
+        const adjustedTimeout = this.calculateAdaptiveTimeout(config.timeout);
         this.client = axios.create({
             baseURL: config.endpoint,
             timeout: adjustedTimeout,
@@ -38,8 +45,140 @@ export class LocalModelClient {
             model: config.model,
             maxTokens: config.maxTokens
         });
-        // Initialize GPU optimization asynchronously
+        // Initialize GPU optimization and model preloading asynchronously
         this.initializeGPUOptimization();
+        this.preloadPrimaryModels();
+    }
+    /**
+     * Calculate adaptive timeout based on system performance and model characteristics
+     */
+    calculateAdaptiveTimeout(baseTimeout) {
+        // Start with base timeout
+        let adaptiveTimeout = baseTimeout;
+        // Reduce timeout for preloaded models (faster response expected)
+        if (this.preloadedModels.size > 0) {
+            adaptiveTimeout = Math.max(adaptiveTimeout * 0.7, 30000); // At least 30 seconds
+        }
+        // Adjust based on system memory (lower memory = longer timeout for model loading)
+        try {
+            const memoryGB = require('os').totalmem() / (1024 * 1024 * 1024);
+            if (memoryGB < 8) {
+                adaptiveTimeout *= 1.5; // Increase timeout for low memory systems
+            }
+            else if (memoryGB > 16) {
+                adaptiveTimeout *= 0.8; // Decrease timeout for high memory systems
+            }
+        }
+        catch (error) {
+            // Fallback if unable to detect memory
+            logger.debug('Unable to detect system memory for adaptive timeout');
+        }
+        // Ensure minimum and maximum bounds
+        const minTimeout = 15000; // 15 seconds minimum
+        const maxTimeout = 300000; // 5 minutes maximum
+        return Math.min(Math.max(adaptiveTimeout, minTimeout), maxTimeout);
+    }
+    /**
+     * Get dynamic timeout based on operation type and model status
+     */
+    getDynamicTimeout(operationType, modelName) {
+        const baseTimeouts = {
+            warmup: 30000, // 30 seconds for model warmup
+            generation: 60000, // 60 seconds for generation
+            health_check: 15000 // 15 seconds for health checks
+        };
+        let timeout = baseTimeouts[operationType];
+        // Adjust for preloaded models (should be faster)
+        if (modelName && this.preloadedModels.has(modelName)) {
+            timeout *= 0.5; // 50% faster expected for preloaded models
+        }
+        // Adjust for concurrent operations (may be slower)
+        const activeOperations = this.modelWarmupPromises.size;
+        if (activeOperations > 2) {
+            timeout *= 1 + (activeOperations * 0.2); // Increase timeout based on load
+        }
+        return Math.min(timeout, 180000); // Max 3 minutes
+    }
+    /**
+     * Preload primary models for faster response times
+     */
+    async preloadPrimaryModels() {
+        try {
+            // Get available models first
+            const availableModels = await this.getAvailableModels();
+            if (availableModels.length === 0) {
+                logger.debug('No models available for preloading');
+                return;
+            }
+            // Preload up to 3 models to balance performance and memory usage
+            const modelsToPreload = availableModels.slice(0, 3);
+            logger.info(`🚀 Preloading ${modelsToPreload.length} models for faster response times...`);
+            for (const model of modelsToPreload) {
+                this.preloadModel(model); // Fire and forget for background preloading
+            }
+        }
+        catch (error) {
+            logger.debug('Model preloading failed (non-critical):', error);
+        }
+    }
+    /**
+     * Preload a specific model into memory
+     */
+    async preloadModel(modelName) {
+        if (this.preloadedModels.has(modelName)) {
+            return true; // Already preloaded
+        }
+        // Check if warmup is already in progress
+        const existingWarmup = this.modelWarmupPromises.get(modelName);
+        if (existingWarmup) {
+            return existingWarmup;
+        }
+        const warmupPromise = this.performModelWarmup(modelName);
+        this.modelWarmupPromises.set(modelName, warmupPromise);
+        try {
+            const success = await warmupPromise;
+            if (success) {
+                this.preloadedModels.add(modelName);
+                logger.debug(`✅ Model ${modelName} preloaded successfully`);
+            }
+            return success;
+        }
+        catch (error) {
+            logger.debug(`Failed to preload model ${modelName}:`, error);
+            return false;
+        }
+        finally {
+            this.modelWarmupPromises.delete(modelName);
+        }
+    }
+    /**
+     * Perform the actual model warmup with optimization
+     */
+    async performModelWarmup(modelName) {
+        try {
+            const dynamicTimeout = this.getDynamicTimeout('warmup', modelName);
+            const warmupClient = axios.create({
+                baseURL: this.config.endpoint,
+                timeout: dynamicTimeout
+            });
+            // Use empty request to preload model as per Ollama documentation
+            const preloadRequest = {
+                model: modelName,
+                prompt: "", // Empty prompt for preloading
+                stream: false,
+                keep_alive: -1, // Keep model in memory indefinitely
+                options: {
+                    num_predict: 1, // Minimal token generation for warmup
+                    temperature: 0.1
+                }
+            };
+            await warmupClient.post('/api/generate', preloadRequest);
+            return true;
+        }
+        catch (error) {
+            logger.debug(`Model warmup failed for ${modelName}:`, error);
+            return false;
+        }
     }
     /**
      * Initialize GPU optimization and hardware detection
@@ -87,7 +226,84 @@ export class LocalModelClient {
         }
     }
     /**
-     * Smart autonomous model selection - uses configured model or first available
+     * Optimize a model for VRAM usage and apply optimizations
+     */
+    async optimizeModelForVRAM(modelName) {
+        try {
+            // Generate optimization configuration
+            const optimization = this.vramOptimizer.optimizeModelForVRAM(modelName);
+            this.currentOptimization = optimization;
+            // Apply environment optimizations if running locally
+            if (this.config.endpoint.includes('localhost') || this.config.endpoint.includes('127.0.0.1')) {
+                const envVars = this.vramOptimizer.createOptimizedEnvironment(optimization);
+                // Apply environment variables (they'll take effect on next Ollama restart)
+                for (const [key, value] of Object.entries(envVars)) {
+                    process.env[key] = value;
+                    logger.debug(`Set ${key}=${value} for VRAM optimization`);
+                }
+                if (Object.keys(envVars).length > 0) {
+                    logger.info(`🔧 Applied ${Object.keys(envVars).length} VRAM optimizations for ${modelName}`);
+                    // If model doesn't fit even with optimizations, suggest alternatives
+                    if (!optimization.fitsInVRAM) {
+                        logger.warn(`⚠️  Model ${modelName} may still exceed VRAM limits even with optimizations`);
+                        logger.info(`💡 Consider using a smaller quantization or model variant`);
+                        // Try to find a better quantization
+                        const betterQuant = optimization.quantizationRecommendation;
+                        if (betterQuant.quantization !== 'q4_k_m') {
+                            const suggestedName = modelName.replace(/:.*$/, `:${betterQuant.quantization}`);
+                            logger.info(`💡 Suggested model: ${suggestedName}`);
+                        }
+                    }
+                }
+            }
+            return modelName;
+        }
+        catch (error) {
+            logger.warn('VRAM optimization failed, proceeding without optimization:', error);
+            return modelName;
+        }
+    }
+    /**
+     * Get current optimization status
+     */
+    getOptimizationStatus() {
+        return this.currentOptimization;
+    }
+    /**
+     * Display VRAM optimization information
+     */
+    displayVRAMOptimization(modelName) {
+        if (!this.currentOptimization) {
+            console.log(chalk.yellow('No VRAM optimization applied'));
+            return;
+        }
+        const opt = this.currentOptimization;
+        console.log(chalk.blue(`\n🔧 VRAM Optimization for ${modelName}:\n`));
+        console.log(chalk.green(`Model Information:`));
+        console.log(`  Parameters: ${(opt.modelInfo.parameterCount / 1e9).toFixed(1)}B`);
+        console.log(`  Quantization: ${opt.modelInfo.quantization}`);
+        console.log(`  Total Layers: ${opt.modelInfo.totalLayers}`);
+        console.log(chalk.blue(`\nLayer Distribution:`));
+        console.log(`  GPU Layers: ${opt.layerOffloading.gpuLayers}/${opt.layerOffloading.totalLayers}`);
+        console.log(`  CPU Layers: ${opt.layerOffloading.cpuLayers}/${opt.layerOffloading.totalLayers}`);
+        console.log(`  GPU Memory: ${opt.layerOffloading.estimatedGPUMemory.toFixed(1)}GB`);
+        console.log(`  CPU Memory: ${opt.layerOffloading.estimatedCPUMemory.toFixed(1)}GB`);
+        console.log(chalk.cyan(`\nK/V Cache Optimization:`));
+        console.log(`  Quantization: ${opt.kvCache.quantizationType}`);
+        console.log(`  Memory Usage: ${opt.kvCache.estimatedMemoryGB.toFixed(1)}GB`);
+        console.log(`  Memory Reduction: ${Math.round((1 - opt.kvCache.memoryReduction) * 100)}%`);
+        console.log(`  Quality Impact: ${opt.kvCache.qualityImpact}`);
+        console.log(chalk.magenta(`\nOverall:`));
+        console.log(`  Total VRAM Usage: ${opt.estimatedTotalMemory.toFixed(1)}GB`);
+        console.log(`  Context Length: ${opt.contextLength}`);
+        console.log(`  Fits in VRAM: ${opt.fitsInVRAM ? '✅ Yes' : '❌ No'}`);
+        if (!opt.fitsInVRAM) {
+            console.log(chalk.red(`\n⚠️  Warning: Model may still exceed available VRAM`));
+            console.log(chalk.yellow(`💡 Consider: ${opt.quantizationRecommendation.description}`));
+        }
+    }
+    /**
+     * Smart autonomous model selection with VRAM optimization
      */
     async getAvailableModel(taskType = 'general') {
         // In test environment, always return configured model immediately
@@ -109,8 +325,10 @@ export class LocalModelClient {
                 logger.info('🎯 Auto-selecting best runnable model...');
                 try {
                     const bestModel = await this.modelSelector.getBestRunnableModel(taskType);
-                    this._cachedBestModel = bestModel;
-                    return bestModel;
+                    // Apply VRAM optimization to the selected model
+                    const optimizedModel = await this.optimizeModelForVRAM(bestModel);
+                    this._cachedBestModel = optimizedModel;
+                    return optimizedModel;
                 }
                 catch (error) {
                     logger.warn('Auto-selection failed, falling back to available models:', error);
@@ -127,15 +345,19 @@ export class LocalModelClient {
             const configExactMatch = availableModels.find(m => m === this.config.model) ||
                 availableModels.find(m => m.includes(this.config.model.split(':')[0]));
             if (configExactMatch) {
-                this._cachedBestModel = configExactMatch;
+                // Apply VRAM optimization to configured model
+                const optimizedModel = await this.optimizeModelForVRAM(configExactMatch);
+                this._cachedBestModel = optimizedModel;
                 logger.info(`✅ Using configured model: ${configExactMatch}`);
-                return configExactMatch;
+                return optimizedModel;
             }
             // If configured model not available, use the first available model
             const fallbackModel = availableModels[0];
-            this._cachedBestModel = fallbackModel;
+            // Apply VRAM optimization to fallback model
+            const optimizedFallback = await this.optimizeModelForVRAM(fallbackModel);
+            this._cachedBestModel = optimizedFallback;
             logger.info(`🔄 Using first available model: ${fallbackModel}`);
-            return fallbackModel;
+            return optimizedFallback;
         }
         catch (error) {
             logger.warn('Model selection failed, using configured model:', this.config.model);
@@ -147,10 +369,11 @@ export class LocalModelClient {
      */
     async quickHealthCheck(model) {
         try {
-            // Very simple test request with reasonable timeout
+            // Very simple test request with dynamic timeout
+            const dynamicTimeout = this.getDynamicTimeout('health_check', model);
             const testClient = axios.create({
                 baseURL: this.config.endpoint,
-                timeout: 180000 // 3 minute timeout for health check
+                timeout: dynamicTimeout
             });
             const testRequest = this.config.endpoint.includes('11434')
                 ? {
@@ -222,8 +445,7 @@ export class LocalModelClient {
         }
     }
     /**
-     * Get list of available models from Ollama with error handling
-     * Filters out known problematic models
+     * Get list of available models from Ollama with intelligent filtering for system capabilities
      */
     async getAvailableModels() {
         try {
@@ -234,15 +456,59 @@ export class LocalModelClient {
             const response = await quickCheck.get('/api/tags');
             const models = response.data.models || [];
             const modelNames = models.map((m) => m.name || m.model || '').filter(Boolean);
-            // Use all available models - no hardcoded filtering
-            const filteredModels = modelNames;
-            logger.info(`🔍 Found ${filteredModels.length} available models`);
-            return filteredModels;
+            // Filter models based on system capabilities to prevent VRAM issues
+            const systemOptimizedModels = this.filterModelsBySystemCapabilities(modelNames);
+            logger.info(`🔍 Found ${systemOptimizedModels.length} system-compatible models out of ${modelNames.length} total`);
+            if (systemOptimizedModels.length !== modelNames.length) {
+                logger.info(`⚡ Filtered out ${modelNames.length - systemOptimizedModels.length} large models to prevent VRAM issues`);
+            }
+            return systemOptimizedModels;
         }
         catch (error) {
             logger.warn('Failed to get available models:', error);
             return [];
         }
+    }
+    /**
+     * Filter models based on system capabilities to prevent VRAM exhaustion
+     */
+    filterModelsBySystemCapabilities(modelNames) {
+        // Detect GPU memory (simplified detection)
+        const has12GBOrLess = true; // Assume most users have <= 12GB VRAM
+        if (!has12GBOrLess) {
+            return modelNames; // High-end GPU, can handle all models
+        }
+        // Filter out models that are too large for typical consumer GPUs
+        const filteredModels = modelNames.filter(modelName => {
+            const name = modelName.toLowerCase();
+            // Filter out models that are definitely too large (>15B parameters)
+            const isTooBig = name.includes('27b') ||
+                name.includes('32b') ||
+                name.includes('70b') ||
+                name.includes('72b') ||
+                name.includes('405b') ||
+                name.includes('qwq:32b'); // Specific problematic model
+            if (isTooBig) {
+                logger.debug(`Filtering out large model: ${modelName} (likely to cause VRAM issues)`);
+                return false;
+            }
+            return true;
+        });
+        // If we filtered everything, keep smaller models and warn
+        if (filteredModels.length === 0) {
+            logger.warn('All models filtered out, keeping smallest available models');
+            // Keep models that are likely smaller
+            return modelNames.filter(name => {
+                const lower = name.toLowerCase();
+                return lower.includes('1b') ||
+                    lower.includes('2b') ||
+                    lower.includes('3b') ||
+                    lower.includes('7b') ||
+                    lower.includes('8b') ||
+                    lower.includes('9b');
+            });
+        }
+        return filteredModels;
     }
     /**
      * Suggest a working model if current one is not available
@@ -269,7 +535,52 @@ export class LocalModelClient {
         return this._cachedBestModel || this.config.model;
     }
     /**
-     * Display available models with descriptions
+     * Enable VRAM optimizations for large models
+     */
+    async enableVRAMOptimizations(modelName) {
+        const targetModel = modelName || this.getCurrentModel();
+        try {
+            console.log(chalk.blue(`🔧 Enabling VRAM optimizations for ${targetModel}...`));
+            const optimizedModel = await this.optimizeModelForVRAM(targetModel);
+            if (this.currentOptimization) {
+                this.displayVRAMOptimization(targetModel);
+                if (!this.currentOptimization.fitsInVRAM) {
+                    console.log(chalk.yellow(`\n💡 Recommendations for better performance:`));
+                    console.log(`   1. Install smaller quantization: ollama pull ${targetModel.split(':')[0]}:q4_k_m`);
+                    console.log(`   2. Use a smaller model variant`);
+                    console.log(`   3. Reduce context window in prompts`);
+                }
+            }
+        }
+        catch (error) {
+            console.log(chalk.red(`❌ Failed to optimize model: ${error instanceof Error ? error.message : 'Unknown error'}`));
+        }
+    }
+    /**
+     * Suggest optimal models for current system
+     */
+    async suggestOptimalModels() {
+        console.log(chalk.blue('\n🎯 Optimal Models for Your System:\n'));
+        const testModels = [
+            { name: 'gemma:2b', desc: 'Ultra-fast, 2GB VRAM', params: 2e9 },
+            { name: 'llama3.2:3b', desc: 'Fast, good quality, 4GB VRAM', params: 3e9 },
+            { name: 'qwen2.5:7b', desc: 'High quality, 8GB VRAM', params: 7e9 },
+            { name: 'llama3.2:latest', desc: 'Balanced performance', params: 8e9 },
+            { name: 'gemma2:9b', desc: 'High quality, 10GB VRAM', params: 9e9 }
+        ];
+        for (const model of testModels) {
+            const optimization = this.vramOptimizer.optimizeModelForVRAM(model.name);
+            const fits = optimization.fitsInVRAM ? '✅' : '❌';
+            const memory = optimization.estimatedTotalMemory.toFixed(1);
+            console.log(`${fits} ${model.name.padEnd(16)} - ${memory}GB - ${model.desc}`);
+        }
+        console.log(chalk.green('\n💡 Recommended installation commands:'));
+        console.log(`   ollama pull gemma:2b       # Ultra-fast`);
+        console.log(`   ollama pull llama3.2:3b    # Balanced`);
+        console.log(`   ollama pull qwen2.5:7b     # High quality`);
+    }
+    /**
+     * Display available models with VRAM compatibility
      */
     async displayAvailableModels() {
         const models = await this.getAvailableModels();
@@ -279,15 +590,23 @@ export class LocalModelClient {
             return;
         }
         console.log(chalk.green(`\n📋 Available Models (${models.length} found):\n`));
-        models.forEach((model, index) => {
+        for (let i = 0; i < models.length; i++) {
+            const model = models[i];
+            const optimization = this.vramOptimizer.optimizeModelForVRAM(model);
             const size = this.extractModelSize(model);
             const type = this.getModelType(model);
             const current = this.getCurrentModel() === model;
             const prefix = current ? chalk.green('→') : ' ';
             const modelDisplay = current ? chalk.green.bold(model) : chalk.cyan(model);
-            console.log(`${prefix} ${index + 1}. ${modelDisplay}`);
-            console.log(`    Type: ${type} | Size: ${size}`);
-        });
+            const vramStatus = optimization.fitsInVRAM ?
+                chalk.green(`✅ ${optimization.estimatedTotalMemory.toFixed(1)}GB`) :
+                chalk.red(`❌ ${optimization.estimatedTotalMemory.toFixed(1)}GB`);
+            console.log(`${prefix} ${i + 1}. ${modelDisplay}`);
+            console.log(`    Type: ${type} | Size: ${size} | VRAM: ${vramStatus}`);
+            if (!optimization.fitsInVRAM) {
+                console.log(chalk.yellow(`    💡 Use CPU offloading: ${optimization.layerOffloading.gpuLayers}/${optimization.layerOffloading.totalLayers} GPU layers`));
+            }
+        }
         console.log(chalk.yellow(`\n💡 Current model: ${this.getCurrentModel()}`));
         console.log(chalk.gray('   Use "/model <number>" to switch models'));
     }
@@ -362,7 +681,17 @@ export class LocalModelClient {
             const requestBody = this.config.endpoint.includes('11434')
                 ? this.buildOllamaRequest(enhancedPrompt, voice, modelName)
                 : this.buildOpenAIRequest(enhancedPrompt, voice, modelName);
-            const response = await this.client.post(this.config.endpoint.includes('11434') ? '/api/generate' : '/v1/chat/completions', requestBody);
+            // Use enhanced timeout manager with circuit breaker
+            const dynamicTimeout = this.getDynamicTimeout('generation', modelName);
+            const operationName = `model_generation_${modelName}`;
+            const response = await timeoutManager.executeWithCircuitBreaker(async () => {
+                const generationClient = axios.create({
+                    baseURL: this.config.endpoint,
+                    timeout: dynamicTimeout,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                return await generationClient.post(this.config.endpoint.includes('11434') ? '/api/generate' : '/v1/chat/completions', requestBody);
+            }, operationName, { timeoutMs: dynamicTimeout });
             return this.parseVoiceResponse(response.data, voice);
         }
         catch (error) {
@@ -431,20 +760,37 @@ export class LocalModelClient {
         }
     }
     /**
-     * Get the fastest available model for quick responses with GPU optimization
+     * Get the fastest available model prioritizing smaller models for speed and VRAM efficiency
      */
     async getFastestAvailableModel() {
-        for (const model of this.fallbackModels) {
-            const available = await this.modelManager.isModelAvailable(model);
-            if (available) {
-                const optimizedModel = model; // Use model as-is
-                logger.info('Selected fastest GPU-optimized model:', optimizedModel);
-                return optimizedModel;
+        const availableModels = await this.getAvailableModels();
+        if (availableModels.length === 0) {
+            return this.config.model;
+        }
+        // Prioritize models by speed/efficiency (smaller = faster)
+        const speedPriority = [
+            // Tiny models (fastest)
+            '1b', '2b',
+            // Small models (fast)
+            '3b', '7b', '8b', '9b',
+            // Medium models (moderate)
+            '11b', '13b', '14b', '15b'
+        ];
+        // Find the smallest available model for maximum speed
+        for (const sizeKey of speedPriority) {
+            const fastModel = availableModels.find(model => model.toLowerCase().includes(sizeKey) &&
+                (model.toLowerCase().includes('gemma') ||
+                    model.toLowerCase().includes('llama') ||
+                    model.toLowerCase().includes('qwen')));
+            if (fastModel) {
+                logger.info(`Selected fastest optimized model: ${fastModel}`);
+                return fastModel;
             }
         }
-        // Fallback with optimization
-        const optimizedFallback = this.config.model; // Use configured model as-is
-        return optimizedFallback;
+        // If no size-specific model found, use first available (already filtered for compatibility)
+        const fallbackModel = availableModels[0];
+        logger.info('Using first available model for speed:', fallbackModel);
+        return fallbackModel;
     }
     /**
      * Analyze task type from prompt for intelligent model selection
@@ -487,26 +833,48 @@ export class LocalModelClient {
         return null;
     }
     /**
-     * Generate responses from multiple voices in parallel
+     * Generate responses from multiple voices with optimized concurrency control
      */
     async generateMultiVoiceResponses(voices, prompt, context) {
-        logger.info(`Generating responses from ${voices.length} voices in parallel`);
-        const promises = voices.map(voice => this.generateVoiceResponse(voice, prompt, context));
-        try {
-            const responses = await Promise.allSettled(promises);
-            const successful = responses
-                .filter(result => result.status === 'fulfilled')
-                .map(result => result.value);
-            if (successful.length === 0) {
-                throw new Error('All voice responses failed');
+        logger.info(`Generating responses from ${voices.length} voices with optimized concurrency`);
+        // Preload models for all voices to reduce cold start times
+        const taskType = this.analyzeTaskType(prompt);
+        const primaryModel = await this.getAvailableModel(taskType);
+        // Ensure primary model is warmed up
+        if (!this.preloadedModels.has(primaryModel)) {
+            logger.debug(`Warming up primary model: ${primaryModel}`);
+            await this.preloadModel(primaryModel);
+        }
+        // Use controlled concurrency to respect Ollama's concurrent request limits
+        const maxConcurrency = Math.min(voices.length, 3); // Limit to 3 concurrent requests
+        const results = [];
+        const errors = [];
+        for (let i = 0; i < voices.length; i += maxConcurrency) {
+            const batch = voices.slice(i, i + maxConcurrency);
+            logger.debug(`Processing voice batch ${Math.floor(i / maxConcurrency) + 1} with ${batch.length} voices`);
+            const batchPromises = batch.map(voice => this.generateVoiceResponse(voice, prompt, context)
+                .catch(error => {
+                logger.warn(`Voice ${voice.name} failed:`, error);
+                errors.push(error);
+                return null;
+            }));
+            const batchResults = await Promise.allSettled(batchPromises);
+            for (const result of batchResults) {
+                if (result.status === 'fulfilled' && result.value !== null) {
+                    results.push(result.value);
+                }
             }
-            logger.info(`Successfully generated ${successful.length}/${voices.length} voice responses`);
-            return successful;
+            // Small delay between batches to prevent overwhelming Ollama
+            if (i + maxConcurrency < voices.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
         }
-        catch (error) {
-            logger.error('Multi-voice generation failed:', error);
-            throw error;
+        if (results.length === 0) {
+            logger.error('All voice responses failed:', errors);
+            throw new Error(`All voice responses failed. Last error: ${errors[errors.length - 1]?.message || 'Unknown error'}`);
         }
+        logger.info(`Successfully generated ${results.length}/${voices.length} voice responses`);
+        return results;
     }
     /**
      * Generate a single response from the local model with GPU optimization and error handling
@@ -539,8 +907,36 @@ export class LocalModelClient {
                 (error.message.includes('status code 404') || error.message.includes('404'));
             const is500 = error instanceof Error &&
                 error.message.includes('status code 500');
+            const isVRAMIssue = error instanceof Error &&
+                (error.message.includes('CUDA') || error.message.includes('memory') || error.message.includes('OOM'));
             if (isTimeout) {
-                throw new Error('Ollama connection timeout. Try:\n1. Start Ollama: ollama serve\n2. Check if models are downloaded: ollama list\n3. Install a model: ollama pull <model-name>');
+                // Check if this might be due to VRAM issues with large models
+                const isLargeModel = model.toLowerCase().includes('27b') ||
+                    model.toLowerCase().includes('32b') ||
+                    model.toLowerCase().includes('70b');
+                if (isLargeModel) {
+                    const smallerModels = await this.getAvailableModels();
+                    const fallbackModel = smallerModels.find(m => !m.toLowerCase().includes('27b') && !m.toLowerCase().includes('32b'));
+                    if (fallbackModel) {
+                        logger.warn(`⚡ Large model ${model} timed out, trying smaller model: ${fallbackModel}`);
+                        this.setModel(fallbackModel);
+                        throw new Error(`Model '${model}' is too large for your system (VRAM exhaustion). Switched to '${fallbackModel}'. Please retry your request.`);
+                    }
+                }
+                throw new Error('Ollama connection timeout. Try:\n1. Start Ollama: ollama serve\n2. Check if models are downloaded: ollama list\n3. Install a smaller model: ollama pull llama3.2:latest');
+            }
+            if (isVRAMIssue) {
+                logger.error(`VRAM exhaustion detected with model: ${model}`);
+                const smallerModels = await this.getAvailableModels();
+                const fallbackModel = smallerModels.find(m => m.toLowerCase().includes('2b') ||
+                    m.toLowerCase().includes('3b') ||
+                    m.toLowerCase().includes('7b'));
+                if (fallbackModel) {
+                    logger.warn(`🔄 Switching to smaller model due to VRAM constraints: ${fallbackModel}`);
+                    this.setModel(fallbackModel);
+                    throw new Error(`VRAM exhaustion with '${model}'. Switched to '${fallbackModel}'. Please retry your request.`);
+                }
+                throw new Error(`VRAM exhaustion. Install a smaller model: ollama pull gemma:2b`);
             }
             if (is404) {
                 // Try to suggest an available model
@@ -554,12 +950,12 @@ export class LocalModelClient {
                     }
                 }
                 else {
-                    errorMsg += `\n2. No models found. Install one: ollama pull <model-name>`;
+                    errorMsg += `\n2. No models found. Install one: ollama pull gemma:2b`;
                 }
                 throw new Error(errorMsg);
             }
             if (is500) {
-                throw new Error(`Ollama server error. The model '${model}' may be corrupted or incompatible.\nTry:\n1. Restart Ollama: Stop and run 'ollama serve'\n2. Re-pull the model: ollama pull ${model}\n3. Use a different model: type 'models' to select another`);
+                throw new Error(`Ollama server error. The model '${model}' may be corrupted, incompatible, or too large.\nTry:\n1. Restart Ollama: Stop and run 'ollama serve'\n2. Use a smaller model: ollama pull gemma:2b\n3. Re-pull the model: ollama pull ${model}`);
             }
             logger.error('Generation failed:', error);
             throw new Error(`Failed to generate response: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -573,11 +969,12 @@ export class LocalModelClient {
             // Get fastest model optimized for speed
             const fastModel = await this.getFastestAvailableModel();
             logger.info(`Fast generation with optimized model: ${fastModel}`);
-            // Streamlined request with minimal overhead
+            // Streamlined request with minimal overhead and performance optimization
             const requestBody = {
                 model: fastModel,
                 prompt: prompt,
                 stream: false,
+                keep_alive: "10m", // Keep model loaded for faster subsequent requests
                 options: {
                     temperature: 0.3, // Lower temperature for faster generation
                     num_predict: maxTokens || 512, // Limit tokens for speed
@@ -599,6 +996,7 @@ export class LocalModelClient {
                     model: this.config.model,
                     prompt: prompt.length > 500 ? prompt.substring(0, 500) + '...' : prompt, // Truncate for speed
                     stream: false,
+                    keep_alive: "10m", // Keep model loaded
                     options: {
                         temperature: 0.1,
                         num_predict: 256, // Very limited tokens
@@ -792,13 +1190,14 @@ Instructions:
         return formatted || 'No additional project context provided.';
     }
     /**
-     * Build request for Ollama endpoint
+     * Build request for Ollama endpoint with performance optimizations
      */
     buildOllamaRequest(prompt, voice, model, jsonSchema) {
         const baseRequest = {
             model: model || this.config.model,
             prompt: prompt,
             stream: false,
+            keep_alive: "10m", // Keep model loaded for 10 minutes for faster subsequent requests
             options: {
                 temperature: voice.temperature || this.config.temperature,
                 num_predict: this.config.maxTokens,

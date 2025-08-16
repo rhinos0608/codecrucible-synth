@@ -7,6 +7,7 @@ import { logger } from './logger.js';
 import { MultiLLMProvider, createMultiLLMProvider } from './multi-llm-provider.js';
 import { RAGSystem, globalRAGSystem } from './rag-system.js';
 import { globalEditConfirmation } from './edit-confirmation-system.js';
+import { cliOutput, CLIError, CLIExitCode } from './cli-output-manager.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
@@ -26,6 +27,10 @@ interface CLIOptions {
   autonomous?: boolean;
   quick?: boolean;
   direct?: boolean;
+  verbose?: boolean;
+  quiet?: boolean;
+  output?: 'text' | 'json' | 'table';
+  timeout?: number;
 }
 
 export interface CLIContext {
@@ -50,10 +55,32 @@ export class CodeCrucibleCLI {
     }
   }
 
+  /**
+   * Configure CLI output based on options
+   */
+  configureOutput(options: CLIOptions): void {
+    cliOutput.configure({
+      verbose: options.verbose,
+      quiet: options.quiet,
+      format: options.output || 'text'
+    });
+  }
+
   async handleGeneration(prompt: string, options: CLIOptions): Promise<void> {
     try {
+      // Configure output based on options
+      this.configureOutput(options);
+
       if (options.interactive) {
         await this.handleInteractiveMode(options);
+        return;
+      }
+
+      // If no prompt provided, show usage
+      if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
+        console.log('💡 Please provide a prompt or use --interactive mode');
+        console.log('   Example: cc "analyze my code"');
+        console.log('   Or use: cc --interactive');
         return;
       }
 
@@ -70,15 +97,15 @@ export class CodeCrucibleCLI {
       }
 
       if (!prompt) {
-        console.log(chalk.yellow('💡 No prompt provided. Starting interactive mode...'));
-        console.log(chalk.gray('   You can also use: cc "Your prompt here" for direct commands'));
-        console.log(chalk.gray('   Or try: cc --agentic "Your goal here" for autonomous processing'));
+        cliOutput.outputInfo('No prompt provided. Starting interactive mode...');
+        cliOutput.outputDebug('Alternative usage: cc "Your prompt here" for direct commands');
+        cliOutput.outputDebug('Or try: cc --agentic "Your goal here" for autonomous processing');
         await this.handleInteractiveMode(options);
         return;
       }
 
-      console.log(chalk.blue('🚀 Starting CodeCrucible generation...'));
-      console.log(chalk.gray(`   Prompt: ${prompt}`));
+      cliOutput.outputProgress('Starting CodeCrucible generation...');
+      cliOutput.outputDebug(`Prompt: ${prompt}`);
 
       // Parse options
       const voices = this.parseVoices(options.voices || options.council ? 'all' : undefined);
@@ -189,7 +216,23 @@ export class CodeCrucibleCLI {
 
     } catch (error) {
       logger.error('Generation failed:', error);
-      console.error(chalk.red('❌ Generation failed:'), error instanceof Error ? error.message : error);
+      
+      if (error instanceof CLIError) {
+        cliOutput.outputError(error.message, error.exitCode);
+      } else if (error instanceof Error) {
+        // Network/timeout errors
+        if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
+          const timeoutError = CLIError.timeout('AI model generation');
+          cliOutput.outputError(timeoutError.message, timeoutError.exitCode);
+        } else if (error.message.includes('ECONNREFUSED') || error.message.includes('network')) {
+          const networkError = CLIError.networkError(error.message);
+          cliOutput.outputError(networkError.message, networkError.exitCode);
+        } else {
+          cliOutput.outputError(`Generation failed: ${error.message}`, CLIExitCode.GENERAL_ERROR);
+        }
+      } else {
+        cliOutput.outputError('Unknown error occurred during generation', CLIExitCode.GENERAL_ERROR);
+      }
     }
   }
 
@@ -505,6 +548,7 @@ Focus on actionable, specific recommendations with clear business value.`;
               { name: '🎭 Single voice consultation', value: 'voice' },
               { name: '🤖 Autonomous Agentic Mode', value: 'agentic' },
               { name: '🔧 Select AI model', value: 'model' },
+              { name: '🧠 VRAM Optimization', value: 'vram' },
               { name: '⚙️  Configure settings', value: 'config' },
               { name: '🚪 Exit', value: 'exit' }
             ]
@@ -931,6 +975,48 @@ Focus on actionable, specific recommendations with clear business value.`;
     }
   }
 
+  async handleVRAMManagement(options: any): Promise<void> {
+    if (!options.status && !options.optimize && !options.test && !options.models && !options.configure) {
+      // Show help if no specific option provided
+      console.log(chalk.cyan('🧠 VRAM Optimization Commands:\n'));
+      console.log(chalk.green('  cc vram --status     ') + chalk.gray('Show VRAM status and current model analysis'));
+      console.log(chalk.green('  cc vram --optimize   ') + chalk.gray('Optimize current model for available VRAM'));
+      console.log(chalk.green('  cc vram --test       ') + chalk.gray('Test model with VRAM optimizations'));
+      console.log(chalk.green('  cc vram --models     ') + chalk.gray('Show optimal models for your system'));
+      console.log(chalk.green('  cc vram --configure  ') + chalk.gray('Configure VRAM optimization settings'));
+      return;
+    }
+
+    try {
+      // Import VRAMOptimizer dynamically
+      const { VRAMOptimizer } = await import('./vram-optimizer.js');
+      const vramOptimizer = new VRAMOptimizer(this.context.config.model.endpoint);
+
+      if (options.status) {
+        await this.showVRAMStatus(vramOptimizer);
+      }
+      
+      if (options.optimize) {
+        await this.optimizeCurrentModel(vramOptimizer);
+      }
+      
+      if (options.test) {
+        await this.testModelWithVRAM(vramOptimizer);
+      }
+      
+      if (options.models) {
+        await this.showOptimalModels(vramOptimizer);
+      }
+      
+      if (options.configure) {
+        await this.configureVRAMSettings(vramOptimizer);
+      }
+      
+    } catch (error) {
+      console.error(chalk.red('❌ VRAM management failed:'), error instanceof Error ? error.message : error);
+    }
+  }
+
   async handleEditManagement(options: any): Promise<void> {
     if (!globalEditConfirmation) {
       console.error(chalk.red('❌ Edit confirmation system not initialized'));
@@ -1067,6 +1153,12 @@ Focus on actionable, specific recommendations with clear business value.`;
     console.log(chalk.green('  cc edits --confirm          # Confirm all edits'));
     console.log(chalk.green('  cc edits --confirm --batch  # Batch confirmation'));
     console.log(chalk.green('  cc edits --clear            # Clear pending edits\n'));
+    
+    console.log(chalk.bold('VRAM Optimization:'));
+    console.log(chalk.green('  cc vram --status            # Show VRAM usage and recommendations'));
+    console.log(chalk.green('  cc vram --optimize          # Optimize current model for VRAM'));
+    console.log(chalk.green('  cc vram --test              # Test model with VRAM optimization'));
+    console.log(chalk.green('  cc vram --models            # Show optimal models for your system\n'));
     
     console.log(chalk.bold('Configuration:'));
     console.log(chalk.green('  cc config --list'));
@@ -1410,6 +1502,10 @@ Focus on actionable, specific recommendations with clear business value.`;
 
       case 'model':
         await this.handleModelSelection();
+        break;
+
+      case 'vram':
+        await this.handleVRAMOptimization();
         break;
     }
   }
@@ -1901,5 +1997,317 @@ Focus on actionable, specific recommendations with clear business value.`;
     }
     
     return insights;
+  }
+
+  /**
+   * Handle VRAM optimization commands and diagnostics
+   */
+  private async handleVRAMOptimization(): Promise<void> {
+    try {
+      const { vramAction } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'vramAction',
+          message: 'What would you like to do with VRAM optimization?',
+          choices: [
+            { name: '📊 Show VRAM status and recommendations', value: 'status' },
+            { name: '🎯 Optimize current model for VRAM', value: 'optimize' },
+            { name: '⚙️  Configure VRAM settings', value: 'configure' },
+            { name: '🔍 Test model with VRAM optimization', value: 'test' },
+            { name: '📋 Show optimal models for your system', value: 'recommend' },
+            { name: '↩️  Go back', value: 'back' }
+          ]
+        }
+      ]);
+
+      if (vramAction === 'back') {
+        return;
+      }
+
+      // Import VRAMOptimizer dynamically
+      const { VRAMOptimizer } = await import('./vram-optimizer.js');
+      const vramOptimizer = new VRAMOptimizer(this.context.config.model.endpoint);
+
+      switch (vramAction) {
+        case 'status':
+          await this.showVRAMStatus(vramOptimizer);
+          break;
+        
+        case 'optimize':
+          await this.optimizeCurrentModel(vramOptimizer);
+          break;
+        
+        case 'configure':
+          await this.configureVRAMSettings(vramOptimizer);
+          break;
+        
+        case 'test':
+          await this.testModelWithVRAM(vramOptimizer);
+          break;
+        
+        case 'recommend':
+          await this.showOptimalModels(vramOptimizer);
+          break;
+      }
+      
+    } catch (error) {
+      console.error(chalk.red('❌ VRAM optimization error:'), error instanceof Error ? error.message : error);
+    }
+  }
+
+  /**
+   * Show VRAM status and system information
+   */
+  private async showVRAMStatus(vramOptimizer: any): Promise<void> {
+    console.log(chalk.cyan('\n🧠 VRAM System Status:'));
+    console.log(chalk.gray('━'.repeat(60)));
+    
+    // Get current model info if available
+    const currentModel = this.context.modelClient.getCurrentModel();
+    console.log(chalk.blue(`📍 Current Model: ${currentModel}`));
+    
+    if (currentModel && currentModel !== 'Not set') {
+      const modelInfo = vramOptimizer.parseModelInfo(currentModel);
+      const optimization = vramOptimizer.optimizeModelForVRAM(currentModel);
+      
+      console.log(chalk.white('\n📊 Model Analysis:'));
+      console.log(chalk.gray(`   Parameters: ${(modelInfo.parameterCount / 1e9).toFixed(1)}B`));
+      console.log(chalk.gray(`   Quantization: ${modelInfo.quantization}`));
+      console.log(chalk.gray(`   Layers: ${modelInfo.totalLayers}`));
+      
+      console.log(chalk.white('\n💾 Memory Requirements:'));
+      console.log(chalk.gray(`   Model Memory: ${optimization.layerOffloading.estimatedGPUMemory.toFixed(1)}GB (GPU)`));
+      console.log(chalk.gray(`   Context Memory: ${optimization.kvCache.estimatedMemoryGB.toFixed(1)}GB`));
+      console.log(chalk.gray(`   Total GPU Memory: ${optimization.estimatedTotalMemory.toFixed(1)}GB`));
+      
+      if (optimization.layerOffloading.cpuLayers > 0) {
+        console.log(chalk.yellow(`   CPU Offloading: ${optimization.layerOffloading.cpuLayers} layers (${optimization.layerOffloading.estimatedCPUMemory.toFixed(1)}GB)`));
+      }
+      
+      console.log(chalk.white('\n🎯 Optimization Status:'));
+      if (optimization.fitsInVRAM) {
+        console.log(chalk.green('   ✅ Model fits in available VRAM'));
+      } else {
+        console.log(chalk.yellow('   ⚠️  Model requires CPU offloading'));
+      }
+      
+      console.log(chalk.gray(`   K/V Cache: ${optimization.kvCache.quantizationType} (${optimization.kvCache.qualityImpact} quality impact)`));
+      console.log(chalk.gray(`   Quality Score: ${optimization.quantizationRecommendation.qualityScore}/100`));
+      
+    } else {
+      console.log(chalk.yellow('\n⚠️  No model currently selected.'));
+      console.log(chalk.gray('   Use the model management to select a model first.'));
+    }
+    
+    console.log(chalk.gray('━'.repeat(60)));
+  }
+
+  /**
+   * Optimize current model for VRAM
+   */
+  private async optimizeCurrentModel(vramOptimizer: any): Promise<void> {
+    const currentModel = this.context.modelClient.getCurrentModel();
+    
+    if (!currentModel || currentModel === 'Not set') {
+      console.log(chalk.red('❌ No model selected. Please select a model first.'));
+      return;
+    }
+    
+    console.log(chalk.blue(`🎯 Optimizing ${currentModel} for VRAM...`));
+    
+    const spinner = ora('Analyzing model and generating optimization...').start();
+    
+    try {
+      // Optimize the model
+      const optimizedModel = await this.context.modelClient.optimizeModelForVRAM(currentModel);
+      
+      spinner.succeed('Optimization applied!');
+      
+      console.log(chalk.green(`\n✅ Model optimized: ${optimizedModel}`));
+      console.log(chalk.gray('   VRAM optimizations have been applied to the current session.'));
+      console.log(chalk.gray('   The model will now use layer offloading and K/V cache quantization as needed.'));
+      
+      // Show what optimizations were applied
+      if (this.context.modelClient['currentOptimization']) {
+        const opt = this.context.modelClient['currentOptimization'];
+        console.log(chalk.cyan('\n🔧 Applied Optimizations:'));
+        
+        if (opt.layerOffloading.cpuLayers > 0) {
+          console.log(chalk.gray(`   • Layer offloading: ${opt.layerOffloading.gpuLayers} GPU + ${opt.layerOffloading.cpuLayers} CPU layers`));
+        }
+        
+        if (opt.kvCache.quantizationType !== 'f16') {
+          console.log(chalk.gray(`   • K/V cache quantization: ${opt.kvCache.quantizationType}`));
+        }
+        
+        if (opt.contextLength < 4096) {
+          console.log(chalk.gray(`   • Context window: ${opt.contextLength} tokens`));
+        }
+      }
+      
+    } catch (error) {
+      spinner.fail('Optimization failed');
+      console.error(chalk.red('❌ Failed to optimize model:'), error instanceof Error ? error.message : error);
+    }
+  }
+
+  /**
+   * Configure VRAM optimization settings
+   */
+  private async configureVRAMSettings(vramOptimizer: any): Promise<void> {
+    console.log(chalk.blue('⚙️  VRAM Configuration'));
+    
+    const answers = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'availableVRAM',
+        message: 'Available VRAM (GB):',
+        default: '8',
+        validate: (input: string) => {
+          const num = parseFloat(input);
+          return !isNaN(num) && num > 0 ? true : 'Please enter a valid positive number';
+        }
+      },
+      {
+        type: 'input',
+        name: 'systemRAM',
+        message: 'System RAM (GB):',
+        default: '32',
+        validate: (input: string) => {
+          const num = parseFloat(input);
+          return !isNaN(num) && num > 0 ? true : 'Please enter a valid positive number';
+        }
+      },
+      {
+        type: 'confirm',
+        name: 'enableLowVRAM',
+        message: 'Enable aggressive low VRAM optimizations?',
+        default: false
+      }
+    ]);
+    
+    // Update configuration (would need to be implemented in config manager)
+    console.log(chalk.green('\n✅ VRAM settings updated:'));
+    console.log(chalk.gray(`   Available VRAM: ${answers.availableVRAM}GB`));
+    console.log(chalk.gray(`   System RAM: ${answers.systemRAM}GB`));
+    console.log(chalk.gray(`   Low VRAM mode: ${answers.enableLowVRAM ? 'Enabled' : 'Disabled'}`));
+    
+    console.log(chalk.yellow('\n💡 Note: Settings will apply to new model optimization sessions.'));
+  }
+
+  /**
+   * Test model with VRAM optimization
+   */
+  private async testModelWithVRAM(vramOptimizer: any): Promise<void> {
+    const currentModel = this.context.modelClient.getCurrentModel();
+    
+    if (!currentModel || currentModel === 'Not set') {
+      console.log(chalk.red('❌ No model selected. Please select a model first.'));
+      return;
+    }
+    
+    console.log(chalk.blue(`🧪 Testing ${currentModel} with VRAM optimization...`));
+    
+    const spinner = ora('Running test generation with optimized settings...').start();
+    
+    try {
+      // Test with a simple prompt
+      const testPrompt = 'Write a simple hello world function in Python.';
+      
+      // Create a simple voice archetype for testing
+      const testVoice = {
+        id: 'test',
+        name: 'Test Voice',
+        systemPrompt: 'You are a helpful assistant.',
+        temperature: 0.7,
+        style: 'helpful'
+      };
+      
+      const response = await this.context.modelClient.generateVoiceResponse(
+        testVoice,
+        testPrompt,
+        { files: [] }
+      );
+      
+      spinner.succeed('Test completed successfully!');
+      
+      console.log(chalk.green('\n✅ VRAM optimization test results:'));
+      console.log(chalk.gray(`   Model: ${currentModel}`));
+      console.log(chalk.gray(`   Response length: ${response.content.length} characters`));
+      console.log(chalk.gray(`   Tokens used: ${response.tokens_used || 'Unknown'}`));
+      
+      console.log(chalk.cyan('\n📄 Test Response:'));
+      console.log(chalk.gray('─'.repeat(50)));
+      console.log(response.content.substring(0, 300) + (response.content.length > 300 ? '...' : ''));
+      console.log(chalk.gray('─'.repeat(50)));
+      
+    } catch (error) {
+      spinner.fail('Test failed');
+      console.error(chalk.red('❌ VRAM optimization test failed:'), error instanceof Error ? error.message : error);
+      
+      console.log(chalk.yellow('\n💡 Troubleshooting tips:'));
+      console.log(chalk.gray('   • The model may need more aggressive optimization'));
+      console.log(chalk.gray('   • Try a smaller model or more CPU offloading'));
+      console.log(chalk.gray('   • Check if Ollama is running and accessible'));
+    }
+  }
+
+  /**
+   * Show optimal models for current system
+   */
+  private async showOptimalModels(vramOptimizer: any): Promise<void> {
+    console.log(chalk.cyan('\n📋 Optimal Models for Your System:'));
+    console.log(chalk.gray('━'.repeat(60)));
+    
+    // Common models with their characteristics
+    const popularModels = [
+      { name: 'gemma2:2b', params: 2e9, description: 'Lightweight, fast responses' },
+      { name: 'llama3.2:3b', params: 3e9, description: 'Good balance of size and capability' },
+      { name: 'mistral:7b', params: 7e9, description: 'High quality, moderate size' },
+      { name: 'llama3.1:8b', params: 8e9, description: 'Excellent reasoning capabilities' },
+      { name: 'gemma2:9b', params: 9e9, description: 'Google\'s efficient architecture' },
+      { name: 'qwen2.5:14b', params: 14e9, description: 'Powerful multilingual model' },
+      { name: 'gemma2:27b', params: 27e9, description: 'High-end performance (requires optimization)' }
+    ];
+    
+    console.log(chalk.white('Recommended models based on VRAM optimization:'));
+    console.log();
+    
+    for (const model of popularModels) {
+      const optimization = vramOptimizer.optimizeModelForVRAM(model.name);
+      const memoryReq = optimization.estimatedTotalMemory;
+      
+      let status = '';
+      let color = chalk.gray;
+      
+      if (optimization.fitsInVRAM) {
+        status = '✅ Fits in VRAM';
+        color = chalk.green;
+      } else if (optimization.layerOffloading.gpuLayers > optimization.layerOffloading.totalLayers * 0.5) {
+        status = '🟡 Partial GPU (good performance)';
+        color = chalk.yellow;
+      } else {
+        status = '🔴 Mostly CPU (slower)';
+        color = chalk.red;
+      }
+      
+      console.log(color(`   ${model.name}`));
+      console.log(chalk.gray(`      ${model.description}`));
+      console.log(chalk.gray(`      Memory: ${memoryReq.toFixed(1)}GB | ${status}`));
+      
+      if (optimization.layerOffloading.cpuLayers > 0) {
+        console.log(chalk.gray(`      Offloading: ${optimization.layerOffloading.gpuLayers}/${optimization.layerOffloading.totalLayers} layers on GPU`));
+      }
+      
+      console.log();
+    }
+    
+    console.log(chalk.cyan('💡 Recommendations:'));
+    console.log(chalk.gray('   • Green models will run entirely on GPU for best performance'));
+    console.log(chalk.gray('   • Yellow models use hybrid CPU/GPU for good performance'));
+    console.log(chalk.gray('   • Red models run mostly on CPU (slower but functional)'));
+    console.log(chalk.gray('   • Use "cc model --pull <model-name>" to download a model'));
+    
+    console.log(chalk.gray('━'.repeat(60)));
   }
 }

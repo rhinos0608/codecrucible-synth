@@ -44,6 +44,9 @@ import {
 import { AutonomousErrorHandler, ErrorContext } from './autonomous-error-handler.js';
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
 import { SimplifiedReActPrompts, SimplifiedJSONParser } from './simplified-react-prompts.js';
+import { ReadCodeStructureTool } from './tools/read-code-structure-tool.js';
+import { IntelligentFileReaderTool } from './tools/intelligent-file-reader-tool.js';
+import { ImprovedReActReasoning, ReasoningOutput } from './improved-react-reasoning.js';
 
 const ThoughtSchema = z.object({
   thought: z.string().describe('Your reasoning and plan for the next action.'),
@@ -94,6 +97,7 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
   private agentContext: ReActAgentContext;
   private errorHandler: AutonomousErrorHandler;
   private modelSelector: IntelligentModelSelector;
+  private reasoning: ImprovedReActReasoning | null = null;
 
   constructor(context: CLIContext, workingDirectory: string) {
     // Initialize BaseAgent with configuration
@@ -131,10 +135,14 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
         issuesFound: [],
         completionSignals: []
       },
-      maxIterations: 15, // Increased from 8
+      maxIterations: 8, // Reduced to prevent loops
       currentIteration: 0
     };
     this.tools = [
+      // Autonomous Code Analysis (NEW)
+      new ReadCodeStructureTool(this.agentContext),
+      new IntelligentFileReaderTool(this.agentContext),
+      
       // Enhanced File Operations
       new EnhancedReadFileTool(this.agentContext),
       new EnhancedWriteFileTool(this.agentContext),
@@ -264,6 +272,9 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
   }
 
   async processRequest(input: string): Promise<string> {
+    const requestStartTime = Date.now();
+    const maxProcessingTime = this.config.timeout || 120000; // 2 minutes default
+    
     this.agentContext.messages.push({ role: 'user', content: input, timestamp: Date.now() });
 
     // Check if conversation history needs rotation
@@ -285,203 +296,67 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
       return this.generateDirectResponse(input, intentAnalysis);
     }
 
+    // Initialize improved reasoning system
+    this.reasoning = new ImprovedReActReasoning(this.tools, input);
+    logger.info('🧠 Initialized improved ReAct reasoning system');
+
     // Use intelligent model selection for this task (temporarily disabled for stability)
     const taskType = this.analyzeTaskType(input);
-    // const optimalModel = await this.modelSelector.selectOptimalModel(taskType, {
-    //   complexity: this.assessComplexity(input),
-    //   speed: 'medium',
-    //   accuracy: 'high'
-    // });
-    
-    // Temporarily use configured model for stability
     const optimalModel = undefined; // Use default configured model
 
     logger.info(`🧠 Using configured model for task type: ${taskType}`);
 
+    let lastObservation: string | undefined;
+
     for (let i = 0; i < this.agentContext.maxIterations; i++) {
       this.agentContext.currentIteration = i;
       
-      // Check if we should conclude based on progress
-      if (this.shouldConcludeBasedOnProgress()) {
-        logger.info(`🎯 Agent concluding after ${i} iterations based on progress signals`);
-        const conclusion = this.generateProgressBasedConclusion();
-        this.agentContext.messages.push({ role: 'assistant', content: conclusion, timestamp: Date.now() });
-        return conclusion;
+      // Check for timeout
+      if (Date.now() - requestStartTime > maxProcessingTime) {
+        logger.warn(`⏰ Request timeout after ${Date.now() - requestStartTime}ms`);
+        return `Request timed out after ${Math.round((Date.now() - requestStartTime) / 1000)} seconds. The request was too complex or the system is experiencing delays. Please try a simpler request.`;
       }
+      
       try {
-        const prompt = this.constructPrompt();
-        const validToolNames = [...this.tools.map(t => t.definition.name), 'final_answer'];
-        const thoughtSchema = {
-          type: "object",
-          properties: {
-            thought: {
-              type: "string",
-              description: "Your reasoning and plan for the next action."
-            },
-            tool: {
-              type: "string",
-              enum: validToolNames,
-              description: "The name of the tool to use from the available tools."
-            },
-            toolInput: {
-              type: "object",
-              description: "The input parameters for the tool."
-            }
-          },
-          required: ["thought", "tool", "toolInput"]
-        };
-        // Set the selected optimal model before generating (if specified)
-        if (optimalModel) {
-          this.model.setModel(optimalModel);
+        // Use improved reasoning system
+        const reasoningOutput: ReasoningOutput = this.reasoning!.reason(lastObservation);
+        
+        logger.info(`🧠 Iteration ${i + 1}: ${reasoningOutput.reasoning}`);
+        logger.info(`🔧 Selected tool: ${reasoningOutput.selectedTool} (confidence: ${reasoningOutput.confidence.toFixed(2)})`);
+        
+        // Check if we should complete
+        if (reasoningOutput.shouldComplete) {
+          const finalAnswer = reasoningOutput.toolInput.answer as string;
+          this.agentContext.messages.push({ role: 'assistant', content: finalAnswer, timestamp: Date.now() });
+          
+          // Record successful completion
+          if (optimalModel) {
+            this.modelSelector.recordPerformance(optimalModel, taskType, true, Date.now() - this.getLastMessageTime(), 1.0);
+          }
+          
+          return finalAnswer;
         }
-        
-        // Try without structured output first to debug
-        const response = await this.model.generate(prompt);
-        logger.info(`Agent iteration ${i + 1} - Raw response: ${response.slice(0, 300)}...`);
-        
+
+        // Find and execute the selected tool
+        const tool = this.tools.find(t => t.definition.name === reasoningOutput.selectedTool);
+        if (!tool) {
+          // Log available tool names for debugging
+          const availableTools = this.tools.map(t => t.definition.name).join(', ');
+          logger.error(`Unknown tool: ${reasoningOutput.selectedTool}. Available tools: ${availableTools}`);
+          
+          lastObservation = `Error: Unknown tool "${reasoningOutput.selectedTool}". Available tools: ${availableTools}`;
+          continue;
+        }
+
+        // Execute the selected tool with error handling
         try {
-          const thought = this.parseSimplifiedResponse(response);
-          
-          // Log the parsed thought for debugging
-          logger.debug('Parsed thought:', thought);
-          
-          if (thought.tool === 'final_answer') {
-            // Validate that agent has done sufficient analysis before concluding
-            const validationResult = this.validateReadyForConclusion();
-            if (!validationResult.isReady) {
-              const errorMessage = `Cannot conclude yet: ${validationResult.reason}. Please use tools to gather more information first.`;
-              this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage, required: validationResult.nextSteps }), timestamp: Date.now() });
-              continue;
-            }
-            
-            let finalAnswer = thought.toolInput.answer as string;
-            
-            // If empty answer, generate one based on gathered information
-            if (!finalAnswer || finalAnswer.trim() === '') {
-              logger.warn('Final answer is empty, generating summary from conversation');
-              finalAnswer = this.generateAnswerFromContext();
-            }
-            
-            this.agentContext.messages.push({ role: 'assistant', content: finalAnswer, timestamp: Date.now() });
-            
-            // Record successful completion
-            if (optimalModel) {
-              this.modelSelector.recordPerformance(optimalModel, taskType, true, Date.now() - this.getLastMessageTime(), 1.0);
-            }
-            
-            return finalAnswer;
-          }
-
-          const tool = this.tools.find(t => t.definition.name === thought.tool);
-          if (!tool) {
-            // Log available tool names for debugging
-            const availableTools = this.tools.map(t => t.definition.name).join(', ');
-            logger.error(`Unknown tool: ${thought.tool}. Available tools: ${availableTools}`);
-            
-            // Try to suggest the correct tool
-            const suggestedTool = this.suggestCorrectTool(thought.tool);
-            if (suggestedTool) {
-              const errorMessage = `Unknown tool "${thought.tool}". Did you mean "${suggestedTool}"? Available tools: ${availableTools}`;
-              this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage }), timestamp: Date.now() });
-              continue;
-            }
-            
-            throw new Error(`Unknown tool: ${thought.tool}. Available tools: ${availableTools}`);
-          }
-
-          // Validate and fix tool input before execution
-          const fixedToolInput = SimplifiedJSONParser.validateAndFixToolInput(thought.tool, thought.toolInput);
-          const validatedInput = this.validateToolInput(thought.tool, fixedToolInput);
-          if (!validatedInput.isValid) {
-            const errorMessage = `Invalid tool input for ${thought.tool}: ${validatedInput.error}`;
-            this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage }), timestamp: Date.now() });
-            continue;
-          }
-          thought.toolInput = fixedToolInput;
-          
-          // Check for repetitive tool usage with enhanced logic BEFORE tracking
-          if (this.isRepetitiveToolUsage(thought.tool, thought.toolInput)) {
-            logger.warn(`Preventing repetitive tool usage: ${thought.tool}`);
-            
-            // Special handling for listFiles when package.json is requested
-            if (thought.tool === 'listFiles' && this.isPackageJsonRequested()) {
-              logger.info('Forcing readFile package.json due to repetitive listFiles usage');
-              const forceReadPackageJson = this.getToolByName('readFile');
-              if (forceReadPackageJson) {
-                this.agentContext.messages.push({ 
-                  role: 'tool', 
-                  content: JSON.stringify({ 
-                    forced_action: 'Auto-executing readFile package.json due to repetitive listFiles usage' 
-                  }), 
-                  timestamp: Date.now() 
-                });
-                
-                try {
-                  const observation = await forceReadPackageJson.execute({ path: 'package.json' });
-                  this.trackToolUsage('readFile', { path: 'package.json' });
-                  this.updateProgressMetrics('readFile', { path: 'package.json' });
-                  this.agentContext.messages.push({ role: 'tool', content: JSON.stringify(observation), timestamp: Date.now() });
-                  continue; // Continue with next iteration
-                } catch (error) {
-                  this.agentContext.messages.push({ 
-                    role: 'tool', 
-                    content: JSON.stringify({ error: `Failed to read package.json: ${error}` }), 
-                    timestamp: Date.now() 
-                  });
-                  continue;
-                }
-              }
-            }
-            
-            // If we have enough progress, conclude
-            if (this.hasMinimumProgress()) {
-              const conclusion = this.generateProgressBasedConclusion();
-              this.agentContext.messages.push({ role: 'assistant', content: conclusion, timestamp: Date.now() });
-              return conclusion;
-            } else {
-              // Auto-execute suggested tool instead of just warning
-              const autoAction = this.getAutoAction(thought.tool, thought.toolInput);
-              if (autoAction) {
-                logger.info(`Auto-executing suggested action: ${autoAction.tool} with ${JSON.stringify(autoAction.input)}`);
-                
-                const suggestedTool = this.tools.find(t => t.definition.name === autoAction.tool);
-                if (suggestedTool) {
-                  try {
-                    const observation = await suggestedTool.execute(autoAction.input);
-                    const toolResult = typeof observation === 'string' ? observation : JSON.stringify(observation);
-                    this.agentContext.messages.push({ role: 'tool', content: toolResult, timestamp: Date.now() });
-                    
-                    // Track the auto-executed tool usage
-                    this.trackToolUsage(autoAction.tool, autoAction.input);
-                    this.updateProgressMetrics(autoAction.tool, autoAction.input);
-                    continue;
-                  } catch (error) {
-                    this.agentContext.messages.push({ 
-                      role: 'tool', 
-                      content: JSON.stringify({ error: `Auto-action failed: ${error}` }), 
-                      timestamp: Date.now() 
-                    });
-                  }
-                }
-              }
-              
-              // Fallback: Force tool diversification warning
-              const diversificationMessage = this.suggestToolDiversification(thought.tool);
-              this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ warning: diversificationMessage }), timestamp: Date.now() });
-              continue;
-            }
-          }
-
-          this.agentContext.messages.push({ role: 'assistant', content: JSON.stringify(thought), timestamp: Date.now() });
-          
-          // Execute tool with enhanced error handling
           const observation = await withErrorHandling(
-            () => tool.execute(thought.toolInput),
+            () => tool.execute(reasoningOutput.toolInput),
             {
-              operation: `execute-tool-${thought.tool}`,
+              operation: `execute-tool-${reasoningOutput.selectedTool}`,
               metadata: { 
-                toolName: thought.tool, 
-                input: thought.toolInput,
+                toolName: reasoningOutput.selectedTool, 
+                input: reasoningOutput.toolInput,
                 sessionId: this.dependencies.sessionId
               }
             },
@@ -492,29 +367,29 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
             }
           );
           
-          // Store tool result in a more readable format
-          const toolResult = typeof observation === 'string' ? observation : JSON.stringify(observation);
-          this.agentContext.messages.push({ role: 'tool', content: toolResult, timestamp: Date.now() });
+          // Store observation for next reasoning cycle
+          lastObservation = typeof observation === 'string' ? observation : JSON.stringify(observation);
           
-          // Track successful tool usage and update progress metrics AFTER execution
-          this.trackToolUsage(thought.tool, thought.toolInput);
-          this.updateProgressMetrics(thought.tool, thought.toolInput);
+          // Store tool result for conversation context
+          this.agentContext.messages.push({ 
+            role: 'tool', 
+            content: lastObservation, 
+            timestamp: Date.now() 
+          });
           
-          // Store file list results for context
-          if (thought.tool === 'listFiles' && typeof observation === 'string') {
-            // Extract file names from formatted string result
-            const fileNames = observation.split('\n')
-              .filter(line => line.startsWith('- '))
-              .map(line => line.substring(2))
-              .slice(0, 20);
-            this.agentContext.lastFileList = fileNames;
-          }
-
-        } catch (parseError) {
-          logger.error('Error parsing agent response:', parseError);
-          logger.debug('Raw model response:', response);
-          const errorMessage = parseError instanceof Error ? parseError.message : 'Failed to parse response';
-          this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage, rawResponse: response.slice(0, 200) }), timestamp: Date.now() });
+          logger.info(`✅ Tool ${reasoningOutput.selectedTool} executed successfully`);
+          
+        } catch (toolError) {
+          const errorMessage = toolError instanceof Error ? toolError.message : 'Tool execution failed';
+          lastObservation = `Error: ${errorMessage}`;
+          
+          this.agentContext.messages.push({ 
+            role: 'tool', 
+            content: JSON.stringify({ error: errorMessage }), 
+            timestamp: Date.now() 
+          });
+          
+          logger.warn(`❌ Tool ${reasoningOutput.selectedTool} failed: ${errorMessage}`);
         }
 
       } catch (error) {
@@ -1101,8 +976,12 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
       };
     } catch (error) {
       logger.error('Simplified JSON parsing failed:', error);
-      // Final fallback - create a default response
-      throw new Error(`Could not parse response: ${response.slice(0, 200)}`);
+      // Return a safe fallback instead of throwing
+      return {
+        thought: "Unable to parse model response, using final_answer as fallback",
+        tool: "final_answer",
+        toolInput: { answer: "I encountered a parsing error and cannot continue. Please try rephrasing your request." }
+      };
     }
   }
 
@@ -1423,16 +1302,27 @@ Provide a direct, helpful response without using any tools.`;
     const recentUsage = this.agentContext.recentToolUsage;
     const now = Date.now();
     
-    // Don't block progressive exploration - allow different paths/files
+    // Block if same tool+input used more than ONCE (more aggressive)
     const exactSameUsage = recentUsage.filter(usage => 
       usage.tool === toolName && 
-      (now - usage.timestamp) < 300000 && // 5 minutes
+      (now - usage.timestamp) < 180000 && // Reduced to 3 minutes
       JSON.stringify(usage.input) === JSON.stringify(toolInput)
     );
     
-    // Only block if EXACT same tool with EXACT same input used more than 2 times
-    if (exactSameUsage.length >= 2) {
+    if (exactSameUsage.length >= 1) { // Changed from 2 to 1
       return true;
+    }
+    
+    // Also block if iteration count is high and we keep using same tool type
+    if (this.agentContext.currentIteration >= 5) {
+      const sameToolRecent = recentUsage.filter(usage => 
+        usage.tool === toolName && 
+        (now - usage.timestamp) < 120000 // Last 2 minutes
+      );
+      
+      if (sameToolRecent.length >= 2) {
+        return true;
+      }
     }
     
     // Special case: Allow multiple listFiles if exploring different directories

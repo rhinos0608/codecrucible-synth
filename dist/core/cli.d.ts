@@ -17,6 +17,10 @@ interface CLIOptions {
     autonomous?: boolean;
     quick?: boolean;
     direct?: boolean;
+    verbose?: boolean;
+    quiet?: boolean;
+    output?: 'text' | 'json' | 'table';
+    timeout?: number;
 }
 export interface CLIContext {
     modelClient: LocalModelClient;
@@ -30,6 +34,10 @@ export interface CLIContext {
 export declare class CodeCrucibleCLI {
     private context;
     constructor(context: CLIContext);
+    /**
+     * Configure CLI output based on options
+     */
+    configureOutput(options: CLIOptions): void;
     handleGeneration(prompt: string, options: CLIOptions): Promise<void>;
     handleCouncilMode(prompt: string, options: any): Promise<void>;
     handleVoiceSpecific(voice: string, prompt: string): Promise<void>;
@@ -39,6 +47,7 @@ export declare class CodeCrucibleCLI {
     handleConfig(options: any): Promise<void>;
     handleModelManagement(options: any): Promise<void>;
     handleVoiceManagement(options: any): Promise<void>;
+    handleVRAMManagement(options: any): Promise<void>;
     handleEditManagement(options: any): Promise<void>;
     showExamples(): void;
     /**
@@ -100,5 +109,29 @@ export declare class CodeCrucibleCLI {
      * Generate project-level insights
      */
     private generateProjectInsights;
+    /**
+     * Handle VRAM optimization commands and diagnostics
+     */
+    private handleVRAMOptimization;
+    /**
+     * Show VRAM status and system information
+     */
+    private showVRAMStatus;
+    /**
+     * Optimize current model for VRAM
+     */
+    private optimizeCurrentModel;
+    /**
+     * Configure VRAM optimization settings
+     */
+    private configureVRAMSettings;
+    /**
+     * Test model with VRAM optimization
+     */
+    private testModelWithVRAM;
+    /**
+     * Show optimal models for current system
+     */
+    private showOptimalModels;
 }
 export {};

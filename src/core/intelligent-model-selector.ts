@@ -1,5 +1,6 @@
 import { logger } from './logger.js';
 import { AutonomousErrorHandler } from './autonomous-error-handler.js';
+import { AdvancedQuantizationOptimizer, QuantizationRecommendation, UseCase } from './advanced-quantization-optimizer.js';
 import { execSync } from 'child_process';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -57,10 +58,12 @@ export interface ModelCapability {
 export class IntelligentModelSelector {
   private errorHandler: AutonomousErrorHandler;
   private performanceHistory = new Map<string, number[]>();
+  private quantizationOptimizer: AdvancedQuantizationOptimizer;
   
   private systemSpecs?: SystemSpecs;
   private availableModels: string[] = [];
   private lastModelCheck = 0;
+  private optimizationCache = new Map<string, ModelOptimizationResult>();
 
   // Model capability database with system requirements
   private modelCapabilities: ModelCapability[] = [
@@ -250,8 +253,9 @@ export class IntelligentModelSelector {
     }
   ];
 
-  constructor() {
+  constructor(endpoint: string = 'http://localhost:11434') {
     this.errorHandler = new AutonomousErrorHandler();
+    this.quantizationOptimizer = new AdvancedQuantizationOptimizer(endpoint);
     this.initializeSystemAnalysis();
   }
 
@@ -856,10 +860,11 @@ export class IntelligentModelSelector {
     }
     
     // Prioritize models based on task type and quality
+    // Focus on reliable, fast models first to avoid timeouts
     const modelPreferences = {
-      'coding': ['codellama', 'qwen', 'deepseek', 'gemma3n', 'gemma'],
-      'general': ['llama', 'gemma3n', 'qwen', 'gemma'],
-      'analysis': ['qwen', 'llama', 'gemma3n', 'codellama']
+      'coding': ['llama3.2', 'gemma', 'qwen', 'codellama', 'gemma3n'],
+      'general': ['llama3.2', 'gemma', 'qwen', 'gemma3n'],
+      'analysis': ['llama3.2', 'qwen', 'gemma', 'codellama']
     };
     
     const preferences = modelPreferences[taskType as keyof typeof modelPreferences] || modelPreferences.general;
@@ -1020,6 +1025,159 @@ export class IntelligentModelSelector {
     
     logger.debug('📊 Auto-optimized requirements:', optimized);
     return optimized;
+  }
+
+  /**
+   * Get optimized configuration for a model using advanced quantization
+   */
+  async getOptimizedModelConfig(modelName: string, useCase: UseCase = 'coding'): Promise<ModelOptimizationResult> {
+    const cacheKey = `${modelName}-${useCase}`;
+    
+    if (this.optimizationCache.has(cacheKey)) {
+      const cached = this.optimizationCache.get(cacheKey)!;
+      // Refresh cache if older than 1 hour
+      if (Date.now() - cached.timestamp < 3600000) {
+        return cached;
+      }
+    }
+
+    try {
+      const quantizationRec = await this.quantizationOptimizer.getOptimalQuantization(modelName, useCase);
+      
+      const result: ModelOptimizationResult = {
+        modelName,
+        useCase,
+        quantizationRecommendation: quantizationRec,
+        ollamaParams: this.generateOllamaParams(quantizationRec),
+        environmentVars: this.generateEnvironmentVars(quantizationRec),
+        expectedPerformance: this.estimatePerformance(quantizationRec),
+        timestamp: Date.now()
+      };
+
+      this.optimizationCache.set(cacheKey, result);
+      
+      logger.info(`🎯 Optimized configuration for ${modelName}:`, {
+        quantization: quantizationRec.quantization,
+        gpuLayers: quantizationRec.gpuLayers,
+        context: quantizationRec.contextLength,
+        quality: quantizationRec.qualityScore,
+        speed: quantizationRec.speedScore
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to generate optimized config:', error);
+      return this.getFallbackOptimization(modelName, useCase);
+    }
+  }
+
+  /**
+   * Generate Ollama parameters from quantization recommendation
+   */
+  private generateOllamaParams(rec: QuantizationRecommendation): Record<string, any> {
+    const params: Record<string, any> = {
+      num_ctx: rec.contextLength,
+      num_batch: rec.batchSize,
+      num_gpu: rec.gpuLayers,
+      low_vram: rec.lowVRAMMode,
+      flash_attn: rec.flashAttention
+    };
+
+    // K/V cache optimization
+    if (rec.kvCacheQuantization !== 'f16') {
+      params.cache_type_k = rec.kvCacheQuantization;
+      params.cache_type_v = rec.kvCacheQuantization;
+    }
+
+    return params;
+  }
+
+  /**
+   * Generate environment variables for optimization
+   */
+  private generateEnvironmentVars(rec: QuantizationRecommendation): Record<string, string> {
+    const envVars: Record<string, string> = {};
+
+    if (rec.flashAttention) {
+      envVars.OLLAMA_FLASH_ATTENTION = '1';
+    }
+
+    if (rec.kvCacheQuantization !== 'f16') {
+      envVars.OLLAMA_KV_CACHE_TYPE = rec.kvCacheQuantization;
+    }
+
+    if (rec.lowVRAMMode) {
+      envVars.OLLAMA_NUM_PARALLEL = '1';
+      envVars.OLLAMA_MAX_LOADED_MODELS = '1';
+    }
+
+    return envVars;
+  }
+
+  /**
+   * Estimate performance metrics for a configuration
+   */
+  private estimatePerformance(rec: QuantizationRecommendation): PerformanceEstimate {
+    // Base estimates (tokens/second)
+    let baseSpeed = 20; // Conservative base
+    
+    // Adjust for quantization
+    const quantSpeedMultiplier: Record<string, number> = {
+      'Q4_0': 1.5,
+      'Q4_K_S': 1.4,
+      'Q4_K_M': 1.3,
+      'Q5_K_S': 1.1,
+      'Q5_K_M': 1.0,
+      'Q6_K': 0.9,
+      'Q8_0': 0.7,
+      'F16': 0.5
+    };
+    
+    baseSpeed *= quantSpeedMultiplier[rec.quantization] || 1.0;
+    
+    // Adjust for GPU usage
+    if (rec.gpuLayers === -1) {
+      baseSpeed *= 3.0; // Full GPU acceleration
+    } else if (rec.gpuLayers > 0) {
+      baseSpeed *= 1.5 + (rec.gpuLayers / 100); // Partial GPU acceleration
+    }
+    
+    return {
+      estimatedTokensPerSecond: Math.round(baseSpeed),
+      estimatedMemoryUsageGB: rec.estimatedVRAMUsage,
+      estimatedLatencyMs: Math.round(1000 / baseSpeed),
+      qualityScore: rec.qualityScore,
+      speedScore: rec.speedScore
+    };
+  }
+
+  /**
+   * Get fallback optimization for error cases
+   */
+  private getFallbackOptimization(modelName: string, useCase: UseCase): ModelOptimizationResult {
+    const fallbackRec: QuantizationRecommendation = {
+      quantization: 'Q4_K_M',
+      kvCacheQuantization: 'q8_0',
+      gpuLayers: 20,
+      contextLength: 4096,
+      batchSize: 1024,
+      flashAttention: true,
+      lowVRAMMode: true,
+      estimatedVRAMUsage: 6,
+      qualityScore: 75,
+      speedScore: 80,
+      reasoning: 'Fallback configuration due to optimization error'
+    };
+
+    return {
+      modelName,
+      useCase,
+      quantizationRecommendation: fallbackRec,
+      ollamaParams: this.generateOllamaParams(fallbackRec),
+      environmentVars: this.generateEnvironmentVars(fallbackRec),
+      expectedPerformance: this.estimatePerformance(fallbackRec),
+      timestamp: Date.now()
+    };
   }
 
   /**
@@ -1371,4 +1529,23 @@ export class IntelligentModelSelector {
     
     return data;
   }
+}
+
+// Additional type definitions for optimization
+export interface ModelOptimizationResult {
+  modelName: string;
+  useCase: UseCase;
+  quantizationRecommendation: QuantizationRecommendation;
+  ollamaParams: Record<string, any>;
+  environmentVars: Record<string, string>;
+  expectedPerformance: PerformanceEstimate;
+  timestamp: number;
+}
+
+export interface PerformanceEstimate {
+  estimatedTokensPerSecond: number;
+  estimatedMemoryUsageGB: number;
+  estimatedLatencyMs: number;
+  qualityScore: number;
+  speedScore: number;
 }

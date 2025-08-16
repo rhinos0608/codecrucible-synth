@@ -1,5 +1,6 @@
 import { Sandbox } from '@e2b/code-interpreter';
 import { logger } from '../logger.js';
+import { registerShutdownHandler, createManagedInterval, clearManagedInterval } from '../process-lifecycle-manager.js';
 
 /**
  * Execution result from E2B sandbox
@@ -54,6 +55,7 @@ export class E2BService {
   private sandboxPool: Map<string, E2BSandbox> = new Map();
   private config: E2BConfiguration;
   private isInitialized: boolean = false;
+  private cleanupTimer: NodeJS.Timeout | null = null;
 
   constructor(config?: Partial<E2BConfiguration>) {
     this.config = {
@@ -73,6 +75,9 @@ export class E2BService {
     if (!this.config.apiKey) {
       logger.warn('E2B API key not found. Code execution will be disabled.');
     }
+
+    // Register for shutdown
+    registerShutdownHandler(this);
   }
 
   /**
@@ -412,9 +417,30 @@ except Exception as e:
    * Start cleanup timer for expired sessions
    */
   private startCleanupTimer(): void {
-    setInterval(async () => {
+    this.cleanupTimer = createManagedInterval(async () => {
       await this.cleanupExpiredSessions();
     }, 300000); // Clean up every 5 minutes
+  }
+
+  /**
+   * Stop cleanup timer and cleanup all resources
+   */
+  async shutdown(): Promise<void> {
+    if (this.cleanupTimer) {
+      clearManagedInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+
+    // Destroy all active sandboxes
+    const destroyPromises = Array.from(this.sandboxPool.keys()).map(sessionId => 
+      this.destroySandbox(sessionId)
+    );
+    
+    await Promise.allSettled(destroyPromises);
+    this.sandboxPool.clear();
+    this.isInitialized = false;
+    
+    logger.info('✅ E2B service shut down successfully');
   }
 
   /**
@@ -469,20 +495,6 @@ except Exception as e:
     return totalAge / this.sandboxPool.size;
   }
 
-  /**
-   * Shutdown the service and cleanup all resources
-   */
-  async shutdown(): Promise<void> {
-    logger.info('🛑 Shutting down E2B service...');
-    
-    const sessionIds = Array.from(this.sandboxPool.keys());
-    const cleanupPromises = sessionIds.map(sessionId => this.destroySandbox(sessionId));
-    
-    await Promise.allSettled(cleanupPromises);
-    
-    this.isInitialized = false;
-    logger.info('✅ E2B service shutdown complete');
-  }
 }
 
 /**

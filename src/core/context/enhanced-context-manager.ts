@@ -3,6 +3,7 @@ import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import { Task } from '../planning/enhanced-agentic-planner.js';
+import { registerShutdownHandler, createManagedInterval, clearManagedInterval } from '../process-lifecycle-manager.js';
 
 export interface ContextItem {
   key: string;
@@ -59,6 +60,7 @@ export class EnhancedContextManager {
   private currentSessionId: string;
   private lastPersistTime: number = 0;
   private persistenceInterval: number = 5 * 60 * 1000; // 5 minutes
+  private persistenceTimer: NodeJS.Timeout | null = null;
 
   constructor(
     maxContextSize: number = 50 * 1024 * 1024, // 50MB
@@ -70,6 +72,9 @@ export class EnhancedContextManager {
     
     this.initializePersistence();
     this.startPeriodicPersistence();
+    
+    // Register for shutdown
+    registerShutdownHandler(this);
   }
 
   /**
@@ -745,13 +750,29 @@ export class EnhancedContextManager {
   }
 
   private startPeriodicPersistence(): void {
-    setInterval(async () => {
+    this.persistenceTimer = createManagedInterval(async () => {
       const timeSinceLastPersist = Date.now() - this.lastPersistTime;
       
       if (timeSinceLastPersist >= this.persistenceInterval) {
         await this.saveContext();
       }
     }, 60000); // Check every minute
+  }
+
+  /**
+   * Shutdown context manager and cleanup resources
+   */
+  async shutdown(): Promise<void> {
+    if (this.persistenceTimer) {
+      clearManagedInterval(this.persistenceTimer);
+      this.persistenceTimer = null;
+    }
+
+    // Save final state before shutdown
+    await this.saveContext();
+    this.contextStore.clear();
+    
+    logger.info('✅ EnhancedContextManager shut down successfully');
   }
 
   private generateSessionId(): string {

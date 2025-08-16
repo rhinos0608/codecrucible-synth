@@ -38,16 +38,16 @@ export class SimplifiedReActPrompts {
     // Generate comprehensive tool documentation
     const toolDocs = this.generateToolDocumentation(toolDefinitions);
     
-    return `You are an expert coding assistant using the ReAct pattern. You systematically explore codebases by:
-1. REASONING about what information you need next
-2. ACTING with the appropriate tool 
-3. OBSERVING the results to plan your next step
+    return `You are an expert coding assistant using the ReAct pattern. You systematically answer questions by:
+1. REASONING about what information you need to answer the user's question
+2. ACTING with the appropriate tool to get that information
+3. OBSERVING the results and answering if you have enough information
 
 CRITICAL RULES:
+- FOCUS on answering the user's specific question, not general exploration
+- If tool results contain the answer to the user's question, use "final_answer" immediately
 - NEVER repeat the same tool call with identical parameters
-- ALWAYS examine tool results before choosing your next action
-- Use "final_answer" only when you have gathered sufficient information
-- Build on previous results - don't ignore what you've already learned
+- Don't explore beyond what's needed to answer the question
 - Always provide valid JSON with correct parameter names and types
 
 ${toolDocs}
@@ -65,6 +65,8 @@ Files explored: ${filesExplored}
 CONVERSATION HISTORY:
 ${conversation}
 
+REMEMBER: If the tool results above contain the answer to the user's question, use "final_answer" with that answer immediately. Don't continue exploring unnecessarily.
+
 Your next action (JSON only):`;
   }
 
@@ -72,19 +74,29 @@ Your next action (JSON only):`;
    * Generate comprehensive tool documentation with parameters and examples
    */
   private static generateToolDocumentation(toolDefinitions: Array<{name: string, description: string, parameters: any, examples?: string[]}>): string {
-    // Prioritize basic tools first
+    // Prioritize autonomous code analysis tools first for better file reading
+    const autonomousTools = ['readCodeStructure', 'readFiles'];
     const basicTools = ['listFiles', 'readFile', 'writeFile', 'confirmedWrite', 'gitStatus', 'gitDiff'];
     const prioritizedTools = [];
     
-    // Add basic tools first
-    for (const basicTool of basicTools) {
-      const tool = toolDefinitions.find(t => t.name === basicTool);
+    // Add autonomous tools first (they're more powerful for code analysis)
+    for (const autonomousTool of autonomousTools) {
+      const tool = toolDefinitions.find(t => t.name === autonomousTool);
       if (tool) prioritizedTools.push(tool);
     }
     
-    // Add remaining tools (limit total to 8 to avoid overwhelming)
-    const remainingTools = toolDefinitions.filter(t => !basicTools.includes(t.name));
-    prioritizedTools.push(...remainingTools.slice(0, 8 - prioritizedTools.length));
+    // Add basic tools next
+    for (const basicTool of basicTools) {
+      const tool = toolDefinitions.find(t => t.name === basicTool);
+      if (tool && !prioritizedTools.includes(tool)) prioritizedTools.push(tool);
+    }
+    
+    // Add remaining tools (limit total to 10 to include more autonomous tools)
+    const remainingTools = toolDefinitions.filter(t => 
+      !autonomousTools.includes(t.name) && 
+      !basicTools.includes(t.name)
+    );
+    prioritizedTools.push(...remainingTools.slice(0, 10 - prioritizedTools.length));
     
     const toolDocs = prioritizedTools.map(tool => {
       const params = this.extractParameterInfo(tool.parameters);
@@ -94,17 +106,23 @@ Your next action (JSON only):`;
     Parameters: ${params}${examples}`;
     }).join('\n');
 
-    const basicToolNames = prioritizedTools.slice(0, 5).map(t => `"${t.name}"`).join(', ');
+    const priorityToolNames = prioritizedTools.slice(0, 7).map(t => `"${t.name}"`).join(', ');
     const allToolNames = toolDefinitions.map(t => `"${t.name}"`).join(', ');
 
-    return `MOST COMMON TOOLS (start with these):
+    return `MOST POWERFUL TOOLS (start with these for code analysis):
 ${toolDocs}
   "final_answer": Provide final response when analysis is complete
     Parameters: {"answer": "your complete response"}
 
-PRIORITY: Use basic tools first: ${basicToolNames}
+PRIORITY: For code analysis, use autonomous tools first: "readCodeStructure", "readFiles"
+THEN: Use standard tools: ${priorityToolNames}
 ALL AVAILABLE: ${allToolNames}, "final_answer"
-CRITICAL: Use EXACT tool names only - do not modify or guess names.`;
+CRITICAL: Use EXACT tool names only - do not modify or guess names.
+
+AUTONOMOUS CODE ANALYSIS PATTERN:
+1. When user asks about code structure/files → use "readCodeStructure" first
+2. When user asks to read specific files → use "readFiles" with file list
+3. For basic tasks → use standard tools like "listFiles", "readFile"`;
   }
 
   /**
@@ -238,7 +256,23 @@ export class SimplifiedJSONParser {
       };
     }
 
-    // Strategy 3: Intelligent defaults for common responses
+    // Strategy 3: Intelligent defaults for common responses (prioritize autonomous tools)
+    if (response.includes('readCodeStructure') || response.includes('code structure') || response.includes('analyze codebase')) {
+      return {
+        thought: "Analyzing codebase structure autonomously",
+        tool: "readCodeStructure",
+        toolInput: { path: ".", maxFiles: 50, includeContent: false }
+      };
+    }
+
+    if (response.includes('readFiles') || response.includes('read multiple files') || response.includes('intelligent file reading')) {
+      return {
+        thought: "Reading multiple files with intelligent analysis",
+        tool: "readFiles",
+        toolInput: { files: ["src"], maxFiles: 20, includeMetadata: true, extractDefinitions: true }
+      };
+    }
+
     if (response.includes('listFiles') || response.includes('list files')) {
       return {
         thought: "Listing files to understand structure",
@@ -281,13 +315,28 @@ export class SimplifiedJSONParser {
     
     // Common fixes for tool inputs
     switch (tool) {
+      case 'readCodeStructure':
+        return {
+          path: safeInput.path || safeInput.directory || safeInput.folder || ".",
+          maxFiles: safeInput.maxFiles || 50,
+          includeContent: safeInput.includeContent || false
+        };
+      
+      case 'readFiles':
+        return {
+          files: safeInput.files || safeInput.paths || ["src"],
+          maxFiles: safeInput.maxFiles || 20,
+          includeMetadata: safeInput.includeMetadata !== false,
+          extractDefinitions: safeInput.extractDefinitions !== false,
+          maxFileSize: safeInput.maxFileSize || 200000
+        };
+      
       case 'listFiles':
         return { 
           path: safeInput.path || safeInput.directory || safeInput.folder || "." 
         };
       
       case 'readFile':
-      case 'readFiles':
         return { 
           path: safeInput.path || safeInput.file || safeInput.filename || "package.json" 
         };

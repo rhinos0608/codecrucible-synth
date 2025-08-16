@@ -65,6 +65,7 @@ export class ClaudeCodeInspiredReasoning {
   private tools: BaseTool[];
   private iterationCount: number = 0;
   private maxIterations: number = 12;
+  private usedTools: Set<string> = new Set();
   
   constructor(tools: BaseTool[], userGoal: string) {
     this.tools = tools;
@@ -101,6 +102,9 @@ export class ClaudeCodeInspiredReasoning {
 
     // Select tool based on goal and current context gaps
     const toolSelection = this.selectGoalDrivenTool();
+    
+    // Track tool usage to prevent loops
+    this.usedTools.add(toolSelection.tool);
     
     // Generate contextual reasoning
     const reasoning = this.generateProgressReasoning(toolSelection);
@@ -203,19 +207,24 @@ export class ClaudeCodeInspiredReasoning {
         this.analyzePackageInfo(data);
       }
 
-      // Extract file structure information
-      if (data.files || observation.includes('files')) {
+      // Extract file structure information from readCodeStructure results
+      if (data.projectType || data.framework || data.totalFiles || observation.includes('Discovered') || observation.includes('TypeScript project')) {
         this.analyzeProjectStructure(data);
       }
 
       // Extract code structure information
-      if (data.definitions || data.classes || observation.includes('function') || observation.includes('class')) {
+      if (data.definitions || data.classes || data.keyFiles || observation.includes('function') || observation.includes('class') || observation.includes('definitions')) {
         this.analyzeCodeStructure(data);
       }
 
       // Extract issues and problems
       if (observation.includes('error') || observation.includes('warning') || observation.includes('deprecated')) {
         this.extractIssues(observation);
+      }
+
+      // Extract files information
+      if (data.files || data.totalFiles || observation.includes('files')) {
+        this.analyzeFileStructure(data, observation);
       }
 
       // Update progress metrics
@@ -235,14 +244,22 @@ export class ClaudeCodeInspiredReasoning {
     // Check what context we're missing for our goal
     const contextGaps = this.identifyContextGaps();
     
-    // Prioritize based on goal and missing context
+    // Prioritize based on goal and missing context, but avoid recently used tools
     for (const gap of contextGaps) {
       switch (gap.type) {
         case 'project_structure':
+          if (!this.usedTools.has('readCodeStructure')) {
+            return {
+              tool: 'readCodeStructure',
+              input: { path: '.', maxFiles: 50, includeContent: true },
+              confidence: 0.9
+            };
+          }
+          // If readCodeStructure was already used, try file listing
           return {
-            tool: 'readCodeStructure',
-            input: { path: '.', maxFiles: 50, includeContent: true },
-            confidence: 0.9
+            tool: 'listFiles',
+            input: { path: '.', recursive: true },
+            confidence: 0.8
           };
 
         case 'package_analysis':
@@ -318,8 +335,8 @@ export class ClaudeCodeInspiredReasoning {
   private identifyContextGaps(): Array<{ type: string; priority: number; reasoning: string }> {
     const gaps: Array<{ type: string; priority: number; reasoning: string }> = [];
 
-    // Check if we understand the project structure
-    if (Object.keys(this.codebaseContext.structure.directories).length === 0) {
+    // Check if we understand the project structure (but only if not already analyzed)
+    if (Object.keys(this.codebaseContext.structure.directories).length === 0 && this.codebaseContext.projectType === 'unknown') {
       gaps.push({
         type: 'project_structure',
         priority: 10,
@@ -529,13 +546,57 @@ export class ClaudeCodeInspiredReasoning {
   }
 
   private analyzeProjectStructure(data: any): void {
-    // Implementation for analyzing project structure
-    this.goalState.progressMetrics.contextGathered++;
+    try {
+      // Extract project type and framework from readCodeStructure output
+      if (data.projectType && this.codebaseContext.projectType === 'unknown') {
+        this.codebaseContext.projectType = data.projectType;
+        this.goalState.progressMetrics.contextGathered++;
+      }
+      
+      if (data.framework && this.codebaseContext.framework === 'unknown') {
+        this.codebaseContext.framework = data.framework;
+        this.goalState.progressMetrics.contextGathered++;
+      }
+
+      // Mark that we've analyzed project structure
+      if (data.totalFiles || data.directories) {
+        this.codebaseContext.structure.directories.set('analyzed', ['true']);
+        this.goalState.progressMetrics.contextGathered++;
+      }
+    } catch (error) {
+      logger.warn('Failed to analyze project structure:', error);
+    }
   }
 
   private analyzeCodeStructure(data: any): void {
-    // Implementation for analyzing code structure
-    this.goalState.progressMetrics.contextGathered++;
+    try {
+      // Extract code definitions and structure
+      if (data.definitions || data.keyFiles) {
+        this.codebaseContext.structure.codeStructure = data;
+        this.goalState.progressMetrics.contextGathered++;
+      }
+    } catch (error) {
+      logger.warn('Failed to analyze code structure:', error);
+    }
+  }
+
+  private analyzeFileStructure(data: any, observation: string): void {
+    try {
+      // Extract file information
+      if (data.files && Array.isArray(data.files)) {
+        data.files.forEach((file: any) => {
+          if (file.path) {
+            this.codebaseContext.structure.keyFiles.set(file.path, file);
+          }
+        });
+        this.goalState.progressMetrics.contextGathered++;
+      } else if (observation.includes('total') && observation.includes('files')) {
+        // Extract file count information
+        this.goalState.progressMetrics.contextGathered++;
+      }
+    } catch (error) {
+      logger.warn('Failed to analyze file structure:', error);
+    }
   }
 
   private extractIssues(observation: string): void {

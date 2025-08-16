@@ -69,11 +69,11 @@ export class EnhancedModelManager {
       available: false
     },
     {
-      name: 'codellama:34b',
-      size: '19GB',
+      name: 'codellama:13b',
+      size: '7.3GB',
       description: 'Meta CodeLlama - Specialized for coding',
       family: 'CodeLlama',
-      parameters: '34B',
+      parameters: '13B',
       available: false
     },
     {

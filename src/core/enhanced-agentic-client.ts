@@ -223,6 +223,11 @@ Provide a single, concise suggestion if you see any obvious issues, otherwise re
           continue;
         }
 
+        if (trimmed === 'models') {
+          await this.showAndSelectModel();
+          continue;
+        }
+
         if (trimmed === 'clear') {
           this.clearMemory();
           continue;
@@ -327,6 +332,7 @@ ADVANCED COMMANDS:
   status   - Show agent status and capabilities
   memory   - Display conversation memory
   tools    - List available tools
+  models   - Show and select AI models
   clear    - Clear conversation memory
   exit     - Exit the agent
 
@@ -408,6 +414,78 @@ ${tools.reduce((acc, tool) => {
         }
       });
     });
+  }
+
+  /**
+   * Show available models and allow user to select one
+   */
+  private async showAndSelectModel(): Promise<void> {
+    try {
+      const inquirer = (await import('inquirer')).default;
+      
+      console.log(chalk.cyan('🤖 Available Models:'));
+      
+      // Get available models from Ollama
+      const availableModels = await this.context.modelClient.getAvailableModels();
+      
+      if (availableModels.length === 0) {
+        console.log(chalk.red('❌ No models available. Make sure Ollama is running and has models installed.'));
+        console.log(chalk.gray('   Try: ollama list'));
+        return;
+      }
+      
+      // Show current model
+      const currentModel = this.context.modelClient.getCurrentModel();
+      console.log(chalk.yellow(`\nCurrent model: ${currentModel}`));
+      
+      // Show available models with numbers
+      console.log(chalk.gray('\nAvailable models:'));
+      availableModels.forEach((model, index) => {
+        const prefix = model === currentModel ? chalk.green('✓') : chalk.gray(' ');
+        console.log(`${prefix} ${index + 1}. ${model}`);
+      });
+      
+      // Prompt user to select
+      const { selection } = await inquirer.prompt({
+        type: 'input',
+        name: 'selection',
+        message: 'Select a model (number or name, or press Enter to keep current):'
+      });
+      
+      if (!selection.trim()) {
+        console.log(chalk.gray('Keeping current model.'));
+        return;
+      }
+      
+      let selectedModel: string | null = null;
+      
+      // Check if input is a number
+      const num = parseInt(selection.trim());
+      if (!isNaN(num) && num >= 1 && num <= availableModels.length) {
+        selectedModel = availableModels[num - 1];
+      } else {
+        // Check if input matches a model name
+        const match = availableModels.find(model => 
+          model.toLowerCase().includes(selection.toLowerCase()) ||
+          selection.toLowerCase().includes(model.toLowerCase())
+        );
+        if (match) {
+          selectedModel = match;
+        }
+      }
+      
+      if (selectedModel) {
+        this.context.modelClient.setModel(selectedModel);
+        console.log(chalk.green(`✅ Model changed to: ${selectedModel}`));
+        console.log(chalk.gray('The new model will be used for future requests.'));
+      } else {
+        console.log(chalk.red('❌ Invalid selection. Model not changed.'));
+      }
+      
+    } catch (error) {
+      console.error(chalk.red('Error fetching models:'), error);
+      console.log(chalk.gray('Make sure Ollama is running with: ollama serve'));
+    }
   }
 
   /**

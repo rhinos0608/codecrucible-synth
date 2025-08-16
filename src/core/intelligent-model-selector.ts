@@ -61,21 +61,12 @@ export class IntelligentModelSelector {
   private modelCapabilities: ModelCapability[] = [
     {
       name: 'codellama:34b',
-      strengths: ['code generation', 'debugging', 'code analysis'],
-      weaknesses: ['general chat', 'creative writing'],
-      recommendedFor: ['coding', 'debugging', 'code_review'],
+      strengths: ['code generation', 'debugging', 'code analysis', 'complex coding'],
+      weaknesses: ['general chat', 'creative writing', 'slower than smaller models'],
+      recommendedFor: ['complex_coding', 'debugging', 'code_review'],
       size: 'large',
       speed: 'slow',
-      requirements: { minRam: 16384, minVram: 20480, minCores: 4 }
-    },
-    {
-      name: 'codellama:13b', 
-      strengths: ['code generation', 'fast responses'],
-      weaknesses: ['complex reasoning'],
-      recommendedFor: ['coding', 'simple_tasks'],
-      size: 'medium',
-      speed: 'medium',
-      requirements: { minRam: 8192, minVram: 8192, minCores: 2 }
+      requirements: { minRam: 16384, minVram: 16384, minCores: 4 }
     },
     {
       name: 'codellama:7b',
@@ -150,12 +141,30 @@ export class IntelligentModelSelector {
       requirements: { minRam: 6144, minVram: 6144, minCores: 2 }
     },
     {
+      name: 'gemma:latest',
+      strengths: ['general purpose', 'fast', 'reliable', 'good for coding', 'stable'],
+      weaknesses: ['not as powerful as larger models'],
+      recommendedFor: ['coding', 'general', 'chat', 'simple_tasks', 'quick_help'],
+      size: 'medium',
+      speed: 'fast',
+      requirements: { minRam: 4096, minVram: 4096, minCores: 2 }
+    },
+    {
+      name: 'gemma3n:e4b',
+      strengths: ['balanced', 'coding', 'reliable', 'fast'],
+      weaknesses: ['not as powerful as larger models'],
+      recommendedFor: ['coding', 'general', 'mixed_tasks'],
+      size: 'medium',
+      speed: 'fast',
+      requirements: { minRam: 6144, minVram: 6144, minCores: 2 }
+    },
+    {
       name: 'gpt-oss:20b',
       strengths: ['code generation', 'reasoning', 'analysis', 'debugging'],
-      weaknesses: ['speed', 'resource usage'],
-      recommendedFor: ['coding', 'complex_coding', 'debugging', 'code_review', 'analysis'],
+      weaknesses: ['speed', 'resource usage', 'timeouts'],
+      recommendedFor: ['complex_coding', 'debugging', 'code_review', 'analysis'],
       size: 'large',
-      speed: 'medium',
+      speed: 'slow',
       requirements: { minRam: 16384, minVram: 12288, minCores: 4 }
     }
   ];
@@ -620,11 +629,11 @@ export class IntelligentModelSelector {
    * Find the simplest model that can run on the system
    */
   private findSimplestCompatibleModel(availableModels: string[]): string | null {
-    // Ordered list of models from simplest to most complex (including what's actually installed)
+    // Ordered list of models from simplest to most complex (prioritizing commonly available models)
     const simplicityOrder = [
-      'gpt-oss:20b', 'codellama:7b', 'qwen2.5:7b', 'llama3.2:8b',
-      'gemma2:9b', 'gemma:7b', 'llama3.2:latest', 'llama3.2:3b', 
-      'qwen2.5:3b', 'gemma:2b', 'gemma2:27b', 'qwq:32b'
+      'gemma:2b', 'gemma:latest', 'gemma3n:e4b', 'llama3.2:latest', 'llama3.2:8b',
+      'gemma2:9b', 'gemma:7b', 'qwen2.5:7b', 'codellama:7b', 
+      'qwen2.5:3b', 'llama3.2:3b', 'gemma2:27b'
     ];
     
     logger.debug(`Looking for simple model from available: ${availableModels.join(', ')}`);

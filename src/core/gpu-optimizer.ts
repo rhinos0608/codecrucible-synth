@@ -333,7 +333,7 @@ export class GPUOptimizer {
     const availableMemory = this.getAvailableMemory();
     
     if (availableMemory >= 24) {
-      return ['qwen2.5:32b', 'llama3.1:70b', 'codellama:34b', 'gemma2:27b'];
+      return ['qwen2.5:32b', 'llama3.1:70b', 'codellama:13b', 'gemma2:27b'];
     } else if (availableMemory >= 12) {
       return ['codellama:13b', 'llama3.1:13b', 'gemma2:9b', 'qwen2.5:14b'];
     } else if (availableMemory >= 6) {

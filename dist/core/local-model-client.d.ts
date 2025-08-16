@@ -55,9 +55,17 @@ export declare class LocalModelClient {
      */
     checkConnection(): Promise<boolean>;
     /**
-     * Auto-detect and select the best available model with intelligent selection and GPU optimization
+     * Smart autonomous model selection - uses configured model or first available
      */
     getAvailableModel(taskType?: string): Promise<string>;
+    /**
+     * Quick health check for a model to see if it's responsive
+     */
+    private quickHealthCheck;
+    /**
+     * Find the first working model from available models
+     */
+    private findWorkingModel;
     /**
      * Assess task complexity for model selection
      */
@@ -72,6 +80,7 @@ export declare class LocalModelClient {
     isModelReady(model: string): Promise<boolean>;
     /**
      * Get list of available models from Ollama with error handling
+     * Filters out known problematic models
      */
     getAvailableModels(): Promise<string[]>;
     /**

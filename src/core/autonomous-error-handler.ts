@@ -508,7 +508,10 @@ export class AutonomousErrorHandler {
       if (model) return model.name;
     }
     
-    // Fallback to first available model
-    return availableModels[0]?.name || 'llama3.2:latest';
+    // Fallback to safest available model (skip problematic ones)
+    const safeModels = availableModels.filter((m: any) => 
+      !m.name.includes('codellama:34b') && !m.name.includes('qwq:32b')
+    );
+    return safeModels[0]?.name || 'gemma:2b';
   }
 }

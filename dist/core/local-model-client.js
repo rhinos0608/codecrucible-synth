@@ -89,7 +89,7 @@ export class LocalModelClient {
         }
     }
     /**
-     * Auto-detect and select the best available model with intelligent selection and GPU optimization
+     * Smart autonomous model selection - uses configured model or first available
      */
     async getAvailableModel(taskType = 'general') {
         // In test environment, always return configured model immediately
@@ -112,48 +112,92 @@ export class LocalModelClient {
                 logger.warn('No models found on system, using configured model');
                 return this.config.model;
             }
-            // Use IntelligentModelSelector to choose the optimal model based on system specs and task
-            try {
-                const optimalModel = await this.modelSelector.selectOptimalModel(taskType, {
-                    complexity: this.assessComplexity(taskType),
-                    speed: 'medium',
-                    accuracy: 'high'
-                });
-                // Check if the intelligent selection is actually available
-                const isOptimalAvailable = availableModels.some(m => m === optimalModel || m.includes(optimalModel.split(':')[0]));
-                if (isOptimalAvailable) {
-                    const exactMatch = availableModels.find(m => m === optimalModel) ||
-                        availableModels.find(m => m.includes(optimalModel.split(':')[0]));
-                    this._cachedBestModel = exactMatch;
-                    logger.info(`🧠 Using IntelligentModelSelector choice: ${exactMatch} (task: ${taskType})`);
-                    return exactMatch;
-                }
-                else {
-                    logger.warn(`IntelligentModelSelector chose ${optimalModel} but it's not available. Falling back to alternatives.`);
-                }
+            // Smart autonomous selection: try configured model first, then first available
+            const configExactMatch = availableModels.find(m => m === this.config.model) ||
+                availableModels.find(m => m.includes(this.config.model.split(':')[0]));
+            if (configExactMatch) {
+                this._cachedBestModel = configExactMatch;
+                logger.info(`✅ Using configured model: ${configExactMatch}`);
+                return configExactMatch;
             }
-            catch (selectorError) {
-                logger.warn('IntelligentModelSelector failed:', selectorError);
-            }
-            // Check if configured model is available as fallback
-            const configModelAvailable = availableModels.some(m => m === this.config.model || m.includes(this.config.model.split(':')[0]));
-            if (configModelAvailable) {
-                const exactMatch = availableModels.find(m => m === this.config.model) ||
-                    availableModels.find(m => m.includes(this.config.model.split(':')[0]));
-                this._cachedBestModel = exactMatch;
-                logger.info('Using configured model as fallback (found on system):', exactMatch);
-                return exactMatch;
-            }
-            // Auto-select best available model from system using legacy logic
-            const bestModel = await this.selectBestAvailableModel(availableModels, taskType);
-            this._cachedBestModel = bestModel;
-            logger.info(`Auto-selected model from system: ${bestModel} (configured: ${this.config.model})`);
-            return bestModel;
+            // If configured model not available, use the first available model
+            const fallbackModel = availableModels[0];
+            this._cachedBestModel = fallbackModel;
+            logger.info(`🔄 Using first available model: ${fallbackModel}`);
+            return fallbackModel;
         }
         catch (error) {
             logger.warn('Model selection failed, using configured model:', this.config.model);
             return this.config.model;
         }
+    }
+    /**
+     * Quick health check for a model to see if it's responsive
+     */
+    async quickHealthCheck(model) {
+        try {
+            // Very simple test request with reasonable timeout
+            const testClient = axios.create({
+                baseURL: this.config.endpoint,
+                timeout: 25000 // 25 second timeout for health check
+            });
+            const testRequest = this.config.endpoint.includes('11434')
+                ? {
+                    model,
+                    prompt: "test",
+                    stream: false,
+                    options: { num_predict: 1 }
+                }
+                : {
+                    model,
+                    messages: [{ role: "user", content: "test" }],
+                    max_tokens: 1
+                };
+            const response = await testClient.post(this.config.endpoint.includes('11434') ? '/api/generate' : '/v1/chat/completions', testRequest);
+            // If we get any response (even an error response), the model is at least loaded
+            return response.status === 200;
+        }
+        catch (error) {
+            logger.debug(`Health check failed for model ${model}:`, error instanceof Error ? error.message : 'Unknown error');
+            return false;
+        }
+    }
+    /**
+     * Find the first working model from available models
+     */
+    async findWorkingModel(availableModels) {
+        // Prioritize smaller, faster models for reliability
+        const preferredOrder = ['gemma:2b', 'llama3.2:3b', 'llama3.2:latest', 'gemma2:9b', 'qwen2.5:7b'];
+        // First try preferred models
+        for (const preferred of preferredOrder) {
+            const match = availableModels.find(m => m.includes(preferred.split(':')[0]));
+            if (match) {
+                const isHealthy = await this.quickHealthCheck(match);
+                if (isHealthy) {
+                    logger.info(`✅ Found working preferred model: ${match}`);
+                    return match;
+                }
+                else {
+                    logger.debug(`❌ Preferred model ${match} failed health check`);
+                }
+            }
+        }
+        // Then try all available models
+        for (const model of availableModels) {
+            // Skip obviously problematic models
+            if (model.includes('codellama:34b') || model.includes('qwq:32b')) {
+                continue;
+            }
+            const isHealthy = await this.quickHealthCheck(model);
+            if (isHealthy) {
+                logger.info(`✅ Found working model: ${model}`);
+                return model;
+            }
+            else {
+                logger.debug(`❌ Model ${model} failed health check`);
+            }
+        }
+        return null;
     }
     /**
      * Assess task complexity for model selection
@@ -173,30 +217,37 @@ export class LocalModelClient {
      * Intelligently select the best model from available models
      */
     async selectBestAvailableModel(availableModels, taskType = 'general') {
-        // Model preferences based on task type
+        logger.debug(`Selecting best model from: ${availableModels.join(', ')}`);
+        // Model preferences based on task type - only using exact model bases that exist
         const taskPreferences = {
-            'coding': ['codellama', 'deepseek-coder', 'codegemma', 'llama3', 'qwen2.5', 'gemma'],
-            'analysis': ['qwen2.5', 'llama3', 'gemma2', 'mistral', 'phi3'],
-            'general': ['llama3.2', 'gemma', 'qwen2.5', 'phi3', 'mistral'],
-            'debugging': ['codellama', 'deepseek-coder', 'llama3', 'qwen2.5']
+            'coding': ['gpt-oss', 'llama3.2', 'qwen2.5', 'gemma2', 'gemma'],
+            'analysis': ['qwen2.5', 'llama3.2', 'gemma2', 'gemma'],
+            'general': ['llama3.2', 'gemma', 'qwen2.5', 'gemma2'],
+            'debugging': ['gpt-oss', 'llama3.2', 'qwen2.5', 'gemma']
         };
         const preferences = taskPreferences[taskType] || taskPreferences['general'];
-        // Try to find preferred models for task type
+        // Try to find preferred models for task type - use exact matching
         for (const preferred of preferences) {
-            const match = availableModels.find(model => model.toLowerCase().includes(preferred.toLowerCase()));
+            const match = availableModels.find(model => {
+                const modelBase = model.split(':')[0].toLowerCase();
+                return modelBase === preferred.toLowerCase() || modelBase.includes(preferred.toLowerCase());
+            });
             if (match) {
+                logger.debug(`Found preferred model: ${match} for task: ${taskType}`);
                 return match;
             }
         }
-        // Fallback: prioritize smaller, faster models
-        const sizePreferences = ['1b', '2b', '3b', '7b', '8b', '13b', '34b', '70b'];
-        for (const size of sizePreferences) {
-            const match = availableModels.find(model => model.includes(size));
+        // Fallback: prioritize smaller, reliable models that are likely to work
+        const reliableModels = ['gemma:2b', 'llama3.2:3b', 'llama3.2:latest', 'gemma2:9b'];
+        for (const reliable of reliableModels) {
+            const match = availableModels.find(model => model.includes(reliable.split(':')[0]));
             if (match) {
+                logger.debug(`Found reliable fallback model: ${match}`);
                 return match;
             }
         }
         // Ultimate fallback: first available model
+        logger.debug(`Using first available model as last resort: ${availableModels[0]}`);
         return availableModels[0];
     }
     /**
@@ -213,6 +264,7 @@ export class LocalModelClient {
     }
     /**
      * Get list of available models from Ollama with error handling
+     * Filters out known problematic models
      */
     async getAvailableModels() {
         try {
@@ -222,7 +274,18 @@ export class LocalModelClient {
             });
             const response = await quickCheck.get('/api/tags');
             const models = response.data.models || [];
-            return models.map((m) => m.name || m.model || '').filter(Boolean);
+            const modelNames = models.map((m) => m.name || m.model || '').filter(Boolean);
+            // Filter out known problematic models immediately
+            const filteredModels = modelNames.filter((model) => {
+                // Skip known non-existent or problematic models
+                if (model.includes('codellama:34b') || model.includes('qwq:32b')) {
+                    logger.debug(`Filtering out known problematic model: ${model}`);
+                    return false;
+                }
+                return true;
+            });
+            logger.info(`🔍 Found ${filteredModels.length} models (filtered out problematic ones from ${modelNames.length} total)`);
+            return filteredModels;
         }
         catch (error) {
             logger.warn('Failed to get available models:', error);

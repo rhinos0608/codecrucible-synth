@@ -59,8 +59,9 @@ export class CodeCrucibleCLI {
       console.log(chalk.cyan(`   Voices: ${Array.isArray(voices) ? voices.join(', ') : voices}`));
       console.log(chalk.cyan(`   Mode: ${synthesisMode}`));
 
-      // Get project context
-      const projectContext = await this.getProjectContext(options.file, options.project);
+      // Get project context - auto-detect mentioned files in prompt
+      const mentionedFiles = this.extractMentionedFiles(prompt);
+      const projectContext = await this.getProjectContext(options.file, options.project, mentionedFiles);
 
       // Check for iterative mode
       if ((options as any).iterative || synthesisMode === 'iterative') {
@@ -811,7 +812,7 @@ Focus on actionable, specific recommendations with clear business value.`;
     return voicesStr.split(',').map(v => v.trim().toLowerCase());
   }
 
-  private async getProjectContext(file?: string, project?: boolean): Promise<ProjectContext> {
+  private async getProjectContext(file?: string, project?: boolean, mentionedFiles?: string[]): Promise<ProjectContext> {
     const context: ProjectContext = { files: [] };
 
     if (file) {
@@ -822,6 +823,24 @@ Focus on actionable, specific recommendations with clear business value.`;
         context.files.push({ path: file, content, language });
       } catch (error) {
         logger.warn(`Could not read file ${file}:`, error);
+      }
+    }
+
+    // Include mentioned files from prompt analysis
+    if (mentionedFiles && mentionedFiles.length > 0) {
+      for (const mentionedFile of mentionedFiles) {
+        try {
+          const content = await readFile(mentionedFile, 'utf8');
+          const language = this.detectLanguage(extname(mentionedFile));
+          context.files = context.files || [];
+          // Don't duplicate if already added
+          if (!context.files.some(f => f.path === mentionedFile)) {
+            context.files.push({ path: mentionedFile, content, language });
+            logger.info(`Added mentioned file to context: ${mentionedFile}`);
+          }
+        } catch (error) {
+          logger.warn(`Could not read mentioned file ${mentionedFile}:`, error);
+        }
       }
     }
 
@@ -1019,6 +1038,42 @@ Focus on actionable, specific recommendations with clear business value.`;
     } catch (error) {
       console.error(chalk.red('❌ Model selection error:'), error instanceof Error ? error.message : error);
     }
+  }
+
+  private extractMentionedFiles(prompt: string): string[] {
+    const mentionedFiles: string[] = [];
+    
+    // Common file patterns to look for in prompts
+    const filePatterns = [
+      // Exact file names with extensions
+      /\b([\w\-\.]+\.(?:js|ts|jsx|tsx|json|md|txt|yml|yaml|xml|html|css|scss|py|java|cpp|c|h|cs|php|rb|go|rs|kt|swift|dart|vue|svelte))\b/gi,
+      // Files with relative paths
+      /\b(?:\.\/|src\/|config\/|scripts\/|docs\/)?([\w\-\/\.]+\.(?:js|ts|jsx|tsx|json|md|txt|yml|yaml|xml|html|css|scss|py|java|cpp|c|h|cs|php|rb|go|rs|kt|swift|dart|vue|svelte))\b/gi
+    ];
+    
+    for (const pattern of filePatterns) {
+      const matches = prompt.match(pattern);
+      if (matches) {
+        for (const match of matches) {
+          const cleanFile = match.replace(/^\.\//, ''); // Remove leading ./
+          // Check if file likely exists in common locations
+          const candidates = [
+            cleanFile,
+            `./${cleanFile}`,
+            `./src/${cleanFile}`,
+            `./config/${cleanFile}`,
+            `./scripts/${cleanFile}`
+          ];
+          
+          // Add the most likely candidate
+          if (!mentionedFiles.includes(cleanFile)) {
+            mentionedFiles.push(cleanFile);
+          }
+        }
+      }
+    }
+    
+    return mentionedFiles;
   }
 
   private parseValue(value: string): any {

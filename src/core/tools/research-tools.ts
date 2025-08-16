@@ -2,6 +2,55 @@ import { BaseTool, ToolDefinition } from './base-tool.js';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 
+// Global MCP tools type declaration
+declare global {
+  var mcpTools: {
+    ref_search_documentation?: (params: { query: string }) => Promise<string>;
+    ref_read_url?: (params: { url: string }) => Promise<string>;
+  } | undefined;
+}
+
+// Shared utility for parsing ref-tools results
+export class RefToolsParser {
+  static parseRefResults(refData: string): any[] {
+    try {
+      const results: any[] = [];
+      const lines = refData.split('\n');
+      
+      let currentResult: any = {};
+      
+      for (const line of lines) {
+        if (line.startsWith('overview:')) {
+          if (currentResult.overview) {
+            results.push({ ...currentResult });
+            currentResult = {};
+          }
+          currentResult.overview = line.replace('overview:', '').trim();
+        } else if (line.startsWith('url:')) {
+          currentResult.url = line.replace('url:', '').trim();
+        } else if (line.startsWith('moduleId:')) {
+          currentResult.moduleId = line.replace('moduleId:', '').trim();
+          // Add completed result
+          if (currentResult.overview) {
+            results.push({ ...currentResult });
+            currentResult = {};
+          }
+        }
+      }
+      
+      // Add last result if exists
+      if (currentResult.overview) {
+        results.push(currentResult);
+      }
+      
+      return results;
+    } catch (error) {
+      logger.warn('Failed to parse ref results:', error);
+      return [];
+    }
+  }
+}
+
 // Enhanced Research Tool that integrates exa and ref for dynamic analysis
 export class ResearchTool extends BaseTool {
   constructor(private agentContext: { workingDirectory: string }) {
@@ -203,9 +252,40 @@ export class WebSearchTool extends BaseTool {
       
       logger.info(`🌐 Web search: ${query}${domain ? ` on ${domain}` : ''}`);
       
-      // Placeholder for real web search implementation
-      // In production, this would call the actual exa search API
+      // Use ref-tools MCP for documentation search first
+      try {
+        const searchQuery = domain ? `${query} site:${domain}` : query;
+        
+        // Call ref-tools MCP documentation search
+        const refResults = await global.mcpTools?.ref_search_documentation?.({
+          query: searchQuery
+        });
+        
+        if (refResults && typeof refResults === 'string') {
+          // Parse the ref results which come as text
+          const results = RefToolsParser.parseRefResults(refResults);
+          
+          if (results.length > 0) {
+            return {
+              success: true,
+              query,
+              domain,
+              results: results.map(r => ({
+                title: r.title || r.overview || 'Documentation Result',
+                url: r.url || '',
+                snippet: r.overview || r.title || '',
+                relevance: 'high',
+                source: 'documentation'
+              })),
+              message: `Found ${results.length} documentation results`
+            };
+          }
+        }
+      } catch (refError) {
+        logger.warn('Ref MCP search failed, falling back:', refError);
+      }
       
+      // Fallback to simulated results if MCP unavailable
       return {
         success: true,
         query,
@@ -214,11 +294,12 @@ export class WebSearchTool extends BaseTool {
           {
             title: `Search results for: ${query}`,
             url: 'https://example.com',
-            snippet: 'This is a placeholder for real web search results. In production, this would return actual search results from exa.',
-            relevance: 'medium'
+            snippet: 'MCP search unavailable, using fallback results',
+            relevance: 'medium',
+            source: 'fallback'
           }
         ],
-        message: 'Web search completed successfully (placeholder implementation)'
+        message: 'Web search completed (fallback mode - MCP unavailable)'
       };
       
     } catch (error) {
@@ -261,22 +342,81 @@ export class DocSearchTool extends BaseTool {
       
       logger.info(`📚 Documentation search: ${query}${language ? ` for ${language}` : ''}`);
       
-      // Placeholder for real documentation search
-      // In production, this would call the ref-tools MCP server
+      try {
+        // Enhance query with language information
+        const enhancedQuery = language ? `${language} ${query}` : query;
+        
+        // Call ref-tools MCP documentation search
+        const refResults = await global.mcpTools?.ref_search_documentation?.({
+          query: enhancedQuery
+        });
+        
+        if (refResults && typeof refResults === 'string') {
+          const parsedResults = RefToolsParser.parseRefResults(refResults);
+          
+          if (parsedResults.length > 0) {
+            // Get detailed content for the first few results
+            const detailedResults = await Promise.all(
+              parsedResults.slice(0, 3).map(async (result) => {
+                try {
+                  if (result.url && global.mcpTools?.ref_read_url) {
+                    const content = await global.mcpTools.ref_read_url({ url: result.url });
+                    return {
+                      title: result.overview || 'Documentation',
+                      source: result.moduleId || 'Documentation',
+                      content: typeof content === 'string' ? content.substring(0, 500) + '...' : result.overview,
+                      url: result.url,
+                      full: false
+                    };
+                  }
+                  return {
+                    title: result.overview || 'Documentation',
+                    source: result.moduleId || 'Documentation', 
+                    content: result.overview || 'No content preview available',
+                    url: result.url || '',
+                    full: false
+                  };
+                } catch (error) {
+                  logger.warn('Failed to fetch content for:', result.url);
+                  return {
+                    title: result.overview || 'Documentation',
+                    source: result.moduleId || 'Documentation',
+                    content: result.overview || 'Content unavailable',
+                    url: result.url || '',
+                    full: false
+                  };
+                }
+              })
+            );
+            
+            return {
+              success: true,
+              query: enhancedQuery,
+              language,
+              results: detailedResults,
+              totalResults: parsedResults.length,
+              message: `Found ${parsedResults.length} documentation results, showing detailed content for ${detailedResults.length}`
+            };
+          }
+        }
+      } catch (error) {
+        logger.warn('Ref MCP documentation search failed:', error);
+      }
       
+      // Fallback response
       return {
         success: true,
         query,
         language,
         results: [
           {
-            title: `Documentation for: ${query}`,
-            source: 'Official Documentation',
-            content: 'This is a placeholder for real documentation search results. In production, this would return actual documentation from ref-tools.',
-            url: 'https://docs.example.com'
+            title: `Documentation search for: ${query}`,
+            source: 'Fallback',
+            content: 'MCP documentation search unavailable. Try searching manually or check MCP server status.',
+            url: ''
           }
         ],
-        message: 'Documentation search completed successfully (placeholder implementation)'
+        message: 'Documentation search completed (fallback mode - MCP unavailable)'
       };
       
     } catch (error) {

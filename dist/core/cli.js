@@ -30,8 +30,9 @@ export class CodeCrucibleCLI {
             const analysisDepth = parseInt(options.depth || '2');
             console.log(chalk.cyan(`   Voices: ${Array.isArray(voices) ? voices.join(', ') : voices}`));
             console.log(chalk.cyan(`   Mode: ${synthesisMode}`));
-            // Get project context
-            const projectContext = await this.getProjectContext(options.file, options.project);
+            // Get project context - auto-detect mentioned files in prompt
+            const mentionedFiles = this.extractMentionedFiles(prompt);
+            const projectContext = await this.getProjectContext(options.file, options.project, mentionedFiles);
             // Check for iterative mode
             if (options.iterative || synthesisMode === 'iterative') {
                 const spinner = ora('Starting iterative Writer/Auditor improvement loop...').start();
@@ -656,7 +657,7 @@ Focus on actionable, specific recommendations with clear business value.`;
         }
         return voicesStr.split(',').map(v => v.trim().toLowerCase());
     }
-    async getProjectContext(file, project) {
+    async getProjectContext(file, project, mentionedFiles) {
         const context = { files: [] };
         if (file) {
             try {
@@ -667,6 +668,24 @@ Focus on actionable, specific recommendations with clear business value.`;
             }
             catch (error) {
                 logger.warn(`Could not read file ${file}:`, error);
+            }
+        }
+        // Include mentioned files from prompt analysis
+        if (mentionedFiles && mentionedFiles.length > 0) {
+            for (const mentionedFile of mentionedFiles) {
+                try {
+                    const content = await readFile(mentionedFile, 'utf8');
+                    const language = this.detectLanguage(extname(mentionedFile));
+                    context.files = context.files || [];
+                    // Don't duplicate if already added
+                    if (!context.files.some(f => f.path === mentionedFile)) {
+                        context.files.push({ path: mentionedFile, content, language });
+                        logger.info(`Added mentioned file to context: ${mentionedFile}`);
+                    }
+                }
+                catch (error) {
+                    logger.warn(`Could not read mentioned file ${mentionedFile}:`, error);
+                }
             }
         }
         if (project) {
@@ -842,6 +861,37 @@ Focus on actionable, specific recommendations with clear business value.`;
         catch (error) {
             console.error(chalk.red('❌ Model selection error:'), error instanceof Error ? error.message : error);
         }
+    }
+    extractMentionedFiles(prompt) {
+        const mentionedFiles = [];
+        // Common file patterns to look for in prompts
+        const filePatterns = [
+            // Exact file names with extensions
+            /\b([\w\-\.]+\.(?:js|ts|jsx|tsx|json|md|txt|yml|yaml|xml|html|css|scss|py|java|cpp|c|h|cs|php|rb|go|rs|kt|swift|dart|vue|svelte))\b/gi,
+            // Files with relative paths
+            /\b(?:\.\/|src\/|config\/|scripts\/|docs\/)?([\w\-\/\.]+\.(?:js|ts|jsx|tsx|json|md|txt|yml|yaml|xml|html|css|scss|py|java|cpp|c|h|cs|php|rb|go|rs|kt|swift|dart|vue|svelte))\b/gi
+        ];
+        for (const pattern of filePatterns) {
+            const matches = prompt.match(pattern);
+            if (matches) {
+                for (const match of matches) {
+                    const cleanFile = match.replace(/^\.\//, ''); // Remove leading ./
+                    // Check if file likely exists in common locations
+                    const candidates = [
+                        cleanFile,
+                        `./${cleanFile}`,
+                        `./src/${cleanFile}`,
+                        `./config/${cleanFile}`,
+                        `./scripts/${cleanFile}`
+                    ];
+                    // Add the most likely candidate
+                    if (!mentionedFiles.includes(cleanFile)) {
+                        mentionedFiles.push(cleanFile);
+                    }
+                }
+            }
+        }
+        return mentionedFiles;
     }
     parseValue(value) {
         // Try to parse as JSON, fallback to string

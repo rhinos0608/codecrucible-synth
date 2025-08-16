@@ -179,6 +179,9 @@ export class ReActAgent {
           },
           required: ["thought", "tool", "toolInput"]
         };
+        // Set the selected optimal model before generating
+        this.model.setModel(optimalModel);
+        
         // Try without structured output first to debug
         const response = await this.model.generate(prompt);
         logger.info(`Agent iteration ${i + 1} - Raw response: ${response.slice(0, 300)}...`);
@@ -190,6 +193,14 @@ export class ReActAgent {
           logger.debug('Parsed thought:', thought);
           
           if (thought.tool === 'final_answer') {
+            // Validate that agent has done sufficient analysis before concluding
+            const validationResult = this.validateReadyForConclusion();
+            if (!validationResult.isReady) {
+              const errorMessage = `Cannot conclude yet: ${validationResult.reason}. Please use tools to gather more information first.`;
+              this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage, required: validationResult.nextSteps }), timestamp: Date.now() });
+              continue;
+            }
+            
             let finalAnswer = thought.toolInput.answer as string;
             
             // If empty answer, generate one based on gathered information
@@ -223,9 +234,6 @@ export class ReActAgent {
             throw new Error(`Unknown tool: ${thought.tool}. Available tools: ${availableTools}`);
           }
 
-          // Track tool usage to prevent loops
-          this.trackToolUsage(thought.tool, thought.toolInput);
-          
           // Validate tool input before execution
           const validatedInput = this.validateToolInput(thought.tool, thought.toolInput);
           if (!validatedInput.isValid) {
@@ -234,12 +242,39 @@ export class ReActAgent {
             continue;
           }
           
-          // Update progress metrics
-          this.updateProgressMetrics(thought.tool, thought.toolInput);
-          
-          // Check for repetitive tool usage with enhanced logic
+          // Check for repetitive tool usage with enhanced logic BEFORE tracking
           if (this.isRepetitiveToolUsage(thought.tool, thought.toolInput)) {
             logger.warn(`Preventing repetitive tool usage: ${thought.tool}`);
+            
+            // Special handling for listFiles when package.json is requested
+            if (thought.tool === 'listFiles' && this.isPackageJsonRequested()) {
+              logger.info('Forcing readFile package.json due to repetitive listFiles usage');
+              const forceReadPackageJson = this.getToolByName('readFile');
+              if (forceReadPackageJson) {
+                this.agentContext.messages.push({ 
+                  role: 'tool', 
+                  content: JSON.stringify({ 
+                    forced_action: 'Auto-executing readFile package.json due to repetitive listFiles usage' 
+                  }), 
+                  timestamp: Date.now() 
+                });
+                
+                try {
+                  const observation = await forceReadPackageJson.execute({ path: 'package.json' });
+                  this.trackToolUsage('readFile', { path: 'package.json' });
+                  this.updateProgressMetrics('readFile', { path: 'package.json' });
+                  this.agentContext.messages.push({ role: 'tool', content: JSON.stringify(observation), timestamp: Date.now() });
+                  continue; // Continue with next iteration
+                } catch (error) {
+                  this.agentContext.messages.push({ 
+                    role: 'tool', 
+                    content: JSON.stringify({ error: `Failed to read package.json: ${error}` }), 
+                    timestamp: Date.now() 
+                  });
+                  continue;
+                }
+              }
+            }
             
             // If we have enough progress, conclude
             if (this.hasMinimumProgress()) {
@@ -258,6 +293,10 @@ export class ReActAgent {
           
           const observation = await tool.execute(thought.toolInput);
           this.agentContext.messages.push({ role: 'tool', content: JSON.stringify(observation), timestamp: Date.now() });
+          
+          // Track successful tool usage and update progress metrics AFTER execution
+          this.trackToolUsage(thought.tool, thought.toolInput);
+          this.updateProgressMetrics(thought.tool, thought.toolInput);
           
           // Store file list results for context
           if (thought.tool === 'listFiles' && Array.isArray(observation)) {
@@ -331,16 +370,20 @@ export class ReActAgent {
       const filePath = toolInput?.path;
       if (filePath) {
         metrics.filesExplored.add(filePath);
+        logger.debug(`Added file to metrics: ${filePath}`);
         
         // Check if this is a critical file
         if (this.isCriticalFile(filePath)) {
           metrics.criticalFilesRead++;
+          logger.debug(`Critical file read: ${filePath}`);
         }
         
         // Update workflow state
         if (this.agentContext.workflowState === 'exploring') {
           this.agentContext.workflowState = 'analyzing';
         }
+      } else {
+        logger.warn(`readFile called but no path in toolInput: ${JSON.stringify(toolInput)}`);
       }
     }
     
@@ -457,10 +500,18 @@ export class ReActAgent {
     
     // Issues and findings
     const issues = this.extractIssuesFromConversation();
+    const findings = this.extractFindingsFromConversation();
+    
+    if (findings.length > 0) {
+      answer += `**Key Findings**:\n${findings.map(finding => `- ${finding}`).join('\n')}\n\n`;
+    }
+    
     if (issues.length > 0) {
-      answer += `**Issues and Findings**:\n${issues.map(issue => `- ${issue}`).join('\n')}\n\n`;
-    } else {
-      answer += `**Status**: No critical issues detected in the analyzed portions of the codebase.\n\n`;
+      answer += `**Issues and Errors**:\n${issues.map(issue => `- ${issue}`).join('\n')}\n\n`;
+    } 
+    
+    if (findings.length === 0 && issues.length === 0) {
+      answer += `**Status**: Analysis tools executed but limited findings due to iteration constraints.\n\n`;
     }
     
     // Limitations and next steps
@@ -520,6 +571,80 @@ export class ReActAgent {
   }
 
   /**
+   * Extract actual findings and content from successful tool results
+   */
+  private extractFindingsFromConversation(): string[] {
+    const findings: string[] = [];
+    
+    // Look for successful tool results with actual content
+    const toolMessages = this.agentContext.messages.filter(m => m.role === 'tool');
+    
+    for (const message of toolMessages) {
+      try {
+        const content = typeof message.content === 'string' ? 
+          JSON.parse(message.content) : message.content;
+        
+        // Skip error messages
+        if (content.error) continue;
+        
+        // Extract package.json information
+        if (typeof content === 'string' && content.includes('"name"')) {
+          const nameMatch = content.match(/"name":\s*"([^"]+)"/);
+          if (nameMatch) {
+            findings.push(`Project name: ${nameMatch[1]}`);
+          }
+          const versionMatch = content.match(/"version":\s*"([^"]+)"/);
+          if (versionMatch) {
+            findings.push(`Project version: ${versionMatch[1]}`);
+          }
+          const descMatch = content.match(/"description":\s*"([^"]+)"/);
+          if (descMatch) {
+            findings.push(`Description: ${descMatch[1]}`);
+          }
+        }
+        
+        // Extract file listings
+        if (Array.isArray(content)) {
+          const importantFiles = content.filter(file => 
+            file.includes('package.json') || 
+            file.includes('tsconfig.json') ||
+            file.includes('README') ||
+            file.includes('.js') ||
+            file.includes('.ts')
+          );
+          if (importantFiles.length > 0) {
+            findings.push(`Found ${content.length} files including: ${importantFiles.slice(0, 3).join(', ')}${importantFiles.length > 3 ? '...' : ''}`);
+          }
+        }
+        
+        // Extract git status information
+        if (typeof content === 'string' && (content.includes('modified:') || content.includes('branch'))) {
+          findings.push('Git repository detected with tracked changes');
+        }
+        
+      } catch (e) {
+        // If raw string content, look for key information
+        if (typeof message.content === 'string') {
+          const content = message.content;
+          
+          // Look for package.json content
+          if (content.includes('codecrucible-synth')) {
+            findings.push('Project identified as codecrucible-synth');
+          }
+          if (content.includes('"version"')) {
+            const versionMatch = content.match(/"version":\s*"([^"]+)"/);
+            if (versionMatch) {
+              findings.push(`Version: ${versionMatch[1]}`);
+            }
+          }
+        }
+      }
+    }
+    
+    return findings;
+  }
+
+  /**
    * Generate recommendations based on current analysis
    */
   private generateRecommendations(): string {
@@ -552,8 +677,10 @@ export class ReActAgent {
    * Suggest tool diversification when repetitive usage detected
    */
   private suggestToolDiversification(repeatedTool: string): string {
+    const userMessage = this.agentContext.messages.find(msg => msg.role === 'user')?.content || '';
+    
     const suggestions: Record<string, string> = {
-      'listFiles': 'Try reading specific files with readFile, or check git status',
+      'listFiles': this.getListFilesSuggestion(userMessage),
       'readFile': 'Consider running linting analysis or checking AST structure',
       'gitStatus': 'Try reading configuration files or analyzing source code',
       'lintCode': 'Consider checking git status or reading other source files',
@@ -563,9 +690,92 @@ export class ReActAgent {
     return suggestions[repeatedTool] || 'Try using different tools to gather more comprehensive information';
   }
 
+  private isPackageJsonRequested(): boolean {
+    const userMessage = this.agentContext.messages.find(msg => msg.role === 'user')?.content || '';
+    return /package\.json|dependencies|package/i.test(userMessage);
+  }
+
+  private getToolByName(toolName: string): BaseTool | undefined {
+    return this.tools.find(tool => tool.definition.name === toolName);
+  }
+
+  private getListFilesSuggestion(userMessage: string): string {
+    if (/package\.json/i.test(userMessage)) {
+      return 'Now read package.json file contents using readFile tool';
+    }
+    if (/tsconfig/i.test(userMessage)) {
+      return 'Now read tsconfig.json file contents using readFile tool';
+    }
+    if (/dependencies|package/i.test(userMessage)) {
+      return 'Read package.json to analyze dependencies using readFile tool';
+    }
+    if (/config/i.test(userMessage)) {
+      return 'Read configuration files like package.json or tsconfig.json using readFile tool';
+    }
+    
+    return 'Now read specific important files like package.json, README.md, or source files using readFile tool';
+  }
+
   /**
    * Build exploration context to guide progressive tool usage
    */
+  /**
+   * Validate if the agent is ready to provide a conclusion
+   */
+  private validateReadyForConclusion(): { isReady: boolean; reason?: string; nextSteps?: string[] } {
+    const metrics = this.agentContext.progressMetrics;
+    const userMessage = this.agentContext.messages.find(msg => msg.role === 'user')?.content || '';
+    
+    // Check for specific file reading requests
+    const requestsPackageJson = /package\.json/i.test(userMessage);
+    const requestsTsConfig = /tsconfig/i.test(userMessage);
+    const requestsSpecificFile = /read|analyze|check.*\.(json|ts|js|md|txt)/i.test(userMessage);
+    
+    // If user specifically requested file reading but no files have been read
+    if ((requestsPackageJson || requestsTsConfig || requestsSpecificFile) && metrics.criticalFilesRead === 0) {
+      const nextSteps = [];
+      if (requestsPackageJson) nextSteps.push('readFile package.json');
+      if (requestsTsConfig) nextSteps.push('readFile tsconfig.json');
+      if (requestsSpecificFile) nextSteps.push('readFile for the requested file');
+      
+      return {
+        isReady: false,
+        reason: 'User requested specific file analysis but no files have been read yet',
+        nextSteps
+      };
+    }
+    
+    // General minimum requirements for any analysis
+    if (metrics.toolsUsed.size === 0) {
+      return {
+        isReady: false,
+        reason: 'No tools have been used to gather information',
+        nextSteps: ['listFiles to explore project structure']
+      };
+    }
+    
+    // For general analysis, require at least some exploration
+    if (metrics.directoriesListed.size === 0 && metrics.filesExplored.size === 0) {
+      return {
+        isReady: false,
+        reason: 'No exploration of project structure or files has been done',
+        nextSteps: ['listFiles to understand project layout', 'readFile for key files']
+      };
+    }
+    
+    // For code analysis requests, require reading at least one file
+    if (/analyze|review|explain|debug|error|issue/i.test(userMessage) && metrics.criticalFilesRead === 0) {
+      return {
+        isReady: false,
+        reason: 'Analysis requested but no files have been read for content examination',
+        nextSteps: ['readFile key files like package.json, main source files']
+      };
+    }
+    
+    // Passed all checks
+    return { isReady: true };
+  }
+
   private buildExplorationContext(): string {
     const metrics = this.agentContext.progressMetrics;
     const iteration = this.agentContext.currentIteration;
@@ -722,7 +932,15 @@ FINAL ANSWER EXAMPLE:
     // Remove common prefixes that models sometimes add
     cleaned = cleaned.replace(/^(Here's|Here is|Response:|JSON:|Output:)\s*/i, '');
     
-    // Remove trailing text after valid JSON
+    // Look for complete JSON objects with thought, tool, and toolInput
+    const fullJsonPattern = /\{\s*"thought":\s*"[^"]*",\s*"tool":\s*"[^"]*",\s*"toolInput":\s*\{[^}]*\}\s*\}/;
+    const fullJsonMatch = cleaned.match(fullJsonPattern);
+    
+    if (fullJsonMatch) {
+      return fullJsonMatch[0];
+    }
+    
+    // Fallback: Find any valid JSON object
     const jsonStart = cleaned.indexOf('{');
     if (jsonStart !== -1) {
       // Find the matching closing brace
@@ -741,7 +959,11 @@ FINAL ANSWER EXAMPLE:
       }
       
       if (jsonEnd !== -1) {
-        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+        const extracted = cleaned.substring(jsonStart, jsonEnd + 1);
+        // Ensure it has the required fields before returning
+        if (extracted.includes('"tool"') && extracted.includes('"toolInput"')) {
+          return extracted;
+        }
       }
     }
     
@@ -753,6 +975,7 @@ FINAL ANSWER EXAMPLE:
    */
   private tryMultipleParsingStrategies(response: string): any {
     const strategies = [
+      () => this.tryTextualParsing(response),  // Try markdown parsing first
       () => this.tryDirectParse(response),
       () => this.tryBraceExtraction(response),
       () => this.tryRegexExtraction(response),
@@ -773,6 +996,8 @@ FINAL ANSWER EXAMPLE:
       }
     }
     
+    // Log the raw response for debugging
+    logger.warn('All parsing strategies failed. Raw response:', response.substring(0, 500));
     throw new Error('All parsing strategies failed');
   }
 
@@ -870,6 +1095,127 @@ FINAL ANSWER EXAMPLE:
     }
     
     throw new Error('No pattern match found');
+  }
+
+  /**
+   * Strategy 6: Textual parsing for non-JSON responses
+   */
+  private tryTextualParsing(response: string): any {
+    const responseText = response.trim();
+    
+    // Parse markdown-style responses like **thought:** and **tool:** 
+    let markdownThoughtMatch = responseText.match(/\*\*thought:\*\*\s*(.+?)(?=\*\*|\n\*\*|$)/is);
+    let markdownToolMatch = responseText.match(/\*\*tool:\*\*\s*(.+?)(?=\*\*|\n\*\*|$)/is);
+    let markdownToolInputMatch = responseText.match(/\*\*toolInput:\*\*[\s\S]*?(\{[\s\S]*?\})/is);
+    
+    // Try alternative patterns if main ones don't match
+    if (!markdownThoughtMatch) {
+      markdownThoughtMatch = responseText.match(/thought:\s*"([^"]+)"/i) || 
+                            responseText.match(/Thought:\s*(.+?)(?=Tool:|$)/is);
+    }
+    if (!markdownToolMatch) {
+      markdownToolMatch = responseText.match(/tool:\s*"([^"]+)"/i) ||
+                         responseText.match(/Tool:\s*`?([^`\n]+)`?/i);
+    }
+    
+    // Also try to find tool input in different formats
+    if (!markdownToolInputMatch) {
+      markdownToolInputMatch = responseText.match(/\*\*Tool Input:\*\*\s*(\{[^}]*\})/is);
+    }
+    if (!markdownToolInputMatch) {
+      // Look for JSON in backticks - improved to handle multiline JSON
+      markdownToolInputMatch = responseText.match(/```json\s*(\{[\s\S]*?\})\s*```/is) ||
+                               responseText.match(/```\s*(\{[\s\S]*?\})\s*```/is);
+    }
+    // Try to match toolInput followed by code block on next lines
+    if (!markdownToolInputMatch) {
+      markdownToolInputMatch = responseText.match(/\*\*toolInput:\*\*[\s\n]*```(?:json)?\s*(\{[\s\S]*?\})\s*```/is);
+    }
+    if (!markdownToolInputMatch) {
+      // Look for any JSON object that looks like toolInput
+      markdownToolInputMatch = responseText.match(/(\{"path":\s*"[^"]*"\})/is);
+    }
+    
+    if (markdownThoughtMatch && markdownToolMatch) {
+      const thought = markdownThoughtMatch[1].trim();
+      let tool = markdownToolMatch[1].trim();
+      let toolInput = {};
+      
+      // Clean tool name of backticks, quotes, and formatting
+      tool = tool.replace(/[`*"']/g, '').trim();
+      
+      if (markdownToolInputMatch) {
+        try {
+          toolInput = JSON.parse(markdownToolInputMatch[1]);
+        } catch (e) {
+          // If JSON parsing fails, try to extract path
+          const pathMatch = markdownToolInputMatch[1].match(/"path":\s*"([^"]+)"/);
+          if (pathMatch) {
+            toolInput = { path: pathMatch[1] };
+          }
+        }
+      } else {
+        // Try to infer toolInput based on tool type
+        if (tool === 'listFiles' || tool === 'readFile' || tool === 'getAst' || tool === 'lintCode') {
+          toolInput = { path: "." };
+        }
+      }
+      
+      // Map tool names
+      const toolMappings: Record<string, string> = {
+        'listFiles': 'listFiles',
+        'readFile': 'readFile',
+        'writeFile': 'writeFile',
+        'gitStatus': 'gitStatus',
+        'gitDiff': 'gitDiff',
+        'lintCode': 'lintCode',
+        'getAst': 'getAst',
+        'research': 'research',
+        'webSearch': 'webSearch',
+        'docSearch': 'docSearch'
+      };
+      
+      const mappedTool = toolMappings[tool] || tool;
+      
+      return {
+        thought,
+        tool: mappedTool,
+        toolInput
+      };
+    }
+    
+    // Check if it's a clear textual response (not JSON)
+    if (responseText && !responseText.includes('{') && !responseText.includes('}')) {
+      return {
+        thought: "Processing textual response from model",
+        tool: "final_answer",
+        toolInput: {
+          answer: responseText
+        }
+      };
+    }
+    
+    // Check for common patterns indicating the model is trying to use tools
+    const toolPatterns = [
+      { pattern: /(?:read|reading|check|checking).*file/i, tool: "readFile", path: "." },
+      { pattern: /(?:list|listing).*files?/i, tool: "listFiles", path: "." },
+      { pattern: /(?:git|check.*status)/i, tool: "gitStatus" },
+      { pattern: /(?:analyze|ast|syntax)/i, tool: "getAst", path: "src/" },
+      { pattern: /(?:lint|linting|check.*code)/i, tool: "lintCode", path: "src/" }
+    ];
+    
+    for (const { pattern, tool, path } of toolPatterns) {
+      if (pattern.test(responseText)) {
+        const toolInput = path ? { path } : {};
+        return {
+          thought: responseText,
+          tool,
+          toolInput
+        };
+      }
+    }
+    
+    throw new Error('Cannot parse textual response');
   }
 
   private fallbackParse(response: string): Thought {
@@ -1306,9 +1652,9 @@ Provide a direct, helpful response without using any tools.`;
         (now - usage.timestamp) < 180000 // 3 minutes
       );
       
-      // Be more permissive with listFiles unless it's really excessive
-      if (samePathUsage.length >= 4) {
-        return true; // Block after 4 attempts on same path
+      // Be more restrictive with listFiles on same path to encourage progression
+      if (samePathUsage.length >= 2) {
+        return true; // Block after 2 attempts on same path to encourage progression
       }
       
       // Also check total listFiles usage regardless of path
@@ -1316,7 +1662,18 @@ Provide a direct, helpful response without using any tools.`;
         usage.tool === 'listFiles' &&
         (now - usage.timestamp) < 300000 // 5 minutes
       );
-      return totalListFiles.length >= 8; // Allow exploring up to 8 different paths
+      
+      // If we've used listFiles extensively but haven't read any files, encourage progression
+      const recentReadFiles = recentUsage.filter(usage => 
+        usage.tool === 'readFile' &&
+        (now - usage.timestamp) < 300000 // 5 minutes
+      );
+      
+      if (totalListFiles.length >= 3 && recentReadFiles.length === 0) {
+        return true; // Block listFiles if we haven't progressed to reading files
+      }
+      
+      return totalListFiles.length >= 6; // Reduced from 8 to encourage more action
     }
     
     // For readFile, allow reading different files

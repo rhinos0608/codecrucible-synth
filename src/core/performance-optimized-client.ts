@@ -107,11 +107,15 @@ export class PerformanceOptimizedClient {
       const bestModel = await this.getCachedBestModel('coding');
       if (bestModel) {
         logger.info(`🔥 Pre-warming model: ${bestModel}`);
-        // Send a tiny request to load the model in memory
-        await this.baseClient.generateDirectResponse('test', { 
-          maxTokens: 10,
-          temperature: 0.1 
-        });
+        // Send a tiny request to load the model in memory using a simple voice
+        const testVoice: VoiceArchetype = {
+          id: 'test',
+          name: 'Test',
+          systemPrompt: 'You are a test voice.',
+          temperature: 0.1,
+          style: 'minimal'
+        };
+        await this.baseClient.generateVoiceResponse(testVoice, 'test', { files: [] });
         logger.info('✅ Model pre-warmed and ready');
       }
     } catch (error) {
@@ -232,7 +236,7 @@ export class PerformanceOptimizedClient {
     }
 
     // Create and cache the request promise
-    const requestPromise = this.baseClient.generateVoiceResponse(voice, prompt, context);
+    const requestPromise = this.baseClient.generateVoiceResponse(voice, prompt, context || { files: [] });
     this._pendingRequests.set(requestKey, requestPromise);
 
     try {
@@ -245,7 +249,7 @@ export class PerformanceOptimizedClient {
   }
 
   /**
-   * Optimized direct response with model caching
+   * Optimized direct response with model caching using voice response
    */
   public async generateDirectResponse(
     prompt: string,
@@ -262,7 +266,17 @@ export class PerformanceOptimizedClient {
       throw new Error('Model connection not available');
     }
 
-    return this.baseClient.generateDirectResponse(prompt, options);
+    // Create a simple voice for direct response
+    const directVoice: VoiceArchetype = {
+      id: 'direct',
+      name: 'Direct',
+      systemPrompt: 'You are a helpful assistant. Provide clear, direct responses.',
+      temperature: options?.temperature || 0.5,
+      style: 'direct'
+    };
+
+    const response = await this.baseClient.generateVoiceResponse(directVoice, prompt, { files: [] });
+    return response.content;
   }
 
   /**

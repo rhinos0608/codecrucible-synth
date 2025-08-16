@@ -395,7 +395,9 @@ Think step by step and be strategic about tool selection and execution order.`;
     // Limit memory size
     if (this.sessionMemory.size > 10) {
       const firstKey = this.sessionMemory.keys().next().value;
-      this.sessionMemory.delete(firstKey);
+      if (firstKey !== undefined) {
+        this.sessionMemory.delete(firstKey);
+      }
     }
   }
 

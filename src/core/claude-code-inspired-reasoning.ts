@@ -35,7 +35,7 @@ export interface CodebaseContext {
 }
 
 export interface GoalState {
-  primaryGoal: 'audit' | 'analyze' | 'debug' | 'optimize' | 'explore';
+  primaryGoal: 'audit' | 'analyze' | 'debug' | 'optimize' | 'explore' | 'create' | 'generate';
   specificObjectives: string[];
   progressMetrics: {
     contextGathered: number;
@@ -174,6 +174,20 @@ export class ClaudeCodeInspiredReasoning {
         'Check resource utilization',
         'Suggest optimization strategies'
       ];
+    } else if (goal.includes('create') || goal.includes('build') || goal.includes('make') || goal.includes('generate')) {
+      primaryGoal = 'create';
+      specificObjectives = [
+        'Understand project context and requirements',
+        'Design appropriate architecture',
+        'Generate necessary code files',
+        'Set up dependencies and configuration',
+        'Create implementation and documentation'
+      ];
+      completionCriteria = {
+        minContextItems: 3,
+        minRecommendations: 1,
+        requiredConfidence: 0.75
+      };
     }
 
     return {
@@ -318,14 +332,64 @@ export class ClaudeCodeInspiredReasoning {
             },
             confidence: 0.75
           };
+
+        case 'project_context':
+          if (!this.usedTools.has('listFiles')) {
+            return {
+              tool: 'listFiles',
+              input: { path: '.', recursive: true },
+              confidence: 0.85
+            };
+          }
+          return {
+            tool: 'readFiles',
+            input: { 
+              files: ['package.json', 'README.md', 'tsconfig.json'],
+              includeMetadata: true 
+            },
+            confidence: 0.8
+          };
+
+        case 'code_generation':
+          return {
+            tool: 'generateCode',
+            input: { 
+              type: 'api',
+              framework: this.codebaseContext.framework || 'express',
+              includeTests: true
+            },
+            confidence: 0.9
+          };
       }
     }
 
-    // Fallback to directory listing if no specific gaps identified
+    // Fallback based on goal type and tools already used
+    if (this.goalState.primaryGoal === 'create' && !this.usedTools.has('generateCode')) {
+      return {
+        tool: 'generateCode',
+        input: { 
+          type: 'api',
+          framework: 'express',
+          includeTests: false
+        },
+        confidence: 0.8
+      };
+    }
+    
+    // Fallback to file operations if nothing else fits
+    if (!this.usedTools.has('listFiles')) {
+      return {
+        tool: 'listFiles',
+        input: { path: '.', recursive: true },
+        confidence: 0.6
+      };
+    }
+    
+    // Final fallback - complete with what we have
     return {
-      tool: 'listFiles',
-      input: { path: '.', recursive: true },
-      confidence: 0.6
+      tool: 'final_answer',
+      input: { answer: this.generateComprehensiveReport() },
+      confidence: this.goalState.progressMetrics.confidence
     };
   }
 
@@ -390,6 +454,21 @@ export class ClaudeCodeInspiredReasoning {
           type: 'git_context',
           priority: 8,
           reasoning: 'Debugging requires understanding recent changes'
+        });
+        break;
+
+      case 'create':
+        if (this.codebaseContext.projectType === 'unknown') {
+          gaps.push({
+            type: 'project_context',
+            priority: 9,
+            reasoning: 'Creation requires understanding current project context'
+          });
+        }
+        gaps.push({
+          type: 'code_generation',
+          priority: 10,
+          reasoning: 'Creation requires generating code based on requirements'
         });
         break;
     }
@@ -486,9 +565,14 @@ export class ClaudeCodeInspiredReasoning {
 
   private generateProgressReasoning(toolSelection: { tool: string; input: any; confidence: number }): string {
     const progress = this.goalState.progressMetrics;
-    const objective = this.goalState.specificObjectives[Math.min(progress.contextGathered, this.goalState.specificObjectives.length - 1)];
+    const objectiveIndex = Math.min(progress.contextGathered, this.goalState.specificObjectives.length - 1);
+    const objective = this.goalState.specificObjectives[objectiveIndex] || 'Working on goal completion';
     
-    return `**Iteration ${this.iterationCount}**: Working on "${objective}" (${progress.contextGathered}/${this.goalState.completionCriteria.minContextItems} context items gathered, ${(progress.confidence * 100).toFixed(1)}% confidence). Selected ${toolSelection.tool} to gather additional context about the codebase.`;
+    const actionDescription = this.goalState.primaryGoal === 'create' 
+      ? 'execute the creation task'
+      : 'gather additional context about the codebase';
+    
+    return `**Iteration ${this.iterationCount}**: Working on "${objective}" (${progress.contextGathered}/${this.goalState.completionCriteria.minContextItems} context items gathered, ${(progress.confidence * 100).toFixed(1)}% confidence). Selected ${toolSelection.tool} to ${actionDescription}.`;
   }
 
   // Helper methods for context analysis

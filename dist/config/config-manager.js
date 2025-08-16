@@ -122,8 +122,8 @@ export class ConfigManager {
         return {
             model: {
                 endpoint: "http://localhost:11434",
-                name: "llama3.2:latest",
-                timeout: 120000, // 2 minutes for cold model starts
+                name: "", // Will be auto-detected from available models
+                timeout: 180000, // 3 minutes for cold model starts
                 maxTokens: 20000,
                 temperature: 0.7
             },

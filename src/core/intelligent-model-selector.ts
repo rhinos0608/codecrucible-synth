@@ -415,7 +415,7 @@ export class IntelligentModelSelector {
 
       // Try Ollama API first
       try {
-        const response = await axios.get('http://localhost:11434/api/tags', { timeout: 3000 });
+        const response = await axios.get('http://localhost:11434/api/tags', { timeout: 30000 });
         const models = response.data.models?.map((m: any) => m.name) || [];
         this.availableModels = models;
         this.lastModelCheck = Date.now();

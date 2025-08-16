@@ -56,9 +56,7 @@ export class LocalModelClient {
   private modelSelector: IntelligentModelSelector;
   // private gpuOptimizer: GPUOptimizer; // Disabled
   private isOptimized = false;
-  private fallbackModels = [
-    'gemma2:9b', 'llama3.2:8b', 'qwen2.5:7b', 'codellama:7b', 'gemma:latest'
-  ];
+  private fallbackModels: string[] = []; // Dynamically populated from available models
 
   constructor(config: LocalModelConfig) {
     this.config = config;
@@ -126,7 +124,7 @@ export class LocalModelClient {
       // Quick ping test to Ollama with very short timeout
       const quickCheck = axios.create({
         baseURL: this.config.endpoint,
-        timeout: 2000 // Very short timeout for quick check
+        timeout: 30000 // 30 second timeout for connection check
       });
       
       await quickCheck.get('/api/tags');
@@ -199,7 +197,7 @@ export class LocalModelClient {
       // Very simple test request with reasonable timeout
       const testClient = axios.create({
         baseURL: this.config.endpoint,
-        timeout: 25000 // 25 second timeout for health check
+        timeout: 180000 // 3 minute timeout for health check
       });
 
       const testRequest = this.config.endpoint.includes('11434')
@@ -232,37 +230,12 @@ export class LocalModelClient {
    * Find the first working model from available models
    */
   private async findWorkingModel(availableModels: string[]): Promise<string | null> {
-    // Prioritize smaller, faster models for reliability
-    const preferredOrder = ['gemma:2b', 'llama3.2:3b', 'llama3.2:latest', 'gemma2:9b', 'qwen2.5:7b'];
-    
-    // First try preferred models
-    for (const preferred of preferredOrder) {
-      const match = availableModels.find(m => m.includes(preferred.split(':')[0]));
-      if (match) {
-        const isHealthy = await this.quickHealthCheck(match);
-        if (isHealthy) {
-          logger.info(`✅ Found working preferred model: ${match}`);
-          return match;
-        } else {
-          logger.debug(`❌ Preferred model ${match} failed health check`);
-        }
-      }
-    }
-
-    // Then try all available models
-    for (const model of availableModels) {
-      // Skip obviously problematic models
-      if (model.includes('codellama:34b') || model.includes('qwq:32b')) {
-        continue;
-      }
-      
-      const isHealthy = await this.quickHealthCheck(model);
-      if (isHealthy) {
-        logger.info(`✅ Found working model: ${model}`);
-        return model;
-      } else {
-        logger.debug(`❌ Model ${model} failed health check`);
-      }
+    // Simply use the first available model - no hardcoded preferences
+    // User can select specific model with /models command
+    if (availableModels.length > 0) {
+      const firstModel = availableModels[0];
+      logger.info(`✅ Using first available model: ${firstModel}`);
+      return firstModel;
     }
 
     return null;
@@ -288,44 +261,9 @@ export class LocalModelClient {
    * Intelligently select the best model from available models
    */
   private async selectBestAvailableModel(availableModels: string[], taskType: string = 'general'): Promise<string> {
-    logger.debug(`Selecting best model from: ${availableModels.join(', ')}`);
-    
-    // Model preferences based on task type - only using exact model bases that exist
-    const taskPreferences: Record<string, string[]> = {
-      'coding': ['gpt-oss', 'llama3.2', 'qwen2.5', 'gemma2', 'gemma'],
-      'analysis': ['qwen2.5', 'llama3.2', 'gemma2', 'gemma'],
-      'general': ['llama3.2', 'gemma', 'qwen2.5', 'gemma2'],
-      'debugging': ['gpt-oss', 'llama3.2', 'qwen2.5', 'gemma']
-    };
-
-    const preferences = taskPreferences[taskType] || taskPreferences['general'];
-    
-    // Try to find preferred models for task type - use exact matching
-    for (const preferred of preferences) {
-      const match = availableModels.find(model => {
-        const modelBase = model.split(':')[0].toLowerCase();
-        return modelBase === preferred.toLowerCase() || modelBase.includes(preferred.toLowerCase());
-      });
-      if (match) {
-        logger.debug(`Found preferred model: ${match} for task: ${taskType}`);
-        return match;
-      }
-    }
-
-    // Fallback: prioritize smaller, reliable models that are likely to work
-    const reliableModels = ['gemma:2b', 'llama3.2:3b', 'llama3.2:latest', 'gemma2:9b'];
-    for (const reliable of reliableModels) {
-      const match = availableModels.find(model => 
-        model.includes(reliable.split(':')[0])
-      );
-      if (match) {
-        logger.debug(`Found reliable fallback model: ${match}`);
-        return match;
-      }
-    }
-
-    // Ultimate fallback: first available model
-    logger.debug(`Using first available model as last resort: ${availableModels[0]}`);
+    // Autonomous selection: simply use first available model
+    // User can choose specific model with /models command
+    logger.debug(`Using first available model: ${availableModels[0]}`);
     return availableModels[0];
   }
 
@@ -349,24 +287,17 @@ export class LocalModelClient {
     try {
       const quickCheck = axios.create({
         baseURL: this.config.endpoint,
-        timeout: 3000
+        timeout: 30000 // 30 second timeout for model detection
       });
       
       const response = await quickCheck.get('/api/tags');
       const models = response.data.models || [];
       const modelNames = models.map((m: any) => m.name || m.model || '').filter(Boolean);
       
-      // Filter out known problematic models immediately
-      const filteredModels = modelNames.filter((model: string) => {
-        // Skip known non-existent or problematic models
-        if (model.includes('codellama:34b') || model.includes('qwq:32b')) {
-          logger.debug(`Filtering out known problematic model: ${model}`);
-          return false;
-        }
-        return true;
-      });
+      // Use all available models - no hardcoded filtering
+      const filteredModels = modelNames;
       
-      logger.info(`🔍 Found ${filteredModels.length} models (filtered out problematic ones from ${modelNames.length} total)`);
+      logger.info(`🔍 Found ${filteredModels.length} available models`);
       return filteredModels;
     } catch (error) {
       logger.warn('Failed to get available models:', error);
@@ -411,7 +342,7 @@ export class LocalModelClient {
     
     if (models.length === 0) {
       console.log(chalk.red('❌ No models found on system'));
-      console.log(chalk.yellow('💡 Install a model with: ollama pull gemma:2b'));
+      console.log(chalk.yellow('💡 Install a model with: ollama pull <model-name>'));
       return;
     }
 
@@ -764,7 +695,7 @@ export class LocalModelClient {
         error.message.includes('status code 500');
       
       if (isTimeout) {
-        throw new Error('Ollama connection timeout. Try:\n1. Start Ollama: ollama serve\n2. Check if models are downloaded: ollama list\n3. Pull a model: ollama pull gemma:2b');
+        throw new Error('Ollama connection timeout. Try:\n1. Start Ollama: ollama serve\n2. Check if models are downloaded: ollama list\n3. Install a model: ollama pull <model-name>');
       }
       
       if (is404) {
@@ -780,14 +711,14 @@ export class LocalModelClient {
             errorMsg += `\n3. Try using: ${suggestedModel}`;
           }
         } else {
-          errorMsg += `\n2. No models found. Install one: ollama pull gemma:2b`;
+          errorMsg += `\n2. No models found. Install one: ollama pull <model-name>`;
         }
         
         throw new Error(errorMsg);
       }
       
       if (is500) {
-        throw new Error(`Ollama server error. The model '${model}' may be corrupted or incompatible.\nTry:\n1. Restart Ollama: Stop and run 'ollama serve'\n2. Re-pull the model: ollama pull ${model}\n3. Use a smaller model: ollama pull gemma:2b`);
+        throw new Error(`Ollama server error. The model '${model}' may be corrupted or incompatible.\nTry:\n1. Restart Ollama: Stop and run 'ollama serve'\n2. Re-pull the model: ollama pull ${model}\n3. Use a different model: type 'models' to select another`);
       }
 
       logger.error('Generation failed:', error);
@@ -826,11 +757,11 @@ export class LocalModelClient {
       
       // Single retry with absolute fastest fallback
       try {
-        const ultrafastModel = 'gemma:2b'; // Smallest available model
-        logger.warn(`🚀 Ultra-fast fallback: ${ultrafastModel}`);
+        // Use current model as fallback
+        logger.warn(`🚀 Ultra-fast fallback: ${this.config.model}`);
         
         const fallbackBody = {
-          model: ultrafastModel,
+          model: this.config.model,
           prompt: prompt.length > 500 ? prompt.substring(0, 500) + '...' : prompt, // Truncate for speed
           stream: false,
           options: {
@@ -1258,16 +1189,13 @@ Instructions:
     console.log('   ollama serve                   # Start Ollama service\n');
     
     console.log(chalk.blue('3. Install Fast Models (Recommended):'));
-    console.log('   ollama pull gemma:2b           # Fastest model (2GB) - Best for testing');
-    console.log('   ollama pull llama3.2:1b        # Ultra-fast (1GB) - Very quick responses');
-    console.log('   ollama pull llama3.2:3b        # Good balance (3GB) - Quality + speed');
-    console.log('   ollama pull qwen2.5:7b         # More capable (7GB) - Better quality\n');
+    console.log('   ollama pull <model-name>       # Install any model you prefer\n');
     
     console.log(chalk.blue('4. Fix Model Errors:'));
     console.log('   For "Model not found" (404 errors):');
     console.log('   - Check config model name matches installed models');
     console.log('   - Update config to use available model name');
-    console.log('   - Example: "gpt-oss:20b" → "gemma:2b"\n');
+    console.log('   - Use /models command to select an available model\n');
     
     console.log(chalk.blue('5. Performance Tips:'));
     console.log('   - Use smaller models (1b-3b parameters) for speed');

@@ -31,10 +31,8 @@ global.restoreConsole = () => {
 const originalExit = process.exit;
 process.exit = jest.fn();
 
-// Restore process.exit after tests
-afterAll(() => {
-  process.exit = originalExit;
-});
+// Note: afterAll will be available in individual test files
+// This setup file doesn't need it since it's imported by each test
 
 // Set up global test utilities
 global.testUtils = {

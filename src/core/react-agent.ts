@@ -35,6 +35,12 @@ import {
 import { LintCodeTool, GetAstTool } from './tools/code-analysis-tools.js';
 import { GitStatusTool, GitDiffTool } from './tools/git-tools.js';
 import { ResearchTool, WebSearchTool, DocSearchTool } from './tools/research-tools.js';
+import { 
+  RefDocumentationTool, 
+  ExaWebSearchTool, 
+  ExaDeepResearchTool, 
+  ExaCompanyResearchTool 
+} from './tools/mcp-tools.js';
 import { AutonomousErrorHandler, ErrorContext } from './autonomous-error-handler.js';
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
 import { SimplifiedReActPrompts, SimplifiedJSONParser } from './simplified-react-prompts.js';
@@ -161,6 +167,12 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
       new ResearchTool(this.agentContext),
       new WebSearchTool(this.agentContext),
       new DocSearchTool(this.agentContext),
+      
+      // MCP Tools Integration
+      new RefDocumentationTool(this.agentContext),
+      new ExaWebSearchTool(this.agentContext),
+      new ExaDeepResearchTool(this.agentContext),
+      new ExaCompanyResearchTool(this.agentContext),
       
       // Legacy tools for compatibility
       new ReadFileTool(this.agentContext),
@@ -1545,6 +1557,34 @@ Provide a direct, helpful response without using any tools.`;
       case 'runCommand':
         if (!toolInput.command || typeof toolInput.command !== 'string' || toolInput.command.trim() === '') {
           return { isValid: false, error: 'command parameter is required and must be a non-empty string' };
+        }
+        break;
+      
+      // MCP Tools validation
+      case 'refDocSearch':
+        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
+          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
+        }
+        break;
+      
+      case 'exaWebSearch':
+        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
+          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
+        }
+        if (toolInput.numResults && (typeof toolInput.numResults !== 'number' || toolInput.numResults < 1 || toolInput.numResults > 10)) {
+          return { isValid: false, error: 'numResults must be a number between 1 and 10' };
+        }
+        break;
+      
+      case 'exaDeepResearch':
+        if (!toolInput.topic || typeof toolInput.topic !== 'string' || toolInput.topic.trim() === '') {
+          return { isValid: false, error: 'topic parameter is required and must be a non-empty string' };
+        }
+        break;
+      
+      case 'exaCompanyResearch':
+        if (!toolInput.companyName || typeof toolInput.companyName !== 'string' || toolInput.companyName.trim() === '') {
+          return { isValid: false, error: 'companyName parameter is required and must be a non-empty string' };
         }
         break;
     }

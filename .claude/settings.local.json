@@ -59,7 +59,9 @@
       "mcp__exa__crawling_exa",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebSearch",
+      "WebFetch(domain:e2b.dev)"
     ],
     "deny": [],
     "ask": [],

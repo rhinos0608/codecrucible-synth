@@ -76,6 +76,30 @@ performance:
     compressionThreshold: 80000       # tokens
     retentionStrategy: "sliding"      # sliding, summary, hierarchical
 
+# E2B Code Interpreter Configuration
+e2b:
+  apiKey: "${E2B_API_KEY}"            # E2B API key from environment
+  enabled: true                       # Enable E2B sandboxed execution
+  defaultEnvironment: "base"          # Default sandbox environment
+  sessionTimeout: 3600000             # 1 hour session timeout
+  maxConcurrentSessions: 10           # Maximum concurrent sandbox sessions
+  
+  # Resource limits for sandbox execution
+  resourceLimits:
+    memory: "512MB"                   # Memory limit per sandbox
+    cpu: "0.5"                        # CPU limit (cores)
+    diskSpace: "1GB"                  # Disk space limit
+    executionTimeout: 30000           # 30 seconds max execution time
+    
+  # Security policy for code execution
+  security:
+    strictMode: false                 # Enable for production environments
+    allowNetworkAccess: false         # Block network access in sandboxes
+    allowFileSystemWrite: true        # Allow file operations
+    allowProcessSpawning: false       # Block process spawning
+    validateCode: true                # Enable code validation
+    auditLog: true                    # Log all execution attempts
+
 # Logging Configuration
 logging:
   level: "info"                       # debug, info, warn, error

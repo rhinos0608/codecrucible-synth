@@ -1,14 +1,15 @@
-import { VoiceEnabledAgent, VoiceEnabledConfig } from '../voice-enabled-agent.js';
-import { AgentDependencies, BaseAgentOutput } from '../base-agent.js';
+import { UnifiedAgent, AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
+import { UnifiedAgent, AgentConfig } from '../agent.js';
+import { AgentContext, ExecutionResult } from '../agent.js';
 import { BaseTool } from '../tools/base-tool.js';
 import { GoogleWebSearchTool, RefDocumentationTool, ExaWebSearchTool } from '../tools/real-research-tools.js';
 import { ReadCodeStructureTool } from '../tools/read-code-structure-tool.js';
 import { IntelligentFileReaderTool } from '../tools/intelligent-file-reader-tool.js';
 import { CodeAnalysisTool, CodeGenerationTool } from '../tools/enhanced-code-tools.js';
-import { logger } from '../logger.js';
-import { ClaudeCodeInspiredReasoning } from '../claude-code-inspired-reasoning.js';
+import { logger } from '../console.js';
+import { UnifiedAgent } from '../agent.js';
 
-export class ExplorerAgent extends VoiceEnabledAgent {
+export class ExplorerAgent extends UnifiedAgent {
   private tools: BaseTool[];
   private reasoning: ClaudeCodeInspiredReasoning | null = null;
 
@@ -85,19 +86,19 @@ You excel at finding creative solutions and helping teams think outside conventi
 
   public async processRequest(input: string, streaming?: boolean): Promise<BaseAgentOutput> {
     try {
-      logger.info(`🚀 ExplorerAgent processing: ${input.substring(0, 100)}...`);
+      console.info(`🚀 ExplorerAgent processing: ${input.substring(0, 100)}...`);
 
       // Initialize reasoning with exploration focus
       const model = this.dependencies.context.modelClient;
-      this.reasoning = new ClaudeCodeInspiredReasoning(this.tools, input, model);
+      this.reasoning = new UnifiedAgent(this.tools, input, model);
 
       // Perform exploration-focused analysis
       const exploration = await this.performExplorationAnalysis(input);
 
-      return new BaseAgentOutput(true, exploration);
+      return new ExecutionResult(true, exploration);
     } catch (error) {
-      logger.error('ExplorerAgent error:', error);
-      return new BaseAgentOutput(false, `Exploration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('ExplorerAgent error:', error);
+      return new ExecutionResult(false, `Exploration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -133,7 +134,7 @@ You excel at finding creative solutions and helping teams think outside conventi
 
       return this.formatExplorationReport(input, results);
     } catch (error) {
-      logger.error('Exploration analysis error:', error);
+      console.error('Exploration analysis error:', error);
       return `Exploration partially completed. Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   }
@@ -173,7 +174,7 @@ You excel at finding creative solutions and helping teams think outside conventi
         }
       }
     } catch (error) {
-      logger.debug('Research tools not available or failed:', error);
+      console.debug('Research tools not available or failed:', error);
     }
 
     return research;
@@ -189,7 +190,7 @@ You excel at finding creative solutions and helping teams think outside conventi
         }
       }
     } catch (error) {
-      logger.debug('Pattern analysis not available:', error);
+      console.debug('Pattern analysis not available:', error);
     }
     
     return null;

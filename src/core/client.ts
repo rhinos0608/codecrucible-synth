@@ -112,16 +112,16 @@ export class UnifiedModelClient extends EventEmitter {
   private async createProvider(config: ProviderConfig): Promise<any> {
     switch (config.type) {
       case 'ollama':
-        const { OllamaProvider } = await import('../llm/ollama.js');
-        return new OllamaProvider(config);
+        const { OllamaProvider } = await import('../providers/ollama.js');
+        return new providers.OllamaProvider(config);
       
       case 'lm-studio':
-        const { LMStudioProvider } = await import('../llm/lm-studio.js');
-        return new LMStudioProvider(config);
+        const { LMStudioProvider } = await import('../providers/lm-studio.js');
+        return new providers.LMStudioProvider(config);
       
       case 'huggingface':
-        const { HuggingFaceProvider } = await import('../llm/huggingface.js');
-        return new HuggingFaceProvider(config);
+        const { HuggingFaceProvider } = await import('../providers/huggingface.js');
+        return new providers.HuggingFaceProvider(config);
       
       default:
         throw new Error(`Unknown provider type: ${config.type}`);
@@ -403,3 +403,17 @@ export class UnifiedModelClient extends EventEmitter {
 }
 
 export { UnifiedModelClient as Client };
+
+export interface VoiceArchetype {
+  name: string;
+  personality: string;
+  expertise: string[];
+}
+
+export interface VoiceResponse {
+  content: string;
+  voice: string;
+  confidence: number;
+}
+
+export type { ProjectContext } from "./types.js";

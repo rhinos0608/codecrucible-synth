@@ -1,5 +1,5 @@
-import { HybridModelClient } from '../hybrid-model-client.js';
-import { LocalModelClient } from '../local-model-client.js';
+import { HybridModelClient } from '../client.js';
+import { UnifiedModelClient } from '../client.js';
 import { logger } from '../logger.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -67,7 +67,7 @@ export interface BenchmarkSummary {
 export class BenchmarkRunner {
   private challenges: CodingChallenge[];
   private hybridClient?: HybridModelClient;
-  private ollamaClient?: LocalModelClient;
+  private ollamaClient?: UnifiedModelClient;
 
   constructor() {
     this.challenges = this.loadDefaultChallenges();
@@ -650,7 +650,7 @@ Function signature and implementation:`;
         enableLearning: false // Disable learning during benchmarks
       });
 
-      this.ollamaClient = new LocalModelClient({
+      this.ollamaClient = new UnifiedModelClient({
         endpoint: 'http://localhost:11434',
         model: 'codellama:34b',
         timeout: 60000

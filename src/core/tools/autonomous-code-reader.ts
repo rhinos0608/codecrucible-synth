@@ -1,5 +1,5 @@
 import { logger } from '../logger.js';
-import { timeoutManager } from '../timeout-manager.js';
+import { UnifiedAgent } from '../agent.js';
 import { readdir, readFile, stat } from 'fs/promises';
 import { join, extname, relative, basename } from 'path';
 import { glob } from 'glob';
@@ -83,7 +83,7 @@ export class AutonomousCodeReader {
     logger.info('🔍 Starting autonomous code structure analysis...');
     
     try {
-      return await timeoutManager.executeWithRetry(
+      return await (await import("../agent.js")).timeoutManager.executeWithRetry(
         async () => {
           // Phase 1: Project Discovery
           const overview = await this.discoverProjectOverview();
@@ -117,8 +117,7 @@ export class AutonomousCodeReader {
             patterns
           };
         },
-        'autonomous_code_analysis',
-        { maxRetries: 2, timeoutMs: 90000 }
+        'autonomous_code_analysis'
       );
     } catch (error) {
       logger.error('❌ Autonomous code analysis failed:', error);

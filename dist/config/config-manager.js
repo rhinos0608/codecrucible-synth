@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import YAML from 'yaml';
 import { logger } from '../core/logger.js';
-import { SecurityUtils } from '../core/security-utils.js';
+import { SecurityUtils } from '../core/security.js';
 export class ConfigManager {
     static instance;
     config = null;
@@ -19,16 +19,16 @@ export class ConfigManager {
             // Initialize encryption for sensitive data
             await SecurityUtils.initializeEncryption();
         }
-        return await ConfigManager.instance.loadConfig();
+        return await ConfigManager.instance.loadConfiguration();
     }
     static async getInstance() {
         if (!ConfigManager.instance) {
             ConfigManager.instance = new ConfigManager();
-            await ConfigManager.instance.loadConfig();
+            await ConfigManager.instance.loadConfiguration();
         }
         return ConfigManager.instance;
     }
-    async loadConfig() {
+    async loadConfiguration() {
         if (this.config) {
             return this.config;
         }
@@ -61,7 +61,7 @@ export class ConfigManager {
     }
     async set(key, value) {
         if (!this.config) {
-            await this.loadConfig();
+            await this.loadConfiguration();
         }
         const keys = key.split('.');
         let current = this.config; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -79,7 +79,7 @@ export class ConfigManager {
     }
     async get(key) {
         if (!this.config) {
-            await this.loadConfig();
+            await this.loadConfiguration();
         }
         const keys = key.split('.');
         let current = this.config; // eslint-disable-line @typescript-eslint/no-explicit-any

@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '../logger.js';
-import { SynthesisResult } from '../response-types.js';
+import { SynthesisResult } from '../types.js';
 
 export interface ProjectContext {
   guidance: string;

@@ -1,15 +1,16 @@
-import { VoiceEnabledAgent, VoiceEnabledConfig } from '../voice-enabled-agent.js';
-import { AgentDependencies, BaseAgentOutput } from '../base-agent.js';
+import { UnifiedAgent, AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
+import { UnifiedAgent, AgentConfig } from '../agent.js';
+import { AgentContext, ExecutionResult } from '../agent.js';
 import { BaseTool } from '../tools/base-tool.js';
 import { LintCodeTool, GetAstTool } from '../tools/code-analysis-tools.js';
 import { CodeAnalysisTool } from '../tools/enhanced-code-tools.js';
 import { ReadCodeStructureTool } from '../tools/read-code-structure-tool.js';
 import { IntelligentFileReaderTool } from '../tools/intelligent-file-reader-tool.js';
 import { EnhancedReadFileTool } from '../tools/enhanced-file-tools.js';
-import { logger } from '../logger.js';
-import { ClaudeCodeInspiredReasoning } from '../claude-code-inspired-reasoning.js';
+import { logger } from '../console.js';
+import { UnifiedAgent } from '../agent.js';
 
-export class CodeAnalyzerAgent extends VoiceEnabledAgent {
+export class CodeAnalyzerAgent extends UnifiedAgent {
   private tools: BaseTool[];
   private reasoning: ClaudeCodeInspiredReasoning | null = null;
 
@@ -70,19 +71,19 @@ You have access to specialized code analysis tools including AST parsing, lintin
 
   public async processRequest(input: string, streaming?: boolean): Promise<BaseAgentOutput> {
     try {
-      logger.info(`🔍 CodeAnalyzerAgent processing: ${input.substring(0, 100)}...`);
+      console.info(`🔍 CodeAnalyzerAgent processing: ${input.substring(0, 100)}...`);
 
       // Initialize reasoning with specialized context
       const model = this.dependencies.context.modelClient;
-      this.reasoning = new ClaudeCodeInspiredReasoning(this.tools, input, model);
+      this.reasoning = new UnifiedAgent(this.tools, input, model);
 
       // Perform specialized analysis
       const analysis = await this.performCodeAnalysis(input);
 
-      return new BaseAgentOutput(true, analysis);
+      return new ExecutionResult(true, analysis);
     } catch (error) {
-      logger.error('CodeAnalyzerAgent error:', error);
-      return new BaseAgentOutput(false, `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('CodeAnalyzerAgent error:', error);
+      return new ExecutionResult(false, `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -114,7 +115,7 @@ You have access to specialized code analysis tools including AST parsing, lintin
             }
           }
         } catch (e) {
-          logger.debug('Linting not available for this project');
+          console.debug('Linting not available for this project');
         }
       }
 
@@ -128,7 +129,7 @@ You have access to specialized code analysis tools including AST parsing, lintin
               results.quality.push('AST analysis completed');
             }
           } catch (e) {
-            logger.debug('AST analysis skipped');
+            console.debug('AST analysis skipped');
           }
         }
       }
@@ -139,7 +140,7 @@ You have access to specialized code analysis tools including AST parsing, lintin
       // Format the analysis report
       return this.formatAnalysisReport(input, results);
     } catch (error) {
-      logger.error('Analysis error:', error);
+      console.error('Analysis error:', error);
       return `Analysis partially completed with errors: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   }

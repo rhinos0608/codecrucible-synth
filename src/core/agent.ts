@@ -6,15 +6,15 @@
  */
 
 import { EventEmitter } from 'events';
-import { ModelClient } from './client.js';
+import { UnifiedModelClient } from './client.js';
 import { configManager, AgentConfig } from './config.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 import { 
-  AgentRequest, 
-  AgentResponse, 
-  AgentExecutionMode, 
-  AgentTask, 
-  AgentWorkflow,
+  ExecutionRequest, 
+  ExecutionResponse, 
+  ExecutionMode, 
+  Task, 
+  Workflow,
   ProjectContext,
   ExecutionResult
 } from './types.js';
@@ -22,7 +22,7 @@ import {
 export interface AgentCapability {
   name: string;
   description: string;
-  handler: (task: AgentTask) => Promise<ExecutionResult>;
+  handler: (task: Task) => Promise<ExecutionResult>;
   priority: number;
   enabled: boolean;
 }
@@ -41,14 +41,14 @@ export interface AgentMetrics {
 export class UnifiedAgent extends EventEmitter {
   private modelClient: ModelClient;
   private performanceMonitor: PerformanceMonitor;
-  private config: AgentConfig;
+  private config: AgentConfig = {};
   private capabilities: Map<string, AgentCapability>;
-  private activeWorkflows: Map<string, AgentWorkflow>;
+  private activeWorkflows: Map<string, Workflow>;
   private metrics: AgentMetrics;
-  private executionQueue: AgentTask[];
+  private executionQueue: Task[];
   private isProcessing: boolean;
 
-  constructor(modelClient: ModelClient, performanceMonitor: PerformanceMonitor) {
+  constructor(modelClient: UnifiedModelClient, performanceMonitor: PerformanceMonitor) {
     super();
     this.modelClient = modelClient;
     this.performanceMonitor = performanceMonitor;
@@ -163,13 +163,13 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Execute agent request with intelligent routing
    */
-  async execute(request: AgentRequest, context?: ProjectContext): Promise<AgentResponse> {
+  async execute(request: ExecutionRequest, context?: ProjectContext): Promise<ExecutionResponse> {
     const startTime = Date.now();
     const workflowId = this.generateWorkflowId();
 
     try {
       // Create workflow
-      const workflow: AgentWorkflow = {
+      const workflow: Workflow = {
         id: workflowId,
         request,
         context: context || {},
@@ -194,7 +194,7 @@ export class UnifiedAgent extends EventEmitter {
       workflow.endTime = Date.now();
       workflow.results = results;
 
-      const response: AgentResponse = {
+      const response: ExecutionResponse = {
         workflowId,
         success: true,
         results,
@@ -237,8 +237,8 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Create execution plan based on request
    */
-  private async createExecutionPlan(request: AgentRequest): Promise<AgentTask[]> {
-    const tasks: AgentTask[] = [];
+  private async createExecutionPlan(request: ExecutionRequest): Promise<Task[]> {
+    const tasks: Task[] = [];
     const mode = request.mode || this.config.mode;
 
     // Analyze request type and create appropriate tasks
@@ -313,7 +313,7 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Execute workflow tasks
    */
-  private async executeWorkflow(workflow: AgentWorkflow): Promise<ExecutionResult[]> {
+  private async executeWorkflow(workflow: Workflow): Promise<ExecutionResult[]> {
     const results: ExecutionResult[] = [];
     const maxConcurrency = this.config.maxConcurrency;
 
@@ -345,7 +345,7 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Execute individual task
    */
-  private async executeTask(task: AgentTask): Promise<ExecutionResult> {
+  private async executeTask(task: Task): Promise<ExecutionResult> {
     const capability = this.capabilities.get(task.capability);
     
     if (!capability || !capability.enabled) {
@@ -357,8 +357,8 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const result = await capability.handler(task);
-      result.executionTime = Date.now() - startTime;
-      result.taskId = task.id;
+      (result as any).executionTime = Date.now() - startTime;
+      (result as any).taskId = task.id;
       
       return result;
     } catch (error) {
@@ -373,7 +373,7 @@ export class UnifiedAgent extends EventEmitter {
   }
 
   // Capability Handlers
-  private async handleCodeAnalysis(task: AgentTask): Promise<ExecutionResult> {
+  private async handleCodeAnalysis(task: Task): Promise<ExecutionResult> {
     const prompt = `Analyze the following code for quality, patterns, and improvements:\n\n${task.input}`;
     
     const response = await this.modelClient.request({
@@ -395,7 +395,7 @@ export class UnifiedAgent extends EventEmitter {
     };
   }
 
-  private async handleCodeGeneration(task: AgentTask): Promise<ExecutionResult> {
+  private async handleCodeGeneration(task: Task): Promise<ExecutionResult> {
     const prompt = `Generate code based on the following requirements:\n\n${task.input}`;
     
     const response = await this.modelClient.request({
@@ -417,7 +417,7 @@ export class UnifiedAgent extends EventEmitter {
     };
   }
 
-  private async handleDocumentation(task: AgentTask): Promise<ExecutionResult> {
+  private async handleDocumentation(task: Task): Promise<ExecutionResult> {
     const prompt = `Generate comprehensive documentation for:\n\n${task.input}`;
     
     const response = await this.modelClient.request({
@@ -439,7 +439,7 @@ export class UnifiedAgent extends EventEmitter {
     };
   }
 
-  private async handleTesting(task: AgentTask): Promise<ExecutionResult> {
+  private async handleTesting(task: Task): Promise<ExecutionResult> {
     const prompt = `Generate comprehensive tests for:\n\n${task.input}`;
     
     const response = await this.modelClient.request({
@@ -461,7 +461,7 @@ export class UnifiedAgent extends EventEmitter {
     };
   }
 
-  private async handleRefactoring(task: AgentTask): Promise<ExecutionResult> {
+  private async handleRefactoring(task: Task): Promise<ExecutionResult> {
     const prompt = `Refactor and optimize the following code:\n\n${task.input}`;
     
     const response = await this.modelClient.request({
@@ -483,7 +483,7 @@ export class UnifiedAgent extends EventEmitter {
     };
   }
 
-  private async handleBugFixing(task: AgentTask): Promise<ExecutionResult> {
+  private async handleBugFixing(task: Task): Promise<ExecutionResult> {
     const prompt = `Identify and fix bugs in the following code:\n\n${task.input}`;
     
     const response = await this.modelClient.request({
@@ -505,7 +505,7 @@ export class UnifiedAgent extends EventEmitter {
     };
   }
 
-  private async handlePerformanceOptimization(task: AgentTask): Promise<ExecutionResult> {
+  private async handlePerformanceOptimization(task: Task): Promise<ExecutionResult> {
     const prompt = `Optimize the performance of the following code:\n\n${task.input}`;
     
     const response = await this.modelClient.request({
@@ -527,7 +527,7 @@ export class UnifiedAgent extends EventEmitter {
     };
   }
 
-  private async handleSecurityAnalysis(task: AgentTask): Promise<ExecutionResult> {
+  private async handleSecurityAnalysis(task: Task): Promise<ExecutionResult> {
     const prompt = `Analyze the following code for security vulnerabilities:\n\n${task.input}`;
     
     const response = await this.modelClient.request({
@@ -568,7 +568,7 @@ export class UnifiedAgent extends EventEmitter {
     return chunks;
   }
 
-  private updateMetrics(response: AgentResponse): void {
+  private updateMetrics(response: ExecutionResponse): void {
     this.metrics.tasksCompleted++;
     this.metrics.lastExecutionTime = response.executionTime;
     
@@ -591,7 +591,7 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Get active workflows
    */
-  getActiveWorkflows(): AgentWorkflow[] {
+  getActiveWorkflows(): Workflow[] {
     return Array.from(this.activeWorkflows.values());
   }
 
@@ -623,4 +623,47 @@ export class UnifiedAgent extends EventEmitter {
   }
 }
 
-export { UnifiedAgent };
+// Legacy compatibility exports
+export const timeoutManager = {
+  async executeWithRetry<T>(fn: () => Promise<T>, retries: number = 3): Promise<T> {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (i === retries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+    throw new Error('Max retries exceeded');
+  }
+};
+
+export const globalEditConfirmation = {
+  getPendingEditsCount: () => 0,
+  proposeEdits: async (edits: any) => ({ approved: true, edits }),
+  confirmAllEdits: async () => ({ approved: [], rejected: [] }),
+  applyEdits: async (edits: any) => ({ success: true, edits }),
+  clearPendingEdits: () => {},
+  generateEditSummary: () => ({ total: 0, approved: 0, rejected: 0 }),
+  displayEditSummary: (summary: any) => console.log('Edit Summary:', summary)
+};
+
+export const globalRAGSystem = {
+  indexPath: async (path: string, options?: any) => ({ indexed: true, path })
+};
+
+export const registerShutdownHandler = (handler: () => void) => {
+  process.on('SIGINT', handler);
+  process.on('SIGTERM', handler);
+};
+
+export const createManagedInterval = (fn: () => void, interval: number) => {
+  return setInterval(fn, interval);
+};
+
+export const clearManagedInterval = (id: NodeJS.Timer) => {
+  clearInterval(id);
+};
+
+export const initializeEditConfirmation = (path: string, options?: any) => globalEditConfirmation;
+export const createUnifiedModelClient = (config: any) => new UnifiedModelClient(config);

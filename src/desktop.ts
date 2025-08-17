@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { startDesktopApp } from './desktop/desktop-app.js';
-import { initializeCLIContext } from './index.js';
+import initializeCLIContext from "./index.js";
 
 /**
  * Desktop application entry point

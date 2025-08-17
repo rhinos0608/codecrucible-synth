@@ -1,9 +1,10 @@
+import { UnifiedAgent, AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
 
-import { BaseSpecializedAgent } from '../base-specialized-agent.js';
-import { BaseAgentConfig, AgentDependencies, BaseAgentOutput } from '../base-agent.js';
-import { ReActAgent } from '../react-agent.js';
+import { UnifiedAgent } from '../agent.js';
+import { AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
+import { UnifiedAgent } from '../agent.js';
 
-export class ProblemSolverAgent extends BaseSpecializedAgent {
+export class ProblemSolverAgent extends UnifiedAgent {
   constructor(dependencies: AgentDependencies) {
     const config: BaseAgentConfig = {
       name: 'ProblemSolverAgent',
@@ -15,7 +16,7 @@ export class ProblemSolverAgent extends BaseSpecializedAgent {
   }
 
   public async processRequest(input: string, streaming?: boolean): Promise<BaseAgentOutput> {
-    const reactAgent = new ReActAgent(this.dependencies.context, this.dependencies.workingDirectory);
+    const reactAgent = new UnifiedAgent(this.dependencies.context, this.dependencies.workingDirectory);
     const enhancedPrompt = `Problem Solving Task: ${input}
     
 Approach:
@@ -26,6 +27,6 @@ Approach:
 5. Anticipate potential issues`;
 
     const result = await reactAgent.processRequest(enhancedPrompt);
-    return new BaseAgentOutput(true, result);
+    return new ExecutionResult(true, result);
   }
 }

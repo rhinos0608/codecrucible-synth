@@ -106,7 +106,7 @@ export async function startServerMode(context, options) {
             });
             // Generate responses from selected voices
             const responses = await context.voiceSystem.generateMultiVoiceSolutions(prompt, voices, {
-                files: userContext.map((ctx) => ({
+                files: (userContext || []).map((ctx) => ({
                     path: ctx.path || file_path || 'untitled',
                     content: ctx.content || '',
                     language: ctx.language || language || 'text'
@@ -127,7 +127,7 @@ export async function startServerMode(context, options) {
                     voice: r.voice,
                     content: r.content,
                     confidence: r.confidence,
-                    tokens_used: r.tokens_used
+                    tokens_used: (r.tokens_used || 0)
                 })),
                 metadata: {
                     timestamp: Date.now(),
@@ -364,7 +364,7 @@ Focus on delivering production-ready code that addresses the specific refactorin
             try {
                 const { prompt, voices, mode, context: userContext } = data;
                 socket.emit('generation_started', { id: data.id });
-                const responses = await context.voiceSystem.generateMultiVoiceSolutions(prompt, voices || context.config.voices.default, { files: userContext || [] });
+                const responses = await context.voiceSystem.generateMultiVoiceSolutions(prompt, voices || context.config.voices.default, { files: userContext || [], structure: {}, metadata: {} });
                 const synthesis = await context.voiceSystem.synthesizeVoiceResponses(responses, mode || 'competitive');
                 socket.emit('generation_complete', {
                     id: data.id,

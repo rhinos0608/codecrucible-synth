@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { join, relative, isAbsolute, dirname } from 'path';
-import { LocalModelClient } from '../local-model-client.js';
+import { UnifiedModelClient } from '../client.js';
 
 const GenerateCodeSchema = z.object({
   specification: z.string().describe('Natural language description of what code to generate'),
@@ -13,11 +13,11 @@ const GenerateCodeSchema = z.object({
 });
 
 export class CodeGeneratorTool extends BaseTool {
-  private modelClient: LocalModelClient;
+  private modelClient: UnifiedModelClient;
 
   constructor(
     private agentContext: { workingDirectory: string },
-    modelClient: LocalModelClient
+    modelClient: UnifiedModelClient
   ) {
     super({
       name: 'generateCode',
@@ -36,7 +36,7 @@ export class CodeGeneratorTool extends BaseTool {
       const codeGenPrompt = this.buildCodeGenerationPrompt(specification, language, codeType, context);
       
       // Generate code using the AI model
-      const generatedCode = await this.modelClient.generate(codeGenPrompt);
+      const generatedCode = await this.modelClient.generateText(codeGenPrompt);
       
       // Extract clean code from the response
       const cleanCode = this.extractCodeFromResponse(generatedCode);
@@ -423,11 +423,11 @@ const ModifyCodeSchema = z.object({
 });
 
 export class CodeModifierTool extends BaseTool {
-  private modelClient: LocalModelClient;
+  private modelClient: UnifiedModelClient;
 
   constructor(
     private agentContext: { workingDirectory: string },
-    modelClient: LocalModelClient
+    modelClient: UnifiedModelClient
   ) {
     super({
       name: 'modifyCode',
@@ -457,7 +457,7 @@ export class CodeModifierTool extends BaseTool {
       const modificationPrompt = this.buildModificationPrompt(existingCode, modification, preserveFormatting);
       
       // Get modified code from AI
-      const modifiedResponse = await this.modelClient.generate(modificationPrompt);
+      const modifiedResponse = await this.modelClient.generateText(modificationPrompt);
       const modifiedCode = this.extractCodeFromResponse(modifiedResponse);
       
       // Write the modified code back to the file
@@ -543,11 +543,11 @@ const RefactorCodeSchema = z.object({
 });
 
 export class RefactoringTool extends BaseTool {
-  private modelClient: LocalModelClient;
+  private modelClient: UnifiedModelClient;
 
   constructor(
     private agentContext: { workingDirectory: string },
-    modelClient: LocalModelClient
+    modelClient: UnifiedModelClient
   ) {
     super({
       name: 'refactorCode',
@@ -579,7 +579,7 @@ export class RefactoringTool extends BaseTool {
       );
       
       // Get refactored code from AI
-      const refactoredResponse = await this.modelClient.generate(refactoringPrompt);
+      const refactoredResponse = await this.modelClient.generateText(refactoringPrompt);
       const refactoredCode = this.extractCodeFromResponse(refactoredResponse);
       
       // Write the refactored code back to the file

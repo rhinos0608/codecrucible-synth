@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
-import { globalEditConfirmation } from '../edit-confirmation-system.js';
+import { UnifiedAgent } from '../agent.js';
 import { logger } from '../logger.js';
 
 const ConfirmedWriteSchema = z.object({
@@ -72,10 +72,9 @@ export class ConfirmedWriteTool extends BaseTool {
 
       // Propose the edit
       if (args.requireConfirmation) {
-        const result = await globalEditConfirmation.proposeEdits(
+        const result = await (await import("../agent.js")).globalEditConfirmation.proposeEdits(
           [editOperation], 
-          `${changeType === 'create' ? 'Create' : 'Modify'} ${args.path}`, 
-          'ConfirmedWriteTool'
+          `${changeType === 'create' ? 'Create' : 'Modify'} ${args.path}`
         );
         
         return {
@@ -127,8 +126,8 @@ export class ViewPendingEditsTool extends BaseTool {
   }
 
   async execute(): Promise<any> {
-    const { globalEditConfirmation } = await import('../edit-confirmation-system.js');
-    const pendingCount = globalEditConfirmation.getPendingEditsCount();
+    const { UnifiedAgent } = await import('../agent.js');
+    const pendingCount = (await import("../agent.js")).globalEditConfirmation.getPendingEditsCount();
     
     return {
       success: true,

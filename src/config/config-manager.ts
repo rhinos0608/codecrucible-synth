@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import YAML from 'yaml';
 import { logger } from '../core/logger.js';
-import { SecurityUtils } from '../core/security-utils.js';
+import { SecurityUtils } from '../core/security.js';
 
 export interface LLMProviderConfig {
   provider: 'openai' | 'google' | 'anthropic' | 'ollama';
@@ -96,18 +96,18 @@ export class ConfigManager {
       // Initialize encryption for sensitive data
       await SecurityUtils.initializeEncryption();
     }
-    return await ConfigManager.instance.loadConfig();
+    return await ConfigManager.instance.loadConfiguration();
   }
 
   static async getInstance(): Promise<ConfigManager> {
     if (!ConfigManager.instance) {
       ConfigManager.instance = new ConfigManager();
-      await ConfigManager.instance.loadConfig();
+      await ConfigManager.instance.loadConfiguration();
     }
     return ConfigManager.instance;
   }
 
-  private async loadConfig(): Promise<AppConfig> {
+  public async loadConfiguration(): Promise<AppConfig> {
     if (this.config) {
       return this.config;
     }
@@ -144,7 +144,7 @@ export class ConfigManager {
 
   async set(key: string, value: any): Promise<void> { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!this.config) {
-      await this.loadConfig();
+      await this.loadConfiguration();
     }
 
     const keys = key.split('.');
@@ -167,7 +167,7 @@ export class ConfigManager {
 
   async get(key: string): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!this.config) {
-      await this.loadConfig();
+      await this.loadConfiguration();
     }
 
     const keys = key.split('.');

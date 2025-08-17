@@ -110,7 +110,7 @@ export declare class ConfigManager {
     constructor();
     static load(): Promise<AppConfig>;
     static getInstance(): Promise<ConfigManager>;
-    private loadConfig;
+    loadConfiguration(): Promise<AppConfig>;
     set(key: string, value: any): Promise<void>;
     get(key: string): Promise<any>;
     reset(): Promise<void>;

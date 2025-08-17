@@ -1,16 +1,20 @@
-import { LocalModelClient, ProjectContext } from './local-model-client.js';
+import { cliOutput, ResponseFactory } from './structured-response-formatter.js';
+import { CLIExitCode, CLIError, SpiralConfig, SynthesisResponse } from './types.js';
+import { globalEditConfirmation } from './agent.js';
+
+import { UnifiedModelClient, ProjectContext } from './client.js';
 import { VoiceArchetypeSystem, SynthesisResult, IterativeResult } from '../voices/voice-archetype-system.js';
-import { LivingSpiralResult, SpiralConfig } from './living-spiral-coordinator.js';
-import { AutonomousClaudeAgent } from './autonomous-claude-agent.js';
+import { ExecutionResult, AgentConfig } from './agent.js';
+import { UnifiedAgent } from './agent.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
-import { AgentOrchestrator } from './agent-orchestrator.js';
+import { UnifiedAgent } from './agent.js';
 import { logger } from './logger.js';
-import { MultiLLMProvider, createMultiLLMProvider } from './multi-llm-provider.js';
-import { RAGSystem, globalRAGSystem } from './rag-system.js';
-import { globalEditConfirmation } from './edit-confirmation-system.js';
-import { cliOutput, CLIError, CLIExitCode } from './cli-output-manager.js';
-import { FastModeClient } from './fast-mode-client.js';
+import { UnifiedModelClient, createUnifiedModelClient } from './client.js';
+import { UnifiedAgent, UnifiedAgent } from './agent.js';
+import { UnifiedAgent } from './agent.js';
+import { StructuredResponseFormatter, ExecutionError, ExecutionResult } from './structured-response-formatter.js';
+import { UnifiedModelClient } from './client.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
@@ -18,11 +22,11 @@ import { readFile, stat, readdir } from 'fs/promises';
 import { join, extname, relative, isAbsolute } from 'path';
 import { glob } from 'glob';
 import { 
-  AgentResponse, 
-  SynthesisResponse, 
-  ResponseFactory, 
+  ExecutionResponse, 
+  ExecutionResult, 
+  StructuredResponseFormatter, 
   ResponseValidator 
-} from './response-types.js';
+} from './types.js';
 
 interface CLIOptions {
   voices?: string | string[];
@@ -73,7 +77,7 @@ export class CodeCrucibleCLI {
     
     // Initialize agent orchestrator for agentic capabilities
     if (!this.context.agentOrchestrator) {
-      this.context.agentOrchestrator = new AgentOrchestrator(context);
+      this.context.agentOrchestrator = new UnifiedAgent(context);
     }
   }
 
@@ -87,7 +91,7 @@ export class CodeCrucibleCLI {
     this.initialized = true;
     
     // Initialize Autonomous Claude Agent
-    this.context.autonomousAgent = new AutonomousClaudeAgent(
+    this.context.autonomousAgent = new UnifiedAgent(
       this.context.voiceSystem,
       this.context.modelClient,
       workingDirectory
@@ -111,7 +115,7 @@ export class CodeCrucibleCLI {
     const spinner = ora('🚀 Initializing fast mode...').start();
     
     try {
-      this.fastModeClient = new FastModeClient({
+      this.fastModeClient = new UnifiedModelClient({
         skipModelPreload: true,
         skipBenchmark: true,
         useMinimalVoices: true,
@@ -419,7 +423,7 @@ export class CodeCrucibleCLI {
       ];
       
       let detectedFiles: string[] = [];
-      let projectContext: ProjectContext = { files: [] };
+      let projectContext: ProjectContext = { files: [], structure: {}, metadata: {} };
       
       // Try each pattern to find file references
       for (const pattern of filePatterns) {
@@ -496,8 +500,8 @@ export class CodeCrucibleCLI {
       
       // Show troubleshooting help for common issues
       if (errorMessage.includes('Ollama') || errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED')) {
-        const { LocalModelClient } = await import('./local-model-client.js');
-        LocalModelClient.displayTroubleshootingHelp();
+        const { UnifiedModelClient } = await import('./client.js');
+        UnifiedModelClient.displayTroubleshootingHelp();
       }
       throw error;
     }
@@ -757,10 +761,9 @@ Focus on actionable, specific recommendations with clear business value.`;
   }
 
   async handleModelManagement(options: any): Promise<void> {
-    const { EnhancedModelManager } = await import('./enhanced-model-manager.js');
-    const { IntelligentModelSelector } = await import('./intelligent-model-selector.js');
-    const modelManager = new EnhancedModelManager(this.context.config.model.endpoint);
-    const modelSelector = new IntelligentModelSelector();
+    const { UnifiedModelClient } = await import('./client.js');
+    const modelManager = new UnifiedModelClient(this.context.config.model.endpoint);
+    const modelSelector = new UnifiedModelClient();
 
     if (options.status) {
       const spinner = ora('Checking system status...').start();
@@ -1138,8 +1141,8 @@ Focus on actionable, specific recommendations with clear business value.`;
 
     try {
       // Import VRAMOptimizer dynamically
-      const { VRAMOptimizer } = await import('./vram-optimizer.js');
-      const vramOptimizer = new VRAMOptimizer(this.context.config.model.endpoint);
+      const { UnifiedModelClient } = await import('./client.js');
+      const vramOptimizer = new UnifiedModelClient(this.context.config.model.endpoint);
 
       if (options.status) {
         await this.showVRAMStatus(vramOptimizer);
@@ -1476,7 +1479,7 @@ Focus on actionable, specific recommendations with clear business value.`;
   }
 
   private async getProjectContext(file?: string, project?: boolean, mentionedFiles?: string[]): Promise<ProjectContext> {
-    const context: ProjectContext = { files: [] };
+    const context: ProjectContext = { files: [], structure: {}, metadata: {} };
 
     if (file) {
       try {
@@ -2179,8 +2182,8 @@ Focus on actionable, specific recommendations with clear business value.`;
       }
 
       // Import VRAMOptimizer dynamically
-      const { VRAMOptimizer } = await import('./vram-optimizer.js');
-      const vramOptimizer = new VRAMOptimizer(this.context.config.model.endpoint);
+      const { UnifiedModelClient } = await import('./client.js');
+      const vramOptimizer = new UnifiedModelClient(this.context.config.model.endpoint);
 
       switch (vramAction) {
         case 'status':
@@ -2380,7 +2383,7 @@ Focus on actionable, specific recommendations with clear business value.`;
       const response = await this.context.modelClient.generateVoiceResponse(
         testVoice,
         testPrompt,
-        { files: [] }
+        { files: [], structure: {}, metadata: {} }
       );
       
       spinner.succeed('Test completed successfully!');
@@ -2475,7 +2478,7 @@ Focus on actionable, specific recommendations with clear business value.`;
     }
 
     try {
-      const result = await this.context.autonomousAgent.processAutonomously(prompt, { files: [] });
+      const result = await this.context.autonomousAgent.processAutonomously(prompt, { files: [], structure: {}, metadata: {} });
       return result.content;
     } catch (error) {
       logger.error('Autonomous processing failed:', error);
@@ -2676,7 +2679,7 @@ Focus on actionable, specific recommendations with clear business value.`;
       const responses = await this.context.voiceSystem.generateMultiVoiceSolutions(
         prompt,
         voices,
-        { files: [] }
+        { files: [], structure: {}, metadata: {} }
       );
 
       if (responses.length === 0) {
@@ -2712,7 +2715,7 @@ Focus on actionable, specific recommendations with clear business value.`;
       
       const result = await this.context.voiceSystem.executeLivingSpiral(
         prompt,
-        { files: [] },
+        { files: [], structure: {}, metadata: {} },
         spiralConfig
       );
 
@@ -2721,14 +2724,14 @@ Focus on actionable, specific recommendations with clear business value.`;
       console.log(chalk.white(`   Total Iterations: ${result.totalIterations}`));
       console.log(chalk.white(`   Convergence: ${result.convergenceReason}`));
       
-      if (result.lessonsLearned.length > 0) {
-        console.log(chalk.yellow(`   📚 Lessons Learned: ${result.lessonsLearned.length}`));
-        result.lessonsLearned.slice(0, 3).forEach((lesson, i) => {
+      if ((result.lessonsLearned || []).length > 0) {
+        console.log(chalk.yellow(`   📚 Lessons Learned: ${(result.lessonsLearned || []).length}`));
+        (result.lessonsLearned || []).slice(0, 3).forEach((lesson: string, i: number) => {
           console.log(chalk.dim(`      ${i + 1}. ${lesson}`));
         });
       }
 
-      return result.finalOutput;
+      return result.content;
     } catch (error) {
       logger.error('Living Spiral processing failed:', error);
       return `Living Spiral Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -2749,7 +2752,7 @@ Focus on actionable, specific recommendations with clear business value.`;
       const responses = await this.context.voiceSystem.generateMultiVoiceSolutions(
         prompt,
         voices,
-        { files: [] }
+        { files: [], structure: {}, metadata: {} }
       );
 
       if (responses.length === 0) {
@@ -2787,7 +2790,7 @@ Focus on actionable, specific recommendations with clear business value.`;
       const response = await this.context.voiceSystem.generateSingleVoiceResponse(
         prompt,
         'developer',
-        { files: [] }
+        { files: [], structure: {}, metadata: {} }
       );
 
       return response.content;
@@ -2799,11 +2802,11 @@ Focus on actionable, specific recommendations with clear business value.`;
 
   /**
    * Process prompt with standardized response format
-   * Returns AgentResponse or SynthesisResponse objects
+   * Returns ExecutionResponse or SynthesisResponse objects
    */
-  async processPromptWithResponse(prompt: string, options: CLIOptions = {}): Promise<AgentResponse | SynthesisResponse> {
+  async processPromptWithResponse(prompt: string, options: CLIOptions = {}): Promise<ExecutionResponse | SynthesisResponse> {
     if (!this.initialized) {
-      return ResponseFactory.createAgentResponse('', {
+      return ResponseFactory.createExecutionResponse('', {
         confidence: 0
       });
     }
@@ -2827,11 +2830,10 @@ Focus on actionable, specific recommendations with clear business value.`;
     } catch (error) {
       const errorInfo = ResponseFactory.createErrorResponse(
         'PROCESSING_ERROR',
-        error instanceof Error ? error.message : 'Unknown error',
-        error instanceof Error ? error.stack : undefined
+        error instanceof Error ? error.message : 'Unknown error'
       );
       
-      return ResponseFactory.createAgentResponse('', {
+      return ResponseFactory.createExecutionResponse('', {
         confidence: 0
       });
     }
@@ -2840,13 +2842,13 @@ Focus on actionable, specific recommendations with clear business value.`;
   /**
    * Handle agentic mode with standardized response
    */
-  private async handleAgenticModeWithResponse(prompt: string, options: CLIOptions): Promise<AgentResponse> {
+  private async handleAgenticModeWithResponse(prompt: string, options: CLIOptions): Promise<ExecutionResponse> {
     if (!this.context.voiceSystem) {
       const errorInfo = ResponseFactory.createErrorResponse(
         'VOICE_SYSTEM_UNAVAILABLE',
         'Voice system not available'
       );
-      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      const response = ResponseFactory.createExecutionResponse('', { confidence: 0 });
       response.error = errorInfo;
       response.success = false;
       return response;
@@ -2857,21 +2859,21 @@ Focus on actionable, specific recommendations with clear business value.`;
       const voiceResponses = await this.context.voiceSystem.generateMultiVoiceSolutions(
         prompt,
         voices,
-        { files: [] }
+        { files: [], structure: {}, metadata: {} }
       );
 
       if (voiceResponses.length === 0) {
-        return ResponseFactory.createAgentResponse('No response generated', {
+        return ResponseFactory.createExecutionResponse('No response generated', {
           confidence: 0.1,
           reasoning: 'Voice system returned no responses'
         });
       }
 
       const voiceResponse = voiceResponses[0];
-      return ResponseFactory.createAgentResponse(voiceResponse.content, {
+      return ResponseFactory.createExecutionResponse(voiceResponse.content, {
         confidence: voiceResponse.confidence,
         voiceId: voiceResponse.voice,
-        tokensUsed: voiceResponse.tokens_used,
+        tokensUsed: (voiceResponse.tokens_used || 0),
         reasoning: 'Agentic mode processing'
       });
     } catch (error) {
@@ -2880,7 +2882,7 @@ Focus on actionable, specific recommendations with clear business value.`;
         'AGENTIC_MODE_ERROR',
         error instanceof Error ? error.message : 'Unknown error'
       );
-      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      const response = ResponseFactory.createExecutionResponse('', { confidence: 0 });
       response.error = errorInfo;
       response.success = false;
       return response;
@@ -2907,7 +2909,7 @@ Focus on actionable, specific recommendations with clear business value.`;
       const voiceResponses = await this.context.voiceSystem.generateMultiVoiceSolutions(
         prompt,
         voices,
-        { files: [] }
+        { files: [], structure: {}, metadata: {} }
       );
 
       if (voiceResponses.length === 0) {
@@ -2919,10 +2921,10 @@ Focus on actionable, specific recommendations with clear business value.`;
 
       if (voiceResponses.length === 1) {
         const singleResponse = voiceResponses[0];
-        const agentResponse = ResponseFactory.createAgentResponse(singleResponse.content, {
+        const agentResponse = ResponseFactory.createExecutionResponse(singleResponse.content, {
           confidence: singleResponse.confidence,
           voiceId: singleResponse.voice,
-          tokensUsed: singleResponse.tokens_used
+          tokensUsed: (singleResponse.tokens_used || 0)
         });
         
         return ResponseFactory.createSynthesisResponse(
@@ -2943,10 +2945,10 @@ Focus on actionable, specific recommendations with clear business value.`;
       );
 
       const individualResponses = voiceResponses.map(vr => 
-        ResponseFactory.createAgentResponse(vr.content, {
+        ResponseFactory.createExecutionResponse(vr.content, {
           confidence: vr.confidence,
           voiceId: vr.voice,
-          tokensUsed: vr.tokens_used
+          tokensUsed: (vr.tokens_used || 0)
         })
       );
 
@@ -2977,13 +2979,13 @@ Focus on actionable, specific recommendations with clear business value.`;
   /**
    * Handle direct mode with standardized response
    */
-  private async handleDirectModeWithResponse(prompt: string, options: CLIOptions): Promise<AgentResponse> {
+  private async handleDirectModeWithResponse(prompt: string, options: CLIOptions): Promise<ExecutionResponse> {
     if (!this.context.voiceSystem) {
       const errorInfo = ResponseFactory.createErrorResponse(
         'VOICE_SYSTEM_UNAVAILABLE',
         'Voice system not available'
       );
-      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      const response = ResponseFactory.createExecutionResponse('', { confidence: 0 });
       response.error = errorInfo;
       response.success = false;
       return response;
@@ -2994,13 +2996,13 @@ Focus on actionable, specific recommendations with clear business value.`;
       const voiceResponse = await this.context.voiceSystem.generateSingleVoiceResponse(
         prompt,
         'developer',
-        { files: [] }
+        { files: [], structure: {}, metadata: {} }
       );
 
-      return ResponseFactory.createAgentResponse(voiceResponse.content, {
+      return ResponseFactory.createExecutionResponse(voiceResponse.content, {
         confidence: voiceResponse.confidence,
         voiceId: voiceResponse.voice,
-        tokensUsed: voiceResponse.tokens_used,
+        tokensUsed: (voiceResponse.tokens_used || 0),
         reasoning: 'Direct mode processing'
       });
     } catch (error) {
@@ -3009,7 +3011,7 @@ Focus on actionable, specific recommendations with clear business value.`;
         'DIRECT_MODE_ERROR',
         error instanceof Error ? error.message : 'Unknown error'
       );
-      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      const response = ResponseFactory.createExecutionResponse('', { confidence: 0 });
       response.error = errorInfo;
       response.success = false;
       return response;
@@ -3058,7 +3060,7 @@ Focus on actionable, specific recommendations with clear business value.`;
         
         const availableBackends = executionManager.getAvailableBackends();
         
-        availableBackends.forEach(backend => {
+        availableBackends.forEach((backend: string) => {
           console.log(`• ${chalk.green(backend)}`);
           
           switch (backend) {

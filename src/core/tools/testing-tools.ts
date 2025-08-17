@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { join, relative, isAbsolute, dirname, extname } from 'path';
-import { LocalModelClient } from '../local-model-client.js';
+import { UnifiedModelClient } from '../client.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -18,11 +18,11 @@ const GenerateTestSchema = z.object({
 });
 
 export class TestGeneratorTool extends BaseTool {
-  private modelClient: LocalModelClient;
+  private modelClient: UnifiedModelClient;
 
   constructor(
     private agentContext: { workingDirectory: string },
-    modelClient: LocalModelClient
+    modelClient: UnifiedModelClient
   ) {
     super({
       name: 'generateTests',
@@ -56,7 +56,7 @@ export class TestGeneratorTool extends BaseTool {
       );
       
       // Generate tests using AI
-      const generatedTests = await this.modelClient.generate(testPrompt);
+      const generatedTests = await this.modelClient.generateText(testPrompt);
       const cleanTestCode = this.extractCodeFromResponse(generatedTests);
       
       // Ensure test directory exists

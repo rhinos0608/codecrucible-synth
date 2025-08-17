@@ -401,5 +401,5 @@ export async function runEnhancedAnalysis(query: string, options: any = {}): Pro
   });
 
   await agent.initialize();
-  return await agent.analyzeQuery(query, options.context);
+  return await agent.analyzeQuery(query);
 }

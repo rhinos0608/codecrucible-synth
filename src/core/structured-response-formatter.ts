@@ -6,7 +6,7 @@ import cliTable3 from 'cli-table3';
 import boxen from 'boxen';
 import figures from 'figures';
 import logSymbols from 'log-symbols';
-import figlet from 'figlet';
+import * as figlet from 'figlet';
 import { ProjectIndex } from './enhanced-startup-indexer.js';
 
 export interface FormattedSection {
@@ -708,3 +708,38 @@ export function createStructuredResponse(
   
   throw new Error('Either projectIndex or code+language must be provided');
 }
+
+// Legacy CLI output compatibility
+export const cliOutput = {
+  outputError: (message: string, exitCode?: any) => {
+    console.error(message);
+    if (exitCode && typeof exitCode === 'number') {
+      process.exit(exitCode);
+    }
+  }
+};
+
+// Response factory for compatibility
+export const ResponseFactory = {
+  createExecutionResponse: (content: string, metadata: any = {}) => ({
+    success: true,
+    content,
+    timestamp: new Date().toISOString(),
+    ...metadata
+  }),
+  
+  createSynthesisResponse: (content: string, synthesis: any[] = [], metadata: any = {}) => ({
+    success: true,
+    content,
+    synthesis,
+    timestamp: new Date().toISOString(),
+    ...metadata
+  }),
+  
+  createErrorResponse: (message: string, code?: string) => ({
+    success: false,
+    error: message,
+    code,
+    timestamp: new Date().toISOString()
+  })
+};

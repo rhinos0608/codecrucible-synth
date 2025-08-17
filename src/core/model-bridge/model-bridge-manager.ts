@@ -1,8 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '../logger.js';
-import { LMStudioClient } from '../lm-studio-client.js';
-import { LocalModelClient } from '../local-model-client.js';
+import { UnifiedModelClient } from "../client.js";
 
 export interface ModelInfo {
   id: string;

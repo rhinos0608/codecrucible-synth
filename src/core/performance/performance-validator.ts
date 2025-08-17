@@ -1,7 +1,7 @@
 import { logger } from '../logger.js';
-import { HybridModelClient } from '../hybrid-model-client.js';
-import { LocalModelClient } from '../local-model-client.js';
-import { LMStudioClient } from '../lm-studio-client.js';
+import { HybridModelClient } from '../client.js';
+import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../client.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -59,8 +59,8 @@ export interface ResourceMetrics {
  */
 export class PerformanceValidator {
   private hybridClient?: HybridModelClient;
-  private ollamaClient?: LocalModelClient;
-  private lmStudioClient?: LMStudioClient;
+  private ollamaClient?: UnifiedModelClient;
+  private lmStudioClient?: UnifiedModelClient;
   private metrics = new Map<string, number[]>();
   private resourceMetrics: ResourceMetrics[] = [];
 
@@ -602,13 +602,13 @@ export class PerformanceValidator {
         enableLearning: false // Disable learning during benchmarks
       });
 
-      this.ollamaClient = new LocalModelClient({
+      this.ollamaClient = new UnifiedModelClient({
         endpoint: 'http://localhost:11434',
         model: 'codellama:34b',
         timeout: 60000
       });
 
-      this.lmStudioClient = new LMStudioClient({
+      this.lmStudioClient = new UnifiedModelClient({
         endpoint: 'http://localhost:1234',
         timeout: 30000,
         streamingEnabled: true

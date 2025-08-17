@@ -3,7 +3,7 @@ import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import { Task } from '../planning/enhanced-agentic-planner.js';
-import { registerShutdownHandler, createManagedInterval, clearManagedInterval } from '../process-lifecycle-manager.js';
+import { registerShutdownHandler, createManagedInterval, clearManagedInterval } from '../agent.js';
 
 export interface ContextItem {
   key: string;
@@ -74,7 +74,7 @@ export class EnhancedContextManager {
     this.startPeriodicPersistence();
     
     // Register for shutdown
-    registerShutdownHandler(this);
+    registerShutdownHandler(() => this.cleanup());
   }
 
   /**

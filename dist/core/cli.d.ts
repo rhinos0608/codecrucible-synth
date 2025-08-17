@@ -1,12 +1,8 @@
-import { LocalModelClient } from './local-model-client.js';
+import { SynthesisResponse } from './types.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
-import { AutonomousClaudeAgent } from './autonomous-claude-agent.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
-import { AgentOrchestrator } from './agent-orchestrator.js';
-import { MultiLLMProvider } from './multi-llm-provider.js';
-import { RAGSystem } from './rag-system.js';
-import { AgentResponse, SynthesisResponse } from './response-types.js';
+import { ExecutionResponse } from './types.js';
 interface CLIOptions {
     voices?: string | string[];
     depth?: string;
@@ -203,9 +199,9 @@ export declare class CodeCrucibleCLI {
     private handleDirectModeWithReturn;
     /**
      * Process prompt with standardized response format
-     * Returns AgentResponse or SynthesisResponse objects
+     * Returns ExecutionResponse or SynthesisResponse objects
      */
-    processPromptWithResponse(prompt: string, options?: CLIOptions): Promise<AgentResponse | SynthesisResponse>;
+    processPromptWithResponse(prompt: string, options?: CLIOptions): Promise<ExecutionResponse | SynthesisResponse>;
     /**
      * Handle agentic mode with standardized response
      */

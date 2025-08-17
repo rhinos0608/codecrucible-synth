@@ -49,7 +49,7 @@ async function startBackendServer(context, port) {
         try {
             const { prompt, voices, mode } = req.body;
             const voiceList = voices || context.config.voices.default;
-            const responses = await context.voiceSystem.generateMultiVoiceSolutions(prompt, voiceList, { files: [] });
+            const responses = await context.voiceSystem.generateMultiVoiceSolutions(prompt, voiceList, { files: [], structure: {}, metadata: {} });
             const synthesis = await context.voiceSystem.synthesizeVoiceResponses(responses, mode || 'competitive');
             res.json({
                 success: true,
@@ -93,7 +93,7 @@ async function startBackendServer(context, port) {
         console.log(chalk.gray(`🔌 Desktop client connected: ${socket.id}`));
         socket.on('generate_code', async (data) => {
             try {
-                const responses = await context.voiceSystem.generateMultiVoiceSolutions(data.prompt, data.voices || context.config.voices.default, { files: data.context || [] });
+                const responses = await context.voiceSystem.generateMultiVoiceSolutions(data.prompt, data.voices || context.config.voices.default, { files: data.context || [], structure: {}, metadata: {} });
                 const synthesis = await context.voiceSystem.synthesizeVoiceResponses(responses, data.mode || 'competitive');
                 socket.emit('generation_complete', {
                     success: true,

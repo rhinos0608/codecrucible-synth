@@ -1,4 +1,4 @@
-import { LocalModelClient } from '../local-model-client.js';
+import { UnifiedModelClient } from '../client.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { logger } from '../logger.js';
@@ -57,13 +57,13 @@ export interface ExecutionStep {
  * the patterns from the Agentic CLI guide.
  */
 export class EnhancedAgenticPlanner {
-  private modelClient: LocalModelClient;
+  private modelClient: UnifiedModelClient;
   private mcpManager: MCPServerManager;
   private voiceSystem: VoiceArchetypeSystem;
   private context: ExecutionContext;
 
   constructor(
-    modelClient: LocalModelClient,
+    modelClient: UnifiedModelClient,
     mcpManager: MCPServerManager,
     voiceSystem: VoiceArchetypeSystem
   ) {
@@ -129,7 +129,7 @@ Consider security, performance, maintainability, and user experience aspects.`;
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
       analysisPrompt,
       analysisVoices,
-      { files: [] }
+      { files: [], structure: {}, metadata: {} }
     );
 
     const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses, 'collaborative');
@@ -187,7 +187,7 @@ IMPORTANT:
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
       planningPrompt,
       planningVoices,
-      { files: [] }
+      { files: [], structure: {}, metadata: {} }
     );
 
     const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses, 'consensus');
@@ -378,7 +378,7 @@ Provide a JSON response:
 }`;
 
     try {
-      const response = await this.modelClient.generateVoiceResponse(
+      const response = await this.modelClient.generate(
         {
           id: 'analyzer',
           name: 'Analyzer',
@@ -387,7 +387,7 @@ Provide a JSON response:
           style: 'analytical'
         },
         recoveryPrompt,
-        { files: [] }
+        { files: [], structure: {}, metadata: {} }
       );
       
       const recovery = this.extractJsonFromText(response.content);
@@ -473,7 +473,7 @@ Provide a JSON response:
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
       prompt,
       voices || ['developer'],
-      context || { files: [] }
+      context || { files: [], structure: {}, metadata: {} }
     );
     
     return await this.voiceSystem.synthesizeVoiceResponses(responses, mode || 'competitive');

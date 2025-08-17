@@ -1,12 +1,13 @@
-import { BaseSpecializedAgent } from '../base-specialized-agent.js';
-import { BaseAgentConfig, AgentDependencies, BaseAgentOutput } from '../base-agent.js';
+import { UnifiedAgent, AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
+import { UnifiedAgent } from '../agent.js';
+import { AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
 import { BaseTool } from '../tools/base-tool.js';
 import { GitStatusTool, GitDiffTool } from '../tools/git-tools.js';
 import { GitOperationsTool, GitAnalysisTool } from '../tools/enhanced-git-tools.js';
 import { TerminalExecuteTool } from '../tools/terminal-tools.js';
-import { logger } from '../logger.js';
+import { logger } from '../console.js';
 
-export class GitManagerAgent extends BaseSpecializedAgent {
+export class GitManagerAgent extends UnifiedAgent {
   private tools: BaseTool[];
 
   constructor(dependencies: AgentDependencies) {
@@ -69,7 +70,7 @@ You have access to Git-specific tools and terminal commands to maintain reposito
 
   public async processRequest(input: string, streaming?: boolean): Promise<BaseAgentOutput> {
     try {
-      logger.info(`🔀 GitManagerAgent processing: ${input.substring(0, 100)}...`);
+      console.info(`🔀 GitManagerAgent processing: ${input.substring(0, 100)}...`);
 
       // Determine git operation type
       const operation = this.identifyGitOperation(input);
@@ -77,10 +78,10 @@ You have access to Git-specific tools and terminal commands to maintain reposito
       // Execute appropriate git workflow
       const result = await this.executeGitWorkflow(operation, input);
 
-      return new BaseAgentOutput(true, result);
+      return new ExecutionResult(true, result);
     } catch (error) {
-      logger.error('GitManagerAgent error:', error);
-      return new BaseAgentOutput(false, `Git operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('GitManagerAgent error:', error);
+      return new ExecutionResult(false, `Git operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "codecrucible-synth",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "description": "AI-Powered Code Generation & Comprehensive Codebase Analysis Tool with Autonomous Startup and Enhanced Intelligence",
   "main": "dist/index.js",
   "type": "module",
@@ -26,7 +26,6 @@
     "desktop:dev": "npm run build && electron dist/desktop.js",
     "desktop:build": "electron-builder",
     "desktop:package": "npm run build && npm run desktop:build",
-    "prepare": "npm run build",
     "version": "npm run build",
     "postversion": "git push && git push --tags",
     "release": "npm run build && npm run package:all && npm version patch && npm publish",

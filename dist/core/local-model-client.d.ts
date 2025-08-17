@@ -56,6 +56,7 @@ export declare class LocalModelClient {
     private vramOptimizer;
     private currentOptimization;
     private modelPreloader;
+    private performanceOptimizer;
     constructor(config: LocalModelConfig);
     /**
      * Calculate adaptive timeout based on system performance and model characteristics

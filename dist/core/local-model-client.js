@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { timeoutManager } from './timeout-manager.js';
 import { logger } from './logger.js';
+import { PerformanceOptimizer } from './performance/performance-optimizer.js';
 import { EnhancedModelManager } from './enhanced-model-manager.js';
 import { AutonomousErrorHandler } from './autonomous-error-handler.js';
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
@@ -27,6 +28,7 @@ export class LocalModelClient {
     vramOptimizer; // VRAM optimization for large models
     currentOptimization = null; // Current model optimization
     modelPreloader; // Advanced model preloading system
+    performanceOptimizer; // System-wide performance optimization
     constructor(config) {
         this.config = config;
         this.modelManager = new EnhancedModelManager(config.endpoint);
@@ -34,6 +36,15 @@ export class LocalModelClient {
         this.modelSelector = new IntelligentModelSelector(config.endpoint);
         this.vramOptimizer = new VRAMOptimizer(config.endpoint);
         // this.gpuOptimizer = new GPUOptimizer(); // Disabled to prevent model downloads
+        // Initialize performance optimizer for system-wide optimization
+        this.performanceOptimizer = new PerformanceOptimizer({
+            enableCaching: true,
+            enableBatching: true,
+            enableStreaming: true,
+            temperature: config.temperature,
+            maxTokensPerPrompt: config.maxTokens,
+            cacheMaxAge: 3600000 // 1 hour cache
+        });
         // Initialize advanced model preloader
         this.modelPreloader = new ModelPreloader({
             endpoint: config.endpoint,

@@ -100,7 +100,7 @@ export class FastModeClient extends EventEmitter {
     const configs = [{
       type: 'local_process' as const,
       localSafeguards: true,
-      allowedCommands: ['echo', 'ls', 'pwd', 'node', 'npm', 'bash', 'sh', 'git']
+      allowedCommands: ['echo', 'ls', 'pwd', 'node', 'npm', 'bash', 'sh', 'git', 'find', 'grep', 'wc', 'head', 'tail', 'cat', 'tree', 'du', 'cd']
     }];
 
     this.executionManager = new ExecutionManager(configs);
@@ -148,9 +148,14 @@ export class FastModeClient extends EventEmitter {
     explanation: string;
     suggestions: string[];
   } {
-    // Template-based code generation for immediate response
     const promptLower = prompt.toLowerCase();
 
+    // Check for audit/analysis requests
+    if (promptLower.includes('audit') || promptLower.includes('analyze')) {
+      return this.generateAuditTemplate(prompt);
+    }
+
+    // Check for specific code types
     if (promptLower.includes('react') && promptLower.includes('component')) {
       return this.generateReactComponentTemplate(prompt);
     }
@@ -163,16 +168,18 @@ export class FastModeClient extends EventEmitter {
       return this.generateClassTemplate(prompt);
     }
 
-    // Generic template
-    return {
-      code: this.generateGenericTemplate(prompt),
-      explanation: `Generated template-based response for: ${prompt}`,
-      suggestions: [
-        'Consider adding error handling',
-        'Add type annotations if using TypeScript',
-        'Include unit tests for this code'
-      ]
-    };
+    // Check for documentation requests
+    if (promptLower.includes('document') || promptLower.includes('readme')) {
+      return this.generateDocumentationTemplate(prompt);
+    }
+
+    // Check for test requests
+    if (promptLower.includes('test') || promptLower.includes('spec')) {
+      return this.generateTestTemplate(prompt);
+    }
+
+    // Generic intelligent response
+    return this.generateIntelligentResponse(prompt, context);
   }
 
   private generateReactComponentTemplate(prompt: string): {
@@ -296,6 +303,504 @@ const implementation = () => {
 };
 
 export default implementation;`;
+  }
+
+  private generateAuditTemplate(prompt: string): {
+    code: string;
+    explanation: string;
+    suggestions: string[];
+  } {
+    const auditScript = `#!/bin/bash
+# Codebase Audit Script - Generated from: ${prompt}
+
+echo "🔍 CodeCrucible Codebase Audit Report"
+echo "======================================"
+echo ""
+
+echo "📁 Project Structure:"
+find . -type d -name node_modules -prune -o -type d -print | head -15
+
+echo ""
+echo "📊 File Statistics:"
+echo "TypeScript files: $(find . -name '*.ts' | wc -l)"
+echo "JavaScript files: $(find . -name '*.js' | wc -l)" 
+echo "JSON config files: $(find . -name '*.json' | wc -l)"
+echo "Test files: $(find . -name '*.test.*' -o -name '*.spec.*' | wc -l)"
+
+echo ""
+echo "🔧 Key Configuration Files:"
+ls -la package.json tsconfig.json README.md 2>/dev/null | grep -v "cannot access"
+
+echo ""
+echo "📝 Recent Git Activity:"
+git log --oneline -5 2>/dev/null || echo "Not a git repository"
+
+echo ""
+echo "🚨 Potential Issues:"
+echo "Large files: $(find . -size +1M -type f | head -5)"
+echo "Node modules size: $(du -sh node_modules 2>/dev/null || echo 'No node_modules')"
+
+echo ""
+echo "✅ Audit Complete"`;
+
+    return {
+      code: auditScript,
+      explanation: 'Generated comprehensive codebase audit script that analyzes project structure, file statistics, configuration, and potential issues',
+      suggestions: [
+        'Run this script to get detailed project insights',
+        'Review large files and optimize if necessary',
+        'Check test coverage percentage',
+        'Ensure all configuration files are properly set up'
+      ]
+    };
+  }
+
+  private generateDocumentationTemplate(prompt: string): {
+    code: string;
+    explanation: string;
+    suggestions: string[];
+  } {
+    const readmeTemplate = `# ${this.extractProjectName(prompt) || 'Project Name'}
+
+## Overview
+Brief description of what this project does and its main purpose.
+
+## Features
+- Feature 1: Description
+- Feature 2: Description  
+- Feature 3: Description
+
+## Installation
+
+\`\`\`bash
+# Clone the repository
+git clone <repository-url>
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+\`\`\`
+
+## Usage
+
+\`\`\`bash
+# Run the application
+npm start
+
+# Run tests
+npm test
+
+# Run in development mode
+npm run dev
+\`\`\`
+
+## Configuration
+Description of configuration options and environment variables.
+
+## API Documentation
+If applicable, document your API endpoints here.
+
+## Contributing
+Guidelines for contributing to the project.
+
+## License
+Specify the license under which this project is released.
+`;
+
+    return {
+      code: readmeTemplate,
+      explanation: 'Generated comprehensive README.md template with standard sections for project documentation',
+      suggestions: [
+        'Customize the project name and description',
+        'Add specific installation instructions for your project',
+        'Include actual feature descriptions',
+        'Add screenshots or examples if applicable'
+      ]
+    };
+  }
+
+  private generateTestTemplate(prompt: string): {
+    code: string;
+    explanation: string;
+    suggestions: string[];
+  } {
+    const testTemplate = `import { describe, it, expect, beforeEach, afterEach } from 'jest';
+// Import the module/function you want to test
+// import { functionToTest } from '../src/module';
+
+describe('${this.extractTestSubject(prompt) || 'Test Suite'}', () => {
+  beforeEach(() => {
+    // Setup before each test
+  });
+
+  afterEach(() => {
+    // Cleanup after each test
+  });
+
+  describe('when testing basic functionality', () => {
+    it('should handle valid input correctly', () => {
+      // Arrange
+      const input = 'test input';
+      const expected = 'expected output';
+
+      // Act
+      const result = functionToTest(input);
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+
+    it('should handle edge cases', () => {
+      // Test edge cases like null, undefined, empty values
+      expect(() => functionToTest(null)).toThrow();
+      expect(functionToTest('')).toBe('');
+    });
+  });
+
+  describe('when testing error conditions', () => {
+    it('should throw error for invalid input', () => {
+      expect(() => functionToTest('invalid')).toThrow('Expected error message');
+    });
+  });
+});`;
+
+    return {
+      code: testTemplate,
+      explanation: 'Generated comprehensive Jest test template with setup, teardown, and organized test cases',
+      suggestions: [
+        'Replace functionToTest with your actual function',
+        'Add more specific test cases for your use case',
+        'Include integration tests if needed',
+        'Consider using test data builders for complex objects'
+      ]
+    };
+  }
+
+  private generateIntelligentResponse(prompt: string, context: string[]): {
+    code: string;
+    explanation: string;
+    suggestions: string[];
+  } {
+    // Analyze the prompt for intent
+    const promptLower = prompt.toLowerCase();
+    
+    if (promptLower.includes('api') || promptLower.includes('endpoint')) {
+      return this.generateAPITemplate(prompt);
+    }
+    
+    if (promptLower.includes('config') || promptLower.includes('setup')) {
+      return this.generateConfigTemplate(prompt);
+    }
+    
+    if (promptLower.includes('database') || promptLower.includes('model')) {
+      return this.generateDatabaseTemplate(prompt);
+    }
+
+    // Default intelligent response
+    const genericCode = `// Generated template for: ${prompt}
+// This appears to be a ${this.classifyPromptType(prompt)} request
+
+/**
+ * TODO: Implement the requested functionality
+ * 
+ * Prompt analysis suggests this involves:
+ * ${this.analyzePromptRequirements(prompt).map(req => `* ${req}`).join('\n * ')}
+ */
+
+const implementation = {
+  // Add your implementation here
+  
+  // Example structure based on the request:
+  ${this.generateStructureSuggestion(prompt)}
+};
+
+export default implementation;`;
+
+    return {
+      code: genericCode,
+      explanation: `Intelligent analysis of "${prompt}" suggests this is a ${this.classifyPromptType(prompt)} request. Generated structured template with analysis.`,
+      suggestions: this.generateContextualSuggestions(prompt)
+    };
+  }
+
+  private extractProjectName(prompt: string): string | null {
+    const match = prompt.match(/(?:project|app|application)\s+(?:called|named|for)?\s*([A-Za-z][A-Za-z0-9\-_]*)/i);
+    return match ? match[1] : null;
+  }
+
+  private extractTestSubject(prompt: string): string | null {
+    const match = prompt.match(/test\s+(?:for\s+)?([A-Za-z][A-Za-z0-9]*)/i);
+    return match ? match[1] : null;
+  }
+
+  private generateAPITemplate(prompt: string): {
+    code: string;
+    explanation: string;
+    suggestions: string[];
+  } {
+    const apiCode = `import express from 'express';
+import { Request, Response } from 'express';
+
+const router = express.Router();
+
+// Generated API endpoint for: ${prompt}
+router.get('/api/endpoint', async (req: Request, res: Response) => {
+  try {
+    // Implement your logic here
+    const result = await processRequest(req.query);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+async function processRequest(query: any) {
+  // Implementation logic
+  return { message: 'Success' };
+}
+
+export default router;`;
+
+    return {
+      code: apiCode,
+      explanation: 'Generated Express.js API endpoint template with error handling and TypeScript types',
+      suggestions: [
+        'Add input validation middleware',
+        'Implement proper authentication if needed',
+        'Add request logging and monitoring',
+        'Consider rate limiting for production'
+      ]
+    };
+  }
+
+  private generateConfigTemplate(prompt: string): {
+    code: string;
+    explanation: string;
+    suggestions: string[];
+  } {
+    const configCode = `// Configuration for: ${prompt}
+export interface AppConfig {
+  // Environment settings
+  NODE_ENV: 'development' | 'production' | 'test';
+  PORT: number;
+  
+  // Database configuration
+  database: {
+    host: string;
+    port: number;
+    name: string;
+    username: string;
+    password: string;
+  };
+  
+  // API settings
+  api: {
+    baseUrl: string;
+    timeout: number;
+    retries: number;
+  };
+  
+  // Feature flags
+  features: {
+    enableFeatureX: boolean;
+    enableLogging: boolean;
+  };
+}
+
+const config: AppConfig = {
+  NODE_ENV: (process.env.NODE_ENV as any) || 'development',
+  PORT: parseInt(process.env.PORT || '3000'),
+  
+  database: {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    name: process.env.DB_NAME || 'myapp',
+    username: process.env.DB_USER || 'user',
+    password: process.env.DB_PASS || 'password'
+  },
+  
+  api: {
+    baseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+    timeout: 30000,
+    retries: 3
+  },
+  
+  features: {
+    enableFeatureX: process.env.ENABLE_FEATURE_X === 'true',
+    enableLogging: process.env.ENABLE_LOGGING !== 'false'
+  }
+};
+
+export default config;`;
+
+    return {
+      code: configCode,
+      explanation: 'Generated TypeScript configuration template with environment variables and type safety',
+      suggestions: [
+        'Create a .env file with your environment variables',
+        'Add validation for required configuration values',
+        'Consider using a configuration library like dotenv',
+        'Add different configs for different environments'
+      ]
+    };
+  }
+
+  private generateDatabaseTemplate(prompt: string): {
+    code: string;
+    explanation: string;
+    suggestions: string[];
+  } {
+    const dbCode = `// Database model for: ${prompt}
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+
+@Entity()
+export class ${this.toPascalCase(this.extractModelName(prompt) || 'Model')} {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  name: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ type: 'boolean', default: true })
+  isActive: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
+// Repository class for database operations
+export class ${this.toPascalCase(this.extractModelName(prompt) || 'Model')}Repository {
+  
+  async findAll(): Promise<${this.toPascalCase(this.extractModelName(prompt) || 'Model')}[]> {
+    // Implementation
+    return [];
+  }
+
+  async findById(id: number): Promise<${this.toPascalCase(this.extractModelName(prompt) || 'Model')} | null> {
+    // Implementation
+    return null;
+  }
+
+  async create(data: Partial<${this.toPascalCase(this.extractModelName(prompt) || 'Model')}>): Promise<${this.toPascalCase(this.extractModelName(prompt) || 'Model')}> {
+    // Implementation
+    return {} as ${this.toPascalCase(this.extractModelName(prompt) || 'Model')};
+  }
+
+  async update(id: number, data: Partial<${this.toPascalCase(this.extractModelName(prompt) || 'Model')}>): Promise<${this.toPascalCase(this.extractModelName(prompt) || 'Model')} | null> {
+    // Implementation  
+    return null;
+  }
+
+  async delete(id: number): Promise<boolean> {
+    // Implementation
+    return true;
+  }
+}`;
+
+    return {
+      code: dbCode,
+      explanation: 'Generated TypeORM entity and repository pattern with CRUD operations',
+      suggestions: [
+        'Customize the entity fields for your specific use case',
+        'Add relationships to other entities if needed',
+        'Implement validation decorators',
+        'Add indexes for performance optimization'
+      ]
+    };
+  }
+
+  private extractModelName(prompt: string): string | null {
+    const match = prompt.match(/(?:model|entity|table)\s+(?:for\s+)?([A-Za-z][A-Za-z0-9]*)/i);
+    return match ? match[1] : null;
+  }
+
+  private classifyPromptType(prompt: string): string {
+    const promptLower = prompt.toLowerCase();
+    
+    if (promptLower.includes('api') || promptLower.includes('endpoint')) return 'API development';
+    if (promptLower.includes('database') || promptLower.includes('model')) return 'database modeling';
+    if (promptLower.includes('test')) return 'testing';
+    if (promptLower.includes('config')) return 'configuration';
+    if (promptLower.includes('component')) return 'UI component';
+    if (promptLower.includes('function')) return 'utility function';
+    if (promptLower.includes('class')) return 'class definition';
+    if (promptLower.includes('audit') || promptLower.includes('analyze')) return 'code analysis';
+    
+    return 'general development';
+  }
+
+  private analyzePromptRequirements(prompt: string): string[] {
+    const requirements = [];
+    const promptLower = prompt.toLowerCase();
+    
+    if (promptLower.includes('error')) requirements.push('Error handling');
+    if (promptLower.includes('async') || promptLower.includes('await')) requirements.push('Asynchronous operations');
+    if (promptLower.includes('type') || promptLower.includes('interface')) requirements.push('Type definitions');
+    if (promptLower.includes('test')) requirements.push('Unit testing');
+    if (promptLower.includes('valid')) requirements.push('Input validation');
+    if (promptLower.includes('secure')) requirements.push('Security considerations');
+    if (promptLower.includes('perform')) requirements.push('Performance optimization');
+    
+    return requirements.length > 0 ? requirements : ['Basic implementation', 'Error handling', 'Type safety'];
+  }
+
+  private generateStructureSuggestion(prompt: string): string {
+    const promptLower = prompt.toLowerCase();
+    
+    if (promptLower.includes('function')) {
+      return `process: (input: any) => any,\n  validate: (input: any) => boolean,\n  handleError: (error: Error) => void`;
+    }
+    
+    if (promptLower.includes('class')) {
+      return `constructor: () => void,\n  publicMethod: () => any,\n  privateMethod: () => any`;
+    }
+    
+    if (promptLower.includes('api')) {
+      return `endpoint: '/api/resource',\n  method: 'GET | POST | PUT | DELETE',\n  handler: async (req, res) => {}`;
+    }
+    
+    return `init: () => void,\n  process: (data: any) => any,\n  cleanup: () => void`;
+  }
+
+  private generateContextualSuggestions(prompt: string): string[] {
+    const suggestions = [
+      'Consider adding comprehensive error handling',
+      'Add type annotations for better code safety',
+      'Include unit tests for reliability'
+    ];
+    
+    const promptLower = prompt.toLowerCase();
+    
+    if (promptLower.includes('async')) {
+      suggestions.push('Handle promise rejections properly');
+    }
+    
+    if (promptLower.includes('api')) {
+      suggestions.push('Add input validation and sanitization');
+      suggestions.push('Implement proper HTTP status codes');
+    }
+    
+    if (promptLower.includes('database')) {
+      suggestions.push('Consider database migrations');
+      suggestions.push('Add proper indexing for performance');
+    }
+    
+    return suggestions;
   }
 
   private extractComponentName(prompt: string): string | null {

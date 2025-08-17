@@ -1,6 +1,6 @@
 {
   "name": "codecrucible-synth",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Revolutionary AI coding assistant with 99% performance optimization, fast mode for instant responses, and full autonomous agent capabilities",
   "main": "dist/index.js",
   "type": "module",

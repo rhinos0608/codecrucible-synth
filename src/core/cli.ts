@@ -2537,19 +2537,51 @@ Focus on actionable, specific recommendations with clear business value.`;
   }
 
   private extractCommandFromPrompt(prompt: string): string | null {
-    // Simple command extraction patterns
+    // Smart command extraction patterns
     const patterns = [
-      /(?:run|execute)\s+["']?([^"']+)["']?/i,
-      /command[:\s]+["']?([^"']+)["']?/i,
+      // Direct command patterns
+      /(?:run|execute)\s+(?:an?\s+)?(.+)/i,
+      /command[:\s]+(.+)/i,
+      
+      // Specific tool patterns
       /(npm\s+[^.]+)/i,
       /(git\s+[^.]+)/i,
-      /(node\s+[^.]+)/i
+      /(node\s+[^.]+)/i,
+      /(ls\s+[^.]*)/i,
+      /(pwd)/i,
+      /(cd\s+[^.]+)/i,
+      /(grep\s+[^.]+)/i,
+      /(find\s+[^.]+)/i,
+      
+      // Analysis patterns that translate to commands
+      /audit.*(?:this\s+)?codebase/i,
+      /analyze.*(?:this\s+)?(?:project|codebase|code)/i,
+      /check.*(?:project|codebase)/i,
+      /scan.*(?:for|this)/i,
+      /list.*files/i,
+      /show.*(?:files|structure)/i
     ];
 
     for (const pattern of patterns) {
       const match = prompt.match(pattern);
       if (match) {
-        return match[1].trim();
+        let command = match[1]?.trim() || match[0].trim();
+        
+        // Smart translations for common requests
+        if (/audit.*codebase/i.test(prompt)) {
+          return 'find . -name "*.ts" -o -name "*.js" -o -name "*.json" | head -20';
+        }
+        if (/analyze.*(?:project|codebase)/i.test(prompt)) {
+          return 'ls -la && echo "TypeScript files:" && find . -name "*.ts" | wc -l && echo "JavaScript files:" && find . -name "*.js" | wc -l';
+        }
+        if (/list.*files/i.test(prompt)) {
+          return 'find . -type f -name "*.ts" -o -name "*.js" | head -15';
+        }
+        if (/show.*structure/i.test(prompt)) {
+          return 'tree -I node_modules || find . -type d | head -10';
+        }
+        
+        return command;
       }
     }
 

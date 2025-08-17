@@ -50,7 +50,7 @@ function logWarning(message) {
 async function checkAutoSetup() {
   try {
     // Check if auto-setup is needed
-    const setupPath = join(__dirname, '../dist/core/auto-setup.js');
+    const setupPath = join(__dirname, '../core/auto-setup.js');
     const setupUrl = new URL(`file:///${setupPath.replace(/\\/g, '/')}`);
     const setupModule = await import(setupUrl);
     const autoSetup = setupModule.autoSetup;
@@ -89,9 +89,9 @@ async function checkAutoSetup() {
 async function findMainEntry() {
   // Try different possible locations for the main entry
   const possiblePaths = [
-    join(__dirname, '../dist/index.js'),
+    join(__dirname, '../index.js'),
     join(__dirname, '../src/index.ts'),
-    join(__dirname, '../dist/cli.js'),
+    join(__dirname, '../cli.js'),
     join(__dirname, '../build/index.js')
   ];
   
@@ -113,7 +113,7 @@ async function findMainEntry() {
       logSuccess('Build completed successfully');
       
       // Check again for dist files
-      const distPath = join(__dirname, '../dist/index.js');
+      const distPath = join(__dirname, '../index.js');
       if (existsSync(distPath)) {
         return distPath;
       }

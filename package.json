@@ -119,12 +119,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rhinos0608/codecrucibe-synth.git"
+    "url": "git+https://github.com/rhinos0608/codecrucible-synth.git"
   },
   "bugs": {
-    "url": "https://github.com/rhinos0608/codecrucibe-synth/issues"
+    "url": "https://github.com/rhinos0608/codecrucible-synth/issues"
   },
-  "homepage": "https://github.com/rhinos0608/codecrucibe-synth#readme",
+  "homepage": "https://github.com/rhinos0608/codecrucible-synth#readme",
   "build": {
     "appId": "com.codecrucible.synth",
     "productName": "CodeCrucible Synth",

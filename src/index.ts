@@ -443,11 +443,11 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Main function for bin entry point
-export // Quick start mode for simple requests
+// Quick start mode for simple requests
 const QUICK_START_MODE = process.env.QUICK_START === 'true';
 
-async function main() {
+// Main function for bin entry point
+export async function main() {
   // Skip heavy initialization in quick start mode
   if (QUICK_START_MODE) {
     console.log('🚀 Quick start mode enabled');

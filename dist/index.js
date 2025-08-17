@@ -396,10 +396,10 @@ process.on('SIGINT', () => {
     console.log(chalk.yellow('\n👋 Shutting down CodeCrucible Synth...'));
     process.exit(0);
 });
+// Quick start mode for simple requests
+const QUICK_START_MODE = process.env.QUICK_START === 'true';
 // Main function for bin entry point
-export // Quick start mode for simple requests
- const QUICK_START_MODE = process.env.QUICK_START === 'true';
-async function main() {
+export async function main() {
     // Skip heavy initialization in quick start mode
     if (QUICK_START_MODE) {
         console.log('🚀 Quick start mode enabled');

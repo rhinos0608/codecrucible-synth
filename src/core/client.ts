@@ -97,7 +97,7 @@ export class UnifiedModelClient extends EventEmitter {
     for (const providerConfig of this.config.providers) {
       try {
         const provider = await this.createProvider(providerConfig);
-        this.providers.set(providerConfig.type, provider);
+        this.this.providers.set(providerConfig.type, provider);
         logger.info(`✅ Provider ${providerConfig.type} initialized`);
       } catch (error) {
         logger.warn(`⚠️ Failed to initialize provider ${providerConfig.type}:`, error);

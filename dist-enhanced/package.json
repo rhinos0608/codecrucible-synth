@@ -1,0 +1,41 @@
+{
+  "name": "codecrucible-synth",
+  "version": "3.4.0",
+  "description": "AI-Powered Code Generation & Comprehensive Codebase Analysis Tool",
+  "type": "module",
+  "bin": {
+    "codecrucible": "./cli.js",
+    "cc": "./cli.js"
+  },
+  "main": "./index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "inquirer": "^9.2.0",
+    "figlet": "^1.7.0",
+    "express": "^4.18.0",
+    "socket.io": "^4.7.0",
+    "commander": "^11.0.0",
+    "ora": "^7.0.0"
+  },
+  "keywords": [
+    "ai",
+    "code-generation",
+    "analysis",
+    "typescript",
+    "javascript",
+    "ollama",
+    "local-ai",
+    "codebase-analysis",
+    "autonomous-startup",
+    "voice-archetypes"
+  ],
+  "author": "CodeCrucible Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rhinos0608/codecrucible-synth.git"
+  }
+}

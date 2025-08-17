@@ -201,7 +201,7 @@ export class UnifiedAgent extends EventEmitter {
 
       // Complete workflow
       workflow.status = 'completed';
-      workflow.endTime = Date.now();
+      workflow.endTime = new Date();
       workflow.results = results;
 
       const response: ExecutionResponse = {
@@ -225,7 +225,7 @@ export class UnifiedAgent extends EventEmitter {
       const workflow = this.activeWorkflows.get(workflowId);
       if (workflow) {
         workflow.status = 'failed';
-        workflow.endTime = Date.now();
+        workflow.endTime = new Date();
         workflow.error = error instanceof Error ? error.message : String(error);
       }
 

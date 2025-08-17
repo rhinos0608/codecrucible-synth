@@ -1,22 +1,42 @@
-export interface SynthesisResult {
-    content: string;
-    archetype: string;
-    confidence: number;
-}
-export interface IterativeResult {
-    iterations: Array<{
-        content: string;
-        feedback: string;
-        improvement: number;
-    }>;
-    final: string;
-    convergence: boolean;
-}
 export declare class VoiceArchetypeSystem {
-    private archetypes;
-    constructor(config?: any);
-    synthesize(prompt: string, archetype?: string): Promise<SynthesisResult>;
-    iterativeSynthesis(prompt: string, iterations?: number): Promise<IterativeResult>;
-    getAvailableArchetypes(): string[];
+    private voices;
+    constructor();
+    private initializeVoices;
+    getVoice(name: string): any;
+    getAvailableVoices(): string[];
+    generateSingleVoiceResponse(voice: string, prompt: string, client: any): Promise<any>;
+    generateMultiVoiceSolutions(voices: string[], prompt: string, client: any): Promise<any[]>;
+    synthesizeVoiceResponses(responses: any[]): Promise<{
+        content: string;
+        voicesUsed: any[];
+        qualityScore: number;
+    }>;
+    generateIterativeCodeImprovement(prompt: string, client: any, config?: any): Promise<{
+        content: string;
+        iterations: {
+            content: string;
+            feedback: any;
+            improvement: number;
+        }[];
+        writerVoice: any;
+        auditorVoice: any;
+        totalIterations: any;
+        finalQualityScore: number;
+        converged: boolean;
+        finalCode: string;
+    }>;
+    executeLivingSpiral(prompt: string, client: any, config?: any): Promise<{
+        content: string;
+        iterations: {
+            content: string;
+            feedback: any;
+            improvement: number;
+        }[];
+        writerVoice: any;
+        auditorVoice: any;
+        totalIterations: any;
+        finalQualityScore: number;
+        converged: boolean;
+        finalCode: string;
+    }>;
 }
-export default VoiceArchetypeSystem;

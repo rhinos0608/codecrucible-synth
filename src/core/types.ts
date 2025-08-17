@@ -1,278 +1,259 @@
-// Essential Types for CodeCrucible System
-// Core configuration and client types
+
+// Core Type Definitions for CodeCrucible Synth
 export interface UnifiedClientConfig {
-  endpoint?: string;
-  apiKey?: string;
-  model?: string;
-  timeout?: number;
-  maxTokens?: number;
-  temperature?: number;
-  providers?: string[];
+  endpoint: string;
+  providers: Array<{
+    type: 'ollama' | 'lm-studio' | 'huggingface';
+    endpoint: string;
+    models?: string[];
+  }>;
   defaultModel?: string;
-  skipModelPreload?: boolean;
+  executionMode: 'auto' | 'fast' | 'quality';
+  fallbackChain: Array<'ollama' | 'lm-studio' | 'huggingface'>;
+  performanceThresholds: {
+    maxLatency: number;
+    minQuality: number;
+  };
+  security: {
+    enableValidation: boolean;
+    maxTokens: number;
+  };
 }
 
 export interface ModelRequest {
   prompt: string;
   model?: string;
+  temperature?: number;
+  maxTokens?: number;
   stream?: boolean;
-  options?: {
-    temperature?: number;
-    max_tokens?: number;
-    top_p?: number;
-  };
 }
 
 export interface ModelResponse {
   content: string;
   model: string;
-  done: boolean;
-  total_duration?: number;
-  load_duration?: number;
-  prompt_eval_count?: number;
-  eval_count?: number;
+  provider: string;
+  metadata: {
+    tokens: number;
+    latency: number;
+    quality?: number;
+  };
 }
 
 export interface ProjectContext {
   workingDirectory: string;
+  config: any;
   files: Array<{
     path: string;
     content: string;
     type: string;
+    language?: string;
   }>;
-  config: AppConfig;
-  metadata?: Record<string, any>;
+  structure?: {
+    directories: string[];
+    fileTypes: Record<string, number>;
+  };
 }
 
 export interface AppConfig {
-  model: {
+  llm: {
+    provider: string;
+    model: string;
     endpoint: string;
-    name: string;
-    timeout: number;
-    maxTokens: number;
-    temperature: number;
-    providers?: string[];
   };
-  autonomous?: {
-    enableStartupAnalysis?: boolean;
+  features: {
+    voiceArchetypes: boolean;
+    agenticMode: boolean;
   };
 }
 
-export interface ClientConfig {
-  endpoint: string;
-  timeout?: number;
-  maxRetries?: number;
-}
-
-// Agent and execution types
 export interface AgentConfig {
-  enabled: boolean;
-  mode: "auto" | "fast" | "balanced" | "thorough";
-  maxConcurrency: number;
-  enableCaching: boolean;
-  enableMetrics: boolean;
-  enableSecurity: boolean;
-}
-
-export interface AgentContext {
-  modelClient: any;
-  workingDirectory: string;
-  config: AgentConfig;
+  voices: string[];
+  maxIterations: number;
+  qualityThreshold: number;
 }
 
 export interface ExecutionResult {
   success: boolean;
-  data?: any;
-  error?: string;
-  metadata?: Record<string, any>;
-  taskId?: string;
-  executionTime?: number;
-}
-
-export interface ExecutionRequest {
-  prompt: string;
-  context?: Record<string, any>;
-  options?: Record<string, any>;
-}
-
-export interface ExecutionResponse {
   content: string;
-  success: boolean;
-  metadata?: Record<string, any>;
-}
-
-export enum ExecutionMode {
-  AUTO = "auto",
-  FAST = "fast",
-  BALANCED = "balanced",
-  THOROUGH = "thorough"
-}
-
-export interface Task {
-  id: string;
-  type: string;
-  description: string;
-  priority: number;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  metadata?: Record<string, any>;
-}
-
-export interface Workflow {
-  id: string;
-  name: string;
-  tasks: Task[];
-  status: 'pending' | 'running' | 'completed' | 'failed';
-}
-
-export interface AgentDependencies {
-  context: AgentContext;
-  workingDirectory: string;
-}
-
-export interface VoiceEnabledConfig extends AgentConfig {
-  voice?: {
-    enabled: boolean;
-    archetype: string;
+  metadata: {
+    model: string;
+    tokens: number;
+    latency: number;
   };
-}
-
-export interface BaseAgentConfig {
-  name: string;
-  type: string;
-  enabled: boolean;
-}
-
-export interface BaseAgentOutput {
-  content: string;
-  metadata?: Record<string, any>;
-  success: boolean;
-}
-
-// CLI and response types
-export interface SpiralConfig {
-  maxIterations: number;
-  convergenceThreshold: number;
-  adaptiveLearning: boolean;
+  output?: string;
 }
 
 export interface SynthesisResponse {
-  content: string;
-  metadata: Record<string, any>;
-  confidence: number;
+  code: string;
+  reasoning: string;
+  quality: number;
 }
 
+// Security Types
+export interface SecurityValidation {
+  isValid: boolean;
+  reason?: string;
+  sanitizedInput?: string;
+  riskLevel?: 'low' | 'medium' | 'high';
+}
+
+export interface SecurityError extends Error {
+  code: string;
+  risk: string;
+}
+
+// CLI Types
 export interface CLIError extends Error {
+  code: string;
   exitCode: number;
 }
 
 export enum CLIExitCode {
   SUCCESS = 0,
-  ERROR = 1,
+  GENERAL_ERROR = 1,
   INVALID_ARGS = 2,
-  MODEL_ERROR = 3,
-  FILE_ERROR = 4
+  CONFIG_ERROR = 3,
+  NETWORK_ERROR = 4
 }
 
-// Security types
-export interface SecurityValidation {
-  isValid: boolean;
-  issues: string[];
-  score: number;
+// Agent Types
+export interface Task {
+  id: string;
+  type: string;
+  description: string;
+  capability?: string;
+  input?: string;
 }
 
-export interface SecurityError extends Error {
-  code: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+export interface Workflow {
+  id: string;
+  tasks: Task[];
+  startTime: Date;
+  endTime?: Date;
+  results?: any;
+  error?: string;
+  request?: any;
 }
 
-// Performance types
-export interface PerformanceMetrics {
-  duration: number;
-  tokenCount: number;
-  memoryUsage: number;
-  requestCount: number;
+export interface ExecutionRequest {
+  type: string;
+  input: string;
+  mode?: string;
 }
 
-export interface ProviderMetrics {
-  totalRequests: number;
-  successRate: number;
-  averageLatency: number;
-  errorCount: number;
+export interface ExecutionResponse {
+  success: boolean;
+  result: any;
+  workflowId?: string;
+  executionTime?: number;
 }
 
-// Legacy compatibility types
-export interface ModelClient {
-  generate(prompt: string): Promise<string>;
-  checkStatus(): Promise<boolean>;
-}
-
-export interface LocalModelClient extends ModelClient {
-  endpoint: string;
-  timeout: number;
-}
-
-export interface FastModeClient {
-  generateFast(prompt: string): Promise<string>;
-}
-
-export interface AgentOrchestrator {
-  processRequest(request: string): Promise<ExecutionResult>;
-}
-
-export interface AutonomousClaudeAgent {
-  process(input: string): Promise<any>;
-}
-
-export interface MultiLLMProvider {
-  getProviders(): string[];
-  selectBest(): Promise<string>;
-}
-
-export interface RAGSystem {
-  search(query: string): Promise<any[]>;
-}
-
-export interface ClaudeCodeInspiredReasoning {
-  analyze(input: string): Promise<any>;
-}
-
-// Voice system types
-export interface SynthesisResult {
-  content: string;
-  archetype: string;
-  confidence: number;
+// Voice Archetype Types
+export interface VoiceConfig {
+  name: string;
+  prompt: string;
+  temperature: number;
+  model: string;
 }
 
 export interface IterativeResult {
+  content: string;
   iterations: Array<{
     content: string;
     feedback: string;
     improvement: number;
+    iteration?: number;
+    qualityScore?: number;
+    diff?: any;
+    code?: string;
+    auditFeedback?: string;
   }>;
-  final: string;
-  convergence: boolean;
+  finalCode?: string;
+  writerVoice?: string;
+  auditorVoice?: string;
+  totalIterations?: number;
+  finalQualityScore?: number;
+  converged?: boolean;
 }
 
-// Tool and formatter types
-export interface StructuredResponseFormatter {
-  format(content: string): string;
-  formatWithHeader(content: string, title: string): string;
+export interface SynthesisResult {
+  content: string;
+  voicesUsed?: string[];
+  qualityScore?: number;
+  combinedCode?: string;
+  reasoning?: string;
 }
 
-export interface ExecutionError extends Error {
-  code: string;
-  context: Record<string, any>;
+export interface SpiralConfig {
+  maxIterations: number;
+  qualityThreshold?: number;
+  voices: string[];
 }
 
-// Default exports for backwards compatibility
-export default {
-  UnifiedClientConfig,
-  ModelRequest,
-  ModelResponse,
-  ProjectContext,
-  AppConfig,
-  AgentConfig,
-  ExecutionResult,
-  SynthesisResponse,
-  CLIExitCode
+// Performance Types
+export interface ProviderMetrics {
+  requests: number;
+  totalLatency: number;
+  averageLatency: number;
+  errorRate?: number;
+  lastError?: string;
+}
+
+export interface PerformanceMetrics {
+  timestamp: Date;
+  totalRequests: number;
+  averageLatency: number;
+  errorRate: number;
+  providers?: Record<string, ProviderMetrics>;
+  overall?: {
+    successRate: number;
+    uptime: number;
+  };
+}
+
+// Response Validator (placeholder)
+export const ResponseValidator = {
+  validate: (response: any) => ({ isValid: true, errors: [] })
 };
+
+// Export classes for compatibility
+export const UnifiedClientConfig = {} as any;
+export const ModelRequest = {} as any;
+export const ModelResponse = {} as any;
+export const ProjectContext = {} as any;
+export const AppConfig = {} as any;
+export const AgentConfig = {} as any;
+export const ExecutionResult = {} as any;
+export const SynthesisResponse = {} as any;
+
+
+// Additional types for agent system
+export interface ExecutionMode {
+  type: 'auto' | 'fast' | 'quality';
+  timeout?: number;
+}
+
+// Update Workflow interface
+export interface WorkflowExtended extends Workflow {
+  status?: 'pending' | 'running' | 'completed' | 'failed';
+}
+
+// Update ExecutionResponse interface  
+export interface ExecutionResponseExtended extends ExecutionResponse {
+  results?: any;
+  error?: string;
+}
+
+// Update Task interface
+export interface TaskExtended extends Task {
+  priority?: 'low' | 'medium' | 'high';
+}
+
+// Export for compatibility
+export const ExecutionMode = {} as any;
+
+// Model client compatibility
+export interface ModelClient {
+  generate(request: any): Promise<any>;
+  checkStatus(): Promise<boolean>;
+}

@@ -1,45 +1,34 @@
-#!/usr/bin/env node
-
-// CodeCrucible Simplified Entry Point
-import chalk from 'chalk';
-
-console.log(chalk.cyan.bold('🔥 CodeCrucible Synth v3.3.4'));
-console.log(chalk.gray('AI-powered code synthesis and generation tool'));
-console.log();
-
-// Simple implementation for now
-export class CodeCrucibleClient {
-  constructor(config = {}) {
-    this.config = {
-      endpoint: config.endpoint || 'http://localhost:11434',
-      model: config.model || 'llama2',
-      ...config
-    };
-  }
-
-  async generate(prompt) {
-    console.log(chalk.yellow('🤖 Generating code...'));
-    console.log(chalk.gray(`Prompt: ${prompt}`));
-    
-    // Placeholder implementation
-    return {
-      content: `// Generated code for: ${prompt}
-// This is a placeholder implementation
-console.log('Hello from CodeCrucible!');
-`,
-      success: true,
-      metadata: {
-        model: this.config.model,
-        timestamp: new Date().toISOString()
-      }
-    };
-  }
-
-  async checkStatus() {
-    console.log(chalk.green('✅ CodeCrucible is ready!'));
-    return true;
-  }
+import { CLI } from './core/cli.js';
+import { ConfigManager } from './config/config-manager.js';
+import { UnifiedModelClient } from './core/client.js';
+// import { EnhancedStartupIndexer } from './indexing/enhanced-startup-indexer.js';
+import { PerformanceMonitor } from './utils/performance.js';
+export async function initializeCLIContext() {
+    try {
+        const configManager = new ConfigManager();
+        const config = await configManager.loadConfiguration();
+        // Startup analysis disabled for now
+        // if (config.autonomous?.enableStartupAnalysis) {
+        //   const indexer = new EnhancedStartupIndexer();
+        //   await indexer.performStartupAnalysis();
+        // }
+        const client = new UnifiedModelClient({
+            providers: config.model?.providers || ['ollama'],
+            defaultModel: config.model?.name || 'llama2',
+            timeout: config.model?.timeout || 30000,
+            maxTokens: config.model?.maxTokens || 2048,
+            temperature: config.model?.temperature || 0.7
+        });
+        const performanceMonitor = new PerformanceMonitor();
+        return new CLI(client, performanceMonitor);
+    }
+    catch (error) {
+        console.error('Failed to initialize CLI context:', error);
+        throw error;
+    }
 }
-
-export { CodeCrucibleClient as CLI };
-export default CodeCrucibleClient;
+export { CLI } from './core/cli.js';
+export { UnifiedModelClient } from './core/client.js';
+export { ConfigManager } from './config/config-manager.js';
+export default initializeCLIContext;
+//# sourceMappingURL=index.js.map

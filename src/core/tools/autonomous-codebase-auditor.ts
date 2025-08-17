@@ -1,663 +1,456 @@
-import { BaseTool, ToolDefinition } from './base-tool.js';
-import { logger } from '../logger.js';
-import { promises as fs } from 'fs';
-import { join } from 'path';
+
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { z } from 'zod';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const execAsync = promisify(exec);
 
-interface AuditResult {
-  summary: {
-    projectType: string;
-    framework: string;
+export interface CodebaseAnalysis {
+  overview: {
     totalFiles: number;
-    linesOfCode: number;
-    issues: {
-      critical: number;
-      high: number;
-      medium: number;
-      low: number;
-    };
-  };
-  structure: any;
-  security: {
-    vulnerabilities: Array<{ name: string; severity: string; description: string; }>;
-    recommendations: string[];
-  };
-  performance: {
-    issues: Array<{ type: string; severity: string; description: string; }>;
-    recommendations: string[];
-  };
-  quality: {
-    score: number;
-    issues: Array<{ type: string; severity: string; description: string; }>;
-    recommendations: string[];
+    totalLines: number;
+    languages: Record<string, number>;
+    directories: string[];
   };
   dependencies: {
-    outdated: Array<{ name: string; current: string; wanted: string; latest: string; }>;
-    vulnerable: Array<{ name: string; description: string; }>;
-    recommendations: string[];
+    production: string[];
+    development: string[];
+    security: {
+      vulnerabilities: number;
+      issues: string[];
+    };
   };
-  recommendations: {
-    immediate: string[];
-    shortTerm: string[];
-    longTerm: string[];
+  codeQuality: {
+    complexity: number;
+    maintainability: string;
+    testCoverage?: number;
+    codeSmells: string[];
+  };
+  architecture: {
+    patterns: string[];
+    frameworks: string[];
+    structure: Record<string, any>;
+  };
+  security: {
+    secrets: string[];
+    permissions: string[];
+    risks: string[];
+  };
+  performance: {
+    buildTime?: number;
+    bundleSize?: number;
+    optimizations: string[];
   };
 }
 
-const AuditParametersSchema = z.object({
-  depth: z.enum(['quick', 'standard', 'deep']).describe('Audit depth level'),
-  focus: z.array(z.enum(['security', 'performance', 'quality', 'dependencies', 'structure'])).optional().describe('Focus areas for audit')
-});
-
-/**
- * Autonomous Codebase Auditor Tool
- * 
- * Performs comprehensive automated codebase analysis including:
- * - Security vulnerability scanning
- * - Performance bottleneck detection
- * - Code quality assessment
- * - Dependency analysis
- * - Architecture review
- */
-export class AutonomousCodebaseAuditor extends BaseTool {
-  constructor(context: any) {
-    const definition: ToolDefinition = {
-      name: 'autonomousCodebaseAudit',
-      description: 'Perform comprehensive autonomous codebase audit with security, performance, and quality analysis',
-      category: 'analysis',
-      parameters: AuditParametersSchema
-    };
-    super(definition);
+export class AutonomousCodebaseAnalyzer {
+  private workingDirectory: string;
+  
+  constructor(workingDirectory: string = process.cwd()) {
+    this.workingDirectory = workingDirectory;
   }
-
-  async execute(params: { depth: 'quick' | 'standard' | 'deep'; focus?: string[] }) {
-    const startTime = Date.now();
-    logger.info(`🔍 Starting autonomous codebase audit (${params.depth} mode)`);
+  
+  async performComprehensiveAnalysis(): Promise<CodebaseAnalysis> {
+    console.log('🔍 Starting comprehensive codebase analysis...');
     
-    const auditResult: AuditResult = {
-      summary: {
-        projectType: 'unknown',
-        framework: 'unknown',
-        totalFiles: 0,
-        linesOfCode: 0,
-        issues: {
-          critical: 0,
-          high: 0,
-          medium: 0,
-          low: 0
-        }
-      },
-      structure: {},
-      security: {
-        vulnerabilities: [],
-        recommendations: []
-      },
-      performance: {
-        issues: [],
-        recommendations: []
-      },
-      quality: {
-        score: 0,
-        issues: [],
-        recommendations: []
-      },
-      dependencies: {
-        outdated: [],
-        vulnerable: [],
-        recommendations: []
-      },
-      recommendations: {
-        immediate: [],
-        shortTerm: [],
-        longTerm: []
-      }
+    const [
+      overview,
+      dependencies,
+      codeQuality,
+      architecture,
+      security,
+      performance
+    ] = await Promise.allSettled([
+      this.analyzeOverview(),
+      this.analyzeDependencies(),
+      this.analyzeCodeQuality(),
+      this.analyzeArchitecture(),
+      this.analyzeSecurity(),
+      this.analyzePerformance()
+    ]);
+    
+    return {
+      overview: overview.status === 'fulfilled' ? overview.value : this.getDefaultOverview(),
+      dependencies: dependencies.status === 'fulfilled' ? dependencies.value : this.getDefaultDependencies(),
+      codeQuality: codeQuality.status === 'fulfilled' ? codeQuality.value : this.getDefaultCodeQuality(),
+      architecture: architecture.status === 'fulfilled' ? architecture.value : this.getDefaultArchitecture(),
+      security: security.status === 'fulfilled' ? security.value : this.getDefaultSecurity(),
+      performance: performance.status === 'fulfilled' ? performance.value : this.getDefaultPerformance()
     };
-
-    try {
-      // 1. Autonomous project discovery
-      const projectInfo = await this.discoverProjectStructure();
-      auditResult.summary.projectType = projectInfo.type;
-      auditResult.summary.framework = projectInfo.framework;
-      auditResult.structure = projectInfo.directories;
-
-      // 2. Security audit with autonomous terminal commands
-      if (!params.focus || params.focus.includes('security')) {
-        const securityResults = await this.performSecurityAudit(params.depth);
-        auditResult.security = securityResults;
-      }
-
-      // 3. Performance analysis
-      if (!params.focus || params.focus.includes('performance')) {
-        const performanceResults = await this.performPerformanceAudit(params.depth);
-        auditResult.performance = performanceResults;
-      }
-
-      // 4. Code quality assessment
-      if (!params.focus || params.focus.includes('quality')) {
-        const qualityResults = await this.performQualityAudit(params.depth);
-        auditResult.quality = qualityResults;
-      }
-
-      // 5. Dependency audit with autonomous commands
-      if (!params.focus || params.focus.includes('dependencies')) {
-        const depResults = await this.performDependencyAudit();
-        auditResult.dependencies = depResults;
-      }
-
-      // 6. Generate comprehensive recommendations
-      auditResult.recommendations = this.generateRecommendations(auditResult);
-
-      // 7. Calculate total issues
-      auditResult.summary.issues = this.calculateIssueCounts(auditResult);
-
-      const duration = Date.now() - startTime;
-      logger.info(`✅ Autonomous codebase audit completed in ${duration}ms`);
-
-      return {
-        success: true,
-        result: auditResult,
-        duration,
-        timestamp: new Date().toISOString()
-      };
-
-    } catch (error) {
-      logger.error('Autonomous codebase audit failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        duration: Date.now() - startTime
-      };
-    }
   }
-
-  /**
-   * Autonomous project structure discovery using terminal commands
-   */
-  private async discoverProjectStructure() {
-    try {
-      logger.info('🔍 Discovering project structure autonomously...');
-      
-      const projectInfo = {
-        type: 'unknown',
-        framework: 'unknown',
-        directories: {} as any,
-        keyFiles: {} as any,
-        packageInfo: null as any
-      };
-
-      // Check for key project files using autonomous commands
-      const keyFiles = ['package.json', 'Cargo.toml', 'requirements.txt', 'go.mod', 'pom.xml'];
-      
-      for (const file of keyFiles) {
-        try {
-          const result = await this.executeCommand(`ls "${file}" 2>/dev/null || echo "not found"`, 'dir', { timeout: 5000 });
-          if (result.success && !result.output?.includes('not found')) {
-            projectInfo.keyFiles[file] = true;
-            
-            // Determine project type based on key files
-            if (file === 'package.json') {
-              projectInfo.type = 'nodejs';
-              // Read package.json for framework detection
-              try {
-                const packageContent = await fs.readFile(file, 'utf-8');
-                const packageJson = JSON.parse(packageContent);
-                projectInfo.packageInfo = packageJson;
-                
-                // Detect framework
-                if (packageJson.dependencies?.react) projectInfo.framework = 'react';
-                else if (packageJson.dependencies?.vue) projectInfo.framework = 'vue';
-                else if (packageJson.dependencies?.angular) projectInfo.framework = 'angular';
-                else if (packageJson.dependencies?.express) projectInfo.framework = 'express';
-                else if (packageJson.dependencies?.next) projectInfo.framework = 'nextjs';
-              } catch (err) {
-                logger.warn('Failed to parse package.json:', err);
-              }
-            } else if (file === 'Cargo.toml') {
-              projectInfo.type = 'rust';
-            } else if (file === 'requirements.txt') {
-              projectInfo.type = 'python';
-            } else if (file === 'go.mod') {
-              projectInfo.type = 'go';
-            } else if (file === 'pom.xml') {
-              projectInfo.type = 'java';
-            }
-          }
-        } catch (error) {
-          // Continue to next file
-        }
-      }
-
-      // Get directory structure using autonomous commands
+  
+  private async analyzeOverview() {
+    const files = await this.findAllFiles();
+    const languages = this.detectLanguages(files);
+    const directories = this.getDirectoryStructure();
+    
+    let totalLines = 0;
+    for (const file of files) {
       try {
-        const dirResult = await this.executeCommand('find . -type d -maxdepth 2 | head -20', 'dir /B /AD', { timeout: 10000 });
-        if (dirResult.success && dirResult.output) {
-          const directories = dirResult.output.split('\\n').filter(dir => dir && dir !== '.');
-          projectInfo.directories = { count: directories.length, list: directories.slice(0, 10) };
-        }
+        const content = fs.readFileSync(path.join(this.workingDirectory, file), 'utf-8');
+        totalLines += content.split('\n').length;
       } catch (error) {
-        logger.warn('Failed to get directory structure:', error);
+        // Skip files that can't be read
       }
-
-      return projectInfo;
-    } catch (error) {
-      logger.error('Failed to discover project structure:', error);
-      return {
-        type: 'unknown',
-        framework: 'unknown',
-        directories: {},
-        keyFiles: {},
-        packageInfo: null
-      };
     }
-  }
-
-  /**
-   * Autonomous security audit using terminal commands
-   */
-  private async performSecurityAudit(depth: string) {
-    logger.info('🔒 Performing autonomous security audit...');
     
-    const securityResult = {
-      vulnerabilities: [] as Array<{ name: string; severity: string; description: string; }>,
-      recommendations: [] as string[]
+    return {
+      totalFiles: files.length,
+      totalLines,
+      languages,
+      directories: directories.slice(0, 20) // Limit for performance
     };
-
-    try {
-      // 1. NPM audit for Node.js projects
-      if (await this.fileExists('package.json')) {
-        try {
-          const auditResult = await this.executeCommand('npm audit --json', 'npm audit', { timeout: 30000 });
-          if (auditResult.success && auditResult.output) {
-            try {
-              const audit = JSON.parse(auditResult.output);
-              if (audit.vulnerabilities) {
-                Object.entries(audit.vulnerabilities).forEach(([name, vuln]: [string, any]) => {
-                  securityResult.vulnerabilities.push({
-                    name,
-                    severity: vuln.severity || 'unknown',
-                    description: vuln.title || 'NPM vulnerability detected'
-                  });
-                });
-              }
-            } catch (parseError) {
-              // Handle plain text output
-              if (auditResult.output.includes('vulnerabilities')) {
-                securityResult.vulnerabilities.push({
-                  name: 'npm-audit',
-                  severity: 'medium',
-                  description: 'NPM vulnerabilities detected (see npm audit for details)'
-                });
-              }
-            }
-          }
-        } catch (error) {
-          logger.warn('NPM audit failed:', error);
-        }
-      }
-
-      // 2. Git secret scanning (basic patterns)
-      try {
-        const secretPatterns = ['password', 'api[_-]?key', 'secret', 'token', 'private[_-]?key'];
-        for (const pattern of secretPatterns) {
-          const grepResult = await this.executeCommand(
-            `grep -r -i "${pattern}" . --include="*.js" --include="*.ts" --include="*.py" --exclude-dir=node_modules --exclude-dir=.git | head -5`,
-            'findstr /R /I /S /M "${pattern}" *.js *.ts *.py',
-            { timeout: 15000 }
-          );
-          
-          if (grepResult.success && grepResult.output && grepResult.output.trim()) {
-            securityResult.vulnerabilities.push({
-              name: `hardcoded-${pattern}`,
-              severity: 'high',
-              description: `Potential hardcoded ${pattern} found in source code`
-            });
-          }
-        }
-      } catch (error) {
-        logger.warn('Secret scanning failed:', error);
-      }
-
-      // 3. Generate security recommendations
-      securityResult.recommendations.push('Run comprehensive security scan with dedicated tools');
-      securityResult.recommendations.push('Implement pre-commit hooks for secret detection');
-      securityResult.recommendations.push('Regular dependency updates and vulnerability monitoring');
-      securityResult.recommendations.push('Code review process for security best practices');
-      securityResult.recommendations.push('Environment variable usage for sensitive configuration');
-
-    } catch (error) {
-      logger.error('Security audit failed:', error);
-    }
-
-    return securityResult;
   }
-
-  /**
-   * Autonomous performance audit
-   */
-  private async performPerformanceAudit(depth: string) {
-    logger.info('⚡ Performing autonomous performance audit...');
+  
+  private async analyzeDependencies() {
+    const packageJsonPath = path.join(this.workingDirectory, 'package.json');
+    let production: string[] = [];
+    let development: string[] = [];
+    let vulnerabilities = 0;
+    let issues: string[] = [];
     
-    const performanceResult = {
-      issues: [] as Array<{ type: string; severity: string; description: string; }>,
-      recommendations: [] as string[]
-    };
-
-    try {
-      // 1. Large file detection
+    if (fs.existsSync(packageJsonPath)) {
       try {
-        const largeFilesResult = await this.executeCommand(
-          'find . -type f -size +1M -not -path "./node_modules/*" -not -path "./.git/*" | head -10',
-          'forfiles /S /M *.* /C "cmd /c if @fsize GEQ 1048576 echo @path @fsize"',
-          { timeout: 10000 }
-        );
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        production = Object.keys(packageJson.dependencies || {});
+        development = Object.keys(packageJson.devDependencies || {});
         
-        if (largeFilesResult.success && largeFilesResult.output && largeFilesResult.output.trim()) {
-          performanceResult.issues.push({
-            type: 'large-files',
-            severity: 'medium',
-            description: 'Large files detected that may impact performance'
+        // Try to run npm audit
+        try {
+          const { stdout } = await execAsync('npm audit --json', { 
+            cwd: this.workingDirectory,
+            timeout: 30000 
           });
+          const auditResult = JSON.parse(stdout);
+          vulnerabilities = auditResult.metadata?.vulnerabilities?.total || 0;
+          issues = Object.keys(auditResult.advisories || {}).slice(0, 10);
+        } catch (auditError) {
+          // npm audit failed, continue without security info
         }
-      } catch (error) {
-        logger.warn('Large file detection failed:', error);
+      } catch (parseError) {
+        // Invalid package.json
       }
-
-      // 2. Bundle size analysis for Node.js projects
-      if (await this.fileExists('package.json')) {
-        try {
-          const bundleAnalysis = await this.executeCommand('npm ls --depth=0 --json', 'npm ls --depth=0', { timeout: 15000 });
-          if (bundleAnalysis.success && bundleAnalysis.output) {
-            try {
-              const deps = JSON.parse(bundleAnalysis.output);
-              const depCount = Object.keys(deps.dependencies || {}).length;
-              if (depCount > 50) {
-                performanceResult.issues.push({
-                  type: 'dependency-bloat',
-                  severity: 'medium',
-                  description: `High number of dependencies (${depCount}) may impact build performance`
-                });
-              }
-            } catch (parseError) {
-              // Handle non-JSON output
-            }
-          }
-        } catch (error) {
-          logger.warn('Bundle analysis failed:', error);
-        }
-      }
-
-      // 3. Generate performance recommendations
-      performanceResult.recommendations.push('Implement code splitting and lazy loading');
-      performanceResult.recommendations.push('Optimize images and static assets');
-      performanceResult.recommendations.push('Review and minimize dependencies');
-      performanceResult.recommendations.push('Implement caching strategies');
-      performanceResult.recommendations.push('Use performance monitoring tools');
-
-    } catch (error) {
-      logger.error('Performance audit failed:', error);
     }
-
-    return performanceResult;
-  }
-
-  /**
-   * Autonomous code quality audit
-   */
-  private async performQualityAudit(depth: string) {
-    logger.info('📊 Performing autonomous quality audit...');
     
-    const qualityResult = {
-      score: 75, // Default score
-      issues: [] as Array<{ type: string; severity: string; description: string; }>,
-      recommendations: [] as string[]
+    return {
+      production,
+      development,
+      security: { vulnerabilities, issues }
     };
-
-    try {
-      // 1. ESLint check for JavaScript/TypeScript projects
-      if (await this.fileExists('package.json')) {
-        try {
-          const eslintResult = await this.executeCommand('npx eslint --version', 'npx eslint --version', { timeout: 5000 });
-          if (eslintResult.success) {
-            const lintCheck = await this.executeCommand('npx eslint . --format json --ext .js,.ts --max-warnings 0', 'npx eslint .', { timeout: 30000 });
-            if (lintCheck.success && lintCheck.output) {
-              try {
-                const lintResults = JSON.parse(lintCheck.output);
-                const totalErrors = lintResults.reduce((sum: number, file: any) => sum + file.errorCount, 0);
-                const totalWarnings = lintResults.reduce((sum: number, file: any) => sum + file.warningCount, 0);
-                
-                if (totalErrors > 0) {
-                  qualityResult.issues.push({
-                    type: 'eslint-errors',
-                    severity: 'high',
-                    description: `${totalErrors} ESLint errors detected`
-                  });
-                  qualityResult.score -= Math.min(20, totalErrors * 2);
-                }
-                
-                if (totalWarnings > 10) {
-                  qualityResult.issues.push({
-                    type: 'eslint-warnings',
-                    severity: 'medium',
-                    description: `${totalWarnings} ESLint warnings detected`
-                  });
-                  qualityResult.score -= Math.min(10, totalWarnings);
-                }
-              } catch (parseError) {
-                // Handle non-JSON output
-              }
-            }
-          }
-        } catch (error) {
-          logger.warn('ESLint check failed:', error);
-        }
-      }
-
-      // 2. Test coverage check
+  }
+  
+  private async analyzeCodeQuality() {
+    let complexity = 1;
+    let maintainability = 'good';
+    let codeSmells: string[] = [];
+    
+    // Basic heuristic analysis
+    const files = await this.findAllFiles(['.ts', '.js', '.jsx', '.tsx']);
+    let totalFunctions = 0;
+    let longFunctions = 0;
+    
+    for (const file of files.slice(0, 50)) { // Limit for performance
       try {
-        const testFiles = await this.executeCommand('find . -name "*.test.*" -o -name "*.spec.*" | head -5', 'dir /S *.test.* *.spec.*', { timeout: 5000 });
-        if (!testFiles.success || !testFiles.output || testFiles.output.trim() === '') {
-          qualityResult.issues.push({
-            type: 'no-tests',
-            severity: 'high',
-            description: 'No test files detected'
-          });
-          qualityResult.score -= 15;
+        const content = fs.readFileSync(path.join(this.workingDirectory, file), 'utf-8');
+        const functionMatches = content.match(/function\s+\w+|const\s+\w+\s*=.*=>|class\s+\w+/g) || [];
+        totalFunctions += functionMatches.length;
+        
+        // Check for long functions (basic heuristic)
+        const lines = content.split('\n');
+        let inFunction = false;
+        let functionLength = 0;
+        
+        for (const line of lines) {
+          if (line.includes('function ') || line.includes('=>') || line.includes('class ')) {
+            if (inFunction && functionLength > 50) {
+              longFunctions++;
+            }
+            inFunction = true;
+            functionLength = 0;
+          } else if (line.includes('}') && inFunction) {
+            inFunction = false;
+          }
+          
+          if (inFunction) functionLength++;
+        }
+        
+        // Detect code smells
+        if (content.includes('console.log')) codeSmells.push('Debug statements');
+        if (content.includes('TODO') || content.includes('FIXME')) codeSmells.push('TODOs/FIXMEs');
+        if (content.match(/\w{50,}/)) codeSmells.push('Long identifiers');
+        
+      } catch (error) {
+        // Skip problematic files
+      }
+    }
+    
+    complexity = totalFunctions > 0 ? Math.min(10, Math.ceil(longFunctions / totalFunctions * 10)) : 1;
+    maintainability = complexity < 3 ? 'excellent' : complexity < 6 ? 'good' : 'needs improvement';
+    
+    return {
+      complexity,
+      maintainability,
+      codeSmells: [...new Set(codeSmells)].slice(0, 10)
+    };
+  }
+  
+  private async analyzeArchitecture() {
+    const patterns: string[] = [];
+    const frameworks: string[] = [];
+    const structure: Record<string, any> = {};
+    
+    // Detect frameworks and patterns
+    const packageJsonPath = path.join(this.workingDirectory, 'package.json');
+    if (fs.existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+        
+        if (allDeps.react) frameworks.push('React');
+        if (allDeps.vue) frameworks.push('Vue');
+        if (allDeps.angular) frameworks.push('Angular');
+        if (allDeps.express) frameworks.push('Express');
+        if (allDeps.typescript) frameworks.push('TypeScript');
+        if (allDeps.jest) frameworks.push('Jest');
+        if (allDeps.webpack) frameworks.push('Webpack');
+        
+        // Detect patterns based on directory structure
+        const dirs = this.getDirectoryStructure();
+        if (dirs.includes('src/components')) patterns.push('Component Architecture');
+        if (dirs.includes('src/services')) patterns.push('Service Layer');
+        if (dirs.includes('src/utils')) patterns.push('Utility Pattern');
+        if (dirs.includes('tests') || dirs.includes('__tests__')) patterns.push('Test Organization');
+        if (dirs.includes('docs')) patterns.push('Documentation');
+      } catch (error) {
+        // Continue without package.json analysis
+      }
+    }
+    
+    return { patterns, frameworks, structure };
+  }
+  
+  private async analyzeSecurity() {
+    const secrets: string[] = [];
+    const permissions: string[] = [];
+    const risks: string[] = [];
+    
+    // Basic secret detection
+    const files = await this.findAllFiles(['.js', '.ts', '.json', '.env']);
+    const secretPatterns = [
+      /api[_-]?key/i,
+      /secret/i,
+      /password/i,
+      /token/i,
+      /auth/i
+    ];
+    
+    for (const file of files.slice(0, 30)) { // Limit for performance
+      try {
+        const content = fs.readFileSync(path.join(this.workingDirectory, file), 'utf-8');
+        
+        for (const pattern of secretPatterns) {
+          if (pattern.test(content)) {
+            secrets.push(file);
+            break;
+          }
+        }
+        
+        // Check for common security risks
+        if (content.includes('eval(')) risks.push('Dynamic code execution');
+        if (content.includes('innerHTML')) risks.push('XSS vulnerability');
+        if (content.includes('document.write')) risks.push('DOM manipulation');
+        
+      } catch (error) {
+        // Skip problematic files
+      }
+    }
+    
+    return {
+      secrets: [...new Set(secrets)].slice(0, 10),
+      permissions: permissions.slice(0, 10),
+      risks: [...new Set(risks)].slice(0, 10)
+    };
+  }
+  
+  private async analyzePerformance() {
+    const optimizations: string[] = [];
+    
+    // Check for common optimization opportunities
+    const packageJsonPath = path.join(this.workingDirectory, 'package.json');
+    if (fs.existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        
+        if (!packageJson.scripts?.build) optimizations.push('Add build script');
+        if (!packageJson.scripts?.test) optimizations.push('Add test script');
+        if (packageJson.dependencies && Object.keys(packageJson.dependencies).length > 50) {
+          optimizations.push('Consider dependency reduction');
         }
       } catch (error) {
-        logger.warn('Test detection failed:', error);
+        // Continue without package.json analysis
       }
-
-      // 3. Generate quality recommendations
-      qualityResult.recommendations.push('Implement comprehensive test suite');
-      qualityResult.recommendations.push('Set up code linting and formatting');
-      qualityResult.recommendations.push('Add type checking (TypeScript)');
-      qualityResult.recommendations.push('Implement code review process');
-      qualityResult.recommendations.push('Add documentation and comments');
-
-    } catch (error) {
-      logger.error('Quality audit failed:', error);
     }
-
-    return qualityResult;
-  }
-
-  /**
-   * Autonomous dependency audit
-   */
-  private async performDependencyAudit() {
-    logger.info('📦 Performing autonomous dependency audit...');
     
-    const dependencyResult = {
-      outdated: [] as Array<{ name: string; current: string; wanted: string; latest: string; }>,
-      vulnerable: [] as Array<{ name: string; description: string; }>,
-      recommendations: [] as string[]
-    };
-
-    try {
-      // 1. Check for outdated packages in Node.js projects
-      if (await this.fileExists('package.json')) {
-        try {
-          const outdatedResult = await this.executeCommand('npm outdated --json', 'npm outdated', { timeout: 30000 });
-          if (outdatedResult.success && outdatedResult.output) {
-            try {
-              const outdated = JSON.parse(outdatedResult.output);
-              Object.entries(outdated).forEach(([name, info]: [string, any]) => {
-                dependencyResult.outdated.push({
-                  name,
-                  current: info.current || 'unknown',
-                  wanted: info.wanted || 'unknown',
-                  latest: info.latest || 'unknown'
-                });
-              });
-            } catch (parseError) {
-              // Handle non-JSON output
-            }
-          }
-        } catch (error) {
-          logger.warn('Outdated package check failed:', error);
+    // Check for large files
+    const files = await this.findAllFiles();
+    for (const file of files) {
+      try {
+        const stats = fs.statSync(path.join(this.workingDirectory, file));
+        if (stats.size > 100000) { // > 100KB
+          optimizations.push('Large file detected: ' + file);
         }
-
-        // 2. Vulnerability check (already covered in security audit, but add to dependencies)
-        try {
-          const auditResult = await this.executeCommand('npm audit --json', 'npm audit', { timeout: 30000 });
-          if (auditResult.success && auditResult.output) {
-            try {
-              const audit = JSON.parse(auditResult.output);
-              if (audit.vulnerabilities) {
-                Object.entries(audit.vulnerabilities).forEach(([name, vuln]: [string, any]) => {
-                  dependencyResult.vulnerable.push({
-                    name,
-                    description: vuln.title || 'Vulnerability detected'
-                  });
-                });
-              }
-            } catch (parseError) {
-              // Handle non-JSON output
-            }
-          }
-        } catch (error) {
-          logger.warn('Dependency vulnerability check failed:', error);
-        }
+      } catch (error) {
+        // Skip problematic files
       }
-
-      // 3. Generate dependency recommendations
-      dependencyResult.recommendations.push('Regular dependency updates and security monitoring');
-      dependencyResult.recommendations.push('Use package-lock.json or yarn.lock for version consistency');
-      dependencyResult.recommendations.push('Audit and remove unused dependencies');
-      dependencyResult.recommendations.push('Consider using dependency vulnerability scanning tools');
-      dependencyResult.recommendations.push('Implement automated dependency update workflows');
-
-    } catch (error) {
-      logger.error('Dependency audit failed:', error);
     }
-
-    return dependencyResult;
-  }
-
-  /**
-   * Generate comprehensive recommendations based on audit results
-   */
-  private generateRecommendations(auditResult: AuditResult) {
-    const recommendations = {
-      immediate: [] as string[],
-      shortTerm: [] as string[],
-      longTerm: [] as string[]
+    
+    return {
+      optimizations: optimizations.slice(0, 10)
     };
-
-    // Immediate actions (critical issues)
-    if (auditResult.security.vulnerabilities.some(v => v.severity === 'critical' || v.severity === 'high')) {
-      recommendations.immediate.push('Address critical security vulnerabilities immediately');
-    }
-
-    if (auditResult.quality.issues.some(i => i.type === 'no-tests')) {
-      recommendations.immediate.push('Implement basic test coverage');
-    }
-
-    // Short-term improvements
-    if (auditResult.dependencies.outdated.length > 5) {
-      recommendations.shortTerm.push('Update outdated dependencies');
-    }
-
-    if (auditResult.performance.issues.length > 0) {
-      recommendations.shortTerm.push('Address performance optimization opportunities');
-    }
-
-    // Long-term strategic improvements
-    recommendations.longTerm.push('Establish comprehensive CI/CD pipeline');
-    recommendations.longTerm.push('Implement automated code quality gates');
-    recommendations.longTerm.push('Set up continuous security monitoring');
-
-    return recommendations;
   }
-
-  /**
-   * Calculate total issue counts across all audit areas
-   */
-  private calculateIssueCounts(auditResult: AuditResult) {
-    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
-
-    // Count security issues
-    auditResult.security.vulnerabilities.forEach(vuln => {
-      if (vuln.severity === 'critical') counts.critical++;
-      else if (vuln.severity === 'high') counts.high++;
-      else if (vuln.severity === 'medium') counts.medium++;
-      else counts.low++;
-    });
-
-    // Count performance issues
-    auditResult.performance.issues.forEach(issue => {
-      if (issue.severity === 'critical') counts.critical++;
-      else if (issue.severity === 'high') counts.high++;
-      else if (issue.severity === 'medium') counts.medium++;
-      else counts.low++;
-    });
-
-    // Count quality issues
-    auditResult.quality.issues.forEach(issue => {
-      if (issue.severity === 'critical') counts.critical++;
-      else if (issue.severity === 'high') counts.high++;
-      else if (issue.severity === 'medium') counts.medium++;
-      else counts.low++;
-    });
-
-    return counts;
+  
+  private async findAllFiles(extensions?: string[]): Promise<string[]> {
+    const files: string[] = [];
+    
+    const walkDir = (dir: string, relativePath: string = '') => {
+      try {
+        const items = fs.readdirSync(path.join(this.workingDirectory, dir));
+        
+        for (const item of items) {
+          if (item.startsWith('.') || item === 'node_modules') continue;
+          
+          const fullPath = path.join(dir, item);
+          const relativeFilePath = path.join(relativePath, item);
+          const stat = fs.statSync(path.join(this.workingDirectory, fullPath));
+          
+          if (stat.isDirectory()) {
+            walkDir(fullPath, relativeFilePath);
+          } else if (stat.isFile()) {
+            if (!extensions || extensions.some(ext => item.endsWith(ext))) {
+              files.push(relativeFilePath);
+            }
+          }
+        }
+      } catch (error) {
+        // Skip directories that can't be read
+      }
+    };
+    
+    walkDir('.');
+    return files.slice(0, 1000); // Limit for performance
   }
-
-  /**
-   * Execute terminal command with platform detection
-   */
-  private async executeCommand(unixCommand: string, windowsCommand: string, options: { timeout?: number } = {}) {
-    const command = process.platform === 'win32' ? windowsCommand : unixCommand;
-    const timeout = options.timeout || 10000;
-
-    try {
-      const { stdout, stderr } = await execAsync(command, { timeout, cwd: process.cwd() });
-      return {
-        success: true,
-        output: stdout.trim(),
-        error: stderr.trim()
-      };
-    } catch (error) {
-      return {
-        success: false,
-        output: '',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+  
+  private detectLanguages(files: string[]): Record<string, number> {
+    const languages: Record<string, number> = {};
+    
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      let language = 'Other';
+      
+      switch (ext) {
+        case '.js': case '.jsx': language = 'JavaScript'; break;
+        case '.ts': case '.tsx': language = 'TypeScript'; break;
+        case '.py': language = 'Python'; break;
+        case '.java': language = 'Java'; break;
+        case '.cpp': case '.cc': case '.cxx': language = 'C++'; break;
+        case '.c': language = 'C'; break;
+        case '.cs': language = 'C#'; break;
+        case '.go': language = 'Go'; break;
+        case '.rs': language = 'Rust'; break;
+        case '.php': language = 'PHP'; break;
+        case '.rb': language = 'Ruby'; break;
+        case '.swift': language = 'Swift'; break;
+        case '.kt': language = 'Kotlin'; break;
+        case '.html': language = 'HTML'; break;
+        case '.css': language = 'CSS'; break;
+        case '.scss': case '.sass': language = 'SCSS'; break;
+        case '.json': language = 'JSON'; break;
+        case '.xml': language = 'XML'; break;
+        case '.yaml': case '.yml': language = 'YAML'; break;
+        case '.md': language = 'Markdown'; break;
+      }
+      
+      languages[language] = (languages[language] || 0) + 1;
     }
+    
+    return languages;
   }
-
-  /**
-   * Check if file exists
-   */
-  private async fileExists(filePath: string): Promise<boolean> {
-    try {
-      await fs.access(filePath);
-      return true;
-    } catch {
-      return false;
-    }
+  
+  private getDirectoryStructure(): string[] {
+    const dirs: string[] = [];
+    
+    const walkDirs = (dir: string, depth = 0) => {
+      if (depth > 3) return; // Limit depth
+      
+      try {
+        const items = fs.readdirSync(path.join(this.workingDirectory, dir));
+        
+        for (const item of items) {
+          if (item.startsWith('.') || item === 'node_modules') continue;
+          
+          const fullPath = path.join(dir, item);
+          const stat = fs.statSync(path.join(this.workingDirectory, fullPath));
+          
+          if (stat.isDirectory()) {
+            dirs.push(fullPath);
+            walkDirs(fullPath, depth + 1);
+          }
+        }
+      } catch (error) {
+        // Skip problematic directories
+      }
+    };
+    
+    walkDirs('.');
+    return dirs;
+  }
+  
+  // Default fallback methods
+  private getDefaultOverview() {
+    return {
+      totalFiles: 0,
+      totalLines: 0,
+      languages: {},
+      directories: []
+    };
+  }
+  
+  private getDefaultDependencies() {
+    return {
+      production: [],
+      development: [],
+      security: { vulnerabilities: 0, issues: [] }
+    };
+  }
+  
+  private getDefaultCodeQuality() {
+    return {
+      complexity: 1,
+      maintainability: 'unknown',
+      codeSmells: []
+    };
+  }
+  
+  private getDefaultArchitecture() {
+    return {
+      patterns: [],
+      frameworks: [],
+      structure: {}
+    };
+  }
+  
+  private getDefaultSecurity() {
+    return {
+      secrets: [],
+      permissions: [],
+      risks: []
+    };
+  }
+  
+  private getDefaultPerformance() {
+    return {
+      optimizations: []
+    };
   }
 }

@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "crucible": "./bin/crucible.js",
-    "cc": "./bin/crucible.js",
-    "codecrucible": "./bin/crucible.js"
+    "crucible": "./dist/bin/crucible.js",
+    "cc": "./dist/bin/crucible.js",
+    "codecrucible": "./dist/bin/crucible.js"
   },
   "scripts": {
     "build": "tsc && npm run copy-assets",

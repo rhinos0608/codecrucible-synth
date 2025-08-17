@@ -39,7 +39,7 @@ export interface CLIContext {
     multiLLMProvider?: MultiLLMProvider;
     ragSystem?: RAGSystem;
 }
-export declare class CodeCrucibleCLI {
+export declare class CLI {
     private context;
     private initialized;
     private workingDirectory;
@@ -219,4 +219,5 @@ export declare class CodeCrucibleCLI {
      */
     handleExecutionBackendCommand(options: any): Promise<void>;
 }
-export {};
+export { CLI as CodeCrucibleCLI };
+export default CLI;

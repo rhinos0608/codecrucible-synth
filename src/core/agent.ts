@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import { UnifiedModelClient } from './client.js';
 import { configManager, AgentConfig } from './config.js';
+export { AgentConfig };
 import { PerformanceMonitor } from '../utils/performance.js';
 import { 
   ExecutionRequest, 
@@ -18,6 +19,8 @@ import {
   ProjectContext,
   ExecutionResult
 } from './types.js';
+
+export { ExecutionResult };
 
 export interface AgentCapability {
   name: string;
@@ -41,7 +44,14 @@ export interface AgentMetrics {
 export class UnifiedAgent extends EventEmitter {
   private modelClient: ModelClient;
   private performanceMonitor: PerformanceMonitor;
-  private config: AgentConfig = {};
+  private config: AgentConfig = {
+    enabled: true,
+    mode: "balanced",
+    maxConcurrency: 3,
+    enableCaching: true,
+    enableMetrics: true,
+    enableSecurity: true
+  };
   private capabilities: Map<string, AgentCapability>;
   private activeWorkflows: Map<string, Workflow>;
   private metrics: AgentMetrics;
@@ -667,3 +677,9 @@ export const clearManagedInterval = (id: NodeJS.Timer) => {
 
 export const initializeEditConfirmation = (path: string, options?: any) => globalEditConfirmation;
 export const createUnifiedModelClient = (config: any) => new UnifiedModelClient(config);
+
+export interface AgentContext {
+  modelClient: any;
+  workingDirectory: string;
+  config: AgentConfig;
+}

@@ -66,7 +66,7 @@ export interface CLIContext {
   ragSystem?: RAGSystem;
 }
 
-export class CodeCrucibleCLI {
+export export class CLI {
   private context: CLIContext;
   private initialized = false;
   private workingDirectory = process.cwd();
@@ -3192,3 +3192,5 @@ Focus on actionable, specific recommendations with clear business value.`;
     }
   }
 }
+export { CLI as CodeCrucibleCLI };
+export default CLI;

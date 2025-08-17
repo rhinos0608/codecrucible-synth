@@ -1,7 +1,7 @@
 import { CLI } from './core/cli.js';
 import { ConfigManager } from './config/config-manager.js';
 import { UnifiedModelClient } from './core/client.js';
-import { EnhancedStartupIndexer } from './indexing/enhanced-startup-indexer.js';
+// import { EnhancedStartupIndexer } from './indexing/enhanced-startup-indexer.js';
 import { PerformanceMonitor } from './utils/performance.js';
 
 export async function initializeCLIContext(): Promise<CLI> {
@@ -9,11 +9,11 @@ export async function initializeCLIContext(): Promise<CLI> {
     const configManager = new ConfigManager();
     const config = await configManager.loadConfiguration();
     
-    if (config.autonomous?.enableStartupAnalysis) {
-      console.log('🚀 Starting autonomous analysis...');
-      const indexer = new EnhancedStartupIndexer(process.cwd());
-      await indexer.performStartupAnalysis();
-    }
+    // Startup analysis disabled for now
+    // if (config.autonomous?.enableStartupAnalysis) {
+    //   const indexer = new EnhancedStartupIndexer();
+    //   await indexer.performStartupAnalysis();
+    // }
 
     const client = new UnifiedModelClient({
       providers: config.model?.providers || ['ollama'],

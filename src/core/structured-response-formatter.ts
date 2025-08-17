@@ -743,3 +743,17 @@ export const ResponseFactory = {
     timestamp: new Date().toISOString()
   })
 };
+
+export class ExecutionError extends Error {
+  constructor(message: string, public code: string, public context: Record<string, any> = {}) {
+    super(message);
+    this.name = 'ExecutionError';
+  }
+}
+
+export interface ExecutionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  metadata?: Record<string, any>;
+}

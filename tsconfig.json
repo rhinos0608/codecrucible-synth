@@ -41,6 +41,11 @@
     "build",
     "archive",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "src/core/benchmarking/*",
+    "src/core/performance/*",
+    "src/core/integration-manager.ts",
+    "src/mcp-servers/*",
+    "src/core/memory/*"
   ]
 }

@@ -67,7 +67,14 @@
       "Bash(gh repo view:*)",
       "WebFetch(domain:www.anthropic.com)",
       "Bash(grep:*)",
-      "Bash(time node:*)"
+      "Bash(time node:*)",
+      "Bash(set OLLAMA_NUM_GPU=0)",
+      "Bash(set OLLAMA_CPU_TARGET=cpu)",
+      "Bash(set CUDA_VISIBLE_DEVICES=)",
+      "Bash(start /B ollama serve)",
+      "WebFetch(domain:markaicode.com)",
+      "WebFetch(domain:lmstudio.ai)",
+      "Bash(del nul)"
     ],
     "deny": [],
     "ask": [],

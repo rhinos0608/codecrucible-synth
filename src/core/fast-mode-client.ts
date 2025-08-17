@@ -122,23 +122,14 @@ export class FastModeClient extends EventEmitter {
     // Optimize prompt for speed
     const optimized = this.optimizer.optimizePrompt(prompt, context);
     
-    // Try cache first
-    const response = await this.optimizer.processBatch([{
-      id: 'fast-gen',
-      prompt: optimized.optimizedPrompt,
-      context: optimized.relevantContext,
-      priority: 1
-    }]);
-
-    const result = response.get('fast-gen');
-    const latency = Date.now() - startTime;
-
-    // Generate template-based response for speed
+    // Generate template-based response for speed (skip optimizer for templates)
     const codeResult = this.generateTemplateResponse(prompt, optimized.relevantContext);
+    
+    const latency = Date.now() - startTime;
 
     return {
       ...codeResult,
-      fromCache: result?.fromCache || false,
+      fromCache: false, // Templates are generated fresh
       latency
     };
   }
@@ -497,7 +488,6 @@ describe('${this.extractTestSubject(prompt) || 'Test Suite'}', () => {
     if (promptLower.includes('database') || promptLower.includes('model')) {
       return this.generateDatabaseTemplate(prompt);
     }
-
     // Default intelligent response
     const genericCode = `// Generated template for: ${prompt}
 // This appears to be a ${this.classifyPromptType(prompt)} request

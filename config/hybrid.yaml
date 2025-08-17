@@ -1,0 +1,292 @@
+# CodeCrucible Synth Hybrid LLM Configuration
+# This file configures the hybrid architecture combining LM Studio and Ollama
+
+hybrid:
+  # Enable/disable hybrid mode
+  enabled: true
+  
+  # Default provider selection strategy
+  defaultProvider: "auto"  # auto | lmstudio | ollama
+  
+  # Confidence threshold for escalation from LM Studio to Ollama
+  escalationThreshold: 0.7
+  
+  # Enable confidence scoring for response quality assessment
+  confidenceScoring: true
+  
+  # Enable adaptive learning to improve routing decisions over time
+  learningEnabled: true
+
+# LM Studio Configuration
+lmStudio:
+  # LM Studio server endpoint
+  endpoint: "http://localhost:1234"
+  
+  # Enable/disable LM Studio
+  enabled: true
+  
+  # Preferred models (in order of preference) - All available LM Studio models
+  models:
+    - "deepseek/deepseek-r1-0528-qwen3-8b"  # Fast reasoning model
+    - "google/gemma-3-12b"                   # Balanced performance
+    - "qwen/qwen3-30b-a3b"                   # Large context model
+  
+  # Task types best suited for LM Studio (fast execution)
+  taskTypes:
+    - "template"
+    - "edit"
+    - "format" 
+    - "boilerplate"
+    - "simple-generation"
+    - "quick-fixes"
+  
+  # Enable streaming responses for real-time feedback (disabled to avoid timeouts)
+  streamingEnabled: false
+  
+  # Maximum concurrent requests (set to 1 for sequential processing)
+  maxConcurrent: 1
+  
+  # Request timeout (milliseconds) - increased for model loading
+  timeout: 180000
+  
+  # Performance optimization settings based on 2024 research
+  performance:
+    # Memory management
+    gpuMemoryFraction: 0.8  # Reserve 80% of VRAM for LM Studio
+    gpuLayers: -1  # Use all GPU layers for maximum acceleration
+    maxLoadedModels: 2  # Keep 2 models in memory
+    
+    # Model loading optimization
+    jitLoading: true  # Just-in-time model loading
+    modelTtl: 300  # Keep models loaded for 5 minutes
+    autoEvict: true  # Auto-evict old models
+    
+    # Inference optimization
+    batchSize: 512  # Optimized batch size
+    flashAttention: true  # Enable Flash Attention for speed
+    keyCacheQuantization: "fp16"  # Reduce memory usage
+    valueCacheQuantization: "fp16"  # Reduce memory usage
+    
+    # Streaming optimization
+    streamBufferSize: 1024  # Buffer size for streaming
+    streamTimeout: 30000  # Stream timeout
+    
+    # Context optimization
+    contextLength: 4096  # Balanced context window
+    temperature: 0.3  # Lower for more consistent code
+    topP: 0.8
+    frequencyPenalty: 0.1
+    presencePenalty: 0.1
+    
+    # Keep-alive optimization
+    keepAliveInterval: 30000  # 30 second keep-alive
+    keepAliveEnabled: true
+    modelWarmupEnabled: true
+
+# Ollama Configuration  
+ollama:
+  # Ollama server endpoint
+  endpoint: "http://localhost:11434"
+  
+  # Enable/disable Ollama
+  enabled: true
+  
+  # Preferred models (in order of preference) - Using only tested working models
+  models:
+    - "gemma:latest"
+  
+  # Task types best suited for Ollama (complex reasoning)
+  taskTypes:
+    - "analysis"
+    - "planning"
+    - "complex"
+    - "multi-file"
+    - "debugging"
+    - "architecture"
+    - "security-review"
+  
+  # Maximum concurrent requests (Ollama typically handles fewer concurrent requests well)
+  maxConcurrent: 1
+  
+  # Request timeout (milliseconds) - increased for CPU-only execution
+  timeout: 300000
+  
+  # Force CPU-only execution to avoid GPU conflicts with LM Studio
+  gpuLayers: 0
+  
+  # CPU-optimized settings
+  cpuOptimized: true
+  
+  # Performance optimization settings based on 2024 research
+  performance:
+    # Memory management
+    maxLoadedModels: 2
+    maxQueueSize: 10
+    numParallel: 2
+    memoryLimit: "16GB"
+    
+    # CPU threading optimization
+    numThreads: 8  # Match CPU core count
+    numaPolicy: "spread"  # Distribute across NUMA nodes
+    
+    # Context window optimization
+    contextSize: 4096  # Balanced performance vs capability
+    
+    # Model quantization for memory efficiency
+    quantization: "q4_0"  # 4-bit quantization for speed
+    
+    # Memory mapping optimization
+    useMmap: true
+    useMlock: false
+    
+    # Batch processing
+    batchSize: 512
+  
+  # Environment variables for CPU-only mode
+  environment:
+    OLLAMA_NUM_GPU: "0"
+    OLLAMA_CPU_TARGET: "cpu"
+    CUDA_VISIBLE_DEVICES: ""
+    OLLAMA_MAX_LOADED_MODELS: "2"
+    OLLAMA_MAX_QUEUE: "10"
+    OLLAMA_NUM_PARALLEL: "2"
+    OLLAMA_NUM_THREADS: "8"
+    OLLAMA_NUMA_POLICY: "spread"
+
+# Intelligent Routing Rules
+routing:
+  # Global escalation threshold (can override per-rule)
+  escalationThreshold: 0.7
+  
+  # Routing rules (evaluated in order)
+  rules:
+    # Template generation - always use LM Studio for speed
+    - condition: "taskType == 'template'"
+      target: "lmstudio"
+      confidence: 0.9
+      description: "Templates are fast tasks best handled by LM Studio"
+    
+    # Code formatting - use LM Studio for speed
+    - condition: "taskType == 'format'"
+      target: "lmstudio" 
+      confidence: 0.85
+      description: "Code formatting is fast and well-suited for LM Studio"
+    
+    # Complex analysis - always use Ollama for quality
+    - condition: "complexity == 'complex'"
+      target: "ollama"
+      confidence: 0.95
+      description: "Complex tasks require Ollama's reasoning capabilities"
+    
+    # Multi-file operations - use Ollama for context handling
+    - condition: "taskType == 'multi-file'"
+      target: "ollama"
+      confidence: 0.9
+      description: "Multi-file operations require Ollama's context handling"
+    
+    # Large context - use Ollama
+    - condition: "context.length > 5"
+      target: "ollama"
+      confidence: 0.8
+      description: "Large context requires Ollama's context handling"
+    
+    # Security-related tasks - use Ollama for thoroughness
+    - condition: "taskType == 'security-review'"
+      target: "ollama"
+      confidence: 0.95
+      description: "Security reviews require thorough analysis from Ollama"
+    
+    # Architecture and planning - use Ollama
+    - condition: "taskType == 'planning' || taskType == 'architecture'"
+      target: "ollama"
+      confidence: 0.9
+      description: "Planning and architecture require deep reasoning"
+    
+    # Simple edits - use LM Studio for speed
+    - condition: "complexity == 'simple' && taskType == 'edit'"
+      target: "lmstudio"
+      confidence: 0.8
+      description: "Simple edits are fast tasks for LM Studio"
+
+# Performance Monitoring
+performance:
+  # Enable performance metrics collection
+  metricsCollection: true
+  
+  # Enable health checking of both services
+  healthChecking: true
+  
+  # Health check interval (milliseconds)
+  healthCheckInterval: 300000  # 5 minutes
+  
+  # Enable automatic optimization based on performance data
+  autoOptimization: true
+  
+  # Cache responses for performance improvement
+  cacheEnabled: true
+  
+  # Cache duration (milliseconds)
+  cacheDuration: 3600000  # 1 hour
+
+# System Resource Optimization
+resources:
+  # Memory management
+  memory:
+    # Maximum memory usage percentage
+    maxUsagePercent: 85
+    
+    # Automatic garbage collection threshold
+    gcThreshold: 75
+  
+  # VRAM optimization
+  vram:
+    # Enable VRAM optimization
+    enabled: true
+    
+    # Reserved VRAM for system (MB)
+    reservedMB: 2048
+    
+    # Model swapping strategy
+    swappingStrategy: "intelligent"  # intelligent | lru | manual
+  
+  # CPU utilization
+  cpu:
+    # Maximum CPU usage percentage
+    maxUsagePercent: 80
+    
+    # Thread pool size
+    threadPoolSize: 4
+
+# Fallback and Error Handling
+fallback:
+  # Automatic fallback on provider failure
+  autoFallback: true
+  
+  # Retry attempts before fallback
+  retryAttempts: 2
+  
+  # Retry delay (milliseconds)
+  retryDelay: 1000
+  
+  # Circuit breaker configuration
+  circuitBreaker:
+    enabled: true
+    failureThreshold: 5
+    recoveryTimeout: 30000
+
+# Development and Debugging
+development:
+  # Enable detailed logging
+  detailedLogging: false
+  
+  # Log routing decisions
+  logRoutingDecisions: true
+  
+  # Enable debug mode
+  debugMode: false
+  
+  # Save routing metrics to file
+  saveMetrics: true
+  
+  # Metrics file path
+  metricsFile: "./logs/hybrid-metrics.json"

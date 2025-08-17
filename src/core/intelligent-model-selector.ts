@@ -29,7 +29,7 @@ export interface SystemSpecs {
 
 export interface ModelCapability {
   name: string;
-  provider: 'ollama' | 'openai' | 'anthropic' | 'google' | 'huggingface';
+  provider: 'ollama' | 'lmstudio' | 'openai' | 'anthropic' | 'google' | 'huggingface';
   type: 'local' | 'api';
   strengths: string[];
   weaknesses: string[];
@@ -46,19 +46,80 @@ export interface ModelCapability {
   contextWindow?: number;
 }
 
+export interface TaskRoutingDecision {
+  selectedLLM: 'lmstudio' | 'ollama' | 'hybrid';
+  confidence: number;
+  reasoning: string;
+  fallbackStrategy: string;
+  escalationThreshold?: number;
+}
+
+export interface HybridRoutingConfig {
+  enabled: boolean;
+  defaultProvider: 'auto' | 'lmstudio' | 'ollama';
+  escalationThreshold: number;
+  confidenceScoring: boolean;
+  learningEnabled: boolean;
+  lmStudio: {
+    endpoint: string;
+    enabled: boolean;
+    models: string[];
+    taskTypes: string[];
+    streamingEnabled: boolean;
+    maxConcurrent: number;
+  };
+  ollama: {
+    endpoint: string;
+    enabled: boolean;
+    models: string[];
+    taskTypes: string[];
+    maxConcurrent: number;
+  };
+  routing: {
+    escalationThreshold: number;
+    rules: RoutingRule[];
+  };
+}
+
+export interface RoutingRule {
+  condition: string;
+  target: 'lmstudio' | 'ollama';
+  confidence: number;
+  description: string;
+}
+
+export interface RoutingMetrics {
+  totalRequests: number;
+  successRate: number;
+  averageResponseTime: number;
+  escalationRate: number;
+  lastUpdated: number;
+}
+
+export interface TaskClassification {
+  type: string;
+  complexity: 'simple' | 'medium' | 'complex';
+  confidence: number;
+  reasoning: string;
+  suggestedProvider: 'lmstudio' | 'ollama';
+}
+
 /**
- * Intelligent Model Selector
+ * Intelligent Model Selector with Hybrid LLM Routing
  * 
  * Automatically selects the best model for each task based on:
- * - Task requirements
+ * - Task requirements and complexity
  * - Available resources
  * - Historical performance
  * - Model capabilities
+ * - Hybrid routing between LM Studio and Ollama
  */
 export class IntelligentModelSelector {
   private errorHandler: AutonomousErrorHandler;
   private performanceHistory = new Map<string, number[]>();
   private quantizationOptimizer: AdvancedQuantizationOptimizer;
+  private hybridConfig: HybridRoutingConfig;
+  private routingMetrics = new Map<string, RoutingMetrics>();
   
   private systemSpecs?: SystemSpecs;
   private availableModels: string[] = [];
@@ -179,7 +240,7 @@ export class IntelligentModelSelector {
       name: 'gemma:latest',
       provider: 'ollama',
       type: 'local',
-      strengths: ['general purpose', 'fast', 'reliable', 'good for coding', 'stable'],
+      strengths: ['general purpose', 'fast', 'reliable', 'good for coding', 'stable', 'tool usage'],
       weaknesses: ['not as powerful as larger models'],
       recommendedFor: ['coding', 'general', 'chat', 'simple_tasks', 'quick_help'],
       size: 'medium',
@@ -191,10 +252,10 @@ export class IntelligentModelSelector {
       name: 'gemma3n:e4b',
       provider: 'ollama',
       type: 'local',
-      strengths: ['balanced', 'coding', 'reliable', 'fast'],
-      weaknesses: ['not as powerful as larger models'],
-      recommendedFor: ['coding', 'general', 'mixed_tasks'],
-      size: 'medium',
+      strengths: ['balanced', 'fast'],
+      weaknesses: ['not as powerful as larger models', 'limited tool usage', 'weak reasoning'],
+      recommendedFor: ['simple_tasks', 'quick_help'],
+      size: 'small',
       speed: 'fast',
       requirements: { minRam: 6144, minVram: 6144, minCores: 2 },
       contextWindow: 8192
@@ -253,10 +314,333 @@ export class IntelligentModelSelector {
     }
   ];
 
-  constructor(endpoint: string = 'http://localhost:11434') {
+  constructor(endpoint: string = 'http://localhost:11434', hybridConfig?: Partial<HybridRoutingConfig>) {
     this.errorHandler = new AutonomousErrorHandler();
     this.quantizationOptimizer = new AdvancedQuantizationOptimizer(endpoint);
+    
+    // Initialize hybrid configuration with defaults
+    this.hybridConfig = this.initializeHybridConfig(hybridConfig);
+    
     this.initializeSystemAnalysis();
+    this.initializeRoutingMetrics();
+  }
+
+  /**
+   * Initialize hybrid configuration with defaults
+   */
+  private initializeHybridConfig(config?: Partial<HybridRoutingConfig>): HybridRoutingConfig {
+    const defaultConfig: HybridRoutingConfig = {
+      enabled: true,
+      defaultProvider: 'auto',
+      escalationThreshold: 0.7,
+      confidenceScoring: true,
+      learningEnabled: true,
+      lmStudio: {
+        endpoint: 'http://localhost:1234',
+        enabled: true,
+        models: ['codellama-7b-instruct', 'gemma-2b-it'],
+        taskTypes: ['template', 'edit', 'format', 'boilerplate'],
+        streamingEnabled: true,
+        maxConcurrent: 3
+      },
+      ollama: {
+        endpoint: 'http://localhost:11434',
+        enabled: true,
+        models: ['codellama:34b', 'qwen2.5:72b'],
+        taskTypes: ['analysis', 'planning', 'complex', 'multi-file'],
+        maxConcurrent: 1
+      },
+      routing: {
+        escalationThreshold: 0.7,
+        rules: [
+          {
+            condition: 'taskType == "template"',
+            target: 'lmstudio',
+            confidence: 0.9,
+            description: 'Templates are fast tasks best handled by LM Studio'
+          },
+          {
+            condition: 'complexity == "complex"',
+            target: 'ollama',
+            confidence: 0.95,
+            description: 'Complex tasks require Ollama\'s reasoning capabilities'
+          },
+          {
+            condition: 'context.length > 5',
+            target: 'ollama',
+            confidence: 0.8,
+            description: 'Large context requires Ollama\'s context handling'
+          }
+        ]
+      }
+    };
+
+    return { ...defaultConfig, ...config };
+  }
+
+  /**
+   * Initialize routing metrics tracking
+   */
+  private initializeRoutingMetrics(): void {
+    const providers = ['lmstudio', 'ollama', 'hybrid'];
+    
+    for (const provider of providers) {
+      this.routingMetrics.set(provider, {
+        totalRequests: 0,
+        successRate: 1.0,
+        averageResponseTime: 0,
+        escalationRate: 0,
+        lastUpdated: Date.now()
+      });
+    }
+  }
+
+  /**
+   * Update hybrid configuration
+   */
+  updateHybridConfig(config: Partial<HybridRoutingConfig>): void {
+    this.hybridConfig = { ...this.hybridConfig, ...config };
+    logger.info('Hybrid routing configuration updated');
+  }
+
+  /**
+   * Classify task type and complexity for routing decisions
+   */
+  classifyTask(prompt: string, context: any = {}): TaskClassification {
+    const lowerPrompt = prompt.toLowerCase();
+    
+    // Determine task type
+    let taskType = 'general';
+    if (lowerPrompt.includes('template') || lowerPrompt.includes('boilerplate') || lowerPrompt.includes('generate')) {
+      taskType = 'template';
+    } else if (lowerPrompt.includes('format') || lowerPrompt.includes('lint') || lowerPrompt.includes('style')) {
+      taskType = 'format';
+    } else if (lowerPrompt.includes('analyze') || lowerPrompt.includes('review') || lowerPrompt.includes('audit')) {
+      taskType = 'analysis';
+    } else if (lowerPrompt.includes('plan') || lowerPrompt.includes('design') || lowerPrompt.includes('architecture')) {
+      taskType = 'planning';
+    } else if (lowerPrompt.includes('debug') || lowerPrompt.includes('fix') || lowerPrompt.includes('error')) {
+      taskType = 'debugging';
+    } else if (lowerPrompt.includes('refactor') && (lowerPrompt.includes('multiple') || lowerPrompt.includes('files'))) {
+      taskType = 'multi-file';
+    }
+
+    // Determine complexity
+    let complexity: 'simple' | 'medium' | 'complex' = 'simple';
+    let complexityScore = 0;
+    
+    // Complexity indicators
+    if (lowerPrompt.length > 500) complexityScore += 1;
+    if (lowerPrompt.includes('complex') || lowerPrompt.includes('advanced')) complexityScore += 2;
+    if (lowerPrompt.includes('multiple') || lowerPrompt.includes('several')) complexityScore += 1;
+    if (lowerPrompt.includes('architecture') || lowerPrompt.includes('system')) complexityScore += 2;
+    if (context.files && context.files.length > 3) complexityScore += 1;
+    if (lowerPrompt.includes('security') || lowerPrompt.includes('performance')) complexityScore += 1;
+
+    if (complexityScore >= 4) complexity = 'complex';
+    else if (complexityScore >= 2) complexity = 'medium';
+
+    // Suggest provider based on task characteristics
+    const suggestedProvider: 'lmstudio' | 'ollama' = 
+      (taskType === 'template' || taskType === 'format' || complexity === 'simple') ? 'lmstudio' : 'ollama';
+
+    const confidence = Math.min(0.9, 0.6 + (complexityScore * 0.05));
+
+    return {
+      type: taskType,
+      complexity,
+      confidence,
+      reasoning: `Task type: ${taskType}, complexity: ${complexity} (score: ${complexityScore})`,
+      suggestedProvider
+    };
+  }
+
+  /**
+   * Make routing decision based on task classification and system state
+   */
+  async makeRoutingDecision(prompt: string, context: any = {}): Promise<TaskRoutingDecision> {
+    if (!this.hybridConfig.enabled) {
+      return {
+        selectedLLM: 'ollama',
+        confidence: 1.0,
+        reasoning: 'Hybrid routing disabled, using Ollama',
+        fallbackStrategy: 'none'
+      };
+    }
+
+    const classification = this.classifyTask(prompt, context);
+    
+    // Check provider availability
+    const lmStudioAvailable = this.hybridConfig.lmStudio.enabled;
+    const ollamaAvailable = this.hybridConfig.ollama.enabled;
+
+    if (!lmStudioAvailable && !ollamaAvailable) {
+      throw new Error('No LLM providers available');
+    }
+
+    if (!lmStudioAvailable) {
+      return {
+        selectedLLM: 'ollama',
+        confidence: 1.0,
+        reasoning: 'LM Studio unavailable, using Ollama',
+        fallbackStrategy: 'none'
+      };
+    }
+
+    if (!ollamaAvailable) {
+      return {
+        selectedLLM: 'lmstudio',
+        confidence: 1.0,
+        reasoning: 'Ollama unavailable, using LM Studio',
+        fallbackStrategy: 'none'
+      };
+    }
+
+    // Apply routing rules
+    for (const rule of this.hybridConfig.routing.rules) {
+      if (this.evaluateRoutingRule(rule, classification, context)) {
+        const decision: TaskRoutingDecision = {
+          selectedLLM: rule.target,
+          confidence: rule.confidence,
+          reasoning: `Rule match: ${rule.description}`,
+          fallbackStrategy: rule.target === 'lmstudio' ? 'ollama' : 'lmstudio',
+          escalationThreshold: this.hybridConfig.escalationThreshold
+        };
+
+        logger.debug('Routing decision:', decision);
+        return decision;
+      }
+    }
+
+    // Default routing based on classification
+    const selectedLLM = classification.suggestedProvider;
+    const fallbackStrategy = selectedLLM === 'lmstudio' ? 'ollama' : 'lmstudio';
+
+    return {
+      selectedLLM,
+      confidence: classification.confidence,
+      reasoning: `Default routing: ${classification.reasoning}`,
+      fallbackStrategy,
+      escalationThreshold: this.hybridConfig.escalationThreshold
+    };
+  }
+
+  /**
+   * Evaluate routing rule against task classification
+   */
+  private evaluateRoutingRule(rule: RoutingRule, classification: TaskClassification, context: any): boolean {
+    const condition = rule.condition.toLowerCase();
+    
+    // Simple rule evaluation (can be extended with more sophisticated logic)
+    if (condition.includes('tasktype') && condition.includes(classification.type)) {
+      return true;
+    }
+    
+    if (condition.includes('complexity') && condition.includes(classification.complexity)) {
+      return true;
+    }
+    
+    if (condition.includes('context.length') && context.files) {
+      const contextLength = context.files.length;
+      const match = condition.match(/context\.length\s*([><=]+)\s*(\d+)/);
+      if (match) {
+        const operator = match[1];
+        const threshold = parseInt(match[2]);
+        
+        switch (operator) {
+          case '>': return contextLength > threshold;
+          case '<': return contextLength < threshold;
+          case '>=': return contextLength >= threshold;
+          case '<=': return contextLength <= threshold;
+          case '=': return contextLength === threshold;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Record routing decision outcome for learning
+   */
+  recordRoutingOutcome(
+    provider: 'lmstudio' | 'ollama' | 'hybrid',
+    success: boolean,
+    responseTime: number,
+    escalated: boolean = false
+  ): void {
+    const metrics = this.routingMetrics.get(provider);
+    if (!metrics) return;
+
+    metrics.totalRequests++;
+    metrics.successRate = (metrics.successRate * (metrics.totalRequests - 1) + (success ? 1 : 0)) / metrics.totalRequests;
+    metrics.averageResponseTime = (metrics.averageResponseTime * (metrics.totalRequests - 1) + responseTime) / metrics.totalRequests;
+    
+    if (escalated) {
+      metrics.escalationRate = (metrics.escalationRate * (metrics.totalRequests - 1) + 1) / metrics.totalRequests;
+    }
+    
+    metrics.lastUpdated = Date.now();
+
+    if (this.hybridConfig.learningEnabled) {
+      this.updateRoutingStrategies(provider, success, responseTime, escalated);
+    }
+  }
+
+  /**
+   * Update routing strategies based on performance data
+   */
+  private updateRoutingStrategies(
+    provider: 'lmstudio' | 'ollama' | 'hybrid',
+    success: boolean,
+    responseTime: number,
+    escalated: boolean
+  ): void {
+    // Simple learning: adjust escalation threshold based on success rates
+    const lmStudioMetrics = this.routingMetrics.get('lmstudio');
+    const ollamaMetrics = this.routingMetrics.get('ollama');
+
+    if (lmStudioMetrics && ollamaMetrics) {
+      // If LM Studio success rate is low, lower escalation threshold (escalate more often)
+      if (lmStudioMetrics.successRate < 0.8) {
+        this.hybridConfig.escalationThreshold = Math.max(0.5, this.hybridConfig.escalationThreshold - 0.05);
+        logger.debug('Lowered escalation threshold due to LM Studio performance');
+      }
+      
+      // If both providers are performing well, can be more selective
+      if (lmStudioMetrics.successRate > 0.9 && ollamaMetrics.successRate > 0.9) {
+        this.hybridConfig.escalationThreshold = Math.min(0.9, this.hybridConfig.escalationThreshold + 0.05);
+        logger.debug('Raised escalation threshold due to good performance');
+      }
+    }
+  }
+
+  /**
+   * Get hybrid routing status and metrics
+   */
+  getHybridStatus(): any {
+    const lmStudioMetrics = this.routingMetrics.get('lmstudio');
+    const ollamaMetrics = this.routingMetrics.get('ollama');
+    const hybridMetrics = this.routingMetrics.get('hybrid');
+
+    return {
+      enabled: this.hybridConfig.enabled,
+      escalationThreshold: this.hybridConfig.escalationThreshold,
+      providers: {
+        lmStudio: {
+          ...this.hybridConfig.lmStudio,
+          metrics: lmStudioMetrics
+        },
+        ollama: {
+          ...this.hybridConfig.ollama,
+          metrics: ollamaMetrics
+        }
+      },
+      routing: {
+        rules: this.hybridConfig.routing.rules.length,
+        metrics: hybridMetrics
+      }
+    };
   }
 
   /**
@@ -707,22 +1091,34 @@ export class IntelligentModelSelector {
       const modelSizes = await this.getModelSizes();
       const modelSize = modelSizes.get(modelName);
       
-      // Known problematic models that require high memory
-      const highMemoryModels: Record<string, number> = {
-        'codellama:34b': 20600,  // 20.6 GB
-        'qwq:32b': 19000,        // ~19 GB
-        'llama3.1:70b': 40000,   // ~40 GB
-        'qwen2.5:72b': 41000,    // ~41 GB
+      // Known models and their actual memory requirements (more realistic estimates)
+      const modelMemoryEstimates: Record<string, number> = {
+        'codellama:34b': 19000,   // ~19 GB (actual disk size, not load requirement)
+        'qwq:32b': 19000,         // ~19 GB
+        'llama3.1:70b': 40000,    // ~40 GB
+        'qwen2.5:72b': 41000,     // ~41 GB
       };
       
-      // Check if it's a known high-memory model
-      if (highMemoryModels[modelName]) {
-        const requiredMemory = highMemoryModels[modelName];
+      // Check if it's a known model with specific memory requirements
+      if (modelMemoryEstimates[modelName]) {
+        const estimatedMemory = modelMemoryEstimates[modelName];
+        const totalMemory = this.systemSpecs?.memory?.total || 0;
         const availableMemory = this.systemSpecs?.memory?.available || 0;
         
-        if (requiredMemory > availableMemory) {
-          logger.info(`❌ ${modelName} requires ${requiredMemory}MB but only ${availableMemory.toFixed(0)}MB available`);
+        // Use 70% of total memory as usable threshold (more realistic for large models)
+        const usableMemory = totalMemory * 0.7;
+        
+        // For 32GB+ systems, be more lenient with codellama:34b specifically
+        if (modelName === 'codellama:34b' && totalMemory >= 30000) {
+          logger.info(`✅ ${modelName} (${estimatedMemory}MB) allowed on high-memory system (${Math.round(totalMemory/1024)}GB total)`);
+          return true;
+        }
+        
+        if (estimatedMemory > usableMemory) {
+          logger.info(`❌ ${modelName} requires ~${estimatedMemory}MB but only ${usableMemory.toFixed(0)}MB usable (${Math.round(totalMemory/1024)}GB total)`);
           return false;
+        } else {
+          logger.info(`✅ ${modelName} (${estimatedMemory}MB) fits in usable memory (${usableMemory.toFixed(0)}MB)`);
         }
       }
       
@@ -860,11 +1256,12 @@ export class IntelligentModelSelector {
     }
     
     // Prioritize models based on task type and quality
-    // Focus on reliable, fast models first to avoid timeouts
+    // For coding, prioritize codellama models which are specifically designed for code
+    // Use specific model names to avoid gemma3n:e4b being selected over gemma:latest
     const modelPreferences = {
-      'coding': ['llama3.2', 'gemma', 'qwen', 'codellama', 'gemma3n'],
-      'general': ['llama3.2', 'gemma', 'qwen', 'gemma3n'],
-      'analysis': ['llama3.2', 'qwen', 'gemma', 'codellama']
+      'coding': ['codellama', 'gemma:latest', 'llama3.2', 'qwen', 'gemma2'],
+      'general': ['gemma:latest', 'llama3.2', 'qwen', 'codellama', 'gemma2'],
+      'analysis': ['llama3.2', 'qwen', 'gemma:latest', 'codellama']
     };
     
     const preferences = modelPreferences[taskType as keyof typeof modelPreferences] || modelPreferences.general;

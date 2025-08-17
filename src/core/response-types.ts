@@ -51,6 +51,18 @@ export interface SynthesisResponse extends BaseResponse {
 }
 
 /**
+ * Legacy synthesis result interface for backward compatibility
+ */
+export interface SynthesisResult {
+  synthesis: string;
+  reasoning: { steps: string[] };
+  confidence: number;
+  latency: number;
+  voicesUsed: string[];
+  modelUsed?: string;
+}
+
+/**
  * Tool execution response
  */
 export interface ToolResponse extends BaseResponse {

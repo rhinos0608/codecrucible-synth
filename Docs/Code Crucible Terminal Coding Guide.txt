@@ -220,7 +220,22 @@ cc --batch commands.txt
 # Integration with shell
 alias ai='cc'
 ai "Fix the failing tests"
+
+# Pipe content into the CLI
+cat my-code.js | cc "Add comments to this code"
+
+# Write output to a file
+cc "Create a new React component" --output src/components/MyNewComponent.jsx
 ```
+
+### Interactive Mode
+
+For a more conversational experience, use the interactive mode:
+
+```bash
+cc --interactive
+```
+
 
 ## VS Code Integration
 

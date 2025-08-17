@@ -2096,10 +2096,47 @@ Focus on actionable, specific recommendations with clear business value.`;
         }
     }
     isCommandRequest(prompt) {
+        const promptLower = prompt.toLowerCase();
+        // Direct command indicators (only when they're likely to be commands, not code generation)
         const commandIndicators = [
-            'run', 'execute', 'command', 'npm', 'git', 'test', 'build', 'install'
+            'run', 'execute', 'command', 'npm', 'git', 'build', 'install'
         ];
-        return commandIndicators.some(indicator => prompt.toLowerCase().includes(indicator));
+        // Command patterns that are more specific
+        const directCommandPatterns = [
+            /^run\s+/i,
+            /^execute\s+/i,
+            /^npm\s+/i,
+            /^git\s+/i,
+            /run.*test/i, // "run test" but not "create a test"
+            /npm.*test/i // "npm test" but not "create a test"
+        ];
+        // Natural language patterns that map to commands (be more specific)
+        const naturalLanguagePatterns = [
+            /list.*files/i,
+            /show.*files/i,
+            /check.*status/i,
+            /scan.*(?:for|this)/i,
+            /run.*audit.*(?:this\s+)?(?:project|codebase|code)/i, // "run an audit" maps to command
+            /find.*(?:files|code)/i,
+            /search.*(?:for|in)/i
+        ];
+        // Check direct command patterns first (more specific)
+        if (directCommandPatterns.some(pattern => pattern.test(prompt))) {
+            return true;
+        }
+        // Check natural language patterns
+        if (naturalLanguagePatterns.some(pattern => pattern.test(prompt))) {
+            return true;
+        }
+        // Check basic indicators but exclude code generation contexts
+        if (commandIndicators.some(indicator => promptLower.includes(indicator))) {
+            // Exclude if it's clearly code generation
+            if (promptLower.includes('create') || promptLower.includes('generate') || promptLower.includes('write')) {
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
     async handleFastCommand(prompt) {
         // Extract command from prompt
@@ -2133,9 +2170,8 @@ Focus on actionable, specific recommendations with clear business value.`;
             /(cd\s+[^.]+)/i,
             /(grep\s+[^.]+)/i,
             /(find\s+[^.]+)/i,
-            // Analysis patterns that translate to commands
-            /audit.*(?:this\s+)?codebase/i,
-            /analyze.*(?:this\s+)?(?:project|codebase|code)/i,
+            // Analysis patterns that translate to commands (be specific about WHEN to run commands)
+            /run.*audit.*(?:this\s+)?codebase/i, // Only "run an audit" - not "analyze"
             /check.*(?:project|codebase)/i,
             /scan.*(?:for|this)/i,
             /list.*files/i,
@@ -2145,12 +2181,9 @@ Focus on actionable, specific recommendations with clear business value.`;
             const match = prompt.match(pattern);
             if (match) {
                 let command = match[1]?.trim() || match[0].trim();
-                // Smart translations for common requests
-                if (/audit.*codebase/i.test(prompt)) {
+                // Smart translations for common requests - only for COMMAND-oriented requests
+                if (/run.*audit.*codebase/i.test(prompt)) {
                     return 'find . -name "*.ts" -o -name "*.js" -o -name "*.json" | head -20';
-                }
-                if (/analyze.*(?:project|codebase)/i.test(prompt)) {
-                    return 'ls -la && echo "TypeScript files:" && find . -name "*.ts" | wc -l && echo "JavaScript files:" && find . -name "*.js" | wc -l';
                 }
                 if (/list.*files/i.test(prompt)) {
                     return 'find . -type f -name "*.ts" -o -name "*.js" | head -15';

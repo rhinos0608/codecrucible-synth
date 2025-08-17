@@ -6,6 +6,20 @@ export interface LocalModelConfig {
     timeout: number;
     maxTokens: number;
     temperature: number;
+    performance?: {
+        maxLoadedModels?: number;
+        maxQueueSize?: number;
+        numParallel?: number;
+        memoryLimit?: string;
+        numThreads?: number;
+        numaPolicy?: string;
+        contextSize?: number;
+        quantization?: string;
+        useMmap?: boolean;
+        useMlock?: boolean;
+        batchSize?: number;
+    };
+    environment?: Record<string, string>;
 }
 export interface VoiceResponse {
     content: string;

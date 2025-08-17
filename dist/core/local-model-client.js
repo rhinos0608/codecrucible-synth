@@ -1407,6 +1407,7 @@ Style Instructions:
      * Build request for Ollama endpoint with performance optimizations
      */
     buildOllamaRequest(prompt, voice, model, jsonSchema) {
+        const perf = this.config.performance || {};
         const baseRequest = {
             model: model || this.config.model,
             prompt: prompt,
@@ -1419,7 +1420,15 @@ Style Instructions:
                 repeat_penalty: 1.1,
                 frequency_penalty: 0.1,
                 presence_penalty: 0.1,
-                stop: ['Human:', 'Assistant:', '<|endoftext|>']
+                stop: ['Human:', 'Assistant:', '<|endoftext|>'],
+                // Performance optimizations based on 2024 research
+                num_ctx: perf.contextSize || 4096,
+                num_thread: perf.numThreads || 8,
+                batch_size: perf.batchSize || 512,
+                use_mmap: perf.useMmap !== undefined ? perf.useMmap : true,
+                use_mlock: perf.useMlock !== undefined ? perf.useMlock : false,
+                numa: perf.numaPolicy === 'spread' ? true : false,
+                num_gpu: 0 // CPU-only to avoid conflicts with LM Studio
             }
         };
         // Add structured output format if schema provided

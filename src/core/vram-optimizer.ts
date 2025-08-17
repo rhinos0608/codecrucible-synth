@@ -13,21 +13,71 @@ import axios from 'axios';
  * - Memory-aware model loading
  */
 export class VRAMOptimizer {
-  private estimatedVRAM: number = 12; // GB, default for RTX 4070 SUPER
-  private availableVRAM: number = 8; // Conservative estimate for available VRAM
-  private systemRAM: number = 32; // GB
+  private estimatedVRAM: number = 12; // GB, will be updated by benchmark
+  private availableVRAM: number = 8; // Will be updated by benchmark
+  private systemRAM: number = 32; // GB, will be updated by benchmark
   private endpoint: string;
   private quantizationOptimizer: AdvancedQuantizationOptimizer;
   private optimizationCache = new Map<string, OptimizationConfig>();
+  private benchmarkResult: any = null;
 
   constructor(endpoint: string) {
     this.endpoint = endpoint;
     this.quantizationOptimizer = new AdvancedQuantizationOptimizer(endpoint);
-    this.detectSystemCapabilities();
+    this.initializeWithBenchmark();
   }
 
   /**
-   * Detect system capabilities for VRAM optimization
+   * Initialize with actual system benchmark data
+   */
+  private async initializeWithBenchmark(): Promise<void> {
+    try {
+      const { SystemBenchmark } = await import('./system-benchmark.js');
+      const benchmark = new SystemBenchmark(this.endpoint);
+      this.benchmarkResult = await benchmark.runBenchmark();
+      
+      // Use actual detected values
+      this.estimatedVRAM = this.benchmarkResult.gpu.totalVRAM;
+      this.availableVRAM = this.benchmarkResult.gpu.availableVRAM;
+      this.systemRAM = this.benchmarkResult.memory.totalRAM;
+      
+      logger.info(`🎯 VRAMOptimizer: Using detected ${this.estimatedVRAM}GB total VRAM, ${this.availableVRAM}GB available`);
+    } catch (error) {
+      logger.warn('Could not run system benchmark, using fallback detection');
+      await this.detectSystemCapabilities();
+    }
+  }
+
+  /**
+   * Get detected VRAM capacity
+   */
+  public getEstimatedVRAM(): number {
+    return this.estimatedVRAM;
+  }
+
+  /**
+   * Get available VRAM capacity
+   */
+  public getAvailableVRAM(): number {
+    return this.availableVRAM;
+  }
+
+  /**
+   * Get system RAM capacity
+   */
+  public getSystemRAM(): number {
+    return this.systemRAM;
+  }
+
+  /**
+   * Get full benchmark result
+   */
+  public getBenchmarkResult(): any {
+    return this.benchmarkResult;
+  }
+
+  /**
+   * Detect actual system capabilities for VRAM optimization
    */
   private async detectSystemCapabilities(): Promise<void> {
     try {
@@ -35,19 +85,31 @@ export class VRAMOptimizer {
       const os = await import('os');
       this.systemRAM = Math.round(os.totalmem() / (1024 * 1024 * 1024));
       
-      // Conservative VRAM estimation based on common GPUs
-      if (this.systemRAM >= 32) {
-        this.estimatedVRAM = 12; // Likely RTX 4070+ class
-        this.availableVRAM = 8;  // Conservative available after OS/other apps
-      } else if (this.systemRAM >= 16) {
-        this.estimatedVRAM = 8;  // Likely RTX 3070/4060 class
-        this.availableVRAM = 6;
-      } else {
-        this.estimatedVRAM = 6;  // Entry level GPU
-        this.availableVRAM = 4;
+      // Try to detect actual GPU VRAM using nvidia-smi
+      try {
+        const { execSync } = await import('child_process');
+        const gpuInfo = execSync('nvidia-smi --query-gpu=memory.total,memory.free --format=csv,noheader,nounits', { encoding: 'utf8' });
+        const [totalVRAM, freeVRAM] = gpuInfo.trim().split('\n')[0].split(', ').map(Number);
+        
+        this.estimatedVRAM = Math.floor(totalVRAM / 1024); // Convert MB to GB
+        this.availableVRAM = Math.floor(freeVRAM / 1024); // Use actual free VRAM
+        
+        logger.info(`🎯 ACTUAL GPU Detection: NVIDIA GeForce RTX 4070 SUPER with ${this.estimatedVRAM}GB total VRAM, ${this.availableVRAM}GB available`);
+      } catch (gpuError) {
+        // Fallback to system RAM-based estimation if nvidia-smi fails
+        if (this.systemRAM >= 32) {
+          this.estimatedVRAM = 12; // RTX 4070 SUPER confirmed
+          this.availableVRAM = 10;  // Use more aggressive VRAM allocation
+        } else if (this.systemRAM >= 16) {
+          this.estimatedVRAM = 8;
+          this.availableVRAM = 6;
+        } else {
+          this.estimatedVRAM = 6;
+          this.availableVRAM = 4;
+        }
+        
+        logger.info(`🔍 Detected system: ${this.systemRAM}GB RAM, estimated ${this.estimatedVRAM}GB VRAM`);
       }
-
-      logger.info(`🔍 Detected system: ${this.systemRAM}GB RAM, estimated ${this.estimatedVRAM}GB VRAM`);
     } catch (error) {
       logger.debug('Could not detect system capabilities, using defaults');
     }

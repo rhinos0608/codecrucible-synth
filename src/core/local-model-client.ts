@@ -8,6 +8,8 @@ import { IntelligentModelSelector } from './intelligent-model-selector.js';
 import { GPUOptimizer } from './gpu-optimizer.js';
 import { VRAMOptimizer, OptimizationConfig } from './vram-optimizer.js';
 import { ModelPreloader } from './model-preloader.js';
+import { modelPersistenceManager } from './model-persistence-manager.js';
+import { requestDeduplicationManager } from './request-deduplication.js';
 import chalk from 'chalk';
 import { AgentResponse, ResponseFactory } from './response-types.js';
 
@@ -82,6 +84,7 @@ export class LocalModelClient {
   private isOptimized = false;
   private fallbackModels: string[] = []; // Dynamically populated from available models
   private preloadedModels = new Set<string>(); // Track preloaded models
+  private modelCache = new Map<string, { model: string; timestamp: number }>(); // Model cache for fast access
   private modelWarmupPromises = new Map<string, Promise<boolean>>(); // Prevent duplicate warmup
   private vramOptimizer: VRAMOptimizer; // VRAM optimization for large models
   private currentOptimization: OptimizationConfig | null = null; // Current model optimization
@@ -200,25 +203,46 @@ export class LocalModelClient {
   /**
    * Preload primary models for faster response times
    */
+  /**
+   * Preload primary models for faster response times (non-blocking)
+   */
   private async preloadPrimaryModels(): Promise<void> {
     try {
-      // Get available models first
-      const availableModels = await this.getAvailableModels();
+      // Get available models with timeout
+      const availableModels = await Promise.race([
+        this.getAvailableModels(),
+        new Promise<string[]>((_, reject) => 
+          setTimeout(() => reject(new Error('Model list timeout')), 10000)
+        )
+      ]);
+      
       if (availableModels.length === 0) {
         logger.debug('No models available for preloading');
         return;
       }
 
-      // Preload up to 3 models to balance performance and memory usage
-      const modelsToPreload = availableModels.slice(0, 3);
+      // Preload only 1-2 small models to prevent resource exhaustion
+      const modelsToPreload = availableModels
+        .filter(model => !model.includes('30b') && !model.includes('20b')) // Skip large models
+        .slice(0, 2);
+      
+      if (modelsToPreload.length === 0) {
+        logger.debug('No suitable models for preloading');
+        return;
+      }
       
       logger.info(`🚀 Preloading ${modelsToPreload.length} models for faster response times...`);
       
-      for (const model of modelsToPreload) {
-        this.preloadModel(model); // Fire and forget for background preloading
-      }
+      // Fire and forget preloading (non-blocking)
+      modelsToPreload.forEach(model => {
+        this.preloadModel(model).catch(error => {
+          logger.debug(`Preload failed for ${model}:`, error.message);
+        });
+      });
+      
     } catch (error) {
-      logger.debug('Model preloading failed (non-critical):', error);
+      logger.debug('Preloading setup failed:', error instanceof Error ? error.message : String(error));
+      // Don't throw - this is non-critical
     }
   }
 
@@ -357,19 +381,69 @@ export class LocalModelClient {
   }
 
   /**
-   * Get best model with preloading awareness
+   * Get best model with preloading awareness and VRAM constraints
+   */
+  /**
+   * Get best model with optimized selection and caching
    */
   async getBestModel(): Promise<string> {
-    // First try to get best model from preloader
-    const preloadedModel = this.modelPreloader.getBestAvailableModel();
-    if (preloadedModel) {
-      logger.debug(`Using preloaded model: ${preloadedModel}`);
-      return preloadedModel;
+    // Use cached result if recent (within 30 seconds)
+    const cacheKey = 'best_model_cache';
+    if (this.modelCache.has(cacheKey)) {
+      const cached = this.modelCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < 30000) {
+        return cached.model;
+      }
     }
 
-    // Fallback to existing logic
-    const availableModels = await this.getAvailableModels();
-    return await this.selectBestAvailableModel(availableModels, 'coding');
+    try {
+      // Try fast preloader selection first
+      const preloadedModel = this.modelPreloader?.getBestAvailableModel?.() || null;
+      if (preloadedModel && this.isModelVRAMSuitable(preloadedModel)) {
+        this.modelCache.set(cacheKey, { model: preloadedModel, timestamp: Date.now() });
+        return preloadedModel;
+      }
+
+      // Fallback to fastest available model
+      const fastModel = await this.getFastestAvailableModel();
+      if (fastModel) {
+        this.modelCache.set(cacheKey, { model: fastModel, timestamp: Date.now() });
+        return fastModel;
+      }
+
+      // Ultimate fallback to config model
+      this.modelCache.set(cacheKey, { model: this.config.model, timestamp: Date.now() });
+      return this.config.model;
+      
+    } catch (error) {
+      logger.warn('Model selection failed, using config default:', error);
+      return this.config.model;
+    }
+  }
+
+  /**
+   * Check if model is suitable for current VRAM constraints (dynamically detected)
+   */
+  private isModelVRAMSuitable(model: string): boolean {
+    const modelLower = model.toLowerCase();
+    
+    // Get actual VRAM from VRAM optimizer if available
+    const actualVRAM = this.vramOptimizer?.getEstimatedVRAM() || 11; // Fallback to detected 11GB
+    
+    if (actualVRAM >= 11) {
+      // High VRAM system (RTX 4070 SUPER or better)
+      // Only exclude extremely large models that exceed available VRAM
+      const excludePatterns = ['70b', '72b']; // These typically need 16GB+ VRAM
+      return !excludePatterns.some(pattern => modelLower.includes(pattern));
+    } else if (actualVRAM >= 8) {
+      // Medium VRAM system
+      const excludePatterns = ['34b', '70b', '72b'];
+      return !excludePatterns.some(pattern => modelLower.includes(pattern));
+    } else {
+      // Low VRAM system
+      const excludePatterns = ['13b', '34b', '70b', '72b'];
+      return !excludePatterns.some(pattern => modelLower.includes(pattern));
+    }
   }
 
   /**
@@ -1070,7 +1144,7 @@ export class LocalModelClient {
   }
 
   /**
-   * Get the fastest available model prioritizing smaller models for speed and VRAM efficiency
+   * Get the fastest available model optimized for detected VRAM capacity
    */
   private async getFastestAvailableModel(): Promise<string> {
     const availableModels = await this.getAvailableModels();
@@ -1079,20 +1153,34 @@ export class LocalModelClient {
       return this.config.model;
     }
 
-    // Prioritize models by speed/efficiency (smaller = faster)
-    const speedPriority = [
-      // Tiny models (fastest)
-      '1b', '2b', 
-      // Small models (fast)
-      '3b', '7b', '8b', '9b',
-      // Medium models (moderate)
-      '11b', '13b', '14b', '15b'
-    ];
+    // Get actual VRAM from system detection
+    const actualVRAM = this.vramOptimizer?.getEstimatedVRAM() || 11;
+    const availableVRAM = this.vramOptimizer?.getAvailableVRAM() || 2;
+    
+    logger.info(`🔍 Selecting model for ${actualVRAM}GB total VRAM (${availableVRAM}GB available)`);
 
-    // Find the smallest available model for maximum speed
+    // Adaptive priority based on actual VRAM
+    let speedPriority: string[];
+    
+    if (actualVRAM >= 11 && availableVRAM >= 8) {
+      // High VRAM, high availability - can use larger models
+      speedPriority = ['2b', '7b', '13b', '34b', '1b', '3b'];
+    } else if (actualVRAM >= 11 && availableVRAM >= 4) {
+      // High VRAM, medium availability - prefer medium models
+      speedPriority = ['2b', '7b', '13b', '1b', '3b'];
+    } else if (actualVRAM >= 8) {
+      // Medium VRAM - stick to smaller models
+      speedPriority = ['2b', '7b', '1b', '3b'];
+    } else {
+      // Low VRAM - only tiny models
+      speedPriority = ['1b', '2b', '3b'];
+    }
+
+    // Find the best model based on VRAM-aware priority
     for (const sizeKey of speedPriority) {
       const fastModel = availableModels.find(model => 
         model.toLowerCase().includes(sizeKey) && 
+        this.isModelVRAMSuitable(model) &&
         (model.toLowerCase().includes('gemma') || 
          model.toLowerCase().includes('llama') ||
          model.toLowerCase().includes('qwen'))

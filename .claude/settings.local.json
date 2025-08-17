@@ -74,7 +74,8 @@
       "Bash(start /B ollama serve)",
       "WebFetch(domain:markaicode.com)",
       "WebFetch(domain:lmstudio.ai)",
-      "Bash(del nul)"
+      "Bash(del nul)",
+      "Bash(nvidia-smi:*)"
     ],
     "deny": [],
     "ask": [],

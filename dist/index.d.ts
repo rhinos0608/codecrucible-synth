@@ -7,4 +7,4 @@ import { CLIContext } from './core/cli.js';
  * Features multi-voice AI synthesis, MCP server integration, and both CLI and desktop interfaces.
  */
 export declare function initializeCLIContext(): Promise<CLIContext>;
-export declare function main(): Promise<void>;
+export declare const QUICK_START_MODE: boolean;

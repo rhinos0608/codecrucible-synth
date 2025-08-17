@@ -66,6 +66,7 @@ export declare class LocalModelClient {
     private isOptimized;
     private fallbackModels;
     private preloadedModels;
+    private modelCache;
     private modelWarmupPromises;
     private vramOptimizer;
     private currentOptimization;
@@ -82,6 +83,9 @@ export declare class LocalModelClient {
     private getDynamicTimeout;
     /**
      * Preload primary models for faster response times
+     */
+    /**
+     * Preload primary models for faster response times (non-blocking)
      */
     private preloadPrimaryModels;
     /**
@@ -105,9 +109,16 @@ export declare class LocalModelClient {
      */
     private determinePrimaryModels;
     /**
-     * Get best model with preloading awareness
+     * Get best model with preloading awareness and VRAM constraints
+     */
+    /**
+     * Get best model with optimized selection and caching
      */
     getBestModel(): Promise<string>;
+    /**
+     * Check if model is suitable for current VRAM constraints (dynamically detected)
+     */
+    private isModelVRAMSuitable;
     /**
      * Ensure model is ready before use
      */
@@ -210,7 +221,7 @@ export declare class LocalModelClient {
      */
     generateVoiceResponse(voice: VoiceArchetype, prompt: string, context: ProjectContext, retryCount?: number): Promise<VoiceResponse>;
     /**
-     * Get the fastest available model prioritizing smaller models for speed and VRAM efficiency
+     * Get the fastest available model optimized for detected VRAM capacity
      */
     private getFastestAvailableModel;
     /**

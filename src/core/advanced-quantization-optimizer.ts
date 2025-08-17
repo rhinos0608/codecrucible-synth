@@ -175,13 +175,19 @@ export class AdvancedQuantizationOptimizer {
   /**
    * Advanced system capability detection with AUTOMATIC BENCHMARKING
    */
+  private static benchmarkPromise: Promise<SystemBenchmarkResult> | null = null;
+  
   private async initializeSystemCapabilities(): Promise<void> {
     try {
-      logger.info('🔍 Running automatic system benchmark for optimal performance...');
+      // Use singleton pattern to prevent multiple simultaneous benchmarks
+      if (!AdvancedQuantizationOptimizer.benchmarkPromise) {
+        logger.info('🔍 Running automatic system benchmark for optimal performance...');
+        const benchmark = new SystemBenchmark(this.endpoint);
+        AdvancedQuantizationOptimizer.benchmarkPromise = benchmark.runBenchmark();
+      }
       
       // Run comprehensive benchmark automatically
-      const benchmark = new SystemBenchmark(this.endpoint);
-      this.benchmarkResult = await benchmark.runBenchmark();
+      this.benchmarkResult = await AdvancedQuantizationOptimizer.benchmarkPromise;
       
       // Convert benchmark to legacy format for compatibility
       this.systemCapabilities = {

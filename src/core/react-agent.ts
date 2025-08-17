@@ -34,6 +34,7 @@ import {
 import { LintCodeTool, GetAstTool } from './tools/code-analysis-tools.js';
 import { GitStatusTool, GitDiffTool } from './tools/git-tools.js';
 import { GoogleWebSearchTool, RefDocumentationTool, RefReadUrlTool, ExaWebSearchTool } from './tools/real-research-tools.js';
+import { AutonomousCodebaseAuditor } from './tools/autonomous-codebase-auditor.js';
 import { CodeInjectionTool } from './tools/code-injection-tool.js';
 import { CodeWriterTool } from './tools/code-writer-tool.js';
 import { AutonomousErrorHandler, ErrorContext } from './autonomous-error-handler.js';
@@ -189,6 +190,9 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
       new RefDocumentationTool(this.agentContext),
       new RefReadUrlTool(this.agentContext),
       new ExaWebSearchTool(this.agentContext),
+
+      // Autonomous Tools
+      new AutonomousCodebaseAuditor(this.agentContext),
       
       // Legacy compatibility
       new ReadFileTool(this.agentContext),

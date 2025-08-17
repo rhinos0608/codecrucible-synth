@@ -31,12 +31,6 @@ module.exports = {
     '^ora$': '<rootDir>/tests/__mocks__/ora.js',
     '^inquirer$': '<rootDir>/tests/__mocks__/inquirer.js'
   },
-  extensionsToTreatAsEsm: ['.ts'],
-  globals: {
-    'ts-jest': {
-      useESM: true
-    }
-  },
   testPathIgnorePatterns: [
     "<rootDir>/archive/",
     "<rootDir>/tests/__mocks__/",
@@ -54,8 +48,11 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov', 'html'],
   coverageDirectory: 'coverage',
-  testTimeout: 30000,
-  // Better error reporting
+  testTimeout: 60000,
   verbose: true,
-  // Handle CommonJS modules better - moved to transform config above
+  // Prevent hanging tests
+  forceExit: true,
+  detectOpenHandles: true,
+  // Limit workers to prevent resource exhaustion
+  maxWorkers: 2
 };

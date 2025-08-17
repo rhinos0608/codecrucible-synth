@@ -319,23 +319,28 @@ export class TimeoutManager {
    */
   static getRecommendedTimeout(operationType: string): number {
     const timeouts: Record<string, number> = {
-      'model_generation': 120000,     // 2 minutes
-      'file_analysis': 30000,         // 30 seconds
-      'project_scan': 60000,          // 1 minute
-      'api_request': 30000,           // 30 seconds
-      'file_operation': 10000,        // 10 seconds
-      'database_operation': 5000,     // 5 seconds
-      'network_request': 15000,       // 15 seconds
-      'compilation': 300000,          // 5 minutes
-      'test_execution': 300000,       // 5 minutes
-      'download': 120000,             // 2 minutes
-      'upload': 300000,               // 5 minutes
+      'model_generation': 300000,     // 5 minutes (increased from 2)
+      'model_warmup': 180000,         // 3 minutes (new)
+      'model_preload': 120000,        // 2 minutes (new)
+      'file_analysis': 60000,         // 1 minute (increased from 30s)
+      'project_scan': 120000,         // 2 minutes (increased from 1)
+      'api_request': 60000,           // 1 minute (increased from 30s)
+      'lmstudio_request': 300000,     // 5 minutes (new)
+      'ollama_request': 180000,       // 3 minutes (new)
+      'hybrid_request': 360000,       // 6 minutes (new)
+      'file_operation': 30000,        // 30 seconds
+      'database_operation': 15000,    // 15 seconds (increased from 5)
+      'network_request': 30000,       // 30 seconds (increased from 15)
+      'compilation': 600000,          // 10 minutes (increased from 5)
+      'test_execution': 600000,       // 10 minutes
+      'download': 300000,             // 5 minutes (increased from 2)
+      'upload': 600000,               // 10 minutes (increased from 5)
       'interactive_input': 300000,    // 5 minutes
-      'agent_orchestration': 600000,  // 10 minutes
-      'voice_synthesis': 180000,      // 3 minutes
+      'agent_orchestration': 1200000, // 20 minutes (increased from 10)
+      'voice_synthesis': 300000,      // 5 minutes (increased from 3)
     };
 
-    return timeouts[operationType] || 60000; // Default 1 minute
+    return timeouts[operationType] || 120000; // Default 2 minutes (increased from 1)
   }
 
   /**

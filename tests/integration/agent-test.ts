@@ -52,7 +52,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
 
   afterAll(async () => {
     // Clean up temporary directory
-    await fs.rmdir(tempDir, { recursive: true });
+    await fs.rm(tempDir, { recursive: true });
   });
 
   beforeEach(() => {
@@ -395,6 +395,31 @@ describe('CodeCrucible Agent Integration Tests', () => {
 class MockLocalModelClient {
   constructor() {
     // Mock constructor that doesn't call parent
+  }
+
+  async generate(prompt: string, jsonSchema?: any): Promise<string> {
+    // Fast mock response to prevent timeouts
+    if (prompt.includes('TypeScript')) {
+      return 'TypeScript is a superset of JavaScript that adds static typing.';
+    }
+    return 'Mock response for testing purposes.';
+  }
+
+  async generateFast(prompt: string, maxTokens?: number): Promise<string> {
+    // Very fast mock response
+    return 'Fast mock response.';
+  }
+
+  getCurrentModel(): string {
+    return 'test-model';
+  }
+
+  setModel(model: string): void {
+    // Mock method
+  }
+
+  async initialize(): Promise<void> {
+    // Mock initialization - return immediately
   }
   
   async generateVoiceResponse(voice: any, prompt: string, context: any) {

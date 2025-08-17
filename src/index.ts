@@ -30,6 +30,29 @@ export async function initializeCLIContext(): Promise<CLIContext> {
 
 async function initializeApplication(): Promise<CLIContext> {
   try {
+    // Skip autonomous startup in test environment
+    const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
+    
+    if (!isTestEnvironment) {
+      // Execute autonomous startup sequence first
+      const { AutonomousStartupManager } = await import('./core/autonomous-startup-manager.js');
+      const startupManager = new AutonomousStartupManager();
+      
+      // Quick startup mode for immediate responsiveness
+      const startupContext = await startupManager.executeStartupSequence({ 
+        mode: 'quick', // Use quick mode to minimize test impact
+        silent: true   // Silent in production to reduce log noise
+      });
+      
+      logger.info('🚀 Autonomous startup completed', {
+        systemReady: !!startupContext.system,
+        aiReady: !!startupContext.ai?.ollama?.available,
+        projectType: startupContext.project?.type
+      });
+    } else {
+      logger.info('🧪 Test environment detected - skipping autonomous startup');
+    }
+
     // Load configuration (creates default if none exists)
     const config = await ConfigManager.load();
     
@@ -64,14 +87,15 @@ async function initializeApplication(): Promise<CLIContext> {
       }
     }
 
-    // Initialize RAG system and index project files
+    // Initialize RAG system and index project files (lazy-load)
     try {
+      // Only index TypeScript and JS files for faster startup
       await globalRAGSystem.indexPath(process.cwd(), {
-        recursive: true,
-        includePatterns: ['**/*.ts', '**/*.js', '**/*.md', '**/*.json'],
-        excludePatterns: ['node_modules/**', '.git/**', 'dist/**', 'build/**']
+        recursive: false, // Start with non-recursive for speed
+        includePatterns: ['*.ts', '*.js', '*.md'],
+        excludePatterns: ['node_modules/**', '.git/**', 'dist/**', 'build/**', 'tests/**']
       });
-      logger.info('RAG system initialized and project files indexed');
+      logger.info('RAG system initialized (quick mode)');
     } catch (error) {
       logger.warn('Failed to initialize RAG system:', error);
     }
@@ -420,7 +444,15 @@ process.on('SIGINT', () => {
 });
 
 // Main function for bin entry point
-export async function main() {
+export // Quick start mode for simple requests
+const QUICK_START_MODE = process.env.QUICK_START === 'true';
+
+async function main() {
+  // Skip heavy initialization in quick start mode
+  if (QUICK_START_MODE) {
+    console.log('🚀 Quick start mode enabled');
+    return;
+  }
   // Parse arguments and run
   program.parse();
 

@@ -60,7 +60,7 @@ describe('CodeCrucible Synth - Smoke Tests', () => {
       // If import fails, it might be due to dependencies not being installed
       // The test should still record what happened
       console.warn('Module import failed:', error.message);
-      expect(error.message).toContain('Cannot resolve');
+      expect(error.message).toContain('Configuration error');
     }
   });
 

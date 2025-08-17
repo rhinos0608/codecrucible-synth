@@ -1,7 +1,7 @@
 {
   "name": "codecrucible-synth",
-  "version": "3.3.3",
-  "description": "Next-generation AI coding assistant with advanced caching, intelligent model persistence, and 68 comprehensive optimizations for enterprise-scale performance",
+  "version": "3.4.0",
+  "description": "AI-Powered Code Generation & Comprehensive Codebase Analysis Tool with Autonomous Startup and Enhanced Intelligence",
   "main": "dist/index.js",
   "type": "module",
   "bin": {

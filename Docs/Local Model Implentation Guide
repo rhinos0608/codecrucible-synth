@@ -1,0 +1,1568 @@
+Complete Guide: Local Model CLI Agents with Ollama & LM Studio
+Executive Summary
+This comprehensive guide focuses on building CLI agents powered by local Large Language Models (LLMs) using Ollama and LM Studio. Running models locally offers complete data privacy, zero API costs, offline capability, and full control over model selection and optimization.
+Table of Contents
+
+Local Model Architecture Overview
+Ollama Deep Dive
+LM Studio Deep Dive
+Hybrid Architecture Patterns
+Implementation Examples
+Performance Optimization
+Model Management & Routing
+Production Deployment
+
+Local Model Architecture Overview
+Why Local Models?
+yamlAdvantages:
+  Privacy:
+    - Complete data sovereignty
+    - No external API calls
+    - GDPR/HIPAA compliance
+    - Proprietary code protection
+  
+  Cost:
+    - Zero per-token fees
+    - One-time hardware investment
+    - Predictable operational costs
+    - No vendor lock-in
+  
+  Performance:
+    - Sub-100ms latency
+    - No network overhead
+    - GPU acceleration
+    - Offline capability
+  
+  Control:
+    - Model selection flexibility
+    - Custom quantization
+    - Fine-tuning capability
+    - Version control
+Architecture Components
+┌──────────────────────────────────────────┐
+│           CLI Interface Layer            │
+├──────────────────────────────────────────┤
+│         Agent Orchestrator               │
+├──────────┬──────────────┬────────────────┤
+│  Router  │  Load Balancer│  Fallback     │
+├──────────┴──────────────┴────────────────┤
+│         Model Runtime Layer              │
+├─────────────┬──────────────┬─────────────┤
+│   Ollama    │  LM Studio   │  llama.cpp  │
+├─────────────┴──────────────┴─────────────┤
+│         Hardware Layer (GPU/CPU)         │
+└──────────────────────────────────────────┘
+Ollama Deep Dive
+1. Architecture & Components
+yamlOllama Architecture:
+  Core Components:
+    Model Manager:
+      - GGUF model loading
+      - Modelfile management
+      - Version control
+      - Hot swapping
+    
+    Inference Server:
+      - REST API (port 11434)
+      - WebSocket support
+      - Streaming responses
+      - Concurrent requests
+    
+    CLI Interface:
+      - Model operations (pull, create, push)
+      - Interactive chat
+      - Batch processing
+      - System management
+  
+  Technical Stack:
+    - Language: Go + Rust
+    - Backend: llama.cpp
+    - API: OpenAI-compatible
+    - Storage: ~/.ollama/models
+2. Installation & Setup
+bash# Linux/macOS Installation
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Windows Installation
+# Download from https://ollama.com/download/windows
+
+# Verify installation
+ollama --version
+
+# Start Ollama service
+ollama serve
+
+# Pull models
+ollama pull llama3.2:1b      # 1B parameter model
+ollama pull mistral:7b       # 7B parameter model
+ollama pull qwen2.5:32b      # 32B parameter model
+ollama pull deepseek-r1:14b  # DeepSeek reasoning model
+
+# List installed models
+ollama list
+3. Model Management
+bash# Using Hugging Face GGUF models directly
+ollama run hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:Q4_K_M
+ollama run hf.co/MaziyarPanahi/Qwen2.5-32B-Instruct-GGUF:Q4_K_M
+
+# Create custom model with Modelfile
+cat > Modelfile << EOF
+FROM llama3.2:3b
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER repeat_penalty 1.1
+SYSTEM "You are a helpful coding assistant specialized in Python and TypeScript."
+EOF
+
+ollama create code-assistant -f Modelfile
+ollama run code-assistant
+4. API Integration
+python# Python Integration
+import requests
+import json
+
+class OllamaAgent:
+    def __init__(self, model="llama3.2:3b", base_url="http://localhost:11434"):
+        self.model = model
+        self.base_url = base_url
+        self.context = []
+    
+    def generate(self, prompt, stream=True):
+        """Generate response with streaming support"""
+        response = requests.post(
+            f"{self.base_url}/api/generate",
+            json={
+                "model": self.model,
+                "prompt": prompt,
+                "stream": stream,
+                "context": self.context,
+                "options": {
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "num_predict": 2048
+                }
+            },
+            stream=stream
+        )
+        
+        if stream:
+            for line in response.iter_lines():
+                if line:
+                    chunk = json.loads(line)
+                    if not chunk.get("done"):
+                        yield chunk.get("response", "")
+                    else:
+                        self.context = chunk.get("context", [])
+        else:
+            result = response.json()
+            self.context = result.get("context", [])
+            return result.get("response")
+    
+    def chat(self, messages):
+        """Chat with conversation history"""
+        response = requests.post(
+            f"{self.base_url}/api/chat",
+            json={
+                "model": self.model,
+                "messages": messages,
+                "stream": False
+            }
+        )
+        return response.json()["message"]["content"]
+5. Advanced Configuration
+yaml# Environment Variables
+OLLAMA_HOST: 0.0.0.0:11434
+OLLAMA_MODELS: /custom/path/models
+OLLAMA_KEEP_ALIVE: 5m
+OLLAMA_NUM_PARALLEL: 4
+OLLAMA_MAX_LOADED_MODELS: 2
+OLLAMA_DEBUG: true
+
+# GPU Configuration
+CUDA_VISIBLE_DEVICES: 0,1  # NVIDIA
+HSA_OVERRIDE_GFX_VERSION: 10.3.0  # AMD ROCm
+OLLAMA_INTEL_GPU: 1  # Intel Arc
+
+# Performance Tuning
+OLLAMA_NUM_GPU: 999  # Use all GPU layers
+OLLAMA_CPU_ONLY: false
+OLLAMA_FLASH_ATTENTION: true
+LM Studio Deep Dive
+1. Architecture & Features
+yamlLM Studio Architecture:
+  Core Features:
+    Model Management:
+      - Hugging Face integration
+      - One-click downloads
+      - Model catalog browser
+      - Automatic compatibility checking
+    
+    Inference Server:
+      - OpenAI-compatible API
+      - Local server mode
+      - Batch processing
+      - Multi-model loading
+    
+    UI Features:
+      - Interactive chat interface
+      - Model configuration GUI
+      - Performance monitoring
+      - Preset management
+  
+  Runtime Support:
+    - llama.cpp (GGUF)
+    - MLX (Apple Silicon)
+    - Custom backends
+    - Quantization: Q2-Q8, K-quants
+2. API Server Configuration
+json// LM Studio Server Configuration
+{
+  "host": "localhost",
+  "port": 1234,
+  "models": {
+    "default": "meta-llama-3.2-3b-instruct",
+    "available": [
+      "meta-llama-3.2-3b-instruct",
+      "mistral-7b-instruct-v0.3",
+      "qwen2.5-coder-32b-instruct"
+    ]
+  },
+  "endpoints": {
+    "completions": "/v1/completions",
+    "chat": "/v1/chat/completions",
+    "embeddings": "/v1/embeddings",
+    "models": "/v1/models"
+  },
+  "settings": {
+    "idle_ttl": 300,
+    "max_loaded_models": 2,
+    "auto_evict": true,
+    "gpu_layers": -1,
+    "context_length": 4096
+  }
+}
+3. CLI Integration
+typescript// TypeScript LM Studio Client
+import axios from 'axios';
+
+interface LMStudioConfig {
+  baseURL: string;
+  model: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
+class LMStudioAgent {
+  private config: LMStudioConfig;
+  
+  constructor(config: Partial<LMStudioConfig> = {}) {
+    this.config = {
+      baseURL: config.baseURL || 'http://localhost:1234/v1',
+      model: config.model || 'default',
+      maxTokens: config.maxTokens || 2048,
+      temperature: config.temperature || 0.7
+    };
+  }
+  
+  async complete(prompt: string): Promise<string> {
+    const response = await axios.post(
+      `${this.config.baseURL}/completions`,
+      {
+        model: this.config.model,
+        prompt: prompt,
+        max_tokens: this.config.maxTokens,
+        temperature: this.config.temperature,
+        stream: false
+      }
+    );
+    
+    return response.data.choices[0].text;
+  }
+  
+  async chat(messages: Array<{role: string, content: string}>): Promise<string> {
+    const response = await axios.post(
+      `${this.config.baseURL}/chat/completions`,
+      {
+        model: this.config.model,
+        messages: messages,
+        max_tokens: this.config.maxTokens,
+        temperature: this.config.temperature
+      }
+    );
+    
+    return response.data.choices[0].message.content;
+  }
+  
+  async *streamChat(messages: Array<{role: string, content: string}>) {
+    const response = await axios.post(
+      `${this.config.baseURL}/chat/completions`,
+      {
+        model: this.config.model,
+        messages: messages,
+        stream: true
+      },
+      {
+        responseType: 'stream'
+      }
+    );
+    
+    for await (const chunk of response.data) {
+      const lines = chunk.toString().split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = JSON.parse(line.slice(6));
+          if (data.choices[0].delta?.content) {
+            yield data.choices[0].delta.content;
+          }
+        }
+      }
+    }
+  }
+}
+4. Headless Mode & Automation
+bash# Start LM Studio in headless mode
+lmstudio server start --headless \
+  --port 1234 \
+  --cors \
+  --models-dir /path/to/models \
+  --verbose
+
+# Load specific model
+lmstudio model load "TheBloke/Llama-3.2-3B-Instruct-GGUF" \
+  --variant "Q4_K_M" \
+  --gpu-layers -1
+
+# Configure server settings
+lmstudio server config \
+  --idle-ttl 600 \
+  --max-loaded 3 \
+  --context-length 8192
+Hybrid Architecture Patterns
+1. Local-First with Cloud Fallback
+pythonclass HybridAgent:
+    def __init__(self):
+        self.local_models = {
+            'small': OllamaClient('llama3.2:1b'),
+            'medium': OllamaClient('mistral:7b'),
+            'large': LMStudioClient('qwen2.5:32b')
+        }
+        self.cloud_models = {
+            'premium': OpenAIClient('gpt-4o'),
+            'fast': AnthropicClient('claude-3-haiku')
+        }
+        self.router = QueryRouter()
+    
+    async def process(self, query: str, context: dict):
+        # Analyze query complexity
+        complexity = self.router.analyze_complexity(query)
+        urgency = context.get('urgency', 'normal')
+        
+        # Route based on complexity and urgency
+        if complexity == 'simple':
+            return await self._use_local('small', query)
+        elif complexity == 'moderate':
+            if urgency == 'high':
+                return await self._use_cloud('fast', query)
+            else:
+                return await self._use_local('medium', query)
+        else:  # complex
+            if await self._check_local_capacity('large'):
+                return await self._use_local('large', query)
+            else:
+                return await self._use_cloud('premium', query)
+    
+    async def _use_local(self, model_size: str, query: str):
+        try:
+            return await self.local_models[model_size].generate(query)
+        except Exception as e:
+            # Fallback to cloud
+            return await self._use_cloud('fast', query)
+    
+    async def _use_cloud(self, model_type: str, query: str):
+        return await self.cloud_models[model_type].generate(query)
+2. Cost-Optimized Routing
+typescriptclass CostOptimizedRouter {
+  private modelCosts = {
+    'local': {
+      'llama3.2:1b': 0,      // Free (local)
+      'mistral:7b': 0,       // Free (local)
+      'qwen2.5:32b': 0       // Free (local)
+    },
+    'cloud': {
+      'gpt-3.5-turbo': 0.001,  // $0.001/1K tokens
+      'gpt-4o-mini': 0.015,     // $0.015/1K tokens
+      'gpt-4o': 0.03,           // $0.03/1K tokens
+      'claude-3-haiku': 0.0025, // $0.0025/1K tokens
+      'claude-3-opus': 0.06     // $0.06/1K tokens
+    }
+  };
+  
+  private modelCapabilities = {
+    'llama3.2:1b': ['simple_qa', 'classification'],
+    'mistral:7b': ['general_qa', 'summarization', 'translation'],
+    'qwen2.5:32b': ['coding', 'reasoning', 'analysis'],
+    'gpt-4o': ['complex_reasoning', 'vision', 'function_calling']
+  };
+  
+  selectModel(
+    task: string,
+    maxCost: number,
+    minQuality: number
+  ): string {
+    // Find capable models
+    const capableModels = Object.entries(this.modelCapabilities)
+      .filter(([model, caps]) => caps.includes(task))
+      .map(([model]) => model);
+    
+    // Sort by cost (local first)
+    const sortedModels = capableModels.sort((a, b) => {
+      const costA = this.getModelCost(a);
+      const costB = this.getModelCost(b);
+      return costA - costB;
+    });
+    
+    // Select based on budget and quality requirements
+    for (const model of sortedModels) {
+      const cost = this.getModelCost(model);
+      const quality = this.getModelQuality(model);
+      
+      if (cost <= maxCost && quality >= minQuality) {
+        return model;
+      }
+    }
+    
+    // Default to best local model
+    return 'qwen2.5:32b';
+  }
+  
+  private getModelCost(model: string): number {
+    return this.modelCosts.local[model] || 
+           this.modelCosts.cloud[model] || 
+           Infinity;
+  }
+  
+  private getModelQuality(model: string): number {
+    const qualityScores = {
+      'llama3.2:1b': 0.6,
+      'mistral:7b': 0.7,
+      'qwen2.5:32b': 0.85,
+      'gpt-3.5-turbo': 0.75,
+      'gpt-4o-mini': 0.8,
+      'gpt-4o': 0.95,
+      'claude-3-haiku': 0.75,
+      'claude-3-opus': 0.95
+    };
+    return qualityScores[model] || 0.5;
+  }
+}
+3. Semantic Routing
+pythonclass SemanticRouter:
+    def __init__(self):
+        self.embeddings_model = OllamaClient('nomic-embed-text')
+        self.routing_rules = self._load_routing_rules()
+    
+    def _load_routing_rules(self):
+        return {
+            'coding': {
+                'models': ['qwen2.5-coder:32b', 'deepseek-coder:33b'],
+                'keywords': ['code', 'function', 'debug', 'implement'],
+                'embedding_threshold': 0.85
+            },
+            'creative': {
+                'models': ['llama3.2:70b', 'mixtral:8x7b'],
+                'keywords': ['story', 'creative', 'imagine', 'write'],
+                'embedding_threshold': 0.80
+            },
+            'analysis': {
+                'models': ['qwen2.5:32b', 'mistral:7b'],
+                'keywords': ['analyze', 'compare', 'evaluate', 'assess'],
+                'embedding_threshold': 0.82
+            },
+            'simple': {
+                'models': ['llama3.2:1b', 'phi3:mini'],
+                'keywords': ['what', 'when', 'who', 'define'],
+                'embedding_threshold': 0.75
+            }
+        }
+    
+    async def route(self, query: str):
+        # Get query embedding
+        query_embedding = await self.embeddings_model.embed(query)
+        
+        # Find best matching category
+        best_match = None
+        best_score = 0
+        
+        for category, rules in self.routing_rules.items():
+            # Check keyword matches
+            keyword_score = sum(
+                1 for kw in rules['keywords'] 
+                if kw.lower() in query.lower()
+            ) / len(rules['keywords'])
+            
+            # Check semantic similarity
+            category_embedding = await self.embeddings_model.embed(
+                ' '.join(rules['keywords'])
+            )
+            semantic_score = self._cosine_similarity(
+                query_embedding, 
+                category_embedding
+            )
+            
+            # Combined score
+            total_score = (keyword_score * 0.3 + semantic_score * 0.7)
+            
+            if total_score > best_score:
+                best_score = total_score
+                best_match = category
+        
+        # Select model from category
+        if best_match and best_score > self.routing_rules[best_match]['embedding_threshold']:
+            available_models = self.routing_rules[best_match]['models']
+            return self._select_available_model(available_models)
+        
+        # Default fallback
+        return 'mistral:7b'
+    
+    def _select_available_model(self, models: list):
+        """Check which models are available and loaded"""
+        for model in models:
+            if self._is_model_available(model):
+                return model
+        return models[0]  # Return first as fallback
+Implementation Examples
+1. Complete CLI Agent with Ollama
+python#!/usr/bin/env python3
+"""
+Advanced CLI Agent with Ollama Backend
+"""
+
+import asyncio
+import click
+import json
+from typing import List, Dict, Any
+from dataclasses import dataclass
+from enum import Enum
+import aiohttp
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.prompt import Prompt
+from rich.markdown import Markdown
+
+console = Console()
+
+class ModelSize(Enum):
+    TINY = "llama3.2:1b"
+    SMALL = "llama3.2:3b"
+    MEDIUM = "mistral:7b"
+    LARGE = "qwen2.5:32b"
+    XLARGE = "llama3.1:70b"
+
+@dataclass
+class AgentConfig:
+    base_url: str = "http://localhost:11434"
+    default_model: str = ModelSize.MEDIUM.value
+    temperature: float = 0.7
+    max_tokens: int = 2048
+    timeout: int = 120
+    stream: bool = True
+
+class OllamaAgent:
+    def __init__(self, config: AgentConfig):
+        self.config = config
+        self.session = None
+        self.context = []
+        self.conversation_history = []
+    
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
+    
+    async def list_models(self) -> List[Dict[str, Any]]:
+        """List available models"""
+        async with self.session.get(
+            f"{self.config.base_url}/api/tags"
+        ) as response:
+            data = await response.json()
+            return data.get("models", [])
+    
+    async def pull_model(self, model_name: str):
+        """Pull a model from registry"""
+        console.print(f"[yellow]Pulling model {model_name}...[/yellow]")
+        
+        async with self.session.post(
+            f"{self.config.base_url}/api/pull",
+            json={"name": model_name},
+            timeout=aiohttp.ClientTimeout(total=None)
+        ) as response:
+            async for line in response.content:
+                if line:
+                    data = json.loads(line)
+                    if "status" in data:
+                        console.print(f"[dim]{data['status']}[/dim]")
+    
+    async def generate(
+        self, 
+        prompt: str, 
+        model: str = None,
+        system_prompt: str = None
+    ):
+        """Generate response with streaming"""
+        model = model or self.config.default_model
+        
+        # Add to conversation history
+        self.conversation_history.append({
+            "role": "user",
+            "content": prompt
+        })
+        
+        # Prepare request
+        request_data = {
+            "model": model,
+            "prompt": prompt,
+            "stream": self.config.stream,
+            "context": self.context,
+            "options": {
+                "temperature": self.config.temperature,
+                "num_predict": self.config.max_tokens
+            }
+        }
+        
+        if system_prompt:
+            request_data["system"] = system_prompt
+        
+        # Generate response
+        full_response = ""
+        
+        async with self.session.post(
+            f"{self.config.base_url}/api/generate",
+            json=request_data,
+            timeout=aiohttp.ClientTimeout(total=self.config.timeout)
+        ) as response:
+            if self.config.stream:
+                console.print("\n[cyan]Assistant:[/cyan]")
+                async for line in response.content:
+                    if line:
+                        chunk = json.loads(line)
+                        if not chunk.get("done"):
+                            text = chunk.get("response", "")
+                            console.print(text, end="")
+                            full_response += text
+                        else:
+                            self.context = chunk.get("context", [])
+                console.print("\n")
+            else:
+                data = await response.json()
+                full_response = data.get("response", "")
+                self.context = data.get("context", [])
+                console.print(f"\n[cyan]Assistant:[/cyan]\n{full_response}\n")
+        
+        # Add response to history
+        self.conversation_history.append({
+            "role": "assistant",
+            "content": full_response
+        })
+        
+        return full_response
+    
+    async def chat(
+        self,
+        messages: List[Dict[str, str]],
+        model: str = None
+    ):
+        """Chat with conversation context"""
+        model = model or self.config.default_model
+        
+        async with self.session.post(
+            f"{self.config.base_url}/api/chat",
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": self.config.stream
+            }
+        ) as response:
+            if self.config.stream:
+                full_response = ""
+                async for line in response.content:
+                    if line:
+                        chunk = json.loads(line)
+                        if "message" in chunk:
+                            content = chunk["message"].get("content", "")
+                            console.print(content, end="")
+                            full_response += content
+                return full_response
+            else:
+                data = await response.json()
+                return data["message"]["content"]
+
+class CLIInterface:
+    def __init__(self):
+        self.config = AgentConfig()
+        self.agent = None
+    
+    async def run_interactive(self):
+        """Run interactive REPL mode"""
+        console.print("[bold cyan]🤖 Ollama CLI Agent[/bold cyan]")
+        console.print("[dim]Type 'help' for commands, 'exit' to quit[/dim]\n")
+        
+        async with OllamaAgent(self.config) as agent:
+            self.agent = agent
+            
+            # Check if model is available
+            await self._ensure_model()
+            
+            while True:
+                try:
+                    prompt = Prompt.ask("[green]You[/green]")
+                    
+                    if prompt.lower() in ['exit', 'quit']:
+                        break
+                    
+                    if prompt.lower() == 'help':
+                        self._show_help()
+                        continue
+                    
+                    if prompt.startswith('/'):
+                        await self._handle_command(prompt[1:])
+                        continue
+                    
+                    # Generate response
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[progress.description]{task.description}"),
+                        transient=True
+                    ) as progress:
+                        progress.add_task("Thinking...", total=None)
+                        await agent.generate(prompt)
+                    
+                except KeyboardInterrupt:
+                    console.print("\n[yellow]Use 'exit' to quit[/yellow]")
+                except Exception as e:
+                    console.print(f"[red]Error: {e}[/red]")
+        
+        console.print("[yellow]👋 Goodbye![/yellow]")
+    
+    async def _ensure_model(self):
+        """Ensure default model is available"""
+        models = await self.agent.list_models()
+        model_names = [m["name"] for m in models]
+        
+        if self.config.default_model not in model_names:
+            console.print(f"[yellow]Model {self.config.default_model} not found[/yellow]")
+            if Prompt.ask("Pull model?", choices=["y", "n"]) == "y":
+                await self.agent.pull_model(self.config.default_model)
+    
+    async def _handle_command(self, command: str):
+        """Handle slash commands"""
+        parts = command.split()
+        cmd = parts[0]
+        
+        if cmd == "model":
+            if len(parts) > 1:
+                self.config.default_model = parts[1]
+                console.print(f"[green]Model set to {parts[1]}[/green]")
+            else:
+                console.print(f"Current model: {self.config.default_model}")
+        
+        elif cmd == "models":
+            models = await self.agent.list_models()
+            console.print("[cyan]Available models:[/cyan]")
+            for model in models:
+                size = model.get("size", 0) / (1024**3)  # Convert to GB
+                console.print(f"  - {model['name']} ({size:.1f}GB)")
+        
+        elif cmd == "pull":
+            if len(parts) > 1:
+                await self.agent.pull_model(parts[1])
+        
+        elif cmd == "temperature":
+            if len(parts) > 1:
+                self.config.temperature = float(parts[1])
+                console.print(f"[green]Temperature set to {parts[1]}[/green]")
+        
+        elif cmd == "clear":
+            self.agent.context = []
+            self.agent.conversation_history = []
+            console.print("[green]Context cleared[/green]")
+        
+        elif cmd == "history":
+            for msg in self.agent.conversation_history:
+                role = msg["role"].capitalize()
+                console.print(f"[cyan]{role}:[/cyan] {msg['content'][:100]}...")
+        
+        else:
+            console.print(f"[red]Unknown command: /{cmd}[/red]")
+    
+    def _show_help(self):
+        help_text = """
+[bold cyan]Available Commands:[/bold cyan]
+  /model [name]      - Switch model
+  /models           - List available models
+  /pull [name]      - Download new model
+  /temperature [n]  - Set temperature (0.0-1.0)
+  /clear           - Clear conversation context
+  /history         - Show conversation history
+  help             - Show this help
+  exit/quit        - Exit the application
+        """
+        console.print(help_text)
+
+@click.command()
+@click.option('--model', '-m', help='Model to use')
+@click.option('--temperature', '-t', type=float, help='Temperature (0.0-1.0)')
+@click.option('--interactive', '-i', is_flag=True, help='Interactive mode')
+@click.argument('prompt', required=False)
+def main(model, temperature, interactive, prompt):
+    """Ollama CLI Agent"""
+    cli = CLIInterface()
+    
+    if model:
+        cli.config.default_model = model
+    if temperature:
+        cli.config.temperature = temperature
+    
+    if interactive or not prompt:
+        asyncio.run(cli.run_interactive())
+    else:
+        # Single prompt mode
+        async def run_single():
+            async with OllamaAgent(cli.config) as agent:
+                await agent.generate(prompt)
+        
+        asyncio.run(run_single())
+
+if __name__ == "__main__":
+    main()
+2. LangChain Integration with Local Models
+python"""
+LangChain + Ollama/LM Studio Integration
+"""
+
+from langchain_ollama import OllamaLLM, OllamaEmbeddings
+from langchain_openai import ChatOpenAI  # For LM Studio
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain.tools import Tool, tool
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain_community.vectorstores import FAISS
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import DirectoryLoader
+import os
+
+class LocalAgentSystem:
+    def __init__(self, model_provider="ollama"):
+        self.model_provider = model_provider
+        self.llm = self._initialize_llm()
+        self.embeddings = self._initialize_embeddings()
+        self.memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True
+        )
+        self.tools = self._initialize_tools()
+        self.agent = self._create_agent()
+    
+    def _initialize_llm(self):
+        if self.model_provider == "ollama":
+            return OllamaLLM(
+                model="llama3.2:7b",
+                temperature=0.7,
+                base_url="http://localhost:11434"
+            )
+        elif self.model_provider == "lmstudio":
+            return ChatOpenAI(
+                base_url="http://localhost:1234/v1",
+                api_key="not-needed",  # LM Studio doesn't need API key
+                model="local-model",
+                temperature=0.7
+            )
+    
+    def _initialize_embeddings(self):
+        if self.model_provider == "ollama":
+            return OllamaEmbeddings(
+                model="nomic-embed-text",
+                base_url="http://localhost:11434"
+            )
+        else:
+            # Use sentence-transformers for LM Studio
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            return HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2"
+            )
+    
+    def _initialize_tools(self):
+        @tool
+        def search_knowledge_base(query: str) -> str:
+            """Search the local knowledge base for information"""
+            if not hasattr(self, 'vector_store'):
+                return "Knowledge base not initialized"
+            
+            docs = self.vector_store.similarity_search(query, k=3)
+            return "\n".join([doc.page_content for doc in docs])
+        
+        @tool
+        def calculate(expression: str) -> str:
+            """Perform mathematical calculations"""
+            try:
+                result = eval(expression)
+                return f"Result: {result}"
+            except Exception as e:
+                return f"Error: {e}"
+        
+        @tool
+        def get_current_time() -> str:
+            """Get the current date and time"""
+            from datetime import datetime
+            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        return [
+            search_knowledge_base,
+            calculate,
+            get_current_time
+        ]
+    
+    def _create_agent(self):
+        prompt = PromptTemplate.from_template("""
+You are a helpful AI assistant with access to various tools.
+
+Available tools:
+{tools}
+
+Tool descriptions:
+{tool_names}
+
+Conversation history:
+{chat_history}
+
+Question: {input}
+
+To use a tool, format your response as:
+Thought: [your reasoning]
+Action: [tool name]
+Action Input: [tool input]
+Observation: [tool output]
+... (repeat as needed)
+Thought: [final reasoning]
+Final Answer: [your final response]
+
+{agent_scratchpad}
+""")
+        
+        agent = create_react_agent(
+            llm=self.llm,
+            tools=self.tools,
+            prompt=prompt
+        )
+        
+        return AgentExecutor(
+            agent=agent,
+            tools=self.tools,
+            memory=self.memory,
+            verbose=True,
+            max_iterations=5
+        )
+    
+    def load_documents(self, directory_path: str):
+        """Load documents into vector store"""
+        loader = DirectoryLoader(
+            directory_path,
+            glob="**/*.txt",
+            show_progress=True
+        )
+        documents = loader.load()
+        
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200
+        )
+        chunks = text_splitter.split_documents(documents)
+        
+        self.vector_store = FAISS.from_documents(
+            chunks,
+            self.embeddings
+        )
+        
+        print(f"Loaded {len(chunks)} document chunks")
+    
+    def query(self, question: str) -> str:
+        """Query the agent"""
+        response = self.agent.invoke({"input": question})
+        return response["output"]
+    
+    def save_memory(self, filepath: str):
+        """Save conversation memory to file"""
+        import pickle
+        with open(filepath, 'wb') as f:
+            pickle.dump(self.memory, f)
+    
+    def load_memory(self, filepath: str):
+        """Load conversation memory from file"""
+        import pickle
+        if os.path.exists(filepath):
+            with open(filepath, 'rb') as f:
+                self.memory = pickle.load(f)
+
+# Usage Example
+if __name__ == "__main__":
+    # Initialize with Ollama
+    agent_system = LocalAgentSystem(model_provider="ollama")
+    
+    # Load knowledge base
+    agent_system.load_documents("./documents")
+    
+    # Interactive loop
+    print("AI Agent ready. Type 'exit' to quit.")
+    while True:
+        user_input = input("\nYou: ")
+        if user_input.lower() == 'exit':
+            break
+        
+        response = agent_system.query(user_input)
+        print(f"\nAgent: {response}")
+    
+    # Save conversation
+    agent_system.save_memory("conversation.pkl")
+Performance Optimization
+1. Model Quantization Guide
+yamlQuantization Levels:
+  Q2_K:
+    - Size: ~25% of original
+    - Quality: Low (emergency fallback)
+    - Use case: Extremely limited RAM
+  
+  Q3_K_S/Q3_K_M/Q3_K_L:
+    - Size: ~35% of original
+    - Quality: Moderate
+    - Use case: Mobile devices, edge computing
+  
+  Q4_0/Q4_K_S/Q4_K_M:
+    - Size: ~45% of original
+    - Quality: Good (recommended)
+    - Use case: Standard deployments
+  
+  Q5_K_S/Q5_K_M:
+    - Size: ~55% of original
+    - Quality: Very good
+    - Use case: Quality-focused deployments
+  
+  Q6_K:
+    - Size: ~65% of original
+    - Quality: Excellent
+    - Use case: High-quality requirements
+  
+  Q8_0:
+    - Size: ~80% of original
+    - Quality: Near-perfect
+    - Use case: Maximum quality needed
+2. GPU Optimization
+bash# NVIDIA GPU Optimization
+export CUDA_VISIBLE_DEVICES=0,1  # Use specific GPUs
+export OLLAMA_NUM_GPU=999        # Use all layers on GPU
+export OLLAMA_GPU_OVERHEAD=0     # Reduce overhead
+
+# AMD GPU Optimization
+export HSA_OVERRIDE_GFX_VERSION=10.3.0
+export ROCR_VISIBLE_DEVICES=0
+
+# Apple Silicon Optimization
+export OLLAMA_NUM_GPU=-1         # Auto-detect optimal layers
+export OLLAMA_METAL=1             # Enable Metal acceleration
+
+# Memory Management
+export OLLAMA_MAX_LOADED_MODELS=2
+export OLLAMA_KEEP_ALIVE=5m
+export OLLAMA_FLASH_ATTENTION=true
+3. Context Window Management
+pythonclass ContextManager:
+    def __init__(self, max_tokens=4096):
+        self.max_tokens = max_tokens
+        self.context_window = []
+        self.summary_cache = {}
+    
+    def add_message(self, message: dict):
+        """Add message with automatic pruning"""
+        self.context_window.append(message)
+        self._prune_if_needed()
+    
+    def _prune_if_needed(self):
+        """Prune context to fit within token limit"""
+        total_tokens = self._count_tokens()
+        
+        while total_tokens > self.max_tokens and len(self.context_window) > 2:
+            # Remove oldest messages (keep system and last user)
+            removed = self.context_window.pop(1)
+            
+            # Create summary of removed content
+            if len(self.context_window) > 10:
+                self._create_summary(removed)
+            
+            total_tokens = self._count_tokens()
+    
+    def _count_tokens(self):
+        """Estimate token count"""
+        # Rough estimation: 1 token ≈ 4 characters
+        total_chars = sum(
+            len(msg.get('content', '')) 
+            for msg in self.context_window
+        )
+        return total_chars // 4
+    
+    def get_context(self):
+        """Get optimized context for model"""
+        if self.summary_cache:
+            # Include summary of older messages
+            summary_msg = {
+                'role': 'system',
+                'content': f"Previous conversation summary: {self.summary_cache}"
+            }
+            return [summary_msg] + self.context_window
+        
+        return self.context_window
+Model Management & Routing
+1. Dynamic Model Selection
+pythonclass ModelSelector:
+    def __init__(self):
+        self.model_registry = {
+            'tiny': {
+                'name': 'llama3.2:1b',
+                'max_context': 2048,
+                'capabilities': ['qa', 'chat'],
+                'performance': 0.6,
+                'memory_gb': 1.5
+            },
+            'small': {
+                'name': 'llama3.2:3b',
+                'max_context': 4096,
+                'capabilities': ['qa', 'chat', 'summarization'],
+                'performance': 0.7,
+                'memory_gb': 3
+            },
+            'medium': {
+                'name': 'mistral:7b',
+                'max_context': 8192,
+                'capabilities': ['qa', 'chat', 'coding', 'analysis'],
+                'performance': 0.8,
+                'memory_gb': 6
+            },
+            'large': {
+                'name': 'qwen2.5:32b',
+                'max_context': 32768,
+                'capabilities': ['all'],
+                'performance': 0.9,
+                'memory_gb': 20
+            }
+        }
+    
+    def select_model(
+        self,
+        task: str,
+        context_length: int,
+        available_memory: float
+    ):
+        """Select optimal model based on requirements"""
+        suitable_models = []
+        
+        for size, specs in self.model_registry.items():
+            # Check memory constraints
+            if specs['memory_gb'] > available_memory:
+                continue
+            
+            # Check context length
+            if context_length > specs['max_context']:
+                continue
+            
+            # Check capabilities
+            if task not in specs['capabilities'] and 'all' not in specs['capabilities']:
+                continue
+            
+            suitable_models.append((size, specs))
+        
+        if not suitable_models:
+            return self.model_registry['tiny']['name']
+        
+        # Sort by performance
+        suitable_models.sort(key=lambda x: x[1]['performance'], reverse=True)
+        
+        return suitable_models[0][1]['name']
+2. Load Balancer for Multiple Instances
+pythonclass LocalModelLoadBalancer:
+    def __init__(self):
+        self.instances = [
+            {'url': 'http://localhost:11434', 'type': 'ollama', 'load': 0},
+            {'url': 'http://localhost:11435', 'type': 'ollama', 'load': 0},
+            {'url': 'http://localhost:1234', 'type': 'lmstudio', 'load': 0}
+        ]
+        self.health_check_interval = 30
+        self._start_health_monitoring()
+    
+    async def get_instance(self, model: str):
+        """Get least loaded healthy instance"""
+        healthy_instances = await self._get_healthy_instances()
+        
+        if not healthy_instances:
+            raise Exception("No healthy instances available")
+        
+        # Sort by load
+        healthy_instances.sort(key=lambda x: x['load'])
+        
+        # Check if model is available on instance
+        for instance in healthy_instances:
+            if await self._model_available(instance, model):
+                instance['load'] += 1
+                return instance
+        
+        # Model not available, use first instance
+        return healthy_instances[0]
+    
+    async def _get_healthy_instances(self):
+        """Check health of all instances"""
+        healthy = []
+        for instance in self.instances:
+            try:
+                if instance['type'] == 'ollama':
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            f"{instance['url']}/api/tags",
+                            timeout=aiohttp.ClientTimeout(total=2)
+                        ) as response:
+                            if response.status == 200:
+                                healthy.append(instance)
+                elif instance['type'] == 'lmstudio':
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            f"{instance['url']}/v1/models",
+                            timeout=aiohttp.ClientTimeout(total=2)
+                        ) as response:
+                            if response.status == 200:
+                                healthy.append(instance)
+            except:
+                continue
+        
+        return healthy
+Production Deployment
+1. Docker Deployment
+dockerfile# Multi-stage Dockerfile for CLI Agent with Ollama
+FROM ollama/ollama:latest as ollama-base
+
+# Install Python and dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+WORKDIR /app
+RUN python3 -m venv venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Install Python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Download models at build time (optional)
+RUN ollama serve & \
+    sleep 5 && \
+    ollama pull llama3.2:3b && \
+    ollama pull mistral:7b && \
+    pkill ollama
+
+# Expose ports
+EXPOSE 11434 8000
+
+# Start script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
+bash#!/bin/bash
+# start.sh
+
+# Start Ollama server in background
+ollama serve &
+
+# Wait for Ollama to be ready
+echo "Waiting for Ollama to start..."
+while ! curl -s http://localhost:11434/api/tags > /dev/null; do
+    sleep 1
+done
+echo "Ollama is ready!"
+
+# Start the CLI agent application
+exec python /app/main.py
+2. Docker Compose Stack
+yaml# docker-compose.yml
+version: '3.8'
+
+services:
+  ollama-1:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-1-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+  
+  ollama-2:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-2-data:/root/.ollama
+    ports:
+      - "11435:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+  
+  lm-studio:
+    image: lmstudio/server:latest
+    volumes:
+      - lmstudio-data:/models
+    ports:
+      - "1234:1234"
+    environment:
+      - SERVER_PORT=1234
+      - MAX_LOADED_MODELS=2
+      - IDLE_TTL=600
+    restart: unless-stopped
+  
+  cli-agent:
+    build: .
+    depends_on:
+      - ollama-1
+      - ollama-2
+      - lm-studio
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URLS=http://ollama-1:11434,http://ollama-2:11434
+      - LMSTUDIO_URL=http://lm-studio:1234
+      - DEFAULT_MODEL=mistral:7b
+      - LOG_LEVEL=info
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    restart: unless-stopped
+  
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - cli-agent
+    restart: unless-stopped
+
+volumes:
+  ollama-1-data:
+  ollama-2-data:
+  lmstudio-data:
+3. Monitoring & Observability
+python# monitoring.py
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
+import time
+
+class ModelMetrics:
+    def __init__(self):
+        # Counters
+        self.request_count = Counter(
+            'model_requests_total',
+            'Total number of model requests',
+            ['model', 'status']
+        )
+        
+        # Histograms
+        self.response_time = Histogram(
+            'model_response_duration_seconds',
+            'Model response time in seconds',
+            ['model'],
+            buckets=[0.1, 0.5, 1.0, 2.5, 5.0, 10.0]
+        )
+        
+        self.token_usage = Histogram(
+            'model_tokens_used',
+            'Number of tokens used per request',
+            ['model', 'type'],
+            buckets=[10, 50, 100, 500, 1000, 2000, 4000]
+        )
+        
+        # Gauges
+        self.active_models = Gauge(
+            'active_models_count',
+            'Number of currently loaded models'
+        )
+        
+        self.memory_usage = Gauge(
+            'model_memory_usage_gb',
+            'Memory usage per model in GB',
+            ['model']
+        )
+        
+        self.queue_size = Gauge(
+            'request_queue_size',
+            'Current size of request queue',
+            ['model']
+        )
+    
+    def record_request(self, model: str, status: str):
+        self.request_count.labels(model=model, status=status).inc()
+    
+    def record_response_time(self, model: str, duration: float):
+        self.response_time.labels(model=model).observe(duration)
+    
+    def record_tokens(self, model: str, prompt_tokens: int, completion_tokens: int):
+        self.token_usage.labels(model=model, type='prompt').observe(prompt_tokens)
+        self.token_usage.labels(model=model, type='completion').observe(completion_tokens)
+    
+    def update_memory(self, model: str, memory_gb: float):
+        self.memory_usage.labels(model=model).set(memory_gb)
+
+# Start metrics server
+metrics = ModelMetrics()
+start_http_server(9090)
+Best Practices & Tips
+1. Model Selection Guidelines
+yamlModel Selection Matrix:
+  Simple Q&A:
+    - Model: llama3.2:1b
+    - Quantization: Q4_K_M
+    - Context: 2048
+    - Memory: <2GB
+  
+  General Chat:
+    - Model: mistral:7b
+    - Quantization: Q4_K_M
+    - Context: 8192
+    - Memory: 4-6GB
+  
+  Code Generation:
+    - Model: qwen2.5-coder:32b
+    - Quantization: Q4_K_S
+    - Context: 32768
+    - Memory: 18-20GB
+  
+  Complex Reasoning:
+    - Model: deepseek-r1:14b
+    - Quantization: Q5_K_M
+    - Context: 16384
+    - Memory: 10-12GB
+  
+  Creative Writing:
+    - Model: llama3.1:70b
+    - Quantization: Q3_K_M
+    - Context: 8192
+    - Memory: 35-40GB
+2. Security Considerations
+pythonclass SecurityManager:
+    def __init__(self):
+        self.rate_limiter = RateLimiter()
+        self.content_filter = ContentFilter()
+        self.audit_logger = AuditLogger()
+    
+    def validate_request(self, request: dict):
+        """Validate and sanitize request"""
+        # Rate limiting
+        if not self.rate_limiter.allow(request['user_id']):
+            raise RateLimitExceeded()
+        
+        # Content filtering
+        if self.content_filter.is_harmful(request['prompt']):
+            self.audit_logger.log_blocked(request)
+            raise HarmfulContentDetected()
+        
+        # Input size validation
+        if len(request['prompt']) > 10000:
+            raise InputTooLarge()
+        
+        # Sanitize prompt
+        request['prompt'] = self.sanitize_input(request['prompt'])
+        
+        return request
+    
+    def sanitize_input(self, text: str):
+        """Remove potential injection attacks"""
+        # Remove system commands
+        dangerous_patterns = [
+            r'\bsystem\s*\(',
+            r'\bexec\s*\(',
+            r'\beval\s*\(',
+            r'__import__',
+            r'subprocess'
+        ]
+        
+        for pattern in dangerous_patterns:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+        
+        return text
+3. Cost Comparison
+yamlCost Analysis (Monthly):
+  Local Setup:
+    Hardware:
+      - GPU (RTX 4090): $2000 (one-time)
+      - Electricity: ~$30/month
+      - Amortized: ~$85/month (24 months)
+    
+    Models:
+      - All models: Free (open source)
+      - Updates: Free
+    
+    Total: ~$85/month
+  
+  Cloud API:
+    GPT-4:
+      - 1M tokens/day: ~$900/month
+      - 5M tokens/day: ~$4500/month
+    
+    Claude Opus:
+      - 1M tokens/day: ~$450/month
+      - 5M tokens/day: ~$2250/month
+  
+  Savings:
+    - vs GPT-4: 90-98% reduction
+    - vs Claude: 80-96% reduction
+    - Break-even: 2-3 months
+Conclusion
+Local model CLI agents with Ollama and LM Studio provide a powerful, cost-effective, and privacy-preserving alternative to cloud-based AI services. Key takeaways:
+
+Privacy First: Complete data sovereignty with no external API calls
+Cost Effective: Zero per-token costs after initial hardware investment
+Flexible Architecture: Support for hybrid local/cloud deployments
+Production Ready: Robust tooling for deployment and monitoring
+Performance Optimized: GPU acceleration, quantization, and intelligent routing
+
+The combination of Ollama's simplicity and LM Studio's user-friendly interface, coupled with modern frameworks like LangChain, enables developers to build sophisticated AI agents that run entirely on local infrastructure while maintaining the flexibility to scale to cloud services when needed.
+Resources & References
+
+Ollama Documentation
+LM Studio Documentation
+LangChain Ollama Integration
+GGUF Model Repository
+llama.cpp
+Model Quantization Guide

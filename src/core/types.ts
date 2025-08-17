@@ -41,7 +41,7 @@ export interface ModelResponse {
 
 export interface ProjectContext {
   workingDirectory: string;
-  config: any;
+  config: Record<string, unknown>;
   files: Array<{
     path: string;
     content: string;
@@ -79,8 +79,10 @@ export interface ExecutionResult {
     model: string;
     tokens: number;
     latency: number;
+    type?: string;
   };
   output?: string;
+  taskId?: string;
 }
 
 export interface SynthesisResponse {
@@ -108,6 +110,26 @@ export interface CLIError extends Error {
   exitCode: number;
 }
 
+export class CLIError extends Error {
+  public code: string;
+  public exitCode: number;
+  
+  constructor(message: string, exitCode: number, code: string = 'CLI_ERROR') {
+    super(message);
+    this.name = 'CLIError';
+    this.code = code;
+    this.exitCode = exitCode;
+  }
+  
+  static timeout(operation: string): CLIError {
+    return new CLIError(`Timeout occurred during ${operation}`, CLIExitCode.NETWORK_ERROR, 'TIMEOUT');
+  }
+  
+  static networkError(message: string): CLIError {
+    return new CLIError(`Network error: ${message}`, CLIExitCode.NETWORK_ERROR, 'NETWORK_ERROR');
+  }
+}
+
 export enum CLIExitCode {
   SUCCESS = 0,
   GENERAL_ERROR = 1,
@@ -123,6 +145,7 @@ export interface Task {
   description: string;
   capability?: string;
   input?: string;
+  priority?: 'low' | 'medium' | 'high';
 }
 
 export interface Workflow {
@@ -130,9 +153,10 @@ export interface Workflow {
   tasks: Task[];
   startTime: Date;
   endTime?: Date;
-  results?: any;
+  results?: Record<string, unknown>;
   error?: string;
-  request?: any;
+  request?: Record<string, unknown>;
+  status?: 'pending' | 'running' | 'completed' | 'failed';
 }
 
 export interface ExecutionRequest {
@@ -143,9 +167,11 @@ export interface ExecutionRequest {
 
 export interface ExecutionResponse {
   success: boolean;
-  result: any;
+  result: Record<string, unknown>;
+  results?: Record<string, unknown>;
   workflowId?: string;
   executionTime?: number;
+  error?: string;
 }
 
 // Voice Archetype Types
@@ -164,7 +190,7 @@ export interface IterativeResult {
     improvement: number;
     iteration?: number;
     qualityScore?: number;
-    diff?: any;
+    diff?: Record<string, unknown>;
     code?: string;
     auditFeedback?: string;
   }>;
@@ -187,7 +213,10 @@ export interface SynthesisResult {
 export interface SpiralConfig {
   maxIterations: number;
   qualityThreshold?: number;
-  voices: string[];
+  voices?: string[];
+  voiceSelectionStrategy?: 'adaptive' | 'fixed';
+  enableAdaptiveLearning?: boolean;
+  reflectionDepth?: 'shallow' | 'medium' | 'deep';
 }
 
 // Performance Types
@@ -213,18 +242,18 @@ export interface PerformanceMetrics {
 
 // Response Validator (placeholder)
 export const ResponseValidator = {
-  validate: (response: any) => ({ isValid: true, errors: [] })
+  validate: (response: Record<string, unknown>) => ({ isValid: true, errors: [] })
 };
 
 // Export classes for compatibility
-export const UnifiedClientConfig = {} as any;
-export const ModelRequest = {} as any;
-export const ModelResponse = {} as any;
-export const ProjectContext = {} as any;
-export const AppConfig = {} as any;
-export const AgentConfig = {} as any;
-export const ExecutionResult = {} as any;
-export const SynthesisResponse = {} as any;
+export const UnifiedClientConfig = {} as Record<string, unknown>;
+export const ModelRequest = {} as Record<string, unknown>;
+export const ModelResponse = {} as Record<string, unknown>;
+export const ProjectContext = {} as Record<string, unknown>;
+export const AppConfig = {} as Record<string, unknown>;
+export const AgentConfig = {} as Record<string, unknown>;
+export const ExecutionResult = {} as Record<string, unknown>;
+export const SynthesisResponse = {} as Record<string, unknown>;
 
 
 // Additional types for agent system
@@ -240,7 +269,7 @@ export interface WorkflowExtended extends Workflow {
 
 // Update ExecutionResponse interface  
 export interface ExecutionResponseExtended extends ExecutionResponse {
-  results?: any;
+  results?: Record<string, unknown>;
   error?: string;
 }
 
@@ -250,10 +279,10 @@ export interface TaskExtended extends Task {
 }
 
 // Export for compatibility
-export const ExecutionMode = {} as any;
+export const ExecutionMode = {} as Record<string, unknown>;
 
 // Model client compatibility
 export interface ModelClient {
-  generate(request: any): Promise<any>;
+  generate(request: Record<string, unknown>): Promise<Record<string, unknown>>;
   checkStatus(): Promise<boolean>;
 }

@@ -10,7 +10,7 @@ import ora from 'ora';
 import { readFile, stat, readdir } from 'fs/promises';
 import { join, extname, isAbsolute } from 'path';
 import { glob } from 'glob';
-export export class CLI {
+export class CLI {
     context;
     initialized = false;
     workingDirectory = process.cwd();
@@ -171,7 +171,7 @@ export export class CLI {
             // Parse options
             const voices = this.parseVoices(options.voices || options.council ? 'all' : undefined);
             const synthesisMode = options.mode || 'competitive';
-            const analysisDepth = parseInt(options.depth || '2');
+            parseInt(options.depth || '2');
             console.log(chalk.cyan(`   Voices: ${Array.isArray(voices) ? voices.join(', ') : voices}`));
             console.log(chalk.cyan(`   Mode: ${synthesisMode}`));
             // Get project context - auto-detect mentioned files in prompt
@@ -510,6 +510,7 @@ Focus on actionable, specific recommendations with clear business value.`;
         console.log(chalk.gray('Type "exit" to quit, "help" for commands\n'));
         const parsedVoices = this.parseVoices(options.voices);
         const defaultVoices = Array.isArray(parsedVoices) ? parsedVoices : ['developer', 'analyzer'];
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             try {
                 const { action } = await inquirer.prompt([

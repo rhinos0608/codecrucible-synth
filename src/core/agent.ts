@@ -8,7 +8,7 @@
 import { EventEmitter } from 'events';
 import { UnifiedModelClient } from './client.js';
 import { configManager, AgentConfig } from './config.js';
-export { AgentConfig };
+export type { AgentConfig };
 import { PerformanceMonitor } from '../utils/performance.js';
 import { 
   ExecutionRequest, 
@@ -42,7 +42,7 @@ export interface AgentMetrics {
  * Unified Agent System with all capabilities
  */
 export class UnifiedAgent extends EventEmitter {
-  private modelClient: ModelClient;
+  private modelClient: UnifiedModelClient;
   private performanceMonitor: PerformanceMonitor;
   private config: AgentConfig = {
     enabled: true,
@@ -181,12 +181,11 @@ export class UnifiedAgent extends EventEmitter {
       // Create workflow
       const workflow: Workflow = {
         id: workflowId,
-        request,
-        context: context || {},
+        request: request as Record<string, unknown>,
         status: 'running',
-        startTime,
+        startTime: new Date(startTime),
         tasks: [],
-        results: []
+        results: {} as Record<string, unknown>
       };
 
       this.activeWorkflows.set(workflowId, workflow);
@@ -207,13 +206,9 @@ export class UnifiedAgent extends EventEmitter {
       const response: ExecutionResponse = {
         workflowId,
         success: true,
-        results,
-        executionTime: workflow.endTime - workflow.startTime,
-        metadata: {
-          tasksExecuted: executionPlan.length,
-          capabilitiesUsed: executionPlan.map(task => task.capability),
-          executionMode: request.mode || 'balanced'
-        }
+        result: results as Record<string, unknown>,
+        results: results as Record<string, unknown>,
+        executionTime: workflow.endTime.getTime() - workflow.startTime.getTime()
       };
 
       this.updateMetrics(response);
@@ -235,9 +230,9 @@ export class UnifiedAgent extends EventEmitter {
       return {
         workflowId,
         success: false,
+        result: {} as Record<string, unknown>,
         error: error instanceof Error ? error.message : String(error),
-        executionTime: Date.now() - startTime,
-        results: []
+        executionTime: Date.now() - startTime
       };
     } finally {
       this.activeWorkflows.delete(workflowId);
@@ -359,7 +354,7 @@ export class UnifiedAgent extends EventEmitter {
     const capability = this.capabilities.get(task.capability);
     
     if (!capability || !capability.enabled) {
-      throw new Error(`Capability '${task.capability}' not available`);
+      throw new Error(`Capability '${task.capability || 'unknown'}' not available`);
     }
 
     const startTime = Date.now();
@@ -373,190 +368,321 @@ export class UnifiedAgent extends EventEmitter {
       return result;
     } catch (error) {
       return {
-        taskId: task.id,
         success: false,
-        error: error instanceof Error ? error.message : String(error),
-        executionTime: Date.now() - startTime,
-        output: ''
+        content: '',
+        metadata: {
+          model: 'unknown',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
       };
     }
   }
 
   // Capability Handlers
   private async handleCodeAnalysis(task: Task): Promise<ExecutionResult> {
-    const prompt = `Analyze the following code for quality, patterns, and improvements:\n\n${task.input}`;
+    const startTime = Date.now();
     
-    const response = await this.modelClient.request({
-      prompt,
-      model: 'default',
-      temperature: 0.3,
-      maxTokens: 2000
-    });
+    try {
+      const prompt = `Analyze the following code for quality, patterns, and improvements:\n\n${task.input}`;
+      
+      const response = await this.modelClient.request({
+        prompt,
+        model: 'default',
+        temperature: 0.3,
+        maxTokens: 2000
+      });
 
-    return {
-      taskId: task.id,
-      success: true,
-      output: response.content,
-      executionTime: 0,
-      metadata: {
-        type: 'code-analysis',
-        tokensUsed: response.tokensUsed || 0
-      }
-    };
+      return {
+        success: true,
+        content: response.content,
+        metadata: {
+          model: 'default',
+          tokens: response.tokensUsed || 0,
+          latency: Date.now() - startTime,
+          type: 'code-analysis'
+        },
+        taskId: task.id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        content: `Error during code analysis: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: {
+          model: 'default',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
+      };
+    }
   }
 
   private async handleCodeGeneration(task: Task): Promise<ExecutionResult> {
-    const prompt = `Generate code based on the following requirements:\n\n${task.input}`;
+    const startTime = Date.now();
     
-    const response = await this.modelClient.request({
-      prompt,
-      model: 'default',
-      temperature: 0.7,
-      maxTokens: 3000
-    });
+    try {
+      const prompt = `Generate code based on the following requirements:\n\n${task.input}`;
+      
+      const response = await this.modelClient.request({
+        prompt,
+        model: 'default',
+        temperature: 0.7,
+        maxTokens: 3000
+      });
 
-    return {
-      taskId: task.id,
-      success: true,
-      output: response.content,
-      executionTime: 0,
-      metadata: {
-        type: 'code-generation',
-        tokensUsed: response.tokensUsed || 0
-      }
-    };
+      return {
+        success: true,
+        content: response.content,
+        metadata: {
+          model: 'default',
+          tokens: response.tokensUsed || 0,
+          latency: Date.now() - startTime,
+          type: 'code-generation'
+        },
+        taskId: task.id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        content: `Error during code generation: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: {
+          model: 'default',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
+      };
+    }
   }
 
   private async handleDocumentation(task: Task): Promise<ExecutionResult> {
-    const prompt = `Generate comprehensive documentation for:\n\n${task.input}`;
+    const startTime = Date.now();
     
-    const response = await this.modelClient.request({
-      prompt,
-      model: 'default',
-      temperature: 0.5,
-      maxTokens: 2500
-    });
+    try {
+      const prompt = `Generate comprehensive documentation for:\n\n${task.input}`;
+      
+      const response = await this.modelClient.request({
+        prompt,
+        model: 'default',
+        temperature: 0.5,
+        maxTokens: 2500
+      });
 
-    return {
-      taskId: task.id,
-      success: true,
-      output: response.content,
-      executionTime: 0,
-      metadata: {
-        type: 'documentation',
-        tokensUsed: response.tokensUsed || 0
-      }
-    };
+      return {
+        success: true,
+        content: response.content,
+        metadata: {
+          model: 'default',
+          tokens: response.tokensUsed || 0,
+          latency: Date.now() - startTime,
+          type: 'documentation'
+        },
+        taskId: task.id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        content: `Error during documentation generation: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: {
+          model: 'default',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
+      };
+    }
   }
 
   private async handleTesting(task: Task): Promise<ExecutionResult> {
-    const prompt = `Generate comprehensive tests for:\n\n${task.input}`;
+    const startTime = Date.now();
     
-    const response = await this.modelClient.request({
-      prompt,
-      model: 'default',
-      temperature: 0.4,
-      maxTokens: 2500
-    });
+    try {
+      const prompt = `Generate comprehensive tests for:\n\n${task.input}`;
+      
+      const response = await this.modelClient.request({
+        prompt,
+        model: 'default',
+        temperature: 0.4,
+        maxTokens: 2500
+      });
 
-    return {
-      taskId: task.id,
-      success: true,
-      output: response.content,
-      executionTime: 0,
-      metadata: {
-        type: 'testing',
-        tokensUsed: response.tokensUsed || 0
-      }
-    };
+      return {
+        success: true,
+        content: response.content,
+        metadata: {
+          model: 'default',
+          tokens: response.tokensUsed || 0,
+          latency: Date.now() - startTime,
+          type: 'testing'
+        },
+        taskId: task.id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        content: `Error during test generation: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: {
+          model: 'default',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
+      };
+    }
   }
 
   private async handleRefactoring(task: Task): Promise<ExecutionResult> {
-    const prompt = `Refactor and optimize the following code:\n\n${task.input}`;
+    const startTime = Date.now();
     
-    const response = await this.modelClient.request({
-      prompt,
-      model: 'default',
-      temperature: 0.3,
-      maxTokens: 3000
-    });
+    try {
+      const prompt = `Refactor and optimize the following code:\n\n${task.input}`;
+      
+      const response = await this.modelClient.request({
+        prompt,
+        model: 'default',
+        temperature: 0.3,
+        maxTokens: 3000
+      });
 
-    return {
-      taskId: task.id,
-      success: true,
-      output: response.content,
-      executionTime: 0,
-      metadata: {
-        type: 'refactoring',
-        tokensUsed: response.tokensUsed || 0
-      }
-    };
+      return {
+        success: true,
+        content: response.content,
+        metadata: {
+          model: 'default',
+          tokens: response.tokensUsed || 0,
+          latency: Date.now() - startTime,
+          type: 'refactoring'
+        },
+        taskId: task.id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        content: `Error during refactoring: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: {
+          model: 'default',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
+      };
+    }
   }
 
   private async handleBugFixing(task: Task): Promise<ExecutionResult> {
-    const prompt = `Identify and fix bugs in the following code:\n\n${task.input}`;
+    const startTime = Date.now();
     
-    const response = await this.modelClient.request({
-      prompt,
-      model: 'default',
-      temperature: 0.2,
-      maxTokens: 2500
-    });
+    try {
+      const prompt = `Identify and fix bugs in the following code:\n\n${task.input}`;
+      
+      const response = await this.modelClient.request({
+        prompt,
+        model: 'default',
+        temperature: 0.2,
+        maxTokens: 2500
+      });
 
-    return {
-      taskId: task.id,
-      success: true,
-      output: response.content,
-      executionTime: 0,
-      metadata: {
-        type: 'bug-fixing',
-        tokensUsed: response.tokensUsed || 0
-      }
-    };
+      return {
+        success: true,
+        content: response.content,
+        metadata: {
+          model: 'default',
+          tokens: response.tokensUsed || 0,
+          latency: Date.now() - startTime,
+          type: 'bug-fixing'
+        },
+        taskId: task.id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        content: `Error during bug fixing: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: {
+          model: 'default',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
+      };
+    }
   }
 
   private async handlePerformanceOptimization(task: Task): Promise<ExecutionResult> {
-    const prompt = `Optimize the performance of the following code:\n\n${task.input}`;
+    const startTime = Date.now();
     
-    const response = await this.modelClient.request({
-      prompt,
-      model: 'default',
-      temperature: 0.3,
-      maxTokens: 2500
-    });
+    try {
+      const prompt = `Optimize the performance of the following code:\n\n${task.input}`;
+      
+      const response = await this.modelClient.request({
+        prompt,
+        model: 'default',
+        temperature: 0.3,
+        maxTokens: 2500
+      });
 
-    return {
-      taskId: task.id,
-      success: true,
-      output: response.content,
-      executionTime: 0,
-      metadata: {
-        type: 'performance-optimization',
-        tokensUsed: response.tokensUsed || 0
-      }
-    };
+      return {
+        success: true,
+        content: response.content,
+        metadata: {
+          model: 'default',
+          tokens: response.tokensUsed || 0,
+          latency: Date.now() - startTime,
+          type: 'performance-optimization'
+        },
+        taskId: task.id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        content: `Error during performance optimization: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: {
+          model: 'default',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
+      };
+    }
   }
 
   private async handleSecurityAnalysis(task: Task): Promise<ExecutionResult> {
-    const prompt = `Analyze the following code for security vulnerabilities:\n\n${task.input}`;
+    const startTime = Date.now();
     
-    const response = await this.modelClient.request({
-      prompt,
-      model: 'default',
-      temperature: 0.2,
-      maxTokens: 2000
-    });
+    try {
+      const prompt = `Analyze the following code for security vulnerabilities:\n\n${task.input}`;
+      
+      const response = await this.modelClient.request({
+        prompt,
+        model: 'default',
+        temperature: 0.2,
+        maxTokens: 2000
+      });
 
-    return {
-      taskId: task.id,
-      success: true,
-      output: response.content,
-      executionTime: 0,
-      metadata: {
-        type: 'security-analysis',
-        tokensUsed: response.tokensUsed || 0
-      }
-    };
+      return {
+        success: true,
+        content: response.content,
+        metadata: {
+          model: 'default',
+          tokens: response.tokensUsed || 0,
+          latency: Date.now() - startTime,
+          type: 'security-analysis'
+        },
+        taskId: task.id
+      };
+    } catch (error) {
+      return {
+        success: false,
+        content: `Error during security analysis: ${error instanceof Error ? error.message : String(error)}`,
+        metadata: {
+          model: 'default',
+          tokens: 0,
+          latency: Date.now() - startTime
+        },
+        taskId: task.id
+      };
+    }
   }
 
   /**
@@ -671,7 +797,7 @@ export const createManagedInterval = (fn: () => void, interval: number) => {
   return setInterval(fn, interval);
 };
 
-export const clearManagedInterval = (id: NodeJS.Timer) => {
+export const clearManagedInterval = (id: NodeJS.Timeout) => {
   clearInterval(id);
 };
 

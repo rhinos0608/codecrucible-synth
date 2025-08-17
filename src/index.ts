@@ -1,30 +1,50 @@
-import { CLI } from './core/cli.js';
+import { CLI, CLIContext } from './core/cli.js';
 import { ConfigManager } from './config/config-manager.js';
-import { UnifiedModelClient } from './core/client.js';
-// import { EnhancedStartupIndexer } from './indexing/enhanced-startup-indexer.js';
-import { PerformanceMonitor } from './utils/performance.js';
+import { UnifiedModelClient, UnifiedClientConfig } from './core/client.js';
+import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
+import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
 export async function initializeCLIContext(): Promise<CLI> {
   try {
     const configManager = new ConfigManager();
     const config = await configManager.loadConfiguration();
     
-    // Startup analysis disabled for now
-    // if (config.autonomous?.enableStartupAnalysis) {
-    //   const indexer = new EnhancedStartupIndexer();
-    //   await indexer.performStartupAnalysis();
-    // }
+    // Create unified client configuration
+    const clientConfig: UnifiedClientConfig = {
+      providers: [
+        { 
+          type: 'ollama', 
+          endpoint: config.model?.endpoint || 'http://localhost:11434',
+          model: config.model?.name || 'llama2',
+          timeout: config.model?.timeout || 30000
+        }
+      ],
+      executionMode: 'auto',
+      fallbackChain: ['ollama'],
+      performanceThresholds: {
+        fastModeMaxTokens: config.model?.maxTokens || 2048,
+        timeoutMs: config.model?.timeout || 30000,
+        maxConcurrentRequests: 3
+      },
+      security: {
+        enableSandbox: true,
+        maxInputLength: 50000,
+        allowedCommands: ['npm', 'node', 'git', 'code']
+      }
+    };
 
-    const client = new UnifiedModelClient({
-      providers: config.model?.providers || ['ollama'],
-      defaultModel: config.model?.name || 'llama2',
-      timeout: config.model?.timeout || 30000,
-      maxTokens: config.model?.maxTokens || 2048,
-      temperature: config.model?.temperature || 0.7
-    });
+    const client = new UnifiedModelClient(clientConfig);
+    const voiceSystem = new VoiceArchetypeSystem(client);
+    const mcpManager = new MCPServerManager();
 
-    const performanceMonitor = new PerformanceMonitor();
-    return new CLI(client, performanceMonitor);
+    const context: CLIContext = {
+      modelClient: client,
+      voiceSystem,
+      mcpManager,
+      config
+    };
+
+    return new CLI(context);
   } catch (error) {
     console.error('Failed to initialize CLI context:', error);
     throw error;

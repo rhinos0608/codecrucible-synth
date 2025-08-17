@@ -8,7 +8,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from './logger.js';
-import { ProjectContext, ModelRequest, ModelResponse, ClientConfig } from './types.js';
+import { ProjectContext, ModelRequest, ModelResponse, UnifiedClientConfig } from './types.js';
 import { SecurityUtils } from './security.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 
@@ -97,7 +97,7 @@ export class UnifiedModelClient extends EventEmitter {
     for (const providerConfig of this.config.providers) {
       try {
         const provider = await this.createProvider(providerConfig);
-        this.this.providers.set(providerConfig.type, provider);
+        this.providers.set(providerConfig.type, provider);
         logger.info(`✅ Provider ${providerConfig.type} initialized`);
       } catch (error) {
         logger.warn(`⚠️ Failed to initialize provider ${providerConfig.type}:`, error);

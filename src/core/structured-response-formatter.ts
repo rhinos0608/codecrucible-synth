@@ -716,6 +716,18 @@ export const cliOutput = {
     if (exitCode && typeof exitCode === 'number') {
       process.exit(exitCode);
     }
+  },
+  configure: (options: { verbose?: boolean; quiet?: boolean; format?: string }) => {
+    // Configure output formatting
+  },
+  outputInfo: (message: string) => {
+    console.log(message);
+  },
+  outputDebug: (message: string) => {
+    console.log(message);
+  },
+  outputProgress: (message: string) => {
+    console.log(message);
   }
 };
 

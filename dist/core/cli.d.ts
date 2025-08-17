@@ -1,12 +1,13 @@
 import { SynthesisResponse } from './types.js';
+import { UnifiedModelClient } from './client.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
+import { UnifiedAgent } from './agent.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
-import { ExecutionResponse } from './types.js';
 interface CLIOptions {
     voices?: string | string[];
     depth?: string;
-    mode?: string;
+    mode?: 'competitive' | 'collaborative' | 'consensus' | 'iterative';
     file?: string;
     project?: boolean;
     interactive?: boolean;
@@ -28,16 +29,23 @@ interface CLIOptions {
     dockerImage?: string;
     fast?: boolean;
     skipInit?: boolean;
+    iterative?: boolean;
+    maxIterations?: string;
+    qualityThreshold?: string;
+    status?: boolean;
+    optimize?: boolean;
+    test?: boolean;
+    models?: boolean;
+    configure?: boolean;
+    [key: string]: unknown;
 }
 export interface CLIContext {
-    modelClient: LocalModelClient;
+    modelClient: UnifiedModelClient;
     voiceSystem: VoiceArchetypeSystem;
     mcpManager: MCPServerManager;
     config: AppConfig;
-    agentOrchestrator?: AgentOrchestrator;
-    autonomousAgent?: AutonomousClaudeAgent;
-    multiLLMProvider?: MultiLLMProvider;
-    ragSystem?: RAGSystem;
+    agentOrchestrator?: UnifiedAgent;
+    autonomousAgent?: UnifiedAgent;
 }
 export declare class CLI {
     private context;
@@ -69,15 +77,15 @@ export declare class CLI {
      */
     configureOutput(options: CLIOptions): void;
     handleGeneration(prompt: string, options: CLIOptions): Promise<void>;
-    handleCouncilMode(prompt: string, options: any): Promise<void>;
+    handleCouncilMode(prompt: string, options: CLIOptions): Promise<void>;
     handleVoiceSpecific(voice: string, prompt: string): Promise<void>;
-    handleFileOperation(operation: string, filepath: string, options: any): Promise<void>;
-    handleProjectOperation(operation: string, options: any): Promise<void>;
-    handleInteractiveMode(options: any): Promise<void>;
-    handleConfig(options: any): Promise<void>;
-    handleModelManagement(options: any): Promise<void>;
-    handleVoiceManagement(options: any): Promise<void>;
-    handleVRAMManagement(options: any): Promise<void>;
+    handleFileOperation(operation: string, filepath: string, options: CLIOptions): Promise<void>;
+    handleProjectOperation(operation: string, options: CLIOptions): Promise<void>;
+    handleInteractiveMode(options: CLIOptions): Promise<void>;
+    handleConfig(options: CLIOptions): Promise<void>;
+    handleModelManagement(options: CLIOptions): Promise<void>;
+    handleVoiceManagement(options: CLIOptions): Promise<void>;
+    handleVRAMManagement(options: CLIOptions): Promise<void>;
     handleEditManagement(options: any): Promise<void>;
     showExamples(): void;
     /**

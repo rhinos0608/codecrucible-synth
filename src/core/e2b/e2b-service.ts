@@ -1,6 +1,5 @@
 import { Sandbox } from '@e2b/code-interpreter';
 import { logger } from '../logger.js';
-import { registerShutdownHandler, createManagedInterval, clearManagedInterval } from '../process-lifecycle-manager.js';
 
 /**
  * Execution result from E2B sandbox
@@ -75,9 +74,6 @@ export class E2BService {
     if (!this.config.apiKey) {
       logger.warn('E2B API key not found. Code execution will be disabled.');
     }
-
-    // Register for shutdown
-    registerShutdownHandler(this);
   }
 
   /**
@@ -109,14 +105,17 @@ export class E2BService {
    */
   private async testConnection(): Promise<void> {
     try {
-      const testSandbox = await Sandbox.create();
+      const testSandbox = await Sandbox.create({
+        apiKey: this.config.apiKey
+      });
+      
       const result = await testSandbox.runCode('print("E2B connection test successful")');
       
       if (!result.text || !result.text.includes('successful')) {
         throw new Error('E2B connection test failed');
       }
       
-      await testSandbox.kill();
+      // Note: E2B sandboxes auto-cleanup, no explicit close needed
       logger.info('🔗 E2B connection test passed');
       
     } catch (error) {
@@ -147,7 +146,7 @@ export class E2BService {
       const startTime = Date.now();
       
       const sandbox = await Sandbox.create({
-        // Add any environment-specific configuration here
+        apiKey: this.config.apiKey
       });
       
       const e2bSandbox: E2BSandbox = {
@@ -379,7 +378,7 @@ except Exception as e:
       const e2bSandbox = this.sandboxPool.get(sessionId);
       
       if (e2bSandbox) {
-        await e2bSandbox.sandbox.kill();
+        // Note: E2B sandboxes auto-cleanup, just remove from pool
         this.sandboxPool.delete(sessionId);
         logger.info(`🗑️ Sandbox destroyed for session: ${sessionId}`);
       }
@@ -417,7 +416,7 @@ except Exception as e:
    * Start cleanup timer for expired sessions
    */
   private startCleanupTimer(): void {
-    this.cleanupTimer = createManagedInterval(async () => {
+    this.cleanupTimer = setInterval(async () => {
       await this.cleanupExpiredSessions();
     }, 300000); // Clean up every 5 minutes
   }
@@ -427,7 +426,7 @@ except Exception as e:
    */
   async shutdown(): Promise<void> {
     if (this.cleanupTimer) {
-      clearManagedInterval(this.cleanupTimer);
+      clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
     }
 
@@ -464,6 +463,84 @@ except Exception as e:
         await this.destroySandbox(sessionId);
       }
     }
+  }
+
+  /**
+   * Install package in a sandbox
+   */
+  async installPackage(sessionId: string, packageName: string, language: 'python' | 'javascript' = 'python'): Promise<ExecutionResult> {
+    try {
+      const e2bSandbox = await this.getOrCreateSandbox(sessionId);
+      
+      let installCommand: string;
+      
+      if (language === 'python') {
+        installCommand = `
+import subprocess
+import sys
+
+try:
+    result = subprocess.run([sys.executable, '-m', 'pip', 'install', '${packageName}'], 
+                          capture_output=True, text=True, timeout=60)
+    if result.returncode == 0:
+        print(f"Successfully installed {packageName}")
+        print(result.stdout)
+    else:
+        print(f"Failed to install {packageName}")
+        print(result.stderr)
+        raise Exception(f"Installation failed: {result.stderr}")
+except subprocess.TimeoutExpired:
+    raise Exception("Package installation timed out")
+except Exception as e:
+    raise Exception(f"Installation error: {str(e)}")
+`;
+      } else {
+        // JavaScript package installation via npm (if available in sandbox)
+        installCommand = `
+import subprocess
+import sys
+
+try:
+    result = subprocess.run(['npm', 'install', '${packageName}'], 
+                          capture_output=True, text=True, timeout=60)
+    if result.returncode == 0:
+        print(f"Successfully installed {packageName}")
+        print(result.stdout)
+    else:
+        print(f"Failed to install {packageName}")
+        print(result.stderr)
+        raise Exception(f"Installation failed: {result.stderr}")
+except subprocess.TimeoutExpired:
+    raise Exception("Package installation timed out")
+except Exception as e:
+    raise Exception(f"Installation error: {str(e)}")
+`;
+      }
+      
+      const result = await e2bSandbox.sandbox.runCode(installCommand);
+      
+      return {
+        success: !result.error,
+        output: result.text || '',
+        error: result.error?.name,
+        executionTime: 0 // Not tracking this for package installation
+      };
+      
+    } catch (error) {
+      logger.error(`❌ Failed to install package ${packageName} in session ${sessionId}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown package installation error',
+        executionTime: 0
+      };
+    }
+  }
+
+  /**
+   * Get list of active session IDs
+   */
+  getActiveSessions(): string[] {
+    return Array.from(this.sandboxPool.keys());
   }
 
   /**

@@ -7,7 +7,10 @@ module.exports = {
     cyan: (str) => str,
     gray: (str) => str,
     bold: (str) => str,
-    dim: (str) => str
+    dim: (str) => str,
+    magenta: (str) => str,
+    white: (str) => str,
+    black: (str) => str
   },
   red: (str) => str,
   green: (str) => str,
@@ -16,5 +19,8 @@ module.exports = {
   cyan: (str) => str,
   gray: (str) => str,
   bold: (str) => str,
-  dim: (str) => str
+  dim: (str) => str,
+  magenta: (str) => str,
+  white: (str) => str,
+  black: (str) => str
 };

@@ -2,6 +2,9 @@ import { logger } from '../core/logger.js';
 import YAML from 'yaml';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { ResponseFactory } from '../core/response-types.js';
+import { AdvancedSynthesisEngine, SynthesisMode } from '../core/advanced-synthesis-engine.js';
+import { LivingSpiralCoordinator } from '../core/living-spiral-coordinator.js';
 /**
  * Enhanced Voice Archetype System
  *
@@ -13,11 +16,15 @@ export class VoiceArchetypeSystem {
     config;
     voices;
     presets;
+    advancedSynthesisEngine;
+    livingSpiralCoordinator;
     constructor(modelClient, config) {
         this.modelClient = modelClient;
         this.config = config;
         this.voices = new Map();
         this.presets = new Map();
+        this.advancedSynthesisEngine = new AdvancedSynthesisEngine(modelClient);
+        this.livingSpiralCoordinator = new LivingSpiralCoordinator(this, modelClient);
         // Initialize fallback voices immediately (synchronously)
         this.initializeFallbackVoices();
         // Load additional voices asynchronously (this will enhance/override fallbacks)
@@ -96,7 +103,7 @@ export class VoiceArchetypeSystem {
             {
                 id: 'explorer',
                 name: 'Explorer',
-                systemPrompt: 'You are Explorer, an innovative AI focused on creative solutions and experimental approaches. Always consider alternative methods, edge cases, and cutting-edge techniques. Be curious and suggest novel approaches.',
+                systemPrompt: 'You are Explorer, an innovative AI focused on creative solutions and experimental approaches. Drive innovation and explore alternative methods, edge cases, and cutting-edge techniques. Be curious and suggest novel approaches.',
                 temperature: 0.9,
                 style: 'experimental'
             },
@@ -235,6 +242,70 @@ export class VoiceArchetypeSystem {
         return selectedVoices;
     }
     /**
+     * Recommend voices for a given prompt
+     * Returns a list of recommended voice IDs based on prompt analysis
+     */
+    recommendVoices(prompt, maxConcurrent = 4) {
+        const promptLower = prompt.toLowerCase();
+        const recommendations = [];
+        // Task classification for voice recommendations  
+        const isAuthTask = /\b(auth|authentication|login|password|jwt|token|secure|security)\b/.test(promptLower);
+        const isUITask = /\b(ui|ux|interface|component|design|responsive|user)\b/.test(promptLower);
+        const isPerformanceTask = /\b(performance|optimize|speed|memory|efficiency|caching)\b/.test(promptLower);
+        const isArchitectureTask = /\b(architecture|microservices|system|scalable|pattern)\b/.test(promptLower);
+        // Security voice for authentication/security tasks
+        if (isAuthTask && this.voices.has('security')) {
+            recommendations.push('security');
+        }
+        // Designer voice for UI/UX tasks
+        if (isUITask) {
+            recommendations.push('designer');
+        }
+        // Optimizer voice for performance tasks
+        if (isPerformanceTask) {
+            recommendations.push('optimizer');
+        }
+        // Architect voice for system design tasks
+        if (isArchitectureTask) {
+            recommendations.push('architect');
+        }
+        // Always include explorer (creative solutions)
+        if (!recommendations.includes('explorer')) {
+            recommendations.push('explorer');
+        }
+        // Include maintainer for stability perspective
+        if (recommendations.length < maxConcurrent && !recommendations.includes('maintainer')) {
+            recommendations.push('maintainer');
+        }
+        // Include developer for practical implementation
+        if (recommendations.length < maxConcurrent && !recommendations.includes('developer')) {
+            recommendations.push('developer');
+        }
+        // Include analyzer for pattern analysis  
+        if (recommendations.length < maxConcurrent && !recommendations.includes('analyzer')) {
+            recommendations.push('analyzer');
+        }
+        return recommendations.slice(0, maxConcurrent);
+    }
+    /**
+     * Validate voice IDs and return valid/invalid lists
+     */
+    validateVoices(voiceIds) {
+        const valid = [];
+        const invalid = [];
+        for (const voiceId of voiceIds) {
+            // Check case-insensitive and normalize to lowercase
+            const normalizedId = voiceId.toLowerCase();
+            if (this.voices.has(normalizedId)) {
+                valid.push(normalizedId);
+            }
+            else {
+                invalid.push(voiceId);
+            }
+        }
+        return { valid, invalid };
+    }
+    /**
      * Generate solutions from multiple voices with intelligent selection
      */
     async generateMultiVoiceSolutions(prompt, voiceIds, context) {
@@ -260,7 +331,8 @@ export class VoiceArchetypeSystem {
             .map(id => this.voices.get(id.toLowerCase()))
             .filter(voice => voice !== undefined);
         if (availableVoices.length === 0) {
-            throw new Error('No valid voices found');
+            const invalidVoices = selectedVoiceIds.filter(id => !this.voices.has(id.toLowerCase()));
+            throw new Error(`No valid voices found. Invalid voices: ${invalidVoices.join(', ')}. Available voices: ${Array.from(this.voices.keys()).join(', ')}`);
         }
         // Generate responses sequentially for better user experience and reliability
         // (Sequential is more stable and provides better feedback to users)
@@ -311,12 +383,17 @@ export class VoiceArchetypeSystem {
     /**
      * Generate response from a single voice (no synthesis)
      */
-    async generateSingleVoiceResponse(prompt, voiceId, context) {
-        const voice = this.voices.get(voiceId.toLowerCase());
+    async generateSingleVoiceResponse(prompt, voiceId, context, temperatureOverride) {
+        let voice = this.voices.get(voiceId.toLowerCase());
         if (!voice) {
             throw new Error(`Voice '${voiceId}' not found`);
         }
-        logger.info(`Generating single response with voice: ${voice.name}`);
+        // Apply temperature override if provided
+        if (temperatureOverride !== undefined) {
+            voice = { ...voice, temperature: temperatureOverride };
+            logger.info(`Temperature override applied: ${temperatureOverride}`);
+        }
+        logger.info(`Generating single response with voice: ${voice.name} (temp: ${voice.temperature}, style: ${voice.style})`);
         console.log(`🎭 Generating response from ${voice.name}...`);
         try {
             const response = await this.modelClient.generateVoiceResponse(voice, prompt, context);
@@ -716,6 +793,485 @@ Be selective and merit-based. Choose excellence over consensus.`;
                 }
             }
         };
+    }
+    /**
+     * Get default voices configuration
+     * Required by tests
+     */
+    getDefaultVoices() {
+        return ['explorer', 'maintainer'];
+    }
+    /**
+     * Convert legacy SynthesisResult to standardized SynthesisResponse
+     */
+    synthesisResultToResponse(synthesisResult, individualResponses) {
+        return ResponseFactory.createSynthesisResponse(synthesisResult.combinedCode, synthesisResult.voicesUsed, {
+            reasoning: synthesisResult.reasoning,
+            confidence: synthesisResult.confidence,
+            qualityScore: synthesisResult.qualityScore,
+            synthesisMode: synthesisResult.synthesisMode,
+            individualResponses
+        });
+    }
+    /**
+     * Generate multi-voice solutions with standardized response format
+     */
+    async generateStandardMultiVoiceSolutions(prompt, voiceIds, context) {
+        try {
+            const voiceResponses = await this.generateMultiVoiceSolutions(prompt, voiceIds, context);
+            return voiceResponses.map(vr => ResponseFactory.createAgentResponse(vr.content, {
+                confidence: vr.confidence,
+                voiceId: vr.voice,
+                tokensUsed: vr.tokens_used,
+                reasoning: vr.reasoning
+            }));
+        }
+        catch (error) {
+            logger.error('Standard multi-voice generation failed:', error);
+            const errorInfo = ResponseFactory.createErrorResponse('MULTI_VOICE_ERROR', error instanceof Error ? error.message : 'Unknown error');
+            const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+            response.error = errorInfo;
+            response.success = false;
+            return [response];
+        }
+    }
+    /**
+     * Synthesize voice responses with standardized format
+     */
+    async synthesizeStandardVoiceResponses(responses, mode = 'competitive') {
+        try {
+            // Convert AgentResponse back to VoiceResponse for legacy synthesis
+            const voiceResponses = responses.map(ar => ({
+                content: ar.content,
+                voice: ar.voiceId || 'unknown',
+                confidence: ar.confidence,
+                reasoning: ar.reasoning,
+                tokens_used: ar.tokensUsed || 0
+            }));
+            const synthesisResult = await this.synthesizeVoiceResponses(voiceResponses, mode);
+            return this.synthesisResultToResponse(synthesisResult, responses);
+        }
+        catch (error) {
+            logger.error('Standard synthesis failed:', error);
+            const errorInfo = ResponseFactory.createErrorResponse('SYNTHESIS_ERROR', error instanceof Error ? error.message : 'Unknown error');
+            const response = ResponseFactory.createSynthesisResponse('', [], { confidence: 0 });
+            response.error = errorInfo;
+            response.success = false;
+            return response;
+        }
+    }
+    /**
+     * Advanced synthesis using the new synthesis engine
+     */
+    async synthesizeAdvanced(responses, config) {
+        return await this.advancedSynthesisEngine.synthesizeAdvanced(responses, config);
+    }
+    /**
+     * Get synthesis mode recommendations based on task analysis
+     */
+    recommendSynthesisMode(prompt, voiceCount) {
+        const promptLower = prompt.toLowerCase();
+        // Creative/exploratory tasks
+        if (/\b(creative|innovative|explore|brainstorm|alternative)\b/.test(promptLower)) {
+            return SynthesisMode.COLLABORATIVE;
+        }
+        // Technical/analytical tasks
+        if (/\b(analyze|review|optimize|performance|security)\b/.test(promptLower)) {
+            return SynthesisMode.COMPETITIVE;
+        }
+        // Consensus-building tasks
+        if (/\b(agree|consensus|standard|best practice|recommend)\b/.test(promptLower)) {
+            return SynthesisMode.CONSENSUS;
+        }
+        // Complex problem-solving
+        if (/\b(complex|difficult|challenge|conflict|contradict)\b/.test(promptLower)) {
+            return SynthesisMode.DIALECTICAL;
+        }
+        // Structured/hierarchical tasks
+        if (/\b(architecture|design|plan|structure|organize)\b/.test(promptLower)) {
+            return SynthesisMode.HIERARCHICAL;
+        }
+        // Default to adaptive for unknown scenarios
+        return SynthesisMode.ADAPTIVE;
+    }
+    /**
+     * Intelligent multi-voice processing with automatic mode selection
+     */
+    async processWithIntelligentSynthesis(prompt, voiceIds = 'auto', context = { files: [] }) {
+        try {
+            // Generate individual responses
+            const agentResponses = await this.generateStandardMultiVoiceSolutions(prompt, voiceIds, context);
+            // Recommend synthesis mode
+            const recommendedMode = this.recommendSynthesisMode(prompt, agentResponses.length);
+            // Configure synthesis
+            const synthesisConfig = {
+                mode: recommendedMode,
+                qualityThreshold: 85,
+                enableAdaptiveSynthesis: true,
+                maxIterations: 3
+            };
+            logger.info(`Processing with intelligent synthesis. Mode: ${recommendedMode}, Voices: ${agentResponses.length}`);
+            // Perform advanced synthesis
+            const result = await this.synthesizeAdvanced(agentResponses, synthesisConfig);
+            return result;
+        }
+        catch (error) {
+            logger.error('Intelligent synthesis failed:', error);
+            // Fallback to standard response
+            const fallbackResponse = ResponseFactory.createAgentResponse(`Error in intelligent synthesis: ${error instanceof Error ? error.message : 'Unknown error'}`, { confidence: 0.1 });
+            const fallbackSynthesis = ResponseFactory.createSynthesisResponse(fallbackResponse.content, ['error'], { confidence: 0.1, qualityScore: 0 });
+            return {
+                ...fallbackSynthesis,
+                qualityMetrics: {
+                    coherence: 0,
+                    completeness: 0,
+                    accuracy: 0,
+                    innovation: 0,
+                    practicality: 0,
+                    overall: 0
+                },
+                conflictAnalysis: {
+                    conflictingTopics: [],
+                    agreementLevel: 0,
+                    resolutionStrategy: 'error',
+                    compromisePoints: []
+                },
+                voiceWeights: [],
+                synthesisStrategy: 'error_fallback',
+                iterationCount: 0,
+                adaptiveAdjustments: []
+            };
+        }
+    }
+    /**
+     * Batch processing for multiple prompts with intelligent synthesis
+     */
+    async processBatchWithIntelligentSynthesis(prompts, context = { files: [] }) {
+        const results = [];
+        for (let i = 0; i < prompts.length; i++) {
+            const { prompt, voices } = prompts[i];
+            logger.info(`Processing batch item ${i + 1}/${prompts.length}: ${prompt.substring(0, 50)}...`);
+            try {
+                const result = await this.processWithIntelligentSynthesis(prompt, voices || 'auto', context);
+                results.push(result);
+            }
+            catch (error) {
+                logger.error(`Batch item ${i + 1} failed:`, error);
+                // Add error result to maintain batch order
+                const errorResult = await this.processWithIntelligentSynthesis('Error processing batch item', ['developer'], context);
+                results.push(errorResult);
+            }
+        }
+        return results;
+    }
+    /**
+     * Quality analysis for synthesis results
+     */
+    analyzeSynthesisQuality(result) {
+        const { qualityMetrics } = result;
+        // Calculate overall grade
+        let grade;
+        if (qualityMetrics.overall >= 90)
+            grade = 'A';
+        else if (qualityMetrics.overall >= 80)
+            grade = 'B';
+        else if (qualityMetrics.overall >= 70)
+            grade = 'C';
+        else if (qualityMetrics.overall >= 60)
+            grade = 'D';
+        else
+            grade = 'F';
+        // Identify strengths and weaknesses
+        const strengths = [];
+        const weaknesses = [];
+        const recommendations = [];
+        if (qualityMetrics.coherence >= 85) {
+            strengths.push('High coherence and logical flow');
+        }
+        else {
+            weaknesses.push('Low coherence between ideas');
+            recommendations.push('Improve logical connections between concepts');
+        }
+        if (qualityMetrics.completeness >= 85) {
+            strengths.push('Comprehensive coverage of topic');
+        }
+        else {
+            weaknesses.push('Incomplete coverage of requirements');
+            recommendations.push('Ensure all aspects of the prompt are addressed');
+        }
+        if (qualityMetrics.innovation >= 85) {
+            strengths.push('Creative and innovative solutions');
+        }
+        else {
+            weaknesses.push('Limited innovation or creativity');
+            recommendations.push('Encourage more creative voice contributions');
+        }
+        if (qualityMetrics.practicality >= 85) {
+            strengths.push('Practical and implementable solutions');
+        }
+        else {
+            weaknesses.push('Solutions may be difficult to implement');
+            recommendations.push('Focus on practical, actionable solutions');
+        }
+        return { grade, recommendations, strengths, weaknesses };
+    }
+    /**
+     * Dynamically adjust voice temperature based on task complexity and context
+     */
+    adjustVoiceTemperature(voice, prompt, context) {
+        const promptLower = prompt.toLowerCase();
+        let temperatureModifier = 0;
+        // Increase temperature for creative/exploratory tasks
+        if (/\b(creative|brainstorm|explore|innovative|alternative|experimental)\b/.test(promptLower)) {
+            temperatureModifier += 0.2;
+        }
+        // Decrease temperature for precise/analytical tasks
+        if (/\b(precise|accurate|exact|calculate|measure|analyze|debug|fix)\b/.test(promptLower)) {
+            temperatureModifier -= 0.2;
+        }
+        // Adjust based on complexity
+        const complexityScore = this.calculatePromptComplexity(prompt);
+        if (complexityScore > 0.8) {
+            temperatureModifier -= 0.1; // Lower temperature for complex tasks
+        }
+        else if (complexityScore < 0.3) {
+            temperatureModifier += 0.1; // Higher temperature for simple tasks
+        }
+        // Apply style-based adjustments
+        const styleTemperatureMap = {
+            'experimental': 0.1,
+            'conservative': -0.1,
+            'analytical': -0.15,
+            'practical': -0.05,
+            'methodical': -0.1,
+            'defensive': -0.2,
+            'user-focused': 0.05,
+            'performance-focused': -0.1
+        };
+        temperatureModifier += styleTemperatureMap[voice.style] || 0;
+        // Clamp to reasonable range
+        const adjustedTemperature = Math.max(0.1, Math.min(1.0, voice.temperature + temperatureModifier));
+        if (Math.abs(temperatureModifier) > 0.05) {
+            logger.info(`Temperature adjusted for ${voice.name}: ${voice.temperature} → ${adjustedTemperature} (${temperatureModifier > 0 ? '+' : ''}${temperatureModifier.toFixed(2)})`);
+        }
+        return { ...voice, temperature: adjustedTemperature };
+    }
+    /**
+     * Calculate prompt complexity score (0.0 - 1.0)
+     */
+    calculatePromptComplexity(prompt) {
+        let score = 0;
+        // Length factor
+        score += Math.min(prompt.length / 1000, 0.3);
+        // Technical keywords
+        const technicalKeywords = ['algorithm', 'architecture', 'optimization', 'integration', 'scalability', 'performance'];
+        const technicalCount = technicalKeywords.filter(keyword => prompt.toLowerCase().includes(keyword)).length;
+        score += technicalCount * 0.1;
+        // Multiple requirements
+        const requirementIndicators = ['and', 'also', 'additionally', 'furthermore', 'plus'];
+        const requirementCount = requirementIndicators.filter(indicator => prompt.toLowerCase().includes(indicator)).length;
+        score += requirementCount * 0.1;
+        // Code-related complexity
+        if (/\b(refactor|migrate|transform|convert)\b/.test(prompt.toLowerCase())) {
+            score += 0.2;
+        }
+        return Math.min(score, 1.0);
+    }
+    /**
+     * Get voice configuration with style-aware defaults
+     */
+    getVoiceWithStyleDefaults(voiceId) {
+        const voice = this.voices.get(voiceId.toLowerCase());
+        if (!voice)
+            return undefined;
+        // Ensure voice has proper style-based temperature if not explicitly set
+        const styleDefaults = {
+            'experimental': {
+                temperature: 0.9,
+                characteristics: ['innovative', 'creative', 'unconventional', 'cutting-edge']
+            },
+            'conservative': {
+                temperature: 0.4,
+                characteristics: ['stable', 'proven', 'reliable', 'maintainable']
+            },
+            'analytical': {
+                temperature: 0.3,
+                characteristics: ['data-driven', 'methodical', 'precise', 'quantitative']
+            },
+            'practical': {
+                temperature: 0.6,
+                characteristics: ['pragmatic', 'efficient', 'actionable', 'results-focused']
+            },
+            'methodical': {
+                temperature: 0.5,
+                characteristics: ['systematic', 'organized', 'step-by-step', 'thorough']
+            },
+            'defensive': {
+                temperature: 0.3,
+                characteristics: ['secure', 'robust', 'safe', 'validated']
+            },
+            'systematic': {
+                temperature: 0.4,
+                characteristics: ['architectural', 'scalable', 'modular', 'well-designed']
+            },
+            'user-focused': {
+                temperature: 0.7,
+                characteristics: ['intuitive', 'accessible', 'user-friendly', 'empathetic']
+            },
+            'performance-focused': {
+                temperature: 0.3,
+                characteristics: ['optimized', 'efficient', 'fast', 'scalable']
+            }
+        };
+        const defaults = styleDefaults[voice.style];
+        if (defaults && Math.abs(voice.temperature - defaults.temperature) > 0.3) {
+            logger.info(`Applying style-based temperature default for ${voice.name} (${voice.style}): ${voice.temperature} → ${defaults.temperature}`);
+            return { ...voice, temperature: defaults.temperature };
+        }
+        return voice;
+    }
+    /**
+     * Generate multi-voice responses with dynamic temperature adjustment
+     */
+    async generateAdaptiveMultiVoiceSolutions(prompt, voiceIds, context, enableTemperatureAdjustment = true) {
+        // Use intelligent selection if 'auto'
+        let selectedVoiceIds;
+        if (voiceIds === 'auto') {
+            selectedVoiceIds = this.selectOptimalVoices(prompt, 2);
+        }
+        else if (Array.isArray(voiceIds)) {
+            selectedVoiceIds = voiceIds;
+        }
+        else {
+            selectedVoiceIds = this.selectOptimalVoices(prompt, 2);
+        }
+        logger.info(`Generating adaptive solutions with voices: ${selectedVoiceIds.join(', ')}`);
+        // Get and adjust voices
+        let voices = selectedVoiceIds
+            .map(id => this.getVoiceWithStyleDefaults(id))
+            .filter(voice => voice !== undefined);
+        if (voices.length === 0) {
+            throw new Error('No valid voices found');
+        }
+        // Apply dynamic temperature adjustment if enabled
+        if (enableTemperatureAdjustment) {
+            voices = voices.map(voice => this.adjustVoiceTemperature(voice, prompt, context));
+        }
+        // Generate responses sequentially
+        const responses = [];
+        for (let i = 0; i < voices.length; i++) {
+            const voice = voices[i];
+            try {
+                console.log(`🎭 Generating adaptive response from ${voice.name} (temp: ${voice.temperature.toFixed(2)}, style: ${voice.style}) (${i + 1}/${voices.length})...`);
+                const response = await this.modelClient.generateVoiceResponse(voice, prompt, context);
+                responses.push(response);
+                console.log(`✅ ${voice.name} completed (${response.content.length} characters)`);
+            }
+            catch (error) {
+                logger.warn(`Adaptive voice ${voice.name} failed:`, error);
+                console.log(`❌ ${voice.name} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+        }
+        logger.info(`Generated ${responses.length} adaptive voice responses`);
+        return responses;
+    }
+    /**
+     * Execute Living Spiral methodology for complex problem solving
+     */
+    async executeLivingSpiral(task, context = { files: [] }, config = {}) {
+        logger.info(`🌀 Initiating Living Spiral for task: "${task.substring(0, 50)}..."`);
+        try {
+            const result = await this.livingSpiralCoordinator.executeLivingSpiral(task, context, config);
+            logger.info(`🌀 Living Spiral completed successfully:`);
+            logger.info(`   Quality Score: ${result.finalQualityScore}/100`);
+            logger.info(`   Total Iterations: ${result.totalIterations}`);
+            logger.info(`   Convergence: ${result.convergenceReason}`);
+            return result;
+        }
+        catch (error) {
+            logger.error('Living Spiral execution failed:', error);
+            throw new Error(`Living Spiral failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Execute Living Spiral with preset configuration
+     */
+    async executeLivingSpiralWithPreset(task, presetName, context = { files: [] }) {
+        const preset = this.getPreset(presetName);
+        if (!preset) {
+            throw new Error(`Preset '${presetName}' not found`);
+        }
+        const spiralConfig = {
+            voiceSelectionStrategy: 'fixed',
+            synthesisMode: preset.mode,
+            maxIterations: 3,
+            qualityThreshold: 85
+        };
+        logger.info(`🌀 Executing Living Spiral with preset: ${preset.name}`);
+        return await this.executeLivingSpiral(task, context, spiralConfig);
+    }
+    /**
+     * Execute adaptive Living Spiral that learns from context
+     */
+    async executeAdaptiveLivingSpiral(task, context = { files: [] }, learningHistory = []) {
+        // Extract lessons from previous spiral executions
+        const previousLessons = learningHistory
+            .flatMap(result => result.lessonsLearned)
+            .slice(-10); // Last 10 lessons
+        // Adjust config based on learning history
+        const adaptiveConfig = {
+            voiceSelectionStrategy: 'adaptive',
+            synthesisMode: SynthesisMode.ADAPTIVE,
+            enableAdaptiveLearning: true,
+            maxIterations: learningHistory.length > 0 ? Math.min(learningHistory.length + 1, 5) : 3,
+            qualityThreshold: this.calculateAdaptiveQualityThreshold(learningHistory),
+            reflectionDepth: learningHistory.length > 2 ? 'deep' : 'medium'
+        };
+        logger.info(`🌀 Executing Adaptive Living Spiral with ${previousLessons.length} previous lessons`);
+        if (previousLessons.length > 0) {
+            logger.info(`🧠 Applying lessons: ${previousLessons.slice(0, 3).join('; ')}`);
+        }
+        return await this.executeLivingSpiral(task, context, adaptiveConfig);
+    }
+    /**
+     * Execute collaborative Living Spiral with external feedback
+     */
+    async executeCollaborativeLivingSpiral(task, context = { files: [] }, externalFeedback = []) {
+        // Incorporate external feedback into the context
+        const enhancedContext = {
+            ...context,
+            externalFeedback: externalFeedback.map(f => ({
+                source: f.source,
+                content: f.feedback,
+                priority: f.priority
+            }))
+        };
+        const collaborativeConfig = {
+            voiceSelectionStrategy: 'adaptive',
+            synthesisMode: SynthesisMode.COLLABORATIVE,
+            enableAdaptiveLearning: true,
+            maxIterations: 4,
+            qualityThreshold: 90, // Higher threshold for collaborative work
+            reflectionDepth: 'deep'
+        };
+        logger.info(`🌀 Executing Collaborative Living Spiral with ${externalFeedback.length} external feedback sources`);
+        return await this.executeLivingSpiral(task, enhancedContext, collaborativeConfig);
+    }
+    /**
+     * Get Living Spiral coordinator for direct access
+     */
+    getLivingSpiralCoordinator() {
+        return this.livingSpiralCoordinator;
+    }
+    /**
+     * Calculate adaptive quality threshold based on learning history
+     */
+    calculateAdaptiveQualityThreshold(history) {
+        if (history.length === 0)
+            return 85;
+        const avgQuality = history.reduce((sum, result) => sum + result.finalQualityScore, 0) / history.length;
+        // Set threshold slightly above historical average, but not too high
+        return Math.min(Math.max(avgQuality + 5, 80), 95);
     }
 }
 //# sourceMappingURL=voice-archetype-system.js.map

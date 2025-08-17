@@ -6,7 +6,9 @@ import { AutonomousErrorHandler, ErrorContext } from './autonomous-error-handler
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
 import { GPUOptimizer } from './gpu-optimizer.js';
 import { VRAMOptimizer, OptimizationConfig } from './vram-optimizer.js';
+import { ModelPreloader } from './model-preloader.js';
 import chalk from 'chalk';
+import { AgentResponse, ResponseFactory } from './response-types.js';
 
 export interface LocalModelConfig {
   endpoint: string;
@@ -35,6 +37,11 @@ export interface ProjectContext {
   gitStatus?: string;
   workingDirectory?: string;
   recentMessages?: any[];
+  externalFeedback?: Array<{
+    source: string;
+    content: string;
+    priority: number;
+  }>;
 }
 
 export interface VoiceArchetype {
@@ -63,6 +70,7 @@ export class LocalModelClient {
   private modelWarmupPromises = new Map<string, Promise<boolean>>(); // Prevent duplicate warmup
   private vramOptimizer: VRAMOptimizer; // VRAM optimization for large models
   private currentOptimization: OptimizationConfig | null = null; // Current model optimization
+  private modelPreloader: ModelPreloader; // Advanced model preloading system
 
   constructor(config: LocalModelConfig) {
     this.config = config;
@@ -71,6 +79,18 @@ export class LocalModelClient {
     this.modelSelector = new IntelligentModelSelector(config.endpoint);
     this.vramOptimizer = new VRAMOptimizer(config.endpoint);
     // this.gpuOptimizer = new GPUOptimizer(); // Disabled to prevent model downloads
+    
+    // Initialize advanced model preloader
+    this.modelPreloader = new ModelPreloader({
+      endpoint: config.endpoint,
+      primaryModels: this.determinePrimaryModels(),
+      fallbackModels: ['gemma:latest', 'gemma:2b'],
+      maxConcurrentLoads: 2,
+      warmupPrompt: 'Hello, ready to assist with coding.',
+      keepAliveTime: '15m',
+      retryAttempts: 3,
+      loadTimeout: 45000
+    });
     
     // Use adaptive timeout based on model size and system performance
     const adjustedTimeout = this.calculateAdaptiveTimeout(config.timeout);
@@ -90,7 +110,7 @@ export class LocalModelClient {
 
     // Initialize GPU optimization and model preloading asynchronously
     this.initializeGPUOptimization();
-    this.preloadPrimaryModels();
+    this.initializeAdvancedPreloading();
   }
 
   /**
@@ -267,6 +287,77 @@ export class LocalModelClient {
       logger.warn('GPU optimization failed, using CPU fallback:', error);
       this.isOptimized = true; // Mark as complete even if failed
     }
+  }
+
+  /**
+   * Initialize advanced model preloading system
+   */
+  private async initializeAdvancedPreloading(): Promise<void> {
+    try {
+      console.log(chalk.cyan('🚀 Initializing Advanced Model Preloader...'));
+      
+      // Initialize preloader asynchronously to avoid blocking startup
+      this.modelPreloader.initialize().then(() => {
+        console.log(chalk.green('✅ Advanced model preloading completed'));
+        this.modelPreloader.displayStatus();
+      }).catch(error => {
+        logger.warn('Advanced model preloading failed (falling back to legacy):', error);
+        // Fallback to legacy preloading
+        this.preloadPrimaryModels();
+      });
+      
+    } catch (error) {
+      logger.warn('Failed to initialize advanced preloader:', error);
+      // Fallback to legacy preloading
+      this.preloadPrimaryModels();
+    }
+  }
+
+  /**
+   * Determine primary models based on available models and system capabilities
+   */
+  private determinePrimaryModels(): string[] {
+    // Default primary models in order of preference
+    const defaultModels = [
+      'gemma:latest',
+      'gemma:2b', 
+      'llama3.2:latest',
+      'codellama:7b',
+      'mistral:latest'
+    ];
+
+    // TODO: Add logic to detect available models and filter based on system specs
+    return defaultModels;
+  }
+
+  /**
+   * Get best model with preloading awareness
+   */
+  async getBestModel(): Promise<string> {
+    // First try to get best model from preloader
+    const preloadedModel = this.modelPreloader.getBestAvailableModel();
+    if (preloadedModel) {
+      logger.debug(`Using preloaded model: ${preloadedModel}`);
+      return preloadedModel;
+    }
+
+    // Fallback to existing logic
+    const availableModels = await this.getAvailableModels();
+    return await this.selectBestAvailableModel(availableModels, 'coding');
+  }
+
+  /**
+   * Ensure model is ready before use
+   */
+  async ensureModelReady(modelName: string): Promise<boolean> {
+    return await this.modelPreloader.ensureModelReady(modelName);
+  }
+
+  /**
+   * Get preloader status for debugging
+   */
+  getPreloaderStatus(): any {
+    return this.modelPreloader.getStatusReport();
   }
 
   /**
@@ -880,7 +971,16 @@ export class LocalModelClient {
     try {
       const enhancedPrompt = this.enhancePromptWithVoice(voice, prompt, context);
       const taskType = this.analyzeTaskType(prompt);
-      const model = await this.getAvailableModel(taskType);
+      
+      // Use preloaded model for better performance
+      let model = await this.getBestModel();
+      
+      // Ensure the selected model is ready
+      const modelReady = await this.ensureModelReady(model);
+      if (!modelReady) {
+        logger.warn(`Model ${model} not ready, falling back to available model`);
+        model = await this.getAvailableModel(taskType);
+      }
       
       logger.info(`Generating response with ${voice.name} using model: ${model}`);
       
@@ -1104,7 +1204,7 @@ export class LocalModelClient {
   /**
    * Generate a single response from the local model with GPU optimization and error handling
    */
-  async generate(prompt: string, jsonSchema?: any): Promise<string> {
+  async generate(prompt: string, jsonSchema?: any, retryCount = 0): Promise<string> {
     // Pre-flight connection check
     const isConnected = await this.checkConnection();
     if (!isConnected) {
@@ -1133,6 +1233,11 @@ export class LocalModelClient {
 
       return this.parseResponse(response.data);
     } catch (error) {
+        if (retryCount < 3 && error instanceof Error && error.message.includes('socket hang up')) {
+            logger.warn(`Socket hang up, retrying... (${retryCount + 1}/3)`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+            return this.generate(prompt, jsonSchema, retryCount + 1);
+        }
       // Handle specific error types with helpful guidance
       const isTimeout = error instanceof Error && 
         (error.message.includes('timeout') || error.message.includes('ECONNREFUSED'));
@@ -1317,7 +1422,13 @@ Provide a structured analysis with actionable recommendations.`;
     const sanitizedContext = this.sanitizeContext(context);
     const contextInfo = this.formatContext(sanitizedContext);
     
+    // Generate style-specific instructions based on voice style
+    const styleInstructions = this.generateStyleInstructions(voice.style);
+    
     return `${voice.systemPrompt}
+
+Voice Style: ${voice.style}
+${styleInstructions}
 
 Project Context:
 ${contextInfo}
@@ -1327,12 +1438,134 @@ ${sanitizedPrompt}
 
 Instructions:
 - Respond as ${voice.name} with your specific perspective and expertise
+- Apply your ${voice.style} approach consistently throughout your response
 - Provide concrete, actionable solutions
 - Include code examples where appropriate
 - Consider the project context provided
 - Be specific and detailed in your recommendations
 - Format code blocks with proper language tags
 - SECURITY NOTICE: Do not execute, evaluate, or suggest running any user-provided code without explicit review`;
+  }
+
+  /**
+   * Generate style-specific instructions for voice behavior
+   */
+  private generateStyleInstructions(style: string): string {
+    const styleMap: Record<string, string> = {
+      'experimental': `
+Style Instructions:
+- Explore unconventional and innovative approaches
+- Suggest cutting-edge technologies and emerging patterns
+- Consider experimental features and beta technologies
+- Think outside the box and challenge traditional methods
+- Embrace creative solutions and novel architectures
+- Focus on innovation over stability`,
+      
+      'conservative': `
+Style Instructions:
+- Prioritize proven, stable, and well-tested approaches
+- Recommend mature technologies with strong community support
+- Focus on long-term maintainability and reliability
+- Avoid bleeding-edge features that may be unstable
+- Emphasize backwards compatibility and migration safety
+- Choose established patterns and best practices`,
+      
+      'analytical': `
+Style Instructions:
+- Provide detailed technical analysis with metrics and data
+- Break down complex problems into measurable components
+- Include performance implications and trade-off analysis
+- Reference benchmarks, studies, and empirical evidence
+- Focus on quantifiable benefits and objective reasoning
+- Present structured, logical decision-making processes`,
+      
+      'practical': `
+Style Instructions:
+- Prioritize working solutions that can be implemented immediately
+- Focus on real-world applicability and pragmatic approaches
+- Provide step-by-step implementation guidance
+- Consider resource constraints and practical limitations
+- Emphasize getting results quickly and efficiently
+- Balance ideal solutions with practical constraints`,
+      
+      'methodical': `
+Style Instructions:
+- Follow systematic, step-by-step approaches
+- Break complex tasks into organized, sequential phases
+- Provide clear workflows and structured processes
+- Emphasize thorough planning and systematic execution
+- Create repeatable, documented procedures
+- Focus on consistency and systematic problem-solving`,
+      
+      'defensive': `
+Style Instructions:
+- Prioritize security, safety, and risk mitigation
+- Include comprehensive error handling and validation
+- Consider potential attack vectors and vulnerabilities
+- Implement defensive programming patterns
+- Focus on robustness and fault tolerance
+- Emphasize security-first design principles`,
+      
+      'systematic': `
+Style Instructions:
+- Apply architectural thinking and system-wide perspective
+- Consider scalability, modularity, and system integration
+- Focus on design patterns and architectural principles
+- Think about system boundaries and interface design
+- Emphasize maintainable and extensible architectures
+- Balance immediate needs with long-term system evolution`,
+      
+      'user-focused': `
+Style Instructions:
+- Prioritize user experience and usability considerations
+- Consider accessibility, inclusivity, and diverse user needs
+- Focus on intuitive interfaces and user-friendly design
+- Emphasize user workflows and interaction patterns
+- Think about user feedback, testing, and validation
+- Balance functionality with ease of use`,
+      
+      'performance-focused': `
+Style Instructions:
+- Optimize for speed, efficiency, and resource utilization
+- Consider algorithmic complexity and performance implications
+- Focus on bottleneck identification and optimization strategies
+- Emphasize scalability and performance monitoring
+- Analyze memory usage, CPU utilization, and I/O efficiency
+- Prioritize measurable performance improvements`,
+      
+      'integrative': `
+Style Instructions:
+- Focus on combining different approaches and perspectives
+- Create hybrid solutions that leverage multiple strengths
+- Emphasize interoperability and system integration
+- Find synergies between different technologies and patterns
+- Build bridges between competing approaches
+- Create unified solutions from diverse components`,
+      
+      'balanced': `
+Style Instructions:
+- Find equilibrium between competing concerns and trade-offs
+- Consider multiple perspectives and stakeholder needs
+- Balance short-term and long-term considerations
+- Weigh benefits and drawbacks of different approaches
+- Seek compromise solutions that satisfy key requirements
+- Avoid extreme positions in favor of moderate, sustainable solutions`,
+      
+      'selective': `
+Style Instructions:
+- Focus on choosing the best elements from available options
+- Apply rigorous evaluation criteria and quality standards
+- Prioritize excellence and high-quality outcomes
+- Be discerning about which approaches to recommend
+- Emphasize merit-based selection and objective evaluation
+- Choose solutions based on proven effectiveness and results`
+    };
+
+    return styleMap[style] || `
+Style Instructions:
+- Apply a ${style} approach to your analysis and recommendations
+- Let your ${style} perspective guide your response methodology
+- Maintain consistency with ${style} principles throughout your answer`;
   }
 
   /**
@@ -1699,5 +1932,43 @@ Instructions:
     console.log('   • 404 errors → Model not installed or wrong name');
     console.log('   • Timeout → Model too large for available resources');
     console.log('   • 500 errors → Model corrupted, try re-pulling');
+  }
+
+  /**
+   * Convert legacy VoiceResponse to standardized AgentResponse
+   */
+  public voiceResponseToAgentResponse(voiceResponse: VoiceResponse): AgentResponse {
+    return ResponseFactory.createAgentResponse(voiceResponse.content, {
+      confidence: voiceResponse.confidence,
+      voiceId: voiceResponse.voice,
+      tokensUsed: voiceResponse.tokens_used,
+      reasoning: voiceResponse.reasoning
+    });
+  }
+
+  /**
+   * Generate voice response with standardized format
+   */
+  async generateStandardVoiceResponse(
+    voice: VoiceArchetype,
+    prompt: string,
+    context: ProjectContext,
+    retryCount = 0
+  ): Promise<AgentResponse> {
+    try {
+      const voiceResponse = await this.generateVoiceResponse(voice, prompt, context, retryCount);
+      return this.voiceResponseToAgentResponse(voiceResponse);
+    } catch (error) {
+      const errorInfo = ResponseFactory.createErrorResponse(
+        'VOICE_GENERATION_ERROR',
+        error instanceof Error ? error.message : 'Unknown error',
+        error instanceof Error ? error.stack : undefined
+      );
+      
+      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      response.error = errorInfo;
+      response.success = false;
+      return response;
+    }
   }
 }

@@ -31,6 +31,12 @@ module.exports = {
     '^ora$': '<rootDir>/tests/__mocks__/ora.js',
     '^inquirer$': '<rootDir>/tests/__mocks__/inquirer.js'
   },
+  extensionsToTreatAsEsm: ['.ts'],
+  globals: {
+    'ts-jest': {
+      useESM: true
+    }
+  },
   testPathIgnorePatterns: [
     "<rootDir>/archive/",
     "<rootDir>/tests/__mocks__/",
@@ -51,10 +57,5 @@ module.exports = {
   testTimeout: 30000,
   // Better error reporting
   verbose: true,
-  // Handle CommonJS modules better
-  globals: {
-    'ts-jest': {
-      useESM: true
-    }
-  }
+  // Handle CommonJS modules better - moved to transform config above
 };

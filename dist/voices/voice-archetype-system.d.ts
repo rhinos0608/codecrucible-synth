@@ -1,5 +1,8 @@
 import { LocalModelClient, VoiceArchetype, VoiceResponse, ProjectContext } from '../core/local-model-client.js';
 import { AppConfig } from '../config/config-manager.js';
+import { AgentResponse, SynthesisResponse } from '../core/response-types.js';
+import { SynthesisConfig, SynthesisMode, AdvancedSynthesisResult } from '../core/advanced-synthesis-engine.js';
+import { LivingSpiralCoordinator, LivingSpiralResult, SpiralConfig } from '../core/living-spiral-coordinator.js';
 export interface SynthesisResult {
     combinedCode: string;
     reasoning: string;
@@ -50,6 +53,8 @@ export declare class VoiceArchetypeSystem {
     private config;
     private voices;
     private presets;
+    private advancedSynthesisEngine;
+    private livingSpiralCoordinator;
     constructor(modelClient: LocalModelClient, config: AppConfig);
     /**
      * Initialize voice archetypes from configuration
@@ -68,6 +73,18 @@ export declare class VoiceArchetypeSystem {
      */
     selectOptimalVoices(prompt: string, maxVoices?: number): string[];
     /**
+     * Recommend voices for a given prompt
+     * Returns a list of recommended voice IDs based on prompt analysis
+     */
+    recommendVoices(prompt: string, maxConcurrent?: number): string[];
+    /**
+     * Validate voice IDs and return valid/invalid lists
+     */
+    validateVoices(voiceIds: string[]): {
+        valid: string[];
+        invalid: string[];
+    };
+    /**
      * Generate solutions from multiple voices with intelligent selection
      */
     generateMultiVoiceSolutions(prompt: string, voiceIds: string[] | 'auto', context: ProjectContext): Promise<VoiceResponse[]>;
@@ -82,7 +99,7 @@ export declare class VoiceArchetypeSystem {
     /**
      * Generate response from a single voice (no synthesis)
      */
-    generateSingleVoiceResponse(prompt: string, voiceId: string, context: ProjectContext): Promise<VoiceResponse>;
+    generateSingleVoiceResponse(prompt: string, voiceId: string, context: ProjectContext, temperatureOverride?: number): Promise<VoiceResponse>;
     /**
      * Iterative Writer/Auditor loop for automated code improvement
      */
@@ -146,4 +163,93 @@ export declare class VoiceArchetypeSystem {
     private capitalize;
     private chunkArray;
     private getDefaultVoicesConfig;
+    /**
+     * Get default voices configuration
+     * Required by tests
+     */
+    getDefaultVoices(): string[];
+    /**
+     * Convert legacy SynthesisResult to standardized SynthesisResponse
+     */
+    synthesisResultToResponse(synthesisResult: SynthesisResult, individualResponses?: AgentResponse[]): SynthesisResponse;
+    /**
+     * Generate multi-voice solutions with standardized response format
+     */
+    generateStandardMultiVoiceSolutions(prompt: string, voiceIds: string[] | 'auto', context: ProjectContext): Promise<AgentResponse[]>;
+    /**
+     * Synthesize voice responses with standardized format
+     */
+    synthesizeStandardVoiceResponses(responses: AgentResponse[], mode?: string): Promise<SynthesisResponse>;
+    /**
+     * Advanced synthesis using the new synthesis engine
+     */
+    synthesizeAdvanced(responses: AgentResponse[], config?: Partial<SynthesisConfig>): Promise<AdvancedSynthesisResult>;
+    /**
+     * Get synthesis mode recommendations based on task analysis
+     */
+    recommendSynthesisMode(prompt: string, voiceCount: number): SynthesisMode;
+    /**
+     * Intelligent multi-voice processing with automatic mode selection
+     */
+    processWithIntelligentSynthesis(prompt: string, voiceIds?: string[] | 'auto', context?: ProjectContext): Promise<AdvancedSynthesisResult>;
+    /**
+     * Batch processing for multiple prompts with intelligent synthesis
+     */
+    processBatchWithIntelligentSynthesis(prompts: Array<{
+        prompt: string;
+        voices?: string[];
+    }>, context?: ProjectContext): Promise<AdvancedSynthesisResult[]>;
+    /**
+     * Quality analysis for synthesis results
+     */
+    analyzeSynthesisQuality(result: AdvancedSynthesisResult): {
+        grade: string;
+        recommendations: string[];
+        strengths: string[];
+        weaknesses: string[];
+    };
+    /**
+     * Dynamically adjust voice temperature based on task complexity and context
+     */
+    adjustVoiceTemperature(voice: VoiceArchetype, prompt: string, context: ProjectContext): VoiceArchetype;
+    /**
+     * Calculate prompt complexity score (0.0 - 1.0)
+     */
+    private calculatePromptComplexity;
+    /**
+     * Get voice configuration with style-aware defaults
+     */
+    getVoiceWithStyleDefaults(voiceId: string): VoiceArchetype | undefined;
+    /**
+     * Generate multi-voice responses with dynamic temperature adjustment
+     */
+    generateAdaptiveMultiVoiceSolutions(prompt: string, voiceIds: string[] | 'auto', context: ProjectContext, enableTemperatureAdjustment?: boolean): Promise<VoiceResponse[]>;
+    /**
+     * Execute Living Spiral methodology for complex problem solving
+     */
+    executeLivingSpiral(task: string, context?: ProjectContext, config?: Partial<SpiralConfig>): Promise<LivingSpiralResult>;
+    /**
+     * Execute Living Spiral with preset configuration
+     */
+    executeLivingSpiralWithPreset(task: string, presetName: string, context?: ProjectContext): Promise<LivingSpiralResult>;
+    /**
+     * Execute adaptive Living Spiral that learns from context
+     */
+    executeAdaptiveLivingSpiral(task: string, context?: ProjectContext, learningHistory?: LivingSpiralResult[]): Promise<LivingSpiralResult>;
+    /**
+     * Execute collaborative Living Spiral with external feedback
+     */
+    executeCollaborativeLivingSpiral(task: string, context?: ProjectContext, externalFeedback?: Array<{
+        source: string;
+        feedback: string;
+        priority: number;
+    }>): Promise<LivingSpiralResult>;
+    /**
+     * Get Living Spiral coordinator for direct access
+     */
+    getLivingSpiralCoordinator(): LivingSpiralCoordinator;
+    /**
+     * Calculate adaptive quality threshold based on learning history
+     */
+    private calculateAdaptiveQualityThreshold;
 }

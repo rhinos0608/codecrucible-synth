@@ -1,0 +1,30 @@
+
+import { BaseSpecializedAgent } from '../base-specialized-agent.js';
+import { BaseAgentConfig, AgentDependencies, BaseAgentOutput } from '../base-agent.js';
+import { ReActAgent } from '../react-agent.js';
+
+export class ResearchAgent extends BaseSpecializedAgent {
+  constructor(dependencies: AgentDependencies) {
+    const config: BaseAgentConfig = {
+      name: 'ResearchAgent',
+      description: 'Conducts research, documentation lookup, and web searches',
+      rateLimit: { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 30000, backoffMultiplier: 2 },
+      timeout: 60000,
+    };
+    super(config, dependencies);
+  }
+
+  public async processRequest(input: string, streaming?: boolean): Promise<BaseAgentOutput> {
+    const reactAgent = new ReActAgent(this.dependencies.context, this.dependencies.workingDirectory);
+    const enhancedPrompt = `Research Task: ${input}
+    
+Use available research tools to:
+- Find relevant documentation
+- Search for best practices
+- Look up error solutions
+- Research patterns and examples`;
+
+    const result = await reactAgent.processRequest(enhancedPrompt);
+    return new BaseAgentOutput(true, result);
+  }
+}

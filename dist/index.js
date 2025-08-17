@@ -109,8 +109,39 @@ program
     .option('--quality-threshold <num>', 'Quality threshold for iterative mode (0-100)', '85')
     .option('--agentic', 'Use autonomous agentic mode with multi-agent orchestration')
     .option('--autonomous', 'Same as --agentic (alias for autonomous processing)')
+    .option('--fast', 'Use fast mode for immediate responses (template-based generation, minimal initialization)')
+    .option('--skip-init', 'Skip heavy initialization (forces fast mode)')
+    .option('--backend <backend>', 'Code execution backend: docker, e2b, local_e2b, local_process, firecracker, podman, auto', 'auto')
+    .option('--e2b-template <template>', 'E2B template to use (e.g., python3, node)', 'python3')
+    .option('--docker-image <image>', 'Docker image for code execution', 'python:3.11-slim')
     .action(async (prompt, options) => {
     try {
+        // Fast mode handling (highest priority)
+        if (options.fast || options.skipInit) {
+            console.log(chalk.cyan('🚀 Fast mode enabled - minimal initialization for immediate responses'));
+            // Create minimal context for fast mode
+            const cli = new CodeCrucibleCLI({
+                modelClient: null, // Will be unused in fast mode
+                voiceSystem: null, // Will be unused in fast mode
+                mcpManager: null, // Will be unused in fast mode
+                config: null // Will be unused in fast mode
+            });
+            await cli.initializeFastMode(process.cwd());
+            if (prompt) {
+                const result = await cli.processPrompt(prompt, { ...options, fast: true });
+                console.log(result);
+            }
+            else {
+                console.log(chalk.green('✅ Fast mode ready! Use "crucible --fast \'your prompt\'" for immediate responses'));
+                console.log('\nFast mode features:');
+                console.log('• Template-based code generation (< 1 second)');
+                console.log('• Local command execution');
+                console.log('• Intelligent caching');
+                console.log('• No model loading required');
+            }
+            return;
+        }
+        // Full initialization for other modes
         const context = await initializeApplication();
         const cli = new CodeCrucibleCLI(context);
         // If no prompt and no specific mode, default to agentic mode
@@ -302,6 +333,20 @@ program
         port: parseInt(options.port),
         host: options.host
     });
+});
+// Execution backend management
+program
+    .command('execution')
+    .description('Manage code execution backends')
+    .option('--status', 'Show execution backend status')
+    .option('--test [backend]', 'Test execution backend (auto-detects if not specified)')
+    .option('--list', 'List available execution backends')
+    .option('--set-default <backend>', 'Set default execution backend')
+    .option('--configure', 'Interactive backend configuration')
+    .action(async (options) => {
+    const context = await initializeApplication();
+    const cli = new CodeCrucibleCLI(context);
+    await cli.handleExecutionBackendCommand(options);
 });
 // Handle global flags and aliases
 if (process.argv.includes('-i') || process.argv.includes('--interactive')) {

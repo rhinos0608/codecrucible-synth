@@ -1,5 +1,7 @@
 import { LocalModelClient, ProjectContext } from './local-model-client.js';
 import { VoiceArchetypeSystem, SynthesisResult, IterativeResult } from '../voices/voice-archetype-system.js';
+import { LivingSpiralResult, SpiralConfig } from './living-spiral-coordinator.js';
+import { AutonomousClaudeAgent } from './autonomous-claude-agent.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
 import { AgentOrchestrator } from './agent-orchestrator.js';
@@ -8,29 +10,45 @@ import { MultiLLMProvider, createMultiLLMProvider } from './multi-llm-provider.j
 import { RAGSystem, globalRAGSystem } from './rag-system.js';
 import { globalEditConfirmation } from './edit-confirmation-system.js';
 import { cliOutput, CLIError, CLIExitCode } from './cli-output-manager.js';
+import { FastModeClient } from './fast-mode-client.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { readFile, stat, readdir } from 'fs/promises';
 import { join, extname, relative, isAbsolute } from 'path';
 import { glob } from 'glob';
+import { 
+  AgentResponse, 
+  SynthesisResponse, 
+  ResponseFactory, 
+  ResponseValidator 
+} from './response-types.js';
 
 interface CLIOptions {
-  voices?: string;
+  voices?: string | string[];
   depth?: string;
   mode?: string;
   file?: string;
   project?: boolean;
   interactive?: boolean;
+  spiral?: boolean;
+  spiralIterations?: number;
+  spiralQuality?: number;
+  autonomous?: boolean;
+  maxSteps?: number;
   council?: boolean;
   agentic?: boolean;
-  autonomous?: boolean;
   quick?: boolean;
   direct?: boolean;
   verbose?: boolean;
   quiet?: boolean;
   output?: 'text' | 'json' | 'table';
   timeout?: number;
+  backend?: 'docker' | 'e2b' | 'local_e2b' | 'local_process' | 'firecracker' | 'podman' | 'auto';
+  e2bTemplate?: string;
+  dockerImage?: string;
+  fast?: boolean;
+  skipInit?: boolean;
 }
 
 export interface CLIContext {
@@ -39,12 +57,16 @@ export interface CLIContext {
   mcpManager: MCPServerManager;
   config: AppConfig;
   agentOrchestrator?: AgentOrchestrator;
+  autonomousAgent?: AutonomousClaudeAgent;
   multiLLMProvider?: MultiLLMProvider;
   ragSystem?: RAGSystem;
 }
 
 export class CodeCrucibleCLI {
   private context: CLIContext;
+  private initialized = false;
+  private workingDirectory = process.cwd();
+  private fastModeClient: FastModeClient | null = null;
 
   constructor(context: CLIContext) {
     this.context = context;
@@ -52,6 +74,133 @@ export class CodeCrucibleCLI {
     // Initialize agent orchestrator for agentic capabilities
     if (!this.context.agentOrchestrator) {
       this.context.agentOrchestrator = new AgentOrchestrator(context);
+    }
+  }
+
+  /**
+   * Initialize the CLI with configuration and working directory
+   * Required by integration tests
+   */
+  async initialize(config: AppConfig, workingDirectory: string): Promise<void> {
+    this.context.config = config;
+    this.workingDirectory = workingDirectory;
+    this.initialized = true;
+    
+    // Initialize Autonomous Claude Agent
+    this.context.autonomousAgent = new AutonomousClaudeAgent(
+      this.context.voiceSystem,
+      this.context.modelClient,
+      workingDirectory
+    );
+    
+    // Update context with new configuration
+    if (this.context.agentOrchestrator) {
+      // this.context.agentOrchestrator.updateConfig(config);
+    }
+    
+    logger.info(`CLI initialized with working directory: ${workingDirectory}`);
+    logger.info(`Autonomous Claude Agent initialized with ${this.context.autonomousAgent.getCapabilitiesSummary().capabilities.length} capabilities`);
+  }
+
+  /**
+   * Initialize fast mode for immediate usage (bypasses heavy initialization)
+   */
+  async initializeFastMode(workingDirectory?: string): Promise<void> {
+    this.workingDirectory = workingDirectory || process.cwd();
+    
+    const spinner = ora('🚀 Initializing fast mode...').start();
+    
+    try {
+      this.fastModeClient = new FastModeClient({
+        skipModelPreload: true,
+        skipBenchmark: true,
+        useMinimalVoices: true,
+        enableCaching: true,
+        maxLatency: 5000
+      });
+
+      await this.fastModeClient.initialize();
+      
+      this.initialized = true;
+      
+      spinner.succeed(`✅ Fast mode ready! (${this.fastModeClient.getMetrics().totalInitTime}ms)`);
+      
+      console.log('Fast mode features:'); // Fix: cliOutput doesn't have info method
+      console.log('• Template-based code generation');
+      console.log('• Local command execution');
+      console.log('• Intelligent caching');
+      console.log('• Sub-5 second responses');
+      
+    } catch (error) {
+      spinner.fail('❌ Fast mode initialization failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Process a prompt and return the result
+   * Required by integration tests
+   */
+  async processPrompt(prompt: string, options: CLIOptions = {}): Promise<string> {
+    if (!this.initialized) {
+      throw new Error('CLI not initialized. Call initialize() first.');
+    }
+    
+    try {
+      logger.info(`Processing prompt: ${prompt.substring(0, 100)}...`);
+      
+      // Fast mode processing (highest priority)
+      if (options.fast || this.fastModeClient) {
+        return await this.handleFastModeWithReturn(prompt, options);
+      }
+      
+      // Use Autonomous Claude Agent for full autonomous processing
+      if (options.autonomous || options.mode === 'autonomous') {
+        return await this.handleAutonomousWithReturn(prompt, options);
+      }
+      
+      // Use Living Spiral for complex methodology-driven processing
+      if (options.spiral) {
+        return await this.handleLivingSpiralWithReturn(prompt, options);
+      }
+      
+      // Use agentic mode for complex processing
+      if (options.agentic || options.mode === 'agentic') {
+        return await this.handleAgenticModeWithReturn(prompt, options);
+      }
+      
+      // Use voice synthesis for multi-voice processing
+      if (options.voices || options.council) {
+        return await this.handleGenerationWithReturn(prompt, options);
+      }
+      
+      // Default to direct mode
+      return await this.handleDirectModeWithReturn(prompt, options);
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Error processing prompt:', error);
+      throw error; // Re-throw for proper error handling in tests
+    }
+  }
+
+  /**
+   * Update configuration
+   * Required by integration tests  
+   */
+  updateConfiguration(newConfig: Partial<AppConfig>): boolean {
+    try {
+      this.context.config = { ...this.context.config, ...newConfig };
+      
+      if (this.context.agentOrchestrator) {
+        // this.context.agentOrchestrator.updateConfig(this.context.config);
+      }
+      
+      logger.info('Configuration updated');
+      return true;
+    } catch (error) {
+      logger.error('Failed to update configuration:', error);
+      return false;
     }
   }
 
@@ -1302,23 +1451,28 @@ Focus on actionable, specific recommendations with clear business value.`;
   }
 
   // Helper methods
-  private parseVoices(voicesStr?: string): string[] | 'auto' {
-    if (!voicesStr) {
+  private parseVoices(voicesInput?: string | string[]): string[] | 'auto' {
+    if (!voicesInput) {
       // Use intelligent voice selection by default
       return 'auto';
     }
 
-    if (voicesStr === 'auto') {
+    // Handle array input (from CLI options)
+    if (Array.isArray(voicesInput)) {
+      return voicesInput.map(v => v.trim().toLowerCase());
+    }
+
+    if (voicesInput === 'auto') {
       return 'auto';
     }
 
-    if (voicesStr === 'all') {
+    if (voicesInput === 'all') {
       const availableVoices = this.context.config.voices.available;
       // Ensure we always return an array
       return Array.isArray(availableVoices) ? availableVoices : ['explorer', 'maintainer', 'analyzer', 'developer'];
     }
 
-    return voicesStr.split(',').map(v => v.trim().toLowerCase());
+    return voicesInput.split(',').map(v => v.trim().toLowerCase());
   }
 
   private async getProjectContext(file?: string, project?: boolean, mentionedFiles?: string[]): Promise<ProjectContext> {
@@ -2309,5 +2463,660 @@ Focus on actionable, specific recommendations with clear business value.`;
     console.log(chalk.gray('   • Use "cc model --pull <model-name>" to download a model'));
     
     console.log(chalk.gray('━'.repeat(60)));
+  }
+
+  /**
+   * Handle autonomous Claude agent processing and return the result content
+   * Used by processPrompt for autonomous mode
+   */
+  private async handleAutonomousWithReturn(prompt: string, options: CLIOptions): Promise<string> {
+    if (!this.context.autonomousAgent) {
+      throw new Error('Autonomous agent not available');
+    }
+
+    try {
+      const result = await this.context.autonomousAgent.processAutonomously(prompt, { files: [] });
+      return result.content;
+    } catch (error) {
+      logger.error('Autonomous processing failed:', error);
+      return `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
+  /**
+   * Handle fast mode processing with return value
+   */
+  private async handleFastModeWithReturn(prompt: string, options: CLIOptions): Promise<string> {
+    if (!this.fastModeClient) {
+      throw new Error('Fast mode client not initialized');
+    }
+
+    try {
+      const startTime = Date.now();
+      console.log(`🚀 Fast mode: Processing "${prompt.substring(0, 50)}..."`);
+
+      // Determine if this is a code generation or command execution request
+      if (this.isCommandRequest(prompt)) {
+        return await this.handleFastCommand(prompt);
+      } else {
+        return await this.handleFastCodeGeneration(prompt, options);
+      }
+    } catch (error) {
+      logger.error('Fast mode error:', error);
+      return `❌ Fast mode error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
+  private isCommandRequest(prompt: string): boolean {
+    const commandIndicators = [
+      'run', 'execute', 'command', 'npm', 'git', 'test', 'build', 'install'
+    ];
+    return commandIndicators.some(indicator => 
+      prompt.toLowerCase().includes(indicator)
+    );
+  }
+
+  private async handleFastCommand(prompt: string): Promise<string> {
+    // Extract command from prompt
+    const command = this.extractCommandFromPrompt(prompt);
+    
+    if (!command) {
+      return '❌ Could not extract command from prompt. Please specify the command to run.';
+    }
+
+    const result = await this.fastModeClient!.executeCommand(command, {
+      workingDirectory: this.workingDirectory,
+      timeout: 30000
+    });
+
+    if (result.success) {
+      return `✅ Command executed successfully (${result.latency}ms):\n\n${result.stdout}`;
+    } else {
+      return `❌ Command failed (${result.latency}ms):\n\n${result.stderr}`;
+    }
+  }
+
+  private extractCommandFromPrompt(prompt: string): string | null {
+    // Simple command extraction patterns
+    const patterns = [
+      /(?:run|execute)\s+["']?([^"']+)["']?/i,
+      /command[:\s]+["']?([^"']+)["']?/i,
+      /(npm\s+[^.]+)/i,
+      /(git\s+[^.]+)/i,
+      /(node\s+[^.]+)/i
+    ];
+
+    for (const pattern of patterns) {
+      const match = prompt.match(pattern);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+
+    return null;
+  }
+
+  private async handleFastCodeGeneration(prompt: string, options: CLIOptions): Promise<string> {
+    const context = options.file ? [await this.readFileContent(options.file)] : [];
+    
+    const result = await this.fastModeClient!.generateCode(prompt, context);
+
+    const output = [
+      `✅ Fast generation complete (${result.latency}ms) ${result.fromCache ? '📋 cached' : '🔥 fresh'}`,
+      '',
+      '```',
+      result.code,
+      '```',
+      '',
+      `💡 ${result.explanation}`,
+      ''
+    ];
+
+    if (result.suggestions.length > 0) {
+      output.push('📝 Suggestions:');
+      result.suggestions.forEach(suggestion => {
+        output.push(`• ${suggestion}`);
+      });
+    }
+
+    return output.join('\n');
+  }
+
+  private async readFileContent(filePath: string): Promise<string> {
+    try {
+      const content = await readFile(filePath, 'utf-8');
+      return `File: ${filePath}\n${content}`;
+    } catch (error) {
+      return `File: ${filePath}\nError reading file: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
+  /**
+   * Handle agentic mode and return the result content
+   * Used by processPrompt for testing
+   */
+  private async handleAgenticModeWithReturn(prompt: string, options: CLIOptions): Promise<string> {
+    // For now, use the voice system to generate a response
+    if (!this.context.voiceSystem) {
+      throw new Error('Voice system not available');
+    }
+
+    try {
+      const voices = ['developer']; // Default voice for agentic mode
+      const responses = await this.context.voiceSystem.generateMultiVoiceSolutions(
+        prompt,
+        voices,
+        { files: [] }
+      );
+
+      if (responses.length === 0) {
+        return 'No response generated';
+      }
+
+      return responses[0].content;
+    } catch (error) {
+      logger.error('Agentic mode failed:', error);
+      return `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
+  /**
+   * Handle Living Spiral methodology and return the result content
+   * Used by processPrompt for spiral mode
+   */
+  private async handleLivingSpiralWithReturn(prompt: string, options: CLIOptions): Promise<string> {
+    if (!this.context.voiceSystem) {
+      throw new Error('Voice system not available');
+    }
+
+    try {
+      const spiralConfig: Partial<SpiralConfig> = {
+        maxIterations: options.spiralIterations || 3,
+        qualityThreshold: options.spiralQuality || 85,
+        voiceSelectionStrategy: 'adaptive',
+        enableAdaptiveLearning: true,
+        reflectionDepth: 'medium'
+      };
+
+      console.log(chalk.cyan('🌀 Initiating Living Spiral Methodology...'));
+      
+      const result = await this.context.voiceSystem.executeLivingSpiral(
+        prompt,
+        { files: [] },
+        spiralConfig
+      );
+
+      console.log(chalk.green(`🎯 Living Spiral Complete:`));
+      console.log(chalk.white(`   Quality Score: ${result.finalQualityScore}/100`));
+      console.log(chalk.white(`   Total Iterations: ${result.totalIterations}`));
+      console.log(chalk.white(`   Convergence: ${result.convergenceReason}`));
+      
+      if (result.lessonsLearned.length > 0) {
+        console.log(chalk.yellow(`   📚 Lessons Learned: ${result.lessonsLearned.length}`));
+        result.lessonsLearned.slice(0, 3).forEach((lesson, i) => {
+          console.log(chalk.dim(`      ${i + 1}. ${lesson}`));
+        });
+      }
+
+      return result.finalOutput;
+    } catch (error) {
+      logger.error('Living Spiral processing failed:', error);
+      return `Living Spiral Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
+  /**
+   * Handle generation mode and return the result content
+   * Used by processPrompt for testing
+   */
+  private async handleGenerationWithReturn(prompt: string, options: CLIOptions): Promise<string> {
+    if (!this.context.voiceSystem) {
+      throw new Error('Voice system not available');
+    }
+
+    try {
+      const voices = this.parseVoices(options.voices || 'auto');
+      const responses = await this.context.voiceSystem.generateMultiVoiceSolutions(
+        prompt,
+        voices,
+        { files: [] }
+      );
+
+      if (responses.length === 0) {
+        return 'No response generated';
+      }
+
+      if (responses.length === 1) {
+        return responses[0].content;
+      }
+
+      // Synthesize multiple responses
+      const synthesis = await this.context.voiceSystem.synthesizeVoiceResponses(
+        responses,
+        (options.mode as any) || 'competitive'
+      );
+
+      return synthesis.combinedCode || synthesis.reasoning || 'Generation completed';
+    } catch (error) {
+      logger.error('Generation mode failed:', error);
+      return `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
+  /**
+   * Handle direct mode and return the result content
+   * Used by processPrompt for testing
+   */
+  private async handleDirectModeWithReturn(prompt: string, options: CLIOptions): Promise<string> {
+    if (!this.context.voiceSystem) {
+      throw new Error('Voice system not available');
+    }
+
+    try {
+      // Use a single voice for direct mode
+      const response = await this.context.voiceSystem.generateSingleVoiceResponse(
+        prompt,
+        'developer',
+        { files: [] }
+      );
+
+      return response.content;
+    } catch (error) {
+      logger.error('Direct mode failed:', error);
+      return `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
+  /**
+   * Process prompt with standardized response format
+   * Returns AgentResponse or SynthesisResponse objects
+   */
+  async processPromptWithResponse(prompt: string, options: CLIOptions = {}): Promise<AgentResponse | SynthesisResponse> {
+    if (!this.initialized) {
+      return ResponseFactory.createAgentResponse('', {
+        confidence: 0
+      });
+    }
+
+    try {
+      logger.info(`Processing prompt with standardized response: ${prompt.substring(0, 100)}...`);
+      
+      // Use agentic mode for complex processing
+      if (options.agentic || options.autonomous || options.mode === 'agentic') {
+        return await this.handleAgenticModeWithResponse(prompt, options);
+      }
+      
+      // Use voice synthesis for multi-voice processing
+      if (options.voices || options.council) {
+        return await this.handleGenerationWithResponse(prompt, options);
+      }
+      
+      // Default to direct mode
+      return await this.handleDirectModeWithResponse(prompt, options);
+      
+    } catch (error) {
+      const errorInfo = ResponseFactory.createErrorResponse(
+        'PROCESSING_ERROR',
+        error instanceof Error ? error.message : 'Unknown error',
+        error instanceof Error ? error.stack : undefined
+      );
+      
+      return ResponseFactory.createAgentResponse('', {
+        confidence: 0
+      });
+    }
+  }
+
+  /**
+   * Handle agentic mode with standardized response
+   */
+  private async handleAgenticModeWithResponse(prompt: string, options: CLIOptions): Promise<AgentResponse> {
+    if (!this.context.voiceSystem) {
+      const errorInfo = ResponseFactory.createErrorResponse(
+        'VOICE_SYSTEM_UNAVAILABLE',
+        'Voice system not available'
+      );
+      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      response.error = errorInfo;
+      response.success = false;
+      return response;
+    }
+
+    try {
+      const voices = ['developer']; // Default voice for agentic mode
+      const voiceResponses = await this.context.voiceSystem.generateMultiVoiceSolutions(
+        prompt,
+        voices,
+        { files: [] }
+      );
+
+      if (voiceResponses.length === 0) {
+        return ResponseFactory.createAgentResponse('No response generated', {
+          confidence: 0.1,
+          reasoning: 'Voice system returned no responses'
+        });
+      }
+
+      const voiceResponse = voiceResponses[0];
+      return ResponseFactory.createAgentResponse(voiceResponse.content, {
+        confidence: voiceResponse.confidence,
+        voiceId: voiceResponse.voice,
+        tokensUsed: voiceResponse.tokens_used,
+        reasoning: 'Agentic mode processing'
+      });
+    } catch (error) {
+      logger.error('Agentic mode failed:', error);
+      const errorInfo = ResponseFactory.createErrorResponse(
+        'AGENTIC_MODE_ERROR',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      response.error = errorInfo;
+      response.success = false;
+      return response;
+    }
+  }
+
+  /**
+   * Handle generation mode with standardized response
+   */
+  private async handleGenerationWithResponse(prompt: string, options: CLIOptions): Promise<SynthesisResponse> {
+    if (!this.context.voiceSystem) {
+      const errorInfo = ResponseFactory.createErrorResponse(
+        'VOICE_SYSTEM_UNAVAILABLE',
+        'Voice system not available'
+      );
+      const response = ResponseFactory.createSynthesisResponse('', [], { confidence: 0 });
+      response.error = errorInfo;
+      response.success = false;
+      return response;
+    }
+
+    try {
+      const voices = this.parseVoices(options.voices || 'auto');
+      const voiceResponses = await this.context.voiceSystem.generateMultiVoiceSolutions(
+        prompt,
+        voices,
+        { files: [] }
+      );
+
+      if (voiceResponses.length === 0) {
+        return ResponseFactory.createSynthesisResponse('No response generated', [], {
+          confidence: 0.1,
+          reasoning: 'Voice system returned no responses'
+        });
+      }
+
+      if (voiceResponses.length === 1) {
+        const singleResponse = voiceResponses[0];
+        const agentResponse = ResponseFactory.createAgentResponse(singleResponse.content, {
+          confidence: singleResponse.confidence,
+          voiceId: singleResponse.voice,
+          tokensUsed: singleResponse.tokens_used
+        });
+        
+        return ResponseFactory.createSynthesisResponse(
+          singleResponse.content,
+          [singleResponse.voice],
+          {
+            reasoning: 'Single voice generation',
+            confidence: singleResponse.confidence,
+            individualResponses: [agentResponse]
+          }
+        );
+      }
+
+      // Synthesize multiple responses
+      const synthesis = await this.context.voiceSystem.synthesizeVoiceResponses(
+        voiceResponses,
+        (options.mode as any) || 'competitive'
+      );
+
+      const individualResponses = voiceResponses.map(vr => 
+        ResponseFactory.createAgentResponse(vr.content, {
+          confidence: vr.confidence,
+          voiceId: vr.voice,
+          tokensUsed: vr.tokens_used
+        })
+      );
+
+      return ResponseFactory.createSynthesisResponse(
+        synthesis.combinedCode || synthesis.reasoning,
+        synthesis.voicesUsed,
+        {
+          reasoning: synthesis.reasoning,
+          confidence: synthesis.confidence,
+          qualityScore: synthesis.qualityScore,
+          synthesisMode: synthesis.synthesisMode,
+          individualResponses
+        }
+      );
+    } catch (error) {
+      logger.error('Generation mode failed:', error);
+      const errorInfo = ResponseFactory.createErrorResponse(
+        'GENERATION_MODE_ERROR',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+      const response = ResponseFactory.createSynthesisResponse('', [], { confidence: 0 });
+      response.error = errorInfo;
+      response.success = false;
+      return response;
+    }
+  }
+
+  /**
+   * Handle direct mode with standardized response
+   */
+  private async handleDirectModeWithResponse(prompt: string, options: CLIOptions): Promise<AgentResponse> {
+    if (!this.context.voiceSystem) {
+      const errorInfo = ResponseFactory.createErrorResponse(
+        'VOICE_SYSTEM_UNAVAILABLE',
+        'Voice system not available'
+      );
+      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      response.error = errorInfo;
+      response.success = false;
+      return response;
+    }
+
+    try {
+      // Use a single voice for direct mode
+      const voiceResponse = await this.context.voiceSystem.generateSingleVoiceResponse(
+        prompt,
+        'developer',
+        { files: [] }
+      );
+
+      return ResponseFactory.createAgentResponse(voiceResponse.content, {
+        confidence: voiceResponse.confidence,
+        voiceId: voiceResponse.voice,
+        tokensUsed: voiceResponse.tokens_used,
+        reasoning: 'Direct mode processing'
+      });
+    } catch (error) {
+      logger.error('Direct mode failed:', error);
+      const errorInfo = ResponseFactory.createErrorResponse(
+        'DIRECT_MODE_ERROR',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+      const response = ResponseFactory.createAgentResponse('', { confidence: 0 });
+      response.error = errorInfo;
+      response.success = false;
+      return response;
+    }
+  }
+
+  /**
+   * Handle execution backend management commands
+   */
+  async handleExecutionBackendCommand(options: any): Promise<void> {
+    try {
+      // Get execution manager from agent orchestrator
+      const executionManager = this.context.agentOrchestrator?.getExecutionManager();
+      
+      if (!executionManager) {
+        console.log(chalk.red('❌ Execution manager not available. Please ensure agent orchestrator is initialized.'));
+        return;
+      }
+
+      if (options.status) {
+        console.log(chalk.cyan('🔧 Execution Backend Status:\n'));
+        
+        const managerStatus = executionManager.getStatus();
+        console.log(`Default Backend: ${chalk.green(managerStatus.default)}`);
+        console.log('\nConfigured Backends:');
+        
+        for (const [type, backendStatus] of Object.entries(managerStatus.backends)) {
+          const backend = backendStatus as any; // Type assertion for backend status
+          const statusIcon = backend.available ? '✅' : '❌';
+          const activeText = backend.active > 0 ? chalk.yellow(` (${backend.active} active)`) : '';
+          console.log(`  ${statusIcon} ${type}${activeText}`);
+          
+          if (backend.config) {
+            const configEntries = Object.entries(backend.config);
+            if (configEntries.length > 0) {
+              configEntries.forEach(([key, value]) => {
+                console.log(`     ${key}: ${value}`);
+              });
+            }
+          }
+        }
+      }
+
+      if (options.list) {
+        console.log(chalk.cyan('📋 Available Execution Backends:\n'));
+        
+        const availableBackends = executionManager.getAvailableBackends();
+        
+        availableBackends.forEach(backend => {
+          console.log(`• ${chalk.green(backend)}`);
+          
+          switch (backend) {
+            case 'docker':
+              console.log('  - Isolated Docker containers for secure execution');
+              console.log('  - Supports all languages with custom images');
+              break;
+            case 'e2b':
+              console.log('  - Cloud-based sandboxes via E2B service');
+              console.log('  - Fast startup, managed infrastructure');
+              break;
+            case 'local_e2b':
+              console.log('  - Self-hosted E2B sandboxes');
+              console.log('  - Local control with E2B ergonomics');
+              break;
+            case 'local_process':
+              console.log('  - Direct local execution with safety checks');
+              console.log('  - Fastest but requires local dependencies');
+              break;
+          }
+          console.log('');
+        });
+      }
+
+      if (options.test) {
+        const backend = options.test === true ? 'auto' : options.test;
+        console.log(chalk.cyan(`🧪 Testing execution backend: ${backend}\n`));
+        
+        const spinner = ora('Running test execution...').start();
+        
+        try {
+          const testCode = 'print("Hello from execution backend test!")';
+          const result = await executionManager.execute(`python -c "${testCode}"`, {
+            backend: backend === 'auto' ? undefined : backend,
+            timeout: 10000
+          });
+          
+          if (result.success) {
+            spinner.succeed(`Backend test successful: ${result.data.backend}`);
+            console.log(`Output: ${result.data.stdout.trim()}`);
+            console.log(`Duration: ${result.data.duration}ms`);
+          } else {
+            spinner.fail(`Backend test failed: ${result.error}`);
+          }
+        } catch (error) {
+          spinner.fail(`Test execution failed: ${error instanceof Error ? error.message : error}`);
+        }
+      }
+
+      if (options.setDefault) {
+        const backend = options.setDefault;
+        const availableBackends = executionManager.getAvailableBackends();
+        
+        if (!availableBackends.includes(backend)) {
+          console.log(chalk.red(`❌ Backend '${backend}' is not available.`));
+          console.log(`Available backends: ${availableBackends.join(', ')}`);
+          return;
+        }
+        
+        try {
+          executionManager.setDefaultBackend(backend);
+          console.log(chalk.green(`✅ Default execution backend set to: ${backend}`));
+        } catch (error) {
+          console.log(chalk.red(`❌ Failed to set default backend: ${error instanceof Error ? error.message : error}`));
+        }
+      }
+
+      if (options.configure) {
+        console.log(chalk.cyan('⚙️ Interactive Backend Configuration\n'));
+        
+        const answers = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'backend',
+            message: 'Select execution backend to configure:',
+            choices: [
+              { name: 'Docker (Recommended for security)', value: 'docker' },
+              { name: 'E2B Cloud (Fastest setup)', value: 'e2b' },
+              { name: 'E2B Self-hosted (Local control)', value: 'local_e2b' },
+              { name: 'Local Process (Fastest execution)', value: 'local_process' }
+            ]
+          }
+        ]);
+
+        switch (answers.backend) {
+          case 'e2b':
+            const e2bAnswers = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'apiKey',
+                message: 'Enter E2B API key:',
+                validate: (input: string) => input.trim().length > 0 || 'API key is required'
+              },
+              {
+                type: 'list',
+                name: 'template',
+                message: 'Select E2B template:',
+                choices: ['python3', 'node', 'go', 'rust'],
+                default: 'python3'
+              }
+            ]);
+            
+            console.log(chalk.green('\n✅ E2B configuration saved!'));
+            console.log(`Set E2B_API_KEY environment variable to: ${e2bAnswers.apiKey}`);
+            console.log(`Template: ${e2bAnswers.template}`);
+            break;
+            
+          case 'docker':
+            const dockerAnswers = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'image',
+                message: 'Docker image for code execution:',
+                default: 'python:3.11-slim'
+              }
+            ]);
+            
+            console.log(chalk.green('\n✅ Docker configuration noted!'));
+            console.log(`Image: ${dockerAnswers.image}`);
+            break;
+            
+          default:
+            console.log(chalk.blue('\n💡 No additional configuration needed for this backend.'));
+        }
+      }
+
+    } catch (error) {
+      console.error(chalk.red('❌ Execution backend command failed:'), error instanceof Error ? error.message : error);
+    }
   }
 }

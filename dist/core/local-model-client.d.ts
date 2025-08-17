@@ -1,4 +1,5 @@
 import { OptimizationConfig } from './vram-optimizer.js';
+import { AgentResponse } from './response-types.js';
 export interface LocalModelConfig {
     endpoint: string;
     model: string;
@@ -24,6 +25,11 @@ export interface ProjectContext {
     gitStatus?: string;
     workingDirectory?: string;
     recentMessages?: any[];
+    externalFeedback?: Array<{
+        source: string;
+        content: string;
+        priority: number;
+    }>;
 }
 export interface VoiceArchetype {
     id: string;
@@ -49,6 +55,7 @@ export declare class LocalModelClient {
     private modelWarmupPromises;
     private vramOptimizer;
     private currentOptimization;
+    private modelPreloader;
     constructor(config: LocalModelConfig);
     /**
      * Calculate adaptive timeout based on system performance and model characteristics
@@ -74,6 +81,26 @@ export declare class LocalModelClient {
      * Initialize GPU optimization and hardware detection
      */
     private initializeGPUOptimization;
+    /**
+     * Initialize advanced model preloading system
+     */
+    private initializeAdvancedPreloading;
+    /**
+     * Determine primary models based on available models and system capabilities
+     */
+    private determinePrimaryModels;
+    /**
+     * Get best model with preloading awareness
+     */
+    getBestModel(): Promise<string>;
+    /**
+     * Ensure model is ready before use
+     */
+    ensureModelReady(modelName: string): Promise<boolean>;
+    /**
+     * Get preloader status for debugging
+     */
+    getPreloaderStatus(): any;
     /**
      * Check if the local model is available and responding
      * Enhanced with auto-setup capabilities
@@ -186,7 +213,7 @@ export declare class LocalModelClient {
     /**
      * Generate a single response from the local model with GPU optimization and error handling
      */
-    generate(prompt: string, jsonSchema?: any): Promise<string>;
+    generate(prompt: string, jsonSchema?: any, retryCount?: number): Promise<string>;
     /**
      * Streamlined API call for maximum speed - bypasses voice complexity
      */
@@ -199,6 +226,10 @@ export declare class LocalModelClient {
      * Enhance prompt with voice-specific instructions and context
      */
     private enhancePromptWithVoice;
+    /**
+     * Generate style-specific instructions for voice behavior
+     */
+    private generateStyleInstructions;
     /**
      * Sanitize prompt input to prevent injection attacks
      */
@@ -259,4 +290,12 @@ export declare class LocalModelClient {
      * Display helpful troubleshooting information for common issues
      */
     static displayTroubleshootingHelp(): void;
+    /**
+     * Convert legacy VoiceResponse to standardized AgentResponse
+     */
+    voiceResponseToAgentResponse(voiceResponse: VoiceResponse): AgentResponse;
+    /**
+     * Generate voice response with standardized format
+     */
+    generateStandardVoiceResponse(voice: VoiceArchetype, prompt: string, context: ProjectContext, retryCount?: number): Promise<AgentResponse>;
 }

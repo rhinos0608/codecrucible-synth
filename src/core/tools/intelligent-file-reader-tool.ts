@@ -22,6 +22,7 @@ export interface FileReadResult {
     complexity: number;
   };
   definitions?: CodeDefinition[];
+  parsed?: any;
   error?: string;
 }
 
@@ -201,7 +202,7 @@ export class IntelligentFileReaderTool extends BaseTool {
           size: stats.size,
           language: this.detectLanguage(extname(filePath)),
           purpose: this.inferFilePurpose(filePath),
-          complexity: this.calculateComplexity(content)
+          complexity: this.calculateComplexity(content, this.detectLanguage(extname(filePath)))
         };
       }
 
@@ -211,6 +212,26 @@ export class IntelligentFileReaderTool extends BaseTool {
         if (['JavaScript', 'TypeScript', 'JSX', 'TSX'].includes(language)) {
           result.definitions = this.extractCodeDefinitions(content);
         }
+      }
+
+      // Parse common file types
+      const fileName = basename(filePath).toLowerCase();
+      if (fileName === 'package.json') {
+        result.parsed = JSON.parse(content);
+      } else if (fileName === 'tsconfig.json') {
+        result.parsed = JSON.parse(content);
+      } else if (fileName === 'jest.config.cjs') {
+        // For CJS, we can't just parse it. We can try to extract some info.
+        const jestConfig: any = {};
+        const transformMatch = content.match(/transform: ({[^}]*})/);
+        if (transformMatch) {
+            try {
+                eval(`jestConfig.transform = ${transformMatch[1]}`);
+            } catch(e) {
+                // ignore
+            }
+        }
+        result.parsed = jestConfig;
       }
 
       return result;
@@ -272,16 +293,47 @@ export class IntelligentFileReaderTool extends BaseTool {
     return 'Source Code';
   }
 
-  private calculateComplexity(content: string): number {
+  private calculateComplexity(content: string, language: string): number {
     const lines = content.split('\n');
     let complexity = 0;
 
+    // Language-specific complexity
+    const complexityPatterns: Record<string, RegExp> = {
+        'JavaScript': /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
+        'TypeScript': /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
+        'Python': /\b(if|for|while|try|except|and|or)\b/g,
+        'Java': /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
+    };
+
+    const pattern = complexityPatterns[language];
+    if (pattern) {
+        for (const line of lines) {
+            const matches = line.match(pattern);
+            if (matches) {
+                complexity += matches.length;
+            }
+        }
+    } else {
+        // Generic complexity for other languages
+        for (const line of lines) {
+            const trimmed = line.trim();
+            // Count complexity indicators
+            if (trimmed.match(/\b(if|for|while|switch|catch|try)\b/)) complexity++;
+            if (trimmed.includes('&&') || trimmed.includes('||')) complexity++;
+            if (trimmed.includes('?') && trimmed.includes(':')) complexity++; // ternary
+        }
+    }
+
+    // Nesting depth
+    let nesting = 0;
     for (const line of lines) {
-      const trimmed = line.trim();
-      // Count complexity indicators
-      if (trimmed.match(/\b(if|for|while|switch|catch|try)\b/)) complexity++;
-      if (trimmed.includes('&&') || trimmed.includes('||')) complexity++;
-      if (trimmed.includes('?') && trimmed.includes(':')) complexity++; // ternary
+        if (line.includes('{') || line.includes('(')) {
+            nesting++;
+        }
+        if (line.includes('}') || line.includes(')')) {
+            nesting--;
+        }
+        complexity += nesting > 2 ? 1 : 0;
     }
 
     return Math.max(1, Math.round(complexity / Math.max(lines.length, 1) * 100));

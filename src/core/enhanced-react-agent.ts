@@ -35,13 +35,26 @@ import {
 } from './tools/enhanced-code-tools.js';
 import { LintCodeTool, GetAstTool } from './tools/code-analysis-tools.js';
 import { GitStatusTool, GitDiffTool } from './tools/git-tools.js';
-import { ResearchTool, WebSearchTool, DocSearchTool } from './tools/research-tools.js';
+import { GoogleWebSearchTool, RefDocumentationTool, RefReadUrlTool } from './tools/real-research-tools.js';
 import { 
-  RefDocumentationTool, 
   ExaWebSearchTool, 
   ExaDeepResearchTool, 
   ExaCompanyResearchTool 
 } from './tools/mcp-tools.js';
+import { 
+  EnhancedExaWebSearchTool,
+  EnhancedDeepResearchTool,
+  EnhancedDocumentationTool,
+  EnhancedCompanyResearchTool,
+  SequentialThinkingTool,
+  MCPServiceStatusTool
+} from './tools/enhanced-mcp-tools.js';
+import {
+  SecureFileReadTool,
+  SecureFileWriteTool,
+  SecureFileListTool
+} from './tools/secure-file-tools.js';
+import { E2BCodeExecutionTool } from './tools/e2b-code-execution-tool.js';
 
 /**
  * Enhanced ReAct Agent with Performance Optimizations
@@ -90,7 +103,12 @@ export class EnhancedReActAgent {
     const agentContext = { workingDirectory: this.workingDirectory };
 
     return [
-      // Enhanced File Operations (prioritized for performance)
+      // Secure File Operations (prioritized for security and performance)
+      new SecureFileReadTool(agentContext),
+      new SecureFileWriteTool(agentContext),
+      new SecureFileListTool(agentContext),
+      
+      // Enhanced File Operations (fallback)
       new EnhancedReadFileTool(agentContext),
       new EnhancedWriteFileTool(agentContext),
       new FileSearchTool(agentContext),
@@ -109,19 +127,24 @@ export class EnhancedReActAgent {
       // Process Management and Code Execution
       new AdvancedProcessTool(agentContext),
       new CodeExecutionTool(agentContext),
+      new E2BCodeExecutionTool(agentContext),
       
       // Enhanced Code Analysis and Generation
       new CodeAnalysisTool(agentContext),
       new CodeGenerationTool(agentContext),
       
-      // Research and External (with MCP integration)
-      new ResearchTool(agentContext),
-      new WebSearchTool(agentContext),
-      new DocSearchTool(agentContext),
+      // Enhanced Research and External (with real MCP integration)
+      new EnhancedExaWebSearchTool(agentContext),
+      new EnhancedDeepResearchTool(agentContext),
+      new EnhancedDocumentationTool(agentContext),
+      new EnhancedCompanyResearchTool(agentContext),
+      new SequentialThinkingTool(agentContext),
+      new MCPServiceStatusTool(agentContext),
+      
+      // Fallback research tools
+      new GoogleWebSearchTool(agentContext),
       new RefDocumentationTool(agentContext),
-      new ExaWebSearchTool(agentContext),
-      new ExaDeepResearchTool(agentContext),
-      new ExaCompanyResearchTool(agentContext),
+      new RefReadUrlTool(agentContext),
       
       // Legacy tools for compatibility
       new ReadFileTool(agentContext),

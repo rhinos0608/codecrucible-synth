@@ -26,11 +26,18 @@ export interface AgentDependencies {
   sessionId?: string;
 }
 
-export abstract class BaseAgentOutput {
-  abstract success: boolean;
-  abstract message: string;
-  abstract data?: any;
-  abstract timestamp: number;
+export class BaseAgentOutput {
+  success: boolean;
+  message: string;
+  data?: any;
+  timestamp: number;
+
+  constructor(success: boolean, message: string, data?: any) {
+    this.success = success;
+    this.message = message;
+    this.data = data;
+    this.timestamp = Date.now();
+  }
 }
 
 export class RateLimitHandler {

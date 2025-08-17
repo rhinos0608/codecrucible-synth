@@ -1,7 +1,11 @@
 import { CLIContext } from './cli.js';
 import { LocalModelClient } from './local-model-client.js';
 import { logger } from './logger.js';
-import { ReActAgent } from './react-agent.js';
+import { CodeAnalyzerAgent } from './agents/code-analyzer-agent.js';
+import { FileExplorerAgent } from './agents/file-explorer-agent.js';
+import { GitManagerAgent } from './agents/git-manager-agent.js';
+import { ResearchAgent } from './agents/research-agent.js';
+import { ProblemSolverAgent } from './agents/problem-solver-agent.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
 import { AgentMemorySystem } from './agent-memory-system.js';
 import { IntentClassifier } from './intent-classifier.js';
@@ -10,6 +14,10 @@ import { SelfCorrectionFramework } from './self-correction-framework.js';
 import { ProactiveTaskSuggester } from './proactive-task-suggester.js';
 import { AutonomousCodebaseAnalyzer } from './autonomous-codebase-analyzer.js';
 import { timeoutManager } from './timeout-manager.js';
+import { AgentDependencies } from './base-agent.js';
+import { ReActAgent } from './react-agent.js';
+import { ExecutionManager, BackendConfig } from './execution/execution-backend.js';
+import { E2BCodeExecutionTool } from './tools/e2b-code-execution-tool.js';
 
 export interface Task {
   id: string;
@@ -82,6 +90,7 @@ export class AgentOrchestrator {
   private goalDecomposer: GoalDecomposer;
   private selfCorrection: SelfCorrectionFramework;
   private taskSuggester: ProactiveTaskSuggester;
+  private executionManager: ExecutionManager;
   
   private agents: Map<string, Agent> = new Map();
   private workflows: Map<string, WorkflowContext> = new Map();
@@ -98,6 +107,9 @@ export class AgentOrchestrator {
     this.goalDecomposer = new GoalDecomposer(this.model);
     this.selfCorrection = new SelfCorrectionFramework(this.model);
     this.taskSuggester = new ProactiveTaskSuggester(this.model, this.memorySystem);
+    
+    // Initialize execution backend system
+    this.executionManager = this.initializeExecutionManager();
     
     // Initialize specialized agents
     this.initializeAgents();
@@ -136,7 +148,13 @@ export class AgentOrchestrator {
         id: 'problemSolver',
         name: 'Problem Solver',
         description: 'Focused on identifying and solving specific problems',
-        capabilities: ['problem_identification', 'solution_design', 'debugging', 'optimization']
+        capabilities: ['problem_identification', 'solution_generation', 'debugging', 'error_resolution']
+      },
+      {
+        id: 'codeExecutor',
+        name: 'Code Executor',
+        description: 'Safely executes code in isolated environments using multiple backends',
+        capabilities: ['code_execution', 'docker_sandbox', 'e2b_sandbox', 'local_execution', 'security_validation']
       },
       {
         id: 'coordinator',
@@ -159,6 +177,164 @@ export class AgentOrchestrator {
     });
 
     logger.info(`🤖 Initialized ${this.agents.size} specialized agents`);
+  }
+
+  /**
+   * Initialize execution backend system for code execution tasks
+   */
+  private initializeExecutionManager(): ExecutionManager {
+    const configs: BackendConfig[] = [];
+
+    // E2B Cloud (if API key available)
+    if (process.env.E2B_API_KEY) {
+      configs.push({
+        type: 'e2b',
+        e2bApiKey: process.env.E2B_API_KEY,
+        e2bTemplate: process.env.E2B_TEMPLATE || 'python3'
+      });
+      logger.info('✅ E2B cloud execution backend configured');
+    }
+
+    // Docker (try to detect)
+    try {
+      const { execSync } = require('child_process');
+      execSync('docker --version', { stdio: 'ignore' });
+      configs.push({
+        type: 'docker',
+        dockerImage: 'python:3.11-slim'
+      });
+      logger.info('✅ Docker execution backend configured');
+    } catch {
+      logger.debug('Docker not available, skipping Docker backend');
+    }
+
+    // Podman (try to detect)
+    try {
+      const { execSync } = require('child_process');
+      execSync('podman --version', { stdio: 'ignore' });
+      configs.push({
+        type: 'podman',
+        podmanImage: 'python:3.11-slim',
+        podmanRootless: true,
+        podmanNetworkMode: 'none'
+      });
+      logger.info('✅ Podman rootless execution backend configured');
+    } catch {
+      logger.debug('Podman not available, skipping Podman backend');
+    }
+
+    // Firecracker (try to detect)
+    try {
+      const { execSync } = require('child_process');
+      execSync('firecracker --version', { stdio: 'ignore' });
+      configs.push({
+        type: 'firecracker',
+        firecrackerKernelPath: '/opt/firecracker/vmlinux.bin',
+        firecrackerRootfsPath: '/opt/firecracker/rootfs.ext4',
+        firecrackerVcpuCount: 1,
+        firecrackerMemSizeMib: 256
+      });
+      logger.info('✅ Firecracker microVM execution backend configured');
+    } catch {
+      logger.debug('Firecracker not available, skipping Firecracker backend');
+    }
+
+    // Local execution as fallback
+    configs.push({
+      type: 'local_process',
+      localSafeguards: true,
+      allowedCommands: ['python', 'node', 'npm', 'pip', 'go', 'cargo', 'rustc', 'echo', 'bash', 'sh', 'ls', 'pwd', 'cat', 'grep', 'head', 'tail', 'wc', 'sort', 'uniq']
+    });
+    logger.info('✅ Local process execution backend configured');
+
+    if (configs.length === 0) {
+      throw new Error('No execution backends could be configured');
+    }
+
+    const manager = new ExecutionManager(configs);
+    logger.info(`🔧 Execution manager initialized with ${configs.length} backends`);
+    
+    return manager;
+  }
+
+  /**
+   * Get execution manager for code execution tasks
+   */
+  getExecutionManager(): ExecutionManager {
+    return this.executionManager;
+  }
+
+  /**
+   * Execute code using the configured execution backends
+   */
+  async executeCode(
+    code: string, 
+    language: string = 'python', 
+    options: { backend?: string; timeout?: number } = {}
+  ): Promise<any> {
+    try {
+      const command = this.prepareExecutionCommand(code, language);
+      const result = await this.executionManager.execute(command, {
+        timeout: options.timeout || 30000,
+        backend: options.backend
+      });
+
+      if (result.success) {
+        logger.info(`✅ Code execution successful using ${result.data.backend} backend`);
+        return {
+          success: true,
+          output: result.data.stdout,
+          error: result.data.stderr,
+          duration: result.data.duration,
+          backend: result.data.backend
+        };
+      } else {
+        logger.warn(`❌ Code execution failed: ${result.error}`);
+        return {
+          success: false,
+          output: '',
+          error: result.error,
+          duration: 0,
+          backend: 'unknown'
+        };
+      }
+    } catch (error) {
+      logger.error('Code execution error:', error);
+      return {
+        success: false,
+        output: '',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        duration: 0,
+        backend: 'error'
+      };
+    }
+  }
+
+  /**
+   * Prepare execution command based on language
+   */
+  private prepareExecutionCommand(code: string, language: string): string {
+    const escapedCode = code.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    
+    switch (language.toLowerCase()) {
+      case 'python':
+        return `python -c "${escapedCode}"`;
+      case 'javascript':
+      case 'js':
+        return `node -e "${escapedCode}"`;
+      case 'typescript':
+      case 'ts':
+        return `npx ts-node -e "${escapedCode}"`;
+      case 'bash':
+      case 'shell':
+        return `bash -c "${escapedCode}"`;
+      case 'go':
+        return `echo '${escapedCode}' > /tmp/main.go && go run /tmp/main.go`;
+      case 'rust':
+        return `echo '${escapedCode}' > /tmp/main.rs && rustc /tmp/main.rs -o /tmp/main && /tmp/main`;
+      default:
+        throw new Error(`Unsupported language: ${language}`);
+    }
   }
 
   /**
@@ -482,26 +658,31 @@ ${correction.fallbackStrategy}`;
     try {
       // Create specialized execution context based on agent type
       let result;
+      const dependencies: AgentDependencies = {
+        context: this.context,
+        workingDirectory: workflowContext.projectPath,
+        sessionId: workflowContext.sessionId,
+      };
       
       switch (agent.id) {
         case 'codeAnalyzer':
-          result = await this.executeCodeAnalysisTask(task, workflowContext);
+          result = await new CodeAnalyzerAgent(dependencies).processRequest(task.description);
           break;
         case 'fileExplorer':
-          result = await this.executeFileExplorationTask(task, workflowContext);
+          result = await new FileExplorerAgent(dependencies).processRequest(task.description);
           break;
         case 'gitManager':
-          result = await this.executeGitTask(task, workflowContext);
+          result = await new GitManagerAgent(dependencies).processRequest(task.description);
           break;
         case 'researchAgent':
-          result = await this.executeResearchTask(task, workflowContext);
+          result = await new ResearchAgent(dependencies).processRequest(task.description);
           break;
         case 'problemSolver':
-          result = await this.executeProblemSolvingTask(task, workflowContext);
+          result = await new ProblemSolverAgent(dependencies).processRequest(task.description);
           break;
         default:
           // Use ReAct agent as fallback
-          result = await this.executeWithReActAgent(task, workflowContext);
+          result = await new ReActAgent(this.context, workflowContext.projectPath).processRequest(task.description);
       }
       
       // Calculate actual complexity
@@ -517,130 +698,17 @@ ${correction.fallbackStrategy}`;
     }
   }
 
-  /**
-   * Execute code analysis task
-   */
-  private async executeCodeAnalysisTask(task: Task, workflowContext: WorkflowContext): Promise<any> {
-    const reactAgent = new ReActAgent(this.context, workflowContext.projectPath);
-    
-    // Enhance task description for code analysis
-    const enhancedPrompt = `Code Analysis Task: ${task.description}
-    
-Focus on:
-- Code quality and maintainability
-- Potential bugs and issues
-- Performance optimization opportunities
-- Best practices compliance
-- Security considerations
+  
 
-Project Context: ${workflowContext.projectType || 'Unknown'}
-Previous Findings: ${workflowContext.learnings.map(l => l.summary).join(', ')}`;
+  
 
-    const result = await reactAgent.processRequest(enhancedPrompt);
-    
-    // Extract learnings for future use
-    const learnings = this.extractLearnings(result, 'code_analysis');
-    workflowContext.learnings.push(...learnings);
-    
-    return { type: 'code_analysis', result, learnings };
-  }
+  
 
-  /**
-   * Execute file exploration task
-   */
-  private async executeFileExplorationTask(task: Task, workflowContext: WorkflowContext): Promise<any> {
-    const reactAgent = new ReActAgent(this.context, workflowContext.projectPath);
-    
-    const enhancedPrompt = `File Exploration Task: ${task.description}
-    
-Focus on:
-- Project structure and organization
-- Key files and directories
-- Configuration files
-- Documentation
-- Build and deployment files
+  
 
-Provide a comprehensive overview of the project layout.`;
+  
 
-    const result = await reactAgent.processRequest(enhancedPrompt);
-    
-    // Update project type based on findings
-    if (!workflowContext.projectType) {
-      workflowContext.projectType = this.inferProjectType(result);
-    }
-    
-    return { type: 'file_exploration', result, projectType: workflowContext.projectType };
-  }
-
-  /**
-   * Execute git management task
-   */
-  private async executeGitTask(task: Task, workflowContext: WorkflowContext): Promise<any> {
-    const reactAgent = new ReActAgent(this.context, workflowContext.projectPath);
-    
-    const enhancedPrompt = `Git Management Task: ${task.description}
-    
-Focus on:
-- Repository status and health
-- Uncommitted changes
-- Branch information
-- Recent commits
-- Potential conflicts or issues`;
-
-    const result = await reactAgent.processRequest(enhancedPrompt);
-    return { type: 'git_management', result };
-  }
-
-  /**
-   * Execute research task
-   */
-  private async executeResearchTask(task: Task, workflowContext: WorkflowContext): Promise<any> {
-    const reactAgent = new ReActAgent(this.context, workflowContext.projectPath);
-    
-    const enhancedPrompt = `Research Task: ${task.description}
-    
-Use available research tools to:
-- Find relevant documentation
-- Search for best practices
-- Look up error solutions
-- Research patterns and examples
-
-Project Context: ${workflowContext.projectType || 'Unknown'}`;
-
-    const result = await reactAgent.processRequest(enhancedPrompt);
-    return { type: 'research', result };
-  }
-
-  /**
-   * Execute problem solving task
-   */
-  private async executeProblemSolvingTask(task: Task, workflowContext: WorkflowContext): Promise<any> {
-    const reactAgent = new ReActAgent(this.context, workflowContext.projectPath);
-    
-    const enhancedPrompt = `Problem Solving Task: ${task.description}
-    
-Approach:
-1. Identify the root cause of the problem
-2. Analyze potential solutions
-3. Recommend the best approach
-4. Consider implementation steps
-5. Anticipate potential issues
-
-Context: ${JSON.stringify(task.context || {})}
-Previous Attempts: ${workflowContext.failedTasks.filter(t => t.description.includes(task.description.split(' ')[0])).length}`;
-
-    const result = await reactAgent.processRequest(enhancedPrompt);
-    return { type: 'problem_solving', result };
-  }
-
-  /**
-   * Execute task with ReAct agent as fallback
-   */
-  private async executeWithReActAgent(task: Task, workflowContext: WorkflowContext): Promise<any> {
-    const reactAgent = new ReActAgent(this.context, workflowContext.projectPath);
-    const result = await reactAgent.processRequest(task.description);
-    return { type: 'general', result };
-  }
+  
 
   /**
    * Check for new tasks that may be enabled by task completion

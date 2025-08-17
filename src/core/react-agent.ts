@@ -2,7 +2,6 @@ import { CLIContext } from './cli.js';
 import { LocalModelClient } from './local-model-client.js';
 import { logger } from './logger.js';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { BaseTool } from './tools/base-tool.js';
 import { ReadFileTool, WriteFileTool, ListFilesTool } from './tools/file-tools.js';
 import { ConfirmedWriteTool, ConfirmEditsTool, ViewPendingEditsTool } from './tools/confirmed-write-tool.js';
@@ -34,13 +33,9 @@ import {
 } from './tools/enhanced-code-tools.js';
 import { LintCodeTool, GetAstTool } from './tools/code-analysis-tools.js';
 import { GitStatusTool, GitDiffTool } from './tools/git-tools.js';
-import { ResearchTool, WebSearchTool, DocSearchTool } from './tools/research-tools.js';
-import { 
-  RefDocumentationTool, 
-  ExaWebSearchTool, 
-  ExaDeepResearchTool, 
-  ExaCompanyResearchTool 
-} from './tools/mcp-tools.js';
+import { GoogleWebSearchTool, RefDocumentationTool, RefReadUrlTool, ExaWebSearchTool } from './tools/real-research-tools.js';
+import { CodeInjectionTool } from './tools/code-injection-tool.js';
+import { CodeWriterTool } from './tools/code-writer-tool.js';
 import { AutonomousErrorHandler, ErrorContext } from './autonomous-error-handler.js';
 import { IntelligentModelSelector } from './intelligent-model-selector.js';
 import { SimplifiedReActPrompts, SimplifiedJSONParser } from './simplified-react-prompts.js';
@@ -60,12 +55,13 @@ type WorkflowState = 'initial' | 'exploring' | 'analyzing' | 'diagnosing' | 'con
 
 export class ReActAgentOutput extends BaseAgentOutput {
   constructor(
-    public success: boolean,
-    public message: string,
-    public data?: any,
-    public timestamp: number = Date.now()
+    success: boolean,
+    message: string,
+    data?: any,
+    timestamp: number = Date.now()
   ) {
-    super();
+    super(success, message, data);
+    this.timestamp = timestamp;
   }
 }
 
@@ -78,17 +74,31 @@ interface ProgressMetrics {
   completionSignals: string[];
 }
 
+interface ContextKnowledge {
+  projectName?: string;
+  projectVersion?: string;
+  projectType?: string;
+  mainTechnologies: string[];
+  fileStructure: Map<string, string[]>;
+  keyFindings: string[];
+  actionableInsights: string[];
+}
+
 interface ReActAgentContext {
   workingDirectory: string;
   messages: Array<{ role: string; content: string; timestamp: number }>;
   currentPlan?: string[];
-  recentToolUsage: Array<{ tool: string; timestamp: number; input: any }>;
+  recentToolUsage: Array<{ tool: string; timestamp: number; input: any; output?: string }>;
   lastFileList?: string[];
   conversationMode: 'exploration' | 'analysis' | 'direct_response';
   workflowState: WorkflowState;
   progressMetrics: ProgressMetrics;
   maxIterations: number;
   currentIteration: number;
+  // NEW: Rich context knowledge
+  knowledge: ContextKnowledge;
+  // NEW: Track exact tool calls to prevent ANY repetition
+  exactToolCalls: Set<string>;
 }
 
 export class ReActAgent extends BaseAgent<ReActAgentOutput> {
@@ -103,14 +113,14 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
     // Initialize BaseAgent with configuration
     const config: BaseAgentConfig = {
       name: 'ReActAgent',
-      description: 'Reasoning-Acting-Observing agent for autonomous code analysis and problem solving',
+      description: 'Enhanced reasoning-acting agent with improved loop prevention',
       rateLimit: {
         maxRetries: 3,
         baseDelayMs: 1000,
         maxDelayMs: 30000,
         backoffMultiplier: 2
       },
-      timeout: 120000 // 2 minutes
+      timeout: 60000 // 1 minute timeout (reduced from 2)
     };
 
     const dependencies: AgentDependencies = {
@@ -135,64 +145,53 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
         issuesFound: [],
         completionSignals: []
       },
-      maxIterations: 8, // Reduced to prevent loops
-      currentIteration: 0
+      maxIterations: 5, // Reduced from 8 to force concise analysis
+      currentIteration: 0,
+      knowledge: {
+        mainTechnologies: [],
+        fileStructure: new Map(),
+        keyFindings: [],
+        actionableInsights: []
+      },
+      exactToolCalls: new Set()
     };
     this.tools = [
-      // Autonomous Code Analysis (NEW)
+      // Prioritize intelligent tools
       new ReadCodeStructureTool(this.agentContext),
       new IntelligentFileReaderTool(this.agentContext),
       
-      // Enhanced File Operations
+      // Essential file operations
       new EnhancedReadFileTool(this.agentContext),
-      new EnhancedWriteFileTool(this.agentContext),
+      new ListFilesTool(this.agentContext),
       new FileSearchTool(this.agentContext),
-      new FileOperationsTool(this.agentContext),
       
-      // Terminal and Process Management
-      new TerminalExecuteTool(this.agentContext),
-      new ProcessManagementTool(this.agentContext),
-      new ShellEnvironmentTool(this.agentContext),
-      new PackageManagerTool(this.agentContext),
-      
-      // Comprehensive Git Operations
-      new GitOperationsTool(this.agentContext),
-      new GitAnalysisTool(this.agentContext),
-      
-      // Process Management and Code Execution
-      new AdvancedProcessTool(this.agentContext),
-      new CodeExecutionTool(this.agentContext),
-      
-      // Enhanced Code Analysis and Generation
+      // Code analysis
       new CodeAnalysisTool(this.agentContext),
-      new CodeGenerationTool(this.agentContext),
-      
-      // Legacy Code Analysis (for compatibility)
       new LintCodeTool(this.agentContext),
       new GetAstTool(this.agentContext),
       
-      // Research and External
-      new ResearchTool(this.agentContext),
-      new WebSearchTool(this.agentContext),
-      new DocSearchTool(this.agentContext),
-      
-      // MCP Tools Integration
-      new RefDocumentationTool(this.agentContext),
-      new ExaWebSearchTool(this.agentContext),
-      new ExaDeepResearchTool(this.agentContext),
-      new ExaCompanyResearchTool(this.agentContext),
-      
-      // Legacy tools for compatibility
-      new ReadFileTool(this.agentContext),
-      new WriteFileTool(this.agentContext),
-      new ListFilesTool(this.agentContext),
+      // Git operations
       new GitStatusTool(this.agentContext),
       new GitDiffTool(this.agentContext),
       
-      // Edit confirmation tools
+      // Terminal operations
+      new TerminalExecuteTool(this.agentContext),
+      new PackageManagerTool(this.agentContext),
+      
+      // Writing tools
       new ConfirmedWriteTool(this.agentContext),
-      new ConfirmEditsTool(this.agentContext),
-      new ViewPendingEditsTool(this.agentContext),
+      new WriteFileTool(this.agentContext),
+      new CodeInjectionTool(this.agentContext),
+      new CodeWriterTool(this.agentContext),
+
+      // Research Tools
+      new GoogleWebSearchTool(this.agentContext),
+      new RefDocumentationTool(this.agentContext),
+      new RefReadUrlTool(this.agentContext),
+      new ExaWebSearchTool(this.agentContext),
+      
+      // Legacy compatibility
+      new ReadFileTool(this.agentContext),
     ];
     
     // Initialize autonomous capabilities
@@ -252,7 +251,6 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
     return this.agentContext;
   }
 
-
   public reset(): void {
     this.agentContext.messages = [];
     this.agentContext.currentPlan = undefined;
@@ -269,44 +267,33 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
       completionSignals: []
     };
     this.agentContext.currentIteration = 0;
+    this.agentContext.knowledge = {
+      mainTechnologies: [],
+      fileStructure: new Map(),
+      keyFindings: [],
+      actionableInsights: []
+    };
+    this.agentContext.exactToolCalls = new Set();
   }
 
   async processRequest(input: string): Promise<string> {
     const requestStartTime = Date.now();
-    const maxProcessingTime = this.config.timeout || 120000; // 2 minutes default
+    const maxProcessingTime = this.config.timeout || 60000; // 1 minute
     
     this.agentContext.messages.push({ role: 'user', content: input, timestamp: Date.now() });
 
-    // Check if conversation history needs rotation
-    if (this.agentContext.messages.length > 30) {
-      await this.rotateConversationHistory();
-    }
-
-    // Handle state reset command
-    if (input.toLowerCase().trim() === '/reset' || input.toLowerCase().trim() === '/clear') {
-      return this.handleStateReset();
-    }
-
-    // Analyze intent and conversation mode
+    // Analyze intent and check if we need tools at all
     const intentAnalysis = this.analyzeUserIntent(input);
-    this.agentContext.conversationMode = intentAnalysis.mode;
-    
-    // Check if this can be answered directly without tools
     if (intentAnalysis.canAnswerDirectly) {
       return this.generateDirectResponse(input, intentAnalysis);
     }
 
-    // Initialize Claude Code inspired reasoning system
-    this.reasoning = new ClaudeCodeInspiredReasoning(this.tools, input);
-    logger.info('🧠 Initialized Claude Code inspired reasoning system');
-
-    // Use intelligent model selection for this task (temporarily disabled for stability)
-    const taskType = this.analyzeTaskType(input);
-    const optimalModel = undefined; // Use default configured model
-
-    logger.info(`🧠 Using configured model for task type: ${taskType}`);
+    // Initialize enhanced reasoning
+    this.reasoning = new ClaudeCodeInspiredReasoning(this.tools, input, this.model);
+    logger.info('🧠 Initialized enhanced reasoning system');
 
     let lastObservation: string | undefined;
+    let noProgressCount = 0;
 
     for (let i = 0; i < this.agentContext.maxIterations; i++) {
       this.agentContext.currentIteration = i;
@@ -314,63 +301,75 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
       // Check for timeout
       if (Date.now() - requestStartTime > maxProcessingTime) {
         logger.warn(`⏰ Request timeout after ${Date.now() - requestStartTime}ms`);
-        return `Request timed out after ${Math.round((Date.now() - requestStartTime) / 1000)} seconds. The request was too complex or the system is experiencing delays. Please try a simpler request.`;
+        return this.generateFinalAnswerFromKnowledge("Request timed out - providing analysis based on gathered information.");
       }
       
       try {
-        // Use Claude Code inspired reasoning system
+        // Use enhanced reasoning
         const reasoningOutput: ReasoningOutput = this.reasoning!.reason(lastObservation);
         
         logger.info(`🧠 Iteration ${i + 1}: ${reasoningOutput.reasoning}`);
-        logger.info(`🔧 Selected tool: ${reasoningOutput.selectedTool} (confidence: ${reasoningOutput.confidence.toFixed(2)})`);
+        logger.info(`🔧 Tool: ${reasoningOutput.selectedTool} (confidence: ${reasoningOutput.confidence.toFixed(2)})`);
         
-        // Check if we should complete
-        if (reasoningOutput.shouldComplete) {
-          const finalAnswer = reasoningOutput.toolInput.answer as string;
+        // Check for completion
+        if (reasoningOutput.shouldComplete || i >= this.agentContext.maxIterations - 1) {
+          const finalAnswer = reasoningOutput.toolInput.answer as string || this.generateFinalAnswerFromKnowledge();
           this.agentContext.messages.push({ role: 'assistant', content: finalAnswer, timestamp: Date.now() });
-          
-          // Record successful completion
-          if (optimalModel) {
-            this.modelSelector.recordPerformance(optimalModel, taskType, true, Date.now() - this.getLastMessageTime(), 1.0);
-          }
-          
           return finalAnswer;
         }
 
-        // Find and execute the selected tool
+        // ENHANCED: Strict duplicate prevention with smart progression
+        const toolCallSignature = `${reasoningOutput.selectedTool}:${JSON.stringify(reasoningOutput.toolInput)}`;
+        if (this.agentContext.exactToolCalls.has(toolCallSignature)) {
+          logger.warn(`⚠️ Preventing duplicate tool call: ${toolCallSignature}`);
+          
+          // Force progression based on goal achievement
+          const hasMinimumContext = this.agentContext.knowledge.keyFindings.length >= 2;
+          const hasProjectInfo = this.agentContext.knowledge.projectName || this.agentContext.knowledge.projectType;
+          const hasFileStructure = this.agentContext.knowledge.fileStructure.size > 0;
+          
+          if (hasMinimumContext && (hasProjectInfo || hasFileStructure)) {
+            return this.generateFinalAnswerFromKnowledge("Sufficient information gathered - completing analysis.");
+          }
+          
+          // Try to force different tool selection
+          lastObservation = `Tool ${reasoningOutput.selectedTool} already used. Need different approach to gather more context.`;
+          noProgressCount++;
+          
+          if (noProgressCount >= 2) {
+            return this.generateFinalAnswerFromKnowledge("Completing analysis with available information to prevent loops.");
+          }
+          continue;
+        }
+        
+        this.agentContext.exactToolCalls.add(toolCallSignature);
+
+        // Find and execute tool
         const tool = this.tools.find(t => t.definition.name === reasoningOutput.selectedTool);
         if (!tool) {
-          // Log available tool names for debugging
           const availableTools = this.tools.map(t => t.definition.name).join(', ');
-          logger.error(`Unknown tool: ${reasoningOutput.selectedTool}. Available tools: ${availableTools}`);
-          
-          lastObservation = `Error: Unknown tool "${reasoningOutput.selectedTool}". Available tools: ${availableTools}`;
+          logger.error(`Unknown tool: ${reasoningOutput.selectedTool}. Available: ${availableTools}`);
+          lastObservation = `Error: Unknown tool "${reasoningOutput.selectedTool}"`;
           continue;
         }
 
-        // Execute the selected tool with error handling
+        // Execute tool
         try {
-          const observation = await withErrorHandling(
-            () => tool.execute(reasoningOutput.toolInput),
-            {
-              operation: `execute-tool-${reasoningOutput.selectedTool}`,
-              metadata: { 
-                toolName: reasoningOutput.selectedTool, 
-                input: reasoningOutput.toolInput,
-                sessionId: this.dependencies.sessionId
-              }
-            },
-            {
-              maxAttempts: 3,
-              baseDelayMs: 500,
-              retryableErrors: [ErrorCategory.NETWORK, ErrorCategory.TIMEOUT, ErrorCategory.TOOL_EXECUTION]
-            }
-          );
-          
-          // Store observation for next reasoning cycle
+          const observation = await tool.execute(reasoningOutput.toolInput);
           lastObservation = typeof observation === 'string' ? observation : JSON.stringify(observation);
           
-          // Store tool result for conversation context
+          // ENHANCED: Extract knowledge from observation
+          this.extractKnowledgeFromObservation(lastObservation, reasoningOutput.selectedTool);
+          
+          // Track tool usage with output
+          this.agentContext.recentToolUsage.push({ 
+            tool: reasoningOutput.selectedTool, 
+            timestamp: Date.now(),
+            input: reasoningOutput.toolInput,
+            output: lastObservation.slice(0, 500)
+          });
+          
+          // Store in messages
           this.agentContext.messages.push({ 
             role: 'tool', 
             content: lastObservation, 
@@ -378,772 +377,225 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
           });
           
           logger.info(`✅ Tool ${reasoningOutput.selectedTool} executed successfully`);
+          noProgressCount = 0; // Reset on successful progress
           
         } catch (toolError) {
           const errorMessage = toolError instanceof Error ? toolError.message : 'Tool execution failed';
           lastObservation = `Error: ${errorMessage}`;
-          
-          this.agentContext.messages.push({ 
-            role: 'tool', 
-            content: JSON.stringify({ error: errorMessage }), 
-            timestamp: Date.now() 
-          });
-          
           logger.warn(`❌ Tool ${reasoningOutput.selectedTool} failed: ${errorMessage}`);
         }
 
       } catch (error) {
         logger.error('Error in agent iteration:', error);
-        
-        // Use autonomous error handling
-        const errorContext: ErrorContext = {
-          errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
-          errorMessage: error instanceof Error ? error.message : 'Unknown error occurred',
-          operation: 'agent_processing',
-          model: optimalModel || 'configured_model',
-          context: { iteration: i, taskType, input }
-        };
-
-        const recoveryActions = await this.errorHandler.analyzeAndRecover(errorContext);
-        
-        // Check if we should switch models based on recovery actions
-        for (const action of recoveryActions) {
-          if (action.action === 'switch_model' && action.target) {
-            logger.info(`🔄 Autonomous model switch: ${optimalModel || 'configured_model'} → ${action.target}`);
-            // The model switch will be handled by the next iteration
-            break;
-          }
-        }
-
-        // Record failure for learning
-        if (optimalModel) {
-          this.modelSelector.recordPerformance(optimalModel, taskType, false, Date.now() - this.getLastMessageTime(), 0.0);
-        }
-
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-        this.agentContext.messages.push({ role: 'tool', content: JSON.stringify({ error: errorMessage, recovery: recoveryActions.length > 0 ? 'autonomous_recovery_attempted' : 'no_recovery' }), timestamp: Date.now() });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        lastObservation = `Error: ${errorMessage}`;
       }
     }
 
-    // Force final answer if we've exhausted iterations
-    logger.warn(`Agent reached maximum iterations (${this.agentContext.maxIterations}), forcing comprehensive final answer`);
-    const forcedAnswer = this.generateComprehensiveFinalAnswer();
-    this.agentContext.messages.push({ role: 'assistant', content: forcedAnswer, timestamp: Date.now() });
-    return forcedAnswer;
+    // Reached max iterations - provide comprehensive answer
+    return this.generateFinalAnswerFromKnowledge("Analysis complete after systematic exploration.");
   }
 
   /**
-   * Update progress metrics based on tool usage
+   * ENHANCED: Extract actionable knowledge from tool observations
    */
-  private updateProgressMetrics(toolName: string, toolInput: any): void {
-    const metrics = this.agentContext.progressMetrics;
-    
-    metrics.toolsUsed.add(toolName);
-    
-    if (toolName === 'listFiles') {
-      const path = toolInput?.path || '.';
-      metrics.directoriesListed.add(path);
-      
-      // Update workflow state
-      if (this.agentContext.workflowState === 'initial') {
-        this.agentContext.workflowState = 'exploring';
-      }
-    }
-    
-    if (toolName === 'readFile') {
-      const filePath = toolInput?.path;
-      if (filePath) {
-        metrics.filesExplored.add(filePath);
-        logger.debug(`Added file to metrics: ${filePath}`);
-        
-        // Check if this is a critical file
-        if (this.isCriticalFile(filePath)) {
-          metrics.criticalFilesRead++;
-          logger.debug(`Critical file read: ${filePath}`);
-        }
-        
-        // Update workflow state
-        if (this.agentContext.workflowState === 'exploring') {
-          this.agentContext.workflowState = 'analyzing';
-        }
-      } else {
-        logger.warn(`readFile called but no path in toolInput: ${JSON.stringify(toolInput)}`);
-      }
-    }
-    
-    if (toolName === 'lintCode' || toolName === 'getAst') {
-      if (this.agentContext.workflowState === 'analyzing') {
-        this.agentContext.workflowState = 'diagnosing';
-      }
-    }
-    
-    if (toolName === 'gitStatus' || toolName === 'gitDiff') {
-      metrics.completionSignals.push('git_analysis_complete');
-    }
-  }
-
-  /**
-   * Check if a file is considered critical for analysis
-   */
-  private isCriticalFile(filePath: string): boolean {
-    const criticalPatterns = [
-      'package.json', 'tsconfig.json', '.eslintrc', 'README',
-      /src\/.*\.(ts|js|tsx|jsx)$/, /\.config\.(ts|js)$/,
-      /index\.(ts|js)$/, /main\.(ts|js)$/
-    ];
-    
-    return criticalPatterns.some(pattern => 
-      typeof pattern === 'string' ? filePath.includes(pattern) : pattern.test(filePath)
-    );
-  }
-
-  /**
-   * Check if agent should conclude based on progress
-   */
-  private shouldConcludeBasedOnProgress(): boolean {
-    const metrics = this.agentContext.progressMetrics;
-    
-    // Conclude if we have comprehensive coverage
-    const hasExploredStructure = metrics.directoriesListed.size >= 2;
-    const hasReadCriticalFiles = metrics.criticalFilesRead >= 3;
-    const hasUsedDiverseTools = metrics.toolsUsed.size >= 4;
-    const hasReachedDiagnosing = this.agentContext.workflowState === 'diagnosing';
-    
-    // Or if we've made significant progress and are approaching iteration limit
-    const approachingLimit = this.agentContext.currentIteration >= (this.agentContext.maxIterations * 0.7);
-    const hasMinimalProgress = this.hasMinimumProgress();
-    
-    return (hasExploredStructure && hasReadCriticalFiles && hasUsedDiverseTools) ||
-           (hasReachedDiagnosing && hasReadCriticalFiles) ||
-           (approachingLimit && hasMinimalProgress);
-  }
-
-  /**
-   * Check if we have minimum progress to provide a meaningful answer
-   */
-  private hasMinimumProgress(): boolean {
-    const metrics = this.agentContext.progressMetrics;
-    return metrics.directoriesListed.size >= 1 && 
-           metrics.filesExplored.size >= 2 && 
-           metrics.toolsUsed.size >= 3;
-  }
-
-  /**
-   * Generate conclusion based on current progress
-   */
-  private generateProgressBasedConclusion(): string {
-    const metrics = this.agentContext.progressMetrics;
-    
-    let conclusion = "## CodeBase Analysis Summary\n\n";
-    
-    // Project structure analysis
-    conclusion += `**Project Structure**: Analyzed ${metrics.directoriesListed.size} directories and explored ${metrics.filesExplored.size} files.\n\n`;
-    
-    // Critical files analyzed
-    if (metrics.criticalFilesRead > 0) {
-      conclusion += `**Critical Files Reviewed**: ${metrics.criticalFilesRead} important configuration and source files examined.\n\n`;
-    }
-    
-    // Tools used
-    conclusion += `**Analysis Tools Used**: ${Array.from(metrics.toolsUsed).join(', ')}\n\n`;
-    
-    // Workflow state
-    conclusion += `**Analysis Stage**: ${this.getWorkflowStateDescription()}\n\n`;
-    
-    // Issues found (extract from conversation)
-    const issues = this.extractIssuesFromConversation();
-    if (issues.length > 0) {
-      conclusion += `**Issues Identified**:\n${issues.map(issue => `- ${issue}`).join('\n')}\n\n`;
-    }
-    
-    // Recommendations
-    conclusion += this.generateRecommendations();
-    
-    return conclusion;
-  }
-
-  /**
-   * Generate comprehensive final answer when max iterations reached
-   */
-  private generateComprehensiveFinalAnswer(): string {
-    const metrics = this.agentContext.progressMetrics;
-    
-    let answer = "## Comprehensive CodeBase Analysis (Max Iterations Reached)\n\n";
-    
-    answer += `After ${this.agentContext.currentIteration} iterations of systematic analysis:\n\n`;
-    
-    // Progress summary
-    answer += `**Analysis Coverage**:\n`;
-    answer += `- Directories explored: ${metrics.directoriesListed.size}\n`;
-    answer += `- Files examined: ${metrics.filesExplored.size}\n`;
-    answer += `- Critical files analyzed: ${metrics.criticalFilesRead}\n`;
-    answer += `- Analysis tools utilized: ${Array.from(metrics.toolsUsed).join(', ')}\n\n`;
-    
-    // Current state
-    answer += `**Current Analysis State**: ${this.getWorkflowStateDescription()}\n\n`;
-    
-    // Issues and findings
-    const issues = this.extractIssuesFromConversation();
-    const findings = this.extractFindingsFromConversation();
-    
-    if (findings.length > 0) {
-      answer += `**Key Findings**:\n${findings.map(finding => `- ${finding}`).join('\n')}\n\n`;
-    }
-    
-    if (issues.length > 0) {
-      answer += `**Issues and Errors**:\n${issues.map(issue => `- ${issue}`).join('\n')}\n\n`;
-    } 
-    
-    if (findings.length === 0 && issues.length === 0) {
-      answer += `**Status**: Analysis tools executed but limited findings due to iteration constraints.\n\n`;
-    }
-    
-    // Limitations and next steps
-    answer += `**Analysis Limitations**: Due to iteration limits, this analysis may be incomplete. For a more thorough review, consider:\n`;
-    answer += `- Running additional specific file analyses\n`;
-    answer += `- Performing targeted linting on source files\n`;
-    answer += `- Checking AST structure of complex components\n\n`;
-    
-    answer += this.generateRecommendations();
-    
-    return answer;
-  }
-
-  /**
-   * Get human-readable workflow state description
-   */
-  private getWorkflowStateDescription(): string {
-    const stateDescriptions = {
-      'initial': 'Starting analysis',
-      'exploring': 'Exploring project structure',
-      'analyzing': 'Analyzing source files and configurations',
-      'diagnosing': 'Diagnosing code quality and issues',
-      'concluding': 'Finalizing analysis',
-      'completed': 'Analysis complete'
-    };
-    return stateDescriptions[this.agentContext.workflowState] || 'Unknown state';
-  }
-
-  /**
-   * Extract issues from conversation history
-   */
-  private extractIssuesFromConversation(): string[] {
-    const issues: string[] = [];
-    
-    // Look for error patterns in tool results
-    const toolMessages = this.agentContext.messages.filter(m => m.role === 'tool');
-    
-    for (const message of toolMessages) {
-      try {
-        const content = JSON.parse(message.content);
-        if (content.error) {
-          issues.push(`Tool error: ${content.error}`);
-        }
-        if (content.lintErrors && Array.isArray(content.lintErrors)) {
-          issues.push(`Linting issues found: ${content.lintErrors.length} errors`);
-        }
-      } catch {
-        // If message content contains obvious error indicators
-        if (message.content.toLowerCase().includes('error') || 
-            message.content.toLowerCase().includes('fail')) {
-          issues.push('Analysis detected potential issues');
-        }
-      }
-    }
-    
-    return issues;
-  }
-
-  /**
-   * Extract actual findings and content from successful tool results
-   */
-  private extractFindingsFromConversation(): string[] {
-    const findings: string[] = [];
-    
-    // Look for successful tool results with actual content
-    const toolMessages = this.agentContext.messages.filter(m => m.role === 'tool');
-    
-    for (const message of toolMessages) {
-      try {
-        const content = typeof message.content === 'string' ? 
-          JSON.parse(message.content) : message.content;
-        
-        // Skip error messages
-        if (content.error) continue;
-        
-        // Extract package.json information
-        if (typeof content === 'string' && content.includes('"name"')) {
-          const nameMatch = content.match(/"name":\s*"([^"]+)"/);
-          if (nameMatch) {
-            findings.push(`Project name: ${nameMatch[1]}`);
-          }
-          const versionMatch = content.match(/"version":\s*"([^"]+)"/);
-          if (versionMatch) {
-            findings.push(`Project version: ${versionMatch[1]}`);
-          }
-          const descMatch = content.match(/"description":\s*"([^"]+)"/);
-          if (descMatch) {
-            findings.push(`Description: ${descMatch[1]}`);
-          }
-        }
-        
-        // Extract file listings
-        if (Array.isArray(content)) {
-          const importantFiles = content.filter(file => 
-            file.includes('package.json') || 
-            file.includes('tsconfig.json') ||
-            file.includes('README') ||
-            file.includes('.js') ||
-            file.includes('.ts')
-          );
-          if (importantFiles.length > 0) {
-            findings.push(`Found ${content.length} files including: ${importantFiles.slice(0, 3).join(', ')}${importantFiles.length > 3 ? '...' : ''}`);
-          }
-        }
-        
-        // Extract git status information
-        if (typeof content === 'string' && (content.includes('modified:') || content.includes('branch'))) {
-          findings.push('Git repository detected with tracked changes');
-        }
-        
-      } catch (e) {
-        // If raw string content, look for key information
-        if (typeof message.content === 'string') {
-          const content = message.content;
-          
-          // Look for package.json content
-          if (content.includes('codecrucible-synth')) {
-            findings.push('Project identified as codecrucible-synth');
-          }
-          if (content.includes('"version"')) {
-            const versionMatch = content.match(/"version":\s*"([^"]+)"/);
-            if (versionMatch) {
-              findings.push(`Version: ${versionMatch[1]}`);
-            }
-          }
-        }
-      }
-    }
-    
-    return findings;
-  }
-
-  /**
-   * Generate recommendations based on current analysis
-   */
-  private generateRecommendations(): string {
-    const metrics = this.agentContext.progressMetrics;
-    let recommendations = "**Recommendations**:\n";
-    
-    if (metrics.criticalFilesRead < 3) {
-      recommendations += "- Review critical configuration files (package.json, tsconfig.json, etc.)\n";
-    }
-    
-    if (!metrics.toolsUsed.has('lintCode')) {
-      recommendations += "- Run linting analysis on source files to check code quality\n";
-    }
-    
-    if (!metrics.toolsUsed.has('gitStatus')) {
-      recommendations += "- Check git status for uncommitted changes and repository health\n";
-    }
-    
-    if (metrics.filesExplored.size < 5) {
-      recommendations += "- Examine more source files for comprehensive analysis\n";
-    }
-    
-    recommendations += "- Consider running automated tests if available\n";
-    recommendations += "- Review dependencies for security vulnerabilities\n";
-    
-    return recommendations;
-  }
-
-  /**
-   * Get auto-action for repetitive tool usage
-   */
-  private getAutoAction(repeatedTool: string, toolInput: any): {tool: string, input: any} | null {
-    const userMessage = this.agentContext.messages.find(msg => msg.role === 'user')?.content || '';
-    
-    // Auto-execute specific actions based on context
-    if (repeatedTool === 'listFiles') {
-      // If user asked about src directory and agent is stuck on root, auto-execute src listing
-      if ((/src\s*(directory|dir|folder)/i.test(userMessage) || /files\s+in\s+src/i.test(userMessage)) && 
-          toolInput?.path === '.') {
-        return { tool: 'listFiles', input: { path: 'src' } };
-      }
-      
-      // If user asked for project files and we already listed root, try config files
-      if (/what\s+files/i.test(userMessage) && toolInput?.path === '.') {
-        return { tool: 'readFile', input: { path: 'package.json' } };
-      }
-    }
-    
-    return null;
-  }
-
-  /**
-   * Suggest tool diversification when repetitive usage detected
-   */
-  private suggestToolDiversification(repeatedTool: string): string {
-    const userMessage = this.agentContext.messages.find(msg => msg.role === 'user')?.content || '';
-    
-    const suggestions: Record<string, string> = {
-      'listFiles': this.getListFilesSuggestion(userMessage),
-      'readFile': 'Consider running linting analysis or checking AST structure',
-      'gitStatus': 'Try reading configuration files or analyzing source code',
-      'lintCode': 'Consider checking git status or reading other source files',
-      'getAst': 'Try running linting or reading related files'
-    };
-    
-    return suggestions[repeatedTool] || 'Try using different tools to gather more comprehensive information';
-  }
-
-  private isPackageJsonRequested(): boolean {
-    const userMessage = this.agentContext.messages.find(msg => msg.role === 'user')?.content || '';
-    return /package\.json|dependencies|package/i.test(userMessage);
-  }
-
-  private getToolByName(toolName: string): BaseTool | undefined {
-    return this.tools.find(tool => tool.definition.name === toolName);
-  }
-
-  private getListFilesSuggestion(userMessage: string): string {
-    // Check if user asked about specific directories
-    if (/src\s*(directory|dir|folder)/i.test(userMessage)) {
-      return 'Use listFiles with path "src" to explore the source directory specifically, then read key files in src/';
-    }
-    if (/files\s+in\s+src/i.test(userMessage)) {
-      return 'Execute: listFiles with {"path": "src"} to see what files are in the src directory';
-    }
-    if (/what\s+files/i.test(userMessage) && /src/i.test(userMessage)) {
-      return 'Use listFiles with path "src" to list files in the source directory';
-    }
-    
-    // Original suggestions for other patterns
-    if (/package\.json/i.test(userMessage)) {
-      return 'Now read package.json file contents using readFile tool';
-    }
-    if (/tsconfig/i.test(userMessage)) {
-      return 'Now read tsconfig.json file contents using readFile tool';
-    }
-    if (/dependencies|package/i.test(userMessage)) {
-      return 'Read package.json to analyze dependencies using readFile tool';
-    }
-    if (/config/i.test(userMessage)) {
-      return 'Read configuration files like package.json or tsconfig.json using readFile tool';
-    }
-    
-    // General file listing suggestions
-    if (/files.*project|project.*files/i.test(userMessage)) {
-      return 'You already listed root directory. Now use listFiles with specific paths like "src", "dist", "config" or read important files with readFile';
-    }
-    
-    return 'You already listed the root directory. Now try listFiles with specific subdirectory paths or use readFile to examine important files';
-  }
-
-  /**
-   * Build exploration context to guide progressive tool usage
-   */
-  /**
-   * Validate if the agent is ready to provide a conclusion
-   */
-  private validateReadyForConclusion(): { isReady: boolean; reason?: string; nextSteps?: string[] } {
-    const metrics = this.agentContext.progressMetrics;
-    const userMessage = this.agentContext.messages.find(msg => msg.role === 'user')?.content || '';
-    
-    // Check for specific file reading requests
-    const requestsPackageJson = /package\.json/i.test(userMessage);
-    const requestsTsConfig = /tsconfig/i.test(userMessage);
-    const requestsSpecificFile = /read|analyze|check.*\.(json|ts|js|md|txt)/i.test(userMessage);
-    
-    // If user specifically requested file reading but no files have been read
-    if ((requestsPackageJson || requestsTsConfig || requestsSpecificFile) && metrics.criticalFilesRead === 0) {
-      const nextSteps = [];
-      if (requestsPackageJson) nextSteps.push('readFile package.json');
-      if (requestsTsConfig) nextSteps.push('readFile tsconfig.json');
-      if (requestsSpecificFile) nextSteps.push('readFile for the requested file');
-      
-      return {
-        isReady: false,
-        reason: 'User requested specific file analysis but no files have been read yet',
-        nextSteps
-      };
-    }
-    
-    // General minimum requirements for any analysis
-    if (metrics.toolsUsed.size === 0) {
-      return {
-        isReady: false,
-        reason: 'No tools have been used to gather information',
-        nextSteps: ['listFiles to explore project structure']
-      };
-    }
-    
-    // For general analysis, require at least some exploration
-    if (metrics.directoriesListed.size === 0 && metrics.filesExplored.size === 0) {
-      return {
-        isReady: false,
-        reason: 'No exploration of project structure or files has been done',
-        nextSteps: ['listFiles to understand project layout', 'readFile for key files']
-      };
-    }
-    
-    // For code analysis requests, require reading at least one file
-    if (/analyze|review|explain|debug|error|issue/i.test(userMessage) && metrics.criticalFilesRead === 0) {
-      return {
-        isReady: false,
-        reason: 'Analysis requested but no files have been read for content examination',
-        nextSteps: ['readFile key files like package.json, main source files']
-      };
-    }
-    
-    // Passed all checks
-    return { isReady: true };
-  }
-
-  private buildExplorationContext(): string {
-    const metrics = this.agentContext.progressMetrics;
-    const iteration = this.agentContext.currentIteration;
-    const maxIterations = this.agentContext.maxIterations;
-    
-    let progressContext = "Current exploration progress:\\n";
-    
-    // Progress summary
-    progressContext += `- Iteration: ${iteration}/${maxIterations}\\n`;
-    progressContext += `- Workflow State: ${this.getWorkflowStateDescription()}\\n`;
-    progressContext += `- Tools used: ${Array.from(metrics.toolsUsed).join(', ') || 'none'}\\n`;
-    progressContext += `- Directories explored: ${metrics.directoriesListed.size}\\n`;
-    progressContext += `- Files examined: ${metrics.filesExplored.size}\\n`;
-    progressContext += `- Critical files read: ${metrics.criticalFilesRead}\\n`;
-    
-    // Guidance based on state and progress
-    if (metrics.toolsUsed.size === 0) {
-      progressContext += "- NEXT: Start with listFiles to understand project structure\\n";
-    } else if (this.agentContext.workflowState === 'exploring') {
-      if (metrics.criticalFilesRead < 2) {
-        progressContext += "- NEXT: Read critical files (package.json, tsconfig.json, main source files)\\n";
-      } else {
-        progressContext += "- NEXT: Check git status or run analysis tools\\n";
-      }
-    } else if (this.agentContext.workflowState === 'analyzing') {
-      if (!metrics.toolsUsed.has('gitStatus')) {
-        progressContext += "- NEXT: Check git status for repository health\\n";
-      } else if (!metrics.toolsUsed.has('lintCode')) {
-        progressContext += "- NEXT: Run linting on source files for code quality\\n";
-      } else {
-        progressContext += "- NEXT: Consider AST analysis or provide final analysis\\n";
-      }
-    } else if (this.agentContext.workflowState === 'diagnosing') {
-      progressContext += "- NEXT: Complete analysis and provide comprehensive final_answer\\n";
-    }
-    
-    // Warning if approaching limits
-    if (iteration >= maxIterations * 0.8) {
-      progressContext += "- ⚠️  WARNING: Approaching iteration limit - consider concluding analysis\\n";
-    }
-    
-    return progressContext;
-  }
-
-  private constructPrompt(): string {
-    const toolDefinitions = this.tools.map(t => ({
-      name: t.definition.name,
-      description: t.definition.description,
-      parameters: t.definition.parameters,
-      examples: t.definition.examples
-    }));
-    // Include more recent messages for better context (especially tool results)
-    const recentMessages = this.agentContext.messages.slice(-8);
-    const filesExplored = this.agentContext.progressMetrics.filesExplored.size;
-    
-    return SimplifiedReActPrompts.createSimplePrompt(
-      toolDefinitions,
-      recentMessages,
-      filesExplored
-    );
-  }
-
-  private parseSimplifiedResponse(response: string): Thought {
+  private extractKnowledgeFromObservation(observation: string, toolName: string): void {
     try {
-      const parsed = SimplifiedJSONParser.parseSimpleResponse(response);
-      
-      // Validate and fix tool input
-      const fixedInput = SimplifiedJSONParser.validateAndFixToolInput(parsed.tool, parsed.toolInput);
-      
-      return {
-        thought: parsed.thought,
-        tool: parsed.tool,
-        toolInput: fixedInput
-      };
-    } catch (error) {
-      logger.error('Simplified JSON parsing failed:', error);
-      // Return a safe fallback instead of throwing
-      return {
-        thought: "Unable to parse model response, using final_answer as fallback",
-        tool: "final_answer",
-        toolInput: { answer: "I encountered a parsing error and cannot continue. Please try rephrasing your request." }
-      };
-    }
-  }
-
-  // Old complex parsing methods removed - now using SimplifiedJSONParser
-
-  /**
-   * Analyze the type of task based on user input
-   */
-  private analyzeTaskType(input: string): string {
-    const lowerInput = input.toLowerCase();
-    
-    if (lowerInput.includes('code') || lowerInput.includes('function') || lowerInput.includes('implement') || lowerInput.includes('write')) {
-      return 'coding';
-    }
-    
-    if (lowerInput.includes('debug') || lowerInput.includes('fix') || lowerInput.includes('error') || lowerInput.includes('bug')) {
-      return 'debugging';
-    }
-    
-    if (lowerInput.includes('analyze') || lowerInput.includes('review') || lowerInput.includes('understand') || lowerInput.includes('explain')) {
-      return 'analysis';
-    }
-    
-    if (lowerInput.includes('plan') || lowerInput.includes('design') || lowerInput.includes('architecture') || lowerInput.includes('strategy')) {
-      return 'planning';
-    }
-    
-    if (lowerInput.includes('test') || lowerInput.includes('testing') || lowerInput.includes('spec')) {
-      return 'testing';
-    }
-    
-    return 'general';
-  }
-
-  /**
-   * Assess the complexity of a task
-   */
-  private assessComplexity(input: string): 'simple' | 'medium' | 'complex' {
-    const lowerInput = input.toLowerCase();
-    
-    // Simple task indicators
-    if (lowerInput.includes('simple') || lowerInput.includes('basic') || lowerInput.includes('quick') || 
-        lowerInput.length < 50 || lowerInput.split(' ').length < 10) {
-      return 'simple';
-    }
-    
-    // Complex task indicators
-    if (lowerInput.includes('complex') || lowerInput.includes('advanced') || lowerInput.includes('comprehensive') ||
-        lowerInput.includes('architecture') || lowerInput.includes('system') || lowerInput.includes('full') ||
-        lowerInput.length > 200 || lowerInput.split(' ').length > 40) {
-      return 'complex';
-    }
-    
-    return 'medium';
-  }
-
-  /**
-   * Get the timestamp of the last message for performance tracking
-   */
-  private getLastMessageTime(): number {
-    if (this.agentContext.messages.length === 0) {
-      return Date.now();
-    }
-    return this.agentContext.messages[this.agentContext.messages.length - 1].timestamp;
-  }
-
-  /**
-   * Generate answer from conversation context when final_answer is empty
-   */
-  private generateAnswerFromContext(): string {
-    const userMessages = this.agentContext.messages.filter(m => m.role === 'user');
-    const toolResults = this.agentContext.messages.filter(m => m.role === 'tool');
-    
-    if (userMessages.length === 0) {
-      return "I'm ready to help with your coding tasks. Please let me know what you'd like me to do.";
-    }
-    
-    const lastUserMessage = userMessages[userMessages.length - 1].content;
-    
-    // Extract useful information from tool results
-    const relevantInfo: string[] = [];
-    
-    for (const result of toolResults.slice(-10)) { // Last 10 tool results with expanded context
+      // Parse if JSON
+      let data: any;
       try {
-        const parsed = JSON.parse(result.content);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // File list result
-          relevantInfo.push(`Files found: ${parsed.slice(0, 10).join(', ')}${parsed.length > 10 ? ` and ${parsed.length - 10} more` : ''}`);
-        } else if (parsed.fileName) {
-          // AST result
-          relevantInfo.push(`Analyzed file: ${parsed.fileName}`);
-        } else if (parsed.staged !== undefined || parsed.modified !== undefined) {
-          // Git status result
-          relevantInfo.push(`Git status: ${JSON.stringify(parsed)}`);
-        }
+        data = JSON.parse(observation);
       } catch {
-        // Skip unparseable results
+        // If not JSON, try to extract information from formatted text
+        data = this.extractFromFormattedText(observation);
       }
-    }
-    
-    // Generate contextual response
-    if (lastUserMessage.toLowerCase().includes('files') || lastUserMessage.toLowerCase().includes('project')) {
-      const fileInfo = relevantInfo.find(info => info.includes('Files found'));
-      if (fileInfo) {
-        return `Based on my analysis, this project contains the following files:\n\n${fileInfo}\n\nThis appears to be a TypeScript/Node.js project with various configuration files, source code, and build outputs.`;
+
+      // Extract based on tool type
+      switch (toolName) {
+        case 'readCodeStructure':
+        case 'readFiles':
+          if (data.projectType) this.agentContext.knowledge.projectType = data.projectType;
+          if (data.framework) this.agentContext.knowledge.mainTechnologies.push(data.framework);
+          if (data.frameworks && Array.isArray(data.frameworks)) {
+            this.agentContext.knowledge.mainTechnologies.push(...data.frameworks);
+          }
+          if (data.totalFiles) this.agentContext.knowledge.keyFindings.push(`Project contains ${data.totalFiles} files`);
+          if (data.definitions) this.agentContext.knowledge.keyFindings.push(`Found ${data.definitions.length} code definitions`);
+          if (data.codeDefinitions && Array.isArray(data.codeDefinitions)) {
+            this.agentContext.knowledge.keyFindings.push(`Found ${data.codeDefinitions.length} code definitions`);
+          }
+          break;
+          
+        case 'listFiles':
+          if (Array.isArray(data)) {
+            const dirs = data.filter(f => !f.includes('.'));
+            const files = data.filter(f => f.includes('.'));
+            this.agentContext.knowledge.fileStructure.set('.', data);
+            this.agentContext.knowledge.keyFindings.push(`Directory contains ${dirs.length} folders and ${files.length} files`);
+          }
+          break;
+          
+        case 'readFile':
+          if (typeof data === 'string' && data.includes('package.json')) {
+            const nameMatch = data.match(/"name":\s*"([^"]+)"/);
+            if (nameMatch) this.agentContext.knowledge.projectName = nameMatch[1];
+            const versionMatch = data.match(/"version":\s*"([^"]+)"/);
+            if (versionMatch) this.agentContext.knowledge.projectVersion = versionMatch[1];
+          }
+          if (typeof data === 'object' && data.name) {
+            this.agentContext.knowledge.projectName = data.name;
+          }
+          if (typeof data === 'object' && data.version) {
+            this.agentContext.knowledge.projectVersion = data.version;
+          }
+          break;
+          
+        case 'gitStatus':
+          if (data.modified || data.staged) {
+            this.agentContext.knowledge.keyFindings.push('Git repository with active changes detected');
+          }
+          if (typeof data === 'string' && (data.includes('modified') || data.includes('staged'))) {
+            this.agentContext.knowledge.keyFindings.push('Git repository with active changes detected');
+          }
+          break;
       }
+
+      // Track progress metrics
+      if (this.agentContext.knowledge.keyFindings.length > 0) {
+        this.agentContext.progressMetrics.criticalFilesRead++;
+      }
+
+      // Generate actionable insights based on accumulated knowledge
+      if (this.agentContext.knowledge.keyFindings.length >= 2 && 
+          this.agentContext.knowledge.actionableInsights.length === 0) {
+        this.generateActionableInsights();
+      }
+      
+    } catch (error) {
+      logger.debug('Could not extract structured knowledge from observation');
     }
-    
-    if (relevantInfo.length > 0) {
-      return `Based on my analysis:\n\n${relevantInfo.join('\n')}\n\nIs there anything specific you'd like me to help you with regarding this project?`;
-    }
-    
-    return `I've analyzed your request: "${lastUserMessage}"\n\nHowever, I need more specific information to provide a complete answer. Could you please clarify what specific aspect you'd like me to help with?`;
   }
 
   /**
-   * Suggest the correct tool name based on fuzzy matching
+   * Extract information from formatted text output
    */
-  private suggestCorrectTool(invalidTool: string): string | null {
-    const toolNames = this.tools.map(t => t.definition.name);
-    const lowerInvalid = invalidTool.toLowerCase();
+  private extractFromFormattedText(text: string): any {
+    const data: any = {};
     
-    // Direct substring matches
-    for (const toolName of toolNames) {
-      if (toolName.toLowerCase().includes(lowerInvalid) || lowerInvalid.includes(toolName.toLowerCase())) {
-        return toolName;
+    // Extract project overview information
+    const projectTypeMatch = text.match(/Primary Language.*: (.+)/);
+    if (projectTypeMatch) {
+      data.projectType = projectTypeMatch[1].trim();
+    }
+    
+    const totalFilesMatch = text.match(/Total Files.*: (\d+)/);
+    if (totalFilesMatch) {
+      data.totalFiles = parseInt(totalFilesMatch[1], 10);
+    }
+    
+    const frameworksMatch = text.match(/Frameworks.*: ([^\n]+)/);
+    if (frameworksMatch) {
+      const frameworks = frameworksMatch[1].trim();
+      if (frameworks !== 'None detected') {
+        data.frameworks = frameworks.split(',').map(f => f.trim());
       }
     }
     
-    // Common mappings
-    const mappings: Record<string, string> = {
-      'read': 'readFile',
-      'write': 'writeFile', 
-      'list': 'listFiles',
-      'dir': 'listFiles',
-      'files': 'listFiles',
-      'git': 'gitStatus',
-      'status': 'gitStatus',
-      'diff': 'gitDiff',
-      'lint': 'lintCode',
-      'ast': 'getAst',
-      'final': 'final_answer',
-      'answer': 'final_answer',
-      'done': 'final_answer'
-    };
-    
-    for (const [key, value] of Object.entries(mappings)) {
-      if (lowerInvalid.includes(key)) {
-        return value;
-      }
-    }
-    for (const [key, value] of Object.entries(mappings)) {
-      if (lowerInvalid.includes(key)) {
-        return value;
-      }
+    const buildSystemMatch = text.match(/Build System.*: ([^\n]+)/);
+    if (buildSystemMatch) {
+      data.buildSystem = buildSystemMatch[1].trim();
     }
     
-    return null;
+    // Extract code definitions count
+    const definitionsMatch = text.match(/extracted (\d+) code definitions/);
+    if (definitionsMatch) {
+      data.definitions = Array(parseInt(definitionsMatch[1], 10)).fill(null);
+    }
+    
+    return data;
   }
 
   /**
-   * Analyze user intent to determine conversation mode and response strategy
+   * Generate actionable insights from accumulated knowledge
+   */
+  private generateActionableInsights(): void {
+    const knowledge = this.agentContext.knowledge;
+    
+    if (knowledge.projectType) {
+      knowledge.actionableInsights.push(`This is a ${knowledge.projectType} project`);
+    }
+    
+    if (knowledge.mainTechnologies.length > 0) {
+      knowledge.actionableInsights.push(`Technologies used: ${knowledge.mainTechnologies.join(', ')}`);
+    }
+    
+    if (knowledge.projectName && knowledge.projectVersion) {
+      knowledge.actionableInsights.push(`Project: ${knowledge.projectName} v${knowledge.projectVersion}`);
+    }
+  }
+
+  /**
+   * ENHANCED: Generate comprehensive final answer from accumulated knowledge
+   */
+  private generateFinalAnswerFromKnowledge(reason?: string): string {
+    const knowledge = this.agentContext.knowledge;
+    const metrics = this.agentContext.progressMetrics;
+    
+    let answer = "";
+    
+    if (reason) {
+      answer += `${reason}\n\n`;
+    }
+    
+    // Project overview if available
+    if (knowledge.projectName || knowledge.projectType) {
+      answer += "## Project Overview\\n";
+      if (knowledge.projectName) answer += `**Name**: ${knowledge.projectName}\\n`;
+      if (knowledge.projectVersion) answer += `**Version**: ${knowledge.projectVersion}\\n`;
+      if (knowledge.projectType) answer += `**Type**: ${knowledge.projectType}\\n`;
+      if (knowledge.mainTechnologies.length > 0) {
+        answer += `**Technologies**: ${knowledge.mainTechnologies.join(', ')}\\n`;
+      }
+      answer += "\\n";
+    }
+    
+    // Key findings
+    if (knowledge.keyFindings.length > 0) {
+      answer += "## Key Findings\\n";
+      knowledge.keyFindings.forEach(finding => {
+        answer += `- ${finding}\\n`;
+      });
+      answer += "\\n";
+    }
+    
+    // Actionable insights
+    if (knowledge.actionableInsights.length > 0) {
+      answer += "## Insights\\n";
+      knowledge.actionableInsights.forEach(insight => {
+        answer += `- ${insight}\\n`;
+      });
+      answer += "\\n";
+    }
+    
+    // Analysis summary
+    answer += "## Analysis Summary\\n";
+    answer += `- Analyzed ${metrics.directoriesListed.size} directories\\n`;
+    answer += `- Examined ${metrics.filesExplored.size} files\\n`;
+    answer += `- Used ${metrics.toolsUsed.size} different analysis tools\\n`;
+    
+    // Recommendations if applicable
+    if (metrics.issuesFound.length > 0) {
+      answer += "\\n## Issues Detected\\n";
+      metrics.issuesFound.forEach(issue => {
+        answer += `- ${issue}\\n`;
+      });
+    }
+    
+    return answer || "Analysis completed. Please provide more specific questions for detailed insights.";
+  }
+
+  /**
+   * Analyze user intent to determine if tools are needed
    */
   private analyzeUserIntent(input: string): {
     mode: 'exploration' | 'analysis' | 'direct_response';
@@ -1153,404 +605,39 @@ export class ReActAgent extends BaseAgent<ReActAgentOutput> {
   } {
     const lowerInput = input.toLowerCase().trim();
     
-    // Conversational/opinion questions that should be answered directly
-    const conversationalPatterns = [
+    // Simple greetings or questions
+    const directResponsePatterns = [
       /^(hi|hello|hey)$/,
-      /what.*think.*it/,
-      /what.*opinion/,
+      /^(thanks|thank you)$/,
+      /what.*think/,
       /how.*feel/,
-      /thoughts.*on/,
-      /what.*about.*this/,
-      /is.*good/,
-      /is.*bad/,
-      /like.*it/,
-      /your.*view/
+      /can you help/
     ];
     
-    const isConversational = conversationalPatterns.some(pattern => pattern.test(lowerInput));
-    
-    // Questions that require file information
-    const fileInfoPatterns = [
-      /list.*files/,
-      /what.*files/,
-      /show.*files/,
-      /file.*structure/,
-      /project.*structure/
-    ];
-    
-    const needsFileInfo = fileInfoPatterns.some(pattern => pattern.test(lowerInput));
-    
-    // Questions that need code analysis
-    const codeAnalysisPatterns = [
-      /analyze.*code/,
-      /review.*code/,
-      /check.*code/,
-      /find.*bug/,
-      /lint/,
-      /ast/
-    ];
-    
-    const needsCodeAnalysis = codeAnalysisPatterns.some(pattern => pattern.test(lowerInput));
-    
-    // Determine if we can answer directly
-    const canAnswerDirectly = isConversational || 
-      (this.agentContext.lastFileList && (lowerInput.includes('think') || lowerInput.includes('opinion')));
-    
-    let mode: 'exploration' | 'analysis' | 'direct_response' = 'exploration';
-    if (needsCodeAnalysis) mode = 'analysis';
-    else if (canAnswerDirectly) mode = 'direct_response';
+    const canAnswerDirectly = directResponsePatterns.some(p => p.test(lowerInput));
     
     return {
-      mode,
-      canAnswerDirectly: canAnswerDirectly || false,
-      needsFileInfo,
-      needsCodeAnalysis
+      mode: canAnswerDirectly ? 'direct_response' : 'analysis',
+      canAnswerDirectly,
+      needsFileInfo: lowerInput.includes('file') || lowerInput.includes('structure'),
+      needsCodeAnalysis: lowerInput.includes('code') || lowerInput.includes('analyze')
     };
   }
 
   /**
-   * Generate direct response without using tools
+   * Generate direct response without tools
    */
   private async generateDirectResponse(input: string, analysis: any): Promise<string> {
     const lowerInput = input.toLowerCase();
     
-    // Handle greetings
     if (lowerInput.match(/^(hi|hello|hey)$/)) {
-      return "Hello! I'm here to help you with your coding project. I can analyze code, read files, check git status, and much more. What would you like me to help you with?";
+      return "Hello! I'm ready to help analyze your codebase. What would you like me to examine?";
     }
     
-    // Handle opinion/analysis questions when we have context
-    if (lowerInput.includes('think') || lowerInput.includes('opinion')) {
-      if (this.agentContext.lastFileList) {
-        return this.generateProjectOpinion();
-      } else {
-        // Need to get file info first, but do it efficiently
-        return "Let me analyze your project structure first, then I'll share my thoughts.";
-      }
+    if (lowerInput.includes('thank')) {
+      return "You're welcome! Let me know if you need any further analysis.";
     }
     
-    // Use the model to generate a contextual response
-    const contextualPrompt = `Based on our conversation history, provide a helpful response to: "${input}"
-    
-Conversation context:
-${this.agentContext.messages.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n')}
-
-Provide a direct, helpful response without using any tools.`;
-    
-    try {
-      const response = await this.model.generate(contextualPrompt);
-      this.agentContext.messages.push({ role: 'assistant', content: response, timestamp: Date.now() });
-      return response;
-    } catch (error) {
-      logger.warn('Direct response generation failed:', error);
-      return "I understand you're asking about the project. Let me help you with that. Could you be more specific about what aspect you'd like me to focus on?";
-    }
-  }
-
-  /**
-   * Generate opinion about the project based on current context
-   */
-  private generateProjectOpinion(): string {
-    const fileCount = this.agentContext.lastFileList?.length || 0;
-    const hasTypeScript = this.agentContext.lastFileList?.some(f => f.includes('.ts')) || false;
-    const hasConfig = this.agentContext.lastFileList?.some(f => f.includes('config') || f.includes('.json')) || false;
-    
-    let opinion = "Based on my analysis of this project:\n\n";
-    
-    if (fileCount > 50) {
-      opinion += `📈 This is a substantial project with ${fileCount}+ files, indicating a mature codebase.\n`;
-    } else if (fileCount > 20) {
-      opinion += "📊 This is a medium-sized project with good structure.\n";
-    } else {
-      opinion += "📝 This appears to be a focused, well-scoped project.\n";
-    }
-    
-    if (hasTypeScript) {
-      opinion += "⚡ Uses TypeScript, which is excellent for code quality and maintainability.\n";
-    }
-    
-    if (hasConfig) {
-      opinion += "⚙️ Has proper configuration files, showing good project setup.\n";
-    }
-    
-    opinion += "\nThe project structure looks well-organized. Is there a specific aspect you'd like me to analyze in more detail?";
-    
-    return opinion;
-  }
-
-  /**
-   * Track tool usage to prevent loops
-   */
-  private trackToolUsage(toolName: string, toolInput: any): void {
-    const now = Date.now();
-    this.agentContext.recentToolUsage.push({
-      tool: toolName,
-      timestamp: now,
-      input: toolInput
-    });
-    
-    // Keep only last 10 tool usages
-    if (this.agentContext.recentToolUsage.length > 10) {
-      this.agentContext.recentToolUsage.shift();
-    }
-  }
-
-  /**
-   * Check if tool usage is repetitive (enhanced with progression awareness)
-   */
-  private isRepetitiveToolUsage(toolName: string, toolInput: any): boolean {
-    const recentUsage = this.agentContext.recentToolUsage;
-    const now = Date.now();
-    
-    // Block if same tool+input used more than ONCE (more aggressive)
-    const exactSameUsage = recentUsage.filter(usage => 
-      usage.tool === toolName && 
-      (now - usage.timestamp) < 180000 && // Reduced to 3 minutes
-      JSON.stringify(usage.input) === JSON.stringify(toolInput)
-    );
-    
-    if (exactSameUsage.length >= 1) { // Changed from 2 to 1
-      return true;
-    }
-    
-    // Also block if iteration count is high and we keep using same tool type
-    if (this.agentContext.currentIteration >= 5) {
-      const sameToolRecent = recentUsage.filter(usage => 
-        usage.tool === toolName && 
-        (now - usage.timestamp) < 120000 // Last 2 minutes
-      );
-      
-      if (sameToolRecent.length >= 2) {
-        return true;
-      }
-    }
-    
-    // Special case: Allow multiple listFiles if exploring different directories
-    if (toolName === 'listFiles') {
-      const samePathUsage = recentUsage.filter(usage => 
-        usage.tool === 'listFiles' && 
-        usage.input?.path === toolInput?.path &&
-        (now - usage.timestamp) < 180000 // 3 minutes
-      );
-      
-      // Be more restrictive with listFiles on same path to encourage progression
-      if (samePathUsage.length >= 2) {
-        return true; // Block after 2 attempts on same path to encourage progression
-      }
-      
-      // Also check total listFiles usage regardless of path
-      const totalListFiles = recentUsage.filter(usage => 
-        usage.tool === 'listFiles' &&
-        (now - usage.timestamp) < 300000 // 5 minutes
-      );
-      
-      // If we've used listFiles extensively but haven't read any files, encourage progression
-      const recentReadFiles = recentUsage.filter(usage => 
-        usage.tool === 'readFile' &&
-        (now - usage.timestamp) < 300000 // 5 minutes
-      );
-      
-      if (totalListFiles.length >= 3 && recentReadFiles.length === 0) {
-        return true; // Block listFiles if we haven't progressed to reading files
-      }
-      
-      return totalListFiles.length >= 6; // Reduced from 8 to encourage more action
-    }
-    
-    // For readFile, allow reading different files
-    if (toolName === 'readFile') {
-      const sameFileUsage = recentUsage.filter(usage => 
-        usage.tool === 'readFile' && 
-        usage.input?.path === toolInput?.path &&
-        (now - usage.timestamp) < 300000 // 5 minutes
-      );
-      return sameFileUsage.length >= 2; // Allow reading same file twice max
-    }
-    
-    // For getAst, be more restrictive since it's often called on non-existent files
-    if (toolName === 'getAst') {
-      const sameFileUsage = recentUsage.filter(usage => 
-        usage.tool === 'getAst' && 
-        usage.input?.path === toolInput?.path &&
-        (now - usage.timestamp) < 300000 // 5 minutes
-      );
-      return sameFileUsage.length >= 1; // Only allow once per file unless successful
-    }
-    
-    return false;
-  }
-
-  /**
-   * Validate tool input before execution
-   */
-  private validateToolInput(toolName: string, toolInput: any): { isValid: boolean; error?: string } {
-    // Check if toolInput exists
-    if (!toolInput || typeof toolInput !== 'object') {
-      return { isValid: false, error: 'Tool input must be a valid object' };
-    }
-
-    // Tool-specific validation
-    switch (toolName) {
-      case 'readFile':
-      case 'getAst':
-      case 'lintCode':
-        if (!toolInput.path || typeof toolInput.path !== 'string' || toolInput.path.trim() === '') {
-          return { isValid: false, error: 'path parameter is required and must be a non-empty string' };
-        }
-        // Check for common bad paths that don't exist in this project
-        if (typeof toolInput.path === 'string' && (toolInput.path.includes('src/main.ts') || toolInput.path.includes('main.ts'))) {
-          return { isValid: false, error: 'main.ts file does not exist in this project. Use listFiles to explore actual project structure first.' };
-        }
-        // Additional common non-existent paths
-        if (typeof toolInput.path === 'string' && toolInput.path.includes('src/index.ts') && !toolInput.path.includes('dist')) {
-          return { isValid: false, error: 'src/index.ts may not exist. Check with listFiles first.' };
-        }
-        break;
-      
-      case 'research':
-        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
-          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
-        }
-        if (toolInput.type && !['error', 'pattern', 'documentation', 'general'].includes(toolInput.type)) {
-          return { isValid: false, error: 'type parameter must be one of: error, pattern, documentation, general' };
-        }
-        break;
-      
-      case 'webSearch':
-        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
-          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
-        }
-        break;
-      
-      case 'docSearch':
-        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
-          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
-        }
-        break;
-      
-      case 'listFiles':
-        // listFiles can work with or without path
-        if (toolInput.path && typeof toolInput.path !== 'string') {
-          return { isValid: false, error: 'path parameter must be a string if provided' };
-        }
-        break;
-      
-      case 'writeFile':
-        if (!toolInput.path || typeof toolInput.path !== 'string' || toolInput.path.trim() === '') {
-          return { isValid: false, error: 'path parameter is required and must be a non-empty string' };
-        }
-        if (!toolInput.content || typeof toolInput.content !== 'string') {
-          return { isValid: false, error: 'content parameter is required and must be a string' };
-        }
-        break;
-      
-      case 'runCommand':
-        if (!toolInput.command || typeof toolInput.command !== 'string' || toolInput.command.trim() === '') {
-          return { isValid: false, error: 'command parameter is required and must be a non-empty string' };
-        }
-        break;
-      
-      // MCP Tools validation
-      case 'refDocSearch':
-        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
-          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
-        }
-        break;
-      
-      case 'exaWebSearch':
-        if (!toolInput.query || typeof toolInput.query !== 'string' || toolInput.query.trim() === '') {
-          return { isValid: false, error: 'query parameter is required and must be a non-empty string' };
-        }
-        if (toolInput.numResults && (typeof toolInput.numResults !== 'number' || toolInput.numResults < 1 || toolInput.numResults > 10)) {
-          return { isValid: false, error: 'numResults must be a number between 1 and 10' };
-        }
-        break;
-      
-      case 'exaDeepResearch':
-        if (!toolInput.topic || typeof toolInput.topic !== 'string' || toolInput.topic.trim() === '') {
-          return { isValid: false, error: 'topic parameter is required and must be a non-empty string' };
-        }
-        break;
-      
-      case 'exaCompanyResearch':
-        if (!toolInput.companyName || typeof toolInput.companyName !== 'string' || toolInput.companyName.trim() === '') {
-          return { isValid: false, error: 'companyName parameter is required and must be a non-empty string' };
-        }
-        break;
-    }
-
-    return { isValid: true };
-  }
-
-  /**
-   * Rotate conversation history when it gets too long
-   */
-  private async rotateConversationHistory(): Promise<void> {
-    try {
-      // Keep the most recent 10 messages
-      const recentMessages = this.agentContext.messages.slice(-10);
-      
-      // Summarize the older conversation
-      const olderMessages = this.agentContext.messages.slice(0, -10);
-      if (olderMessages.length > 0) {
-        const conversationSummary = await this.summarizeConversation(olderMessages);
-        
-        // Replace old messages with summary
-        this.agentContext.messages = [
-          { 
-            role: 'system', 
-            content: `Previous conversation summary: ${conversationSummary}`, 
-            timestamp: Date.now() 
-          },
-          ...recentMessages
-        ];
-        
-        logger.info(`📝 Rotated conversation history: ${olderMessages.length} messages summarized`);
-      }
-    } catch (error) {
-      logger.warn('Failed to rotate conversation history:', error);
-      // Fallback: just keep recent messages
-      this.agentContext.messages = this.agentContext.messages.slice(-15);
-    }
-  }
-
-  /**
-   * Summarize conversation for history rotation
-   */
-  private async summarizeConversation(messages: Array<{ role: string; content: string }>): Promise<string> {
-    try {
-      const conversationText = messages
-        .map(m => `${m.role}: ${m.content}`)
-        .join('\n');
-      
-      const summaryPrompt = `Summarize the following conversation in 2-3 sentences, focusing on the main topics discussed and any important context:\n\n${conversationText}`;
-      
-      const summary = await this.model.generate(summaryPrompt);
-      return summary.trim();
-    } catch (error) {
-      // Fallback summary
-      const userMessages = messages.filter(m => m.role === 'user');
-      const topics = userMessages.map(m => m.content.slice(0, 50)).join(', ');
-      return `Previous conversation covered: ${topics}`;
-    }
-  }
-
-  /**
-   * Handle state reset command
-   */
-  private handleStateReset(): string {
-    const messageCount = this.agentContext.messages.length;
-    const toolCount = this.agentContext.recentToolUsage.length;
-    
-    // Reset all agent state
-    this.agentContext.messages = [];
-    this.agentContext.recentToolUsage = [];
-    this.agentContext.lastFileList = undefined;
-    this.agentContext.conversationMode = 'exploration';
-    this.agentContext.currentPlan = undefined;
-    
-    logger.info('🔄 Agent state reset by user command');
-    
-    return `🔄 **Agent State Reset**\n\nCleared:\n- ${messageCount} conversation messages\n- ${toolCount} recent tool usage records\n- Cached file listings\n- Current context and plans\n\nReady for a fresh start! How can I help you?`;
+    return "I can help with that. Let me analyze your codebase to provide specific insights.";
   }
 }

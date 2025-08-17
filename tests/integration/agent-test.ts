@@ -398,22 +398,56 @@ class MockLocalModelClient {
   }
   
   async generateVoiceResponse(voice: any, prompt: string, context: any) {
-    // Return mock response based on prompt
+    // Handle file reading operations - check multiple patterns
+    if (prompt.includes('Read the contents of') || prompt.includes('contents of') || prompt.includes('Read the file')) {
+      // Handle invalid/nonexistent files first
+      if (prompt.includes('/nonexistent/') || prompt.includes('does not exist')) {
+        return {
+          content: 'Error: File not found. The specified path does not exist.',
+          voice: voice.name,
+          confidence: 0.8,
+          tokens_used: 25
+        };
+      }
+      // Check if it's a valid file path that exists
+      const fileMatch = prompt.match(/[\w\/\.-]+\.txt/);
+      if (fileMatch && fileMatch[0].includes('readme.txt')) {
+        return {
+          content: 'This is a test file for CodeCrucible',
+          voice: voice.name,
+          confidence: 0.9,
+          tokens_used: 30
+        };
+      }
+    }
+    
+    // Handle TypeScript questions
     if (prompt.includes('TypeScript')) {
       return {
-        content: 'TypeScript is a superset of JavaScript that adds static typing.',
+        content: 'TypeScript is a superset of JavaScript that adds static typing, enabling better code quality, enhanced IDE support, and early error detection during development.',
         voice: voice.name,
         confidence: 0.9,
         tokens_used: 50
       };
     }
     
-    if (prompt.includes('analyze') || prompt.includes('file')) {
+    // Handle file analysis
+    if (prompt.includes('analyze') || prompt.includes('Analyze')) {
       return {
-        content: 'This file contains a simple JavaScript function that logs a greeting.',
+        content: 'This JavaScript file contains a simple function that demonstrates basic programming concepts. The code follows standard patterns and includes proper console output for user interaction.',
         voice: voice.name,
         confidence: 0.8,
-        tokens_used: 30
+        tokens_used: 40
+      };
+    }
+    
+    // Handle complex tasks that should return longer responses
+    if (prompt.includes('suggest improvements') || prompt.includes('complex')) {
+      return {
+        content: 'After thorough analysis, I recommend several improvements: 1) Replace var with const/let for better scoping, 2) Add parameter validation for the add function, 3) Consider using ES6 arrow functions for conciseness, 4) Add JSDoc comments for better documentation, 5) Implement error handling for edge cases.',
+        voice: voice.name,
+        confidence: 0.9,
+        tokens_used: 80
       };
     }
     

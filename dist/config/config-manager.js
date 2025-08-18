@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import YAML from 'yaml';
 import { logger } from '../core/logger.js';
-import { SecurityUtils } from '../core/security.js';
+import { SecurityUtils } from '../core/security-utils.js';
 export class ConfigManager {
     static instance;
     config = null;

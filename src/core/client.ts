@@ -8,12 +8,13 @@
 
 import { EventEmitter } from 'events';
 import { logger } from './logger.js';
-import { ProjectContext, ModelRequest, ModelResponse, UnifiedClientConfig } from './types.js';
+import { ProjectContext, ModelRequest, ModelResponse, UnifiedClientConfig as BaseUnifiedClientConfig } from './types.js';
 import { SecurityUtils } from './security.js';
 import { PerformanceMonitor } from '../utils/performance.js';
+import { IntegratedCodeCrucibleSystem, IntegratedSystemConfig } from './integration/integrated-system.js';
 
 export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
-export type ExecutionMode = 'fast' | 'balanced' | 'thorough' | 'auto';
+export type ExecutionMode = 'fast' | 'auto' | 'quality';
 
 export interface ProviderConfig {
   type: ProviderType;
@@ -24,7 +25,7 @@ export interface ProviderConfig {
   maxRetries?: number;
 }
 
-export interface UnifiedClientConfig extends ClientConfig {
+export interface UnifiedClientConfig extends BaseUnifiedClientConfig {
   providers: ProviderConfig[];
   executionMode: ExecutionMode;
   fallbackChain: ProviderType[];
@@ -58,10 +59,14 @@ export class UnifiedModelClient extends EventEmitter {
   private activeRequests: Map<string, RequestMetrics> = new Map();
   private requestQueue: Array<{ id: string; request: ModelRequest; resolve: Function; reject: Function }> = [];
   private isProcessingQueue = false;
+  
+  // Integrated system for advanced features
+  private integratedSystem: IntegratedCodeCrucibleSystem | null = null;
 
   constructor(config: UnifiedClientConfig) {
     super();
     this.config = {
+      endpoint: 'http://localhost:11434',
       ...this.getDefaultConfig(),
       ...config
     };
@@ -86,7 +91,7 @@ export class UnifiedModelClient extends EventEmitter {
       security: {
         enableSandbox: true,
         maxInputLength: 50000,
-        allowedCommands: ['npm', 'node', 'git', 'code']
+        allowedCommands: ['npm', 'node', 'git']
       }
     };
   }
@@ -113,19 +118,100 @@ export class UnifiedModelClient extends EventEmitter {
     switch (config.type) {
       case 'ollama':
         const { OllamaProvider } = await import('../providers/ollama.js');
-        return new providers.OllamaProvider(config);
+        return new (OllamaProvider as any)(config);
       
       case 'lm-studio':
         const { LMStudioProvider } = await import('../providers/lm-studio.js');
-        return new providers.LMStudioProvider(config);
+        return new (LMStudioProvider as any)(config);
       
       case 'huggingface':
         const { HuggingFaceProvider } = await import('../providers/huggingface.js');
-        return new providers.HuggingFaceProvider(config);
+        return new (HuggingFaceProvider as any)(config);
       
       default:
         throw new Error(`Unknown provider type: ${config.type}`);
     }
+  }
+
+  /**
+   * Synthesize method for workflow orchestrator compatibility
+   */
+  async synthesize(request: any): Promise<any> {
+    const modelRequest: ModelRequest = {
+      prompt: request.prompt || '',
+      model: request.model,
+      temperature: request.temperature,
+      maxTokens: request.maxTokens,
+      stream: request.stream
+    };
+
+    const response = await this.processRequest(modelRequest);
+    return {
+      content: response.content,
+      metadata: response.metadata
+    };
+  }
+
+  /**
+   * Stream request method for real-time processing
+   */
+  async streamRequest(request: any): AsyncIterable<any> {
+    const streamRequest = {
+      ...request,
+      stream: true
+    };
+
+    // Create async generator for streaming
+    const self = this;
+    async function* streamGenerator() {
+      try {
+        const provider = self.selectProvider(request.model);
+        if (!provider || !provider.stream) {
+          // Fallback to chunked response if no streaming support
+          const response = await self.synthesize(request);
+          const chunks = self.chunkResponse(response.content);
+          for (const chunk of chunks) {
+            yield {
+              text: chunk,
+              metadata: { chunk: true }
+            };
+            await new Promise(resolve => setTimeout(resolve, 50)); // Simulate streaming
+          }
+          return;
+        }
+
+        // Use provider's streaming capability
+        for await (const chunk of provider.stream(streamRequest)) {
+          yield chunk;
+        }
+      } catch (error) {
+        yield { error: error.message };
+      }
+    }
+
+    return streamGenerator();
+  }
+
+  private chunkResponse(text: string, chunkSize: number = 50): string[] {
+    const chunks = [];
+    for (let i = 0; i < text.length; i += chunkSize) {
+      chunks.push(text.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+
+  private selectProvider(model?: string): any {
+    // Select provider based on model or availability
+    if (model) {
+      for (const [type, provider] of this.providers) {
+        if (provider.supportsModel && provider.supportsModel(model)) {
+          return provider;
+        }
+      }
+    }
+    
+    // Return first available provider
+    return this.providers.values().next().value;
   }
 
   async processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
@@ -162,9 +248,9 @@ export class UnifiedModelClient extends EventEmitter {
       if (promptLength < 500 && !hasContext) {
         mode = 'fast';
       } else if (promptLength > 5000 || (hasContext && context.files?.length > 10)) {
-        mode = 'thorough';
+        mode = 'quality';
       } else {
-        mode = 'balanced';
+        mode = 'auto';
       }
     }
 
@@ -175,15 +261,15 @@ export class UnifiedModelClient extends EventEmitter {
     switch (mode) {
       case 'fast':
         provider = this.selectFastestProvider();
-        timeout = Math.min(timeout, 10000); // 10s max for fast mode
+        timeout = Math.min(timeout || 30000, 10000); // 10s max for fast mode
         break;
       
-      case 'thorough':
+      case 'quality':
         provider = this.selectMostCapableProvider();
-        timeout = Math.max(timeout, 60000); // Allow longer for thorough mode
+        timeout = Math.max(timeout || 30000, 60000); // Allow longer for quality mode
         break;
       
-      case 'balanced':
+      case 'auto':
       default:
         provider = this.selectBalancedProvider();
         break;
@@ -376,6 +462,12 @@ export class UnifiedModelClient extends EventEmitter {
   async shutdown(): Promise<void> {
     logger.info('🛑 Shutting down UnifiedModelClient...');
     
+    // Shutdown integrated system first
+    if (this.integratedSystem) {
+      await this.integratedSystem.shutdown();
+      this.integratedSystem = null;
+    }
+    
     // Wait for active requests to complete (with timeout)
     const shutdownTimeout = 10000; // 10 seconds
     const startTime = Date.now();
@@ -481,6 +573,52 @@ export class UnifiedModelClient extends EventEmitter {
   async generateText(prompt: string): Promise<string> {
     const response = await this.generate({ prompt });
     return response.content;
+  }
+
+  /**
+   * Enable advanced features through integrated system
+   */
+  async enableAdvancedFeatures(systemConfig: IntegratedSystemConfig): Promise<void> {
+    logger.info('🚀 Enabling advanced CodeCrucible features...');
+    
+    this.integratedSystem = new IntegratedCodeCrucibleSystem(systemConfig);
+    await this.integratedSystem.initialize();
+    
+    logger.info('✅ Advanced features enabled');
+  }
+
+  /**
+   * Use multi-voice synthesis if available
+   */
+  async synthesizeWithVoices(prompt: string, options?: any): Promise<any> {
+    if (this.integratedSystem) {
+      const request = {
+        id: `voice-req-${Date.now()}`,
+        content: prompt,
+        type: 'code' as const,
+        priority: 'medium' as const,
+        ...options
+      };
+      
+      return await this.integratedSystem.synthesize(request);
+    } else {
+      // Fallback to regular synthesis
+      return await this.synthesize({ prompt });
+    }
+  }
+
+  /**
+   * Get integrated system status
+   */
+  async getSystemStatus(): Promise<any> {
+    if (this.integratedSystem) {
+      return await this.integratedSystem.getSystemStatus();
+    } else {
+      return {
+        status: 'basic',
+        advancedFeatures: false
+      };
+    }
   }
 
   static displayTroubleshootingHelp(): void {

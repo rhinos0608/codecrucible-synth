@@ -1,0 +1,52 @@
+{
+  "models": {
+    "gpt-4": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.7,
+      "maxTokens": 4000,
+      "timeout": 30000,
+      "retries": 3
+    },
+    "claude-3-sonnet": {
+      "provider": "anthropic",
+      "model": "claude-3-sonnet-20240229",
+      "temperature": 0.7,
+      "maxTokens": 4000,
+      "timeout": 30000,
+      "retries": 3
+    },
+    "local-llama": {
+      "provider": "ollama",
+      "model": "llama2",
+      "endpoint": "http://localhost:11434",
+      "temperature": 0.7,
+      "maxTokens": 4000,
+      "timeout": 60000,
+      "retries": 2
+    }
+  },
+  "agent": {
+    "enabled": true,
+    "mode": "balanced",
+    "maxConcurrency": 3,
+    "enableCaching": true,
+    "enableMetrics": true,
+    "enableSecurity": true
+  },
+  "performance": {
+    "enableMonitoring": true,
+    "alertThreshold": 5000,
+    "metricsRetention": 86400000
+  },
+  "security": {
+    "enableValidation": true,
+    "sandboxMode": true,
+    "allowUnsafeCommands": false
+  },
+  "debug": {
+    "enabled": false,
+    "verbose": false,
+    "logLevel": "info"
+  }
+}

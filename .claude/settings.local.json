@@ -75,7 +75,8 @@
       "WebFetch(domain:markaicode.com)",
       "WebFetch(domain:lmstudio.ai)",
       "Bash(del nul)",
-      "Bash(nvidia-smi:*)"
+      "Bash(nvidia-smi:*)",
+      "Bash(git remote set-url:*)"
     ],
     "deny": [],
     "ask": [],

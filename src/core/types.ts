@@ -1,22 +1,27 @@
 
 // Core Type Definitions for CodeCrucible Synth
 export interface UnifiedClientConfig {
-  endpoint: string;
+  endpoint?: string;
   providers: Array<{
-    type: 'ollama' | 'lm-studio' | 'huggingface';
-    endpoint: string;
-    models?: string[];
+    type: 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
+    endpoint?: string;
+    apiKey?: string;
+    model?: string;
+    timeout?: number;
+    maxRetries?: number;
   }>;
   defaultModel?: string;
   executionMode: 'auto' | 'fast' | 'quality';
-  fallbackChain: Array<'ollama' | 'lm-studio' | 'huggingface'>;
+  fallbackChain: Array<'ollama' | 'lm-studio' | 'huggingface' | 'auto'>;
   performanceThresholds: {
-    maxLatency: number;
-    minQuality: number;
+    fastModeMaxTokens: number;
+    timeoutMs: number;
+    maxConcurrentRequests: number;
   };
   security: {
-    enableValidation: boolean;
-    maxTokens: number;
+    enableSandbox: boolean;
+    maxInputLength: number;
+    allowedCommands: string[];
   };
 }
 
@@ -36,6 +41,12 @@ export interface ModelResponse {
     tokens: number;
     latency: number;
     quality?: number;
+  };
+  tokens_used?: number;
+  usage?: {
+    totalTokens: number;
+    promptTokens?: number;
+    completionTokens?: number;
   };
 }
 
@@ -89,6 +100,23 @@ export interface SynthesisResponse {
   code: string;
   reasoning: string;
   quality: number;
+}
+
+export interface SynthesisResult {
+  content: string;
+  confidence?: number;
+  voicesUsed: any[];
+  qualityScore: number;
+  combinedCode?: string;
+  convergenceReason?: string;
+  lessonsLearned?: string[];
+  iterations?: any[];
+  writerVoice?: any;
+  auditorVoice?: any;
+  totalIterations?: any;
+  finalQualityScore?: number;
+  converged?: boolean;
+  finalCode?: string;
 }
 
 // Security Types
@@ -146,6 +174,18 @@ export interface Task {
   capability?: string;
   input?: string;
   priority?: 'low' | 'medium' | 'high';
+  estimatedTime?: number;
+}
+
+export interface ExecutionRequest {
+  id: string;
+  input: string;
+  mode?: string;
+  type?: string;
+  priority?: string;
+  maxTokens?: number;
+  voice?: string;
+  temperature?: number;
 }
 
 export interface Workflow {
@@ -222,9 +262,11 @@ export interface SpiralConfig {
 // Performance Types
 export interface ProviderMetrics {
   requests: number;
+  totalRequests: number;
   totalLatency: number;
   averageLatency: number;
   errorRate?: number;
+  successRate: number;
   lastError?: string;
 }
 
@@ -237,6 +279,8 @@ export interface PerformanceMetrics {
   overall?: {
     successRate: number;
     uptime: number;
+    totalRequests: number;
+    averageLatency: number;
   };
 }
 

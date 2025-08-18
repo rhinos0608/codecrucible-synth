@@ -1,4 +1,4 @@
-import { SynthesisResponse } from './types.js';
+import { SynthesisResponse, ExecutionResponse } from './types.js';
 import { UnifiedModelClient } from './client.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
 import { UnifiedAgent } from './agent.js';

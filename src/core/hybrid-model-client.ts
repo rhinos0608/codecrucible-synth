@@ -53,7 +53,7 @@ export class HybridModelClient {
         endpoint: this.config.ollama.endpoint,
         model: 'llama2'
       }],
-      executionMode: 'balanced',
+      executionMode: 'auto',
       fallbackChain: ['ollama'],
       performanceThresholds: {
         fastModeMaxTokens: 2048,
@@ -95,12 +95,17 @@ export class HybridModelClient {
     try {
       // If LLM is forced, use it directly
       if (options.forceLLM) {
-        return await this.generateWithSpecificLLM(
+        const result = await this.generateWithSpecificLLM(
           options.forceLLM,
           prompt,
           context,
           startTime
         );
+        return {
+          ...result,
+          llmUsed: options.forceLLM,
+          reasoning: `Forced to use ${options.forceLLM} as specified`
+        };
       }
 
       // Determine task characteristics

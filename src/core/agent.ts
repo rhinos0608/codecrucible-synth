@@ -181,7 +181,7 @@ export class UnifiedAgent extends EventEmitter {
       // Create workflow
       const workflow: Workflow = {
         id: workflowId,
-        request: request as Record<string, unknown>,
+        request: request as unknown as Record<string, unknown>,
         status: 'running',
         startTime: new Date(startTime),
         tasks: [],
@@ -201,13 +201,13 @@ export class UnifiedAgent extends EventEmitter {
       // Complete workflow
       workflow.status = 'completed';
       workflow.endTime = new Date();
-      workflow.results = results;
+      workflow.results = results as unknown as Record<string, unknown>;
 
       const response: ExecutionResponse = {
         workflowId,
         success: true,
-        result: results as Record<string, unknown>,
-        results: results as Record<string, unknown>,
+        result: results as unknown as Record<string, unknown>,
+        results: results as unknown as Record<string, unknown>,
         executionTime: workflow.endTime.getTime() - workflow.startTime.getTime()
       };
 
@@ -250,10 +250,11 @@ export class UnifiedAgent extends EventEmitter {
     if (request.type === 'code-analysis' || request.type === 'comprehensive') {
       tasks.push({
         id: this.generateTaskId(),
+        type: 'code-analysis',
         capability: 'code-analysis',
         description: 'Analyze code structure and quality',
         input: request.input,
-        priority: 10,
+        priority: 'high',
         estimatedTime: mode === 'fast' ? 5000 : 15000
       });
     }
@@ -261,10 +262,11 @@ export class UnifiedAgent extends EventEmitter {
     if (request.type === 'code-generation' || request.type === 'comprehensive') {
       tasks.push({
         id: this.generateTaskId(),
+        type: 'code-generation',
         capability: 'code-generation',
         description: 'Generate required code',
         input: request.input,
-        priority: 9,
+        priority: 'high',
         estimatedTime: mode === 'fast' ? 10000 : 30000
       });
     }
@@ -272,10 +274,11 @@ export class UnifiedAgent extends EventEmitter {
     if (request.type === 'testing' || request.type === 'comprehensive') {
       tasks.push({
         id: this.generateTaskId(),
+        type: 'testing',
         capability: 'testing',
         description: 'Generate and validate tests',
         input: request.input,
-        priority: 8,
+        priority: 'medium',
         estimatedTime: mode === 'fast' ? 8000 : 20000
       });
     }
@@ -283,10 +286,11 @@ export class UnifiedAgent extends EventEmitter {
     if (request.type === 'documentation' || request.type === 'comprehensive') {
       tasks.push({
         id: this.generateTaskId(),
+        type: 'documentation',
         capability: 'documentation',
         description: 'Generate documentation',
         input: request.input,
-        priority: 7,
+        priority: 'medium',
         estimatedTime: mode === 'fast' ? 5000 : 15000
       });
     }
@@ -294,16 +298,18 @@ export class UnifiedAgent extends EventEmitter {
     if (request.type === 'security-analysis' || request.type === 'comprehensive') {
       tasks.push({
         id: this.generateTaskId(),
+        type: 'security-analysis',
         capability: 'security-analysis',
         description: 'Analyze security vulnerabilities',
         input: request.input,
-        priority: 9,
+        priority: 'high',
         estimatedTime: mode === 'fast' ? 10000 : 25000
       });
     }
 
     // Sort tasks by priority
-    tasks.sort((a, b) => b.priority - a.priority);
+    const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+    tasks.sort((a, b) => (priorityOrder[b.priority || 'low'] || 1) - (priorityOrder[a.priority || 'low'] || 1));
 
     // Apply mode-specific filtering
     if (mode === 'fast') {
@@ -387,7 +393,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       const prompt = `Analyze the following code for quality, patterns, and improvements:\n\n${task.input}`;
       
-      const response = await this.modelClient.request({
+      const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
         temperature: 0.3,
@@ -425,7 +431,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       const prompt = `Generate code based on the following requirements:\n\n${task.input}`;
       
-      const response = await this.modelClient.request({
+      const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
         temperature: 0.7,
@@ -463,7 +469,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       const prompt = `Generate comprehensive documentation for:\n\n${task.input}`;
       
-      const response = await this.modelClient.request({
+      const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
         temperature: 0.5,
@@ -501,7 +507,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       const prompt = `Generate comprehensive tests for:\n\n${task.input}`;
       
-      const response = await this.modelClient.request({
+      const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
         temperature: 0.4,
@@ -539,7 +545,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       const prompt = `Refactor and optimize the following code:\n\n${task.input}`;
       
-      const response = await this.modelClient.request({
+      const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
         temperature: 0.3,
@@ -577,7 +583,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       const prompt = `Identify and fix bugs in the following code:\n\n${task.input}`;
       
-      const response = await this.modelClient.request({
+      const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
         temperature: 0.2,
@@ -615,7 +621,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       const prompt = `Optimize the performance of the following code:\n\n${task.input}`;
       
-      const response = await this.modelClient.request({
+      const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
         temperature: 0.3,
@@ -653,7 +659,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       const prompt = `Analyze the following code for security vulnerabilities:\n\n${task.input}`;
       
-      const response = await this.modelClient.request({
+      const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
         temperature: 0.2,

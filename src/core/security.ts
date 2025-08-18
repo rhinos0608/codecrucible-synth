@@ -30,8 +30,8 @@ export class SecurityUtils {
   constructor(config: Partial<SecurityConfig> = {}) {
     this.config = {
       enableSandbox: true,
-      maxInputLength: 50000,
-      allowedCommands: ['npm', 'node', 'git', 'code', 'tsc', 'eslint'],
+      maxInputLength: 10000,
+      allowedCommands: ['npm', 'node', 'git', 'tsc', 'eslint'],
       allowedPaths: [process.cwd()],
       blockedPatterns: [
         /rm\s+-rf/gi,          // Dangerous delete commands
@@ -44,6 +44,28 @@ export class SecurityUtils {
         /fopen\s*\(/gi,        // File operations
         /curl\s+.*\|\s*sh/gi,  // Remote execution
         /wget\s+.*\|\s*sh/gi,  // Remote execution
+        /powershell\s+/gi,     // PowerShell execution
+        /cmd\s+\/c/gi,         // Command prompt execution
+        /net\s+user/gi,        // User management
+        /reg\s+add/gi,         // Registry modification
+        /schtasks/gi,          // Task scheduling
+        /wmic/gi,              // WMI commands
+        /format\s+c:/gi,       // Format commands
+        /del\s+\/[sqa]/gi,     // Dangerous delete flags
+        /taskkill\s+\/f/gi,    // Force kill processes
+        /shutdown/gi,          // System shutdown
+        /reboot/gi,            // System reboot
+        /halt/gi,              // System halt
+        /chmod\s+777/gi,       // Dangerous permissions
+        /chown\s+root/gi,      // Ownership changes
+        /passwd/gi,            // Password changes
+        /su\s+/gi,             // Switch user
+        /mount\s+/gi,          // Mount operations
+        /umount\s+/gi,         // Unmount operations
+        /dd\s+if=/gi,          // Disk operations
+        /fdisk/gi,             // Disk partitioning
+        /mkfs/gi,              // File system creation
+        /cryptsetup/gi,        // Encryption operations
       ],
       scanDependencies: true,
       enableCSPProtection: true,
@@ -198,19 +220,34 @@ export class SecurityUtils {
         };
       }
 
-      // Check for directory traversal
-      if (filePath.includes('..') || filePath.includes('~')) {
-        return {
-          isValid: false,
-          reason: 'Path contains directory traversal patterns',
-          riskLevel: 'high'
-        };
+      // Check for directory traversal and dangerous patterns
+      const dangerousPatterns = [
+        /\.\.[\/\\]/,          // Directory traversal
+        /~[\/\\]/,             // Home directory access
+        /[\/\\][.]+[\/\\]/,   // Hidden directory access
+        /\$\{/,                // Variable substitution
+        /%[0-9A-Fa-f]{2}/,     // URL encoded characters
+        /\\x[0-9A-Fa-f]{2}/,   // Hex encoded characters
+        /\\u[0-9A-Fa-f]{4}/,   // Unicode encoded characters
+      ];
+
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(filePath)) {
+          return {
+            isValid: false,
+            reason: 'Path contains dangerous traversal or encoding patterns',
+            riskLevel: 'high'
+          };
+        }
       }
 
       // Check for system file access
       const systemPaths = [
-        '/etc', '/proc', '/sys', '/dev',
-        'C:\\Windows', 'C:\\System32'
+        '/etc', '/proc', '/sys', '/dev', '/root', '/boot',
+        '/var/log', '/var/run', '/tmp', '/var/tmp',
+        'C:\\Windows', 'C:\\System32', 'C:\\Program Files',
+        'C:\\ProgramData', 'C:\\Users\\All Users',
+        'C:\\$Recycle.Bin', 'C:\\Recovery'
       ];
 
       for (const systemPath of systemPaths) {
@@ -247,7 +284,8 @@ export class SecurityUtils {
   ): Promise<{ success: boolean; output: string; error?: string }> {
     
     if (!this.config.enableSandbox) {
-      throw new SecurityError('Sandbox execution is disabled');
+      logger.error('🚨 CRITICAL: Attempted to execute command with sandbox disabled', { command, args });
+      throw new SecurityError('Sandbox execution is REQUIRED and cannot be disabled');
     }
 
     // Validate command
@@ -438,10 +476,24 @@ export class SecurityUtils {
    * Update security configuration
    */
   updateConfig(newConfig: Partial<SecurityConfig>): void {
+    // SECURITY: Never allow disabling sandbox in production
+    if (newConfig.enableSandbox === false && process.env.NODE_ENV === 'production') {
+      logger.error('🚨 SECURITY VIOLATION: Attempted to disable sandbox in production');
+      throw new SecurityError('Cannot disable sandbox in production environment');
+    }
+
+    // SECURITY: Validate that critical security settings are not weakened
+    if (newConfig.maxInputLength && newConfig.maxInputLength > 50000) {
+      logger.warn('⚠️ Warning: Increasing max input length beyond recommended limit');
+    }
+
+    // SECURITY: Log all security configuration changes
+    const changes = Object.keys(newConfig);
+    logger.warn('🔒 Security configuration updated', { changes, timestamp: new Date().toISOString() });
+
     this.config = { ...this.config, ...newConfig };
     this.allowedCommands = new Set(this.config.allowedCommands);
     this.blockedPatterns = this.config.blockedPatterns;
-    logger.info('🔒 Security configuration updated');
   }
 
   /**

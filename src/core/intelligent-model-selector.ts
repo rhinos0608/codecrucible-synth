@@ -11,6 +11,10 @@ interface RoutingMetric {
 export class IntelligentModelSelector {
   private routingMetrics = new Map<string, RoutingMetric>();
   private endpoint: string;
+  
+  // OPTIMIZED: Cache health checks to reduce redundant API calls
+  private healthCheckCache = new Map<string, { healthy: boolean; timestamp: number }>();
+  private readonly HEALTH_CACHE_TTL = 30000; // 30 seconds
 
   constructor(endpoint: string = 'http://localhost:11434') {
     this.endpoint = endpoint;
@@ -130,25 +134,47 @@ export class IntelligentModelSelector {
   }
 
   /**
-   * Check LM Studio health
+   * OPTIMIZED: Check LM Studio health with caching
    */
   private async checkLMStudioHealth(): Promise<boolean> {
+    const cacheKey = 'lmstudio';
+    const cached = this.healthCheckCache.get(cacheKey);
+    
+    // Use cached result if less than 30 seconds old
+    if (cached && (Date.now() - cached.timestamp) < this.HEALTH_CACHE_TTL) {
+      return cached.healthy;
+    }
+    
     try {
       const response = await axios.get('http://localhost:1234/v1/models', { timeout: 5000 });
-      return response.status === 200;
+      const healthy = response.status === 200;
+      this.healthCheckCache.set(cacheKey, { healthy, timestamp: Date.now() });
+      return healthy;
     } catch {
+      this.healthCheckCache.set(cacheKey, { healthy: false, timestamp: Date.now() });
       return false;
     }
   }
 
   /**
-   * Check Ollama health
+   * OPTIMIZED: Check Ollama health with caching
    */
   private async checkOllamaHealth(): Promise<boolean> {
+    const cacheKey = 'ollama';
+    const cached = this.healthCheckCache.get(cacheKey);
+    
+    // Use cached result if less than 30 seconds old
+    if (cached && (Date.now() - cached.timestamp) < this.HEALTH_CACHE_TTL) {
+      return cached.healthy;
+    }
+    
     try {
       const response = await axios.get(`${this.endpoint}/api/tags`, { timeout: 5000 });
-      return response.status === 200;
+      const healthy = response.status === 200;
+      this.healthCheckCache.set(cacheKey, { healthy, timestamp: Date.now() });
+      return healthy;
     } catch {
+      this.healthCheckCache.set(cacheKey, { healthy: false, timestamp: Date.now() });
       return false;
     }
   }

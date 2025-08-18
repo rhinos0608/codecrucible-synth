@@ -1341,6 +1341,24 @@ class OptimizerAgent extends BaseAgent {
       description: 'Optimize system and code performance',
       tools: ['profiler', 'benchmarker', 'optimizer'],
       learnable: true
+    }, {
+      name: 'memory_management',
+      level: 'expert',
+      description: 'Detect and prevent memory leaks',
+      tools: ['memory_profiler', 'gc_analyzer', 'leak_detector'],
+      learnable: true
+    }, {
+      name: 'algorithm_optimization',
+      level: 'expert',
+      description: 'Optimize algorithms and data structures',
+      tools: ['complexity_analyzer', 'benchmark_suite', 'profiler'],
+      learnable: true
+    }, {
+      name: 'async_optimization',
+      level: 'expert',
+      description: 'Optimize asynchronous operations',
+      tools: ['concurrency_analyzer', 'event_loop_monitor', 'promise_tracker'],
+      learnable: true
     }];
   }
 
@@ -1356,16 +1374,104 @@ class OptimizerAgent extends BaseAgent {
   }
 
   private async optimizePerformance(request: AgentRequest): Promise<string> {
-    return `Optimized performance for: ${request.content}`;
+    try {
+      // Analyze the request content for performance optimization opportunities
+      const performanceAnalysis = await this.analyzePerformance(request.content);
+      
+      // Generate optimization recommendations
+      const optimizations = [];
+      
+      // Check for common performance issues
+      if (performanceAnalysis.hasMemoryLeaks) {
+        optimizations.push('Memory leak detection and prevention');
+      }
+      
+      if (performanceAnalysis.hasInefficientLoops) {
+        optimizations.push('Loop optimization and algorithmic improvements');
+      }
+      
+      if (performanceAnalysis.hasBlockingOperations) {
+        optimizations.push('Async/await optimization for non-blocking operations');
+      }
+      
+      if (performanceAnalysis.hasCachingOpportunities) {
+        optimizations.push('Caching strategy implementation');
+      }
+      
+      if (performanceAnalysis.hasLargePayloads) {
+        optimizations.push('Data compression and payload optimization');
+      }
+      
+      return `Performance optimization analysis complete:\n${optimizations.map(opt => `• ${opt}`).join('\n')}`;
+    } catch (error) {
+      return `Performance optimization failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
   }
 
   private async generateOptimizationActions(request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'file_modify',
-      target: 'performance_critical.ts',
-      parameters: { optimization: 'caching' },
-      reversible: true
-    }];
+    const actions: AgentAction[] = [];
+    
+    try {
+      const performanceAnalysis = await this.analyzePerformance(request.content);
+      
+      // Generate specific optimization actions based on analysis
+      if (performanceAnalysis.hasMemoryLeaks) {
+        actions.push({
+          type: 'file_modify',
+          target: 'memory-optimization.ts',
+          parameters: { 
+            optimization: 'memory_leak_prevention',
+            techniques: ['weak_references', 'disposal_patterns', 'gc_optimization']
+          },
+          reversible: true
+        });
+      }
+      
+      if (performanceAnalysis.hasInefficientLoops) {
+        actions.push({
+          type: 'file_modify',
+          target: 'algorithm-optimization.ts',
+          parameters: { 
+            optimization: 'loop_optimization',
+            techniques: ['vectorization', 'early_termination', 'complexity_reduction']
+          },
+          reversible: true
+        });
+      }
+      
+      if (performanceAnalysis.hasBlockingOperations) {
+        actions.push({
+          type: 'file_modify',
+          target: 'async-optimization.ts',
+          parameters: { 
+            optimization: 'async_conversion',
+            techniques: ['promise_batching', 'concurrent_execution', 'stream_processing']
+          },
+          reversible: true
+        });
+      }
+      
+      if (performanceAnalysis.hasCachingOpportunities) {
+        actions.push({
+          type: 'file_modify',
+          target: 'caching-strategy.ts',
+          parameters: { 
+            optimization: 'intelligent_caching',
+            techniques: ['lru_cache', 'distributed_cache', 'cache_invalidation']
+          },
+          reversible: true
+        });
+      }
+      
+      return actions;
+    } catch (error) {
+      return [{
+        type: 'error_report',
+        target: 'optimization-error.log',
+        parameters: { error: error instanceof Error ? error.message : 'Unknown optimization error' },
+        reversible: false
+      }];
+    }
   }
 }
 

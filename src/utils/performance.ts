@@ -54,7 +54,7 @@ export class PerformanceMonitor extends EventEmitter {
   private alerts: PerformanceAlert[] = [];
   private startTime: number = Date.now();
   
-  private readonly MAX_HISTORY_SIZE = 1000;
+  private readonly MAX_HISTORY_SIZE = 50; // OPTIMIZED: Reduced from 1000 to prevent memory leaks
   private readonly ALERT_THRESHOLDS = {
     latency: 10000, // 10 seconds
     errorRate: 0.1, // 10%
@@ -133,9 +133,9 @@ export class PerformanceMonitor extends EventEmitter {
     // Add to history
     this.requestHistory.push(metrics);
     
-    // Trim history if too large
+    // OPTIMIZED: Aggressive trimming to prevent memory leaks
     if (this.requestHistory.length > this.MAX_HISTORY_SIZE) {
-      this.requestHistory = this.requestHistory.slice(-this.MAX_HISTORY_SIZE);
+      this.requestHistory = this.requestHistory.slice(-25); // Keep only 25 most recent
     }
 
     // Update provider metrics
@@ -225,9 +225,9 @@ export class PerformanceMonitor extends EventEmitter {
   private createAlert(alert: PerformanceAlert): void {
     this.alerts.push(alert);
     
-    // Keep only recent alerts (last 100)
-    if (this.alerts.length > 100) {
-      this.alerts = this.alerts.slice(-100);
+    // OPTIMIZED: Keep only recent alerts (last 25 instead of 100)
+    if (this.alerts.length > 25) {
+      this.alerts = this.alerts.slice(-15); // Keep only 15 most recent
     }
 
     // Log alert
@@ -278,6 +278,10 @@ export class PerformanceMonitor extends EventEmitter {
     const uptime = (Date.now() - this.startTime) / 1000; // seconds
 
     return {
+      timestamp: new Date(),
+      totalRequests,
+      averageLatency: averageLatency || 0,
+      errorRate: 1 - (successRate || 0),
       providers,
       overall: {
         totalRequests,

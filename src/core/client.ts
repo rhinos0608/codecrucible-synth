@@ -60,6 +60,15 @@ export class UnifiedModelClient extends EventEmitter {
   private requestQueue: Array<{ id: string; request: ModelRequest; resolve: Function; reject: Function }> = [];
   private isProcessingQueue = false;
   
+  // OPTIMIZED: Unified cache system to prevent fragmentation
+  private unifiedCache: Map<string, { value: any; expires: number; accessCount: number }> = new Map();
+  private readonly CACHE_TTL = 300000; // 5 minutes
+  private readonly MAX_CACHE_SIZE = 500;
+  
+  // OPTIMIZED: Cached health checks
+  private healthCheckCache: Map<string, { healthy: boolean; timestamp: number }> = new Map();
+  private readonly HEALTH_CACHE_TTL = 30000; // 30 seconds
+  
   // Integrated system for advanced features
   private integratedSystem: IntegratedCodeCrucibleSystem | null = null;
 
@@ -73,6 +82,11 @@ export class UnifiedModelClient extends EventEmitter {
     this.performanceMonitor = new PerformanceMonitor();
     this.securityUtils = new SecurityUtils();
     this.initializeProviders();
+    
+    // OPTIMIZED: Automated cache cleanup to prevent memory leaks
+    setInterval(() => {
+      this.cleanupCache();
+    }, 60000); // Every minute
   }
 
   private getDefaultConfig(): UnifiedClientConfig {
@@ -86,7 +100,7 @@ export class UnifiedModelClient extends EventEmitter {
       performanceThresholds: {
         fastModeMaxTokens: 1000,
         timeoutMs: 30000,
-        maxConcurrentRequests: 3
+        maxConcurrentRequests: 1 // OPTIMIZED: Reduced from 3 to 1 to prevent resource competition
       },
       security: {
         enableSandbox: true,
@@ -134,9 +148,16 @@ export class UnifiedModelClient extends EventEmitter {
   }
 
   /**
-   * Synthesize method for workflow orchestrator compatibility
+   * OPTIMIZED: Synthesize method with caching
    */
   async synthesize(request: any): Promise<any> {
+    // Check cache first
+    const cacheKey = `synth_${Buffer.from(request.prompt || '').toString('base64').slice(0, 16)}`;
+    const cached = this.getCache(cacheKey);
+    if (cached) {
+      return { ...cached, fromCache: true };
+    }
+
     const modelRequest: ModelRequest = {
       prompt: request.prompt || '',
       model: request.model,
@@ -146,10 +167,16 @@ export class UnifiedModelClient extends EventEmitter {
     };
 
     const response = await this.processRequest(modelRequest);
-    return {
+    const result = {
       content: response.content,
-      metadata: response.metadata
+      metadata: response.metadata,
+      fromCache: false
     };
+    
+    // Cache the result for 5 minutes
+    this.setCache(cacheKey, result, this.CACHE_TTL);
+    
+    return result;
   }
 
   /**
@@ -234,20 +261,43 @@ export class UnifiedModelClient extends EventEmitter {
     return await this.executeWithFallback(requestId, request, context, strategy);
   }
 
+  // OPTIMIZED: Fast complexity assessment for timeout determination
+  private assessComplexityFast(prompt: string): 'simple' | 'medium' | 'complex' {
+    const length = prompt.length;
+    
+    // Fast bit-flag classification
+    let flags = 0;
+    if (length > 200) flags |= 1;
+    if (prompt.includes('analyze')) flags |= 2;
+    if (prompt.includes('review')) flags |= 2;
+    if (prompt.includes('debug')) flags |= 2;
+    if (prompt.includes('function')) flags |= 4;
+    if (prompt.includes('class')) flags |= 4;
+    if (prompt.includes('interface')) flags |= 4;
+    
+    // Fast O(1) classification
+    if (flags >= 4 || (flags & 2)) return 'complex';
+    if (length < 50 && flags === 0) return 'simple';
+    return 'medium';
+  }
+
   private determineExecutionStrategy(request: ModelRequest, context?: ProjectContext): {
     mode: ExecutionMode;
     provider: ProviderType;
     timeout: number;
+    complexity: string;
   } {
+    // OPTIMIZED: Fast complexity assessment
+    const complexity = this.assessComplexityFast(request.prompt);
+    
     // Auto-determine execution mode if not specified
     let mode = this.config.executionMode;
     if (mode === 'auto') {
-      const promptLength = request.prompt.length;
       const hasContext = context && Object.keys(context).length > 0;
       
-      if (promptLength < 500 && !hasContext) {
+      if (complexity === 'simple' && !hasContext) {
         mode = 'fast';
-      } else if (promptLength > 5000 || (hasContext && context.files?.length > 10)) {
+      } else if (complexity === 'complex' || (hasContext && context.files?.length > 10)) {
         mode = 'quality';
       } else {
         mode = 'auto';
@@ -258,24 +308,27 @@ export class UnifiedModelClient extends EventEmitter {
     let provider: ProviderType = 'auto';
     let timeout = this.config.performanceThresholds.timeoutMs;
 
+    // OPTIMIZED: Adaptive timeouts based on complexity
     switch (mode) {
       case 'fast':
         provider = this.selectFastestProvider();
-        timeout = Math.min(timeout || 30000, 10000); // 10s max for fast mode
+        timeout = complexity === 'simple' ? 30000 : 45000; // 30s for simple, 45s for others
         break;
       
       case 'quality':
         provider = this.selectMostCapableProvider();
-        timeout = Math.max(timeout || 30000, 60000); // Allow longer for quality mode
+        timeout = complexity === 'complex' ? 90000 : 60000; // 90s for complex, 60s for others
         break;
       
       case 'auto':
       default:
         provider = this.selectBalancedProvider();
+        timeout = complexity === 'simple' ? 45000 : 
+                 complexity === 'complex' ? 75000 : 60000; // Adaptive timeouts
         break;
     }
 
-    return { mode, provider, timeout };
+    return { mode, provider, timeout, complexity };
   }
 
   private selectFastestProvider(): ProviderType {
@@ -312,7 +365,7 @@ export class UnifiedModelClient extends EventEmitter {
     requestId: string,
     request: ModelRequest,
     context: ProjectContext | undefined,
-    strategy: { mode: ExecutionMode; provider: ProviderType; timeout: number }
+    strategy: { mode: ExecutionMode; provider: ProviderType; timeout: number; complexity: string }
   ): Promise<ModelResponse> {
     const fallbackChain = strategy.provider === 'auto' 
       ? this.config.fallbackChain 
@@ -393,6 +446,53 @@ export class UnifiedModelClient extends EventEmitter {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  // ==== OPTIMIZED CACHE MANAGEMENT ====
+  private setCache(key: string, value: any, ttl: number = this.CACHE_TTL): void {
+    this.unifiedCache.set(key, {
+      value,
+      expires: Date.now() + ttl,
+      accessCount: 1
+    });
+    
+    // Prevent cache bloat
+    if (this.unifiedCache.size > this.MAX_CACHE_SIZE) {
+      this.cleanupCache();
+    }
+  }
+
+  private getCache(key: string): any {
+    const cached = this.unifiedCache.get(key);
+    if (cached && Date.now() < cached.expires) {
+      cached.accessCount++;
+      return cached.value;
+    }
+    this.unifiedCache.delete(key);
+    return null;
+  }
+
+  private cleanupCache(): void {
+    const now = Date.now();
+    const entries = Array.from(this.unifiedCache.entries());
+    
+    // Remove expired entries
+    for (const [key, entry] of entries) {
+      if (now >= entry.expires) {
+        this.unifiedCache.delete(key);
+      }
+    }
+    
+    // If still too large, remove least accessed entries
+    if (this.unifiedCache.size > this.MAX_CACHE_SIZE) {
+      const sortedEntries = entries
+        .filter(([_, entry]) => now < entry.expires)
+        .sort(([_, a], [__, b]) => a.accessCount - b.accessCount);
+      
+      // Remove least accessed 50%
+      const toRemove = sortedEntries.slice(0, Math.floor(sortedEntries.length / 2));
+      toRemove.forEach(([key]) => this.unifiedCache.delete(key));
+    }
+  }
+
   // Queue management for concurrent request limiting
   async queueRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
     if (this.activeRequests.size < this.config.performanceThresholds.maxConcurrentRequests) {
@@ -434,16 +534,27 @@ export class UnifiedModelClient extends EventEmitter {
     this.isProcessingQueue = false;
   }
 
-  // Management methods
+  // OPTIMIZED: Management methods with caching
   async healthCheck(): Promise<Record<string, boolean>> {
     const health: Record<string, boolean> = {};
     
     for (const [type, provider] of this.providers) {
+      const cacheKey = `health_${type}`;
+      const cached = this.healthCheckCache.get(cacheKey);
+      
+      // Use cached result if less than 30 seconds old
+      if (cached && (Date.now() - cached.timestamp) < this.HEALTH_CACHE_TTL) {
+        health[type] = cached.healthy;
+        continue;
+      }
+      
       try {
         await provider.healthCheck?.();
         health[type] = true;
+        this.healthCheckCache.set(cacheKey, { healthy: true, timestamp: Date.now() });
       } catch {
         health[type] = false;
+        this.healthCheckCache.set(cacheKey, { healthy: false, timestamp: Date.now() });
       }
     }
     
@@ -486,11 +597,14 @@ export class UnifiedModelClient extends EventEmitter {
       }
     }
     
+    // OPTIMIZED: Clear all caches and prevent memory leaks
     this.providers.clear();
     this.activeRequests.clear();
     this.requestQueue.length = 0;
+    this.unifiedCache.clear();
+    this.healthCheckCache.clear();
     
-    logger.info('✅ UnifiedModelClient shutdown complete');
+    logger.info('✅ UnifiedModelClient shutdown complete with memory cleanup');
   }
 
   // Legacy compatibility methods

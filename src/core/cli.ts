@@ -125,7 +125,7 @@ export class CLI {
           maxConcurrentRequests: 3
         },
         security: {
-          enableSandbox: false,
+          enableSandbox: true,
           maxInputLength: 10000,
           allowedCommands: ['npm', 'node', 'git']
         }
@@ -789,7 +789,7 @@ Focus on actionable, specific recommendations with clear business value.`;
       executionMode: 'auto' as const,
       fallbackChain: ['ollama' as const],
       performanceThresholds: { fastModeMaxTokens: 1000, timeoutMs: 5000, maxConcurrentRequests: 3 },
-      security: { enableSandbox: false, maxInputLength: 10000, allowedCommands: ['npm', 'node', 'git'] }
+      security: { enableSandbox: true, maxInputLength: 10000, allowedCommands: ['npm', 'node', 'git'] }
     };
     const modelManager = new UnifiedModelClient(defaultConfig);
     const modelSelector = new UnifiedModelClient(defaultConfig);
@@ -1187,7 +1187,7 @@ Focus on actionable, specific recommendations with clear business value.`;
         executionMode: 'auto' as const,
         fallbackChain: ['ollama' as const],
         performanceThresholds: { fastModeMaxTokens: 1000, timeoutMs: 5000, maxConcurrentRequests: 3 },
-        security: { enableSandbox: false, maxInputLength: 10000, allowedCommands: ['npm', 'node', 'git'] }
+        security: { enableSandbox: true, maxInputLength: 10000, allowedCommands: ['npm', 'node', 'git'] }
       };
       const vramOptimizer = new UnifiedModelClient(defaultConfig);
 
@@ -1270,9 +1270,11 @@ Focus on actionable, specific recommendations with clear business value.`;
       // Set batch or individual mode
       if (options.batch) {
         // Override default to batch mode
-        globalEditConfirmation['options'].batchMode = true;
+        (globalEditConfirmation as any).options = (globalEditConfirmation as any).options || {};
+        (globalEditConfirmation as any).options.batchMode = true;
       } else if (options.individual) {
-        globalEditConfirmation['options'].batchMode = false;
+        (globalEditConfirmation as any).options = (globalEditConfirmation as any).options || {};
+        (globalEditConfirmation as any).options.batchMode = false;
       }
 
       console.log(chalk.cyan(`🔍 Confirming ${pendingCount} pending edits...`));
@@ -2262,7 +2264,7 @@ Focus on actionable, specific recommendations with clear business value.`;
         executionMode: 'auto' as const,
         fallbackChain: ['ollama' as const],
         performanceThresholds: { fastModeMaxTokens: 1000, timeoutMs: 5000, maxConcurrentRequests: 3 },
-        security: { enableSandbox: false, maxInputLength: 10000, allowedCommands: ['npm', 'node', 'git'] }
+        security: { enableSandbox: true, maxInputLength: 10000, allowedCommands: ['npm', 'node', 'git'] }
       };
       const vramOptimizer = new UnifiedModelClient(defaultConfig);
 

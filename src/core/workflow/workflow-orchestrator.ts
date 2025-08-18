@@ -187,6 +187,10 @@ export class WorkflowOrchestrator extends EventEmitter {
   private executionHistory: Map<string, ExecutionResult[]>;
   private activeWorkflows: Map<string, WorkflowExecution>;
   private patternHandlers: Map<WorkflowPatternType, PatternHandler>;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+  private isDisposed: boolean = false;
+  private readonly MAX_HISTORY_SIZE = 1000;
+  private readonly MAX_ACTIVE_WORKFLOWS = 100;
 
   constructor(modelClient: UnifiedModelClient) {
     super();
@@ -195,6 +199,9 @@ export class WorkflowOrchestrator extends EventEmitter {
     this.executionHistory = new Map();
     this.activeWorkflows = new Map();
     this.patternHandlers = this.initializeHandlers();
+    
+    // Set up periodic cleanup to prevent memory leaks
+    this.setupCleanupInterval();
   }
 
   private initializeHandlers(): Map<WorkflowPatternType, PatternHandler> {
@@ -2073,5 +2080,140 @@ class MemoryStore {
       oldestTimestamp: Math.min(...memories.map(m => m.timestamp)),
       newestTimestamp: Math.max(...memories.map(m => m.timestamp))
     };
+  }
+
+  /**
+   * Set up periodic cleanup to prevent memory leaks
+   */
+  private setupCleanupInterval(): void {
+    // Run cleanup every 10 minutes
+    this.cleanupInterval = setInterval(() => {
+      if (this.isDisposed) {
+        if (this.cleanupInterval) {
+          clearInterval(this.cleanupInterval);
+          this.cleanupInterval = null;
+        }
+        return;
+      }
+      
+      this.performCleanup();
+    }, 10 * 60 * 1000);
+
+    // Ensure cleanup interval doesn't prevent process exit
+    if (this.cleanupInterval.unref) {
+      this.cleanupInterval.unref();
+    }
+  }
+
+  /**
+   * Perform memory cleanup
+   */
+  private performCleanup(): void {
+    try {
+      // Clean up execution history
+      this.cleanupExecutionHistory();
+      
+      // Clean up stale workflows
+      this.cleanupStaleWorkflows();
+      
+      // Clean up memory store
+      this.memoryStore.cleanup();
+      
+      this.logger.info('🧹 Performed periodic memory cleanup');
+    } catch (error) {
+      this.logger.error('Failed to perform cleanup:', error);
+    }
+  }
+
+  /**
+   * Clean up execution history to prevent unbounded growth
+   */
+  private cleanupExecutionHistory(): void {
+    let totalEntries = 0;
+    
+    for (const [key, results] of this.executionHistory) {
+      totalEntries += results.length;
+      
+      // Keep only recent entries per workflow
+      if (results.length > 50) {
+        this.executionHistory.set(key, results.slice(-50));
+      }
+    }
+
+    // If total entries exceed limit, remove oldest workflows
+    if (totalEntries > this.MAX_HISTORY_SIZE) {
+      const sortedKeys = Array.from(this.executionHistory.keys()).sort((a, b) => {
+        const aResults = this.executionHistory.get(a) || [];
+        const bResults = this.executionHistory.get(b) || [];
+        const aLatest = Math.max(...aResults.map(r => r.timestamp || 0));
+        const bLatest = Math.max(...bResults.map(r => r.timestamp || 0));
+        return aLatest - bLatest;
+      });
+      
+      // Remove oldest 25%
+      const toRemove = Math.floor(sortedKeys.length * 0.25);
+      for (let i = 0; i < toRemove; i++) {
+        this.executionHistory.delete(sortedKeys[i]);
+      }
+    }
+  }
+
+  /**
+   * Clean up stale workflows
+   */
+  private cleanupStaleWorkflows(): void {
+    const now = Date.now();
+    const staleThreshold = 60 * 60 * 1000; // 1 hour
+    
+    for (const [id, workflow] of this.activeWorkflows) {
+      const age = now - workflow.startTime;
+      
+      if (age > staleThreshold) {
+        this.logger.warn(`Removing stale workflow: ${id} (age: ${Math.round(age / 1000 / 60)}min)`);
+        this.activeWorkflows.delete(id);
+      }
+    }
+
+    // Enforce max active workflows limit
+    if (this.activeWorkflows.size > this.MAX_ACTIVE_WORKFLOWS) {
+      const sortedWorkflows = Array.from(this.activeWorkflows.entries())
+        .sort(([, a], [, b]) => a.startTime - b.startTime);
+      
+      const toRemove = this.activeWorkflows.size - this.MAX_ACTIVE_WORKFLOWS;
+      for (let i = 0; i < toRemove; i++) {
+        const [id] = sortedWorkflows[i];
+        this.activeWorkflows.delete(id);
+      }
+    }
+  }
+
+  /**
+   * Dispose of the orchestrator and cleanup all resources
+   */
+  dispose(): void {
+    if (this.isDisposed) return;
+    
+    this.isDisposed = true;
+    
+    // Clear cleanup interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    
+    // Clear all data structures
+    this.executionHistory.clear();
+    this.activeWorkflows.clear();
+    this.patternHandlers.clear();
+    
+    // Dispose memory store
+    if (this.memoryStore && typeof this.memoryStore.dispose === 'function') {
+      this.memoryStore.dispose();
+    }
+    
+    // Remove all event listeners
+    this.removeAllListeners();
+    
+    this.logger.info('🗑️ WorkflowOrchestrator disposed and resources cleaned up');
   }
 }

@@ -357,7 +357,7 @@ export class UnifiedAgent extends EventEmitter {
    * Execute individual task
    */
   private async executeTask(task: Task): Promise<ExecutionResult> {
-    const capability = this.capabilities.get(task.capability);
+    const capability = this.capabilities.get(task.capability || '');
     
     if (!capability || !capability.enabled) {
       throw new Error(`Capability '${task.capability || 'unknown'}' not available`);
@@ -712,7 +712,7 @@ export class UnifiedAgent extends EventEmitter {
 
   private updateMetrics(response: ExecutionResponse): void {
     this.metrics.tasksCompleted++;
-    this.metrics.lastExecutionTime = response.executionTime;
+    this.metrics.lastExecutionTime = response.executionTime || 0;
     
     if (response.success) {
       this.metrics.successRate = (this.metrics.successRate * (this.metrics.tasksCompleted - 1) + 1) / this.metrics.tasksCompleted;
@@ -720,7 +720,8 @@ export class UnifiedAgent extends EventEmitter {
       this.metrics.successRate = (this.metrics.successRate * (this.metrics.tasksCompleted - 1)) / this.metrics.tasksCompleted;
     }
     
-    this.metrics.averageExecutionTime = (this.metrics.averageExecutionTime * (this.metrics.tasksCompleted - 1) + response.executionTime) / this.metrics.tasksCompleted;
+    const executionTime = response.executionTime || 0;
+    this.metrics.averageExecutionTime = (this.metrics.averageExecutionTime * (this.metrics.tasksCompleted - 1) + executionTime) / this.metrics.tasksCompleted;
   }
 
   /**

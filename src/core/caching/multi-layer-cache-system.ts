@@ -129,9 +129,9 @@ export class MultiLayerCacheSystem extends EventEmitter {
   private performanceTracker: CachePerformanceTracker;
   
   // Specialized caches
-  private aiResponseCache: AIResponseCache;
-  private embeddingCache: EmbeddingCache;
-  private codeAnalysisCache: CodeAnalysisCache;
+  private aiResponseCache!: AIResponseCache;
+  private embeddingCache!: EmbeddingCache;
+  private codeAnalysisCache!: CodeAnalysisCache;
   
   private isInitialized: boolean = false;
   private cleanupInterval: NodeJS.Timeout | null = null;

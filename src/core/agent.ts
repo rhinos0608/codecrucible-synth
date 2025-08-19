@@ -13,7 +13,6 @@ import { PerformanceMonitor } from '../utils/performance.js';
 import { 
   ExecutionRequest, 
   ExecutionResponse, 
-  ExecutionMode, 
   Task, 
   Workflow,
   ProjectContext,
@@ -173,7 +172,7 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Execute agent request with intelligent routing
    */
-  async execute(request: ExecutionRequest, context?: ProjectContext): Promise<ExecutionResponse> {
+  async execute(request: ExecutionRequest, _context?: ProjectContext): Promise<ExecutionResponse> {
     const startTime = Date.now();
     const workflowId = this.generateWorkflowId();
 
@@ -436,8 +435,8 @@ export class UnifiedAgent extends EventEmitter {
       )) {
         // Read project structure
         try {
-          const { readdir, stat, readFile } = await import('fs/promises');
-          const { join, extname } = await import('path');
+          const { readFile } = await import('fs/promises');
+          const { join } = await import('path');
           
           const projectRoot = process.cwd();
           const projectStructure = await this.getProjectStructure(projectRoot);

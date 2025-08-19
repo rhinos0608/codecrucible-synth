@@ -45,7 +45,7 @@ interface AuditResult {
 }
 
 export class DependencyAuditor {
-  private packageJson: any;
+  private packageJson: Record<string, unknown>;
   private dependencies: Map<string, DependencyInfo> = new Map();
   private issues: DependencyIssue[] = [];
 
@@ -242,8 +242,8 @@ export class DependencyAuditor {
       const auditResult = JSON.parse(stdout);
 
       if (auditResult.vulnerabilities) {
-        for (const [pkgName, vulnInfo] of Object.entries(auditResult.vulnerabilities as any)) {
-          const vuln = vulnInfo as any;
+        for (const [pkgName, vulnInfo] of Object.entries(auditResult.vulnerabilities as Record<string, unknown>)) {
+          const vuln = vulnInfo as Record<string, unknown>;
           const severity = this.mapNpmSeverity(vuln.severity);
           
           this.issues.push({
@@ -475,7 +475,6 @@ OVERVIEW:
 `;
 
     // Issues by type
-    const issueTypes = ['critical', 'high', 'medium', 'low'] as const;
     const typeGroups = new Map<string, DependencyIssue[]>();
 
     for (const issue of this.issues) {

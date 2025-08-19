@@ -338,10 +338,10 @@ export class EnhancedCodeCrucibleAgent {
     console.log('');
   }
 
-  private formatError(error: any): string {
+  private formatError(error: Error | unknown): string {
     const timestamp = new Date().toISOString();
     return `❌ CodeCrucible Error [${timestamp}]\n\n` +
-           `${error.message || 'Unknown error occurred'}\n\n` +
+           `${error instanceof Error ? error.message : 'Unknown error occurred'}\n\n` +
            `Please check your configuration and try again.`;
   }
 
@@ -390,7 +390,7 @@ export async function createEnhancedAgent(config?: Partial<EnhancedAgentConfig>)
 }
 
 // Export for direct CLI usage
-export async function runEnhancedAnalysis(query: string, options: any = {}): Promise<string> {
+export async function runEnhancedAnalysis(query: string, options: Record<string, unknown> = {}): Promise<string> {
   const agent = new EnhancedCodeCrucibleAgent({
     projectPath: options.cwd || process.cwd(),
     enableIndexing: options.index !== false,

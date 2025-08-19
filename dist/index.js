@@ -93,13 +93,66 @@ export { UnifiedModelClient } from './core/client.js';
 export { ConfigManager } from './config/config-manager.js';
 export async function main() {
     try {
+        // Handle basic commands immediately without full initialization
+        const args = process.argv.slice(2);
+        // Check for basic commands that don't need AI models
+        if (args.includes('--help') || args.includes('-h')) {
+            showBasicHelp();
+            return;
+        }
+        if (args.includes('--version') || args.includes('-v')) {
+            console.log('CodeCrucible Synth v3.8.1');
+            return;
+        }
+        // For other commands, do full initialization
         const { cli } = await initializeCLIContext();
-        await cli.run(process.argv.slice(2));
+        await cli.run(args);
     }
     catch (error) {
         console.error('Fatal error:', error);
         process.exit(1);
     }
 }
+function showBasicHelp() {
+    console.log('Usage:');
+    console.log('  crucible [options] <prompt>');
+    console.log('  cc [options] <prompt>');
+    console.log();
+    console.log('Options:');
+    console.log('  --help, -h           Show this help message');
+    console.log('  --version, -v        Show version');
+    console.log('  --file <path>        Write output to file');
+    console.log('  --stream             Enable real-time streaming responses (default: enabled)');
+    console.log('  --no-stream          Disable streaming, show complete response at once');
+    console.log('  --no-autonomous      Disable autonomous mode (not recommended)');
+    console.log('  --context-aware      Enable enhanced context awareness (default: enabled)');
+    console.log('  --no-intelligence    Disable project intelligence analysis');
+    console.log('  --smart-suggestions  Enable intelligent command suggestions');
+    console.log('  --project-analysis   Perform comprehensive project analysis');
+    console.log('  --verbose            Show detailed output');
+    console.log('  --server             Start server mode');
+    console.log('  --port <number>      Server port (default: 3002)');
+    console.log();
+    console.log('Commands:');
+    console.log('  status               Show system status');
+    console.log('  models               List available models');
+    console.log('  recommend            Show intelligent model recommendations');
+    console.log('  analyze <file>       Analyze a code file');
+    console.log('  analyze-dir [dir]    Analyze a directory/project');
+    console.log('  intelligence         Show comprehensive project intelligence');
+    console.log('  suggestions [ctx]    Get smart suggestions for current context');
+    console.log();
+    console.log('Examples:');
+    console.log('  crucible "Create a React component for a todo list"');
+    console.log('  cc --fast "Format this code"');
+    console.log('  cc --voices explorer,developer "Analyze this codebase"');
+}
 export default initializeCLIContext;
+// Auto-run main when executed directly
+if (import.meta.url === `file://${process.argv[1]}` || import.meta.url.endsWith(process.argv[1])) {
+    main().catch((error) => {
+        console.error('Fatal error:', error);
+        process.exit(1);
+    });
+}
 //# sourceMappingURL=index.js.map

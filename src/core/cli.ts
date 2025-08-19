@@ -104,9 +104,17 @@ export class CLI {
   constructor(context: CLIContext) {
     this.context = context;
     
+    // Check if this is a basic command that doesn't need full monitoring
+    const isBasicCommand = process.argv.some(arg => 
+      ['--help', '-h', '--version', '-v', 'status', 'help', 'models'].includes(arg)
+    );
+    
     // Initialize agent orchestrator for agentic capabilities
     if (!this.context.agentOrchestrator) {
-      this.context.agentOrchestrator = new UnifiedAgent(this.context.modelClient, new PerformanceMonitor());
+      this.context.agentOrchestrator = new UnifiedAgent(
+        this.context.modelClient, 
+        new PerformanceMonitor(!isBasicCommand)
+      );
     }
     
     // Initialize streaming client
@@ -273,7 +281,27 @@ export class CLI {
    * Main entry point for the CLI
    */
   async run(args: string[]): Promise<void> {
-    // Execute main CLI with resilient error handling
+    // Handle basic commands early without full initialization
+    const isBasicCommand = args.some(arg => 
+      ['--help', '-h', '--version', '-v'].includes(arg)
+    );
+    
+    if (isBasicCommand) {
+      // Parse basic options without full initialization
+      const options = this.parseOptions(args);
+      
+      if (options.help || options.h) {
+        this.showHelp();
+        return;
+      }
+      
+      if (options.version || options.v) {
+        console.log('CodeCrucible Synth v3.8.1');
+        return;
+      }
+    }
+    
+    // Execute main CLI with resilient error handling for complex commands
     const result = await this.resilientWrapper.executeWithRecovery(
       async () => {
         return await this.executeMainCLI(args);
@@ -302,7 +330,7 @@ export class CLI {
     try {
       // Show header
       console.log(chalk.blue('╔══════════════════════════════════════════════════════════════╗'));
-      console.log(chalk.blue('║               CodeCrucible Synth v3.7.1                     ║'));
+      console.log(chalk.blue('║               CodeCrucible Synth v3.8.1                     ║'));
       console.log(chalk.blue('║          AI-Powered Code Generation & Analysis Tool         ║'));
       console.log(chalk.blue('║                   🧠 Enhanced with Project Intelligence      ║'));
       console.log(chalk.blue('╚══════════════════════════════════════════════════════════════╝'));

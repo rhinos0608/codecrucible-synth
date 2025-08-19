@@ -53,6 +53,8 @@ export class PerformanceMonitor extends EventEmitter {
   private systemMetrics: SystemMetrics | null = null;
   private alerts: PerformanceAlert[] = [];
   private startTime: number = Date.now();
+  private monitoringEnabled: boolean;
+  private monitoringInterval?: NodeJS.Timeout;
   
   private readonly MAX_HISTORY_SIZE = 50; // OPTIMIZED: Reduced from 1000 to prevent memory leaks
   private readonly ALERT_THRESHOLDS = {
@@ -61,19 +63,46 @@ export class PerformanceMonitor extends EventEmitter {
     memoryUsage: 0.85 // 85%
   };
 
-  constructor() {
+  constructor(enableMonitoring: boolean = true) {
     super();
-    this.initializeSystemMonitoring();
+    this.monitoringEnabled = enableMonitoring;
+    if (this.monitoringEnabled) {
+      this.initializeSystemMonitoring();
+    }
   }
 
   private initializeSystemMonitoring(): void {
+    if (!this.monitoringEnabled) return;
+    
     // Update system metrics every 30 seconds
-    setInterval(async () => {
+    this.monitoringInterval = setInterval(async () => {
       await this.updateSystemMetrics();
     }, 30000);
 
     // Initial system metrics
     this.updateSystemMetrics();
+  }
+
+  /**
+   * Disable monitoring and clean up intervals
+   */
+  public disableMonitoring(): void {
+    this.monitoringEnabled = false;
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = undefined;
+    }
+  }
+
+  /**
+   * Clean up resources and disable monitoring
+   */
+  public destroy(): void {
+    this.disableMonitoring();
+    this.removeAllListeners();
+    this.providerMetrics.clear();
+    this.requestHistory.length = 0;
+    this.alerts.length = 0;
   }
 
   private async updateSystemMetrics(): Promise<void> {

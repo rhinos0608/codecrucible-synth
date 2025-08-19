@@ -528,6 +528,26 @@ export class SecurityUtils {
       /\.(js|ts|tsx|jsx|py|java|cpp|c|h|css|html|json|md|yml|yaml)\s+code\s+file/gi
     ];
 
+    // Check for legitimate code patterns
+    const codePatterns = [
+      /^function\s+\w+\s*\([^)]*\)\s*:\s*\w+\s*{/gi, // TypeScript functions
+      /^const\s+\w+\s*=\s*\([^)]*\)\s*=>/gi, // Arrow functions
+      /^class\s+\w+\s*{/gi, // Class definitions
+      /^interface\s+\w+\s*{/gi, // Interface definitions
+      /^type\s+\w+\s*=/gi, // Type definitions
+      /^import\s+.*from\s+/gi, // Import statements
+      /^export\s+(default\s+)?/gi, // Export statements
+      /\/\^.*\$\/[gimuy]*\.test\(/gi, // Regex test methods
+      /return\s+\/\^.*\$\/[gimuy]*\.test\(/gi, // Return regex test
+    ];
+
+    // Check if input looks like legitimate code
+    const looksLikeCode = codePatterns.some(pattern => pattern.test(input.trim()));
+    
+    if (looksLikeCode) {
+      return true;
+    }
+
     return analysisPatterns.some(pattern => pattern.test(input));
   }
 }

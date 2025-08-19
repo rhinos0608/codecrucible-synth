@@ -450,6 +450,26 @@ ${fileContent}
                 return;
             }
             console.log(chalk.cyan('🤔 Processing prompt...'));
+            // Check for voice synthesis mode first
+            if (options.voices) {
+                console.log(chalk.magenta('🎭 Voice Synthesis Mode Activated'));
+                const voiceNames = Array.isArray(options.voices)
+                    ? options.voices
+                    : options.voices.split(',').map(v => v.trim());
+                console.log(chalk.cyan(`Using voices: ${voiceNames.join(', ')}`));
+                try {
+                    const result = await this.context.voiceSystem.synthesize(prompt, voiceNames, 'collaborative', this.context.modelClient);
+                    this.displayResults(result, result.responses || []);
+                    // Handle file output if requested
+                    if (options.file) {
+                        await this.handleFileOutput(options.file, result.content);
+                    }
+                }
+                catch (error) {
+                    console.error(chalk.red('❌ Voice synthesis failed:'), error);
+                }
+                return;
+            }
             // Autonomous agent mode is the DEFAULT
             if (this.context.agentOrchestrator && options.autonomous !== false) {
                 console.log(chalk.blue('🤖 Autonomous Agent Mode Activated'));

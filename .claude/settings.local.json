@@ -92,7 +92,10 @@
       "Bash(set CUDA_VISIBLE_DEVICES=0)",
       "Bash(set OLLAMA_NUM_GPU=999)",
       "Bash(ollama serve:*)",
-      "Bash(time codecrucible:*)"
+      "Bash(time codecrucible:*)",
+      "Bash(start /B node:*)",
+      "Bash(time crucible:*)",
+      "Bash(set OLLAMA_NUM_GPU=8)"
     ],
     "deny": [],
     "ask": [],

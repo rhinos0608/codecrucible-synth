@@ -3,6 +3,55 @@ import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
 import { UnifiedAgent } from './agent.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
+interface CLIOptions {
+    voices?: string | string[];
+    depth?: string;
+    mode?: 'competitive' | 'collaborative' | 'consensus' | 'iterative' | 'agentic' | 'comprehensive' | 'analysis';
+    file?: string;
+    project?: boolean;
+    interactive?: boolean;
+    spiral?: boolean;
+    spiralIterations?: number;
+    spiralQuality?: number;
+    autonomous?: boolean;
+    maxSteps?: number;
+    council?: boolean;
+    agentic?: boolean;
+    quick?: boolean;
+    direct?: boolean;
+    verbose?: boolean;
+    quiet?: boolean;
+    output?: 'text' | 'json' | 'table';
+    timeout?: number;
+    backend?: 'docker' | 'e2b' | 'local_e2b' | 'local_process' | 'firecracker' | 'podman' | 'auto';
+    e2bTemplate?: string;
+    dockerImage?: string;
+    fast?: boolean;
+    skipInit?: boolean;
+    iterative?: boolean;
+    maxIterations?: string;
+    qualityThreshold?: string;
+    stream?: boolean;
+    noStream?: boolean;
+    enableIntelligence?: boolean;
+    contextAware?: boolean;
+    smartSuggestions?: boolean;
+    projectAnalysis?: boolean;
+    dualAgent?: boolean;
+    realtimeAudit?: boolean;
+    autoFix?: boolean;
+    streamGeneration?: boolean;
+    writerModel?: string;
+    auditorModel?: string;
+    status?: boolean;
+    optimize?: boolean;
+    test?: boolean;
+    models?: boolean;
+    configure?: boolean;
+    server?: boolean;
+    port?: string;
+    [key: string]: unknown;
+}
 export interface CLIContext {
     modelClient: UnifiedModelClient;
     voiceSystem: VoiceArchetypeSystem;
@@ -52,7 +101,11 @@ export declare class CLI {
     private analyzeFile;
     private handleSlashCommand;
     private determineRequestType;
-    private processPrompt;
+    /**
+     * Process prompt and return response (for testing)
+     */
+    processPrompt(prompt: string, options?: CLIOptions): Promise<string>;
+    private processPromptInternal;
     private executePromptProcessing;
     /**
      * Show comprehensive project intelligence
@@ -86,6 +139,38 @@ export declare class CLI {
      * Display system status
      */
     private displaySystemStatus;
+    /**
+     * Initialize CLI with configuration and working directory
+     */
+    initialize(config?: any, workingDirectory?: string): Promise<void>;
+    /**
+     * Handle code generation requests
+     */
+    handleGeneration(prompt: string, options?: CLIOptions): Promise<void>;
+    /**
+     * Handle file analysis requests
+     */
+    handleAnalyze(files?: string[], options?: CLIOptions): Promise<void>;
+    /**
+     * Analyze a specific target (file or directory)
+     */
+    private analyzeTarget;
+    /**
+     * Get list of analyzable files in directory
+     */
+    private getAnalyzableFiles;
+    /**
+     * Clean up CLI resources
+     */
+    destroy(): Promise<void>;
+    /**
+     * Legacy compatibility methods for existing tests
+     */
+    checkOllamaStatus(): Promise<boolean>;
+    getAllAvailableModels(): Promise<any[]>;
+    getAvailableModels(): Promise<any[]>;
+    getBestAvailableModel(): Promise<string>;
+    pullModel(name: string): Promise<boolean>;
 }
 export { CLI as CodeCrucibleCLI };
 export default CLI;

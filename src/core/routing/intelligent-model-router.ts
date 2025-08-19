@@ -733,6 +733,25 @@ export class IntelligentModelRouter extends EventEmitter {
     this.logger.info('Health monitoring started');
   }
 
+  /**
+   * Shutdown the router and clean up resources
+   */
+  public shutdown(): void {
+    this.logger.info('🛑 Shutting down IntelligentModelRouter...');
+    
+    // Stop health monitoring
+    if (this.healthMonitor) {
+      this.healthMonitor.stop();
+    }
+    
+    // Clear all collections to prevent memory leaks
+    this.providers.clear();
+    this.routingHistory.length = 0;
+    this.circuitBreakers.clear();
+    
+    this.logger.info('✅ IntelligentModelRouter shutdown complete');
+  }
+
   private calculateSuccessRate(): number {
     if (this.routingHistory.length === 0) return 0;
     

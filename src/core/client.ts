@@ -71,6 +71,9 @@ export class UnifiedModelClient extends EventEmitter {
   
   // Integrated system for advanced features
   private integratedSystem: IntegratedCodeCrucibleSystem | null = null;
+  
+  // Cleanup interval reference for proper shutdown
+  private cacheCleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(config: UnifiedClientConfig) {
     super();
@@ -84,7 +87,7 @@ export class UnifiedModelClient extends EventEmitter {
     // Note: Provider initialization will be done in initialize() method
     
     // OPTIMIZED: Automated cache cleanup to prevent memory leaks
-    setInterval(() => {
+    this.cacheCleanupInterval = setInterval(() => {
       this.cleanupCache();
     }, 60000); // Every minute
   }
@@ -580,6 +583,17 @@ export class UnifiedModelClient extends EventEmitter {
 
   async shutdown(): Promise<void> {
     logger.info('🛑 Shutting down UnifiedModelClient...');
+    
+    // Clear cache cleanup interval first
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+      this.cacheCleanupInterval = null;
+    }
+    
+    // Shutdown performance monitor
+    if (this.performanceMonitor) {
+      this.performanceMonitor.destroy();
+    }
     
     // Shutdown integrated system first
     if (this.integratedSystem) {

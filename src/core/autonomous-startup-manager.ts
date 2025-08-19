@@ -3,7 +3,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AutonomousCodebaseAnalyzer } from './tools/autonomous-codebase-auditor';
+import { AutonomousCodebaseAnalyzer, CodebaseAnalysis } from './tools/autonomous-codebase-auditor';
 
 const execAsync = promisify(exec);
 
@@ -38,7 +38,7 @@ export interface StartupReport {
     dependencies: number;
     framework?: string;
   };
-  analysis?: Record<string, unknown>;
+  analysis?: CodebaseAnalysis;
   recommendations: string[];
   readinessScore: number;
 }
@@ -116,7 +116,7 @@ export class AutonomousStartupManager {
       }
     }
     
-    return environment;
+    return environment as unknown as SystemEnvironment;
   }
   
   private async validateAndOptimizeModels(): Promise<ModelStatus> {
@@ -243,15 +243,15 @@ export class AutonomousStartupManager {
     
     // Analysis-based recommendations
     if (report.analysis) {
-      if (report.analysis.dependencies.security.vulnerabilities > 0) {
+      if (report.analysis?.dependencies?.security?.vulnerabilities > 0) {
         recommendations.push(`Fix ${report.analysis.dependencies.security.vulnerabilities} security vulnerabilities`);
       }
       
-      if (report.analysis.codeQuality.maintainability === 'needs improvement') {
+      if (report.analysis?.codeQuality?.maintainability === 'needs improvement') {
         recommendations.push('Improve code maintainability');
       }
       
-      if (report.analysis.security.risks.length > 0) {
+      if (report.analysis?.security?.risks?.length > 0) {
         recommendations.push('Address security risks in codebase');
       }
     }

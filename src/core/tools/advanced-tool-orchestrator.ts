@@ -7,6 +7,7 @@
 import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
 import { UnifiedModelClient } from '../client.js';
+import { SecureToolFactory } from '../security/secure-tool-factory.js';
 
 // Core Tool Interfaces
 export interface Tool {
@@ -159,6 +160,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   private costOptimizer: CostOptimizer;
   private performanceMonitor: PerformanceMonitor;
   private errorRecovery: ErrorRecoveryManager;
+  private secureToolFactory: SecureToolFactory;
 
   constructor(modelClient: UnifiedModelClient) {
     super();
@@ -171,6 +173,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     this.costOptimizer = new CostOptimizer();
     this.performanceMonitor = new PerformanceMonitor();
     this.errorRecovery = new ErrorRecoveryManager();
+    this.secureToolFactory = new SecureToolFactory();
 
     this.initializeBuiltInTools();
   }
@@ -468,12 +471,63 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   }
 
   private initializeBuiltInTools(): void {
-    // Initialize built-in tools
+    // Initialize secure tools using E2B-based factory
     this.registerTool(new FileReadTool());
     this.registerTool(new FileWriteTool());
     this.registerTool(new NetworkRequestTool());
-    this.registerTool(new CodeExecutionTool());
+    
+    // Create a secure code execution tool adapter
+    const agentContext = { workingDirectory: process.cwd() }; // Basic context
+    const secureCodeTool = this.secureToolFactory.createCodeExecutionTool(agentContext);
+    
+    // Create an adapter that implements the Tool interface
+    const secureCodeToolAdapter = {
+      id: 'secure_code_execution',
+      name: 'Secure Code Executor',
+      description: 'Execute code in sandboxed E2B environment',
+      category: ToolCategory.COMPUTATION,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          code: { type: 'string' },
+          language: { type: 'string' }
+        },
+        required: ['code', 'language']
+      },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          output: { type: 'string' },
+          error: { type: 'string' }
+        }
+      },
+      execute: async (input: any, context: any) => {
+        return await secureCodeTool.execute(input);
+      },
+      metadata: {
+        version: '1.0.0',
+        author: 'system',
+        tags: ['security', 'execution', 'e2b'],
+        cost: 5,
+        latency: 2000,
+        reliability: 0.95,
+        performance: 4,
+        dependencies: [],
+        conflictsWith: [],
+        capabilities: [{
+          type: 'execute' as const,
+          scope: 'sandboxed',
+          permissions: ['code_execution']
+        }],
+        requirements: []
+      }
+    };
+    
+    this.registerTool(secureCodeToolAdapter);
     this.registerTool(new DataAnalysisTool());
+    
+    this.logger.info('🔒 Initialized built-in tools with secure execution');
   }
 
   // Public API methods

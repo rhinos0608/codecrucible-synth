@@ -223,7 +223,7 @@ export class ConfigurationConsolidator {
       keyMap.get(fullKey)!.push({ source, value, path: fullKey });
 
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        this.flattenConfig(value, fullKey, source, keyMap);
+        this.flattenConfig(value as Record<string, unknown>, fullKey, source, keyMap);
       }
     }
   }
@@ -246,7 +246,7 @@ export class ConfigurationConsolidator {
           conflict.resolvedValue = {};
           for (const source of conflict.sources.sort((a, b) => a.priority - b.priority)) {
             if (typeof source.value === 'object' && source.value !== null) {
-              conflict.resolvedValue = { ...conflict.resolvedValue, ...source.value };
+              conflict.resolvedValue = { ...conflict.resolvedValue as Record<string, unknown>, ...source.value as Record<string, unknown> };
             }
           }
           break;
@@ -299,7 +299,7 @@ export class ConfigurationConsolidator {
     for (const key in source) {
       if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
         if (!target[key]) target[key] = {};
-        this.mergeDeep(target[key], source[key]);
+        this.mergeDeep(target[key] as Record<string, unknown>, source[key] as Record<string, unknown>);
       } else {
         target[key] = source[key];
       }
@@ -318,7 +318,7 @@ export class ConfigurationConsolidator {
       if (!current[keys[i]]) {
         current[keys[i]] = {};
       }
-      current = current[keys[i]];
+      current = current[keys[i]] as Record<string, unknown>;
     }
 
     current[keys[keys.length - 1]] = value;

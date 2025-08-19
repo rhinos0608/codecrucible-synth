@@ -4,6 +4,8 @@ import { exec, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { SecureToolFactory } from '../security/secure-tool-factory.js';
+import { logger } from '../logger.js';
 
 const execAsync = promisify(exec);
 
@@ -255,7 +257,9 @@ export class ProcessManagementTool extends BaseTool {
 
   async execute(args: z.infer<typeof this.definition.parameters>): Promise<any> {
     try {
-      const terminalTool = new TerminalExecuteTool(this.agentContext);
+      // Use secure tool factory instead of direct TerminalExecuteTool
+      const secureToolFactory = new SecureToolFactory();
+      const terminalTool = secureToolFactory.createTerminalTool(this.agentContext);
       
       switch (args.action) {
         case 'list':
@@ -550,7 +554,9 @@ export class PackageManagerTool extends BaseTool {
       }
 
       // Execute command using terminal tool
-      const terminalTool = new TerminalExecuteTool(this.agentContext);
+      // Use secure tool factory for terminal execution
+      const secureToolFactory = new SecureToolFactory();
+      const terminalTool = secureToolFactory.createTerminalTool(this.agentContext);
       const result = await terminalTool.execute({
         command: command,
         timeout: 120000, // 2 minutes for package operations

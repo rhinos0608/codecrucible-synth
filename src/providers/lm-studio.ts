@@ -92,8 +92,8 @@ export class LMStudioProvider {
         this.isAvailable = false;
         throw new Error('LM Studio server is not running. Please start LM Studio and enable the local server.');
       }
-      logger.error('LM Studio generation failed:', error.message);
-      throw new Error(`LM Studio generation failed: ${error.message}`);
+      logger.error('LM Studio generation failed:', (error as Error).message);
+      throw new Error(`LM Studio generation failed: ${(error as Error).message}`);
     }
   }
   

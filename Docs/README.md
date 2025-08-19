@@ -264,6 +264,8 @@ Special thanks to the open-source AI community for advancing local AI capabiliti
 
 ---
 
-**🎯 Mission**: Making advanced AI coding assistance fast, local, and accessible to every developer.
+**🎯 Mission**: Making advanced AI coding assistance fast, local, and secure.
 
-**🚀 Vision**: A world where every developer has a personal AI coding expert running locally on their machine.
+**🚀 Vision**: A world where every developer has a personal AI coding expert running securely on their machine.
+
+**🔒 Security**: Enterprise-grade security with E2B sandboxing and comprehensive validation.

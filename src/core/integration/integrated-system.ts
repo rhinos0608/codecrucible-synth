@@ -812,7 +812,18 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
     // Wait a brief moment for any in-flight requests to complete
     // Since we don't have active request tracking, we'll use a simple delay
     await new Promise(resolve => setTimeout(resolve, 1000));
-    this.logger.debug('Waited for active requests to complete');
+    // Wait for all in-flight requests to complete, up to a configurable timeout
+    const timeoutMs = this.config?.performance?.activeRequestWaitTimeoutMs ?? 10000; // default 10s
+    const pollInterval = 100; // ms
+    const start = Date.now();
+    while (this.activeRequestCount > 0 && (Date.now() - start) < timeoutMs) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+    if (this.activeRequestCount > 0) {
+      this.logger.warn(`Timed out waiting for active requests to complete (still ${this.activeRequestCount} active after ${timeoutMs}ms)`);
+    } else {
+      this.logger.debug('All active requests completed');
+    }
   }
 
   private async shutdownComponents(): Promise<void> {

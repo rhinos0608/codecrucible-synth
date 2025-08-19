@@ -3,6 +3,26 @@
  * Sets up global test environment for CodeCrucible Synth
  */
 
+// Ensure we have a valid working directory for all tests
+const path = require('path');
+const fs = require('fs');
+
+// Fix ENOENT issues by ensuring we have a valid cwd
+if (!process.cwd || typeof process.cwd !== 'function') {
+  process.cwd = () => __dirname;
+}
+
+// Ensure the current working directory exists and is valid
+try {
+  const cwd = process.cwd();
+  if (!fs.existsSync(cwd)) {
+    process.chdir(__dirname);
+  }
+} catch (error) {
+  // If we can't get cwd, set it to the project root
+  process.chdir(path.resolve(__dirname));
+}
+
 // Set test environment variables
 process.env.NODE_ENV = 'test';
 process.env.CI = 'true';

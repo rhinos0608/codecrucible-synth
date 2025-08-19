@@ -4,7 +4,7 @@
  * workflow orchestration, RAG, caching, and agent collaboration
  */
 
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/testing-library';
+import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { IntegratedCodeCrucibleSystem, IntegratedSystemConfig } from '../../src/core/integration/integrated-system.js';
 import { UnifiedModelClient } from '../../src/core/client.js';
 import { Logger } from '../../src/core/logger.js';

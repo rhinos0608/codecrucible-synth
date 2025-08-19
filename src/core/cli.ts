@@ -1881,8 +1881,8 @@ ${fileContent}
       }
 
       // Clean up resilient wrapper
-      if (this.resilientWrapper && typeof this.resilientWrapper.destroy === 'function') {
-        this.resilientWrapper.destroy();
+      if (this.resilientWrapper && typeof this.resilientWrapper.shutdown === 'function') {
+        this.resilientWrapper.shutdown();
       }
 
       logger.info('CLI resources cleaned up');

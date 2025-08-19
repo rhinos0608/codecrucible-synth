@@ -320,7 +320,7 @@ export class ProductionStreamingClient extends EventEmitter {
         activeVoice: session.request.voice || 'default',
         confidence: session.metrics.qualityScore,
         latencyMs: latency,
-        bufferLevel: session.buffer.size() / session.buffer.capacity() * 100,
+        bufferLevel: (session.buffer as any).getSize() / (session.buffer as any).capacity() * 100,
         throughputTPS: session.metrics.throughputTPS,
         modelUsed: session.request.model || 'default',
         chunkSize: content.length,
@@ -596,7 +596,7 @@ class CircularBuffer<T> {
     return this.size === 0;
   }
 
-  size(): number {
+  getSize(): number {
     return this.size;
   }
 

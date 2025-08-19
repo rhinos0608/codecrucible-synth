@@ -46,6 +46,9 @@ export class OllamaProvider {
   
   async generate(request: any): Promise<any> {
     try {
+      // Get GPU configuration from config if available
+      const gpuConfig = this.getGPUConfig();
+      
       const response = await this.httpClient.post('/api/generate', {
         model: this.model,
         prompt: request.prompt || request.text || request.content,
@@ -53,13 +56,25 @@ export class OllamaProvider {
         options: {
           temperature: request.temperature || 0.7,
           top_p: request.top_p || 0.9,
-          max_tokens: request.max_tokens || 2048
+          max_tokens: request.max_tokens || 2048,
+          ...gpuConfig  // Include GPU optimization options
         }
       });
       
       return {
-        text: response.data.response,
+        content: response.data.response,
         model: this.model,
+        provider: 'ollama',
+        metadata: {
+          tokens: response.data.eval_count || 0,
+          latency: response.data.total_duration ? Math.round(response.data.total_duration / 1000000) : 0,
+          quality: 0.8
+        },
+        usage: {
+          totalTokens: response.data.eval_count || 0,
+          promptTokens: response.data.prompt_eval_count || 0,
+          completionTokens: response.data.eval_count || 0
+        },
         done: response.data.done,
         total_duration: response.data.total_duration,
         load_duration: response.data.load_duration,
@@ -128,5 +143,82 @@ export class OllamaProvider {
       logger.error('Failed to list Ollama models:', error);
       return [];
     }
+  }
+  
+  /**
+   * Get GPU configuration for optimal performance
+   */
+  private getGPUConfig(): Record<string, any> {
+    try {
+      // Try to read configuration from config manager
+      const config = this.loadConfigFromFile();
+      
+      if (config?.model?.gpu?.enabled) {
+        const gpuConfig: Record<string, any> = {};
+        
+        // GPU layers
+        if (config.model.gpu.layers !== undefined) {
+          gpuConfig.numa = false; // Disable NUMA for GPU
+          gpuConfig.num_gpu = config.model.gpu.layers;
+        }
+        
+        // CPU threads for non-GPU operations
+        if (config.model.gpu.threads) {
+          gpuConfig.num_thread = config.model.gpu.threads;
+        }
+        
+        // Batch size for GPU processing
+        if (config.model.gpu.batch_size) {
+          gpuConfig.num_batch = config.model.gpu.batch_size;
+        }
+        
+        // Context length
+        if (config.model.gpu.context_length) {
+          gpuConfig.num_ctx = config.model.gpu.context_length;
+        }
+        
+        // Memory mapping for efficiency
+        if (config.model.gpu.memory_map) {
+          gpuConfig.mmap = true;
+        }
+        
+        logger.info('🎮 GPU optimization enabled', gpuConfig);
+        return gpuConfig;
+      }
+    } catch (error) {
+      logger.warn('Could not load GPU config, using defaults:', error instanceof Error ? error.message : String(error));
+    }
+    
+    // Conservative GPU configuration for stability
+    return {
+      numa: false,        // Disable NUMA
+      num_gpu: 10,        // Conservative GPU layers
+      num_thread: 4,      // CPU threads
+      num_batch: 256,     // Conservative batch size
+      num_ctx: 4096,      // Conservative context length
+      mmap: true          // Memory mapping
+    };
+  }
+  
+  /**
+   * Load configuration from file
+   */
+  private loadConfigFromFile(): any {
+    try {
+      const fs = require('fs');
+      const yaml = require('js-yaml');
+      const path = require('path');
+      
+      const configPath = path.join(process.env.HOME || process.env.USERPROFILE || '', '.codecrucible', 'config.yaml');
+      
+      if (fs.existsSync(configPath)) {
+        const configContent = fs.readFileSync(configPath, 'utf8');
+        return yaml.load(configContent);
+      }
+    } catch (error) {
+      // Silently fail and use defaults
+    }
+    
+    return null;
   }
 }

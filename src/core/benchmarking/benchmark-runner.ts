@@ -482,15 +482,106 @@ Function signature and implementation:`;
    * Execute Python test case (placeholder - would need Python runtime)
    */
   private async executePythonTest(code: string, testCase: TestCase): Promise<TestResult> {
-    // This would require a Python runtime or subprocess execution
-    // For now, return a placeholder result
-    return {
-      input: testCase.input,
-      expectedOutput: testCase.expectedOutput,
-      actualOutput: null,
-      passed: false,
-      error: 'Python execution not implemented in this environment'
-    };
+    try {
+      // Check if python is available in the system
+      const { spawn } = await import('child_process');
+      const { writeFile, unlink } = await import('fs/promises');
+      const { join } = await import('path');
+      const { randomBytes } = await import('crypto');
+      
+      // Create temporary Python file
+      const tempId = randomBytes(8).toString('hex');
+      const tempFile = join(process.cwd(), `temp_test_${tempId}.py`);
+      
+      // Write test code to temporary file
+      const testCode = `
+import sys
+import json
+
+${code}
+
+try:
+    result = ${testCase.input}
+    print(json.dumps({"result": result, "error": None}))
+except Exception as e:
+    print(json.dumps({"result": None, "error": str(e)}))
+`;
+      
+      await writeFile(tempFile, testCode);
+      
+      // Execute Python code
+      const result = await new Promise<TestResult>((resolve) => {
+        const python = spawn('python', [tempFile]);
+        let stdout = '';
+        let stderr = '';
+        
+        python.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        python.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        python.on('close', async (code) => {
+          // Clean up temporary file
+          try {
+            await unlink(tempFile);
+          } catch {}
+          
+          if (code !== 0) {
+            resolve({
+              input: testCase.input,
+              expectedOutput: testCase.expectedOutput,
+              actualOutput: null,
+              passed: false,
+              error: stderr || `Python process exited with code ${code}`
+            });
+            return;
+          }
+          
+          try {
+            const output = JSON.parse(stdout.trim());
+            if (output.error) {
+              resolve({
+                input: testCase.input,
+                expectedOutput: testCase.expectedOutput,
+                actualOutput: null,
+                passed: false,
+                error: output.error
+              });
+            } else {
+              const passed = JSON.stringify(output.result) === JSON.stringify(testCase.expectedOutput);
+              resolve({
+                input: testCase.input,
+                expectedOutput: testCase.expectedOutput,
+                actualOutput: output.result,
+                passed,
+                error: null
+              });
+            }
+          } catch (parseError) {
+            resolve({
+              input: testCase.input,
+              expectedOutput: testCase.expectedOutput,
+              actualOutput: stdout,
+              passed: false,
+              error: `Failed to parse Python output: ${parseError}`
+            });
+          }
+        });
+      });
+      
+      return result;
+    } catch (error) {
+      return {
+        input: testCase.input,
+        expectedOutput: testCase.expectedOutput,
+        actualOutput: null,
+        passed: false,
+        error: `Python execution failed: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
   }
 
   /**

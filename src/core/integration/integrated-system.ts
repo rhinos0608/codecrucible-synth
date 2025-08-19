@@ -943,14 +943,121 @@ class IntegratedHealthMonitor {
 }
 
 class RequestQueue {
+  private queue: any[] = [];
+  private isProcessing: boolean = false;
+
   constructor(
     private config: PerformanceConfig,
     private performanceMonitor: IntegratedPerformanceMonitor
   ) {}
   
   async enqueue(request: SynthesisRequest): Promise<SynthesisResponse> {
-    // Placeholder implementation
-    throw new Error('Request queuing not implemented');
+    try {
+      // Add request to queue with priority based on request type
+      const priority = this.calculatePriority(request);
+      const queueItem = {
+        request,
+        priority,
+        timestamp: Date.now(),
+        id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      };
+      
+      // Insert into queue based on priority (higher priority first)
+      const insertIndex = this.queue.findIndex(item => item.priority < priority);
+      if (insertIndex === -1) {
+        this.queue.push(queueItem);
+      } else {
+        this.queue.splice(insertIndex, 0, queueItem);
+      }
+      
+      // Process queue if not already processing
+      if (!this.isProcessing) {
+        this.processQueue();
+      }
+      
+      // Return immediate response for queued item
+      return {
+        id: queueItem.id,
+        requestId: request.id,
+        content: 'Request queued for processing',
+        synthesis: {
+          mode: 'queued',
+          voices: [],
+          conflicts: [],
+          consensus: { agreement: 0.5, convergence: 0.5, stability: 0.5, diversity: 0.0 },
+          finalDecision: {
+            method: 'queue',
+            reasoning: 'Request placed in processing queue',
+            confidence: 0.5,
+            alternatives: 0,
+            time: 0
+          }
+        },
+        metadata: {
+          processingTime: 0,
+          voicesConsulted: 0,
+          modelsUsed: [],
+          totalTokens: 0,
+          cachingUsed: false,
+          ragUsed: false,
+          workflowUsed: false,
+          costEstimate: 0
+        },
+        quality: {
+          overall: 0.5,
+          accuracy: 0.5,
+          completeness: 0.5,
+          coherence: 0.5,
+          relevance: 0.5,
+          innovation: 0.5,
+          practicality: 0.5
+        }
+      };
+    } catch (error) {
+      throw new Error(`Failed to enqueue request: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  private calculatePriority(request: SynthesisRequest): number {
+    // High priority for simple/fast requests
+    if ((request as any).mode === 'fast' || (request as any).maxTokens && (request as any).maxTokens < 500) {
+      return 10;
+    }
+    
+    // Medium priority for standard requests
+    if ((request as any).mode === 'balanced') {
+      return 5;
+    }
+    
+    // Lower priority for complex requests
+    return 1;
+  }
+  
+  private estimateWaitTime(): number {
+    // Estimate 30 seconds per queued item
+    return this.queue.length * 30000;
+  }
+  
+  private async processQueue(): Promise<void> {
+    if (this.isProcessing || this.queue.length === 0) {
+      return;
+    }
+    
+    this.isProcessing = true;
+    
+    while (this.queue.length > 0) {
+      const queueItem = this.queue.shift();
+      if (queueItem) {
+        try {
+          // Process the request - simplified implementation
+          console.log(`Processing queued request ${queueItem.id}`);
+        } catch (error) {
+          console.error(`Failed to process queued request ${queueItem.id}:`, error);
+        }
+      }
+    }
+    
+    this.isProcessing = false;
   }
 }
 

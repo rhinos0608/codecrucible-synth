@@ -1409,11 +1409,11 @@ class HealthMonitor {
     
     for (const provider of providers) {
       try {
-        const healthStatus = await this.checkProviderHealth(provider);
-        provider.healthStatus = healthStatus;
+        const healthStatus = await this.checkProviderHealth(provider as ModelProvider);
+        (provider as ModelProvider).healthStatus = healthStatus;
         
         // Update circuit breaker based on health
-        const circuitBreaker = (this.router as any).circuitBreakers.get(provider.id);
+        const circuitBreaker = (this.router as any).circuitBreakers.get((provider as ModelProvider).id);
         if (circuitBreaker) {
           if (healthStatus.status === 'healthy') {
             circuitBreaker.recordSuccess();
@@ -1423,8 +1423,8 @@ class HealthMonitor {
         }
         
       } catch (error) {
-        this.logger.error(`Health check failed for provider ${provider.name}:`, error);
-        provider.healthStatus = {
+        this.logger.error(`Health check failed for provider ${(provider as ModelProvider).name}:`, error);
+        (provider as ModelProvider).healthStatus = {
           status: 'unavailable',
           lastChecked: new Date(),
           responseTime: 0,

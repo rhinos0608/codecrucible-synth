@@ -86,7 +86,10 @@
       "Bash(echo:*)",
       "Bash(ollama show:*)",
       "Bash(OLLAMA_HOST=0.0.0.0 start /B ollama serve)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(ollama stop:*)",
+      "Bash(set OLLAMA_NUM_GPU=10)",
+      "Bash(set CUDA_VISIBLE_DEVICES=0)"
     ],
     "deny": [],
     "ask": [],

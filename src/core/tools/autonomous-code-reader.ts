@@ -117,7 +117,7 @@ export class AutonomousCodeReader {
             patterns
           };
         },
-        'autonomous_code_analysis'
+        3
       );
     } catch (error) {
       logger.error('❌ Autonomous code analysis failed:', error);

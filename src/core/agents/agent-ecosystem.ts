@@ -778,8 +778,154 @@ abstract class BaseAgent implements Agent {
   abstract process(request: AgentRequest): Promise<AgentResponse>;
 
   async collaborate(agents: Agent[], task: CollaborativeTask): Promise<CollaborativeResponse> {
-    // Default collaboration implementation
-    throw new Error('Collaboration not implemented for this agent');
+    try {
+      // Default collaboration implementation using round-robin approach
+      const responses: AgentResponse[] = [];
+      const participatingAgents = agents.filter(agent => agent !== this);
+      
+      this.logger.info(`Starting collaboration with ${participatingAgents.length} agents for task: ${task.type}`);
+      
+      const startTime = Date.now();
+      
+      // Execute task with each participating agent
+      for (const agent of participatingAgents) {
+        try {
+          const response = await (agent as any).process({
+            prompt: (task as any).prompt || task.description,
+            context: (task as any).context,
+            type: task.type,
+            constraints: (task as any).constraints
+          });
+          
+          responses.push({
+            id: `resp_${Date.now()}_${agent.id}`,
+            requestId: (task as any).id || `task_${Date.now()}`,
+            agentId: agent.id,
+            content: response.content || response.result?.toString() || '',
+            confidence: response.confidence || 0.8,
+            reasoning: response.reasoning || `Response from ${(agent as any).type || 'unknown'} agent`,
+            metadata: {
+              processingTime: Date.now() - startTime,
+              tokensUsed: 0,
+              toolsUsed: [],
+              modelsUsed: [(agent as any).model || 'unknown'],
+              qualityScore: response.confidence || 0.8,
+              complexity: 1,
+              resources: {
+                cpu: 0.1,
+                memory: 0.1,
+                cost: 0.01,
+                apiCalls: 1
+              }
+            }
+          });
+        } catch (error) {
+          this.logger.warn(`Agent ${agent.id} failed in collaboration:`, error);
+          responses.push({
+            id: `resp_${Date.now()}_${agent.id}`,
+            requestId: (task as any).id || `task_${Date.now()}`,
+            agentId: agent.id,
+            content: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            confidence: 0,
+            reasoning: 'Agent execution failed',
+            metadata: {
+              processingTime: Date.now() - startTime,
+              tokensUsed: 0,
+              toolsUsed: [],
+              modelsUsed: [],
+              qualityScore: 0,
+              complexity: 1,
+              resources: {
+                cpu: 0.1,
+                memory: 0.1,
+                cost: 0.01,
+                apiCalls: 1
+              }
+            }
+          });
+        }
+      }
+      
+      // Synthesize collaborative response
+      const synthesizedContent = this.synthesizeResponses(responses, (task as any).synthesis || 'consensus');
+      const averageConfidence = responses.reduce((sum, r) => sum + r.confidence, 0) / responses.length;
+      
+      return {
+        taskId: (task as any).id || `task_${Date.now()}`,
+        phases: responses.map(response => ({
+          phaseId: `phase_${response.agentId}`,
+          agentId: response.agentId,
+          result: response,
+          quality: response.confidence,
+          confidence: response.confidence,
+          issues: response.confidence < 0.5 ? ['Low confidence response'] : undefined
+        })),
+        synthesis: {
+          approach: 'consensus' as const,
+          weights: responses.reduce((acc, r) => ({ ...acc, [r.agentId]: r.confidence }), {}),
+          conflicts: [],
+          finalOutput: synthesizedContent,
+          confidenceScore: averageConfidence
+        },
+        consensus: {
+          agreement: averageConfidence,
+          conflicts: responses.filter(r => r.confidence < 0.5).length,
+          convergence: averageConfidence,
+          stability: averageConfidence
+        },
+        finalRecommendation: synthesizedContent,
+        metadata: {
+          totalTime: responses.reduce((sum, r) => sum + (r.metadata?.processingTime || 0), 0),
+          participationLevel: responses.reduce((acc, r) => ({ ...acc, [r.agentId]: r.confidence }), {}),
+          communicationRounds: 1,
+          decisionsReached: 1,
+          escalationsRequired: 0
+        }
+      };
+    } catch (error) {
+      throw new Error(`Collaboration failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  private synthesizeResponses(responses: AgentResponse[], method: 'consensus' | 'best' | 'merge'): string {
+    if (responses.length === 0) {
+      return 'No responses available for synthesis';
+    }
+    
+    switch (method) {
+      case 'best':
+        // Return the response with highest confidence
+        const bestResponse = responses.reduce((best, current) => 
+          current.confidence > best.confidence ? current : best
+        );
+        return bestResponse.content;
+        
+      case 'merge':
+        // Merge all responses with separators
+        return responses
+          .map(r => `**${r.agentId}**: ${r.content}`)
+          .join('\n\n---\n\n');
+        
+      case 'consensus':
+      default:
+        // Simple consensus: use majority approach or highest confidence
+        if (responses.length === 1) {
+          return responses[0].content;
+        }
+        
+        // For multiple responses, combine them intelligently
+        const highConfidenceResponses = responses.filter(r => r.confidence > 0.7);
+        if (highConfidenceResponses.length > 0) {
+          return highConfidenceResponses
+            .map(r => r.content)
+            .join('\n\n');
+        }
+        
+        // Fallback to best response
+        return responses.reduce((best, current) => 
+          current.confidence > best.confidence ? current : best
+        ).content;
+    }
   }
 
   async learn(feedback: AgentFeedback): Promise<void> {

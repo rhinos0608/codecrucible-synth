@@ -512,6 +512,7 @@ export class SecurityUtils {
     // Check for code analysis indicators
     const analysisPatterns = [
       /analyze\s+this\s+.*code/gi,
+      /analyze\s+this\s+\w+\s+code\s+file/gi,
       /code\s+analysis/gi,
       /file:\s+.*\.(js|ts|py|java|cpp|c|h|css|html|json)/gi,
       /content:\s*```/gi,

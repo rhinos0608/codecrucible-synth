@@ -166,6 +166,7 @@ export interface RealTimeProcessing {
   chunkSize: number;
   bufferStrategy: 'window' | 'sliding' | 'circular';
   onChunk: (chunk: any) => void;
+  transform?: (content: string) => string;
 }
 
 export interface ContextualContinuation {
@@ -2037,9 +2038,26 @@ class MemoryHandler extends PatternHandler {
   }
   
   private async generateEmbedding(text: string): Promise<number[]> {
-    // In production, use actual embedding model
-    // For now, return mock embedding
-    return Array(768).fill(0).map(() => Math.random());
+    try {
+      // Simple hash-based embedding for deterministic results
+      let hash = 0;
+      for (let i = 0; i < text.length; i++) {
+        const char = text.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      
+      // Generate deterministic embedding based on text content
+      const embedding = Array(768).fill(0).map((_, idx) => {
+        const seed = (hash + idx) / Math.pow(2, 32);
+        return Math.sin(seed) * 0.5 + 0.5; // Normalize to [0, 1]
+      });
+      
+      return embedding;
+    } catch (error) {
+      // Fallback to zero vector
+      return Array(768).fill(0);
+    }
   }
 }
 

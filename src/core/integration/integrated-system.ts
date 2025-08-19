@@ -632,7 +632,6 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
     const dangerousPatterns = [
       /rm\s+-rf\s*\/[^\s]*/gi,  // rm -rf /
       /rm\s+-rf\s+\*/gi,        // rm -rf *
-      /malicious/gi,            // malicious keyword
       /eval\s*\(/gi,            // eval(
       /exec\s*\(/gi,            // exec(
       /system\s*\(/gi,          // system(

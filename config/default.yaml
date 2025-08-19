@@ -1,0 +1,108 @@
+# CodeCrucible Terminal Default Configuration
+# Local offline AI coding assistant with gpt-oss-20b
+
+model:
+  endpoint: "http://localhost:11434"  # Ollama default endpoint
+  name: "llama3.2:latest"             # Use llama3.2 as default
+  timeout: 60000                      # 60 seconds for large model
+  maxTokens: 20000                    # Increased to 20k for better context
+  temperature: 0.7
+
+voices:
+  default: ["explorer", "maintainer"]
+  available: ["explorer", "maintainer", "analyzer", "developer", "implementor", "security", "architect", "designer", "optimizer"]
+  parallel: true
+  maxConcurrent: 3
+
+safety:
+  commandValidation: true
+  fileSystemRestrictions: true
+  requireConsent: ["delete", "execute"]
+  
+terminal:
+  shell: "auto"                       # auto-detect or specify: bash, zsh, cmd, powershell
+  prompt: "CC> "
+  historySize: 1000
+  colorOutput: true
+  
+vscode:
+  autoActivate: true
+  inlineGeneration: true
+  showVoicePanel: true
+
+# MCP Server Configuration
+mcp:
+  servers:
+    filesystem:
+      enabled: true
+      restrictedPaths: ["/etc", "/sys", "/proc"]
+      allowedPaths: ["~/", "./"]
+    
+    git:
+      enabled: true
+      autoCommitMessages: false
+      safeModeEnabled: true
+    
+    terminal:
+      enabled: true
+      allowedCommands: ["ls", "cat", "grep", "find", "git", "npm", "node", "python"]
+      blockedCommands: ["rm -rf", "sudo", "su", "chmod +x"]
+    
+    packageManager:
+      enabled: true
+      autoInstall: false
+      securityScan: true
+  
+  # Smithery AI Configuration (optional)
+  smithery:
+    enabled: false
+    apiKey: ""
+    profile: ""
+    baseUrl: "https://server.smithery.ai"
+
+# Performance Settings
+performance:
+  responseCache:
+    enabled: true
+    maxAge: 3600000                   # 1 hour in milliseconds
+    maxSize: 100                      # 100MB
+  
+  voiceParallelism:
+    maxConcurrent: 3
+    batchSize: 2
+  
+  contextManagement:
+    maxContextLength: 100000          # tokens
+    compressionThreshold: 80000       # tokens
+    retentionStrategy: "sliding"      # sliding, summary, hierarchical
+
+# E2B Code Interpreter Configuration
+e2b:
+  apiKey: "${E2B_API_KEY}"            # E2B API key from environment
+  enabled: true                       # Enable E2B sandboxed execution
+  defaultEnvironment: "base"          # Default sandbox environment
+  sessionTimeout: 3600000             # 1 hour session timeout
+  maxConcurrentSessions: 10           # Maximum concurrent sandbox sessions
+  
+  # Resource limits for sandbox execution
+  resourceLimits:
+    memory: "512MB"                   # Memory limit per sandbox
+    cpu: "0.5"                        # CPU limit (cores)
+    diskSpace: "1GB"                  # Disk space limit
+    executionTimeout: 30000           # 30 seconds max execution time
+    
+  # Security policy for code execution
+  security:
+    strictMode: false                 # Enable for production environments
+    allowNetworkAccess: false         # Block network access in sandboxes
+    allowFileSystemWrite: true        # Allow file operations
+    allowProcessSpawning: false       # Block process spawning
+    validateCode: true                # Enable code validation
+    auditLog: true                    # Log all execution attempts
+
+# Logging Configuration
+logging:
+  level: "info"                       # debug, info, warn, error
+  toFile: true
+  maxFileSize: "10MB"
+  maxFiles: 5

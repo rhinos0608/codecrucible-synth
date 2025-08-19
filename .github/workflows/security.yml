@@ -1,0 +1,307 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scans weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=moderate --json > audit-report.json
+          npm audit --audit-level=moderate
+        continue-on-error: true
+        
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: audit-report.json
+          retention-days: 30
+
+  snyk-security-scan:
+    name: Snyk Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'  # Skip on scheduled runs unless token is available
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: |
+            --severity-threshold=high
+            --json-file-output=snyk-report.json
+            --all-projects
+            
+      - name: Upload Snyk report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snyk-security-report
+          path: snyk-report.json
+          retention-days: 30
+
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build application
+        run: npm run build
+        
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  semgrep-scan:
+    name: Semgrep Security Scan
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Run Semgrep
+        run: |
+          semgrep \
+            --config=auto \
+            --json \
+            --output=semgrep-report.json \
+            --skip-unknown-extensions \
+            --exclude="node_modules" \
+            --exclude="dist" \
+            --exclude="build" \
+            .
+        continue-on-error: true
+        
+      - name: Upload Semgrep report
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-security-report
+          path: semgrep-report.json
+          retention-days: 30
+
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Install license checker
+        run: npm install -g license-checker
+        
+      - name: Check licenses
+        run: |
+          license-checker \
+            --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;Unlicense;WTFPL;CC0-1.0' \
+            --json \
+            --out license-report.json
+        continue-on-error: true
+        
+      - name: Generate license summary
+        run: |
+          echo "# License Compliance Report" > license-summary.md
+          echo "" >> license-summary.md
+          echo "Generated on: $(date)" >> license-summary.md
+          echo "" >> license-summary.md
+          
+          if [ -f license-report.json ]; then
+            echo "## Allowed Licenses Found:" >> license-summary.md
+            cat license-report.json | jq -r 'to_entries[] | "\(.key): \(.value.licenses)"' | sort >> license-summary.md
+          else
+            echo "❌ License check failed - please review manually" >> license-summary.md
+          fi
+          
+      - name: Upload license reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-compliance-report
+          path: |
+            license-report.json
+            license-summary.md
+          retention-days: 30
+
+  secrets-scan:
+    name: Secret Detection Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for secret scanning
+          
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified --json --output=trufflehog-report.json
+        continue-on-error: true
+        
+      - name: Upload secrets scan report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: secrets-scan-report
+          path: trufflehog-report.json
+          retention-days: 30
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, codeql-analysis, semgrep-scan, license-check, secrets-scan]
+    if: always()
+    steps:
+      - name: Download all security reports
+        uses: actions/download-artifact@v4
+        with:
+          path: security-reports
+          
+      - name: Generate security summary
+        run: |
+          echo "# Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "Generated on: $(date)" >> security-summary.md
+          echo "Commit: ${{ github.sha }}" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          echo "## Scan Results:" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          # Check individual job results
+          if [ "${{ needs.dependency-audit.result }}" = "success" ]; then
+            echo "✅ Dependency Audit: Passed" >> security-summary.md
+          else
+            echo "❌ Dependency Audit: Failed or Skipped" >> security-summary.md
+          fi
+          
+          if [ "${{ needs.codeql-analysis.result }}" = "success" ]; then
+            echo "✅ CodeQL Analysis: Passed" >> security-summary.md
+          else
+            echo "❌ CodeQL Analysis: Failed or Skipped" >> security-summary.md
+          fi
+          
+          if [ "${{ needs.semgrep-scan.result }}" = "success" ]; then
+            echo "✅ Semgrep Scan: Passed" >> security-summary.md
+          else
+            echo "❌ Semgrep Scan: Failed or Skipped" >> security-summary.md
+          fi
+          
+          if [ "${{ needs.license-check.result }}" = "success" ]; then
+            echo "✅ License Check: Passed" >> security-summary.md
+          else
+            echo "❌ License Check: Failed or Skipped" >> security-summary.md
+          fi
+          
+          if [ "${{ needs.secrets-scan.result }}" = "success" ]; then
+            echo "✅ Secrets Scan: Passed" >> security-summary.md
+          else
+            echo "❌ Secrets Scan: Failed or Skipped" >> security-summary.md
+          fi
+          
+          echo "" >> security-summary.md
+          echo "## Recommendations:" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "1. Review all failed scans and address identified issues" >> security-summary.md
+          echo "2. Update dependencies with known vulnerabilities" >> security-summary.md
+          echo "3. Ensure no secrets are committed to the repository" >> security-summary.md
+          echo "4. Verify all dependencies use approved licenses" >> security-summary.md
+          echo "5. Run security scans regularly as part of your development workflow" >> security-summary.md
+          
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md
+          retention-days: 30
+          
+      - name: Comment on PR with security summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('security-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🔒 Security Scan Results\n\n${summary}`
+            });

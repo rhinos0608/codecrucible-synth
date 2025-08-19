@@ -1,0 +1,34 @@
+{
+  "modelPreloader": {
+    "endpoint": "http://localhost:11434",
+    "primaryModels": [
+      "gemma:7b",
+      "llama3.2:latest"
+    ],
+    "fallbackModels": [
+      "gemma:7b"
+    ],
+    "maxConcurrentLoads": 1,
+    "warmupPrompt": "Hi",
+    "keepAliveTime": "10m",
+    "retryAttempts": 2,
+    "loadTimeout": 45000,
+    "initializationTimeout": 30000
+  },
+  "hybridClient": {
+    "fastModeThreshold": 200,
+    "defaultTimeout": 60000,
+    "maxTimeout": 180000,
+    "cacheEnabled": true,
+    "cacheDuration": 300000,
+    "skipComplexRouting": true
+  },
+  "performance": {
+    "enableModelCaching": true,
+    "cacheTimeout": 30000,
+    "maxConcurrentRequests": 2,
+    "enableFastMode": true,
+    "skipModelDiscovery": false,
+    "useSmallModelsOnly": true
+  }
+}

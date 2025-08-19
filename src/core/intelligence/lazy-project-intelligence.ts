@@ -37,6 +37,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   private fullSystem: ProjectIntelligenceSystem;
   private cache: Map<string, LazyProjectIntelligence> = new Map();
   private loadingPromises: Map<string, Promise<ProjectIntelligence>> = new Map();
+  private cleanupInterval?: NodeJS.Timeout;
   private metrics: PerformanceMetrics = {
     initTime: 0,
     analysisTime: 0,
@@ -51,7 +52,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
     this.fullSystem = new ProjectIntelligenceSystem();
     
     // Cleanup timer to prevent memory leaks
-    setInterval(() => this.cleanupCache(), 300000); // 5 minutes
+    this.cleanupInterval = setInterval(() => this.cleanupCache(), 300000); // 5 minutes
   }
 
   /**
@@ -348,6 +349,10 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
    * Shutdown and cleanup
    */
   shutdown(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
     this.clearCache();
     this.removeAllListeners();
   }

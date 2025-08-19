@@ -921,6 +921,34 @@ export class UnifiedAgent extends EventEmitter {
   }
 
   /**
+   * Clean up agent resources
+   */
+  async destroy(): Promise<void> {
+    try {
+      // Cancel any active workflows
+      for (const workflow of this.activeWorkflows.values()) {
+        workflow.status = 'cancelled';
+      }
+      this.activeWorkflows.clear();
+      
+      // Clear execution queue
+      this.executionQueue.length = 0;
+      this.isProcessing = false;
+      
+      // Clean up performance monitor
+      if (this.performanceMonitor && typeof this.performanceMonitor.destroy === 'function') {
+        this.performanceMonitor.destroy();
+      }
+      
+      // Remove all listeners
+      this.removeAllListeners();
+      
+    } catch (error) {
+      console.error('Error during UnifiedAgent cleanup:', error);
+    }
+  }
+
+  /**
    * Get active workflows
    */
   getActiveWorkflows(): Workflow[] {

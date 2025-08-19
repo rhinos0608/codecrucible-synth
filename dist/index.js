@@ -31,30 +31,49 @@ export async function initializeCLIContext() {
             }
         };
         const client = new UnifiedModelClient(clientConfig);
-        await client.initialize(); // Initialize providers
+        // Initialize providers but don't fail if they're not available
+        try {
+            await client.initialize();
+        }
+        catch (error) {
+            console.warn('⚠️ Provider initialization failed, continuing in degraded mode:', error.message);
+        }
         const voiceSystem = new VoiceArchetypeSystem();
-        const mcpManager = new MCPServerManager({
-            filesystem: {
-                enabled: true,
-                restrictedPaths: [],
-                allowedPaths: ['src', 'test', 'docs']
-            },
-            git: {
-                enabled: true,
-                autoCommitMessages: true,
-                safeModeEnabled: true
-            },
-            terminal: {
-                enabled: true,
-                allowedCommands: ['npm', 'node', 'git'],
-                blockedCommands: ['rm', 'sudo']
-            },
-            packageManager: {
-                enabled: true,
-                autoInstall: true,
-                securityScan: true
-            }
-        });
+        // Make MCP manager optional to prevent hanging
+        let mcpManager;
+        try {
+            mcpManager = new MCPServerManager({
+                filesystem: {
+                    enabled: false,
+                    restrictedPaths: [],
+                    allowedPaths: []
+                },
+                git: {
+                    enabled: false,
+                    autoCommitMessages: false,
+                    safeModeEnabled: true
+                },
+                terminal: {
+                    enabled: false,
+                    allowedCommands: [],
+                    blockedCommands: []
+                },
+                packageManager: {
+                    enabled: false,
+                    autoInstall: false,
+                    securityScan: false
+                }
+            });
+        }
+        catch (error) {
+            console.warn('⚠️ MCP Manager initialization failed, using minimal setup:', error.message);
+            // Create a minimal mock MCP manager
+            mcpManager = {
+                startServers: async () => { },
+                stopServers: async () => { },
+                getServerStatus: () => ({ filesystem: { status: 'disabled' } })
+            };
+        }
         const context = {
             modelClient: client,
             voiceSystem,

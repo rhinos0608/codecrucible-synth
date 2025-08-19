@@ -30,7 +30,7 @@ export class SecurityUtils {
   constructor(config: Partial<SecurityConfig> = {}) {
     this.config = {
       enableSandbox: true,
-      maxInputLength: 10000,
+      maxInputLength: 50000, // Increased for code file analysis
       allowedCommands: ['npm', 'node', 'git', 'tsc', 'eslint'],
       allowedPaths: [process.cwd()],
       blockedPatterns: [

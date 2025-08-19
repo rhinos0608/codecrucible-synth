@@ -349,7 +349,7 @@ export class ConfigManager {
   /**
    * Encrypt sensitive configuration fields
    */
-  private encryptSensitiveFields(config: any): void {
+  private encryptSensitiveFields(config: Record<string, unknown>): void {
     const sensitiveFields = [
       'mcp.servers.smithery.apiKey',
       'model.apiKey',
@@ -373,7 +373,7 @@ export class ConfigManager {
   /**
    * Decrypt sensitive configuration fields
    */
-  private decryptSensitiveFields(config: any): void {
+  private decryptSensitiveFields(config: Record<string, unknown>): void {
     const sensitiveFields = [
       'mcp.servers.smithery.apiKey',
       'model.apiKey',
@@ -398,14 +398,14 @@ export class ConfigManager {
   /**
    * Get nested value from object using dot notation
    */
-  private getNestedValue(obj: any, path: string): any {
+  private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
     return path.split('.').reduce((current, key) => current?.[key], obj);
   }
 
   /**
    * Set nested value in object using dot notation
    */
-  private setNestedValue(obj: any, path: string, value: any): void {
+  private setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
     const keys = path.split('.');
     const lastKey = keys.pop()!;
     const target = keys.reduce((current, key) => {

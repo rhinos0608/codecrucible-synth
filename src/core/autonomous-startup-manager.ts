@@ -38,7 +38,7 @@ export interface StartupReport {
     dependencies: number;
     framework?: string;
   };
-  analysis?: any;
+  analysis?: Record<string, unknown>;
   recommendations: string[];
   readinessScore: number;
 }
@@ -101,7 +101,7 @@ export class AutonomousStartupManager {
       python: 'python --version'
     };
     
-    const environment: any = { os: commands.os, shell: commands.shell };
+    const environment: Record<string, string> = { os: commands.os, shell: commands.shell };
     
     for (const [key, command] of Object.entries(commands)) {
       if (key === 'os' || key === 'shell') continue;

@@ -1,6 +1,4 @@
-import { cliOutput, ResponseFactory } from './structured-response-formatter.js';
-import { CLIExitCode, CLIError, SynthesisResponse, SynthesisResult, IterativeResult, ExecutionResponse, SpiralConfig, ExecutionRequest, ExecutionMode } from './types.js';
-import { globalEditConfirmation } from './agent.js';
+import { CLIExitCode, CLIError, SynthesisResponse, SynthesisResult, IterativeResult, ExecutionResponse, SpiralConfig, ExecutionRequest } from './types.js';
 
 import { UnifiedModelClient, ProjectContext } from './client.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
@@ -20,7 +18,7 @@ import { AutoConfigurator } from './model-management/auto-configurator.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
-import { readFile, stat, readdir } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
 import { join, extname, isAbsolute } from 'path';
 import { glob } from 'glob';
 

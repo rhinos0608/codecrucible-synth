@@ -50,7 +50,7 @@ async function startBackendServer(context, port) {
             const { prompt, voices, mode } = req.body;
             const voiceList = voices || context.config.voices.default;
             const responses = await context.voiceSystem.generateMultiVoiceSolutions(prompt, voiceList, { files: [], structure: {}, metadata: {} });
-            const synthesis = await context.voiceSystem.synthesizeVoiceResponses(responses, mode || 'competitive');
+            const synthesis = await context.voiceSystem.synthesizeVoiceResponses(responses);
             res.json({
                 success: true,
                 result: synthesis,
@@ -73,7 +73,8 @@ async function startBackendServer(context, port) {
     });
     app.get('/api/status', async (req, res) => {
         try {
-            const modelStatus = await context.modelClient.checkConnection();
+            const healthCheck = await context.modelClient.healthCheck();
+            const modelStatus = Object.values(healthCheck).some(status => status);
             res.json({
                 model: {
                     available: modelStatus,
@@ -94,7 +95,7 @@ async function startBackendServer(context, port) {
         socket.on('generate_code', async (data) => {
             try {
                 const responses = await context.voiceSystem.generateMultiVoiceSolutions(data.prompt, data.voices || context.config.voices.default, { files: data.context || [], structure: {}, metadata: {} });
-                const synthesis = await context.voiceSystem.synthesizeVoiceResponses(responses, data.mode || 'competitive');
+                const synthesis = await context.voiceSystem.synthesizeVoiceResponses(responses);
                 socket.emit('generation_complete', {
                     success: true,
                     result: synthesis,

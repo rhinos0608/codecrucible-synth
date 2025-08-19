@@ -99,6 +99,7 @@ export interface RequestContext {
   codebase?: CodebaseInfo;
   session?: SessionInfo;
   previousInteractions?: InteractionHistory[];
+  ragResults?: any[]; // RAG system search results
 }
 
 export interface ProjectInfo {

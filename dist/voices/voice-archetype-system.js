@@ -31,7 +31,7 @@ export class VoiceArchetypeSystem {
         if (!voiceConfig)
             throw new Error('Voice not found: ' + voice);
         const enhancedPrompt = voiceConfig.prompt + '\n\n' + prompt;
-        return await client.generate({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
+        return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
     }
     async generateMultiVoiceSolutions(voices, prompt, client) {
         const solutions = [];
@@ -40,6 +40,55 @@ export class VoiceArchetypeSystem {
             solutions.push({ voice, ...result });
         }
         return solutions;
+    }
+    async synthesize(prompt, voices, mode = 'collaborative', client) {
+        // If no client provided, return error
+        if (!client) {
+            return {
+                content: `Error: No model client provided for synthesis`,
+                voicesUsed: voices,
+                qualityScore: 0,
+                mode
+            };
+        }
+        try {
+            // Generate responses from each voice
+            const responses = await this.generateMultiVoiceSolutions(voices, prompt, client);
+            // Synthesize based on mode
+            let synthesizedContent = '';
+            if (mode === 'competitive') {
+                // Choose the best response
+                const best = responses.reduce((prev, curr) => (curr.confidence || 0) > (prev.confidence || 0) ? curr : prev);
+                synthesizedContent = best.content || best.text || best.response || '';
+            }
+            else if (mode === 'consensus') {
+                // Combine all responses with consensus
+                const allResponses = responses.map(r => r.content || r.text || r.response || '').filter(Boolean);
+                synthesizedContent = allResponses.join('\n\n---\n\n');
+            }
+            else {
+                // Collaborative mode - merge responses
+                const allResponses = responses.map(r => r.content || r.text || r.response || '').filter(Boolean);
+                if (allResponses.length > 0) {
+                    synthesizedContent = allResponses[0]; // Use first valid response for now
+                }
+            }
+            return {
+                content: synthesizedContent || 'No response generated',
+                voicesUsed: voices,
+                qualityScore: synthesizedContent ? 0.8 : 0.2,
+                mode,
+                responses
+            };
+        }
+        catch (error) {
+            return {
+                content: `Error during synthesis: ${error.message}`,
+                voicesUsed: voices,
+                qualityScore: 0,
+                mode
+            };
+        }
     }
     async synthesizeVoiceResponses(responses) {
         const combined = responses.map(r => r.content).join('\n\n---\n\n');

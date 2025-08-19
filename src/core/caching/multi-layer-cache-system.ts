@@ -1204,7 +1204,7 @@ class CacheLayerStats {
 
 // Additional interfaces and types
 
-interface CacheSystemConfig {
+export interface CacheSystemConfig {
   layers: {
     memory: { enabled: boolean; policy: CachePolicy };
     disk: { enabled: boolean; policy: CachePolicy; dataPath: string };

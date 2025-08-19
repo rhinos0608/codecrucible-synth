@@ -127,18 +127,18 @@ Consider security, performance, maintainability, and user experience aspects.`;
 
     const analysisVoices = ['architect', 'analyzer', 'security'];
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
-      analysisPrompt,
       analysisVoices,
-      { files: [], structure: {}, metadata: {} }
+      analysisPrompt,
+      this.modelClient
     );
 
-    const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses, 'collaborative');
+    const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses);
     
     try {
-      return this.extractJsonFromText(synthesis.combinedCode);
+      return this.extractJsonFromText((synthesis as any).combinedCode || synthesis.content);
     } catch (error) {
       logger.warn('Failed to parse objective analysis JSON, using text response');
-      return { analysis: synthesis.combinedCode };
+      return { analysis: (synthesis as any).combinedCode || synthesis.content };
     }
   }
 
@@ -185,14 +185,14 @@ IMPORTANT:
 
     const planningVoices = ['architect', 'implementor', 'maintainer'];
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
-      planningPrompt,
       planningVoices,
-      { files: [], structure: {}, metadata: {} }
+      planningPrompt,
+      this.modelClient
     );
 
-    const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses, 'consensus');
+    const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses);
     
-    return this.extractJsonFromText(synthesis.combinedCode);
+    return this.extractJsonFromText((synthesis as any).combinedCode || synthesis.content);
   }
 
   /**
@@ -378,17 +378,15 @@ Provide a JSON response:
 }`;
 
     try {
-      const response = await this.modelClient.generate(
-        {
-          id: 'analyzer',
-          name: 'Analyzer',
-          systemPrompt: 'You are an expert at analyzing failures and suggesting recovery strategies. Always respond with valid JSON.',
-          temperature: 0.3,
-          style: 'analytical'
-        },
-        recoveryPrompt,
-        { files: [], structure: {}, metadata: {} }
-      );
+      const response = await this.modelClient.processRequest({
+        prompt: `You are an expert at analyzing failures and suggesting recovery strategies. Always respond with valid JSON.\n\n${recoveryPrompt}`,
+        temperature: 0.3
+      }, {
+        files: [],
+        structure: { directories: [], fileTypes: {} },
+        workingDirectory: process.cwd(),
+        config: {}
+      });
       
       const recovery = this.extractJsonFromText(response.content);
       
@@ -476,7 +474,7 @@ Provide a JSON response:
       context || { files: [], structure: {}, metadata: {} }
     );
     
-    return await this.voiceSystem.synthesizeVoiceResponses(responses, mode || 'competitive');
+    return await this.voiceSystem.synthesizeVoiceResponses(responses);
   }
 
   /**

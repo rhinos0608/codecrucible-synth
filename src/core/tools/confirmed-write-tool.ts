@@ -72,10 +72,9 @@ export class ConfirmedWriteTool extends BaseTool {
 
       // Propose the edit
       if (args.requireConfirmation) {
-        const result = await (await import("../agent.js")).globalEditConfirmation.proposeEdits(
-          [editOperation], 
-          `${changeType === 'create' ? 'Create' : 'Modify'} ${args.path}`
-        );
+        const result = await (await import("../agent.js")).globalEditConfirmation.proposeEdits([
+          editOperation
+        ]);
         
         return {
           success: true,

@@ -76,7 +76,17 @@
       "WebFetch(domain:lmstudio.ai)",
       "Bash(del nul)",
       "Bash(nvidia-smi:*)",
-      "Bash(git remote set-url:*)"
+      "Bash(git remote set-url:*)",
+      "Bash(cp:*)",
+      "Bash(cat:*)",
+      "Bash(start /B ollama:*)",
+      "Bash(set)",
+      "Bash(echo $OLLAMA_NUM_GPU)",
+      "Bash(echo $OLLAMA_CPU_TARGET)",
+      "Bash(echo:*)",
+      "Bash(ollama show:*)",
+      "Bash(OLLAMA_HOST=0.0.0.0 start /B ollama serve)",
+      "Bash(git init:*)"
     ],
     "deny": [],
     "ask": [],

@@ -179,7 +179,7 @@ export class AutonomousStartupManager {
       project.hasPackageJson = true;
       
       try {
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, 'utf-8'));
         const deps = Object.keys(packageJson.dependencies || {});
         const devDeps = Object.keys(packageJson.devDependencies || {});
         project.dependencies = deps.length + devDeps.length;

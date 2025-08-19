@@ -300,9 +300,9 @@ export class AdvancedLogger {
         });
       }
 
-      // Keep only recent metrics
-      if (this.performanceMetrics.length > 1000) {
-        this.performanceMetrics = this.performanceMetrics.slice(-500);
+      // Keep only recent metrics - reduced to prevent memory pressure
+      if (this.performanceMetrics.length > 100) {
+        this.performanceMetrics = this.performanceMetrics.slice(-50);
       }
     }
   }

@@ -644,7 +644,7 @@ export class VectorRAGSystem extends EventEmitter {
     return hash.toString(36);
   }
 
-  private debounce(func: Function, delay: number): Function {
+  private debounce<T extends (...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
     let timeoutId: NodeJS.Timeout;
     return (...args: any[]) => {
       clearTimeout(timeoutId);

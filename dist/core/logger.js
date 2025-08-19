@@ -13,15 +13,30 @@ class Logger {
     logQueue = [];
     isWriting = false;
     logDirectory;
-    constructor(config) {
-        this.config = {
-            level: 'info',
-            toFile: true,
-            toConsole: true,
-            maxFileSize: '10MB',
-            maxFiles: 5,
-            ...config
-        };
+    name;
+    constructor(nameOrConfig, config) {
+        // Handle overloaded constructor
+        if (typeof nameOrConfig === 'string') {
+            this.name = nameOrConfig;
+            this.config = {
+                level: 'info',
+                toFile: true,
+                toConsole: true,
+                maxFileSize: '10MB',
+                maxFiles: 5,
+                ...config
+            };
+        }
+        else {
+            this.config = {
+                level: 'info',
+                toFile: true,
+                toConsole: true,
+                maxFileSize: '10MB',
+                maxFiles: 5,
+                ...nameOrConfig
+            };
+        }
         this.logDirectory = this.config.logDirectory || join(homedir(), '.codecrucible', 'logs');
         this.ensureLogDirectory();
     }

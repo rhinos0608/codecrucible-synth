@@ -6,6 +6,19 @@ export declare class VoiceArchetypeSystem {
     getAvailableVoices(): string[];
     generateSingleVoiceResponse(voice: string, prompt: string, client: any): Promise<any>;
     generateMultiVoiceSolutions(voices: string[], prompt: string, client: any): Promise<any[]>;
+    synthesize(prompt: string, voices: string[], mode?: 'competitive' | 'collaborative' | 'consensus', client?: any): Promise<{
+        content: string;
+        voicesUsed: string[];
+        qualityScore: number;
+        mode: "collaborative" | "consensus" | "competitive";
+        responses?: undefined;
+    } | {
+        content: string;
+        voicesUsed: string[];
+        qualityScore: number;
+        mode: "collaborative" | "consensus" | "competitive";
+        responses: any[];
+    }>;
     synthesizeVoiceResponses(responses: any[]): Promise<{
         content: string;
         voicesUsed: any[];

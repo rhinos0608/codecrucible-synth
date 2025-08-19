@@ -1257,7 +1257,7 @@ class SecurityAgent extends BaseAgent {
   async process(request: AgentRequest): Promise<AgentResponse> {
     this.status.state = 'busy';
     try {
-      const securityAnalysis = await this.analyzeSecurityl(request);
+      const securityAnalysis = await this.analyzeSecurity(request);
       const actions = await this.generateSecurityActions(request);
       return await this.generateResponse(request, securityAnalysis, actions);
     } finally {
@@ -1289,7 +1289,7 @@ class SecurityAgent extends BaseAgent {
     }];
   }
 
-  private async analyzeSecurityl(request: AgentRequest): Promise<string> {
+  private async analyzeSecurity(request: AgentRequest): Promise<string> {
     return `Performed security analysis for: ${request.content}`;
   }
 
@@ -1408,6 +1408,45 @@ class OptimizerAgent extends BaseAgent {
     }
   }
 
+  private async analyzePerformance(content: string): Promise<any> {
+    const analysis = {
+      hasMemoryLeaks: false,
+      hasInefficientLoops: false,
+      hasBlockingOperations: false,
+      hasCachingOpportunities: false,
+      hasLargePayloads: false
+    };
+
+    // Check for memory leak patterns
+    if (/new\s+\w+|setInterval|addEventListener/gi.test(content) && 
+        !/cleanup|dispose|removeEventListener|clearInterval/gi.test(content)) {
+      analysis.hasMemoryLeaks = true;
+    }
+
+    // Check for inefficient loops
+    if (/for\s*\([^)]*\.[^)]*length[^)]*\)|while\s*\([^)]*\.[^)]*length[^)]*\)/gi.test(content)) {
+      analysis.hasInefficientLoops = true;
+    }
+
+    // Check for blocking operations
+    if (/\.readFileSync|sleep\(|setTimeout\s*\([^,]*,\s*[5-9]\d{3,}/gi.test(content)) {
+      analysis.hasBlockingOperations = true;
+    }
+
+    // Check for caching opportunities
+    if (/fetch\(|axios\.|http\.|database\.|query\(/gi.test(content) && 
+        !/cache|memoize|store/gi.test(content)) {
+      analysis.hasCachingOpportunities = true;
+    }
+
+    // Check for large payloads
+    if (/JSON\.stringify|response\.data|largeObject/gi.test(content)) {
+      analysis.hasLargePayloads = true;
+    }
+
+    return analysis;
+  }
+
   private async generateOptimizationActions(request: AgentRequest): Promise<AgentAction[]> {
     const actions: AgentAction[] = [];
     
@@ -1466,7 +1505,7 @@ class OptimizerAgent extends BaseAgent {
       return actions;
     } catch (error) {
       return [{
-        type: 'error_report',
+        type: 'analysis_run',
         target: 'optimization-error.log',
         parameters: { error: error instanceof Error ? error.message : 'Unknown optimization error' },
         reversible: false

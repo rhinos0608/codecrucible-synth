@@ -246,7 +246,39 @@ export class UnifiedAgent extends EventEmitter {
     const tasks: Task[] = [];
     const mode = request.mode || this.config.mode;
 
-    // Analyze request type and create appropriate tasks
+    // Determine request complexity and create appropriate tasks
+    const isSimpleQuery = this.isSimpleQuery(request.input);
+    const taskType = request.type || this.determineRequestType(request.input);
+
+    // For simple queries, create only relevant tasks
+    if (isSimpleQuery) {
+      if (taskType === 'code-analysis' || request.input.toLowerCase().includes('analyze')) {
+        tasks.push({
+          id: this.generateTaskId(),
+          type: 'code-analysis',
+          capability: 'code-analysis',
+          description: 'Analyze code structure and quality',
+          input: request.input,
+          priority: 'high',
+          estimatedTime: mode === 'fast' ? 5000 : 15000
+        });
+      } else {
+        // For simple queries, create only one primary task
+        const capability = this.getValidCapability(taskType);
+        tasks.push({
+          id: this.generateTaskId(),
+          type: taskType,
+          capability: capability,
+          description: `Process ${taskType} request`,
+          input: request.input,
+          priority: 'high',
+          estimatedTime: mode === 'fast' ? 5000 : 15000
+        });
+      }
+      return tasks;
+    }
+
+    // For complex requests, create comprehensive tasks
     if (request.type === 'code-analysis' || request.type === 'comprehensive') {
       tasks.push({
         id: this.generateTaskId(),
@@ -391,10 +423,69 @@ export class UnifiedAgent extends EventEmitter {
     const startTime = Date.now();
     
     try {
-      const prompt = `Analyze the following code for quality, patterns, and improvements:\n\n${task.input}`;
+      let codeContent = '';
+      let analysisPrompt = '';
+      
+      // Check if this is a project/directory analysis request
+      if (typeof task.input === 'string' && (
+        task.input.toLowerCase().includes('project structure') ||
+        task.input.toLowerCase().includes('analyze the project') ||
+        task.input.toLowerCase().includes('codebase') ||
+        task.input.toLowerCase().includes('directory') ||
+        task.input.toLowerCase().includes('files in')
+      )) {
+        // Read project structure
+        try {
+          const { readdir, stat, readFile } = await import('fs/promises');
+          const { join, extname } = await import('path');
+          
+          const projectRoot = process.cwd();
+          const projectStructure = await this.getProjectStructure(projectRoot);
+          
+          analysisPrompt = `Analyze this project structure and codebase:\n\nProject Root: ${projectRoot}\n\n${projectStructure}\n\nPlease provide:\n1. Overview of the project architecture\n2. Key components and their relationships\n3. Code organization patterns\n4. Potential improvements\n5. Technology stack analysis`;
+        } catch (error) {
+          analysisPrompt = `Unable to read project structure: ${error instanceof Error ? error.message : String(error)}\n\nRequest: ${task.input}`;
+        }
+      }
+      // Check if input looks like a file path or contains file extension
+      else if (typeof task.input === 'string' && (task.input.includes('.') || task.input.includes('/'))) {
+        // Try to read as file path
+        try {
+          const { readFile } = await import('fs/promises');
+          const { resolve, extname } = await import('path');
+          
+          // Handle multiple potential file paths in the input
+          const words = task.input.split(/\s+/);
+          const potentialPaths = words.filter(word => word.includes('.') && (
+            word.endsWith('.js') || word.endsWith('.ts') || word.endsWith('.jsx') || 
+            word.endsWith('.tsx') || word.endsWith('.py') || word.endsWith('.java') ||
+            word.endsWith('.c') || word.endsWith('.cpp') || word.endsWith('.h') ||
+            word.endsWith('.css') || word.endsWith('.html') || word.endsWith('.md')
+          ));
+          
+          if (potentialPaths.length > 0) {
+            const filePath = resolve(potentialPaths[0]);
+            codeContent = await readFile(filePath, 'utf-8');
+            const extension = extname(filePath);
+            analysisPrompt = `Analyze this ${extension} code file (${filePath}) for quality, patterns, and improvements:\n\n${codeContent}`;
+          } else {
+            // Treat as direct code content
+            codeContent = task.input;
+            analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
+          }
+        } catch (fileError) {
+          // If file reading fails, treat as direct code content
+          codeContent = task.input;
+          analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
+        }
+      } else {
+        // Treat as direct code content
+        codeContent = task.input;
+        analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
+      }
       
       const response = await this.modelClient.synthesize({
-        prompt,
+        prompt: analysisPrompt,
         model: 'default',
         temperature: 0.3,
         maxTokens: 2000
@@ -700,6 +791,104 @@ export class UnifiedAgent extends EventEmitter {
 
   private generateTaskId(): string {
     return `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private isSimpleQuery(input: string): boolean {
+    const simplePatterns = [
+      /^what\s+files\s+are\s+in/gi,
+      /^list\s+files/gi,
+      /^show\s+me/gi,
+      /^explain\s+\w+$/gi,
+      /^how\s+to\s+\w+$/gi,
+      /^\w+\s+help$/gi
+    ];
+    
+    // Simple queries are typically short and don't need comprehensive analysis
+    return input.length < 100 && simplePatterns.some(pattern => pattern.test(input));
+  }
+
+  private determineRequestType(input: string): string {
+    const lowerInput = input.toLowerCase();
+    
+    if (lowerInput.includes('analyze') || lowerInput.includes('review') || lowerInput.includes('audit')) {
+      return 'code-analysis';
+    }
+    if (lowerInput.includes('generate') || lowerInput.includes('create') || lowerInput.includes('write')) {
+      return 'code-generation';
+    }
+    if (lowerInput.includes('test') || lowerInput.includes('spec')) {
+      return 'testing';
+    }
+    if (lowerInput.includes('document') || lowerInput.includes('readme')) {
+      return 'documentation';
+    }
+    if (lowerInput.includes('security') || lowerInput.includes('vulnerabilit')) {
+      return 'security-analysis';
+    }
+    
+    return 'code-analysis'; // Default
+  }
+
+  private getValidCapability(taskType: string): string {
+    const validCapabilities = [
+      'code-analysis', 'code-generation', 'documentation', 'testing',
+      'refactoring', 'bug-fixing', 'performance-optimization', 'security-analysis'
+    ];
+    
+    return validCapabilities.includes(taskType) ? taskType : 'code-analysis';
+  }
+
+  private async getProjectStructure(rootPath: string): Promise<string> {
+    try {
+      const { readdir, stat } = await import('fs/promises');
+      const { join, relative } = await import('path');
+      
+      const structure: string[] = [];
+      const maxDepth = 3; // Limit depth to avoid huge outputs
+      const ignorePatterns = [
+        'node_modules', '.git', 'dist', 'build', '.vscode', 
+        '.idea', 'coverage', '.nyc_output', 'logs', '*.log'
+      ];
+      
+      async function walkDirectory(dirPath: string, depth: number = 0): Promise<void> {
+        if (depth > maxDepth) return;
+        
+        try {
+          const items = await readdir(dirPath);
+          
+          for (const item of items) {
+            // Skip ignored patterns
+            if (ignorePatterns.some(pattern => item.includes(pattern.replace('*', '')))) {
+              continue;
+            }
+            
+            const itemPath = join(dirPath, item);
+            const stats = await stat(itemPath);
+            const relativePath = relative(rootPath, itemPath);
+            
+            if (stats.isDirectory()) {
+              structure.push(`${'  '.repeat(depth)}📁 ${relativePath}/`);
+              await walkDirectory(itemPath, depth + 1);
+            } else if (stats.isFile()) {
+              const ext = item.split('.').pop()?.toLowerCase();
+              const icon = ext === 'js' || ext === 'ts' ? '📄' : 
+                         ext === 'json' ? '⚙️' : 
+                         ext === 'md' ? '📝' : 
+                         ext === 'css' ? '🎨' : '📄';
+              structure.push(`${'  '.repeat(depth)}${icon} ${relativePath}`);
+            }
+          }
+        } catch (error) {
+          structure.push(`${'  '.repeat(depth)}❌ Error reading ${relative(rootPath, dirPath)}`);
+        }
+      }
+      
+      await walkDirectory(rootPath);
+      
+      return `Project Structure:\n${structure.slice(0, 100).join('\n')}${structure.length > 100 ? '\n... (truncated)' : ''}`;
+    } catch (error) {
+      return `Error reading project structure: ${error instanceof Error ? error.message : String(error)}`;
+    }
   }
 
   private chunkArray<T>(array: T[], chunkSize: number): T[][] {

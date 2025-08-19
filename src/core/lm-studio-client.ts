@@ -147,8 +147,8 @@ export class LMStudioClient {
       // Parse the response to extract code and explanation
       const parsed = this.parseCodeResponse(content);
       
-      // Calculate confidence based on response quality
-      const confidence = this.calculateConfidence(content, prompt, latency);
+      // Calculate confidence based on response quality (skip for performance if not needed)
+      const confidence = (options as any).skipConfidence ? 0.8 : this.calculateConfidence(content, prompt, latency);
 
       logger.info(`LM Studio generation completed in ${latency}ms`, {
         confidence,

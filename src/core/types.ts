@@ -132,6 +132,18 @@ export interface SecurityError extends Error {
   risk: string;
 }
 
+export class SecurityError extends Error {
+  public code: string;
+  public risk: string;
+  
+  constructor(message: string, code: string = 'SECURITY_ERROR', risk: string = 'medium') {
+    super(message);
+    this.name = 'SecurityError';
+    this.code = code;
+    this.risk = risk;
+  }
+}
+
 // CLI Types
 export interface CLIError extends Error {
   code: string;
@@ -199,10 +211,8 @@ export interface Workflow {
   status?: 'pending' | 'running' | 'completed' | 'failed';
 }
 
-export interface ExecutionRequest {
+export interface ExecutionRequestExtended extends ExecutionRequest {
   type: string;
-  input: string;
-  mode?: string;
 }
 
 export interface ExecutionResponse {
@@ -240,14 +250,6 @@ export interface IterativeResult {
   totalIterations?: number;
   finalQualityScore?: number;
   converged?: boolean;
-}
-
-export interface SynthesisResult {
-  content: string;
-  voicesUsed?: string[];
-  qualityScore?: number;
-  combinedCode?: string;
-  reasoning?: string;
 }
 
 export interface SpiralConfig {

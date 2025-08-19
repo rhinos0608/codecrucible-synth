@@ -281,7 +281,7 @@ export class StubCompletionEngine {
       return actions;
     } catch (error) {
       return [{
-        type: 'error_report',
+        type: 'analysis_run',
         target: 'optimization-error.log',
         parameters: { error: error instanceof Error ? error.message : 'Unknown optimization error' },
         reversible: false

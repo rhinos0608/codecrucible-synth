@@ -11,6 +11,7 @@ import {
   ErrorCategory, 
   ErrorSeverity,
   ServiceResponse,
+  ErrorResponse,
   ErrorHandler
 } from '../error-handling/structured-error-system.js';
 
@@ -457,7 +458,7 @@ export class APICallQueue {
     );
 
     if (!rateLimitCheck.success) {
-      throw rateLimitCheck.error;
+      throw (rateLimitCheck as ErrorResponse).error;
     }
 
     return new Promise((resolve, reject) => {
@@ -572,7 +573,7 @@ export class APICallQueue {
       if (!result.success) {
         // Record failed request for rate limiting
         this.rateLimitManager.recordRequest(config.identifier, false, config.rateLimit);
-        reject(result.error);
+        reject((result as ErrorResponse).error);
         return;
       }
 

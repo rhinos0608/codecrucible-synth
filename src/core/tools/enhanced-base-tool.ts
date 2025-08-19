@@ -13,7 +13,8 @@ import {
   InputValidator,
   ErrorCategory, 
   ErrorSeverity,
-  ServiceResponse 
+  ServiceResponse,
+  ErrorResponse
 } from '../error-handling/structured-error-system.js';
 import { logger } from '../logger.js';
 
@@ -96,7 +97,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
       // Validate and sanitize input
       const validationResult = await this.validateAndSanitizeInput(params);
       if (!validationResult.success) {
-        return this.createErrorResult(validationResult.error, executionContext, startTime);
+        return this.createErrorResult((validationResult as ErrorResponse).error, executionContext, startTime);
       }
 
       // Execute with timeout and retry logic
@@ -228,7 +229,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
       );
 
       if (!result.success) {
-        throw result.error;
+        throw (result as ErrorResponse).error;
       }
 
       return result.data;

@@ -4,7 +4,7 @@ import { UnifiedModelClient, UnifiedClientConfig } from './core/client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
-export async function initializeCLIContext(): Promise<CLI> {
+export async function initializeCLIContext(): Promise<{cli: CLI, context: CLIContext}> {
   try {
     const configManager = new ConfigManager();
     const config = await configManager.loadConfiguration();
@@ -34,8 +34,31 @@ export async function initializeCLIContext(): Promise<CLI> {
     };
 
     const client = new UnifiedModelClient(clientConfig);
-    const voiceSystem = new VoiceArchetypeSystem(client);
-    const mcpManager = new MCPServerManager();
+    await client.initialize(); // Initialize providers
+    
+    const voiceSystem = new VoiceArchetypeSystem();
+    const mcpManager = new MCPServerManager({
+      filesystem: { 
+        enabled: true,
+        restrictedPaths: [],
+        allowedPaths: ['src', 'test', 'docs']
+      },
+      git: { 
+        enabled: true,
+        autoCommitMessages: true,
+        safeModeEnabled: true
+      },
+      terminal: { 
+        enabled: true,
+        allowedCommands: ['npm', 'node', 'git'],
+        blockedCommands: ['rm', 'sudo']
+      },
+      packageManager: {
+        enabled: true,
+        autoInstall: true,
+        securityScan: true
+      }
+    });
 
     const context: CLIContext = {
       modelClient: client,
@@ -44,7 +67,8 @@ export async function initializeCLIContext(): Promise<CLI> {
       config
     };
 
-    return new CLI(context);
+    const cli = new CLI(context);
+    return {cli, context};
   } catch (error) {
     console.error('Failed to initialize CLI context:', error);
     throw error;
@@ -54,4 +78,15 @@ export async function initializeCLIContext(): Promise<CLI> {
 export { CLI } from './core/cli.js';
 export { UnifiedModelClient } from './core/client.js';
 export { ConfigManager } from './config/config-manager.js';
+
+export async function main() {
+  try {
+    const { cli } = await initializeCLIContext();
+    await cli.run(process.argv.slice(2));
+  } catch (error) {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  }
+}
+
 export default initializeCLIContext;

@@ -44,10 +44,10 @@ export class PerformanceOptimizer extends EventEmitter {
       contextWindowSize: config.contextWindowSize || 32768,
       chunkSize: config.chunkSize || 1000,
       
-      // Batch settings
-      batchSize: config.batchSize || 4,
-      batchTimeoutMs: config.batchTimeoutMs || 100,
-      maxConcurrentBatches: config.maxConcurrentBatches || 2,
+      // Batch settings - optimized for better performance
+      batchSize: config.batchSize || 16,
+      batchTimeoutMs: config.batchTimeoutMs || 500,
+      maxConcurrentBatches: config.maxConcurrentBatches || 1,
       
       // Model parameters
       temperature: config.temperature || 0.3,

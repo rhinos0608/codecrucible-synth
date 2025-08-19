@@ -18,7 +18,9 @@ import {
   ErrorFactory, 
   ErrorCategory, 
   ErrorSeverity,
-  InputValidator 
+  InputValidator,
+  ServiceResponse,
+  ErrorResponse
 } from '../error-handling/structured-error-system.js';
 import { logger } from '../logger.js';
 
@@ -51,7 +53,7 @@ export class SecureFileReadTool extends EnhancedBaseTool {
     // Validate and resolve file path
     const pathValidation = InputValidator.validateFilePath(path);
     if (!pathValidation.success) {
-      throw pathValidation.error;
+      throw (pathValidation as ErrorResponse).error;
     }
 
     const resolvedPath = this.resolveSecurePath(pathValidation.data);
@@ -243,14 +245,14 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
     // Validate inputs
     const pathValidation = InputValidator.validateFilePath(path);
     if (!pathValidation.success) {
-      throw pathValidation.error;
+      throw (pathValidation as ErrorResponse).error;
     }
 
     const contentValidation = InputValidator.validateString(content, 'content', {
       maxLength: 10000000 // 10MB limit for content
     });
     if (!contentValidation.success) {
-      throw contentValidation.error;
+      throw (contentValidation as ErrorResponse).error;
     }
 
     const resolvedPath = this.resolveSecurePath(pathValidation.data);
@@ -433,7 +435,7 @@ export class SecureFileListTool extends EnhancedBaseTool {
     // Validate path
     const pathValidation = InputValidator.validateFilePath(path);
     if (!pathValidation.success) {
-      throw pathValidation.error;
+      throw (pathValidation as ErrorResponse).error;
     }
 
     const resolvedPath = this.resolveSecurePath(pathValidation.data);

@@ -78,8 +78,7 @@ async function startBackendServer(context: CLIContext, port: number): Promise<nu
       );
       
       const synthesis = await context.voiceSystem.synthesizeVoiceResponses(
-        responses,
-        mode || 'competitive'
+        responses
       );
       
       res.json({
@@ -106,7 +105,8 @@ async function startBackendServer(context: CLIContext, port: number): Promise<nu
   
   app.get('/api/status', async (req, res) => {
     try {
-      const modelStatus = await context.modelClient.checkConnection();
+      const healthCheck = await context.modelClient.healthCheck();
+      const modelStatus = Object.values(healthCheck).some(status => status);
       res.json({
         model: {
           available: modelStatus,
@@ -134,8 +134,7 @@ async function startBackendServer(context: CLIContext, port: number): Promise<nu
         );
         
         const synthesis = await context.voiceSystem.synthesizeVoiceResponses(
-          responses,
-          data.mode || 'competitive'
+          responses
         );
         
         socket.emit('generation_complete', {

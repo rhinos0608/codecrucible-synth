@@ -25,7 +25,8 @@ declare class Logger {
     private logQueue;
     private isWriting;
     private logDirectory;
-    constructor(config?: Partial<LoggerConfig>);
+    private name?;
+    constructor(nameOrConfig?: string | Partial<LoggerConfig>, config?: Partial<LoggerConfig>);
     /**
      * Ensure log directory exists
      */

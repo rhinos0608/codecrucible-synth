@@ -243,13 +243,14 @@ export class DependencyAuditor {
 
       if (auditResult.vulnerabilities) {
         for (const [pkgName, vulnInfo] of Object.entries(auditResult.vulnerabilities as any)) {
-          const severity = this.mapNpmSeverity(vulnInfo.severity);
+          const vuln = vulnInfo as any;
+          const severity = this.mapNpmSeverity(vuln.severity);
           
           this.issues.push({
             type: 'security',
             severity,
             dependency: pkgName,
-            description: `${vulnInfo.via?.length || 0} security vulnerabilities found`,
+            description: `${vuln.via?.length || 0} security vulnerabilities found`,
             recommendation: 'Run `npm audit fix` or update to a secure version',
             autoFixable: true
           });
@@ -257,7 +258,7 @@ export class DependencyAuditor {
           // Update dependency info
           const depInfo = this.dependencies.get(pkgName);
           if (depInfo) {
-            depInfo.securityVulnerabilities = vulnInfo.via?.length || 0;
+            depInfo.securityVulnerabilities = vuln.via?.length || 0;
           }
         }
       }

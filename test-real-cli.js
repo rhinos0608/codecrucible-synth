@@ -25,7 +25,8 @@ class RealCLITester {
     console.log('🔧 Initializing CLI context...');
     
     try {
-      this.cli = await initializeCLIContext();
+      const {cli, context} = await initializeCLIContext();
+      this.cli = cli;
       console.log('✅ CLI context initialized successfully\n');
       await this.runRealCLITests();
     } catch (error) {

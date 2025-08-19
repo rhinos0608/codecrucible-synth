@@ -81,12 +81,19 @@ export class UnifiedModelClient extends EventEmitter {
     };
     this.performanceMonitor = new PerformanceMonitor();
     this.securityUtils = new SecurityUtils();
-    this.initializeProviders();
+    // Note: Provider initialization will be done in initialize() method
     
     // OPTIMIZED: Automated cache cleanup to prevent memory leaks
     setInterval(() => {
       this.cleanupCache();
     }, 60000); // Every minute
+  }
+  
+  /**
+   * Initialize providers - must be called after constructor
+   */
+  async initialize(): Promise<void> {
+    await this.initializeProviders();
   }
 
   private getDefaultConfig(): UnifiedClientConfig {
@@ -99,8 +106,8 @@ export class UnifiedModelClient extends EventEmitter {
       fallbackChain: ['ollama', 'lm-studio', 'huggingface'],
       performanceThresholds: {
         fastModeMaxTokens: 1000,
-        timeoutMs: 30000,
-        maxConcurrentRequests: 1 // OPTIMIZED: Reduced from 3 to 1 to prevent resource competition
+        timeoutMs: 180000,  // 3 minutes default timeout
+        maxConcurrentRequests: 3 // Increased back to 3 for faster parallel processing
       },
       security: {
         enableSandbox: true,
@@ -182,7 +189,7 @@ export class UnifiedModelClient extends EventEmitter {
   /**
    * Stream request method for real-time processing
    */
-  async streamRequest(request: any): AsyncIterable<any> {
+  async streamRequest(request: any): Promise<AsyncIterable<any>> {
     const streamRequest = {
       ...request,
       stream: true
@@ -312,19 +319,19 @@ export class UnifiedModelClient extends EventEmitter {
     switch (mode) {
       case 'fast':
         provider = this.selectFastestProvider();
-        timeout = complexity === 'simple' ? 30000 : 45000; // 30s for simple, 45s for others
+        timeout = complexity === 'simple' ? 120000 : 180000; // 2min for simple, 3min for others
         break;
       
       case 'quality':
         provider = this.selectMostCapableProvider();
-        timeout = complexity === 'complex' ? 90000 : 60000; // 90s for complex, 60s for others
+        timeout = complexity === 'complex' ? 240000 : 180000; // 4min for complex, 3min for others
         break;
       
       case 'auto':
       default:
         provider = this.selectBalancedProvider();
-        timeout = complexity === 'simple' ? 45000 : 
-                 complexity === 'complex' ? 75000 : 60000; // Adaptive timeouts
+        timeout = complexity === 'simple' ? 120000 : 
+                 complexity === 'complex' ? 240000 : 180000; // Adaptive timeouts: 2-4 minutes
         break;
     }
 
@@ -684,9 +691,19 @@ export class UnifiedModelClient extends EventEmitter {
     return { success: true, message: 'Auto setup complete' };
   }
 
-  async generateText(prompt: string): Promise<string> {
+  async generateText(prompt: string, options?: any): Promise<string> {
     const response = await this.generate({ prompt });
-    return response.content;
+    return response.text || response.content || response.response || '';
+  }
+
+  async generate(request: any): Promise<any> {
+    return await this.processRequest({
+      prompt: request.prompt,
+      temperature: request.temperature,
+      model: request.model,
+      maxTokens: request.maxTokens,
+      stream: request.stream
+    });
   }
 
   /**

@@ -818,4 +818,25 @@ export class EnhancedContextManager {
       summary: this.getContextSummary()
     };
   }
+
+  /**
+   * Cleanup resources and save state
+   */
+  async cleanup(): Promise<void> {
+    try {
+      // Stop the persistence timer
+      if (this.persistenceTimer) {
+        clearInterval(this.persistenceTimer);
+        this.persistenceTimer = null;
+      }
+      
+      // Save current state
+      await this.saveContext();
+      
+      // Clear the context store
+      this.contextStore.clear();
+    } catch (error) {
+      console.error('Error during context manager cleanup:', error);
+    }
+  }
 }

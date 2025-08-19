@@ -153,20 +153,24 @@ export class PerformanceMonitor extends EventEmitter {
     
     if (!providerStats) {
       providerStats = {
+        requests: 0,
+        totalRequests: 0,
+        totalLatency: 0,
         averageLatency: 0,
         successRate: 0,
-        totalRequests: 0,
         errorRate: 0
       };
       this.providerMetrics.set(provider, providerStats);
     }
 
     // Update total requests
+    providerStats.requests++;
     providerStats.totalRequests++;
 
     // Update latency
     if (metrics.endTime && metrics.startTime) {
       const latency = metrics.endTime - metrics.startTime;
+      providerStats.totalLatency += latency;
       providerStats.averageLatency = (
         (providerStats.averageLatency * (providerStats.totalRequests - 1) + latency) /
         providerStats.totalRequests

@@ -12,6 +12,7 @@ import {
   ErrorCategory, 
   ErrorSeverity,
   ServiceResponse,
+  ErrorResponse,
   ErrorHandler
 } from '../error-handling/structured-error-system.js';
 
@@ -265,7 +266,7 @@ export class AdvancedInputValidator {
     });
 
     if (!validation.success) {
-      return ErrorHandler.createErrorResponse(validation.error);
+      return ErrorHandler.createErrorResponse((validation as ErrorResponse).error);
     }
 
     const { sanitizedValue, threats } = validation.data;
@@ -322,7 +323,7 @@ export class AdvancedInputValidator {
     });
 
     if (!validation.success) {
-      return ErrorHandler.createErrorResponse(validation.error);
+      return ErrorHandler.createErrorResponse((validation as ErrorResponse).error);
     }
 
     const { sanitizedValue, threats } = validation.data;
@@ -381,7 +382,7 @@ export class AdvancedInputValidator {
     });
 
     if (!validation.success) {
-      return ErrorHandler.createErrorResponse(validation.error);
+      return ErrorHandler.createErrorResponse((validation as ErrorResponse).error);
     }
 
     const { sanitizedValue } = validation.data;
@@ -612,7 +613,7 @@ export class SchemaValidator {
       // Perform security validation on string fields
       const securityCheck = this.performSecurityValidation(result.data, options);
       if (!securityCheck.success) {
-        return ErrorHandler.createErrorResponse(securityCheck.error);
+        return ErrorHandler.createErrorResponse((securityCheck as ErrorResponse).error);
       }
 
       return ErrorHandler.createSuccessResponse(result.data);

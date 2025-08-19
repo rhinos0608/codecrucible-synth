@@ -33,16 +33,30 @@ class Logger {
   private logQueue: LogEntry[] = [];
   private isWriting = false;
   private logDirectory: string;
+  private name?: string;
 
-  constructor(config?: Partial<LoggerConfig>) {
-    this.config = {
-      level: 'info',
-      toFile: true,
-      toConsole: true,
-      maxFileSize: '10MB',
-      maxFiles: 5,
-      ...config
-    };
+  constructor(nameOrConfig?: string | Partial<LoggerConfig>, config?: Partial<LoggerConfig>) {
+    // Handle overloaded constructor
+    if (typeof nameOrConfig === 'string') {
+      this.name = nameOrConfig;
+      this.config = {
+        level: 'info',
+        toFile: true,
+        toConsole: true,
+        maxFileSize: '10MB',
+        maxFiles: 5,
+        ...config
+      };
+    } else {
+      this.config = {
+        level: 'info',
+        toFile: true,
+        toConsole: true,
+        maxFileSize: '10MB',
+        maxFiles: 5,
+        ...nameOrConfig
+      };
+    }
 
     this.logDirectory = this.config.logDirectory || join(homedir(), '.codecrucible', 'logs');
     this.ensureLogDirectory();

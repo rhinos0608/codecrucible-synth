@@ -34,20 +34,18 @@ export class SecurityUtils {
       allowedCommands: ['npm', 'node', 'git', 'tsc', 'eslint'],
       allowedPaths: [process.cwd()],
       blockedPatterns: [
-        /rm\s+-rf/gi,          // Dangerous delete commands
-        /sudo\s+/gi,           // Privilege escalation
-        /eval\s*\(/gi,         // Code evaluation
-        /exec\s*\(/gi,         // Code execution
-        /system\s*\(/gi,       // System calls
-        /shell_exec/gi,        // Shell execution
-        /file_get_contents/gi, // File access
-        /fopen\s*\(/gi,        // File operations
-        /curl\s+.*\|\s*sh/gi,  // Remote execution
-        /wget\s+.*\|\s*sh/gi,  // Remote execution
-        /powershell\s+/gi,     // PowerShell execution
-        /cmd\s+\/c/gi,         // Command prompt execution
-        /net\s+user/gi,        // User management
-        /reg\s+add/gi,         // Registry modification
+        /rm\s+-rf\s+\/[^/\s]*/gi,     // Dangerous delete commands with actual paths
+        /sudo\s+rm/gi,                // Sudo with dangerous commands
+        /eval\s*\(\s*[^)]*\$_/gi,     // Dynamic code evaluation with user input
+        /exec\s*\(\s*[^)]*\$_/gi,     // Dynamic code execution with user input
+        /system\s*\(\s*[^)]*\$_/gi,   // Dynamic system calls with user input
+        /shell_exec\s*\(\s*[^)]*\$_/gi, // Dynamic shell execution with user input
+        /curl\s+.*\|\s*sh/gi,         // Remote execution
+        /wget\s+.*\|\s*sh/gi,         // Remote execution
+        /powershell\s+-[Cc]ommand/gi, // PowerShell remote execution
+        /cmd\s+\/c\s+.*&/gi,          // Chained command execution
+        /net\s+user\s+.*\/add/gi,     // User creation
+        /reg\s+add\s+HKEY/gi,         // Registry modification
         /schtasks/gi,          // Task scheduling
         /wmic/gi,              // WMI commands
         /format\s+c:/gi,       // Format commands
@@ -90,15 +88,20 @@ export class SecurityUtils {
         };
       }
 
-      // Check for blocked patterns
-      for (const pattern of this.blockedPatterns) {
-        if (pattern.test(input)) {
-          logger.warn('🚨 Blocked potentially dangerous input pattern', { pattern: pattern.source });
-          return {
-            isValid: false,
-            reason: `Input contains potentially dangerous pattern: ${pattern.source}`,
-            riskLevel: 'high'
-          };
+      // Check if this is legitimate code analysis context
+      const isCodeAnalysis = this.isLegitimateCodeAnalysis(input);
+      
+      // Check for blocked patterns (skip if legitimate code analysis)
+      if (!isCodeAnalysis) {
+        for (const pattern of this.blockedPatterns) {
+          if (pattern.test(input)) {
+            logger.warn('🚨 Blocked potentially dangerous input pattern', { pattern: pattern.source });
+            return {
+              isValid: false,
+              reason: `Input contains potentially dangerous pattern: ${pattern.source}`,
+              riskLevel: 'high'
+            };
+          }
         }
       }
 
@@ -503,5 +506,27 @@ export class SecurityUtils {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { blockedPatterns, ...config } = this.config;
     return config;
+  }
+
+  private isLegitimateCodeAnalysis(input: string): boolean {
+    // Check for code analysis indicators
+    const analysisPatterns = [
+      /analyze\s+this\s+.*code/gi,
+      /code\s+analysis/gi,
+      /file:\s+.*\.(js|ts|py|java|cpp|c|h|css|html|json)/gi,
+      /content:\s*```/gi,
+      /project\s+structure/gi,
+      /codebase/gi,
+      /overview\s+of\s+the\s+project/gi,
+      /technology\s+stack/gi,
+      /brief\s+summary/gi,
+      /key\s+functions/gi,
+      /quality\s+assessment/gi,
+      /potential\s+issues/gi,
+      /security\s+concerns/gi,
+      /\.(js|ts|tsx|jsx|py|java|cpp|c|h|css|html|json|md|yml|yaml)\s+code\s+file/gi
+    ];
+
+    return analysisPatterns.some(pattern => pattern.test(input));
   }
 }

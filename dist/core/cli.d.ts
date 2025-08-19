@@ -101,7 +101,11 @@ export declare class CLI {
     private analyzeFile;
     private handleSlashCommand;
     private determineRequestType;
-    private processPrompt;
+    /**
+     * Process prompt and return response (for testing)
+     */
+    processPrompt(prompt: string, options?: CLIOptions): Promise<string>;
+    private processPromptInternal;
     private executePromptProcessing;
     /**
      * Show comprehensive project intelligence
@@ -155,6 +159,10 @@ export declare class CLI {
      * Get list of analyzable files in directory
      */
     private getAnalyzableFiles;
+    /**
+     * Clean up CLI resources
+     */
+    destroy(): Promise<void>;
     /**
      * Legacy compatibility methods for existing tests
      */

@@ -66,6 +66,13 @@ describe('CodeCrucible Agent Integration Tests', () => {
     cli = new CodeCrucibleCLI(mockContext as any);
   });
 
+  afterEach(async () => {
+    // Clean up CLI instance
+    if (cli && cli.destroy) {
+      await cli.destroy();
+    }
+  });
+
   describe('Basic Agent Functionality', () => {
     test('should initialize agent successfully', async () => {
       // Test that CLI is properly constructed with context

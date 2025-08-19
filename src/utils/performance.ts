@@ -66,6 +66,10 @@ export class PerformanceMonitor extends EventEmitter {
   constructor(enableMonitoring: boolean = true) {
     super();
     this.monitoringEnabled = enableMonitoring;
+    
+    // Set higher max listeners to avoid warnings during testing
+    this.setMaxListeners(20);
+    
     if (this.monitoringEnabled) {
       this.initializeSystemMonitoring();
     }

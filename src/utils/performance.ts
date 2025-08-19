@@ -53,7 +53,7 @@ export class PerformanceMonitor extends EventEmitter {
   private systemMetrics: SystemMetrics | null = null;
   private alerts: PerformanceAlert[] = [];
   private startTime: number = Date.now();
-  private monitoringEnabled: boolean = true;
+  private monitoringEnabled: boolean;
   private monitoringInterval?: NodeJS.Timeout;
   
   private readonly MAX_HISTORY_SIZE = 50; // OPTIMIZED: Reduced from 1000 to prevent memory leaks

@@ -1,5 +1,5 @@
 export class VoiceArchetypeSystem {
-  private voices: Map<string, any> = new Map();
+  private voices: Map<string, Record<string, unknown>> = new Map();
   
   constructor() {
     this.initializeVoices();
@@ -179,7 +179,7 @@ export class VoiceArchetypeSystem {
     }
   }
   
-  async synthesizeVoiceResponses(responses: any[]) {
+  async synthesizeVoiceResponses(responses: Record<string, unknown>[]) {
     const combined = responses.map(r => r.content).join('\n\n---\n\n');
     return { 
       content: combined,

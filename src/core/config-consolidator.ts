@@ -6,7 +6,7 @@
  */
 
 import { promises as fs } from 'fs';
-import { resolve, join } from 'path';
+import { resolve } from 'path';
 import { load as loadYaml } from 'js-yaml';
 import { logger } from './logger.js';
 
@@ -21,11 +21,11 @@ interface ConfigConflict {
   key: string;
   sources: Array<{
     file: string;
-    value: any;
+    value: unknown;
     priority: number;
   }>;
   resolution: 'highest_priority' | 'merge' | 'manual_required';
-  resolvedValue: any;
+  resolvedValue: unknown;
 }
 
 export class ConfigurationConsolidator {
@@ -102,7 +102,7 @@ export class ConfigurationConsolidator {
         
         if (exists) {
           const content = await fs.readFile(filePath, 'utf-8');
-          let data: any;
+          let data: unknown;
 
           switch (configFile.type) {
             case 'yaml':
@@ -155,7 +155,7 @@ export class ConfigurationConsolidator {
    * Detect conflicts between configuration sources
    */
   private detectConflicts(): void {
-    const keyMap = new Map<string, Array<{ source: ConfigSource; value: any; path: string }>>();
+    const keyMap = new Map<string, Array<{ source: ConfigSource; value: unknown; path: string }>>();
 
     // Flatten all configurations and track their sources
     for (const source of this.sources) {
@@ -208,10 +208,10 @@ export class ConfigurationConsolidator {
    * Flatten nested configuration objects for conflict detection
    */
   private flattenConfig(
-    obj: any, 
+    obj: Record<string, unknown>, 
     prefix: string, 
     source: ConfigSource,
-    keyMap: Map<string, Array<{ source: ConfigSource; value: any; path: string }>>
+    keyMap: Map<string, Array<{ source: ConfigSource; value: unknown; path: string }>>
   ): void {
     for (const [key, value] of Object.entries(obj)) {
       const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -295,7 +295,7 @@ export class ConfigurationConsolidator {
   /**
    * Deep merge two objects
    */
-  private mergeDeep(target: any, source: any): any {
+  private mergeDeep(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
     for (const key in source) {
       if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
         if (!target[key]) target[key] = {};
@@ -310,7 +310,7 @@ export class ConfigurationConsolidator {
   /**
    * Set value in nested object using dot notation
    */
-  private setNestedValue(obj: any, path: string, value: any): void {
+  private setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
     const keys = path.split('.');
     let current = obj;
 
@@ -429,7 +429,7 @@ SOURCES PROCESSED:
   /**
    * Get value from nested object using dot notation
    */
-  private getNestedValue(obj: any, path: string): any {
+  private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
     return path.split('.').reduce((current, key) => current?.[key], obj);
   }
 }
@@ -439,7 +439,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const consolidator = new ConfigurationConsolidator();
   
   consolidator.consolidateConfigurations()
-    .then(result => {
+    .then(_result => {
       console.log(consolidator.generateReport());
       
       const validation = consolidator.validateConfiguration();

@@ -5,7 +5,7 @@
  * Automatically syncs and validates documentation across the codebase
  */
 
-import { promises as fs } from 'fs';
+import { promises as fs, readFileSync } from 'fs';
 import { glob } from 'glob';
 import { resolve, relative, basename, dirname } from 'path';
 import { logger } from './logger.js';
@@ -291,7 +291,7 @@ export class DocumentationSyncSystem {
    */
   private hasInlineDocumentation(filePath: string): boolean {
     try {
-      const content = require('fs').readFileSync(filePath, 'utf-8');
+      const content = readFileSync(filePath, 'utf-8');
       return content.includes('/**') || content.includes('//') && content.split('//').length > 5;
     } catch {
       return false;
@@ -367,7 +367,7 @@ export class DocumentationSyncSystem {
     let packageVersion = '1.0.0';
     
     try {
-      const packageContent = require('fs').readFileSync(packageJsonPath, 'utf-8');
+      const packageContent = readFileSync(packageJsonPath, 'utf-8');
       const packageData = JSON.parse(packageContent);
       packageVersion = packageData.version;
     } catch {
@@ -482,7 +482,7 @@ export class DocumentationSyncSystem {
    * Generate README content
    */
   private async generateReadme(): Promise<string> {
-    let packageData: any = {};
+    let packageData: Record<string, unknown> = {};
     
     try {
       const packageContent = await fs.readFile('package.json', 'utf-8');

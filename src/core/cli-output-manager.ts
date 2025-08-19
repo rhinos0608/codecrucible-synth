@@ -4,7 +4,7 @@ export interface CLIOutputManager {
   outputInfo: (message: string) => void;
   outputDebug: (message: string) => void;
   outputProgress: (message: string) => void;
-  configure: (options: any) => void;
+  configure: (options: Record<string, unknown>) => void;
 }
 
 export function createCLIOutputManager(): CLIOutputManager {
@@ -26,7 +26,7 @@ export function createCLIOutputManager(): CLIOutputManager {
     outputProgress: (message: string) => {
       console.log('⏳', message);
     },
-    configure: (options: any) => {
+    configure: (options: Record<string, unknown>) => {
       // Configuration logic
     }
   };

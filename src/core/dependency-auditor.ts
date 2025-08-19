@@ -475,7 +475,6 @@ OVERVIEW:
 `;
 
     // Issues by type
-    const issueTypes = ['critical', 'high', 'medium', 'low'] as const;
     const typeGroups = new Map<string, DependencyIssue[]>();
 
     for (const issue of this.issues) {

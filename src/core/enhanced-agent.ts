@@ -338,10 +338,10 @@ export class EnhancedCodeCrucibleAgent {
     console.log('');
   }
 
-  private formatError(error: any): string {
+  private formatError(error: Error | unknown): string {
     const timestamp = new Date().toISOString();
     return `❌ CodeCrucible Error [${timestamp}]\n\n` +
-           `${error.message || 'Unknown error occurred'}\n\n` +
+           `${error instanceof Error ? error.message : 'Unknown error occurred'}\n\n` +
            `Please check your configuration and try again.`;
   }
 

@@ -164,6 +164,10 @@ export declare class CLI {
      */
     destroy(): Promise<void>;
     /**
+     * Update CLI configuration (for testing)
+     */
+    updateConfiguration(newConfig: any): Promise<boolean>;
+    /**
      * Legacy compatibility methods for existing tests
      */
     checkOllamaStatus(): Promise<boolean>;

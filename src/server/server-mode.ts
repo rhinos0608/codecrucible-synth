@@ -4,8 +4,8 @@ import { Server as SocketIOServer } from 'socket.io';
 import { CLIContext } from '../core/cli.js';
 import { logger } from '../core/logger.js';
 import chalk from 'chalk';
-import { readFile, writeFile, stat, readdir } from 'fs/promises';
-import { join, extname, relative } from 'path';
+import { readFile, writeFile, stat } from 'fs/promises';
+import { join, extname } from 'path';
 
 export interface ServerOptions {
   port: number;
@@ -143,8 +143,8 @@ export async function startServerMode(context: CLIContext, options: ServerOption
         voices = context.config.voices?.default || ['explorer', 'maintainer'],
         mode = 'competitive',
         context: userContext = [],
-        language,
-        file_path
+        language: _language,
+        file_path: _file_path
       } = req.body;
 
       if (!prompt) {
@@ -169,9 +169,9 @@ export async function startServerMode(context: CLIContext, options: ServerOption
       res.json({
         success: true,
         result: {
-          code: (synthesis as any).combinedCode || synthesis.content,
-          reasoning: (synthesis as any).reasoning || 'No reasoning provided',
-          confidence: (synthesis as any).confidence || 0.8,
+          code: (synthesis as Record<string, unknown>).combinedCode || synthesis.content,
+          reasoning: (synthesis as Record<string, unknown>).reasoning || 'No reasoning provided',
+          confidence: (synthesis as Record<string, unknown>).confidence || 0.8,
           quality_score: synthesis.qualityScore,
           voices_used: synthesis.voicesUsed
         },
@@ -338,7 +338,7 @@ ${refactorPrompt}`,
               type: language,
               language
             }],
-            workingDirectory: (context.config as any).workingDirectory || process.cwd(),
+            workingDirectory: (context.config as Record<string, unknown>).workingDirectory || process.cwd(),
             config: {},
             structure: { directories: [], fileTypes: {} }
           });
@@ -352,7 +352,7 @@ ${refactorPrompt}`,
             original_code: originalContent,
             refactored_code: refactoredCode,
             explanation: response.content.replace(/```[\s\S]*?```/g, '').trim(),
-            confidence: (response as any).confidence || 0.8
+            confidence: (response as Record<string, unknown>).confidence || 0.8
           });
           break;
 
@@ -458,7 +458,7 @@ ${refactorPrompt}`,
     // Handle real-time code generation
     socket.on('generate_realtime', async (data) => {
       try {
-        const { prompt, voices, mode, context: userContext } = data;
+        const { prompt, voices, mode, context: _userContext } = data;
 
         socket.emit('generation_started', { id: data.id });
 
@@ -608,7 +608,7 @@ function extractRecommendations(analysisContent: string): string[] {
         lowerSentence.includes('implement')) {
       
       // Clean up the sentence
-      let recommendation = sentence.trim();
+      const recommendation = sentence.trim();
       if (recommendation.length > 10 && recommendation.length < 200) {
         recommendations.push(recommendation);
       }

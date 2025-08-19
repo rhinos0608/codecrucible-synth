@@ -461,7 +461,6 @@ export class PerformanceMonitor extends EventEmitter {
     const operation = this.operationTracking.get(operationId);
     if (operation) {
       const endTime = Date.now();
-      const duration = endTime - operation.startTime;
       
       // Record as a request metric for tracking
       this.recordRequest(operation.component || 'unknown', {

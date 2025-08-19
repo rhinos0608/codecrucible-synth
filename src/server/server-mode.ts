@@ -195,12 +195,16 @@ export async function startServerMode(context: CLIContext, options: ServerOption
         temperature: 0.7
       });
 
+      // Calculate quality score based on analysis content
+      const qualityScore = calculateQualityScore(analysis.content);
+      const recommendations = extractRecommendations(analysis.content);
+      
       res.json({
         success: true,
         analysis: {
           content: analysis.content,
-          quality_score: 0.8, // Mock quality score
-          recommendations: [], // Mock recommendations
+          quality_score: qualityScore,
+          recommendations: recommendations,
           timestamp: new Date().toISOString()
         },
         metadata: {
@@ -532,4 +536,70 @@ function detectLanguage(ext: string): string {
   };
 
   return langMap[ext.toLowerCase()] || 'text';
+}
+
+/**
+ * Calculate quality score based on analysis content
+ */
+function calculateQualityScore(analysisContent: string): number {
+  let score = 0.5; // Base score
+  
+  // Positive indicators
+  if (analysisContent.includes('good') || analysisContent.includes('well-written') || analysisContent.includes('excellent')) {
+    score += 0.2;
+  }
+  if (analysisContent.includes('clean') || analysisContent.includes('readable') || analysisContent.includes('maintainable')) {
+    score += 0.15;
+  }
+  if (analysisContent.includes('optimized') || analysisContent.includes('efficient')) {
+    score += 0.1;
+  }
+  
+  // Negative indicators
+  if (analysisContent.includes('issues') || analysisContent.includes('problems') || analysisContent.includes('bugs')) {
+    score -= 0.2;
+  }
+  if (analysisContent.includes('improve') || analysisContent.includes('fix') || analysisContent.includes('refactor')) {
+    score -= 0.1;
+  }
+  if (analysisContent.includes('complex') || analysisContent.includes('difficult')) {
+    score -= 0.05;
+  }
+  
+  // Ensure score is between 0 and 1
+  return Math.max(0, Math.min(1, score));
+}
+
+/**
+ * Extract recommendations from analysis content
+ */
+function extractRecommendations(analysisContent: string): string[] {
+  const recommendations: string[] = [];
+  
+  // Split into sentences and look for recommendation patterns
+  const sentences = analysisContent.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
+  
+  for (const sentence of sentences) {
+    const lowerSentence = sentence.toLowerCase();
+    
+    // Look for recommendation patterns
+    if (lowerSentence.includes('should') || 
+        lowerSentence.includes('could') ||
+        lowerSentence.includes('consider') ||
+        lowerSentence.includes('recommend') ||
+        lowerSentence.includes('suggest') ||
+        lowerSentence.includes('improve') ||
+        lowerSentence.includes('add') ||
+        lowerSentence.includes('use') ||
+        lowerSentence.includes('implement')) {
+      
+      // Clean up the sentence
+      let recommendation = sentence.trim();
+      if (recommendation.length > 10 && recommendation.length < 200) {
+        recommendations.push(recommendation);
+      }
+    }
+  }
+  
+  return recommendations.slice(0, 5); // Return top 5 recommendations
 }

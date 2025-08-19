@@ -33,6 +33,39 @@ export class VoiceArchetypeSystem {
     return Array.from(this.voices.keys());
   }
   
+  private calculateImprovementScore(feedback: string, code: string): number {
+    // Calculate improvement score based on feedback quality and code analysis
+    let score = 0.5; // Base score
+    
+    // Positive indicators
+    if (feedback.includes('good') || feedback.includes('well') || feedback.includes('excellent')) {
+      score += 0.2;
+    }
+    if (feedback.includes('optimized') || feedback.includes('efficient') || feedback.includes('clean')) {
+      score += 0.15;
+    }
+    if (feedback.includes('readable') || feedback.includes('maintainable')) {
+      score += 0.1;
+    }
+    
+    // Negative indicators
+    if (feedback.includes('error') || feedback.includes('bug') || feedback.includes('issue')) {
+      score -= 0.2;
+    }
+    if (feedback.includes('improve') || feedback.includes('fix') || feedback.includes('change')) {
+      score -= 0.1;
+    }
+    
+    // Code quality indicators
+    const codeLines = code.split('\n').length;
+    if (codeLines > 0 && codeLines < 200) { // Reasonable length
+      score += 0.05;
+    }
+    
+    // Ensure score is between 0 and 1
+    return Math.max(0, Math.min(1, score));
+  }
+  
   async generateSingleVoiceResponse(voice: string, prompt: string, client: any) {
     const voiceConfig = this.getVoice(voice);
     if (!voiceConfig) throw new Error('Voice not found: ' + voice);
@@ -132,10 +165,14 @@ export class VoiceArchetypeSystem {
       const auditorResult = await this.generateSingleVoiceResponse(auditorVoice, auditorPrompt, client);
       
       currentCode = writerResult.content;
+      
+      // Calculate real improvement score based on feedback quality
+      const improvementScore = this.calculateImprovementScore(auditorResult.content, currentCode);
+      
       iterations.push({
         content: currentCode,
         feedback: auditorResult.content,
-        improvement: Math.random() * 0.3 + 0.7 // Mock improvement score
+        improvement: improvementScore
       });
     }
     

@@ -56,8 +56,12 @@ export class OllamaProvider {
         options: {
           temperature: request.temperature || 0.7,
           top_p: request.top_p || 0.9,
-          max_tokens: request.max_tokens || 2048,
-          ...gpuConfig  // Include GPU optimization options
+          num_predict: request.maxTokens || request.max_tokens || 2048,
+          num_ctx: gpuConfig.num_ctx || 4096,
+          num_gpu: gpuConfig.num_gpu || 10,
+          num_thread: gpuConfig.num_thread || 4,
+          num_batch: gpuConfig.num_batch || 256
+          // Removed invalid options: max_tokens, numa, mmap
         }
       });
       
@@ -158,7 +162,6 @@ export class OllamaProvider {
         
         // GPU layers
         if (config.model.gpu.layers !== undefined) {
-          gpuConfig.numa = false; // Disable NUMA for GPU
           gpuConfig.num_gpu = config.model.gpu.layers;
         }
         
@@ -177,10 +180,7 @@ export class OllamaProvider {
           gpuConfig.num_ctx = config.model.gpu.context_length;
         }
         
-        // Memory mapping for efficiency
-        if (config.model.gpu.memory_map) {
-          gpuConfig.mmap = true;
-        }
+        // Removed invalid options: numa, mmap
         
         logger.info('🎮 GPU optimization enabled', gpuConfig);
         return gpuConfig;
@@ -191,12 +191,11 @@ export class OllamaProvider {
     
     // Conservative GPU configuration for stability
     return {
-      numa: false,        // Disable NUMA
       num_gpu: 10,        // Conservative GPU layers
       num_thread: 4,      // CPU threads
       num_batch: 256,     // Conservative batch size
-      num_ctx: 4096,      // Conservative context length
-      mmap: true          // Memory mapping
+      num_ctx: 4096       // Conservative context length
+      // Removed invalid options: numa, mmap
     };
   }
   

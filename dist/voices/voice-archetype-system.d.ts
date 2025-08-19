@@ -4,6 +4,7 @@ export declare class VoiceArchetypeSystem {
     private initializeVoices;
     getVoice(name: string): any;
     getAvailableVoices(): string[];
+    private calculateImprovementScore;
     generateSingleVoiceResponse(voice: string, prompt: string, client: any): Promise<any>;
     generateMultiVoiceSolutions(voices: string[], prompt: string, client: any): Promise<any[]>;
     synthesize(prompt: string, voices: string[], mode?: 'competitive' | 'collaborative' | 'consensus', client?: any): Promise<{

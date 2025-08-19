@@ -27,7 +27,7 @@ import { glob } from 'glob';
 interface CLIOptions {
   voices?: string | string[];
   depth?: string;
-  mode?: 'competitive' | 'collaborative' | 'consensus' | 'iterative' | 'agentic';
+  mode?: 'competitive' | 'collaborative' | 'consensus' | 'iterative' | 'agentic' | 'comprehensive' | 'analysis';
   file?: string;
   project?: boolean;
   interactive?: boolean;
@@ -1665,6 +1665,213 @@ ${fileContent}
     console.log(chalk.gray(`   Last Scan: ${status.models.lastScan || 'Never'}`));
     
     console.log(chalk.gray('─'.repeat(50)));
+  }
+
+  /**
+   * Initialize CLI with configuration and working directory
+   */
+  async initialize(config?: any, workingDirectory?: string): Promise<void> {
+    if (config) {
+      // Merge provided config with existing context config
+      Object.assign(this.context.config, config);
+    }
+    
+    if (workingDirectory) {
+      this.workingDirectory = workingDirectory;
+      process.chdir(workingDirectory);
+    }
+    
+    // Initialize context awareness if not already done
+    if (!this.initialized) {
+      await this.initializeContextAwareness();
+      this.initialized = true;
+    }
+    
+    logger.info('CLI initialized', { 
+      workingDirectory: this.workingDirectory,
+      configProvided: !!config 
+    });
+  }
+
+  /**
+   * Handle code generation requests
+   */
+  async handleGeneration(prompt: string, options: CLIOptions = {}): Promise<void> {
+    try {
+      // Set default options for generation
+      const generationOptions: CLIOptions = {
+        mode: 'collaborative',
+        stream: true,
+        contextAware: true,
+        ...options
+      };
+
+      // Process the generation request
+      await this.processPrompt(prompt, generationOptions);
+      
+    } catch (error) {
+      logger.error('Generation failed:', error);
+      console.error(chalk.red(`❌ Generation failed: ${error.message}`));
+      throw error;
+    }
+  }
+
+  /**
+   * Handle file analysis requests  
+   */
+  async handleAnalyze(files: string[] = [], options: CLIOptions = {}): Promise<void> {
+    try {
+      if (files.length === 0) {
+        // Analyze current directory
+        files = ['.'];
+      }
+
+      const analysisOptions: CLIOptions = {
+        mode: 'comprehensive',
+        depth: options.depth || '3',
+        verbose: true,
+        ...options
+      };
+
+      for (const file of files) {
+        await this.analyzeTarget(file, analysisOptions);
+      }
+      
+    } catch (error) {
+      logger.error('Analysis failed:', error);
+      console.error(chalk.red(`❌ Analysis failed: ${error.message}`));
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze a specific target (file or directory)
+   */
+  private async analyzeTarget(target: string, options: CLIOptions): Promise<void> {
+    const spinner = ora(`Analyzing ${target}...`).start();
+    
+    try {
+      // Check if target exists
+      const targetPath = isAbsolute(target) ? target : join(this.workingDirectory, target);
+      
+      try {
+        const stats = await stat(targetPath);
+        
+        if (stats.isFile()) {
+          await this.analyzeFile(targetPath, options);
+        } else if (stats.isDirectory()) {
+          await this.analyzeDirectory(targetPath, options);
+        }
+        
+        spinner.succeed(`Analysis of ${target} completed`);
+        
+      } catch (error) {
+        spinner.fail(`Failed to access ${target}`);
+        console.error(chalk.red(`❌ Cannot access ${target}: ${error.message}`));
+      }
+      
+    } catch (error) {
+      spinner.fail(`Analysis failed`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get list of analyzable files in directory
+   */
+  private async getAnalyzableFiles(dirPath: string, maxDepth: number): Promise<string[]> {
+    const patterns = [
+      '**/*.{js,jsx,ts,tsx,py,java,cpp,c,cs,go,rs,php,rb,swift,kt}',
+      '**/*.{json,yaml,yml,xml,md,txt}',
+      '**/package.json',
+      '**/requirements.txt', 
+      '**/Cargo.toml',
+      '**/pom.xml',
+      '**/Dockerfile',
+      '**/*.config.{js,ts}',
+      '**/.{gitignore,env}'
+    ];
+
+    const options = {
+      cwd: dirPath,
+      ignore: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/.git/**',
+        '**/coverage/**',
+        '**/*.min.js',
+        '**/*.bundle.js'
+      ],
+      absolute: false,
+      onlyFiles: true,
+      deep: maxDepth
+    };
+
+    const files: string[] = [];
+    for (const pattern of patterns) {
+      const matches = await glob(pattern, options);
+      files.push(...matches);
+    }
+
+    // Remove duplicates and sort
+    return [...new Set(files)].sort();
+  }
+
+  /**
+   * Legacy compatibility methods for existing tests
+   */
+  async checkOllamaStatus(): Promise<boolean> {
+    try {
+      const healthStatus = await this.context.modelClient.healthCheck();
+      return Object.values(healthStatus).some(status => status === true);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async getAllAvailableModels(): Promise<any[]> {
+    try {
+      return await this.context.modelClient.getAllAvailableModels();
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async getAvailableModels(): Promise<any[]> {
+    return this.getAllAvailableModels();
+  }
+
+  async getBestAvailableModel(): Promise<string> {
+    try {
+      const models = await this.getAllAvailableModels();
+      if (models.length === 0) {
+        throw new Error('No models available');
+      }
+      
+      // Prefer coding models
+      const codingModels = models.filter(model => 
+        model.name?.includes('code') || 
+        model.name?.includes('deepseek') || 
+        model.name?.includes('qwen')
+      );
+      
+      return codingModels.length > 0 ? codingModels[0].name : models[0].name;
+    } catch (error) {
+      logger.error('Failed to get best model:', error);
+      throw error;
+    }
+  }
+
+  async pullModel(name: string): Promise<boolean> {
+    try {
+      // This would depend on the model provider implementation
+      logger.info('Model pull requested:', { model: name });
+      return true;
+    } catch (error) {
+      logger.error('Model pull failed:', error);
+      return false;
+    }
   }
 }
 

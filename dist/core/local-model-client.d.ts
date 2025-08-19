@@ -1,327 +1,75 @@
-import { OptimizationConfig } from './vram-optimizer.js';
-import { AgentResponse } from './response-types.js';
+/**
+ * Local Model Client for CodeCrucible Synth
+ * Provides interface to local AI models (Ollama, LM Studio)
+ */
 export interface LocalModelConfig {
+    provider: 'ollama' | 'lmstudio';
     endpoint: string;
     model: string;
     timeout: number;
-    maxTokens: number;
     temperature: number;
-    performance?: {
-        maxLoadedModels?: number;
-        maxQueueSize?: number;
-        numParallel?: number;
-        memoryLimit?: string;
-        numThreads?: number;
-        numaPolicy?: string;
-        contextSize?: number;
-        quantization?: string;
-        useMmap?: boolean;
-        useMlock?: boolean;
-        batchSize?: number;
+    maxTokens: number;
+    streamingEnabled: boolean;
+}
+export interface ModelResponse {
+    content: string;
+    model: string;
+    metadata: {
+        tokens: number;
+        duration: number;
+        temperature: number;
     };
-    environment?: Record<string, string>;
 }
 export interface VoiceResponse {
     content: string;
     voice: string;
     confidence: number;
-    reasoning?: string;
-    tokens_used: number;
 }
-export interface ProjectContext {
-    files?: Array<{
-        path: string;
-        content: string;
-        language: string;
-    }>;
-    projectType?: string;
-    dependencies?: string[];
-    gitStatus?: string;
-    workingDirectory?: string;
-    recentMessages?: any[];
-    externalFeedback?: Array<{
-        source: string;
-        content: string;
-        priority: number;
-    }>;
-}
-export interface VoiceArchetype {
-    id: string;
-    name: string;
-    systemPrompt: string;
-    temperature: number;
-    style: string;
-}
-/**
- * Enhanced Local Model Client for Ollama integration
- * Features automatic model detection, installation, and management
- */
 export declare class LocalModelClient {
     private client;
     private config;
-    private modelManager;
-    private _cachedBestModel;
-    private errorHandler;
-    private modelSelector;
-    private isOptimized;
-    private fallbackModels;
-    private preloadedModels;
-    private modelCache;
-    private modelWarmupPromises;
-    private vramOptimizer;
-    private currentOptimization;
-    private modelPreloader;
-    private performanceOptimizer;
     constructor(config: LocalModelConfig);
     /**
-     * Calculate adaptive timeout based on system performance and model characteristics
-     */
-    private calculateAdaptiveTimeout;
-    /**
-     * Get dynamic timeout based on operation type and model status
-     */
-    private getDynamicTimeout;
-    /**
-     * Preload primary models for faster response times
-     */
-    /**
-     * Preload primary models for faster response times (non-blocking)
-     */
-    private preloadPrimaryModels;
-    /**
-     * Preload a specific model into memory
-     */
-    private preloadModel;
-    /**
-     * Perform the actual model warmup with optimization
-     */
-    private performModelWarmup;
-    /**
-     * Initialize GPU optimization and hardware detection
-     */
-    private initializeGPUOptimization;
-    /**
-     * Initialize advanced model preloading system
-     */
-    private initializeAdvancedPreloading;
-    /**
-     * Determine primary models based on available models and system capabilities
-     */
-    private determinePrimaryModels;
-    /**
-     * Get best model with preloading awareness and VRAM constraints
-     */
-    /**
-     * Get best model with optimized selection and caching
-     */
-    getBestModel(): Promise<string>;
-    /**
-     * Check if model is suitable for current VRAM constraints (dynamically detected)
-     */
-    private isModelVRAMSuitable;
-    /**
-     * Ensure model is ready before use
-     */
-    ensureModelReady(modelName: string): Promise<boolean>;
-    /**
-     * Get preloader status for debugging
-     */
-    getPreloaderStatus(): any;
-    /**
-     * Check if the local model is available and responding
-     * Enhanced with auto-setup capabilities
+     * Check connection to the model provider
      */
     checkConnection(): Promise<boolean>;
     /**
-     * Optimize a model for VRAM usage and apply optimizations
+     * Check status of the model provider
      */
-    optimizeModelForVRAM(modelName: string): Promise<string>;
+    checkStatus(): Promise<boolean>;
     /**
-     * Get current optimization status
+     * Generate response from model
      */
-    getOptimizationStatus(): OptimizationConfig | null;
+    generate(prompt: string): Promise<string>;
     /**
-     * Display VRAM optimization information
+     * Generate voice-specific response
      */
-    displayVRAMOptimization(modelName: string): void;
+    generateVoiceResponse(prompt: string, voice: string): Promise<VoiceResponse>;
     /**
-     * Smart autonomous model selection with VRAM optimization
+     * Generate multiple voice responses
      */
-    getAvailableModel(taskType?: string): Promise<string>;
+    generateMultiVoiceResponses(prompt: string, voices: string[]): Promise<VoiceResponse[]>;
     /**
-     * Quick health check for a model to see if it's responsive
+     * Analyze code with AI
      */
-    private quickHealthCheck;
+    analyzeCode(code: string, language?: string): Promise<string>;
     /**
-     * Find the first working model from available models
-     */
-    private findWorkingModel;
-    /**
-     * Assess task complexity for model selection
-     */
-    private assessComplexity;
-    /**
-     * Intelligently select the best model from available models
-     */
-    private selectBestAvailableModel;
-    /**
-     * Check if model is ready and available
-     */
-    isModelReady(model: string): Promise<boolean>;
-    /**
-     * Get list of available models from Ollama with intelligent filtering for system capabilities
+     * List available models
      */
     getAvailableModels(): Promise<string[]>;
     /**
-     * Filter models based on system capabilities to prevent VRAM exhaustion
+     * Get best available model for the task
      */
-    private filterModelsBySystemCapabilities;
+    getBestAvailableModel(): Promise<string>;
+    private generateOllama;
+    private generateLMStudio;
+    private buildVoicePrompt;
+    private buildCodeAnalysisPrompt;
     /**
-     * Suggest a working model if current one is not available
+     * Legacy compatibility methods
      */
-    suggestWorkingModel(): Promise<string | null>;
-    /**
-     * Set the model to use (for manual selection)
-     */
-    setModel(modelName: string): void;
-    /**
-     * Get current model being used
-     */
-    getCurrentModel(): string;
-    /**
-     * Enable VRAM optimizations for large models
-     */
-    enableVRAMOptimizations(modelName?: string): Promise<void>;
-    /**
-     * Suggest optimal models for current system
-     */
-    suggestOptimalModels(): Promise<void>;
-    /**
-     * Display available models with VRAM compatibility
-     */
-    displayAvailableModels(): Promise<void>;
-    /**
-     * Select model by index or name
-     */
-    selectModel(selection: string | number): Promise<boolean>;
-    /**
-     * Extract model size from name
-     */
-    private extractModelSize;
-    /**
-     * Get model type/category
-     */
-    private getModelType;
-    /**
-     * Generate a response using a specific model and voice archetype
-     */
-    generateVoiceResponseWithModel(voice: VoiceArchetype, prompt: string, context: ProjectContext, modelName: string, retryCount?: number): Promise<VoiceResponse>;
-    /**
-     * Generate a response from a specific voice archetype
-     */
-    generateVoiceResponse(voice: VoiceArchetype, prompt: string, context: ProjectContext, retryCount?: number): Promise<VoiceResponse>;
-    /**
-     * Get the fastest available model optimized for detected VRAM capacity
-     */
-    private getFastestAvailableModel;
-    /**
-     * Analyze task type from prompt for intelligent model selection
-     */
-    private analyzeTaskType;
-    /**
-     * Try fallback models if primary fails
-     */
-    private tryFallbackModels;
-    /**
-     * Generate responses from multiple voices with optimized concurrency control
-     */
-    generateMultiVoiceResponses(voices: VoiceArchetype[], prompt: string, context: ProjectContext): Promise<VoiceResponse[]>;
-    /**
-     * Generate a single response from the local model with GPU optimization and error handling
-     */
-    generate(prompt: string, jsonSchema?: any, retryCount?: number): Promise<string>;
-    /**
-     * Streamlined API call for maximum speed - bypasses voice complexity
-     */
-    generateFast(prompt: string, maxTokens?: number): Promise<string>;
-    /**
-     * Analyze code with local model
-     */
-    analyzeCode(code: string, language: string): Promise<any>;
-    /**
-     * Enhance prompt with voice-specific instructions and context
-     */
-    private enhancePromptWithVoice;
-    /**
-     * Generate style-specific instructions for voice behavior
-     */
-    private generateStyleInstructions;
-    /**
-     * Sanitize prompt input to prevent injection attacks
-     */
-    private sanitizePromptInput;
-    /**
-     * Sanitize project context to prevent injection
-     */
-    private sanitizeContext;
-    /**
-     * Sanitize file paths to prevent path traversal
-     */
-    private sanitizeFilePath;
-    /**
-     * Sanitize file content to prevent code injection
-     */
-    private sanitizeFileContent;
-    /**
-     * Basic string sanitization
-     */
-    private sanitizeString;
-    /**
-     * Format project context for the model
-     */
-    private formatContext;
-    /**
-     * Build request for Ollama endpoint with performance optimizations
-     */
-    private buildOllamaRequest;
-    /**
-     * Build request for OpenAI-compatible endpoint
-     */
-    private buildOpenAIRequest;
-    /**
-     * Parse response from voice generation
-     */
-    private parseVoiceResponse;
-    /**
-     * Parse a single response from the local model
-     */
-    private parseResponse;
-    /**
-     * Parse code analysis response
-     */
-    private parseAnalysisResponse;
-    /**
-     * Calculate confidence score based on response characteristics
-     */
-    private calculateConfidence;
-    /**
-     * Extract quality score from analysis content
-     */
-    private extractQualityScore;
-    /**
-     * Extract recommendations from analysis content
-     */
-    private extractRecommendations;
-    /**
-     * Display helpful troubleshooting information for common issues
-     */
-    static displayTroubleshootingHelp(): void;
-    /**
-     * Convert legacy VoiceResponse to standardized AgentResponse
-     */
-    voiceResponseToAgentResponse(voiceResponse: VoiceResponse): AgentResponse;
-    /**
-     * Generate voice response with standardized format
-     */
-    generateStandardVoiceResponse(voice: VoiceArchetype, prompt: string, context: ProjectContext, retryCount?: number): Promise<AgentResponse>;
+    checkOllamaStatus(): Promise<boolean>;
+    getAllAvailableModels(): Promise<any[]>;
+    pullModel(name: string): Promise<boolean>;
 }
+export default LocalModelClient;

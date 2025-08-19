@@ -1,326 +1,202 @@
-# CodeCrucible Synth v2.0.0
+# CodeCrucible Synth v3.8.1
 
-> **Revolutionary Standalone Desktop CLI Agentic Coding Assistant**  
-> *Complete local AI-powered development with multi-voice synthesis*
+> **Revolutionary AI-Powered Code Generation & Analysis Tool**  
+> *Complete local AI assistance with multi-voice synthesis and hybrid model architecture*
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/codecrucible/codecrucible-synth)
+[![Version](https://img.shields.io/badge/version-3.8.1-blue.svg)](https://github.com/rhinos0608/codecrucible-synth)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
+[![AI Models](https://img.shields.io/badge/models-Ollama%20%7C%20LM%20Studio-orange.svg)](https://ollama.ai)
 
-**CodeCrucible Synth** is a completely self-contained, offline-first coding assistant that brings the power of multi-voice AI synthesis to your local development environment. No API keys, no external dependencies, no cloud services required.
+**CodeCrucible Synth** is an advanced local AI coding assistant that combines the power of multiple LLM providers through an intelligent hybrid architecture. It features a unique multi-voice synthesis system where different AI personalities collaborate to provide superior code generation, analysis, and architectural guidance.
 
 ## 🚀 What Makes This Special
 
-### 🎭 Multi-Voice AI System
-- **9 Specialized AI Voices** - Each with unique perspectives and expertise
-- **Synthesis Engine** - Combines multiple viewpoints into superior solutions
+### 🎭 Multi-Voice AI Synthesis System
+- **10 Specialized AI Voices** - Each with unique expertise and personality
+- **Intelligent Synthesis** - Competitive, collaborative, and consensus modes
 - **Voice Archetypes** - Explorer, Maintainer, Security, Architect, Designer, and more
-- **Configurable Presets** - Pre-tuned voice combinations for common tasks
+- **Adaptive Temperature** - Each voice optimized for its specific role
 
-### 🏠 Completely Local & Offline
-- **No API Keys Required** - Uses local Ollama with gpt-oss-20b
-- **Full Privacy** - Your code never leaves your machine
-- **No Internet Dependencies** - Works completely offline
-- **Zero Configuration** - Self-configuring with sensible defaults
+### 🏠 Local-First with Hybrid Intelligence
+- **Hybrid Architecture** - Ollama + LM Studio for optimal performance
+- **Complete Privacy** - Your code never leaves your machine
+- **Smart Model Routing** - Automatically selects best model for each task
+- **Graceful Degradation** - Works without models for basic operations
 
 ### 🖥️ Multiple Interface Options
-- **CLI Mode** - Rich terminal interface with colors and interactive prompts
-- **Agentic Mode** - Cursor/Claude Code-like autonomous coding assistant
-- **Desktop GUI** - Electron-based visual interface
-- **Server Mode** - REST API for IDE integration
+- **Enhanced CLI** - Rich terminal interface with intelligent project awareness
+- **Server Mode** - REST API + WebSocket for IDE integration
+- **Desktop App** - Electron-based GUI (Experimental)
+- **MCP Integration** - Model Context Protocol for extensibility
 
-### 🔧 Advanced Features
-- **File System Integration** - Safe, sandboxed file operations
-- **Project Awareness** - Understands your codebase structure
-- **Real-time File Watching** - Responds to code changes automatically
-- **Multi-Language Support** - TypeScript, JavaScript, Python, and more
-- **MCP Server Integration** - Extensible with Model Context Protocol
+### 🧠 Advanced Features
+- **Project Intelligence** - Deep understanding of codebase structure
+- **Real-time Analysis** - Live file watching and context awareness
+- **Performance Monitoring** - Built-in metrics and optimization insights
+- **Error Recovery** - Resilient operation with fallback strategies
 
 ## 📋 Prerequisites
 
 1. **Node.js 18+** - [Download Node.js](https://nodejs.org)
-2. **Ollama** - Local AI model runtime (auto-installed during setup)
+2. **Local AI Models** (Optional but Recommended):
+   - **Ollama** - For high-quality reasoning and analysis
+   - **LM Studio** - For fast response times (optional dual-agent mode)
 
-## 🚀 One-Liner Installation
+## 🚀 Quick Installation
 
-### npm (Recommended - Once Published)
+### npm (Recommended)
 ```bash
 npm install -g codecrucible-synth
-crucible
+codecrucible --version
 ```
 
 ### npx (No Installation Required)
 ```bash
-npx codecrucible-synth
+npx codecrucible-synth --help
 ```
 
-### curl + bash (Unix/macOS)
+### From Source
 ```bash
-curl -sSL https://raw.githubusercontent.com/rhinos0608/codecrucibe-synth/main/install-from-git.sh | bash
-```
-
-### PowerShell (Windows)
-```powershell
-iwr -useb https://raw.githubusercontent.com/rhinos0608/codecrucibe-synth/main/install-from-git.ps1 | iex
-```
-
-### Manual Installation
-```bash
-git clone https://github.com/rhinos0608/codecrucibe-synth.git
-cd codecrucibe-synth
+git clone https://github.com/rhinos0608/codecrucible-synth.git
+cd codecrucible-synth
 npm install && npm run build
 npm link  # Makes 'crucible' command available globally
 ```
 
-### Automatic Setup ✨
+### AI Model Setup (Optional)
 
-CodeCrucible features **autonomous setup** with progressive model pulling:
-```
-
-The app will automatically:
-- Install Ollama if needed
-- Guide you through model selection
-- Set up your preferred AI model
-- Start the enhanced agentic client
-
-### Manual Ollama Setup (Optional)
-
-If you prefer manual setup:
+CodeCrucible works without AI models for basic operations but requires them for code generation and analysis:
 
 ```bash
-# Install Ollama
+# Install Ollama (for AI functionality)
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Download a recommended model
-ollama pull qwq:32b-preview-q4_K_M
-
-# Start Ollama server
-ollama serve
-```
-
-## 🛠️ Installation
-
-### Method 1: NPM (Recommended)
-
-```bash
-# Install globally
-npm install -g codecrucible-synth
+# Download a coding model
+ollama pull qwen2.5-coder:7b
 
 # Verify installation
-cc --help
+crucible status
 ```
 
-### Method 2: From Source
-
-```bash
-# Clone repository
-git clone https://github.com/codecrucible/codecrucible-synth.git
-cd codecrucible-synth
-
-# Install dependencies
-npm install
-
-# Build application
-npm run build
-
-# Link globally
-npm link
-
-# Test installation
-cc --help
-```
-
-### Method 3: Standalone Binaries
-
-Download pre-built binaries from [Releases](https://github.com/codecrucible/codecrucible-synth/releases):
-
-- **Windows**: `codecrucible-win.exe`
-- **macOS**: `codecrucible-macos`
-- **Linux**: `codecrucible-linux`
+**Note:** The application gracefully degrades when no models are available, still providing help, status, configuration, and project analysis features.
 
 ## 🎯 Quick Start
 
 ### Basic Usage
 
 ```bash
-# Simple code generation
-cc "Create a React component for user authentication"
+# Quick help and version
+crucible --help
+crucible --version
+
+# System status (works without models)
+crucible status
+
+# List available models
+crucible models
+
+# Simple code generation (requires AI models)
+crucible "Create a React component for user authentication"
 
 # Multi-voice generation with specific voices
-cc --voices explorer,security "Build a secure API endpoint"
+crucible --voices explorer,security "Build a secure API endpoint"
 
-# Full council mode (all voices)
-cc --council "Design a microservices architecture"
-```
-
-### Interactive Mode
-
-```bash
-# Start interactive session
-cc --interactive
-# or
-cc -i
-
-# Interactive with specific voices
-cc -i --voices explorer,maintainer
+# Voice synthesis mode (all voices)
+crucible --council "Design a microservices architecture"
 ```
 
 ### File Operations
 
 ```bash
-# Analyze a file
-cc file analyze src/auth.ts
+# Analyze a file (basic analysis works without models)
+crucible analyze src/auth.ts
 
-# Refactor code
-cc file refactor components/Button.tsx
-
-# Generate tests
-cc file test utils/validation.js
-
-# Explain complex code
-cc file explain src/algorithm.py
-```
-
-### Project Operations
-
-```bash
 # Analyze entire project
-cc project analyze
+crucible analyze-dir .
 
-# Refactor with pattern matching
-cc project refactor --pattern "src/**/*.ts"
-
-# Generate documentation
-cc project document
-
-# Suggest testing strategy
-cc project test
+# Get project intelligence
+crucible intelligence
 ```
 
-### Voice-Specific Consultation
+### Server Mode (IDE Integration)
 
 ```bash
-# Security review
-cc voice security "Review this authentication flow"
-
-# Performance optimization
-cc voice optimizer "Improve this function's performance"
-
-# Architecture guidance
-cc voice architect "Design a database schema"
-```
-
-## 🤖 Agentic Mode (Cursor/Claude Code-like)
-
-Experience autonomous coding assistance with real-time project awareness:
-
-```bash
-# Start agentic mode with file watching
-cc agent --watch
-
-# With custom port
-cc agent --port 3000
-
-# The agentic client will:
-# ✅ Watch your files for changes
-# ✅ Understand your project structure
-# ✅ Provide contextual assistance
-# ✅ Execute commands safely
-# ✅ Maintain conversation history
-```
-
-**Natural Language Commands:**
-- "Create a new React component for user profiles"
-- "Fix the authentication bug in auth.ts"
-- "Optimize the database queries in this file"
-- "Add comprehensive error handling"
-- "Run the test suite"
-
-## 🖥️ Desktop Application
-
-Launch the visual interface for a more traditional app experience:
-
-```bash
-# Start desktop mode
-cc desktop
-
-# Custom port
-cc desktop --port 3001
-```
-
-**Features:**
-- **Visual Voice Selection** - Click to choose voices
-- **Synthesis Mode Switching** - Competitive, Collaborative, Consensus
-- **Real-time Generation** - See responses as they're generated
-- **Code Export** - Save generated code to files
-- **Project Integration** - Load and analyze project files
-
-## 🌐 Server Mode (IDE Integration)
-
-Run as a server for integration with VS Code, JetBrains IDEs, and other editors:
-
-```bash
-# Start server mode
-cc serve --port 3002
-
-# With CORS enabled for web integration
-cc serve --port 3002 --cors
+# Start REST API server
+crucible --server --port 3002
 
 # Available endpoints:
 # GET  /health
-# GET  /api/model/status
+# GET  /api/model/status  
 # GET  /api/voices
 # POST /api/generate
 # POST /api/analyze
-# POST /api/file/:operation
 # WebSocket support for real-time communication
 ```
 
-### VS Code Integration Example
+## 📊 Current Status (v3.8.1)
 
-```typescript
-// In your VS Code extension
-const response = await fetch('http://localhost:3002/api/generate', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    prompt: 'Optimize this function',
-    voices: ['optimizer', 'maintainer'],
-    mode: 'competitive',
-    context: [{ path: 'file.ts', content: selectedText }]
-  })
-});
+### ✅ **Fully Functional**
+- **CLI Operations**: Help, version, status commands work instantly
+- **Server Mode**: REST API and WebSocket support  
+- **Voice System**: 10 AI personalities with unique specializations
+- **Project Analysis**: Codebase structure and dependency scanning
+- **Configuration**: YAML-based config with validation
+- **Error Handling**: Graceful degradation when models unavailable
 
-const result = await response.json();
-// Use result.result.code
-```
+### ⚠️ **Requires AI Models**
+- **Code Generation**: Needs Ollama or LM Studio with downloaded models
+- **AI Analysis**: Deep code insights require model availability  
+- **Multi-Voice Synthesis**: Full synthesis modes need AI backends
+- **Smart Suggestions**: Intelligent recommendations require models
+
+### 🔄 **In Development**
+- **Enhanced Testing**: Test suite improvements in progress
+- **TypeScript Strict Mode**: Type safety improvements planned
+- **Advanced MCP Integration**: Expanded Model Context Protocol features
+
+### **Performance Metrics**
+- **Startup Time**: < 100ms for basic commands, 2-5s for full initialization
+- **Memory Usage**: ~20MB baseline, efficient resource management
+- **Model Detection**: 1-2s to check Ollama/LM Studio availability
 
 ## 🎭 Voice Archetypes
 
-### Analysis Engines (Perspectives)
+## 🎭 Voice Archetypes
 
-| Voice | Focus | Temperature | Style |
-|-------|-------|-------------|-------|
-| **Explorer** | Innovation & creativity | 0.9 | Experimental |
-| **Maintainer** | Stability & best practices | 0.5 | Conservative |
-| **Analyzer** | Performance & patterns | 0.6 | Analytical |
-| **Developer** | Developer experience | 0.7 | Pragmatic |
-| **Implementor** | Practical delivery | 0.6 | Decisive |
+### **10 Specialized AI Personalities**
 
-### Specialization Engines (Roles)
+| Voice | Focus | Temperature | Specialty |
+|-------|-------|-------------|-----------|
+| **Explorer** | Innovation & creativity | 0.8 | Experimental solutions, novel approaches |
+| **Maintainer** | Stability & best practices | 0.3 | Long-term sustainability, technical debt |
+| **Analyzer** | Performance & patterns | 0.4 | Data-driven insights, optimization |
+| **Developer** | Developer experience | 0.5 | Practical solutions, real-world constraints |
+| **Implementor** | Practical delivery | 0.4 | Actionable solutions, execution focus |
+| **Security** | Secure coding practices | 0.2 | Vulnerability assessment, defensive programming |
+| **Architect** | Scalable system design | 0.3 | System-level thinking, design patterns |
+| **Designer** | UI/UX & interfaces | 0.6 | User-centric design, accessibility |
+| **Optimizer** | Performance & efficiency | 0.4 | Speed optimization, resource efficiency |
+| **Guardian** | Code quality & standards | 0.3 | Quality gates, standard compliance |
 
-| Voice | Focus | Temperature | Style |
-|-------|-------|-------------|-------|
-| **Security** | Secure coding practices | 0.3 | Defensive |
-| **Architect** | Scalable system design | 0.5 | Systematic |
-| **Designer** | UI/UX & interfaces | 0.7 | User-centric |
-| **Optimizer** | Performance & efficiency | 0.4 | Efficiency-focused |
+### **Synthesis Modes**
 
-### Synthesis Modes
+- **Competitive** - Voices compete, best response selected
+- **Collaborative** - Voices build upon each other's ideas  
+- **Consensus** - Voices find common ground and agreement
 
-- **Competitive** - Selects best aspects from each voice
-- **Collaborative** - Integrates perspectives into hybrid solutions
-- **Consensus** - Finds common ground between all voices
+### **Usage Examples**
+
+```bash
+# Single voice consultation
+crucible --voices security "Review this authentication code"
+
+# Multi-voice collaboration  
+crucible --voices explorer,maintainer,security "Design a secure user system"
+
+# Full council synthesis
+crucible --council "Architect a scalable microservices platform"
+```
 
 ## ⚙️ Configuration
 

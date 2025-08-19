@@ -27,7 +27,11 @@ export declare class VoiceArchetypeSystem {
     }>;
     generateIterativeCodeImprovement(prompt: string, client: any, config?: any): Promise<{
         content: string;
-        iterations: any[];
+        iterations: {
+            content: string;
+            feedback: any;
+            improvement: number;
+        }[];
         writerVoice: any;
         auditorVoice: any;
         totalIterations: any;
@@ -37,7 +41,11 @@ export declare class VoiceArchetypeSystem {
     }>;
     executeLivingSpiral(prompt: string, client: any, config?: any): Promise<{
         content: string;
-        iterations: any[];
+        iterations: {
+            content: string;
+            feedback: any;
+            improvement: number;
+        }[];
         writerVoice: any;
         auditorVoice: any;
         totalIterations: any;

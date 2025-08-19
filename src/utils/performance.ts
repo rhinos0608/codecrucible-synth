@@ -95,13 +95,14 @@ export class PerformanceMonitor extends EventEmitter {
   }
 
   /**
-   * Enable monitoring (restart intervals)
+   * Clean up resources and disable monitoring
    */
-  public enableMonitoring(): void {
-    if (!this.monitoringEnabled) {
-      this.monitoringEnabled = true;
-      this.initializeSystemMonitoring();
-    }
+  public destroy(): void {
+    this.disableMonitoring();
+    this.removeAllListeners();
+    this.providerMetrics.clear();
+    this.requestHistory.length = 0;
+    this.alerts.length = 0;
   }
 
   private async updateSystemMetrics(): Promise<void> {

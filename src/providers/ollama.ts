@@ -1,6 +1,9 @@
 
 import axios, { AxiosInstance } from 'axios';
 import { logger } from '../core/logger.js';
+import { readFileSync, existsSync } from 'fs';
+import { load as loadYaml } from 'js-yaml';
+import { join } from 'path';
 
 export interface OllamaConfig {
   endpoint?: string;
@@ -32,7 +35,7 @@ export class OllamaProvider {
     });
   }
   
-  async processRequest(request: any, context?: any): Promise<any> {
+  async processRequest(request: any, _context?: any): Promise<any> {
     // Check status first
     if (!this.isAvailable) {
       const available = await this.checkStatus();
@@ -85,9 +88,10 @@ export class OllamaProvider {
         prompt_eval_duration: response.data.prompt_eval_duration,
         eval_duration: response.data.eval_duration
       };
-    } catch (error: any) {
-      logger.error('Ollama generation failed:', error.message);
-      throw new Error(`Ollama generation failed: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Ollama generation failed:', message);
+      throw new Error(`Ollama generation failed: ${message}`);
     }
   }
   
@@ -97,7 +101,7 @@ export class OllamaProvider {
       this.isAvailable = response.status === 200;
       
       if (this.isAvailable && response.data.models) {
-        const models = response.data.models.map((m: any) => m.name);
+        const models = response.data.models.map((m: Record<string, unknown>) => m.name);
         
         // Check if our configured model exists
         if (!models.includes(this.model)) {
@@ -140,7 +144,7 @@ export class OllamaProvider {
     try {
       const response = await this.httpClient.get('/api/tags');
       if (response.data.models) {
-        return response.data.models.map((m: any) => m.name);
+        return response.data.models.map((m: Record<string, unknown>) => m.name);
       }
       return [];
     } catch (error) {
@@ -204,15 +208,11 @@ export class OllamaProvider {
    */
   private loadConfigFromFile(): any {
     try {
-      const fs = require('fs');
-      const yaml = require('js-yaml');
-      const path = require('path');
+      const configPath = join(process.env.HOME || process.env.USERPROFILE || '', '.codecrucible', 'config.yaml');
       
-      const configPath = path.join(process.env.HOME || process.env.USERPROFILE || '', '.codecrucible', 'config.yaml');
-      
-      if (fs.existsSync(configPath)) {
-        const configContent = fs.readFileSync(configPath, 'utf8');
-        return yaml.load(configContent);
+      if (existsSync(configPath)) {
+        const configContent = readFileSync(configPath, 'utf8');
+        return loadYaml(configContent);
       }
     } catch (error) {
       // Silently fail and use defaults

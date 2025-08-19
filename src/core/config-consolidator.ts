@@ -14,7 +14,7 @@ interface ConfigSource {
   file: string;
   type: 'yaml' | 'json' | 'env';
   priority: number;
-  data: Record<string, unknown>;
+  data: any;
 }
 
 interface ConfigConflict {
@@ -31,13 +31,13 @@ interface ConfigConflict {
 export class ConfigurationConsolidator {
   private sources: ConfigSource[] = [];
   private conflicts: ConfigConflict[] = [];
-  private consolidatedConfig: Record<string, unknown> = {};
+  private consolidatedConfig: any = {};
 
   /**
    * Load and consolidate all configuration files
    */
   async consolidateConfigurations(): Promise<{
-    config: Record<string, unknown>;
+    config: any;
     conflicts: ConfigConflict[];
     summary: {
       filesProcessed: number;

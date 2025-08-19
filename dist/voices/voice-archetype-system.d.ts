@@ -2,7 +2,7 @@ export declare class VoiceArchetypeSystem {
     private voices;
     constructor();
     private initializeVoices;
-    getVoice(name: string): any;
+    getVoice(name: string): Record<string, unknown>;
     getAvailableVoices(): string[];
     private calculateImprovementScore;
     generateSingleVoiceResponse(voice: string, prompt: string, client: any): Promise<any>;
@@ -20,9 +20,9 @@ export declare class VoiceArchetypeSystem {
         mode: "collaborative" | "consensus" | "competitive";
         responses: any[];
     }>;
-    synthesizeVoiceResponses(responses: any[]): Promise<{
+    synthesizeVoiceResponses(responses: Record<string, unknown>[]): Promise<{
         content: string;
-        voicesUsed: any[];
+        voicesUsed: unknown[];
         qualityScore: number;
     }>;
     generateIterativeCodeImprovement(prompt: string, client: any, config?: any): Promise<{

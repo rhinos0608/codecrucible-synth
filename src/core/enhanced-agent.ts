@@ -390,7 +390,7 @@ export async function createEnhancedAgent(config?: Partial<EnhancedAgentConfig>)
 }
 
 // Export for direct CLI usage
-export async function runEnhancedAnalysis(query: string, options: Record<string, unknown> = {}): Promise<string> {
+export async function runEnhancedAnalysis(query: string, options: any = {}): Promise<string> {
   const agent = new EnhancedCodeCrucibleAgent({
     projectPath: options.cwd || process.cwd(),
     enableIndexing: options.index !== false,

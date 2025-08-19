@@ -34,7 +34,7 @@ export class LMStudioProvider {
     });
   }
   
-  async processRequest(request: Record<string, unknown>, _context?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async processRequest(request: any, _context?: any): Promise<any> {
     // Check status first
     if (!this.isAvailable) {
       const available = await this.checkStatus();
@@ -46,7 +46,7 @@ export class LMStudioProvider {
     return this.generate(request);
   }
   
-  async generate(request: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async generate(request: any): Promise<any> {
     try {
       // Get available models first if model is 'auto'
       if (this.model === 'auto') {

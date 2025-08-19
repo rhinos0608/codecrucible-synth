@@ -109,7 +109,7 @@ export class VoiceArchetypeSystem {
     return Math.max(0, Math.min(1, score));
   }
   
-  async generateSingleVoiceResponse(voice: string, prompt: string, client: Record<string, unknown>) {
+  async generateSingleVoiceResponse(voice: string, prompt: string, client: any) {
     const voiceConfig = this.getVoice(voice);
     if (!voiceConfig) throw new Error('Voice not found: ' + voice);
     
@@ -117,7 +117,7 @@ export class VoiceArchetypeSystem {
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
   
-  async generateMultiVoiceSolutions(voices: string[], prompt: string, client: Record<string, unknown>) {
+  async generateMultiVoiceSolutions(voices: string[], prompt: string, client: any) {
     const solutions = [];
     for (const voice of voices) {
       const result = await this.generateSingleVoiceResponse(voice, prompt, client);
@@ -126,7 +126,7 @@ export class VoiceArchetypeSystem {
     return solutions;
   }
   
-  async synthesize(prompt: string, voices: string[], mode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative', client?: Record<string, unknown>) {
+  async synthesize(prompt: string, voices: string[], mode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative', client?: any) {
     // If no client provided, return error
     if (!client) {
       return {
@@ -188,7 +188,7 @@ export class VoiceArchetypeSystem {
     };
   }
   
-  async generateIterativeCodeImprovement(prompt: string, client: Record<string, unknown>, config: Record<string, unknown> = {}) {
+  async generateIterativeCodeImprovement(prompt: string, client: any, config: any = {}) {
     const writerVoice = config.writerVoice || 'explorer';
     const auditorVoice = config.auditorVoice || 'maintainer';
     const maxIterations = config.maxIterations || 3;
@@ -231,7 +231,7 @@ export class VoiceArchetypeSystem {
     };
   }
   
-  async executeLivingSpiral(prompt: string, client: Record<string, unknown>, config: Record<string, unknown> = {}) {
+  async executeLivingSpiral(prompt: string, client: any, config: any = {}) {
     return this.generateIterativeCodeImprovement(prompt, client, config);
   }
 }

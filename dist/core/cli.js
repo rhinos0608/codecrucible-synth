@@ -1002,7 +1002,12 @@ ${fileContent}
                     if (response.result && typeof response.result === 'object') {
                         for (const [key, value] of Object.entries(response.result)) {
                             console.log(chalk.cyan(`\n📋 ${key}:`));
-                            console.log(value);
+                            if (typeof value === 'object') {
+                                console.log(JSON.stringify(value, null, 2));
+                            }
+                            else {
+                                console.log(value);
+                            }
                         }
                     }
                     // Save to file if requested
@@ -1544,11 +1549,41 @@ ${fileContent}
             if (this.dualAgentSystem && typeof this.dualAgentSystem.shutdown === 'function') {
                 await this.dualAgentSystem.shutdown();
             }
-            // Note: Performance monitor and streaming client cleanup handled internally
+            // Clean up performance monitor in agent orchestrator
+            if (this.context.agentOrchestrator && typeof this.context.agentOrchestrator.destroy === 'function') {
+                await this.context.agentOrchestrator.destroy();
+            }
+            // Clean up optimized context CLI (contains LazyProjectIntelligence)
+            if (this.optimizedContextCLI && typeof this.optimizedContextCLI.shutdown === 'function') {
+                this.optimizedContextCLI.shutdown();
+            }
+            // Clean up resilient wrapper
+            if (this.resilientWrapper && typeof this.resilientWrapper.shutdown === 'function') {
+                this.resilientWrapper.shutdown();
+            }
             logger.info('CLI resources cleaned up');
         }
         catch (error) {
             logger.error('Error during CLI cleanup:', error);
+        }
+    }
+    /**
+     * Update CLI configuration (for testing)
+     */
+    async updateConfiguration(newConfig) {
+        try {
+            // Update context config
+            this.context.config = { ...this.context.config, ...newConfig };
+            // Update voice system config if it exists
+            if (this.context.voiceSystem && newConfig.voices) {
+                // Voice system should handle config updates internally
+            }
+            logger.info('Configuration updated successfully');
+            return true;
+        }
+        catch (error) {
+            logger.error('Failed to update configuration:', error);
+            return false;
         }
     }
     /**

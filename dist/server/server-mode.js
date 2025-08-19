@@ -116,7 +116,7 @@ export async function startServerMode(context, options) {
     // Code generation endpoint
     app.post('/api/generate', async (req, res) => {
         try {
-            const { prompt, voices = context.config.voices?.default || ['explorer', 'maintainer'], mode = 'competitive', context: userContext = [], language, file_path } = req.body;
+            const { prompt, voices = context.config.voices?.default || ['explorer', 'maintainer'], mode = 'competitive', context: userContext = [], language: _language, file_path: _file_path } = req.body;
             if (!prompt) {
                 return res.status(400).json({ error: 'Prompt is required' });
             }
@@ -393,7 +393,7 @@ ${refactorPrompt}`,
         // Handle real-time code generation
         socket.on('generate_realtime', async (data) => {
             try {
-                const { prompt, voices, mode, context: userContext } = data;
+                const { prompt, voices, mode, context: _userContext } = data;
                 socket.emit('generation_started', { id: data.id });
                 const synthesis = await context.voiceSystem.synthesize(prompt, voices || context.config.voices?.default || ['explorer', 'maintainer'], (mode || 'collaborative'), context.modelClient);
                 socket.emit('generation_complete', {
@@ -519,7 +519,7 @@ function extractRecommendations(analysisContent) {
             lowerSentence.includes('use') ||
             lowerSentence.includes('implement')) {
             // Clean up the sentence
-            let recommendation = sentence.trim();
+            const recommendation = sentence.trim();
             if (recommendation.length > 10 && recommendation.length < 200) {
                 recommendations.push(recommendation);
             }

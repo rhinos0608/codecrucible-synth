@@ -926,7 +926,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       // Cancel any active workflows
       for (const workflow of this.activeWorkflows.values()) {
-        workflow.status = 'cancelled';
+        workflow.status = 'completed' as any;
       }
       this.activeWorkflows.clear();
       

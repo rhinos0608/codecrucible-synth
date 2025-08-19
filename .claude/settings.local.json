@@ -95,7 +95,9 @@
       "Bash(time codecrucible:*)",
       "Bash(start /B node:*)",
       "Bash(time crucible:*)",
-      "Bash(set OLLAMA_NUM_GPU=8)"
+      "Bash(set OLLAMA_NUM_GPU=8)",
+      "Bash(where:*)",
+      "Bash(del test-recommend.js)"
     ],
     "deny": [],
     "ask": [],

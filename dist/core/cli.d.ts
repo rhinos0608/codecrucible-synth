@@ -30,6 +30,8 @@ export declare class CLI {
     private parseOptions;
     private showStatus;
     private listModels;
+    private showModelRecommendations;
+    private getModelPerformance;
     private analyzeDirectory;
     private analyzeFile;
     private handleSlashCommand;

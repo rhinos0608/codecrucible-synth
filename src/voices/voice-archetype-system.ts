@@ -8,19 +8,62 @@ export class VoiceArchetypeSystem {
   private initializeVoices() {
     this.voices.set('explorer', {
       name: 'Explorer',
-      prompt: 'You are an innovative explorer agent focused on discovering new possibilities.',
+      prompt: 'You are an innovative explorer agent focused on discovering new possibilities and creative solutions. You think outside the box and propose novel approaches.',
       temperature: 0.8
     });
     
     this.voices.set('maintainer', {
       name: 'Maintainer', 
-      prompt: 'You are a maintainer focused on code quality and long-term sustainability.',
+      prompt: 'You are a maintainer focused on code quality, long-term sustainability, and technical debt management. You prioritize stability and maintainability.',
       temperature: 0.3
     });
     
+    this.voices.set('analyzer', {
+      name: 'Analyzer',
+      prompt: 'You are an analytical expert focused on performance analysis, architectural insights, and system optimization. You provide data-driven recommendations.',
+      temperature: 0.4
+    });
+    
+    this.voices.set('developer', {
+      name: 'Developer',
+      prompt: 'You are a practical developer focused on developer experience, usability, and pragmatic solutions. You consider real-world implementation constraints.',
+      temperature: 0.5
+    });
+    
+    this.voices.set('implementor', {
+      name: 'Implementor',
+      prompt: 'You are an implementor focused on practical execution, delivery, and getting things done efficiently. You provide actionable, concrete solutions.',
+      temperature: 0.4
+    });
+    
+    this.voices.set('security', {
+      name: 'Security',
+      prompt: 'You are a security expert focused on secure coding practices, vulnerability assessment, and defensive programming. You prioritize security considerations above all.',
+      temperature: 0.2
+    });
+    
+    this.voices.set('architect', {
+      name: 'Architect',
+      prompt: 'You are a software architect focused on scalable architecture, design patterns, and system-level thinking. You consider long-term architectural implications.',
+      temperature: 0.3
+    });
+    
+    this.voices.set('designer', {
+      name: 'Designer',
+      prompt: 'You are a designer focused on user experience, interface design, and usability. You consider human-centered design principles.',
+      temperature: 0.6
+    });
+    
+    this.voices.set('optimizer', {
+      name: 'Optimizer',
+      prompt: 'You are an optimization specialist focused on performance, efficiency, and resource management. You identify bottlenecks and optimization opportunities.',
+      temperature: 0.3
+    });
+    
+    // Legacy alias for backward compatibility
     this.voices.set('guardian', {
       name: 'Guardian',
-      prompt: 'You are a security-focused guardian agent.',
+      prompt: 'You are a security-focused guardian agent. (Legacy alias for security voice)',
       temperature: 0.2
     });
   }

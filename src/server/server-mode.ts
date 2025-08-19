@@ -24,13 +24,38 @@ export interface ServerOptions {
  * Compatible with VS Code, JetBrains IDEs, and other development environments
  */
 export async function startServerMode(context: CLIContext, options: ServerOptions): Promise<void> {
+  // Validate context initialization
+  if (!context) {
+    throw new Error('CLI context is required for server mode');
+  }
+  
+  if (!context.modelClient) {
+    throw new Error('Model client not initialized');
+  }
+  
+  if (!context.voiceSystem) {
+    throw new Error('Voice system not initialized');
+  }
+  
+  if (!context.config) {
+    throw new Error('Configuration not loaded');
+  }
+
+  console.log(chalk.blue('🚀 Starting CodeCrucible Server Mode...'));
+  
+  // Initialize context components if needed
+  try {
+    await context.modelClient.initialize();
+    logger.info('Model client initialized for server mode');
+  } catch (error) {
+    logger.warn('Model client initialization warning:', error);
+  }
+
   const app = express();
   const server = createServer(app);
   const io = new SocketIOServer(server, {
     cors: options.cors ? { origin: '*' } : undefined
   });
-
-  console.log(chalk.blue('🚀 Starting CodeCrucible Server Mode...'));
 
   // Middleware
   app.use(express.json({ limit: '50mb' }));
@@ -67,8 +92,8 @@ export async function startServerMode(context: CLIContext, options: ServerOption
       version: '2.0.0',
       timestamp: Date.now(),
       model: {
-        endpoint: context.config.model.endpoint,
-        name: context.config.model.name
+        endpoint: context.config.model?.endpoint || 'http://localhost:11434',
+        name: context.config.model?.name || 'llama2'
       }
     });
   });
@@ -80,8 +105,8 @@ export async function startServerMode(context: CLIContext, options: ServerOption
       const isAvailable = Object.values(healthCheck).some(status => status);
       res.json({
         available: isAvailable,
-        endpoint: context.config.model.endpoint,
-        model: context.config.model.name
+        endpoint: context.config.model?.endpoint || 'http://localhost:11434',
+        model: context.config.model?.name || 'llama2'
       });
     } catch (error) {
       res.status(500).json({
@@ -94,8 +119,8 @@ export async function startServerMode(context: CLIContext, options: ServerOption
   // Voice information endpoint
   app.get('/api/voices', (req, res) => {
     res.json({
-      available: context.config.voices.available,
-      default: context.config.voices.default,
+      available: context.config.voices?.available || ['explorer', 'maintainer', 'analyzer', 'developer', 'implementor', 'security', 'architect', 'designer', 'optimizer'],
+      default: context.config.voices?.default || ['explorer', 'maintainer'],
       descriptions: {
         explorer: 'Innovation and creative solutions',
         maintainer: 'Stability and long-term maintenance',
@@ -115,7 +140,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
     try {
       const {
         prompt,
-        voices = context.config.voices.default,
+        voices = context.config.voices?.default || ['explorer', 'maintainer'],
         mode = 'competitive',
         context: userContext = [],
         language,
@@ -134,20 +159,12 @@ export async function startServerMode(context: CLIContext, options: ServerOption
       });
 
       // Generate responses from selected voices
-      const responses = await context.voiceSystem.generateMultiVoiceSolutions(
+      const synthesis = await context.voiceSystem.synthesize(
         prompt,
         voices,
-        {
-          files: (userContext || []).map((ctx: any) => ({
-            path: ctx.path || file_path || 'untitled',
-            content: ctx.content || '',
-            language: ctx.language || language || 'text'
-          }))
-        }
+        mode as 'competitive' | 'collaborative' | 'consensus',
+        context.modelClient
       );
-
-      // Synthesize responses
-      const synthesis = await context.voiceSystem.synthesizeVoiceResponses(responses);
 
       res.json({
         success: true,
@@ -158,7 +175,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
           quality_score: synthesis.qualityScore,
           voices_used: synthesis.voicesUsed
         },
-        individual_responses: responses.map(r => ({
+        individual_responses: (synthesis.responses || []).map(r => ({
           voice: r.voice,
           content: r.content,
           confidence: r.confidence,
@@ -166,7 +183,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
         })),
         metadata: {
           timestamp: Date.now(),
-          model: context.config.model.name,
+          model: context.config.model?.name || 'llama2',
           mode,
           voices
         }
@@ -211,7 +228,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
           file_path,
           language,
           code_length: code.length,
-          model: context.config.model.name
+          model: context.config.model?.name || 'llama2'
         }
       });
 
@@ -435,7 +452,7 @@ ${refactorPrompt}`,
     socket.emit('status', {
       connected: true,
       model_available: true, // Will be updated by actual check
-      voices: context.config.voices.available
+      voices: context.config.voices?.available || ['explorer', 'maintainer', 'analyzer', 'developer', 'implementor', 'security', 'architect', 'designer', 'optimizer']
     });
 
     // Handle real-time code generation
@@ -445,21 +462,18 @@ ${refactorPrompt}`,
 
         socket.emit('generation_started', { id: data.id });
 
-        const responses = await context.voiceSystem.generateMultiVoiceSolutions(
+        const synthesis = await context.voiceSystem.synthesize(
           prompt,
-          voices || context.config.voices.default,
-          { files: userContext || [], structure: {}, metadata: {} }
-        );
-
-        const synthesis = await context.voiceSystem.synthesizeVoiceResponses(
-          responses
+          voices || context.config.voices?.default || ['explorer', 'maintainer'],
+          (mode || 'collaborative') as 'competitive' | 'collaborative' | 'consensus',
+          context.modelClient
         );
 
         socket.emit('generation_complete', {
           id: data.id,
           success: true,
           result: synthesis,
-          responses
+          responses: synthesis.responses || []
         });
 
       } catch (error) {

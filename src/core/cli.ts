@@ -9,6 +9,8 @@ import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 import { AppConfig } from '../config/config-manager.js';
 import { logger } from './logger.js';
+import { startServerMode, ServerOptions } from '../server/server-mode.js';
+import { IntelligentModelSelector } from './intelligent-model-selector.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
@@ -50,6 +52,8 @@ interface CLIOptions {
   test?: boolean;
   models?: boolean;
   configure?: boolean;
+  server?: boolean;
+  port?: string;
   // Additional CLI options
   [key: string]: unknown;
 }
@@ -117,7 +121,7 @@ export class CLI {
     try {
       // Show header
       console.log(chalk.blue('╔══════════════════════════════════════════════════════════════╗'));
-      console.log(chalk.blue('║               CodeCrucible Synth v3.5.2                     ║'));
+      console.log(chalk.blue('║               CodeCrucible Synth v3.7.1                     ║'));
       console.log(chalk.blue('║          AI-Powered Code Generation & Analysis Tool         ║'));
       console.log(chalk.blue('╚══════════════════════════════════════════════════════════════╝'));
       console.log();
@@ -138,7 +142,24 @@ export class CLI {
       }
       
       if (options.version || options.v) {
-        console.log('CodeCrucible Synth v3.5.2');
+        console.log('CodeCrucible Synth v3.7.1');
+        return;
+      }
+
+      // Handle server mode
+      if (options.server) {
+        const port = parseInt(options.port || '3002', 10);
+        const serverOptions: ServerOptions = {
+          port,
+          host: '0.0.0.0',
+          cors: true,
+          auth: {
+            enabled: false
+          }
+        };
+        
+        console.log(chalk.blue(`🚀 Starting CodeCrucible Server on port ${port}...`));
+        await startServerMode(this.context, serverOptions);
         return;
       }
 
@@ -150,6 +171,11 @@ export class CLI {
       
       if (args[0] === 'models') {
         await this.listModels();
+        return;
+      }
+      
+      if (args[0] === 'recommend') {
+        await this.showModelRecommendations();
         return;
       }
       
@@ -172,7 +198,7 @@ export class CLI {
       
       // Extract prompt by filtering out option flags
       const promptArgs = [];
-      const optionsWithValues = ['voices', 'mode', 'file', 'depth', 'maxIterations', 'qualityThreshold', 'timeout', 'backend', 'e2bTemplate', 'dockerImage', 'maxSteps', 'spiralIterations', 'spiralQuality', 'output'];
+      const optionsWithValues = ['voices', 'mode', 'file', 'depth', 'maxIterations', 'qualityThreshold', 'timeout', 'backend', 'e2bTemplate', 'dockerImage', 'maxSteps', 'spiralIterations', 'spiralQuality', 'output', 'port'];
       
       for (let i = 0; i < args.length; i++) {
         const arg = args[i];
@@ -217,6 +243,8 @@ export class CLI {
     console.log('  --file <path>        Write output to file');
     console.log('  --no-autonomous      Disable autonomous mode (not recommended)');
     console.log('  --verbose            Show detailed output');
+    console.log('  --server             Start server mode');
+    console.log('  --port <number>      Server port (default: 3002)');
     console.log();
     console.log(chalk.cyan('Slash Commands (use within prompts):'));
     console.log('  /voices <names>      Switch to voice synthesis mode');
@@ -227,6 +255,7 @@ export class CLI {
     console.log(chalk.cyan('Commands:'));
     console.log('  status               Show system status');
     console.log('  models               List available models');
+    console.log('  recommend            Show intelligent model recommendations');
     console.log('  analyze <file>       Analyze a code file');
     console.log('  analyze-dir [dir]    Analyze a directory/project');
     console.log();
@@ -304,12 +333,83 @@ export class CLI {
   private async listModels(): Promise<void> {
     try {
       console.log(chalk.cyan('📋 Available models:'));
-      // TODO: Implement actual model listing
-      console.log('  - codellama:7b');
-      console.log('  - llama2:7b');
-      console.log('  - mistral:7b');
+      
+      const modelSelector = new IntelligentModelSelector();
+      
+      // Get models from both backends
+      const [ollamaModels, lmStudioModels] = await Promise.all([
+        modelSelector.getAvailableModels('ollama'),
+        modelSelector.getAvailableModels('lmstudio')
+      ]);
+      
+      if (ollamaModels.length > 0) {
+        console.log(chalk.yellow('\n  Ollama Models:'));
+        ollamaModels.forEach(model => {
+          const performance = this.getModelPerformance(model);
+          console.log(`    ✓ ${model} ${performance}`);
+        });
+      }
+      
+      if (lmStudioModels.length > 0) {
+        console.log(chalk.yellow('\n  LM Studio Models:'));
+        lmStudioModels.forEach(model => {
+          console.log(`    ✓ ${model}`);
+        });
+      }
+      
+      if (ollamaModels.length === 0 && lmStudioModels.length === 0) {
+        console.log(chalk.gray('  No models currently available'));
+        console.log(chalk.gray('  Make sure Ollama or LM Studio is running'));
+      }
     } catch (error) {
       console.error(chalk.red('Failed to list models:'), error);
+    }
+  }
+
+  private async showModelRecommendations(): Promise<void> {
+    try {
+      console.log(chalk.cyan('🎯 Intelligent Model Recommendations'));
+      console.log(chalk.gray('Based on performance testing and optimization results\n'));
+      
+      const modelSelector = new IntelligentModelSelector();
+      
+      // Get current recommendations
+      const recommendations = await modelSelector.getPerformanceRecommendations();
+      const stats = modelSelector.getRoutingStatistics();
+      
+      console.log(chalk.green('📊 Current Optimal Model:'));
+      console.log(`   Model: ${chalk.bold(recommendations.recommendedModel)}`);
+      console.log(`   Latency: ${chalk.yellow(recommendations.estimatedLatency)}`);
+      console.log(`   Quality: ${chalk.cyan((recommendations.qualityScore * 100).toFixed(0))}%`);
+      console.log(`   Reasoning: ${recommendations.reasoning}\n`);
+      
+      console.log(chalk.blue('⚡ Performance Guide:'));
+      console.log('   🚀 gemma:2b     - Ultra-fast (4-6s)  - Simple tasks');
+      console.log('   ⚖️  llama3.2    - Balanced (8-10s)   - Most development work');
+      console.log('   🎯 gemma:7b     - High-quality (12s) - Complex analysis\n');
+      
+      if (stats.totalRequests > 0) {
+        console.log(chalk.magenta('📈 Usage Statistics:'));
+        console.log(`   Total Requests: ${stats.totalRequests}`);
+        console.log(`   Success Rate: ${(stats.successRate * 100).toFixed(1)}%`);
+        console.log(`   Average Latency: ${stats.averageLatency}s`);
+      }
+      
+    } catch (error) {
+      console.error(chalk.red('Failed to get model recommendations:'), error);
+    }
+  }
+
+  private getModelPerformance(model: string): string {
+    switch (model) {
+      case 'gemma:2b':
+        return chalk.green('(Ultra-fast: 4-6s)');
+      case 'llama3.2':
+        return chalk.blue('(Balanced: 8-10s)');
+      case 'gemma:7b':
+        return chalk.magenta('(High-quality: 12s)');
+      default:
+        return chalk.gray('(Performance unknown)');
     }
   }
 

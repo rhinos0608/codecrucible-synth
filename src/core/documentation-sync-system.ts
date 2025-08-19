@@ -524,8 +524,8 @@ npx ${packageData.name || 'project-name'} --help
 
 ## Requirements
 
-- Node.js ${packageData.engines?.node || '>=18.0.0'}
-- TypeScript ${packageData.devDependencies?.typescript || '>=5.0.0'}
+- Node.js ${(packageData.engines as any)?.node || '>=18.0.0'}
+- TypeScript ${(packageData.devDependencies as any)?.typescript || '>=5.0.0'}
 
 ## License
 

@@ -8,6 +8,7 @@ import { ContextAwareCLIIntegration } from './intelligence/context-aware-cli-int
 import { OptimizedContextAwareCLI } from './intelligence/optimized-context-cli.js';
 import { ResilientCLIWrapper } from './resilience/resilient-cli-wrapper.js';
 import { AutoConfigurator } from './model-management/auto-configurator.js';
+import { SecureToolFactory } from './security/secure-tool-factory.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { readFile, stat } from 'fs/promises';
@@ -442,6 +443,19 @@ export class CLI {
     async showStatus() {
         try {
             console.log(chalk.cyan('🔍 Checking system status...'));
+            // Check security status
+            console.log(chalk.yellow('\n🔒 Security Status:'));
+            const secureToolFactory = new SecureToolFactory();
+            const securityStatus = secureToolFactory.getSecurityStatus();
+            console.log(chalk.green(`  ✓ Security Level: ${securityStatus.securityLevel.toUpperCase()}`));
+            console.log(chalk[securityStatus.e2bAvailable ? 'green' : 'yellow'](`  ${securityStatus.e2bAvailable ? '✓' : '⚠'} E2B Sandboxing: ${securityStatus.e2bAvailable ? 'Available' : 'Not Available'}`));
+            console.log(chalk[securityStatus.sandboxingEnabled ? 'green' : 'red'](`  ${securityStatus.sandboxingEnabled ? '✓' : '✗'} Code Execution: ${securityStatus.sandboxingEnabled ? 'Sandboxed' : 'Restricted'}`));
+            if (securityStatus.recommendations.length > 0) {
+                console.log(chalk.yellow('\n💡 Security Recommendations:'));
+                securityStatus.recommendations.forEach((rec, index) => {
+                    console.log(chalk.yellow(`  ${index + 1}. ${rec}`));
+                });
+            }
             // Check Ollama
             console.log(chalk.yellow('\nOllama Status:'));
             // TODO: Implement actual status check

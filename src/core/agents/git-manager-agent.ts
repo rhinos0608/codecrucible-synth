@@ -25,12 +25,13 @@ export class GitManagerAgent extends UnifiedAgent {
 
     // Initialize specialized tools for Git operations
     const agentContext = { workingDirectory: dependencies.workingDirectory };
+    const secureToolFactory = new SecureToolFactory();
     this.tools = [
       new GitStatusTool(agentContext),
       new GitDiffTool(agentContext),
       new GitOperationsTool(agentContext),
       new GitAnalysisTool(agentContext),
-      new TerminalExecuteTool(agentContext), // For advanced git commands
+      secureToolFactory.createTerminalTool(agentContext), // Secure terminal for advanced git commands
     ];
   }
 

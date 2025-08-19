@@ -338,7 +338,7 @@ ${refactorPrompt}`,
               type: language,
               language
             }],
-            workingDirectory: (context.config as Record<string, unknown>).workingDirectory || process.cwd(),
+            workingDirectory: (context.config as unknown as Record<string, unknown>).workingDirectory as string || process.cwd(),
             config: {},
             structure: { directories: [], fileTypes: {} }
           });
@@ -352,7 +352,7 @@ ${refactorPrompt}`,
             original_code: originalContent,
             refactored_code: refactoredCode,
             explanation: response.content.replace(/```[\s\S]*?```/g, '').trim(),
-            confidence: (response as Record<string, unknown>).confidence || 0.8
+            confidence: (response as unknown as Record<string, unknown>).confidence as number || 0.8
           });
           break;
 

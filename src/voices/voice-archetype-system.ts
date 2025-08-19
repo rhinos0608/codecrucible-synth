@@ -1,5 +1,5 @@
 export class VoiceArchetypeSystem {
-  private voices: Map<string, any> = new Map();
+  private voices: Map<string, Record<string, unknown>> = new Map();
   
   constructor() {
     this.initializeVoices();
@@ -109,7 +109,7 @@ export class VoiceArchetypeSystem {
     return Math.max(0, Math.min(1, score));
   }
   
-  async generateSingleVoiceResponse(voice: string, prompt: string, client: any) {
+  async generateSingleVoiceResponse(voice: string, prompt: string, client: Record<string, unknown>) {
     const voiceConfig = this.getVoice(voice);
     if (!voiceConfig) throw new Error('Voice not found: ' + voice);
     
@@ -117,7 +117,7 @@ export class VoiceArchetypeSystem {
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
   
-  async generateMultiVoiceSolutions(voices: string[], prompt: string, client: any) {
+  async generateMultiVoiceSolutions(voices: string[], prompt: string, client: Record<string, unknown>) {
     const solutions = [];
     for (const voice of voices) {
       const result = await this.generateSingleVoiceResponse(voice, prompt, client);
@@ -126,7 +126,7 @@ export class VoiceArchetypeSystem {
     return solutions;
   }
   
-  async synthesize(prompt: string, voices: string[], mode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative', client?: any) {
+  async synthesize(prompt: string, voices: string[], mode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative', client?: Record<string, unknown>) {
     // If no client provided, return error
     if (!client) {
       return {
@@ -179,7 +179,7 @@ export class VoiceArchetypeSystem {
     }
   }
   
-  async synthesizeVoiceResponses(responses: any[]) {
+  async synthesizeVoiceResponses(responses: Record<string, unknown>[]) {
     const combined = responses.map(r => r.content).join('\n\n---\n\n');
     return { 
       content: combined,
@@ -188,7 +188,7 @@ export class VoiceArchetypeSystem {
     };
   }
   
-  async generateIterativeCodeImprovement(prompt: string, client: any, config: any = {}) {
+  async generateIterativeCodeImprovement(prompt: string, client: Record<string, unknown>, config: Record<string, unknown> = {}) {
     const writerVoice = config.writerVoice || 'explorer';
     const auditorVoice = config.auditorVoice || 'maintainer';
     const maxIterations = config.maxIterations || 3;
@@ -231,7 +231,7 @@ export class VoiceArchetypeSystem {
     };
   }
   
-  async executeLivingSpiral(prompt: string, client: any, config: any = {}) {
+  async executeLivingSpiral(prompt: string, client: Record<string, unknown>, config: Record<string, unknown> = {}) {
     return this.generateIterativeCodeImprovement(prompt, client, config);
   }
 }

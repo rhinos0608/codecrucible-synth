@@ -34,7 +34,7 @@ export class LMStudioProvider {
     });
   }
   
-  async processRequest(request: any, context?: any): Promise<any> {
+  async processRequest(request: Record<string, unknown>, _context?: Record<string, unknown>): Promise<Record<string, unknown>> {
     // Check status first
     if (!this.isAvailable) {
       const available = await this.checkStatus();
@@ -46,7 +46,7 @@ export class LMStudioProvider {
     return this.generate(request);
   }
   
-  async generate(request: any): Promise<any> {
+  async generate(request: Record<string, unknown>): Promise<Record<string, unknown>> {
     try {
       // Get available models first if model is 'auto'
       if (this.model === 'auto') {
@@ -87,8 +87,8 @@ export class LMStudioProvider {
         },
         finished: choice.finish_reason === 'stop'
       };
-    } catch (error: any) {
-      if (error.code === 'ECONNREFUSED') {
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && error.code === 'ECONNREFUSED') {
         this.isAvailable = false;
         throw new Error('LM Studio server is not running. Please start LM Studio and enable the local server.');
       }
@@ -103,7 +103,7 @@ export class LMStudioProvider {
       this.isAvailable = response.status === 200;
       
       if (this.isAvailable && response.data.data) {
-        const models = response.data.data.map((m: any) => m.id);
+        const models = response.data.data.map((m: Record<string, unknown>) => m.id);
         logger.info(`LM Studio available with ${models.length} models:`, models.slice(0, 3));
         
         // Auto-select first available model if not specified
@@ -127,7 +127,7 @@ export class LMStudioProvider {
     try {
       const response = await this.httpClient.get('/v1/models');
       if (response.data.data) {
-        return response.data.data.map((m: any) => m.id);
+        return response.data.data.map((m: Record<string, unknown>) => m.id);
       }
       return [];
     } catch (error) {
@@ -174,7 +174,7 @@ export class LMStudioProvider {
     return this.checkStatus();
   }
   
-  supportsModel(modelName: string): boolean {
+  supportsModel(_modelName: string): boolean {
     // LM Studio supports any model loaded in it
     return true;
   }

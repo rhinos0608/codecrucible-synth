@@ -23,8 +23,7 @@
       "DOM"
     ],
     "types": [
-      "node",
-      "@types/jest"
+      "@types/node"
     ],
     "baseUrl": ".",
     "paths": {

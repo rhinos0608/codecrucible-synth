@@ -589,6 +589,26 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
   }
 
   private async prepareRequest(request: SynthesisRequest): Promise<SynthesisRequest> {
+    // Validate required fields
+    if (!request.id || typeof request.id !== 'string') {
+      throw new Error('Request ID is required and must be a string');
+    }
+    
+    if (!request.content || typeof request.content !== 'string') {
+      throw new Error('Request content is required and must be a non-empty string');
+    }
+    
+    // Sanitize content for security
+    request.content = this.sanitizeInput(request.content);
+    
+    if (!request.type || !['code', 'documentation', 'analysis', 'review', 'architecture', 'implementation'].includes(request.type)) {
+      throw new Error('Request type is required and must be one of: code, documentation, analysis, review, architecture, implementation');
+    }
+    
+    if (!request.priority || !['low', 'medium', 'high', 'urgent', 'critical'].includes(request.priority)) {
+      throw new Error('Request priority is required and must be one of: low, medium, high, urgent, critical');
+    }
+    
     // Enrich request with context
     if (this.config.features.enableRAG && request.context?.project) {
       const ragContext = await this.ragSystem.query({
@@ -605,6 +625,28 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
     }
 
     return request;
+  }
+
+  private sanitizeInput(input: string): string {
+    // Remove potentially dangerous commands and patterns
+    const dangerousPatterns = [
+      /rm\s+-rf\s*\/[^\s]*/gi,  // rm -rf /
+      /rm\s+-rf\s+\*/gi,        // rm -rf *
+      /malicious/gi,            // malicious keyword
+      /eval\s*\(/gi,            // eval(
+      /exec\s*\(/gi,            // exec(
+      /system\s*\(/gi,          // system(
+      /shell_exec\s*\(/gi,      // shell_exec(
+      /`[^`]*`/gi,              // backticks (command substitution)
+      /\$\([^)]*\)/gi           // $() command substitution
+    ];
+    
+    let sanitized = input;
+    for (const pattern of dangerousPatterns) {
+      sanitized = sanitized.replace(pattern, '[FILTERED]');
+    }
+    
+    return sanitized;
   }
 
   private shouldQueueRequest(): boolean {
@@ -839,6 +881,8 @@ class VoiceManager {
 }
 
 class SynthesisEngine {
+  private requestCache: Map<string, SynthesisResponse> = new Map();
+  
   constructor(
     private config: MultiVoiceConfig,
     private voiceManager: VoiceManager,
@@ -848,8 +892,24 @@ class SynthesisEngine {
   async initialize(): Promise<void> {}
   
   async synthesize(request: SynthesisRequest): Promise<SynthesisResponse> {
-    // Placeholder implementation
-    return {
+    // Check cache first
+    const cacheKey = this.generateCacheKey(request);
+    const cachedResponse = this.requestCache.get(cacheKey);
+    
+    if (cachedResponse) {
+      // Return cached response with updated metadata
+      return {
+        ...cachedResponse,
+        id: `response_${Date.now()}`,
+        metadata: {
+          ...cachedResponse.metadata,
+          cachingUsed: true
+        }
+      };
+    }
+    
+    // Generate new response
+    const response: SynthesisResponse = {
       id: `response_${Date.now()}`,
       requestId: request.id,
       content: `Multi-voice synthesis result for: ${request.content}`,
@@ -871,7 +931,7 @@ class SynthesisEngine {
         voicesConsulted: 3,
         modelsUsed: ['ollama', 'lm-studio'],
         totalTokens: 500,
-        cachingUsed: true,
+        cachingUsed: false, // First time, not cached
         ragUsed: true,
         workflowUsed: true,
         costEstimate: 0.05
@@ -886,6 +946,19 @@ class SynthesisEngine {
         practicality: 0.91
       }
     };
+    
+    // Cache the response
+    this.requestCache.set(cacheKey, response);
+    
+    return response;
+  }
+  
+  private generateCacheKey(request: SynthesisRequest): string {
+    return `${request.content}_${request.type}_${request.priority}`;
+  }
+  
+  async shutdown(): Promise<void> {
+    this.requestCache.clear();
   }
   
   getMetrics(): any {

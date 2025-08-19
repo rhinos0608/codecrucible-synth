@@ -439,4 +439,41 @@ export class PerformanceMonitor extends EventEmitter {
     logger.info('📊 Performance monitoring stopped');
     this.emit('stopped');
   }
+
+  /**
+   * Start operation tracking (for compatibility)
+   */
+  startOperation(operationId: string, component?: string): void {
+    const startTime = Date.now();
+    if (!this.operationTracking) {
+      this.operationTracking = new Map();
+    }
+    this.operationTracking.set(operationId, { startTime, component });
+  }
+
+  /**
+   * End operation tracking (for compatibility)
+   */
+  endOperation(operationId: string): void {
+    if (!this.operationTracking) {
+      return;
+    }
+    const operation = this.operationTracking.get(operationId);
+    if (operation) {
+      const endTime = Date.now();
+      
+      // Record as a request metric for tracking
+      this.recordRequest(operation.component || 'unknown', {
+        provider: operation.component || 'unknown',
+        model: 'operation',
+        startTime: operation.startTime,
+        endTime,
+        success: true
+      });
+      
+      this.operationTracking.delete(operationId);
+    }
+  }
+
+  private operationTracking?: Map<string, { startTime: number; component?: string }>;
 }

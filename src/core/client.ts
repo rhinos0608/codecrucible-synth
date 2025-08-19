@@ -131,7 +131,8 @@ export class UnifiedModelClient extends EventEmitter {
     }
 
     if (this.providers.size === 0) {
-      throw new Error('No providers successfully initialized');
+      logger.warn('⚠️ No providers successfully initialized. CLI will run in degraded mode.');
+      // Don't throw an error - allow CLI to run for help/version commands
     }
   }
 

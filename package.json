@@ -1,7 +1,7 @@
 {
   "name": "codecrucible-synth",
-  "version": "3.7.1",
-  "description": "AI-Powered Code Generation & Comprehensive Codebase Analysis Tool with Autonomous Startup and Enhanced Intelligence",
+  "version": "3.8.0",
+  "description": "AI-Powered Code Generation & Analysis Tool with Dual-Agent Real-Time Code Review, Hybrid Model Architecture (Ollama + LM Studio), and Automated Quality Assurance",
   "main": "dist/index.js",
   "type": "module",
   "bin": {

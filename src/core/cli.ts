@@ -16,6 +16,7 @@ import { ResilientCLIWrapper, ResilientOptions, OperationResult } from './resili
 import { DualAgentRealtimeSystem } from './collaboration/dual-agent-realtime-system.js';
 import { AutoConfigurator } from './model-management/auto-configurator.js';
 import { UnifiedResponseCoordinator } from './unified-response-coordinator.js';
+import { InteractiveREPL } from './interactive-repl.js';
 import { SecureToolFactory } from './security/secure-tool-factory.js';
 import { InputSanitizer } from './security/input-sanitizer.js';
 import chalk from 'chalk';
@@ -385,7 +386,7 @@ export class CLI {
       }
       
       if (options.version || options.v) {
-        console.log('CodeCrucible Synth v3.8.1');
+        console.log('CodeCrucible Synth v3.8.5');
         return;
       }
     }
@@ -419,7 +420,7 @@ export class CLI {
     try {
       // Show header
       console.log(chalk.blue('╔══════════════════════════════════════════════════════════════╗'));
-      console.log(chalk.blue('║               CodeCrucible Synth v3.8.1                     ║'));
+      console.log(chalk.blue('║               CodeCrucible Synth v3.8.5                     ║'));
       console.log(chalk.blue('║          AI-Powered Code Generation & Analysis Tool         ║'));
       console.log(chalk.blue('║                   🧠 Enhanced with Project Intelligence      ║'));
       console.log(chalk.blue('╚══════════════════════════════════════════════════════════════╝'));
@@ -445,7 +446,9 @@ export class CLI {
           }
         }
         
-        this.showHelp();
+        // Start interactive mode by default when no arguments
+        console.log(chalk.yellow('🚀 Starting interactive mode...'));
+        await this.startInteractiveMode();
         return;
       }
 
@@ -468,7 +471,7 @@ export class CLI {
       }
       
       if (options.version || options.v) {
-        console.log('CodeCrucible Synth v3.7.1');
+        console.log('CodeCrucible Synth v3.8.5');
         return;
       }
 
@@ -497,6 +500,13 @@ export class CLI {
       
       if (args[0] === 'models') {
         await this.listModels();
+        return;
+      }
+      
+      // Check for interactive mode flag
+      if (args.includes('--interactive') || args.includes('-i') || args[0] === 'interactive') {
+        console.log(chalk.yellow('🚀 Starting interactive mode...'));
+        await this.startInteractiveMode();
         return;
       }
       
@@ -909,11 +919,19 @@ ${fileContents.map(f => `\n### ${f.path}\n\`\`\`\n${f.content}\n\`\`\``).join('\
     try {
       console.log(chalk.cyan(`📂 Analyzing file: ${filePath}`));
       
-      // Check if file exists
+      // Check if file exists and determine if it's a directory or file
+      let stats;
       try {
-        await stat(filePath);
+        stats = await stat(filePath);
       } catch (error) {
         console.error(chalk.red(`❌ File not found: ${filePath}`));
+        return;
+      }
+      
+      // If it's a directory, handle it differently
+      if (stats.isDirectory()) {
+        console.log(chalk.yellow(`📁 Directory detected - switching to directory analysis mode`));
+        await this.analyzeDirectory(filePath, options);
         return;
       }
       
@@ -2202,6 +2220,19 @@ ${fileContent}
     } catch (error) {
       logger.error('Model pull failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Start interactive REPL mode like Claude Code
+   */
+  async startInteractiveMode(): Promise<void> {
+    try {
+      const repl = new InteractiveREPL(this, this.context);
+      await repl.start();
+    } catch (error) {
+      console.error(chalk.red('❌ Failed to start interactive mode:'), error);
+      throw error;
     }
   }
 }

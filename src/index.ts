@@ -122,13 +122,13 @@ export async function main() {
     const args = process.argv.slice(2);
     
     // Fast commands that don't need AI models or full initialization
-    if (args.includes('--help') || args.includes('-h') || args.length === 0) {
+    if (args.includes('--help') || args.includes('-h')) {
       showBasicHelp();
       return;
     }
     
     if (args.includes('--version') || args.includes('-v')) {
-      console.log('CodeCrucible Synth v3.8.1');
+      console.log('CodeCrucible Synth v3.8.5');
       return;
     }
     
@@ -181,6 +181,7 @@ function showBasicHelp() {
   console.log('Commands:');
   console.log('  status               Show system status');
   console.log('  models               List available models');
+  console.log('  interactive, -i      Start interactive chat mode (default with no args)');
   console.log('  recommend            Show intelligent model recommendations');
   console.log('  analyze <file>       Analyze a code file');
   console.log('  analyze-dir [dir]    Analyze a directory/project');
@@ -188,8 +189,9 @@ function showBasicHelp() {
   console.log('  suggestions [ctx]    Get smart suggestions for current context');
   console.log();
   console.log('Examples:');
+  console.log('  cc                   Start interactive mode');
   console.log('  crucible "Create a React component for a todo list"');
-  console.log('  cc --fast "Format this code"');
+  console.log('  cc --interactive     Explicitly start interactive chat');
   console.log('  cc --voices explorer,developer "Analyze this codebase"');
 }
 
@@ -197,7 +199,7 @@ async function showQuickStatus() {
   console.log('📊 CodeCrucible Synth Status');
   console.log('━'.repeat(40));
   
-  console.log(`Version: 3.8.1`);
+  console.log(`Version: 3.8.5`);
   console.log(`Node.js: ${process.version}`);
   console.log(`Platform: ${process.platform}`);
   

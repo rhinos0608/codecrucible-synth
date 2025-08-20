@@ -270,17 +270,8 @@ export class PerformanceMonitor extends EventEmitter {
   }
 
   private createAlert(alert: PerformanceAlert): void {
-    // Create unique key for alert throttling
-    const alertKey = `${alert.type}_${alert.provider || 'system'}_${alert.severity}`;
-    const now = Date.now();
-    const lastAlertTime = this.lastAlertTimes.get(alertKey) || 0;
-    
-    // Throttle alerts - only allow one alert of same type per 60 seconds
-    if (now - lastAlertTime < 60000) { // 60 seconds
-      return; // Skip this alert to prevent spam
-    }
-    
-    this.lastAlertTimes.set(alertKey, now);
+    // DISABLED: Performance alerts are too verbose for normal operation
+    // Only store alert but don't log it to prevent spam
     this.alerts.push(alert);
     
     // OPTIMIZED: Keep only recent alerts (last 25 instead of 100)
@@ -288,14 +279,8 @@ export class PerformanceMonitor extends EventEmitter {
       this.alerts = this.alerts.slice(-15); // Keep only 15 most recent
     }
 
-    // Log alert
-    const logLevel = alert.severity === 'critical' ? 'error' : 'warn';
-    logger[logLevel](`🚨 Performance Alert: ${alert.message}`, {
-      type: alert.type,
-      value: alert.value,
-      threshold: alert.threshold,
-      provider: alert.provider
-    });
+    // NOTE: Logging disabled to prevent spam in normal operation
+    // Alerts are still stored for monitoring purposes but not logged
 
     // Emit alert event
     this.emit('alert', alert);

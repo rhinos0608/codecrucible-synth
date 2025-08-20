@@ -289,7 +289,7 @@ Please provide a comprehensive analysis with specific recommendations.`;
   /**
    * Build Ollama request payload (for testing)
    */
-  private buildOllamaRequest(prompt: string, voice: any, model: string): any {
+  private buildOllamaRequest(prompt: string, voice: VoiceParams, model: string): any {
     const temperature = (typeof voice === 'object' && voice.temperature) 
       ? voice.temperature 
       : this.config.temperature || 0.7;

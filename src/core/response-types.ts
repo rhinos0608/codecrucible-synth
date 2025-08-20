@@ -5,13 +5,57 @@
 
 import { logger } from './logger.js';
 
-// Core Response Types
-export interface AgentResponse {
+// Base Response Interface (for test compatibility)
+export interface BaseResponse {
+  success: boolean;
+  timestamp: number;
+  error?: ErrorResponse;
+}
+
+// Test-Compatible Response Types
+export interface AgentResponse extends BaseResponse {
   content: string;
-  metadata: ResponseMetadata;
-  type: ResponseType;
-  quality: number;
+  confidence?: number;
+  voiceId?: string;
+  tokensUsed?: number;
+  reasoning?: string;
+  metadata?: ResponseMetadata;
+  type?: ResponseType;
+  quality?: number;
+}
+
+export interface SynthesisResponse extends BaseResponse {
+  combinedContent: string;
+  voicesUsed: string[];
   confidence: number;
+  qualityScore: number;
+  synthesisMode: string;
+  reasoning: string;
+}
+
+export interface ToolResponse extends BaseResponse {
+  toolName: string;
+  result: any;
+  executionTime?: number;
+  retryCount?: number;
+  metadata?: any;
+}
+
+export interface FileResponse extends BaseResponse {
+  path: string;
+  filePath?: string; // For test compatibility
+  operation: string;
+  content?: string;
+  size?: number;
+  language?: string;
+  metadata?: any;
+}
+
+export interface ErrorResponse {
+  code: string;
+  message: string;
+  details?: any;
+  stack?: string;
 }
 
 export interface ResponseMetadata {
@@ -129,13 +173,121 @@ export interface ValidationWarning {
 // Factory and Validator Classes
 export class ResponseFactory {
   /**
-   * Create a basic agent response
+   * Create a basic agent response (test-compatible)
    */
   static createAgentResponse(
     content: string,
+    options: {
+      confidence?: number;
+      voiceId?: string;
+      tokensUsed?: number;
+      reasoning?: string;
+    } = {}
+  ): AgentResponse {
+    return {
+      success: true,
+      timestamp: Date.now(),
+      content,
+      confidence: options.confidence || 0.8,
+      voiceId: options.voiceId,
+      tokensUsed: options.tokensUsed || 0,
+      reasoning: options.reasoning || 'Agent response generated'
+    };
+  }
+
+  /**
+   * Create a synthesis response (test-compatible)
+   */
+  static createSynthesisResponse(
+    combinedContent: string,
+    voicesUsed: string[],
+    options: {
+      confidence?: number;
+      qualityScore?: number;
+      synthesisMode?: string;
+      reasoning?: string;
+    } = {}
+  ): SynthesisResponse {
+    return {
+      success: true,
+      timestamp: Date.now(),
+      combinedContent,
+      voicesUsed,
+      confidence: options.confidence || 0.8,
+      qualityScore: options.qualityScore || 85,
+      synthesisMode: options.synthesisMode || 'competitive',
+      reasoning: options.reasoning || 'Multi-voice synthesis completed'
+    };
+  }
+
+  /**
+   * Create a tool response (test-compatible)
+   */
+  static createToolResponse(
+    toolName: string,
+    result: any,
+    options: {
+      executionTime?: number;
+      retryCount?: number;
+      metadata?: any;
+    } = {}
+  ): ToolResponse {
+    return {
+      success: true,
+      timestamp: Date.now(),
+      toolName,
+      result,
+      executionTime: options.executionTime,
+      retryCount: options.retryCount,
+      metadata: options.metadata
+    };
+  }
+
+  /**
+   * Create a file response (test-compatible)
+   */
+  static createFileResponse(
+    path: string,
+    operation: string,
+    options: {
+      content?: string;
+      size?: number;
+      language?: string;
+      metadata?: any;
+    } = {}
+  ): FileResponse {
+    return {
+      success: true,
+      timestamp: Date.now(),
+      path,
+      filePath: path, // For test compatibility
+      operation,
+      content: options.content,
+      size: options.size,
+      language: options.language,
+      metadata: options.metadata
+    };
+  }
+
+  /**
+   * Create an error response (test-compatible)
+   */
+  static createErrorResponse(code: string, message: string, details?: any): ErrorResponse {
+    return {
+      code,
+      message,
+      details,
+      stack: new Error().stack
+    };
+  }
+  /**
+   * Create a legacy-style response for backward compatibility
+   */
+  static createLegacyAgentResponse(
+    content: string,
     type: ResponseType,
     metadata: Partial<ResponseMetadata> = {}
-  ): AgentResponse {
+  ): any {
     return {
       content,
       type,
@@ -165,7 +317,7 @@ export class ResponseFactory {
     } = {}
   ): CodeGenerationResponse {
     return {
-      ...this.createAgentResponse(`Generated ${language} code`, ResponseType.CODE_GENERATION, metadata),
+      ...this.createLegacyAgentResponse(`Generated ${language} code`, ResponseType.CODE_GENERATION, metadata),
       code,
       language,
       framework: options.framework,
@@ -184,7 +336,7 @@ export class ResponseFactory {
     metadata: Partial<ResponseMetadata> = {}
   ): CodeAnalysisResponse {
     return {
-      ...this.createAgentResponse(content, ResponseType.CODE_ANALYSIS, metadata),
+      ...this.createLegacyAgentResponse(content, ResponseType.CODE_ANALYSIS, metadata),
       analysis,
       type: ResponseType.CODE_ANALYSIS
     };
@@ -199,7 +351,7 @@ export class ResponseFactory {
     metadata: Partial<ResponseMetadata> = {}
   ): CodeReviewResponse {
     return {
-      ...this.createAgentResponse(content, ResponseType.CODE_REVIEW, metadata),
+      ...this.createLegacyAgentResponse(content, ResponseType.CODE_REVIEW, metadata),
       review,
       type: ResponseType.CODE_REVIEW
     };
@@ -244,6 +396,42 @@ export class ResponseFactory {
 }
 
 export class ResponseValidator {
+  /**
+   * Check if response is valid (test-compatible)
+   */
+  static isValidResponse(response: any): boolean {
+    return response && 
+           typeof response === 'object' && 
+           typeof response.success === 'boolean' && 
+           typeof response.timestamp === 'number';
+  }
+
+  /**
+   * Check if response has error (test-compatible)
+   */
+  static hasError(response: BaseResponse): boolean {
+    return response.success === false && !!response.error;
+  }
+
+  /**
+   * Get error message from response (test-compatible)
+   */
+  static getErrorMessage(response: BaseResponse): string | null {
+    return response.error?.message || null;
+  }
+
+  /**
+   * Extract content from any response type (test-compatible)
+   */
+  static extractContent(response: AgentResponse | SynthesisResponse): string {
+    if ('content' in response) {
+      return response.content;
+    }
+    if ('combinedContent' in response) {
+      return response.combinedContent;
+    }
+    return '';
+  }
   /**
    * Validate any agent response
    */
@@ -524,7 +712,7 @@ export class ResponseProcessor {
     const totalDuration = responses.reduce((sum, r) => sum + r.metadata.duration, 0);
     const totalTokens = responses.reduce((sum, r) => sum + r.metadata.tokens, 0);
 
-    return ResponseFactory.createAgentResponse(
+    return ResponseFactory.createLegacyAgentResponse(
       mergedContent,
       ResponseType.GENERAL,
       {

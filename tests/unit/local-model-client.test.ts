@@ -17,7 +17,9 @@ describe('LocalModelClient', () => {
       model: 'gpt-oss:20b',
       timeout: 30000,
       maxTokens: 4096,
-      temperature: 0.7
+      temperature: 0.7,
+      provider: 'ollama',
+      streamingEnabled: false
     };
 
     mockAxiosInstance = {
@@ -33,6 +35,7 @@ describe('LocalModelClient', () => {
   describe('Connection Check', () => {
     test('should check Ollama connection successfully', async () => {
       mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
         data: {
           models: [
             { name: 'gpt-oss:20b' },
@@ -220,6 +223,7 @@ describe('LocalModelClient', () => {
   describe('OpenAI-Compatible Mode', () => {
     test('should work with OpenAI-compatible endpoints', async () => {
       config.endpoint = 'http://localhost:8080';
+      config.provider = 'lmstudio';
       client = new LocalModelClient(config);
 
       const voiceArchetype = {

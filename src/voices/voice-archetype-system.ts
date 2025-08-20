@@ -256,8 +256,7 @@ export class VoiceArchetypeSystem {
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
   
-  async generateMultiVoiceSolutions(voices: string[], prompt: string, context: any) {
-    if (!this.modelClient) {
+
       throw new Error('No model client available for voice generation');
     }
     
@@ -268,13 +267,13 @@ export class VoiceArchetypeSystem {
         throw new Error(`Voice not found: ${voiceId}`);
       }
       
-      // Use the mock client's generateVoiceResponse method that tests expect
-      const result = await this.modelClient.generateVoiceResponse(voice.systemPrompt, prompt, context);
+      // Use the model client's generateVoiceResponse method
+      const result = await modelClient.generateVoiceResponse(voice.systemPrompt, voiceId);
       solutions.push({ 
         voice: voiceId,
         content: result.content,
         confidence: result.confidence,
-        tokens_used: result.tokens_used
+        tokens_used: result.tokens_used || 0
       });
     }
     return solutions;

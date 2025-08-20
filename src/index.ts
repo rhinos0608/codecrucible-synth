@@ -104,7 +104,12 @@ export async function initializeCLIContext(): Promise<{cli: CLI, context: CLICon
       config
     };
 
-    const cli = new CLI(context);
+    const cli = new CLI(
+      context.modelClient,
+      context.voiceSystem, 
+      context.mcpManager,
+      context.config
+    );
     return {cli, context};
   } catch (error) {
     console.error('Failed to initialize CLI context:', error);

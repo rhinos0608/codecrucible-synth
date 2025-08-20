@@ -104,15 +104,19 @@ export class LocalModelClient {
       voice = promptOrVoice;
     }
     
-    const voicePrompt = this.buildVoicePrompt(prompt, voice);
-    const content = await this.generate(voicePrompt);
-    
-    return {
-      content,
-      voice,
-      confidence: 0.8, // Default confidence score
-      tokens_used: Math.floor(Math.random() * 100) + 50 // Mock token count
-    };
+    try {
+      const voicePrompt = this.buildVoicePrompt(prompt, voice);
+      const content = await this.generate(voicePrompt);
+      
+      return {
+        content,
+        voice,
+        confidence: 0.8, // Default confidence score
+        tokens_used: Math.floor(Math.random() * 100) + 50 // Mock token count
+      };
+    } catch (error) {
+      throw new Error(`Failed to generate response from ${voice}`);
+    }
   }
 
   /**

@@ -223,6 +223,7 @@ describe('LocalModelClient', () => {
   describe('OpenAI-Compatible Mode', () => {
     test('should work with OpenAI-compatible endpoints', async () => {
       config.endpoint = 'http://localhost:8080';
+      config.provider = 'lmstudio';
       client = new LocalModelClient(config);
 
       const voiceArchetype = {

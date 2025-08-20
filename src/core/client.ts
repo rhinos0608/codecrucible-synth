@@ -200,12 +200,8 @@ export class UnifiedModelClient extends EventEmitter {
     });
 
     this.processManager.on('memoryWarning', (event) => {
-      // Throttle memory warnings to prevent spam
-      const now = Date.now();
-      if (now - this.lastMemoryWarningTime > 30000) { // 30 seconds between warnings
-        logger.warn(`Memory warning: ${(event.usage * 100).toFixed(1)}% usage with ${event.activeProcesses} active processes`);
-        this.lastMemoryWarningTime = now;
-      }
+      // DISABLED: Memory warnings are too verbose for normal operation
+      // Only emit the event but don't log anything
       this.emit('memoryWarning', event);
     });
   }

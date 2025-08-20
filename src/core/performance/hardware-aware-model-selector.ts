@@ -502,7 +502,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
     const memoryUsage = 1 - (freeMemoryGB / this.hardwareProfile.totalMemoryGB);
     
     if (memoryUsage > this.thresholds.memoryWarningThreshold && this.currentModel) {
-      this.logger.warn(`High memory usage detected: ${(memoryUsage * 100).toFixed(1)}%`);
+      // DISABLED: High memory usage warnings disabled for normal operation
       
       const metrics: PerformanceMetrics = {
         responseTime: 0,
@@ -521,7 +521,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
           // Only switch if current model is larger than 4GB
           this.checkForAutomaticSwitch(this.currentModel, metrics);
         } else {
-          this.logger.info(`Keeping efficient model ${this.currentModel} (${currentModelSize}GB) despite high memory usage`);
+          // DISABLED: Model keeping info disabled for cleaner operation
         }
       }
     }

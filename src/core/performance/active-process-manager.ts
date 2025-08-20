@@ -154,12 +154,7 @@ export class ActiveProcessManager extends EventEmitter {
   private async handleEmergencyMemoryPressure(memoryUsage: number): Promise<void> {
     if (this.modelSwitchInProgress) return;
     
-    // Only log emergency warning every 30 seconds to avoid spam
-    const now = Date.now();
-    if (now - this.lastEmergencyWarning > 30000) {
-      this.logger.error(`🚨 EMERGENCY: Memory usage at ${(memoryUsage * 100).toFixed(1)}% - terminating all processes and switching to smaller model`);
-      this.lastEmergencyWarning = now;
-    }
+    // DISABLED: Emergency warnings disabled for normal operation
     
     this.modelSwitchInProgress = true;
     this.isTerminating = true;
@@ -197,12 +192,8 @@ export class ActiveProcessManager extends EventEmitter {
    * Handle critical memory pressure (90%+) - terminate low priority processes
    */
   private async handleCriticalMemoryPressure(memoryUsage: number): Promise<void> {
-    // Only log critical warnings occasionally to avoid spam
-    const now = Date.now();
-    if (now - this.lastCriticalWarning > 30000) { // 30 seconds between critical warnings
-      this.logger.warn(`⚠️ CRITICAL: Memory usage at ${(memoryUsage * 100).toFixed(1)}% - terminating low priority processes`);
-      this.lastCriticalWarning = now;
-    }
+    // DISABLED: Critical memory warnings disabled for normal operation
+    // Still perform the cleanup but don't log
 
     // Terminate low and medium priority processes
     const processesToTerminate = Array.from(this.activeProcesses.values())
@@ -241,21 +232,13 @@ export class ActiveProcessManager extends EventEmitter {
    * Handle memory warning (75%+) - log warning and prepare for potential action
    */
   private handleMemoryWarning(memoryUsage: number): void {
-    // Only log warning occasionally to avoid spam
-    const now = Date.now();
-    const lastWarning = this.getLastWarningTime();
-    
-    if (!lastWarning || (now - lastWarning) > 30000) { // 30 seconds between warnings
-      this.logger.warn(`⚠️ Memory usage at ${(memoryUsage * 100).toFixed(1)}% - monitoring for potential action`);
-      this.setLastWarningTime(now);
-      
-      // Emit warning event for external listeners
-      this.emit('memoryWarning', {
-        usage: memoryUsage,
-        threshold: this.thresholds.memoryWarning,
-        activeProcesses: this.activeProcesses.size
-      });
-    }
+    // DISABLED: Memory warnings disabled for normal operation
+    // Only emit event but don't log
+    this.emit('memoryWarning', {
+      usage: memoryUsage,
+      threshold: this.thresholds.memoryWarning,
+      activeProcesses: this.activeProcesses.size
+    });
   }
 
   /**

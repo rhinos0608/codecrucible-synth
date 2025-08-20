@@ -308,7 +308,7 @@ Please provide a comprehensive analysis with specific recommendations.`;
   /**
    * Build OpenAI-compatible request payload (for testing)
    */
-  private buildOpenAIRequest(prompt: string, voice: any, model: string): any {
+  private buildOpenAIRequest(prompt: string, voice: string | VoiceParams, model: string): any {
     const temperature = (typeof voice === 'object' && voice.temperature) 
       ? voice.temperature 
       : this.config.temperature || 0.7;

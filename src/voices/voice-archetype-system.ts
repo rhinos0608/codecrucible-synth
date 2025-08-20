@@ -256,29 +256,6 @@ export class VoiceArchetypeSystem {
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
   
-
-      throw new Error('No model client available for voice generation');
-    }
-    
-    const solutions = [];
-    for (const voiceId of voices) {
-      const voice = this.getVoice(voiceId);
-      if (!voice) {
-        throw new Error(`Voice not found: ${voiceId}`);
-      }
-      
-      // Use the model client's generateVoiceResponse method
-      const result = await modelClient.generateVoiceResponse(voice.systemPrompt, voiceId);
-      solutions.push({ 
-        voice: voiceId,
-        content: result.content,
-        confidence: result.confidence,
-        tokens_used: result.tokens_used || 0
-      });
-    }
-    return solutions;
-  }
-  
   async synthesize(prompt: string, voices: string[], mode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative', client?: any) {
     // If no client provided, return error
     if (!client) {

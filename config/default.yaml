@@ -76,10 +76,11 @@ performance:
     compressionThreshold: 80000       # tokens
     retentionStrategy: "sliding"      # sliding, summary, hierarchical
 
-# E2B Code Interpreter Configuration
+# E2B Code Interpreter Configuration - SECURITY CRITICAL
 e2b:
   apiKey: "${E2B_API_KEY}"            # E2B API key from environment
-  enabled: true                       # Enable E2B sandboxed execution
+  enabled: true                       # ✅ MANDATORY: Enable E2B sandboxed execution
+  enforceOnly: true                   # ✅ SECURITY: Only allow E2B execution, block unsafe local execution
   defaultEnvironment: "base"          # Default sandbox environment
   sessionTimeout: 3600000             # 1 hour session timeout
   maxConcurrentSessions: 10           # Maximum concurrent sandbox sessions
@@ -91,14 +92,16 @@ e2b:
     diskSpace: "1GB"                  # Disk space limit
     executionTimeout: 30000           # 30 seconds max execution time
     
-  # Security policy for code execution
+  # Security policy for code execution - PRODUCTION HARDENED
   security:
-    strictMode: false                 # Enable for production environments
-    allowNetworkAccess: false         # Block network access in sandboxes
-    allowFileSystemWrite: true        # Allow file operations
-    allowProcessSpawning: false       # Block process spawning
-    validateCode: true                # Enable code validation
-    auditLog: true                    # Log all execution attempts
+    strictMode: true                  # ✅ SECURITY: Enable strict mode for production security
+    allowNetworkAccess: false         # ❌ Block network access in sandboxes
+    allowFileSystemWrite: true        # Allow controlled file operations in sandbox
+    allowProcessSpawning: false       # ❌ Block dangerous process spawning
+    validateCode: true                # ✅ Enable comprehensive code validation
+    auditLog: true                    # ✅ Log all execution attempts for security monitoring
+    blockUnsafePatterns: true         # ✅ Block dangerous command patterns
+    requireAuthentication: false      # TODO: Enable in production deployment
 
 # Logging Configuration
 logging:

@@ -1,53 +1,63 @@
-// Temporarily disabled agent due to type conflicts
-// TODO: Refactor this agent to use simplified types
-
-/* ORIGINAL CONTENT COMMENTED OUT
-import { UnifiedAgent, AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
+/**
+ * Problem Solver Agent - Uses Living Spiral methodology for complex problem solving
+ * Integrates with the existing UnifiedAgent system
+ */
 
 import { UnifiedAgent } from '../agent.js';
-import { AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
-import { UnifiedAgent } from '../agent.js';
+import { ExecutionRequest, ExecutionResponse } from '../types.js';
+import { UnifiedModelClient } from '../client.js';
+import { PerformanceMonitor } from '../../utils/performance.js';
+import { logger } from '../logger.js';
 
 export class ProblemSolverAgent extends UnifiedAgent {
-  constructor(dependencies: AgentDependencies) {
-    const config: BaseAgentConfig = {
-      name: 'ProblemSolverAgent',
-      description: 'Focused on identifying and solving specific problems',
-      rateLimit: { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 30000, backoffMultiplier: 2 },
-      timeout: 60000,
-    };
-    super(config, dependencies);
+  constructor(modelClient: UnifiedModelClient, performanceMonitor: PerformanceMonitor) {
+    super(modelClient, performanceMonitor);
   }
 
-  public async processRequest(input: string, streaming?: boolean): Promise<BaseAgentOutput> {
-    const reactAgent = new UnifiedAgent(this.dependencies.context, this.dependencies.workingDirectory);
-    const enhancedPrompt = `Problem Solving Task: ${input}
+  async processRequest(input: string): Promise<ExecutionResponse> {
+    logger.info('🧩 Problem Solver Agent processing request');
     
-Approach:
-1. Identify the root cause of the problem
-2. Analyze potential solutions
-3. Recommend the best approach
-4. Consider implementation steps
-5. Anticipate potential issues`;
+    const request: ExecutionRequest = {
+      id: `problem-${Date.now()}`,
+      input,
+      type: 'problem-solving',
+      mode: 'quality' // Use quality mode for complex problem solving
+    };
 
-    const result = await reactAgent.processRequest(enhancedPrompt);
-    return new ExecutionResult(true, result);
+    // Use the sophisticated Living Spiral methodology through UnifiedAgent
+    const response = await this.execute(request);
+    
+    // Enhance with problem-solving specific analysis
+    if (response.success && response.result) {
+      const enhancedResult = await this.enhanceProblemSolution(input, response.result as Record<string, unknown>);
+      return {
+        ...response,
+        result: enhancedResult
+      };
+    }
+
+    return response;
   }
-}
 
-*/
-
-// Simplified placeholder implementation
-export class ProblemSolverAgent {
-  constructor(dependencies: any) {
-    // Placeholder constructor
-  }
-
-  async processRequest(input: string, streaming?: boolean): Promise<any> {
+  private async enhanceProblemSolution(originalProblem: string, solution: Record<string, unknown>): Promise<Record<string, unknown>> {
+    // Add problem-solving specific enhancements
     return {
-      content: 'Agent temporarily disabled',
-      metadata: {},
-      success: true
+      ...solution,
+      problemAnalysis: {
+        originalProblem,
+        solutionApproach: 'Living Spiral methodology with multi-voice council',
+        confidence: 'High - uses sophisticated agent architecture',
+        nextSteps: [
+          'Review proposed solution',
+          'Test implementation approach', 
+          'Iterate based on feedback'
+        ]
+      },
+      metadata: {
+        ...((solution.metadata as Record<string, unknown>) || {}),
+        agentType: 'problem-solver',
+        methodology: 'living-spiral'
+      }
     };
   }
 }

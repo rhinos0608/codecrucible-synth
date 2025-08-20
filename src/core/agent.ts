@@ -175,7 +175,7 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Execute agent request with intelligent routing
    */
-  async execute(request: ExecutionRequest, _context?: ProjectContext): Promise<ExecutionResponse> {
+  async execute(request: ExecutionRequest, context?: ProjectContext): Promise<ExecutionResponse> {
     const startTime = Date.now();
     const workflowId = this.generateWorkflowId();
 
@@ -402,8 +402,8 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const result = await capability.handler(task);
-      (result as any).executionTime = Date.now() - startTime;
-      (result as any).taskId = task.id;
+      (result as ExecutionResult & { executionTime?: number; taskId?: string }).executionTime = Date.now() - startTime;
+      (result as ExecutionResult & { executionTime?: number; taskId?: string }).taskId = task.id;
       
       return result;
     } catch (error) {
@@ -448,8 +448,7 @@ export class UnifiedAgent extends EventEmitter {
       if (typeof task.input === 'string' && isProjectAnalysis) {
         // Read project structure
         try {
-          const { readFile } = await import('fs/promises');
-          const { join } = await import('path');
+          // File reading functionality moved to getProjectStructure method
           
           const projectRoot = process.cwd();
           const projectStructure = await this.getProjectStructure(projectRoot);
@@ -875,7 +874,7 @@ export class UnifiedAgent extends EventEmitter {
         '.idea', 'coverage', '.nyc_output', 'logs', '*.log'
       ];
       
-      async function walkDirectory(dirPath: string, depth: number = 0): Promise<void> {
+      const walkDirectory = async (dirPath: string, depth: number = 0): Promise<void> => {
         if (depth > maxDepth) return;
         
         try {
@@ -952,7 +951,7 @@ export class UnifiedAgent extends EventEmitter {
     try {
       // Cancel any active workflows
       for (const workflow of this.activeWorkflows.values()) {
-        workflow.status = 'completed' as any;
+        workflow.status = 'completed';
       }
       this.activeWorkflows.clear();
       
@@ -1023,18 +1022,44 @@ export const timeoutManager = {
   }
 };
 
+interface EditSummary {
+  total: number;
+  approved: number;
+  rejected: number;
+}
+
+interface EditConfirmationResult {
+  approved: boolean;
+  edits: unknown;
+}
+
+interface EditApplicationResult {
+  success: boolean;
+  edits: unknown;
+}
+
+interface ConfirmationResult {
+  approved: unknown[];
+  rejected: unknown[];
+}
+
 export const globalEditConfirmation = {
   getPendingEditsCount: () => 0,
-  proposeEdits: async (edits: any) => ({ approved: true, edits }),
-  confirmAllEdits: async () => ({ approved: [], rejected: [] }),
-  applyEdits: async (edits: any) => ({ success: true, edits }),
+  proposeEdits: async (edits: unknown): Promise<EditConfirmationResult> => ({ approved: true, edits }),
+  confirmAllEdits: async (): Promise<ConfirmationResult> => ({ approved: [], rejected: [] }),
+  applyEdits: async (edits: unknown): Promise<EditApplicationResult> => ({ success: true, edits }),
   clearPendingEdits: () => {},
-  generateEditSummary: () => ({ total: 0, approved: 0, rejected: 0 }),
-  displayEditSummary: (summary: any) => console.log('Edit Summary:', summary)
+  generateEditSummary: (): EditSummary => ({ total: 0, approved: 0, rejected: 0 }),
+  displayEditSummary: (summary: EditSummary) => console.log('Edit Summary:', summary)
 };
 
+interface IndexResult {
+  indexed: boolean;
+  path: string;
+}
+
 export const globalRAGSystem = {
-  indexPath: async (path: string, options?: any) => ({ indexed: true, path })
+  indexPath: async (path: string, _options?: unknown): Promise<IndexResult> => ({ indexed: true, path })
 };
 
 let shutdownHandlersRegistered = false;
@@ -1055,11 +1080,30 @@ export const clearManagedInterval = (id: NodeJS.Timeout) => {
   clearInterval(id);
 };
 
-export const initializeEditConfirmation = (path: string, options?: any) => globalEditConfirmation;
-export const createUnifiedModelClient = (config: any) => new UnifiedModelClient(config);
+export const initializeEditConfirmation = (_path: string, _options?: unknown) => globalEditConfirmation;
+export const createUnifiedModelClient = (config: Record<string, unknown>) => {
+  // Create a basic config structure for compatibility
+  const unifiedConfig = {
+    providers: [],
+    executionMode: 'auto' as const,
+    fallbackChain: ['ollama', 'lm-studio'] as Array<'ollama' | 'lm-studio' | 'huggingface' | 'auto'>,
+    performanceThresholds: {
+      fastModeMaxTokens: 1000,
+      timeoutMs: 30000,
+      maxConcurrentRequests: 3
+    },
+    security: {
+      enableSandbox: true,
+      maxInputLength: 10000,
+      allowedCommands: []
+    },
+    ...config
+  };
+  return new UnifiedModelClient(unifiedConfig);
+};
 
 export interface AgentContext {
-  modelClient: any;
+  modelClient: UnifiedModelClient;
   workingDirectory: string;
   config: AgentConfig;
 }

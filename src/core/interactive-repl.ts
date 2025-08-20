@@ -283,7 +283,11 @@ export class InteractiveREPL {
   private handleExit(): void {
     console.log(chalk.cyan('\n👋 Goodbye!'));
     this.rl.close();
-    process.exit(0);
+    
+    // Don't call process.exit in test environments
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(0);
+    }
   }
 
   /**
@@ -291,5 +295,17 @@ export class InteractiveREPL {
    */
   destroy(): void {
     this.rl.close();
+  }
+  
+  /**
+   * Cleanup method for graceful shutdown
+   */
+  async cleanup(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.rl) {
+        this.rl.close();
+      }
+      resolve();
+    });
   }
 }

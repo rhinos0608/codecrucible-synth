@@ -13,6 +13,8 @@ import { CLIOptions, CLIContext } from './cli-types.js';
 import { CLIDisplay } from './cli-display.js';
 import { ProjectContext } from '../client.js';
 import { startServerMode, ServerOptions } from '../../server/server-mode.js';
+import { analysisWorkerPool, AnalysisTask } from '../workers/analysis-worker.js';
+import { randomUUID } from 'crypto';
 
 export class CLICommands {
   private context: CLIContext;
@@ -28,124 +30,173 @@ export class CLICommands {
    */
   async showStatus(): Promise<void> {
     console.log(chalk.bold('\n📊 CodeCrucible Synth - System Status\n'));
-    
-    const spinner = ora('Checking system status...').start();
-    
+
+    // Model Client Status
+    console.log(chalk.cyan('🤖 Model Client:'));
     try {
-      // Check model client status
-      const modelStatus = await this.context.modelClient.healthCheck().then(() => true).catch(() => false);
-      spinner.text = 'Checking voice system...';
-      
-      // Check voice system
-      const voiceStatus = this.context.voiceSystem ? 'Active' : 'Inactive';
-      spinner.text = 'Checking MCP servers...';
-      
-      // Check MCP manager
-      const mcpStatus = this.context.mcpManager ? 'Active' : 'Inactive';
-      
-      spinner.succeed('System status check complete');
-      
-      console.log(chalk.cyan('🤖 Model Client:'), modelStatus ? chalk.green('Connected') : chalk.red('Disconnected'));
-      console.log(chalk.cyan('🎭 Voice System:'), voiceStatus === 'Active' ? chalk.green(voiceStatus) : chalk.yellow(voiceStatus));
-      console.log(chalk.cyan('🔧 MCP Manager:'), mcpStatus === 'Active' ? chalk.green(mcpStatus) : chalk.yellow(mcpStatus));
-      
-      // Show available models
-      try {
-        const models = await this.context.modelClient.getAllAvailableModels?.() || [];
-        console.log(chalk.cyan(`\n📋 Available Models (${models.length}):`));
-        models.slice(0, 5).forEach((model: any) => {
-          const perf = CLIDisplay.getModelPerformance(model.name || model);
-          console.log(`  ${perf} ${model.name || model}`);
-        });
-        if (models.length > 5) {
-          console.log(chalk.gray(`  ... and ${models.length - 5} more`));
+      if (this.context.modelClient) {
+        const healthCheck = await this.context.modelClient.healthCheck();
+        console.log(chalk.green(`  ✅ Status: ${healthCheck ? 'Connected' : 'Disconnected'}`));
+        
+        if (typeof (this.context.modelClient as any).getCurrentModel === 'function') {
+          const currentModel = (this.context.modelClient as any).getCurrentModel();
+          console.log(chalk.cyan(`  🎯 Current Model: ${currentModel || 'Auto-detect'}`));
         }
-      } catch (error) {
-        console.log(chalk.yellow('\n⚠️  Could not fetch models:'), error);
+      } else {
+        console.log(chalk.red('  ❌ Model client not initialized'));
       }
-      
-      // System health recommendations
-      console.log(chalk.cyan('\n💡 Recommendations:'));
-      if (!modelStatus) {
-        console.log(chalk.yellow('  • Install and start Ollama or LM Studio'));
-      }
-      if (voiceStatus === 'Inactive') {
-        console.log(chalk.yellow('  • Voice system needs initialization'));
-      }
-      
     } catch (error) {
-      spinner.fail('Status check failed');
-      console.error(chalk.red('Error:'), error);
+      console.log(chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
     }
+
+    // Voice System Status  
+    console.log(chalk.cyan('\n🎭 Voice System:'));
+    try {
+      if (this.context.voiceSystem) {
+        const voices = this.context.voiceSystem.getAvailableVoices();
+        console.log(chalk.green(`  ✅ Available Voices: ${voices.length}`));
+        console.log(chalk.cyan(`  🎯 Voice Names: ${voices.map(v => v.name).join(', ')}`));
+      } else {
+        console.log(chalk.red('  ❌ Voice system not initialized'));
+      }
+    } catch (error) {
+      console.log(chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
+
+    // MCP Server Status
+    console.log(chalk.cyan('\n🔧 MCP Servers:'));
+    try {
+      if (this.context.mcpManager) {
+        const serverCount = (this.context.mcpManager as any).servers?.size || 0;
+        console.log(chalk.green(`  ✅ Active Servers: ${serverCount}`));
+        
+        if (typeof (this.context.mcpManager as any).isReady === 'function') {
+          const ready = (this.context.mcpManager as any).isReady();
+          console.log(chalk.cyan(`  🚀 Ready: ${ready ? 'Yes' : 'No'}`));
+        }
+      } else {
+        console.log(chalk.red('  ❌ MCP manager not initialized'));
+      }
+    } catch (error) {
+      console.log(chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
+
+    // Configuration Status
+    console.log(chalk.cyan('\n⚙️  Configuration:'));
+    try {
+      if (this.context.config) {
+        console.log(chalk.green('  ✅ Configuration loaded'));
+        
+        if (this.context.config.model) {
+          console.log(chalk.cyan(`  🔗 Endpoint: ${this.context.config.model.endpoint || 'Default'}`));
+          console.log(chalk.cyan(`  ⏱️  Timeout: ${this.context.config.model.timeout || 'Default'}ms`));
+        }
+      } else {
+        console.log(chalk.red('  ❌ Configuration not loaded'));
+      }
+    } catch (error) {
+      console.log(chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
+
+    console.log(chalk.green('\n✨ System check complete!\n'));
   }
 
   /**
-   * List available models with details
+   * List available AI models
    */
   async listModels(): Promise<void> {
-    console.log(chalk.bold('\n🤖 Available Models\n'));
+    console.log(chalk.bold('\n🧠 Available AI Models\n'));
     
-    const spinner = ora('Fetching models...').start();
+    const spinner = ora('Fetching available models...').start();
     
     try {
-      const models = await this.context.modelClient.getAllAvailableModels?.() || [];
-      spinner.succeed(`Found ${models.length} models`);
-      
-      if (models.length === 0) {
-        console.log(chalk.yellow('No models found. Install models with:'));
-        console.log(chalk.gray('  ollama pull qwen2.5-coder:7b'));
-        console.log(chalk.gray('  ollama pull deepseek-coder:8b'));
+      if (!this.context.modelClient) {
+        spinner.fail('Model client not available');
+        console.log(chalk.red('❌ Model client is not initialized'));
         return;
       }
-      
-      console.log(chalk.cyan('📋 Installed Models:'));
-      models.forEach((model: any) => {
-        const name = model.name || model;
-        const size = model.size ? ` (${model.size})` : '';
-        const perf = CLIDisplay.getModelPerformance(name);
-        console.log(`  ${perf} ${chalk.bold(name)}${chalk.gray(size)}`);
-      });
-      
-      console.log(chalk.cyan('\n💡 Performance Legend:'));
-      console.log(`  ${chalk.green('●')} High Performance`);
-      console.log(`  ${chalk.yellow('●')} Medium Performance`);
-      console.log(`  ${chalk.gray('●')} Basic Performance`);
-      
-      // Show recommendations
-      await CLIDisplay.showModelRecommendations();
-      
+
+      // Check if getAllAvailableModels method exists
+      if (typeof this.context.modelClient.getAllAvailableModels === 'function') {
+        const models = await this.context.modelClient.getAllAvailableModels();
+        
+        spinner.succeed(`Found ${models.length} models`);
+        
+        if (models.length > 0) {
+          console.log(chalk.cyan('📋 Available Models:'));
+          models.forEach((model, index) => {
+            console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || model}`));
+            if (model.size) {
+              console.log(chalk.gray(`     Size: ${model.size}`));
+            }
+            if (model.modified_at) {
+              console.log(chalk.gray(`     Modified: ${new Date(model.modified_at).toLocaleDateString()}`));
+            }
+          });
+        } else {
+          console.log(chalk.yellow('No models found. Make sure your AI service is running.'));
+        }
+      } else {
+        spinner.warn('Model listing not supported');
+        console.log(chalk.yellow('ℹ️  Model listing is not supported by the current client'));
+      }
     } catch (error) {
       spinner.fail('Failed to fetch models');
-      console.error(chalk.red('Error:'), error);
+      console.error(chalk.red('❌ Error fetching models:'), error);
     }
+
+    console.log('');
   }
 
   /**
    * Handle code generation requests
    */
   async handleGeneration(prompt: string, options: CLIOptions = {}): Promise<void> {
-    if (!prompt || prompt.trim().length === 0) {
-      console.error(chalk.red('❌ Generation requires a prompt'));
-      return;
-    }
-
-    console.log(chalk.cyan('\n🎯 Starting Code Generation'));
-    console.log(chalk.gray(`Prompt: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`));
+    console.log(chalk.bold(`\n🎨 Generating Code\n`));
+    console.log(chalk.cyan(`Prompt: ${prompt}`));
     
     const spinner = ora('Generating code...').start();
     
     try {
-      const result = await this.context.modelClient.generateText(prompt);
+      if (!this.context.modelClient || !this.context.voiceSystem) {
+        spinner.fail('Required services not available');
+        console.log(chalk.red('❌ Model client or voice system not initialized'));
+        return;
+      }
+
+      // Get voices for code generation
+      const voices = options.voices || this.context.voiceSystem.getDefaultVoices() || ['developer'];
+      
+      // Generate multi-voice solutions
+      const results = await this.context.voiceSystem.generateMultiVoiceSolutions(
+        Array.isArray(voices) ? voices : [voices],
+        prompt,
+        this.context.modelClient,
+        { files: [] }
+      );
       
       spinner.succeed('Code generation complete');
       
-      console.log(chalk.green('\n📝 Generated Code:'));
-      console.log(result || 'No code generated');
-      
+      if (results && results.length > 0) {
+        console.log(chalk.green('\n✨ Generated Solutions:\n'));
+        
+        results.forEach((result, index) => {
+          console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Solution:`));
+          console.log(chalk.white(result.content || 'No content generated'));
+          
+          if (result.confidence) {
+            console.log(chalk.gray(`   Confidence: ${Math.round(result.confidence * 100)}%`));
+          }
+        });
+      } else {
+        console.log(chalk.yellow('No solutions generated'));
+      }
     } catch (error) {
       spinner.fail('Code generation failed');
-      console.error(chalk.red('Error:'), error);
+      console.error(chalk.red('❌ Error during generation:'), error);
     }
+
+    console.log('');
   }
 
   /**
@@ -198,7 +249,7 @@ export class CLICommands {
   }
 
   /**
-   * Analyze a directory structure
+   * Analyze a directory structure with worker pool
    */
   private async analyzeDirectory(dirPath: string, options: CLIOptions): Promise<void> {
     console.log(chalk.bold(`\n📁 Analyzing Directory: ${dirPath}`));
@@ -225,63 +276,68 @@ export class CLICommands {
       
       spinner.text = `Found ${allFiles.length} files, analyzing...`;
       
-      // Create project context
-      const projectContext: ProjectContext = {
-        workingDirectory: dirPath,
-        config: {},
-        files: allFiles.slice(0, 50).map(f => ({
-          path: f,
-          content: '',
-          type: 'file'
-        })),
-        structure: {
-          directories: [],
-          fileTypes: {}
-        }
-      };
-      
-      // Analyze with voice system if available
+      // PERFORMANCE FIX: Use worker pool for non-blocking analysis
       if (this.context.voiceSystem && this.context.modelClient) {
-        const voices = options.voices || ['analyzer', 'architect']; // Use lowercase voice names
+        const voices = options.voices || ['analyzer', 'architect'];
         
-        // Add timeout to prevent hanging
-        const timeoutMs = options.timeout || 60000; // 60 seconds default
-        const analysisPromise = this.context.voiceSystem.generateMultiVoiceSolutions(
-          Array.isArray(voices) ? voices : [voices],
-          `Analyze this codebase structure and provide insights`,
-          this.context.modelClient, // Pass the model client as the 3rd parameter
-          projectContext // Pass context as 4th parameter
-        );
+        // Create analysis task for worker pool
+        const analysisTask: AnalysisTask = {
+          id: randomUUID(),
+          files: allFiles,
+          prompt: (options.prompt as string) || 'Analyze this codebase for architecture, quality, and potential improvements.',
+          options: {
+            voices,
+            maxFiles: 50 // Limit files to prevent memory overload
+          },
+          timeout: options.timeout || 30000 // 30 seconds timeout
+        };
         
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Analysis timeout - operation took too long')), timeoutMs);
-        });
-        
+        // Execute analysis in worker thread
         try {
-          const analysis = await Promise.race([analysisPromise, timeoutPromise]);
+          const result = await analysisWorkerPool.executeAnalysis(analysisTask, {
+            endpoint: this.context.config.model?.endpoint || 'http://localhost:11434',
+            providers: [{ type: 'ollama' as const }],
+            executionMode: 'auto' as const,
+            fallbackChain: ['ollama' as const],
+            performanceThresholds: {
+              fastModeMaxTokens: 2048,
+              timeoutMs: 30000,
+              maxConcurrentRequests: 2
+            },
+            security: {
+              enableSandbox: true,
+              maxInputLength: 100000,
+              allowedCommands: ['node', 'npm', 'git']
+            }
+          });
           
-          spinner.succeed('Directory analysis complete');
+          spinner.succeed(`Analysis complete - processed ${result.result?.totalFiles || 0} files`);
           
-          if (analysis && typeof analysis === 'object' && 'content' in analysis) {
-            CLIDisplay.displayResults(analysis as any, []);
-          } else if (Array.isArray(analysis)) {
-            // Handle array of voice responses
-            console.log(chalk.green('\n📊 Analysis Results:'));
-            analysis.forEach((result, index) => {
-              console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Analysis:`));
-              console.log(result.content || 'No content available');
+          // Display results
+          if (result.success && result.result) {
+            console.log(chalk.green('\n✅ Analysis Results:'));
+            console.log(chalk.cyan(`📊 Files processed: ${result.result.totalFiles}`));
+            console.log(chalk.cyan(`⏱️ Duration: ${result.duration}ms`));
+            console.log(chalk.cyan(`📈 Success rate: ${result.result.summary?.successRate || 0}%`));
+            
+            // Display chunk results
+            result.result.chunks.forEach((chunk: any, index: number) => {
+              console.log(chalk.yellow(`\n📦 Chunk ${index + 1}:`));
+              if (chunk.error) {
+                console.log(chalk.red(`❌ Error: ${chunk.error}`));
+              } else if (chunk.analysis) {
+                console.log(chalk.green(`✅ Successfully analyzed ${chunk.files.length} files`));
+                if (chunk.analysis.length > 0) {
+                  console.log(chalk.white(chunk.analysis[0].content.substring(0, 200) + '...'));
+                }
+              }
             });
           } else {
-            console.log(chalk.yellow('Analysis completed but no structured results available'));
+            console.log(chalk.red(`❌ Analysis failed: ${result.error || 'Unknown error'}`));
           }
         } catch (analysisError) {
           spinner.fail('Analysis failed');
-          if (analysisError instanceof Error && analysisError.message.includes('timeout')) {
-            console.log(chalk.yellow(`⏱️ Analysis timed out after ${timeoutMs/1000} seconds`));
-            console.log(chalk.cyan('Tip: Use --timeout <seconds> to increase timeout or try analyzing fewer files'));
-          } else {
-            console.error(chalk.red('Error during analysis:'), analysisError);
-          }
+          console.error(chalk.red('Error during analysis:'), analysisError);
         }
       } else {
         spinner.succeed('Basic directory scan complete');
@@ -316,50 +372,28 @@ export class CLICommands {
       console.log(`  Type: ${extname(filePath)}`);
       
       if (this.context.voiceSystem && this.context.modelClient) {
-        const voices = options.voices || ['maintainer', 'security']; // Use lowercase voice names
+        const voices = options.voices || ['analyzer'];
         
-        // Add timeout to prevent hanging
-        const timeoutMs = options.timeout || 60000; // 60 seconds default
-        const analysisPromise = this.context.voiceSystem.generateMultiVoiceSolutions(
+        const analysis = await this.context.voiceSystem.generateMultiVoiceSolutions(
           Array.isArray(voices) ? voices : [voices],
-          `Analyze this ${extname(filePath)} file for quality, security, and maintainability`,
-          this.context.modelClient, // Pass the model client as the 3rd parameter
-          { files: [filePath], structure: {}, metadata: { content: content.substring(0, 5000) } } // Pass context as 4th parameter
+          `Analyze this file: ${filePath}\n\nContent:\n${content.substring(0, 2000)}${content.length > 2000 ? '...' : ''}`,
+          this.context.modelClient,
+          { files: [filePath] }
         );
         
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Analysis timeout - operation took too long')), timeoutMs);
-        });
+        spinner.succeed('File analysis complete');
         
-        try {
-          const analysis = await Promise.race([analysisPromise, timeoutPromise]);
-          
-          spinner.succeed('File analysis complete');
-          if (analysis && typeof analysis === 'object' && 'content' in analysis) {
-            CLIDisplay.displayResults(analysis as any, []);
-          } else if (Array.isArray(analysis)) {
-            // Handle array of voice responses
-            console.log(chalk.green('\n📊 File Analysis Results:'));
-            analysis.forEach((result, index) => {
-              console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Analysis:`));
-              console.log(result.content || 'No content available');
-            });
-          } else {
-            console.log(chalk.yellow('Analysis completed but no structured results available'));
-          }
-        } catch (analysisError) {
-          spinner.fail('File analysis failed');
-          if (analysisError instanceof Error && analysisError.message.includes('timeout')) {
-            console.log(chalk.yellow(`⏱️ File analysis timed out after ${timeoutMs/1000} seconds`));
-            console.log(chalk.cyan('Tip: Use --timeout <seconds> to increase timeout'));
-          } else {
-            console.error(chalk.red('Error during file analysis:'), analysisError);
-          }
+        if (analysis && analysis.length > 0) {
+          analysis.forEach((result, index) => {
+            console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Analysis:`));
+            console.log(result.content || 'No analysis available');
+          });
+        } else {
+          console.log(chalk.yellow('No analysis results available'));
         }
       } else {
-        spinner.succeed('Basic file analysis complete');
+        spinner.succeed('Basic file scan complete');
       }
-      
     } catch (error) {
       spinner.fail('File analysis failed');
       console.error(chalk.red('Error:'), error);
@@ -367,19 +401,17 @@ export class CLICommands {
   }
 
   /**
-   * Get summary of file types in a file list
+   * Get file type summary
    */
   private getFileTypes(files: string[]): string {
     const types = new Map<string, number>();
     
     files.forEach(file => {
-      const ext = extname(file);
+      const ext = extname(file) || 'no extension';
       types.set(ext, (types.get(ext) || 0) + 1);
     });
     
     return Array.from(types.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
       .map(([ext, count]) => `${ext}(${count})`)
       .join(', ');
   }

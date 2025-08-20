@@ -109,7 +109,10 @@
       "mcp__filesystem__write_file",
       "mcp__filesystem__create_directory",
       "mcp__filesystem__edit_file",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(NODE_ENV=test npm test)",
+      "Bash(NODE_ENV=test npm test -- --testNamePattern=\"Voice Archetype System\")",
+      "Bash(NODE_ENV=test npm test -- --testNamePattern=\"Voice Archetype System|Response System\")"
     ],
     "deny": [],
     "ask": [],

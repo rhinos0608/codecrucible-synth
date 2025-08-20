@@ -49,8 +49,8 @@ export interface ModelRequest {
 export interface ModelResponse {
   content: string;
   model: string;
-  provider: string;
-  metadata: {
+  provider?: string;
+  metadata?: {
     tokens: number;
     latency: number;
     quality?: number;
@@ -61,6 +61,9 @@ export interface ModelResponse {
     promptTokens?: number;
     completionTokens?: number;
   };
+  cached?: boolean;
+  streamed?: boolean;
+  processingTime?: number;
 }
 
 export interface ProjectContext {

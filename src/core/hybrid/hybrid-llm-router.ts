@@ -52,6 +52,12 @@ export class HybridLLMRouter extends EventEmitter {
   private config: HybridConfig;
   private taskHistory: Map<string, RoutingDecision & { actualPerformance: any }> = new Map();
   private currentLoads: { lmStudio: number; ollama: number } = { lmStudio: 0, ollama: 0 };
+  
+  // PERFORMANCE OPTIMIZATIONS: Caching and metrics
+  private routingDecisionCache: Map<string, { decision: RoutingDecision; timestamp: number }> = new Map();
+  private performanceMetrics: Map<string, number[]> = new Map();
+  private readonly CACHE_TTL = 300000; // 5 minutes
+  private readonly MAX_CACHE_SIZE = 1000;
 
   constructor(config: HybridConfig) {
     super();
@@ -61,9 +67,18 @@ export class HybridLLMRouter extends EventEmitter {
 
   /**
    * Determine which LLM should handle a task based on complexity and current load
+   * PERFORMANCE OPTIMIZED: Includes caching and intelligent fallback
    */
   async routeTask(taskType: string, prompt: string, metrics?: TaskComplexityMetrics): Promise<RoutingDecision> {
     try {
+      // PERFORMANCE FIX: Check cache first
+      const cacheKey = this.generateCacheKey(taskType, prompt, metrics);
+      const cached = this.getFromCache(cacheKey);
+      if (cached) {
+        logger.debug('Using cached routing decision');
+        return cached;
+      }
+      
       const complexity = this.analyzeTaskComplexity(taskType, prompt, metrics);
       const decision = this.makeRoutingDecision(taskType, complexity);
       
@@ -74,6 +89,9 @@ export class HybridLLMRouter extends EventEmitter {
 
       // Check current system load and adjust if necessary
       const loadAdjustedDecision = this.adjustForCurrentLoad(decision);
+      
+      // PERFORMANCE FIX: Cache the decision
+      this.cacheDecision(cacheKey, loadAdjustedDecision);
 
       // Emit routing event for monitoring
       this.emit('routing-decision', {
@@ -382,11 +400,111 @@ export class HybridLLMRouter extends EventEmitter {
   }
 
   /**
+   * PERFORMANCE FIX: Generate cache key for routing decisions
+   */
+  private generateCacheKey(taskType: string, prompt: string, metrics?: TaskComplexityMetrics): string {
+    const metricHash = metrics ? JSON.stringify(metrics) : '';
+    const promptHash = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
+    return `${taskType}:${promptHash}:${metricHash}`.replace(/[^a-zA-Z0-9:]/g, '_');
+  }
+  
+  /**
+   * PERFORMANCE FIX: Get cached routing decision
+   */
+  private getFromCache(key: string): RoutingDecision | null {
+    const cached = this.routingDecisionCache.get(key);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+      return cached.decision;
+    }
+    // Remove expired entry
+    if (cached) {
+      this.routingDecisionCache.delete(key);
+    }
+    return null;
+  }
+  
+  /**
+   * PERFORMANCE FIX: Cache routing decision
+   */
+  private cacheDecision(key: string, decision: RoutingDecision): void {
+    // Implement LRU behavior
+    if (this.routingDecisionCache.size >= this.MAX_CACHE_SIZE) {
+      const firstKey = this.routingDecisionCache.keys().next().value;
+      this.routingDecisionCache.delete(firstKey);
+    }
+    
+    this.routingDecisionCache.set(key, {
+      decision,
+      timestamp: Date.now()
+    });
+  }
+  
+  /**
+   * PERFORMANCE FIX: Track performance metrics for learning
+   */
+  trackPerformance(provider: string, responseTime: number, success: boolean): void {
+    const key = `${provider}_${success ? 'success' : 'failure'}`;
+    
+    if (!this.performanceMetrics.has(key)) {
+      this.performanceMetrics.set(key, []);
+    }
+    
+    const metrics = this.performanceMetrics.get(key)!;
+    metrics.push(responseTime);
+    
+    // Keep only last 100 measurements
+    if (metrics.length > 100) {
+      metrics.shift();
+    }
+    
+    logger.debug(`Performance tracked: ${key} - ${responseTime}ms`);
+  }
+  
+  /**
+   * Get performance statistics for a provider
+   */
+  getPerformanceStats(provider: string): { avgResponseTime: number; successRate: number } {
+    const successMetrics = this.performanceMetrics.get(`${provider}_success`) || [];
+    const failureMetrics = this.performanceMetrics.get(`${provider}_failure`) || [];
+    
+    const totalRequests = successMetrics.length + failureMetrics.length;
+    const successRate = totalRequests > 0 ? (successMetrics.length / totalRequests) : 0;
+    
+    const allTimes = [...successMetrics, ...failureMetrics];
+    const avgResponseTime = allTimes.length > 0 ? 
+      allTimes.reduce((sum, time) => sum + time, 0) / allTimes.length : 0;
+    
+    return { avgResponseTime, successRate };
+  }
+  
+  /**
+   * Clear performance cache (for memory management)
+   */
+  clearCache(): void {
+    this.routingDecisionCache.clear();
+    this.performanceMetrics.clear();
+    logger.info('Hybrid router cache cleared');
+  }
+  
+  /**
+   * Get current cache status
+   */
+  getCacheStatus(): { size: number; maxSize: number; hitRate: number } {
+    return {
+      size: this.routingDecisionCache.size,
+      maxSize: this.MAX_CACHE_SIZE,
+      hitRate: 0.0 // TODO: Implement hit rate tracking
+    };
+  }
+
+  /**
    * Destroy router and cleanup resources
    */
   destroy(): void {
     this.removeAllListeners();
     this.taskHistory.clear();
+    this.routingDecisionCache.clear();
+    this.performanceMetrics.clear();
     this.currentLoads = { lmStudio: 0, ollama: 0 };
   }
 }

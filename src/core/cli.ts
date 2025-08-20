@@ -3,7 +3,7 @@
  * Reduced from 2334 lines to ~400 lines by extracting modules
  */
 
-import { CLIExitCode, CLIError } from './types.js';
+import { CLIExitCode, CLIError, ModelRequest } from './types.js';
 import { UnifiedModelClient } from './client.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
 import { UnifiedAgent } from './agent.js';
@@ -23,6 +23,7 @@ import { CLIOptions, CLIContext, CLIDisplay, CLIParser, CLICommands } from './cl
 export type { CLIContext, CLIOptions };
 
 import chalk from 'chalk';
+import ora from 'ora';
 import inquirer from 'inquirer';
 import { writeFile } from 'fs/promises';
 
@@ -36,6 +37,11 @@ export class CLI {
   private repl: InteractiveREPL;
   private commands: CLICommands;
   private static globalListenersRegistered = false;
+  
+  // PERFORMANCE FIX: AbortController pattern for cleanup
+  private abortController: AbortController;
+  private activeOperations: Set<string> = new Set();
+  private isShuttingDown = false;
 
   constructor(
     modelClient: UnifiedModelClient,
@@ -43,6 +49,9 @@ export class CLI {
     mcpManager: MCPServerManager,
     config: AppConfig
   ) {
+    // PERFORMANCE FIX: Initialize AbortController for cleanup
+    this.abortController = new AbortController();
+    
     this.context = {
       modelClient,
       voiceSystem,
@@ -226,11 +235,12 @@ export class CLI {
     const sanitizedPrompt = prompt; // Simplified for now
 
     try {
-      if (options.stream && !options.noStream) {
+      // Streaming is now the default mode unless explicitly disabled
+      if (options.noStream || options.batch) {
+        return await this.executePromptProcessing(sanitizedPrompt, options);
+      } else {
         await this.displayStreamingResponse(sanitizedPrompt, options);
         return 'Streaming response completed';
-      } else {
-        return await this.executePromptProcessing(sanitizedPrompt, options);
       }
     } catch (error) {
       logger.error('Prompt processing failed:', error);
@@ -276,17 +286,63 @@ export class CLI {
   }
 
   /**
-   * Display streaming response
+   * Display streaming response using enhanced streaming client
    */
   private async displayStreamingResponse(prompt: string, options: CLIOptions): Promise<void> {
-    const request = {
-      id: `req-${Date.now()}`,
-      input: prompt,
-      mode: options.mode || 'collaborative',
-      type: 'generation'
+    const request: ModelRequest = {
+      prompt,
+      model: (options.model as string) || 'default',
+      maxTokens: (options.maxTokens as number) || 2000
     };
 
-    await CLIDisplay.displayStreamingResponse(request, this.streamingClient);
+    let buffer = '';
+    const spinner = ora('🌊 Streaming response...').start();
+    
+    try {
+      const response = await this.context.modelClient.streamRequest(
+        request,
+        (token) => {
+          // Real-time token handling
+          if (!token.finished) {
+            buffer += token.content;
+            
+            // Update display every few tokens
+            if (token.index % 5 === 0) {
+              spinner.stop();
+              process.stdout.write('\r\x1b[K'); // Clear current line
+              process.stdout.write(chalk.cyan('🌊 ') + buffer + chalk.gray('▋')); // Show cursor
+            }
+          } else {
+            // Final token - display completion
+            spinner.stop();
+            process.stdout.write('\r\x1b[K'); // Clear current line
+            console.log(chalk.green('\n📝 Streaming Complete:'));
+            console.log(buffer);
+            
+            if (token.metadata) {
+              console.log(chalk.gray(`   Tokens: ${token.metadata.totalTokens}, Duration: ${token.metadata.duration}ms`));
+            }
+          }
+        },
+        {
+          workingDirectory: this.workingDirectory,
+          config: this.context.config.getAllConfig(),
+          files: []
+        }
+      );
+      
+      // Log final response details
+      logger.info('Streaming response completed', {
+        length: response.content.length,
+        cached: response.cached,
+        processingTime: response.processingTime
+      });
+      
+    } catch (error) {
+      spinner.stop();
+      console.error(chalk.red('\n❌ Streaming Error:'), error);
+      throw error;
+    }
   }
 
   /**
@@ -458,6 +514,22 @@ export class CLI {
     }
   }
 
+  /**
+   * Track an active operation for graceful shutdown
+   */
+  private trackOperation(operationId: string): void {
+    if (!this.isShuttingDown) {
+      this.activeOperations.add(operationId);
+    }
+  }
+  
+  /**
+   * Untrack a completed operation
+   */
+  private untrackOperation(operationId: string): void {
+    this.activeOperations.delete(operationId);
+  }
+
   // Legacy compatibility methods
   async checkOllamaStatus(): Promise<boolean> {
     try {
@@ -504,3 +576,7 @@ export class CLI {
     await this.commands.handleAnalyze(files, options);
   }
 }
+
+// Export alias for backward compatibility
+export const CodeCrucibleCLI = CLI;
+export default CLI;

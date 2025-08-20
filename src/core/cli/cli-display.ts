@@ -104,7 +104,7 @@ export class CLIDisplay {
     console.log('  --interactive          Enter interactive mode');
     console.log('  --spiral               Use spiral methodology');
     console.log('  --autonomous           Enable autonomous mode');
-    console.log('  --stream               Enable streaming responses');
+    console.log('  --no-stream            Disable streaming responses (streaming is default)');
     console.log('  --fast                 Use fast mode');
     console.log('  --verbose              Verbose output');
     console.log('  --quiet                Quiet mode');

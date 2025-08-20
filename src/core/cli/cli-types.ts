@@ -38,9 +38,10 @@ export interface CLIOptions {
   maxIterations?: string;
   qualityThreshold?: string;
   
-  // Real-time streaming options
+  // Real-time streaming options (streaming is now default)
   stream?: boolean;
   noStream?: boolean;
+  batch?: boolean;
   
   // Enhanced context awareness options
   enableIntelligence?: boolean;

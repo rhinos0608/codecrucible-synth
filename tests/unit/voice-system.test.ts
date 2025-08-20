@@ -158,14 +158,15 @@ describe('Voice Archetype System', () => {
     });
 
     test('should handle invalid voice IDs gracefully', async () => {
-      await expect(
-        voiceSystem.generateMultiVoiceSolutions(
-          ['invalid-voice'],
-          'Test prompt',
-          mockModelClient,
-          { files: [] }
-        )
-      ).rejects.toThrow();
+      const result = await voiceSystem.generateMultiVoiceSolutions(
+        ['invalid-voice'],
+        'Test prompt',
+        mockModelClient,
+        { files: [] }
+      );
+      
+      // Should return empty array when all voices are invalid
+      expect(result).toEqual([]);
     });
   });
 

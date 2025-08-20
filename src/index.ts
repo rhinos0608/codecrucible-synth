@@ -128,7 +128,7 @@ export async function main() {
     }
     
     if (args.includes('--version') || args.includes('-v')) {
-      console.log('CodeCrucible Synth v3.8.5');
+      console.log('CodeCrucible Synth v3.8.7');
       return;
     }
     
@@ -199,7 +199,7 @@ async function showQuickStatus() {
   console.log('📊 CodeCrucible Synth Status');
   console.log('━'.repeat(40));
   
-  console.log(`Version: 3.8.5`);
+  console.log(`Version: 3.8.7`);
   console.log(`Node.js: ${process.version}`);
   console.log(`Platform: ${process.platform}`);
   

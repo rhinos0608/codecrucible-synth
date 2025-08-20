@@ -145,8 +145,8 @@ describe('Voice Archetype System', () => {
         .mockResolvedValueOnce({ content: 'Security response', voice: 'Security Engineer', confidence: 0.9, tokens_used: 120 });
 
       const result = await voiceSystem.generateMultiVoiceSolutions(
-        'Create a secure login function',
         ['explorer', 'security'],
+        'Create a secure login function',
         { files: [] }
       );
 
@@ -159,8 +159,8 @@ describe('Voice Archetype System', () => {
     test('should handle invalid voice IDs gracefully', async () => {
       await expect(
         voiceSystem.generateMultiVoiceSolutions(
-          'Test prompt',
           ['invalid-voice'],
+          'Test prompt',
           { files: [] }
         )
       ).rejects.toThrow();

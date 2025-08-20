@@ -37,21 +37,35 @@ export class CLI {
   private commands: CLICommands;
   private static globalListenersRegistered = false;
 
+  constructor(context: CLIContext);
   constructor(
     modelClient: UnifiedModelClient,
     voiceSystem: VoiceArchetypeSystem,
     mcpManager: MCPServerManager,
     config: AppConfig
+  );
+  constructor(
+    contextOrModelClient: CLIContext | UnifiedModelClient,
+    voiceSystem?: VoiceArchetypeSystem,
+    mcpManager?: MCPServerManager,
+    config?: AppConfig
   ) {
-    this.context = {
-      modelClient,
-      voiceSystem,
-      mcpManager,
-      config
-    };
+    // Handle both constructor signatures
+    if (typeof contextOrModelClient === 'object' && 'modelClient' in contextOrModelClient) {
+      // Single context parameter (for tests)
+      this.context = contextOrModelClient as CLIContext;
+    } else {
+      // Individual parameters (legacy)
+      this.context = {
+        modelClient: contextOrModelClient as UnifiedModelClient,
+        voiceSystem: voiceSystem!,
+        mcpManager: mcpManager!,
+        config: config!
+      };
+    }
 
     // Initialize subsystems with simplified constructors
-    this.streamingClient = new StreamingAgentClient(modelClient);
+    this.streamingClient = new StreamingAgentClient(this.context.modelClient);
     this.contextAwareCLI = new ContextAwareCLIIntegration();
     this.autoConfigurator = new AutoConfigurator();
     this.repl = new InteractiveREPL(this, this.context);
@@ -504,3 +518,6 @@ export class CLI {
     await this.commands.handleAnalyze(files, options);
   }
 }
+
+// Export alias for backward compatibility with tests
+export const CodeCrucibleCLI = CLI;

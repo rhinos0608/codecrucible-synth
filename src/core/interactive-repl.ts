@@ -283,13 +283,19 @@ export class InteractiveREPL {
   private handleExit(): void {
     console.log(chalk.cyan('\n👋 Goodbye!'));
     this.rl.close();
-    process.exit(0);
+    // Only exit if not in test environment
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(0);
+    }
   }
 
   /**
    * Clean up resources
    */
   destroy(): void {
+    // Remove event listeners before closing to prevent exit handler
+    this.rl.removeAllListeners('SIGINT');
+    this.rl.removeAllListeners('close');
     this.rl.close();
   }
 }

@@ -127,8 +127,8 @@ Consider security, performance, maintainability, and user experience aspects.`;
 
     const analysisVoices = ['architect', 'analyzer', 'security'];
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
-      analysisPrompt,
       analysisVoices,
+      analysisPrompt,
       this.modelClient
     );
 
@@ -185,8 +185,8 @@ IMPORTANT:
 
     const planningVoices = ['architect', 'implementor', 'maintainer'];
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
-      planningPrompt,
       planningVoices,
+      planningPrompt,
       this.modelClient
     );
 
@@ -469,8 +469,8 @@ Provide a JSON response:
     const { prompt, voices, mode, context } = args;
     
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
-      prompt,
       voices || ['developer'],
+      prompt,
       context || { files: [], structure: {}, metadata: {} }
     );
     

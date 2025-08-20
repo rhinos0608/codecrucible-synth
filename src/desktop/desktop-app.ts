@@ -72,8 +72,8 @@ async function startBackendServer(context: CLIContext, port: number): Promise<nu
       
       const voiceList = voices || context.config.voices.default;
       const responses = await context.voiceSystem.generateMultiVoiceSolutions(
-        prompt,
         voiceList,
+        prompt,
         { files: [], structure: {}, metadata: {} }
       );
       
@@ -128,8 +128,8 @@ async function startBackendServer(context: CLIContext, port: number): Promise<nu
     socket.on('generate_code', async (data) => {
       try {
         const responses = await context.voiceSystem.generateMultiVoiceSolutions(
-          data.prompt,
           data.voices || context.config.voices.default,
+          data.prompt,
           { files: data.context || [], structure: {}, metadata: {} }
         );
         

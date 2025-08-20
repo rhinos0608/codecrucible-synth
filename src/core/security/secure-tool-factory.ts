@@ -2,6 +2,8 @@ import { E2BService } from '../e2b/e2b-service.js';
 import { SecurityValidator } from '../e2b/security-validator.js';
 import { E2BCodeExecutionTool } from '../tools/e2b/e2b-code-execution-tool.js';
 import { E2BTerminalTool } from '../tools/e2b/e2b-terminal-tool.js';
+import { SecureTerminalExecuteTool } from '../tools/secure-terminal-tools.js';
+import { SecureExecutionManager } from './secure-execution-manager.js';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 
@@ -70,18 +72,9 @@ export class SecureToolFactory {
    * Create secure terminal execution tool
    */
   createTerminalTool(agentContext: any): any {
-    if (this.isE2BAvailable && this.e2bService) {
-      logger.info('🔐 Using E2B sandboxed terminal execution');
-      return new E2BTerminalTool(
-        this.e2bService,
-        agentContext,
-        this.securityValidator
-      );
-    }
-
-    // If E2B is not available, return a restricted terminal tool
-    logger.warn('⚠️ E2B not available, using restricted terminal mode');
-    return new RestrictedTerminalTool(agentContext, this.securityValidator);
+    // Always use SecureTerminalExecuteTool which enforces E2B execution
+    logger.info('🔐 Using SecureTerminalExecuteTool with E2B enforcement');
+    return new SecureTerminalExecuteTool(agentContext);
   }
 
   /**

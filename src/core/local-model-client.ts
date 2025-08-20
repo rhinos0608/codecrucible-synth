@@ -112,7 +112,7 @@ export class LocalModelClient {
         content,
         voice,
         confidence: 0.8, // Default confidence score
-        tokens_used: Math.floor(Math.random() * 100) + 50 // Mock token count
+        tokens_used: content ? Math.max(1, Math.round(content.length / 4)) : 0 // Deterministic token count estimate
       };
     } catch (error) {
       throw new Error(`Failed to generate response from ${voice}`);

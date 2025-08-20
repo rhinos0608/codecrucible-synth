@@ -131,7 +131,7 @@ async function main() {
     if (process.argv.includes('--help') || process.argv.includes('-h') || process.argv.length === 2) {
       log('', 'blue');
       log('╔══════════════════════════════════════════════════════════════╗', 'blue');
-      log('║               CodeCrucible Synth v2.0.0                     ║', 'blue');
+      log('║               CodeCrucible Synth v3.8.4                     ║', 'blue');
       log('║          Autonomous AI Coding Assistant for Local Models    ║', 'blue');
       log('╚══════════════════════════════════════════════════════════════╝', 'blue');
       log('');

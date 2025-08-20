@@ -15,6 +15,7 @@ import { OptimizedContextAwareCLI, OptimizedContextOptions } from './intelligenc
 import { ResilientCLIWrapper, ResilientOptions, OperationResult } from './resilience/resilient-cli-wrapper.js';
 import { DualAgentRealtimeSystem } from './collaboration/dual-agent-realtime-system.js';
 import { AutoConfigurator } from './model-management/auto-configurator.js';
+import { UnifiedResponseCoordinator } from './unified-response-coordinator.js';
 import { SecureToolFactory } from './security/secure-tool-factory.js';
 import { InputSanitizer } from './security/input-sanitizer.js';
 import chalk from 'chalk';
@@ -99,6 +100,7 @@ export class CLI {
   private resilientWrapper: ResilientCLIWrapper;
   private dualAgentSystem: DualAgentRealtimeSystem | null = null;
   private autoConfigurator: AutoConfigurator;
+  private responseCoordinator: UnifiedResponseCoordinator;
   private logger = logger;
 
   constructor(context: CLIContext) {
@@ -141,6 +143,9 @@ export class CLI {
     
     // Initialize auto-configurator for intelligent dual-agent setup
     this.autoConfigurator = new AutoConfigurator();
+    
+    // Initialize response coordinator
+    this.responseCoordinator = new UnifiedResponseCoordinator();
     
     // Auto-configure dual-agent system (async initialization)
     this.initializeDualAgentSystem();
@@ -676,7 +681,7 @@ export class CLI {
     return options;
   }
 
-  private async showStatus(): Promise<void> {
+  async showStatus(): Promise<void> {
     try {
       console.log(chalk.cyan('🔍 Checking system status...'));
       
@@ -716,7 +721,7 @@ export class CLI {
     }
   }
 
-  private async listModels(): Promise<void> {
+  async listModels(): Promise<void> {
     try {
       console.log(chalk.cyan('📋 Available models:'));
       
@@ -1263,7 +1268,7 @@ ${fileContent}
     }
   }
 
-  private async executePromptProcessing(prompt: string, options: CLIOptions): Promise<void> {
+  async executePromptProcessing(prompt: string, options: CLIOptions): Promise<void> {
     try {
       // SECURITY FIX: Sanitize input prompt first
       const promptSanitization = InputSanitizer.sanitizePrompt(prompt);
@@ -1368,47 +1373,51 @@ ${fileContent}
         return;
       }
       
-      // Autonomous agent mode is the DEFAULT
-      if (this.context.agentOrchestrator && options.autonomous !== false) {
-        console.log(chalk.blue('🤖 Autonomous Agent Mode Activated'));
-        console.log(chalk.gray('Creating task plan...'));
+      // PRIORITY 1: Use coordinated dual-agent system when available
+      if (this.responseCoordinator.isDualAgentReady() && !options.voices) {
+        console.log(chalk.blue('🤖🔬 Dual-Agent Coordinated Mode Activated'));
+        console.log(chalk.gray('Ollama (Generation) + LM Studio (Audit) = Single Coherent Response'));
         
-        // Create execution request for the agent
-        const request: ExecutionRequest = {
-          id: `req_${Date.now()}`,
-          type: this.determineRequestType(enhancedPrompt),
-          input: enhancedPrompt,
-          mode: 'balanced',
-          priority: 'high'
-        };
-        
-        // Execute autonomously
-        const response = await this.context.agentOrchestrator.execute(request);
-        
-        if (response.success) {
-          console.log(chalk.green('\n✅ Autonomous execution completed successfully'));
-          
-          // Display results
-          if (response.result && typeof response.result === 'object') {
-            for (const [key, value] of Object.entries(response.result)) {
-              console.log(chalk.cyan(`\n📋 ${key}:`));
-              if (typeof value === 'object') {
-                console.log(JSON.stringify(value, null, 2));
-              } else {
-                console.log(value);
-              }
+        try {
+          const coordinatedResponse = await this.responseCoordinator.coordinateResponse(
+            enhancedPrompt,
+            { 
+              originalPrompt: cleanPrompt,
+              contextType: this.determineRequestType(enhancedPrompt)
+            },
+            {
+              requireAudit: true,
+              streamResponse: options.stream !== false,
+              maxResponseTime: options.timeout || 60000
             }
+          );
+          
+          // Display the single coordinated response
+          this.responseCoordinator.displayCoordinatedResponse(coordinatedResponse, options.verbose === true);
+          
+          // Handle file output if requested
+          if (options.file) {
+            await this.handleFileOutput(options.file as string, coordinatedResponse.content);
           }
           
-          // Save to file if requested
-          if (options.file) {
-            const output = JSON.stringify(response.result, null, 2);
-            await this.handleFileOutput(options.file as string, output);
+        } catch (error) {
+          console.error(chalk.red('❌ Coordinated response failed:'), error);
+          console.log(chalk.yellow('🔄 Falling back to autonomous agent mode...'));
+          
+          // Fallback to autonomous agent
+          if (this.context.agentOrchestrator && options.autonomous !== false) {
+            await this.executeAutonomousAgentMode(enhancedPrompt, options);
+          } else {
+            console.error(chalk.red('❌ No fallback available'));
           }
-        } else {
-          console.error(chalk.red('❌ Autonomous execution failed:'), response.error);
         }
         
+        return;
+      }
+      
+      // PRIORITY 2: Autonomous agent mode 
+      if (this.context.agentOrchestrator && options.autonomous !== false) {
+        await this.executeAutonomousAgentMode(enhancedPrompt, options);
         return;
       }
       
@@ -1729,6 +1738,55 @@ ${fileContent}
   }
   
   /**
+   * Execute autonomous agent mode
+   */
+  private async executeAutonomousAgentMode(prompt: string, options: CLIOptions): Promise<void> {
+    console.log(chalk.blue('🤖 Autonomous Agent Mode Activated'));
+    console.log(chalk.gray('Creating task plan...'));
+    
+    try {
+      // Create execution request for the agent
+      const request: ExecutionRequest = {
+        id: `req_${Date.now()}`,
+        type: this.determineRequestType(prompt),
+        input: prompt,
+        mode: 'balanced',
+        priority: 'high'
+      };
+      
+      // Execute autonomously
+      const response = await this.context.agentOrchestrator.execute(request);
+      
+      if (response.success) {
+        console.log(chalk.green('\n✅ Autonomous execution completed successfully'));
+        
+        // Display results
+        if (response.result && typeof response.result === 'object') {
+          for (const [key, value] of Object.entries(response.result)) {
+            console.log(chalk.cyan(`\n📋 ${key}:`));
+            if (typeof value === 'object') {
+              console.log(JSON.stringify(value, null, 2));
+            } else {
+              console.log(value);
+            }
+          }
+        }
+        
+        // Save to file if requested
+        if (options.file) {
+          const output = JSON.stringify(response.result, null, 2);
+          await this.handleFileOutput(options.file as string, output);
+        }
+      } else {
+        console.error(chalk.red('❌ Autonomous execution failed:'), response.error);
+      }
+      
+    } catch (error) {
+      console.error(chalk.red('❌ Autonomous agent execution failed:'), error);
+    }
+  }
+  
+  /**
    * Initialize dual-agent system with auto-configuration
    */
   private async initializeDualAgentSystem(): Promise<void> {
@@ -1737,7 +1795,11 @@ ${fileContent}
       
       if (configResult.success && configResult.dualAgentSystem) {
         this.dualAgentSystem = configResult.dualAgentSystem;
-        this.logger.info('Dual-agent system auto-configured successfully');
+        
+        // Connect to response coordinator
+        this.responseCoordinator.setDualAgentSystem(this.dualAgentSystem);
+        
+        this.logger.info('Dual-agent system auto-configured successfully and connected to response coordinator');
       } else {
         this.logger.warn('Dual-agent system auto-configuration failed');
         this.dualAgentSystem = null;

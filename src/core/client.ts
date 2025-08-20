@@ -85,6 +85,9 @@ export class UnifiedModelClient extends EventEmitter {
   // HYBRID ARCHITECTURE: Intelligent routing between LM Studio and Ollama
   private hybridRouter: HybridLLMRouter | null = null;
   
+  // Memory warning throttling
+  private lastMemoryWarningTime = 0;
+  
   constructor(config: UnifiedClientConfig) {
     super();
     this.config = {
@@ -197,7 +200,12 @@ export class UnifiedModelClient extends EventEmitter {
     });
 
     this.processManager.on('memoryWarning', (event) => {
-      logger.warn(`Memory warning: ${(event.usage * 100).toFixed(1)}% usage with ${event.activeProcesses} active processes`);
+      // Throttle memory warnings to prevent spam
+      const now = Date.now();
+      if (now - this.lastMemoryWarningTime > 30000) { // 30 seconds between warnings
+        logger.warn(`Memory warning: ${(event.usage * 100).toFixed(1)}% usage with ${event.activeProcesses} active processes`);
+        this.lastMemoryWarningTime = now;
+      }
       this.emit('memoryWarning', event);
     });
   }

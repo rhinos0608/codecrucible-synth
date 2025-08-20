@@ -124,11 +124,20 @@ export class HardwareAwareModelSelector extends EventEmitter {
       throw new Error('No models compatible with current hardware configuration');
     }
 
-    // Sort by hardware compatibility and performance
-    const sortedModels = this.sortModelsByHardwareCompatibility(suitableModels);
+    // Prioritize qwen2.5-coder if available
+    const qwenCoder = suitableModels.find(m => m.name.toLowerCase().includes('qwen2.5-coder'));
+    let sortedModels = this.sortModelsByHardwareCompatibility(suitableModels);
     
-    // Create fallback chain
-    this.fallbackModels = sortedModels.slice(1, 4); // Keep top 3 fallbacks
+    if (qwenCoder) {
+      // Move qwen2.5-coder to the front if it's available
+      sortedModels = [qwenCoder, ...sortedModels.filter(m => m !== qwenCoder)];
+    }
+    
+    // Create fallback chain - only include models smaller or equal in size to primary
+    const primaryModelSize = this.estimateModelMemoryUsage(sortedModels[0]);
+    this.fallbackModels = sortedModels.slice(1, 5)
+      .filter(m => this.estimateModelMemoryUsage(m) <= primaryModelSize)
+      .slice(0, 3); // Keep top 3 smaller/equal fallbacks
     
     const primaryModel = sortedModels[0];
     const secondaryModel = sortedModels[1] || primaryModel;
@@ -181,6 +190,13 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private sortModelsByHardwareCompatibility(models: ModelInfo[]): ModelInfo[] {
     return models.sort((a, b) => {
+      // Give priority to qwen2.5-coder
+      const aIsQwenCoder = a.name.toLowerCase().includes('qwen2.5-coder');
+      const bIsQwenCoder = b.name.toLowerCase().includes('qwen2.5-coder');
+      
+      if (aIsQwenCoder && !bIsQwenCoder) return -1;
+      if (!aIsQwenCoder && bIsQwenCoder) return 1;
+      
       const scoreA = this.calculateHardwareCompatibilityScore(a);
       const scoreB = this.calculateHardwareCompatibilityScore(b);
       return scoreB - scoreA;
@@ -245,6 +261,23 @@ export class HardwareAwareModelSelector extends EventEmitter {
     if (memoryGB > 20) return 8; // Large models need more cores
     if (memoryGB > 10) return 4;
     return 2; // Minimum for any model
+  }
+  
+  /**
+   * Estimate memory usage by model name string
+   */
+  private estimateModelMemoryUsageByName(modelName: string): number {
+    const nameLower = modelName.toLowerCase();
+    if (nameLower.includes('72b') || nameLower.includes('70b')) return 40;
+    if (nameLower.includes('34b') || nameLower.includes('32b') || nameLower.includes('30b')) return 20;
+    if (nameLower.includes('13b') || nameLower.includes('14b')) return 8;
+    if (nameLower.includes('7b') || nameLower.includes('8b')) return 4;
+    if (nameLower.includes('3b') || nameLower.includes('2b')) return 2;
+    if (nameLower.includes('gemma') && nameLower.includes('2b')) return 2;
+    if (nameLower.includes('qwen2.5-coder')) return 4; // Qwen 2.5 Coder 7B
+    if (nameLower.includes('llama3.2')) return 2; // Llama 3.2 is small
+    
+    return 4; // Default estimate
   }
 
   /**
@@ -388,6 +421,17 @@ export class HardwareAwareModelSelector extends EventEmitter {
    * Select appropriate fallback model based on failure reason
    */
   private selectFallbackModel(reason: ModelSwitchEvent['reason'], metrics: PerformanceMetrics): ModelInfo | null {
+    // Check if current model is already small/efficient
+    if (this.currentModel) {
+      const currentModelSize = this.estimateModelMemoryUsageByName(this.currentModel);
+      
+      // If we're already using a small model (<=4GB) and facing memory issues, don't switch to larger
+      if ((reason === 'oom' || reason === 'hardware_constraint') && currentModelSize <= 4) {
+        this.logger.info(`Keeping current efficient model ${this.currentModel} (${currentModelSize}GB) despite memory pressure`);
+        return null; // Don't switch if already using efficient model
+      }
+    }
+    
     let sortedFallbacks = [...this.fallbackModels];
 
     // Sort fallbacks based on failure reason
@@ -471,7 +515,14 @@ export class HardwareAwareModelSelector extends EventEmitter {
       };
 
       if (memoryUsage > this.thresholds.maxMemoryUsage) {
-        this.checkForAutomaticSwitch(this.currentModel, metrics);
+        // Don't switch if we're already using an efficient model
+        const currentModelSize = this.estimateModelMemoryUsageByName(this.currentModel);
+        if (currentModelSize > 4) {
+          // Only switch if current model is larger than 4GB
+          this.checkForAutomaticSwitch(this.currentModel, metrics);
+        } else {
+          this.logger.info(`Keeping efficient model ${this.currentModel} (${currentModelSize}GB) despite high memory usage`);
+        }
       }
     }
   }

@@ -55,6 +55,7 @@ export class MemoryLeakDetector extends EventEmitter {
   private cacheGrowthTracking: Map<string, { size: number; timestamp: number }> = new Map();
   private performanceData: Map<string, number[]> = new Map();
   private isMonitoring = false;
+  private lastMemorySpikeWarning = 0;
 
   /**
    * Start comprehensive memory leak detection
@@ -153,7 +154,12 @@ export class MemoryLeakDetector extends EventEmitter {
         timestamp: Date.now()
       });
       
-      logger.warn(`🚨 Memory spike detected: +${Math.round(heapGrowth / 1024 / 1024)}MB`);
+      // Throttle memory spike warnings to prevent spam
+      const now = Date.now();
+      if (now - this.lastMemorySpikeWarning > 30000) { // 30 seconds between warnings
+        logger.warn(`🚨 Memory spike detected: +${Math.round(heapGrowth / 1024 / 1024)}MB`);
+        this.lastMemorySpikeWarning = now;
+      }
     }
   }
 

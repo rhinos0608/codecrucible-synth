@@ -104,7 +104,8 @@
       "Bash(git branch:*)",
       "mcp__filesystem__list_directory",
       "mcp__filesystem__read_multiple_files",
-      "mcp__filesystem__directory_tree"
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__read_text_file"
     ],
     "deny": [],
     "ask": [],

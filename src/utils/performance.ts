@@ -55,6 +55,7 @@ export class PerformanceMonitor extends EventEmitter {
   private startTime: number = Date.now();
   private monitoringEnabled: boolean;
   private monitoringInterval?: NodeJS.Timeout;
+  private lastAlertTimes: Map<string, number> = new Map(); // Track last alert times to prevent spam
   
   private readonly MAX_HISTORY_SIZE = 50; // OPTIMIZED: Reduced from 1000 to prevent memory leaks
   private readonly ALERT_THRESHOLDS = {
@@ -269,6 +270,17 @@ export class PerformanceMonitor extends EventEmitter {
   }
 
   private createAlert(alert: PerformanceAlert): void {
+    // Create unique key for alert throttling
+    const alertKey = `${alert.type}_${alert.provider || 'system'}_${alert.severity}`;
+    const now = Date.now();
+    const lastAlertTime = this.lastAlertTimes.get(alertKey) || 0;
+    
+    // Throttle alerts - only allow one alert of same type per 60 seconds
+    if (now - lastAlertTime < 60000) { // 60 seconds
+      return; // Skip this alert to prevent spam
+    }
+    
+    this.lastAlertTimes.set(alertKey, now);
     this.alerts.push(alert);
     
     // OPTIMIZED: Keep only recent alerts (last 25 instead of 100)

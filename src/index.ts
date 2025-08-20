@@ -20,10 +20,16 @@ export async function initializeCLIContext(): Promise<{cli: CLI, context: CLICon
           endpoint: config.model?.endpoint || 'http://localhost:11434',
           model: config.model?.name || 'llama2',
           timeout: config.model?.timeout || 30000
+        },
+        {
+          type: 'lm-studio',
+          endpoint: 'http://localhost:1234',
+          model: 'auto',
+          timeout: 30000
         }
       ],
       executionMode: 'auto',
-      fallbackChain: ['ollama'],
+      fallbackChain: ['ollama', 'lm-studio'],
       performanceThresholds: {
         fastModeMaxTokens: config.model?.maxTokens || 2048,
         timeoutMs: config.model?.timeout || 30000,

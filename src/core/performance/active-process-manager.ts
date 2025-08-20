@@ -46,6 +46,8 @@ export class ActiveProcessManager extends EventEmitter {
   private thresholds: ResourceThresholds;
   private isTerminating = false;
   private modelSwitchInProgress = false;
+  private lastCriticalWarning = 0;
+  private lastEmergencyWarning = 0;
 
   constructor(hardwareSelector: HardwareAwareModelSelector) {
     super();
@@ -53,9 +55,9 @@ export class ActiveProcessManager extends EventEmitter {
     this.hardwareSelector = hardwareSelector;
     
     this.thresholds = {
-      memoryWarning: 0.70,    // 70% - early warning
-      memoryCritical: 0.80,   // 80% - start optimizing
-      memoryEmergency: 0.90,  // 90% - emergency model switch (was 95%)
+      memoryWarning: 0.80,    // 80% - early warning (less aggressive)
+      memoryCritical: 0.90,   // 90% - start optimizing
+      memoryEmergency: 0.95,  // 95% - emergency model switch
       cpuWarning: 0.75,       // 75%
       cpuCritical: 0.85       // 85%
     };
@@ -152,7 +154,12 @@ export class ActiveProcessManager extends EventEmitter {
   private async handleEmergencyMemoryPressure(memoryUsage: number): Promise<void> {
     if (this.modelSwitchInProgress) return;
     
-    this.logger.error(`🚨 EMERGENCY: Memory usage at ${(memoryUsage * 100).toFixed(1)}% - terminating all processes and switching to smaller model`);
+    // Only log emergency warning every 30 seconds to avoid spam
+    const now = Date.now();
+    if (now - this.lastEmergencyWarning > 30000) {
+      this.logger.error(`🚨 EMERGENCY: Memory usage at ${(memoryUsage * 100).toFixed(1)}% - terminating all processes and switching to smaller model`);
+      this.lastEmergencyWarning = now;
+    }
     
     this.modelSwitchInProgress = true;
     this.isTerminating = true;
@@ -187,10 +194,15 @@ export class ActiveProcessManager extends EventEmitter {
   }
 
   /**
-   * Handle critical memory pressure (85%+) - terminate low priority processes
+   * Handle critical memory pressure (90%+) - terminate low priority processes
    */
   private async handleCriticalMemoryPressure(memoryUsage: number): Promise<void> {
-    this.logger.warn(`⚠️ CRITICAL: Memory usage at ${(memoryUsage * 100).toFixed(1)}% - terminating low priority processes`);
+    // Only log critical warnings occasionally to avoid spam
+    const now = Date.now();
+    if (now - this.lastCriticalWarning > 30000) { // 30 seconds between critical warnings
+      this.logger.warn(`⚠️ CRITICAL: Memory usage at ${(memoryUsage * 100).toFixed(1)}% - terminating low priority processes`);
+      this.lastCriticalWarning = now;
+    }
 
     // Terminate low and medium priority processes
     const processesToTerminate = Array.from(this.activeProcesses.values())

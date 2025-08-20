@@ -99,7 +99,9 @@
       "Bash(where:*)",
       "Bash(del test-recommend.js)",
       "Bash(claude mcp:*)",
-      "Bash(claude restart)"
+      "Bash(claude restart)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)"
     ],
     "deny": [],
     "ask": [],

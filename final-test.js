@@ -1,1 +1,0 @@
-Synthesized response from voices: explorer

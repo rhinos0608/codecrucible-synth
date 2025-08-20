@@ -333,6 +333,37 @@ export class MCPServerManager {
     }
   }
 
+  async getFileStats(filePath: string): Promise<{
+    exists: boolean;
+    isFile: boolean;
+    isDirectory: boolean;
+    size: number;
+    modified: string;
+  }> {
+    if (!this.isPathAllowed(filePath)) {
+      throw new Error(`Access denied: ${filePath}`);
+    }
+
+    try {
+      const stats = await stat(filePath);
+      return {
+        exists: true,
+        isFile: stats.isFile(),
+        isDirectory: stats.isDirectory(),
+        size: stats.size,
+        modified: stats.mtime.toISOString()
+      };
+    } catch (error) {
+      return {
+        exists: false,
+        isFile: false,
+        isDirectory: false,
+        size: 0,
+        modified: ''
+      };
+    }
+  }
+
   /**
    * Safe command execution with enhanced security
    */

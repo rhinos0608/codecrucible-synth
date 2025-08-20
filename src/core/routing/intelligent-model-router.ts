@@ -1436,8 +1436,17 @@ class HealthMonitor {
     
     // Check health every 30 seconds
     this.monitoringInterval = setInterval(() => {
-      this.performHealthChecks();
+      try {
+        this.performHealthChecks();
+      } catch (error) {
+        console.error('Health monitoring error:', error);
+      }
     }, 30000);
+    
+    // Prevent the interval from keeping the process alive
+    if (this.monitoringInterval.unref) {
+      this.monitoringInterval.unref();
+    }
     
     // Perform initial health check
     this.performHealthChecks();

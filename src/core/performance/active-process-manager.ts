@@ -53,11 +53,11 @@ export class ActiveProcessManager extends EventEmitter {
     this.hardwareSelector = hardwareSelector;
     
     this.thresholds = {
-      memoryWarning: 0.75,    // 75%
-      memoryCritical: 0.85,   // 85% 
-      memoryEmergency: 0.95,  // 95%
-      cpuWarning: 0.80,       // 80%
-      cpuCritical: 0.90       // 90%
+      memoryWarning: 0.70,    // 70% - early warning
+      memoryCritical: 0.80,   // 80% - start optimizing
+      memoryEmergency: 0.90,  // 90% - emergency model switch (was 95%)
+      cpuWarning: 0.75,       // 75%
+      cpuCritical: 0.85       // 85%
     };
 
     this.startResourceMonitoring();
@@ -107,8 +107,17 @@ export class ActiveProcessManager extends EventEmitter {
    */
   private startResourceMonitoring(): void {
     this.resourceMonitorInterval = setInterval(() => {
-      this.checkResourcePressure();
+      try {
+        this.checkResourcePressure();
+      } catch (error) {
+        console.error('Resource monitoring error:', error);
+      }
     }, 2000); // Check every 2 seconds for responsive memory management
+    
+    // Prevent the interval from keeping the process alive
+    if (this.resourceMonitorInterval.unref) {
+      this.resourceMonitorInterval.unref();
+    }
   }
 
   /**

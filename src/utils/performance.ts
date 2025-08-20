@@ -80,8 +80,16 @@ export class PerformanceMonitor extends EventEmitter {
     
     // Update system metrics every 30 seconds
     this.monitoringInterval = setInterval(async () => {
-      await this.updateSystemMetrics();
+      try {
+        await this.updateSystemMetrics();
+      } catch (error) {
+        // Silent error handling to prevent crashes
+        console.warn('Performance monitoring error:', error);
+      }
     }, 30000);
+    
+    // Prevent interval from keeping process alive during tests
+    this.monitoringInterval.unref();
 
     // Initial system metrics
     this.updateSystemMetrics();

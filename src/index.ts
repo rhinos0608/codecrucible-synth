@@ -4,6 +4,9 @@ import { UnifiedModelClient, UnifiedClientConfig } from './core/client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
+// Fix EventEmitter memory leak warning
+process.setMaxListeners(50);
+
 export async function initializeCLIContext(): Promise<{cli: CLI, context: CLIContext}> {
   try {
     const configManager = new ConfigManager();
@@ -49,24 +52,24 @@ export async function initializeCLIContext(): Promise<{cli: CLI, context: CLICon
     try {
       mcpManager = new MCPServerManager({
         filesystem: { 
-          enabled: false,
-          restrictedPaths: [],
-          allowedPaths: []
+          enabled: true,
+          restrictedPaths: ['/etc', '/var', '/usr', '/sys', '/proc', 'C:\\Windows', 'C:\\Program Files'],
+          allowedPaths: [process.cwd(), 'src', 'tests', 'docs', 'config']
         },
         git: { 
-          enabled: false,
+          enabled: true,
           autoCommitMessages: false,
           safeModeEnabled: true
         },
         terminal: { 
-          enabled: false,
-          allowedCommands: [],
-          blockedCommands: []
+          enabled: true,
+          allowedCommands: ['ls', 'dir', 'find', 'grep', 'cat', 'head', 'tail', 'wc', 'tree'],
+          blockedCommands: ['rm', 'del', 'format', 'fdisk', 'shutdown', 'reboot']
         },
         packageManager: {
-          enabled: false,
+          enabled: true,
           autoInstall: false,
-          securityScan: false
+          securityScan: true
         }
       });
     } catch (error) {
@@ -77,6 +80,15 @@ export async function initializeCLIContext(): Promise<{cli: CLI, context: CLICon
         stopServers: async () => {},
         getServerStatus: () => ({ filesystem: { status: 'disabled' } })
       } as any;
+    }
+
+    // Initialize tool integration system for AI function calling
+    try {
+      const { initializeGlobalToolIntegration } = await import('./core/tools/tool-integration.js');
+      initializeGlobalToolIntegration(mcpManager);
+      console.log('✅ Tool integration initialized with filesystem tools');
+    } catch (error) {
+      console.warn('⚠️ Tool integration failed:', error.message);
     }
 
     const context: CLIContext = {

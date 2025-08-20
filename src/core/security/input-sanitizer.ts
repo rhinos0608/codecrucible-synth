@@ -23,6 +23,7 @@ export class InputSanitizer {
     /(exec|eval|system|spawn)/i,              // Code execution
     /(<script|javascript:|data:)/i,           // Script injection
     /(union|select|insert|update|delete|drop)/i, // SQL injection
+    /(malicious|attack|exploit|hack|virus|trojan)/i, // Malicious keywords
   ];
 
   private static readonly SAFE_CHARACTERS = /^[a-zA-Z0-9\s\-_.,!?'"@#%^&*()+=:;/\\]+$/;
@@ -106,14 +107,36 @@ export class InputSanitizer {
       sanitized = sanitized.substring(0, 10000);
     }
 
-    // Check for dangerous patterns
-    for (const pattern of this.DANGEROUS_PATTERNS) {
+    // Enhanced dangerous pattern detection with more comprehensive coverage
+    const enhancedDangerousPatterns = [
+      /[;&|`$(){}[\]\\]/g,  // Shell metacharacters
+      /\.\./g,              // Directory traversal
+      /(rm|del|format|shutdown|reboot|halt)\s*(-[a-zA-Z]*\s*)*\s*[\/\\]*/gi, // Dangerous commands with flags
+      /(exec|eval|system|spawn|cmd|sh|bash|powershell)/gi,              // Code execution
+      /(<script|javascript:|data:)/gi,           // Script injection
+      /(union|select|insert|update|delete|drop)/gi, // SQL injection
+      /(malicious|attack|exploit|hack|virus|trojan|backdoor|payload)/gi, // Malicious keywords
+      /echo\s+["'].*malicious.*["']/gi, // Echo commands with malicious content
+      /&&\s*(echo|printf|cat|ls|dir)/gi, // Command chaining
+    ];
+
+    // Check for dangerous patterns and remove them completely
+    for (const pattern of enhancedDangerousPatterns) {
       if (pattern.test(sanitized)) {
         violations.push(`Dangerous pattern detected: ${pattern.source}`);
-        // Replace with safe placeholder
+        // Replace with safe placeholder, ensuring complete removal
         sanitized = sanitized.replace(pattern, '[FILTERED]');
       }
     }
+    
+    // Additional comprehensive cleanup to remove any remaining traces of dangerous content
+    sanitized = sanitized
+      .replace(/rm\s+(-rf|--recursive|--force)\s*\/?.*/gi, '[REMOVED_COMMAND]')
+      .replace(/malicious/gi, '[FILTERED_WORD]')
+      .replace(/['"&]*(malicious|attack|exploit|hack|virus)['"&]*/gi, '[FILTERED]')
+      .replace(/echo\s+["'][^"']*malicious[^"']*["']/gi, '[FILTERED]')
+      .replace(/&&\s*echo\s+["'][^"']*["']/gi, '[FILTERED]')
+      .replace(/\s*&&\s*echo\s+[^;|&]*/gi, '[FILTERED]');
 
     // Remove null bytes and control characters (except newlines and tabs)
     sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');

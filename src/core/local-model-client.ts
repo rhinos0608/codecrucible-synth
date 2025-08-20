@@ -151,6 +151,18 @@ export class LocalModelClient {
     return codingModels.length > 0 ? codingModels[0] : models[0];
   }
 
+  /**
+   * Get single available model (alias for compatibility)
+   */
+  async getAvailableModel(): Promise<string> {
+    try {
+      return await this.getBestAvailableModel();
+    } catch (error) {
+      // Fallback to configured model if no models are available
+      return this.config.model;
+    }
+  }
+
   private async generateOllama(prompt: string): Promise<string> {
     const response = await this.client.post('/api/generate', {
       model: this.config.model,

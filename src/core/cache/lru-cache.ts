@@ -33,11 +33,20 @@ export class LRUCache<T> {
     this.maxSize = Math.max(1, options.maxSize);
     this.ttl = Math.max(1000, options.ttl); // Minimum 1 second TTL
 
-    // Set up automatic cleanup
+    // Set up automatic cleanup with proper cleanup handling
     const checkInterval = options.checkInterval || Math.min(this.ttl / 4, 60000);
     this.cleanupInterval = setInterval(() => {
-      this.cleanup();
+      try {
+        this.cleanup();
+      } catch (error) {
+        console.error('LRU Cache cleanup error:', error);
+      }
     }, checkInterval);
+    
+    // Ensure cleanup interval doesn't keep process alive
+    if (this.cleanupInterval.unref) {
+      this.cleanupInterval.unref();
+    }
   }
 
   /**

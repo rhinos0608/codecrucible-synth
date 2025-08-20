@@ -144,6 +144,9 @@ export class CLI {
     
     // Auto-configure dual-agent system (async initialization)
     this.initializeDualAgentSystem();
+    
+    // Initialize context-aware CLI with project intelligence (async)
+    this.initializeContextAwareness();
 
     // MEMORY LEAK FIX: Register cleanup handlers for process termination
     this.registerCleanupHandlers();

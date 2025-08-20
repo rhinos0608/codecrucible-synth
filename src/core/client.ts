@@ -13,6 +13,7 @@ import { SecurityUtils } from './security.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 import { IntegratedCodeCrucibleSystem, IntegratedSystemConfig } from './integration/integrated-system.js';
 import { HardwareAwareModelSelector } from './performance/hardware-aware-model-selector.js';
+import { ToolIntegration, getGlobalToolIntegration } from './tools/tool-integration.js';
 import { ActiveProcessManager, ActiveProcess } from './performance/active-process-manager.js';
 import { LRUCache } from './cache/lru-cache.js';
 import { HybridLLMRouter, HybridConfig } from './hybrid/hybrid-llm-router.js';
@@ -243,17 +244,22 @@ export class UnifiedModelClient extends EventEmitter {
 
   private async createProvider(config: ProviderConfig): Promise<any> {
     switch (config.type) {
-      case 'ollama':
+      case 'ollama': {
         const { OllamaProvider } = await import('../providers/ollama.js');
         return new (OllamaProvider as any)(config);
+      }
       
-      case 'lm-studio':
+      case 'lm-studio': {
         const { LMStudioProvider } = await import('../providers/lm-studio.js');
         return new (LMStudioProvider as any)(config);
+      }
       
-      case 'huggingface':
-        const { HuggingFaceProvider } = await import('../providers/huggingface.js');
-        return new (HuggingFaceProvider as any)(config);
+      case 'huggingface': {
+        // HuggingFace provider is not yet implemented - fallback to Ollama
+        console.warn('HuggingFace provider not implemented, falling back to Ollama');
+        const { OllamaProvider: HFOllamaProvider } = await import('../providers/ollama.js');
+        return new (HFOllamaProvider as any)({ ...config, type: 'ollama' });
+      }
       
       default:
         throw new Error(`Unknown provider type: ${config.type}`);
@@ -290,13 +296,19 @@ export class UnifiedModelClient extends EventEmitter {
       }
     }
 
+    // Get available tools for function calling - only for compatible models
+    const toolIntegration = getGlobalToolIntegration();
+    const supportsTools = this.modelSupportsTools(selectedProvider, request.model);
+    const tools = (supportsTools && toolIntegration) ? toolIntegration.getLLMFunctions() : [];
+    
     const modelRequest: ModelRequest = {
       prompt: request.prompt || '',
       model: request.model,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
       stream: request.stream,
-      provider: selectedProvider
+      provider: selectedProvider,
+      tools: tools
     };
 
     const startTime = Date.now();
@@ -597,6 +609,28 @@ export class UnifiedModelClient extends EventEmitter {
     
     scored.sort((a, b) => b.score - a.score);
     return (scored[0]?.provider as ProviderType) || this.config.fallbackChain[0];
+  }
+
+  private modelSupportsTools(provider: ProviderType, model?: string): boolean {
+    // Only enable tools for specific models that support function calling
+    if (provider === 'lm-studio') {
+      return true; // LM Studio generally supports OpenAI-compatible function calling
+    }
+    
+    if (provider === 'ollama') {
+      // Only certain Ollama models support function calling
+      const model_name = model?.toLowerCase() || '';
+      // Models that support function calling (update this list as needed)
+      const supportedModels = [
+        'llama3', 'llama3.1', 'llama3.2', 
+        'qwen2.5', 'qwq', 
+        'mistral', 'codellama'
+      ];
+      
+      return supportedModels.some(supportedModel => model_name.includes(supportedModel));
+    }
+    
+    return false; // Conservative default - no tools for unknown providers
   }
 
   private async executeWithFallback(

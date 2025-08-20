@@ -656,12 +656,27 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
   }
 
   private async executeSynthesis(request: SynthesisRequest): Promise<SynthesisResponse> {
+    let response: SynthesisResponse;
+    
     if (this.config.features.enableMultiVoice) {
-      return await this.synthesisEngine.synthesize(request);
+      response = await this.synthesisEngine.synthesize(request);
     } else {
       // Single-voice fallback
-      return await this.executeSingleVoiceSynthesis(request);
+      response = await this.executeSingleVoiceSynthesis(request);
     }
+    
+    // Apply security filtering to response content
+    const { InputSanitizer } = await import('../security/input-sanitizer.js');
+    const sanitizationResult = InputSanitizer.sanitizePrompt(response.content);
+    
+    if (!sanitizationResult.isValid) {
+      this.logger.warn('Security violations detected in response:', sanitizationResult.violations);
+    }
+    
+    // Update response with sanitized content
+    response.content = sanitizationResult.sanitized;
+    
+    return response;
   }
 
   private async executeSingleVoiceSynthesis(request: SynthesisRequest): Promise<SynthesisResponse> {

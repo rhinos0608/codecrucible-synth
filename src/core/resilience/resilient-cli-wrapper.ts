@@ -379,6 +379,9 @@ export class ResilientCLIWrapper extends EventEmitter {
         reject(new Error(`Operation '${operationName}' timed out after ${timeoutMs}ms`));
       }, timeoutMs);
       
+      // Prevent timeout from keeping process alive during tests
+      timeoutId.unref();
+      
       // Store timeout ID for potential cleanup (though in this case it auto-cleans when Promise resolves)
       return timeoutId;
     });

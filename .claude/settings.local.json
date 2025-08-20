@@ -101,7 +101,10 @@
       "Bash(claude mcp:*)",
       "Bash(claude restart)",
       "Bash(git checkout:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "mcp__filesystem__list_directory",
+      "mcp__filesystem__read_multiple_files",
+      "mcp__filesystem__directory_tree"
     ],
     "deny": [],
     "ask": [],

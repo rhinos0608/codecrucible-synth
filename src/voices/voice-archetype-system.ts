@@ -1,8 +1,13 @@
+import { LivingSpiralCoordinator } from '../core/living-spiral-coordinator.js';
+
 export class VoiceArchetypeSystem {
   private voices: Map<string, Record<string, unknown>> = new Map();
+  private livingSpiralCoordinator: LivingSpiralCoordinator;
   
   constructor() {
     this.initializeVoices();
+    // Initialize LivingSpiralCoordinator with default values - will be properly initialized when used
+    this.livingSpiralCoordinator = null as any;
   }
   
   private initializeVoices() {
@@ -233,5 +238,47 @@ export class VoiceArchetypeSystem {
   
   async executeLivingSpiral(prompt: string, client: any, config: any = {}) {
     return this.generateIterativeCodeImprovement(prompt, client, config);
+  }
+  
+  async executeAdaptiveLivingSpiral(prompt: string, client: any, config: any = {}) {
+    // Adaptive version that adjusts voices based on context
+    const adaptiveConfig = {
+      ...config,
+      writerVoice: config.writerVoice || 'developer',
+      auditorVoice: config.auditorVoice || 'security',
+      maxIterations: config.maxIterations || 5,
+      adaptiveThreshold: config.adaptiveThreshold || 0.7
+    };
+    
+    return this.generateIterativeCodeImprovement(prompt, client, adaptiveConfig);
+  }
+  
+  async executeCollaborativeLivingSpiral(prompt: string, client: any, config: any = {}) {
+    // Collaborative version using multiple voices in each iteration
+    const collaborativeConfig = {
+      ...config,
+      mode: 'collaborative',
+      voices: config.voices || ['explorer', 'maintainer', 'security'],
+      maxIterations: config.maxIterations || 3,
+      consensusRequired: config.consensusRequired || true
+    };
+    
+    return this.generateMultiVoiceSolutions(['explorer', 'maintainer', 'security'], prompt, client);
+  }
+  
+  getLivingSpiralCoordinator(): LivingSpiralCoordinator {
+    if (!this.livingSpiralCoordinator) {
+      // Lazy initialization - need to import here to avoid circular dependencies
+      const defaultConfig = {
+        maxIterations: 5,
+        qualityThreshold: 0.8,
+        convergenceTarget: 0.9,
+        enableReflection: true,
+        parallelVoices: false,
+        councilSize: 3
+      };
+      this.livingSpiralCoordinator = new LivingSpiralCoordinator(this, null as any, defaultConfig);
+    }
+    return this.livingSpiralCoordinator;
   }
 }

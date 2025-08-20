@@ -154,12 +154,23 @@ export class HardwareAwareModelSelector extends EventEmitter {
   private filterModelsByHardware(models: ModelInfo[]): ModelInfo[] {
     return models.filter(model => {
       const estimatedMemoryGB = this.estimateModelMemoryUsage(model);
-      const memoryFitsWithBuffer = estimatedMemoryGB <= (this.hardwareProfile.availableMemoryGB * 0.7); // 70% safety margin
+      
+      // Adaptive safety margin based on current memory pressure
+      const currentMemoryUsage = 1 - (this.hardwareProfile.availableMemoryGB / this.hardwareProfile.totalMemoryGB);
+      let safetyMargin = 0.7; // Default 70% safety margin
+      
+      if (currentMemoryUsage > 0.8) {
+        safetyMargin = 0.5; // More aggressive under high memory pressure
+      } else if (currentMemoryUsage > 0.7) {
+        safetyMargin = 0.6; // Moderate adjustment
+      }
+      
+      const memoryFitsWithBuffer = estimatedMemoryGB <= (this.hardwareProfile.availableMemoryGB * safetyMargin);
       
       // Additional hardware-specific filters
       const cpuSuitable = this.hardwareProfile.cpuCores >= this.getMinCoresForModel(model);
       
-      this.logger.debug(`Model ${model.name}: memory=${estimatedMemoryGB.toFixed(1)}GB, fits=${memoryFitsWithBuffer}, cpu=${cpuSuitable}`);
+      this.logger.debug(`Model ${model.name}: memory=${estimatedMemoryGB.toFixed(1)}GB, fits=${memoryFitsWithBuffer}, cpu=${cpuSuitable}, margin=${(safetyMargin*100).toFixed(0)}%`);
       
       return memoryFitsWithBuffer && cpuSuitable;
     });
@@ -423,8 +434,17 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private startPerformanceMonitoring(): void {
     this.monitoringInterval = setInterval(() => {
-      this.updateHardwareProfile();
+      try {
+        this.updateHardwareProfile();
+      } catch (error) {
+        console.error('Hardware monitoring error:', error);
+      }
     }, 30000); // Update every 30 seconds
+    
+    // Prevent the interval from keeping the process alive
+    if (this.monitoringInterval.unref) {
+      this.monitoringInterval.unref();
+    }
   }
 
   /**

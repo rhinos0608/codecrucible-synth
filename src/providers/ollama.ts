@@ -52,30 +52,81 @@ export class OllamaProvider {
       // Get GPU configuration from config if available
       const gpuConfig = this.getGPUConfig();
       
-      const response = await this.httpClient.post('/api/generate', {
-        model: this.model,
-        prompt: request.prompt || request.text || request.content,
-        stream: false,
-        options: {
-          temperature: request.temperature || 0.7,
-          top_p: request.top_p || 0.9,
-          num_predict: request.maxTokens || request.max_tokens || 2048,
-          num_ctx: gpuConfig.num_ctx || 4096,
-          num_gpu: gpuConfig.num_gpu || 10,
-          num_thread: gpuConfig.num_thread || 4,
-          num_batch: gpuConfig.num_batch || 256
-          // Removed invalid options: max_tokens, numa, mmap
-        }
-      });
+      // Use chat API for function calling support if tools are provided
+      const useChat = request.tools && request.tools.length > 0;
+      const endpoint = useChat ? '/api/chat' : '/api/generate';
+      
+      let requestBody: any;
+      
+      if (useChat) {
+        // Chat API format with function calling support
+        requestBody = {
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an AI assistant with access to tools. When you need to read files, list directories, or perform file operations to answer a question, use the available tools. Always use tools to examine the codebase when asked about it.'
+            },
+            {
+              role: 'user',
+              content: request.prompt || request.text || request.content
+            }
+          ],
+          tools: request.tools,
+          stream: false,
+          options: {
+            temperature: request.temperature || 0.7,
+            top_p: request.top_p || 0.9,
+            num_predict: request.maxTokens || request.max_tokens || 2048,
+            num_ctx: gpuConfig.num_ctx || 4096,
+            num_gpu: gpuConfig.num_gpu || 10,
+            num_thread: gpuConfig.num_thread || 4,
+            num_batch: gpuConfig.num_batch || 256
+          }
+        };
+      } else {
+        // Original generate API format
+        requestBody = {
+          model: this.model,
+          prompt: request.prompt || request.text || request.content,
+          stream: false,
+          options: {
+            temperature: request.temperature || 0.7,
+            top_p: request.top_p || 0.9,
+            num_predict: request.maxTokens || request.max_tokens || 2048,
+            num_ctx: gpuConfig.num_ctx || 4096,
+            num_gpu: gpuConfig.num_gpu || 10,
+            num_thread: gpuConfig.num_thread || 4,
+            num_batch: gpuConfig.num_batch || 256
+          }
+        };
+      }
+      
+      const response = await this.httpClient.post(endpoint, requestBody);
+      
+      // Handle different response formats
+      let content = '';
+      let toolCalls = [];
+      
+      if (useChat && response.data.message) {
+        // Chat API response format
+        content = response.data.message.content || '';
+        toolCalls = response.data.message.tool_calls || [];
+      } else {
+        // Generate API response format
+        content = response.data.response || '';
+      }
       
       return {
-        content: response.data.response,
+        content,
+        toolCalls,
         model: this.model,
         provider: 'ollama',
         metadata: {
           tokens: response.data.eval_count || 0,
           latency: response.data.total_duration ? Math.round(response.data.total_duration / 1000000) : 0,
-          quality: 0.8
+          quality: 0.8,
+          usedTools: toolCalls.length > 0
         },
         usage: {
           totalTokens: response.data.eval_count || 0,

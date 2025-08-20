@@ -21,7 +21,7 @@ export class OllamaProvider {
     this.config = {
       endpoint: config.endpoint || 'http://localhost:11434',
       model: config.model || 'gemma:latest', // Default to gemma which works on most systems
-      timeout: config.timeout || 180000  // Default to 3 minutes
+      timeout: config.timeout || 300000  // Default to 5 minutes for large analysis
     };
     
     this.model = this.config.model;
@@ -36,6 +36,15 @@ export class OllamaProvider {
   }
   
   async processRequest(request: any, _context?: any): Promise<any> {
+    console.log('🤖 DEBUG: OllamaProvider.processRequest called');
+    console.log('🤖 DEBUG: Request object:', {
+      prompt: (request.prompt || '').substring(0, 200) + '...',
+      model: request.model,
+      temperature: request.temperature,
+      maxTokens: request.maxTokens,
+      hasTools: !!(request.tools && request.tools.length)
+    });
+    
     // Check status first
     if (!this.isAvailable) {
       const available = await this.checkStatus();
@@ -44,7 +53,9 @@ export class OllamaProvider {
       }
     }
     
-    return this.generate(request);
+    const result = await this.generate(request);
+    console.log('🤖 DEBUG: OllamaProvider response:', result.content.substring(0, 200) + '...');
+    return result;
   }
   
   async generate(request: any): Promise<any> {
@@ -96,7 +107,7 @@ Respond with helpful analysis while actively using tools to gather real informat
             temperature: request.temperature || 0.7,
             top_p: request.top_p || 0.9,
             num_predict: request.maxTokens || request.max_tokens || 2048,
-            num_ctx: gpuConfig.num_ctx || 4096,
+            num_ctx: gpuConfig.num_ctx || 8192,  // Increased for large prompts
             num_gpu: gpuConfig.num_gpu || 10,
             num_thread: gpuConfig.num_thread || 4,
             num_batch: gpuConfig.num_batch || 256
@@ -112,7 +123,7 @@ Respond with helpful analysis while actively using tools to gather real informat
             temperature: request.temperature || 0.7,
             top_p: request.top_p || 0.9,
             num_predict: request.maxTokens || request.max_tokens || 2048,
-            num_ctx: gpuConfig.num_ctx || 4096,
+            num_ctx: gpuConfig.num_ctx || 8192,  // Increased for large prompts
             num_gpu: gpuConfig.num_gpu || 10,
             num_thread: gpuConfig.num_thread || 4,
             num_batch: gpuConfig.num_batch || 256
@@ -120,7 +131,20 @@ Respond with helpful analysis while actively using tools to gather real informat
         };
       }
       
+      console.log('🤖 DEBUG: Making HTTP request to Ollama:', {
+        endpoint,
+        model: requestBody.model,
+        promptLength: (requestBody.prompt || '').length,
+        messagesLength: requestBody.messages ? requestBody.messages.length : 0
+      });
+      
       const response = await this.httpClient.post(endpoint, requestBody);
+      
+      console.log('🤖 DEBUG: Ollama HTTP response received:', {
+        status: response.status,
+        hasData: !!response.data,
+        contentLength: response.data.response ? response.data.response.length : 0
+      });
       
       // Handle different response formats
       let content = '';

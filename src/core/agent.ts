@@ -426,13 +426,23 @@ export class UnifiedAgent extends EventEmitter {
       let analysisPrompt = '';
       
       // Check if this is a project/directory analysis request
-      if (typeof task.input === 'string' && (
-        task.input.toLowerCase().includes('project structure') ||
-        task.input.toLowerCase().includes('analyze the project') ||
-        task.input.toLowerCase().includes('codebase') ||
-        task.input.toLowerCase().includes('directory') ||
-        task.input.toLowerCase().includes('files in')
-      )) {
+      const inputLower = (typeof task.input === 'string' ? task.input : '').toLowerCase();
+      const isProjectAnalysis = (
+        inputLower.includes('project structure') ||
+        inputLower.includes('analyze the project') ||
+        inputLower.includes('codebase') ||
+        inputLower.includes('directory') ||
+        inputLower.includes('files in') ||
+        inputLower.includes('analyze this') ||
+        inputLower.includes('audit') ||
+        inputLower.includes('thorough audit') ||
+        inputLower.includes('comprehensive')
+      );
+      
+      console.log(`🔍 DEBUG: Input analysis - "${task.input}"`);
+      console.log(`🔍 DEBUG: Detected as project analysis: ${isProjectAnalysis}`);
+      
+      if (typeof task.input === 'string' && isProjectAnalysis) {
         // Read project structure
         try {
           const { readFile } = await import('fs/promises');
@@ -483,12 +493,25 @@ export class UnifiedAgent extends EventEmitter {
         analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
       }
       
+      // DEBUG: Log the actual prompt being sent to the AI model
+      console.log('🔍 DEBUG: Analysis prompt being sent to AI model:');
+      console.log('─'.repeat(80));
+      console.log(analysisPrompt.substring(0, 500) + (analysisPrompt.length > 500 ? '...' : ''));
+      console.log('─'.repeat(80));
+      console.log(`Prompt length: ${analysisPrompt.length} characters`);
+      
       const response = await this.modelClient.synthesize({
         prompt: analysisPrompt,
         model: 'default',
         temperature: 0.3,
         maxTokens: 2000
       });
+      
+      // DEBUG: Log the response from the AI model
+      console.log('🤖 DEBUG: AI model response:');
+      console.log('─'.repeat(80));
+      console.log(response.content.substring(0, 300) + (response.content.length > 300 ? '...' : ''));
+      console.log('─'.repeat(80));
 
       return {
         success: true,

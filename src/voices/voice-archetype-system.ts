@@ -256,7 +256,7 @@ export class VoiceArchetypeSystem {
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
   
-  async generateMultiVoiceSolutions(prompt: string, voices: string[], context: any) {
+  async generateMultiVoiceSolutions(voices: string[], prompt: string, context: any) {
     if (!this.modelClient) {
       throw new Error('No model client available for voice generation');
     }
@@ -293,7 +293,7 @@ export class VoiceArchetypeSystem {
 
     try {
       // Generate responses from each voice
-      const responses = await this.generateMultiVoiceSolutions(prompt, voices, client);
+      const responses = await this.generateMultiVoiceSolutions(voices, prompt, client);
       
       // Synthesize based on mode
       let synthesizedContent = '';
@@ -412,7 +412,7 @@ export class VoiceArchetypeSystem {
       consensusRequired: config.consensusRequired || true
     };
     
-    return this.generateMultiVoiceSolutions(prompt, ['explorer', 'maintainer', 'security'], client);
+    return this.generateMultiVoiceSolutions(['explorer', 'maintainer', 'security'], prompt, client);
   }
   
   getLivingSpiralCoordinator(): LivingSpiralCoordinator {

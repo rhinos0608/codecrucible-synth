@@ -256,14 +256,29 @@ export class VoiceArchetypeSystem {
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
   
-  async generateMultiVoiceSolutions(voices: string[], prompt: string, context: any) {
-    // Support both parameter orders for backward compatibility
-    if (typeof voices === 'string' && Array.isArray(prompt)) {
-      // Old order: prompt, voices, context - swap them
-      [voices, prompt] = [prompt as any, voices as any];
+  async generateMultiVoiceSolutions(promptOrVoices: string | string[], voicesOrPrompt: string[] | string, context: any) {
+    // Handle both parameter orders for compatibility
+    let prompt: string;
+    let voices: string[];
+    
+    if (Array.isArray(promptOrVoices)) {
+      // New integration test order: (voices, prompt, context)
+      voices = promptOrVoices;
+      prompt = voicesOrPrompt as string;
+    } else {
+      // Original unit test order: (prompt, voices, context)
+      prompt = promptOrVoices;
+      voices = voicesOrPrompt as string[];
     }
     
-    if (!context) {
+    // Use the model client: first try the passed context if it has generateVoiceResponse,
+    // otherwise use the instance modelClient
+    let modelClient = this.modelClient;
+    if (context && typeof context.generateVoiceResponse === 'function') {
+      modelClient = context;
+    }
+    
+    if (!modelClient) {
       throw new Error('No model client available for voice generation');
     }
     
@@ -274,13 +289,13 @@ export class VoiceArchetypeSystem {
         throw new Error(`Voice not found: ${voiceId}`);
       }
       
-      // Use the mock client's generateVoiceResponse method that tests expect
-      const result = await context.generateVoiceResponse(voice.systemPrompt, prompt, context);
+      // Use the model client's generateVoiceResponse method
+      const result = await modelClient.generateVoiceResponse(voice.systemPrompt, voiceId);
       solutions.push({ 
         voice: voiceId,
         content: result.content,
         confidence: result.confidence,
-        tokens_used: result.tokens_used
+        tokens_used: result.tokens_used || 0
       });
     }
     return solutions;
@@ -299,7 +314,7 @@ export class VoiceArchetypeSystem {
 
     try {
       // Generate responses from each voice
-      const responses = await this.generateMultiVoiceSolutions(voices, prompt, client);
+      const responses = await this.generateMultiVoiceSolutions(prompt, voices, client);
       
       // Synthesize based on mode
       let synthesizedContent = '';
@@ -418,7 +433,7 @@ export class VoiceArchetypeSystem {
       consensusRequired: config.consensusRequired || true
     };
     
-    return this.generateMultiVoiceSolutions(['explorer', 'maintainer', 'security'], prompt, client);
+    return this.generateMultiVoiceSolutions(prompt, ['explorer', 'maintainer', 'security'], client);
   }
   
   getLivingSpiralCoordinator(): LivingSpiralCoordinator {

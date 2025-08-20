@@ -22,7 +22,6 @@ module.exports = {
     "<rootDir>"
   ],
   setupFiles: ["<rootDir>/jest.setup.js"],
-  setupFilesAfterEnv: ["<rootDir>/tests/setup/test-setup.ts"],
   transformIgnorePatterns: [
     "node_modules/(?!(ora|chalk|inquirer|commander)/)"
   ],

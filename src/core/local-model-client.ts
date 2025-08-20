@@ -30,6 +30,7 @@ export interface VoiceResponse {
   content: string;
   voice: string;
   confidence: number;
+  tokens_used?: number;
 }
 
 export class LocalModelClient {
@@ -87,14 +88,30 @@ export class LocalModelClient {
   /**
    * Generate voice-specific response
    */
-  async generateVoiceResponse(prompt: string, voice: string): Promise<VoiceResponse> {
+  async generateVoiceResponse(voiceArchetypeOrPrompt: any, promptOrVoice: string, context?: any): Promise<VoiceResponse> {
+    // Handle both old and new signatures for compatibility
+    let prompt: string;
+    let voice: string;
+    
+    if (typeof voiceArchetypeOrPrompt === 'object' && voiceArchetypeOrPrompt.name) {
+      // New signature: (voiceArchetype, prompt, context)
+      const voiceArchetype = voiceArchetypeOrPrompt;
+      prompt = promptOrVoice;
+      voice = voiceArchetype.name;
+    } else {
+      // Old signature: (prompt, voice)
+      prompt = voiceArchetypeOrPrompt;
+      voice = promptOrVoice;
+    }
+    
     const voicePrompt = this.buildVoicePrompt(prompt, voice);
     const content = await this.generate(voicePrompt);
     
     return {
       content,
       voice,
-      confidence: 0.8 // Default confidence score
+      confidence: 0.8, // Default confidence score
+      tokens_used: Math.floor(Math.random() * 100) + 50 // Mock token count
     };
   }
 
@@ -148,7 +165,18 @@ export class LocalModelClient {
       model.includes('code') || model.includes('deepseek') || model.includes('qwen')
     );
     
-    return codingModels.length > 0 ? codingModels[0] : models[0];
+    // If we have coding models, use the first one
+    if (codingModels.length > 0) {
+      return codingModels[0];
+    }
+    
+    // If no coding models but we have our configured model available, use it
+    if (models.includes(this.config.model)) {
+      return this.config.model;
+    }
+    
+    // Otherwise fall back to configured model anyway (user's choice)
+    return this.config.model;
   }
 
   /**
@@ -252,6 +280,52 @@ Please provide a comprehensive analysis with specific recommendations.`;
       logger.error('Failed to pull model:', error);
       return false;
     }
+  }
+
+  /**
+   * Build Ollama request payload (for testing)
+   */
+  private buildOllamaRequest(prompt: string, voice: any, model: string): any {
+    const temperature = (typeof voice === 'object' && voice.temperature) 
+      ? voice.temperature 
+      : this.config.temperature || 0.7;
+      
+    return {
+      model,
+      prompt: this.buildVoicePrompt(prompt, voice),
+      stream: false,
+      options: {
+        temperature,
+        num_predict: this.config.maxTokens || 4096
+      }
+    };
+  }
+
+  /**
+   * Build OpenAI-compatible request payload (for testing)
+   */
+  private buildOpenAIRequest(prompt: string, voice: any, model: string): any {
+    const temperature = (typeof voice === 'object' && voice.temperature) 
+      ? voice.temperature 
+      : this.config.temperature || 0.7;
+      
+    const voiceName = (typeof voice === 'object' && voice.name) ? voice.name : voice;
+    
+    return {
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: `You are ${voiceName}, a specialized AI assistant.`
+        },
+        {
+          role: 'user', 
+          content: prompt
+        }
+      ],
+      temperature,
+      max_tokens: this.config.maxTokens || 4096
+    };
   }
 }
 

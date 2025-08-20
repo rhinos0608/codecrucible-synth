@@ -283,7 +283,11 @@ export class CLI {
       // TODO: Implement proper multi-voice synthesis/combining
       const firstResponse = result[0];
       if (firstResponse && firstResponse.content) {
-        CLIDisplay.displayResults({ content: firstResponse.content, voices: result }, []);
+        CLIDisplay.displayResults({ 
+          content: firstResponse.content, 
+          voicesUsed: result,
+          qualityScore: 0.8
+        }, []);
         return firstResponse.content;
       }
     }
@@ -338,7 +342,7 @@ export class CLI {
         },
         {
           workingDirectory: this.workingDirectory,
-          config: this.context.config,
+          config: this.context.config as unknown as Record<string, unknown>,
           files: []
         }
       );

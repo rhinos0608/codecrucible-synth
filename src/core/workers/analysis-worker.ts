@@ -4,6 +4,7 @@
  */
 
 import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
+import { cpus } from 'os';
 import { UnifiedModelClient } from '../client.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 
@@ -73,7 +74,7 @@ export class AnalysisWorkerPool {
   private readonly maxWorkers: number;
   private readonly workerTimeout: number;
   
-  constructor(maxWorkers = require('os').cpus().length, workerTimeout = 30000) {
+  constructor(maxWorkers = cpus().length, workerTimeout = 30000) {
     this.maxWorkers = maxWorkers;
     this.workerTimeout = workerTimeout;
   }

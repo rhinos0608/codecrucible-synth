@@ -1558,37 +1558,40 @@ class StreamingHandler extends PatternHandler {
     
     try {
       // Get stream from model
-      const stream = await this.modelClient.streamRequest(streamRequest);
+      const streamResponse = await this.modelClient.streamRequest(
+        streamRequest,
+        (token) => {
+          // Process streaming token
+          if (token.content) {
+            buffer.add(token.content);
+          }
+        },
+        { workingDirectory: '.', config: {}, files: [] }
+      );
       
       let totalChunks = 0;
       let accumulatedContent = '';
       const startTime = Date.now();
       
-      // Process stream
-      for await (const chunk of stream) {
-        totalChunks++;
+      // The streaming is handled by the onToken callback above
+      // streamResponse contains the final result
+      totalChunks = 1;
+      accumulatedContent = streamResponse.content || '';
+      
+      // Process final result
+      const processed = await this.processChunk(accumulatedContent, buffer, config);
+      this.processedChunks.push(processed);
+      
+      // Call chunk handler
+      onChunk(processed);
         
-        // Add to buffer
-        buffer.add(chunk);
-        
-        // Process chunk
-        const processed = await this.processChunk(chunk, buffer, config);
-        this.processedChunks.push(processed);
-        
-        // Accumulate content
-        accumulatedContent += processed.content || '';
-        
-        // Call chunk handler
-        onChunk(processed);
-        
-        // Update progress
-        const estimatedProgress = Math.min(90, 10 + (totalChunks * 2));
-        onProgress(estimatedProgress);
-        
-        // Apply backpressure if needed
-        if (buffer.isFull()) {
-          await this.applyBackpressure(buffer);
-        }
+      // Update progress
+      const estimatedProgress = Math.min(90, 10 + (totalChunks * 2));
+      onProgress(estimatedProgress);
+      
+      // Apply backpressure if needed
+      if (buffer.isFull()) {
+        await this.applyBackpressure(buffer);
       }
       
       // Final processing

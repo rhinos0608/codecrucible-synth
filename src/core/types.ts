@@ -122,6 +122,7 @@ export interface SynthesisResult {
   content: string;
   confidence?: number;
   voicesUsed: any[];
+  voices?: any[];
   qualityScore: number;
   combinedCode?: string;
   convergenceReason?: string;

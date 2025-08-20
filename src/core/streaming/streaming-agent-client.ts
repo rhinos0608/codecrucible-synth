@@ -5,7 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { UnifiedModelClient } from '../client.js';
-import { ExecutionRequest, ExecutionResponse } from '../types.js';
+import { ExecutionRequest, ExecutionResponse, ModelResponse } from '../types.js';
 import { Logger } from '../logger.js';
 
 // Streaming Response Types
@@ -46,6 +46,7 @@ export interface StreamingSession {
   status: 'active' | 'paused' | 'completed' | 'error';
   metrics: StreamingMetrics;
   buffer: StreamBuffer;
+  tokensProcessed: number;
 }
 
 export interface StreamingMetrics {
@@ -225,6 +226,7 @@ export class StreamingAgentClient extends EventEmitter {
       request,
       startTime: Date.now(),
       status: 'active',
+      tokensProcessed: 0,
       metrics: {
         totalTokens: 0,
         tokensPerSecond: 0,
@@ -249,19 +251,43 @@ export class StreamingAgentClient extends EventEmitter {
   /**
    * Initialize stream from model client
    */
-  private async initializeStream(
+  private async *initializeStream(
     request: ExecutionRequest,
     sessionId: string
-  ): Promise<AsyncIterable<any>> {
+  ): AsyncGenerator<any, void, unknown> {
     // Create streaming request
     const streamRequest = {
+      prompt: request.input || '',
       ...request,
       streaming: true,
       sessionId
     };
     
-    // Get stream from model client
-    return this.modelClient.streamRequest(streamRequest);
+    let fullResponse = '';
+    
+    // Get stream from model client with token handler
+    const response = await this.modelClient.streamRequest(
+      streamRequest, 
+      (token) => {
+        // Token will be handled by the session
+        this.handleToken(sessionId, token);
+        fullResponse += token.content || '';
+        return token; // Yield the token
+      },
+      { workingDirectory: '.', config: {}, files: [] }
+    );
+    
+    // Yield the complete response at the end
+    yield { content: fullResponse, isComplete: true };
+  }
+  
+  private handleToken(sessionId: string, token: any): any {
+    const session = this.activeSessions.get(sessionId);
+    if (session) {
+      // Process token for this session
+      session.tokensProcessed++;
+    }
+    return token;
   }
 
   /**

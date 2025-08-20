@@ -27,10 +27,7 @@
     "package:all": "npm run package:win && npm run package:mac && npm run package:linux",
     "version": "npm run build",
     "postversion": "git push && git push --tags",
-    "release": "npm run build && npm run package:all && npm version patch && npm publish",
-    "apply-fixes": "node apply-agent-fixes.js",
-    "test-fixes": "node test-agent-fixes.js",
-    "fix-agent": "npm run apply-fixes && npm run build && npm run test-fixes"
+    "release": "npm run build && npm run package:all && npm version patch && npm publish"
   },
   "dependencies": {
     "@ast-grep/cli": "^0.18.0",

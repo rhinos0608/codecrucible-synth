@@ -265,6 +265,7 @@ export class CLI {
     const result = await this.context.voiceSystem.generateMultiVoiceSolutions(
       voices,
       prompt,
+      this.context.modelClient,
       { 
         workingDirectory: this.workingDirectory,
         config: {},
@@ -276,7 +277,18 @@ export class CLI {
       }
     );
 
-    // Display results using the display module
+    // Handle array of voice responses
+    if (Array.isArray(result) && result.length > 0) {
+      // For now, return the content from the first voice response
+      // TODO: Implement proper multi-voice synthesis/combining
+      const firstResponse = result[0];
+      if (firstResponse && firstResponse.content) {
+        CLIDisplay.displayResults({ content: firstResponse.content, voices: result }, []);
+        return firstResponse.content;
+      }
+    }
+    
+    // Handle single response object
     if (result && typeof result === 'object' && 'content' in result) {
       CLIDisplay.displayResults(result as any, []);
       return (result as any).content || 'No content generated';
@@ -326,7 +338,7 @@ export class CLI {
         },
         {
           workingDirectory: this.workingDirectory,
-          config: this.context.config.getAllConfig(),
+          config: this.context.config,
           files: []
         }
       );

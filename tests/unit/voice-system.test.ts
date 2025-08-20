@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { VoiceArchetypeSystem } from '../../src/voices/voice-archetype-system';
-import { LocalModelClient } from '../../src/core/local-model-client';
+import { UnifiedModelClient } from '../../src/core/client';
 
-jest.mock('../../src/core/local-model-client', () => ({
-  LocalModelClient: jest.fn().mockImplementation(() => ({
+jest.mock('../../src/core/client', () => ({
+  UnifiedModelClient: jest.fn().mockImplementation(() => ({
     generateVoiceResponse: jest.fn(),
     generateMultiVoiceResponses: jest.fn(),
     checkConnection: jest.fn(),
@@ -14,7 +14,7 @@ jest.mock('../../src/core/local-model-client', () => ({
 
 describe('Voice Archetype System', () => {
   let voiceSystem: VoiceArchetypeSystem;
-  let mockModelClient: jest.Mocked<LocalModelClient>;
+  let mockModelClient: jest.Mocked<UnifiedModelClient>;
 
   beforeEach(async () => {
     // Create a proper mock that implements all needed methods

@@ -1,4 +1,3 @@
-import { HybridModelClient } from '../client.js';
 import { UnifiedModelClient } from '../client.js';
 import { logger } from '../logger.js';
 import * as fs from 'fs/promises';
@@ -66,7 +65,7 @@ export interface BenchmarkSummary {
  */
 export class BenchmarkRunner {
   private challenges: CodingChallenge[];
-  private hybridClient?: HybridModelClient;
+  private hybridClient?: UnifiedModelClient;
   private ollamaClient?: UnifiedModelClient;
 
   constructor() {
@@ -735,10 +734,14 @@ except Exception as e:
    */
   private initializeClients(): void {
     try {
-      this.hybridClient = new HybridModelClient({
-        autoLoadConfig: true,
-        enableFallback: true,
-        enableLearning: false // Disable learning during benchmarks
+      this.hybridClient = new UnifiedModelClient({
+        providers: [
+          { type: 'ollama', endpoint: 'http://localhost:11434', model: 'auto', timeout: 30000 },
+          { type: 'lm-studio', endpoint: 'http://localhost:1234', model: 'auto', timeout: 30000 }
+        ],
+        executionMode: 'auto',
+        fallbackChain: ['ollama', 'lm-studio'],
+        performanceThresholds: { fastModeMaxTokens: 2048, timeoutMs: 30000, maxConcurrentRequests: 3 }
       });
 
       this.ollamaClient = new UnifiedModelClient({

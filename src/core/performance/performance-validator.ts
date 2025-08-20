@@ -1,6 +1,4 @@
 import { logger } from '../logger.js';
-import { HybridModelClient } from '../client.js';
-import { UnifiedModelClient } from '../client.js';
 import { UnifiedModelClient } from '../client.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -58,7 +56,7 @@ export interface ResourceMetrics {
  * Validates all claims from Performance-Benchmarks.md
  */
 export class PerformanceValidator {
-  private hybridClient?: HybridModelClient;
+  private hybridClient?: UnifiedModelClient;
   private ollamaClient?: UnifiedModelClient;
   private lmStudioClient?: UnifiedModelClient;
   private metrics = new Map<string, number[]>();
@@ -596,10 +594,14 @@ export class PerformanceValidator {
    */
   private async initializeClients(): Promise<void> {
     try {
-      this.hybridClient = new HybridModelClient({
-        autoLoadConfig: true,
-        enableFallback: true,
-        enableLearning: false // Disable learning during benchmarks
+      this.hybridClient = new UnifiedModelClient({
+        providers: [
+          { type: 'ollama', endpoint: 'http://localhost:11434', model: 'auto', timeout: 30000 },
+          { type: 'lm-studio', endpoint: 'http://localhost:1234', model: 'auto', timeout: 30000 }
+        ],
+        executionMode: 'auto',
+        fallbackChain: ['ollama', 'lm-studio'],
+        performanceThresholds: { fastModeMaxTokens: 2048, timeoutMs: 30000, maxConcurrentRequests: 3 }
       });
 
       this.ollamaClient = new UnifiedModelClient({

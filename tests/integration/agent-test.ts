@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
-import { CodeCrucibleCLI } from '../../src/core/cli.js';
-import { LocalModelClient } from '../../src/core/local-model-client.js';
+import { CLI } from '../../src/core/cli.js';
+import { UnifiedModelClient } from '../../src/core/client.js';
+import { MCPServerManager } from '../../src/mcp-servers/mcp-server-manager.js';
 import { VoiceArchetypeSystem } from '../../src/voices/voice-archetype-system.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -14,7 +15,7 @@ import os from 'os';
  */
 describe('CodeCrucible Agent Integration Tests', () => {
   let tempDir: string;
-  let cli: CodeCrucibleCLI;
+  let cli: CLI;
   let mockConfig: any;
 
   beforeAll(async () => {
@@ -57,14 +58,16 @@ describe('CodeCrucible Agent Integration Tests', () => {
 
   beforeEach(() => {
     // Reset CLI instance for each test - create mock context
-    const mockClient = new MockLocalModelClient();
-    const mockContext = {
-      modelClient: mockClient,
-      voiceSystem: new VoiceArchetypeSystem(mockClient, mockConfig),
-      mcpManager: { servers: new Map(), isReady: () => true },
-      config: mockConfig
-    };
-    cli = new CodeCrucibleCLI(mockContext as any);
+    const mockClient = new MockUnifiedModelClient();
+    const mockVoiceSystem = new VoiceArchetypeSystem();
+    const mockMcpManager = {
+      servers: new Map(),
+      isReady: () => true,
+      initialize: async () => {},
+      destroy: async () => {}
+    } as any;
+    
+    cli = new CLI(mockClient as any, mockVoiceSystem, mockMcpManager, mockConfig);
   });
 
   afterEach(async () => {
@@ -88,7 +91,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
     test('should initialize agent successfully', async () => {
       // Test that CLI is properly constructed with context
       expect(cli).toBeDefined();
-      expect(typeof cli.handleGeneration).toBe('function');
+      expect(typeof cli.processPrompt).toBe('function');
     });
 
     test('should handle simple prompts without tools', async () => {
@@ -100,7 +103,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
       console.log = jest.fn((msg) => outputCapture.push(msg));
       
       try {
-        await cli.handleGeneration(prompt, { quick: true });
+        await cli.processPrompt(prompt, { quick: true });
         expect(outputCapture.length).toBeGreaterThan(0);
       } finally {
         console.log = originalLog;
@@ -122,7 +125,8 @@ describe('CodeCrucible Agent Integration Tests', () => {
       const prompt = `Analyze the file ${testFile}`;
       const response = await cli.processPrompt(prompt, { 
         mode: 'agentic',
-        maxIterations: 3
+        maxIterations: 3,
+        noStream: true  // Disable streaming for tests to get actual content
       });
       
       expect(response).toBeDefined();
@@ -142,7 +146,8 @@ describe('CodeCrucible Agent Integration Tests', () => {
       const prompt = `Read the contents of ${testFile}`;
       const response = await cli.processPrompt(prompt, {
         mode: 'agentic',
-        maxIterations: 2
+        maxIterations: 2,
+        noStream: true  // Disable streaming to get actual content
       });
       
       expect(response).toContain(testContent);
@@ -208,7 +213,8 @@ describe('CodeCrucible Agent Integration Tests', () => {
       const prompt = 'Explain the benefits of using TypeScript over JavaScript';
       const response = await cli.processPrompt(prompt, {
         voices: ['developer', 'analyzer'],
-        mode: 'competitive'
+        mode: 'competitive',
+        noStream: true  // Disable streaming to get actual content
       });
       
       expect(response).toBeDefined();
@@ -244,7 +250,8 @@ describe('CodeCrucible Agent Integration Tests', () => {
       const prompt = 'Read the file /nonexistent/path/file.txt';
       const response = await cli.processPrompt(prompt, {
         mode: 'agentic',
-        maxIterations: 2
+        maxIterations: 2,
+        noStream: true  // Disable streaming to get actual content
       });
       
       expect(response).toBeDefined();
@@ -275,11 +282,9 @@ describe('CodeCrucible Agent Integration Tests', () => {
     test('should handle malformed prompts', async () => {
       await cli.initialize(mockConfig, tempDir);
       
-      const emptyResponse = await cli.processPrompt('', {});
-      const whitespaceResponse = await cli.processPrompt('   ', {});
-      
-      expect(emptyResponse).toBeDefined();
-      expect(whitespaceResponse).toBeDefined();
+      // Test that empty prompts throw appropriate errors
+      await expect(cli.processPrompt('', {})).rejects.toThrow('Empty prompt provided');
+      await expect(cli.processPrompt('   ', {})).rejects.toThrow('Empty prompt provided');
     }, 30000);
   });
 
@@ -324,7 +329,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
       console.log = jest.fn((msg) => outputCapture.push(msg));
       
       try {
-        await cli.handleGeneration(prompt, { quick: true });
+        await cli.processPrompt(prompt, { quick: true });
         expect(outputCapture.length).toBeGreaterThan(0);
       } finally {
         console.log = originalLog;
@@ -413,7 +418,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
 /**
  * Mock implementations for testing
  */
-class MockLocalModelClient {
+class MockUnifiedModelClient {
   constructor() {
     // Mock constructor that doesn't call parent
   }
@@ -473,14 +478,14 @@ class MockLocalModelClient {
     // Mock initialization - return immediately
   }
   
-  async generateVoiceResponse(voice: any, prompt: string, context: any) {
+  async generateVoiceResponse(prompt: string, voiceId: string, options: any) {
     // Handle file reading operations - check multiple patterns
     if (prompt.includes('Read the contents of') || prompt.includes('contents of') || prompt.includes('Read the file')) {
       // Handle invalid/nonexistent files first
       if (prompt.includes('/nonexistent/') || prompt.includes('does not exist')) {
         return {
           content: 'Error: File not found. The specified path does not exist.',
-          voice: voice.name,
+          voice: voiceId,
           confidence: 0.8,
           tokens_used: 25
         };
@@ -490,7 +495,7 @@ class MockLocalModelClient {
       if (fileMatch && fileMatch[0].includes('readme.txt')) {
         return {
           content: 'This is a test file for CodeCrucible',
-          voice: voice.name,
+          voice: voiceId,
           confidence: 0.9,
           tokens_used: 30
         };
@@ -501,7 +506,7 @@ class MockLocalModelClient {
     if (prompt.includes('TypeScript')) {
       return {
         content: 'TypeScript is a superset of JavaScript that adds static typing, enabling better code quality, enhanced IDE support, and early error detection during development.',
-        voice: voice.name,
+        voice: voiceId,
         confidence: 0.9,
         tokens_used: 50
       };
@@ -511,7 +516,7 @@ class MockLocalModelClient {
     if (prompt.includes('analyze') || prompt.includes('Analyze')) {
       return {
         content: 'This JavaScript file contains a simple function that demonstrates basic programming concepts. The code follows standard patterns and includes proper console output for user interaction.',
-        voice: voice.name,
+        voice: voiceId,
         confidence: 0.8,
         tokens_used: 40
       };
@@ -521,7 +526,7 @@ class MockLocalModelClient {
     if (prompt.includes('suggest improvements') || prompt.includes('complex')) {
       return {
         content: 'After thorough analysis, I recommend several improvements: 1) Replace var with const/let for better scoping, 2) Add parameter validation for the add function, 3) Consider using ES6 arrow functions for conciseness, 4) Add JSDoc comments for better documentation, 5) Implement error handling for edge cases.',
-        voice: voice.name,
+        voice: voiceId,
         confidence: 0.9,
         tokens_used: 80
       };
@@ -529,7 +534,7 @@ class MockLocalModelClient {
     
     return {
       content: 'This is a mock response for testing purposes.',
-      voice: voice.name,
+      voice: voiceId,
       confidence: 0.7,
       tokens_used: 20
     };
@@ -603,7 +608,42 @@ class MockLocalModelClient {
       tokensUsed: 20
     };
   }
+
+  // Add missing streamRequest method that CLI expects
+  async streamRequest(request: any, onToken: (token: any) => void, context?: any): Promise<any> {
+    // Simulate streaming response
+    const content = await this.synthesize(request);
+    
+    // Emit token chunks to simulate streaming
+    const words = content.content.split(' ');
+    for (let i = 0; i < words.length; i++) {
+      const token = {
+        content: words[i] + (i < words.length - 1 ? ' ' : ''),
+        index: i,
+        finished: i === words.length - 1,
+        metadata: {
+          totalTokens: words.length,
+          duration: 100 * i
+        }
+      };
+      onToken(token);
+      // Small delay to simulate real streaming
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    return {
+      content: content.content,
+      cached: false,
+      processingTime: words.length * 10
+    };
+  }
+
+  // Add other required methods for UnifiedModelClient compatibility
+  async generateText(prompt: string): Promise<string> {
+    const result = await this.synthesize({ prompt });
+    return result.content;
+  }
 }
 
 // Export for use in other test files
-export { MockLocalModelClient };
+export { MockUnifiedModelClient };

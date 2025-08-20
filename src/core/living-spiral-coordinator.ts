@@ -5,7 +5,6 @@
 
 import { logger } from './logger.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
-import { LocalModelClient } from './local-model-client.js';
 import { UnifiedModelClient } from './client.js';
 
 export enum SpiralPhase {
@@ -50,12 +49,12 @@ export interface SpiralResult {
 
 export class LivingSpiralCoordinator {
   private voiceSystem: VoiceArchetypeSystem;
-  private modelClient: UnifiedModelClient | LocalModelClient;
+  private modelClient: UnifiedModelClient;
   private config: SpiralConfig;
 
   constructor(
     voiceSystem: VoiceArchetypeSystem,
-    modelClient: UnifiedModelClient | LocalModelClient,
+    modelClient: UnifiedModelClient,
     config: SpiralConfig
   ) {
     this.voiceSystem = voiceSystem;

@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../logger.js';
-import { LLMProvider, LLMResponse, LLMCapabilities, LLMStatus } from './hybrid-model-client.js';
+import { LLMProvider, LLMResponse, LLMCapabilities, LLMStatus } from '../types.js';
 
 export interface LMStudioConfig {
   endpoint: string;

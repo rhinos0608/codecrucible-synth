@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { LivingSpiralCoordinator, SpiralPhase, SpiralConfig } from '../../src/core/living-spiral-coordinator';
 import { VoiceArchetypeSystem } from '../../src/voices/voice-archetype-system';
-import { MockLocalModelClient } from '../integration/agent-test';
+import { MockUnifiedModelClient } from '../integration/agent-test';
 
 /**
  * Test suite for Living Spiral Methodology
@@ -9,10 +9,10 @@ import { MockLocalModelClient } from '../integration/agent-test';
 describe('Living Spiral Methodology', () => {
   let coordinator: LivingSpiralCoordinator;
   let voiceSystem: VoiceArchetypeSystem;
-  let mockModelClient: MockLocalModelClient;
+  let mockModelClient: MockUnifiedModelClient;
 
   beforeEach(() => {
-    mockModelClient = new MockLocalModelClient();
+    mockModelClient = new MockUnifiedModelClient();
     
     const mockConfig = {
       voices: {

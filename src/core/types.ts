@@ -198,6 +198,43 @@ export enum CLIExitCode {
   UNEXPECTED_ERROR = 99
 }
 
+// LLM Provider Interfaces (moved from hybrid-model-client.ts)
+export interface LLMProvider {
+  name: string;
+  endpoint: string;
+  isAvailable(): Promise<boolean>;
+  generateCode(prompt: string, options?: any): Promise<LLMResponse>;
+  getCapabilities(): LLMCapabilities;
+  getStatus(): Promise<LLMStatus>;
+}
+
+export interface LLMResponse {
+  content: string;
+  confidence: number;
+  responseTime: number;
+  model: string;
+  provider: string;
+  metadata?: any;
+}
+
+export interface LLMCapabilities {
+  strengths: string[];
+  optimalFor: string[];
+  responseTime: string;
+  contextWindow: number;
+  supportsStreaming?: boolean;
+  maxConcurrent?: number;
+}
+
+export interface LLMStatus {
+  available: boolean;
+  currentLoad: number;
+  maxLoad: number;
+  responseTime: number;
+  errorRate: number;
+  lastError?: string;
+}
+
 // Agent Types
 export interface Task {
   id: string;

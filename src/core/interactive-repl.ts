@@ -198,18 +198,72 @@ export class InteractiveREPL {
     try {
       console.log(chalk.gray('🤔 Processing...\n'));
       
-      // Pass the prompt to the CLI for processing
-      await this.cli.executePromptProcessing(prompt, {
-        stream: true,
-        autonomous: true,
-        contextAware: true
-      });
+      // Check if this is a codebase analysis request
+      if (this.isCodebaseAnalysisRequest(prompt)) {
+        console.log(chalk.blue('🔍 Direct codebase analysis mode activated'));
+        await this.executeDirectCodebaseAnalysis(prompt);
+      } else {
+        // Pass other prompts to the CLI for processing
+        await this.cli.executePromptProcessing(prompt, {
+          stream: true,
+          autonomous: true,
+          contextAware: true
+        });
+      }
       
     } catch (error) {
       console.error(chalk.red('❌ Error:'), error.message);
     } finally {
       this.isProcessing = false;
       this.rl.prompt();
+    }
+  }
+  
+  /**
+   * Check if this is a codebase analysis request
+   */
+  private isCodebaseAnalysisRequest(prompt: string): boolean {
+    const lowerPrompt = prompt.toLowerCase();
+    return (
+      lowerPrompt.includes('analyze this codebase') ||
+      lowerPrompt.includes('analyze the codebase') ||
+      lowerPrompt.includes('audit this codebase') ||
+      lowerPrompt.includes('audit the codebase') ||
+      (lowerPrompt.includes('analyze') && lowerPrompt.includes('project')) ||
+      (lowerPrompt.includes('analyze') && lowerPrompt.includes('code')) ||
+      lowerPrompt.includes('comprehensive audit') ||
+      lowerPrompt.includes('thorough audit')
+    );
+  }
+  
+  /**
+   * Execute direct codebase analysis in interactive mode
+   */
+  private async executeDirectCodebaseAnalysis(prompt: string): Promise<void> {
+    try {
+      const { simpleCodebaseAnalyzer } = await import('./simple-codebase-analyzer.js');
+      
+      console.log(chalk.gray('Using conflict-free direct analysis...'));
+      console.log(chalk.yellow('⏳ This may take 1-2 minutes for comprehensive analysis\n'));
+      
+      const result = await simpleCodebaseAnalyzer.analyzeCurrentProject();
+      
+      if (result.success) {
+        console.log(chalk.green('\n✅ Codebase Analysis Complete'));
+        console.log(chalk.blue('═'.repeat(80)));
+        console.log(result.content);
+        console.log(chalk.blue('═'.repeat(80)));
+        
+        console.log(chalk.gray(`\n📊 Analysis Statistics:`));
+        console.log(chalk.gray(`   Duration: ${(result.metadata.duration / 1000).toFixed(1)}s`));
+        console.log(chalk.gray(`   Response length: ${result.metadata.responseLength} characters`));
+        console.log(chalk.gray(`   Project items analyzed: ${result.metadata.projectStructure.split('\n').length}`));
+      } else {
+        console.error(chalk.red('❌ Direct codebase analysis failed:'), result.error);
+        console.log(chalk.yellow('🔄 You can try rephrasing your request or use a simpler prompt.'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Failed to load direct analyzer:'), error);
     }
   }
 

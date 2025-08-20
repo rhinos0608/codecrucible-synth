@@ -31,6 +31,7 @@ export interface ErrorPattern {
 }
 
 export class ErrorRecoverySystem extends EventEmitter {
+  private static globalErrorHandlersRegistered = false;
   private logger: Logger;
   private errorHistory: Map<string, ErrorContext[]> = new Map();
   private recoveryPatterns: ErrorPattern[] = [];
@@ -404,18 +405,22 @@ export class ErrorRecoverySystem extends EventEmitter {
   }
 
   /**
-   * Setup global error handling
+   * Setup global error handling (only register once)
    */
   private setupGlobalErrorHandling(): void {
-    process.on('uncaughtException', (error) => {
-      this.logger.error('Uncaught exception:', error);
-      this.emit('error:uncaught', error);
-    });
+    if (!ErrorRecoverySystem.globalErrorHandlersRegistered) {
+      ErrorRecoverySystem.globalErrorHandlersRegistered = true;
+      
+      process.on('uncaughtException', (error) => {
+        this.logger.error('Uncaught exception:', error);
+        this.emit('error:uncaught', error);
+      });
 
-    process.on('unhandledRejection', (reason, promise) => {
-      this.logger.error('Unhandled rejection:', reason);
-      this.emit('error:unhandled_rejection', { reason, promise });
-    });
+      process.on('unhandledRejection', (reason, promise) => {
+        this.logger.error('Unhandled rejection:', reason);
+        this.emit('error:unhandled_rejection', { reason, promise });
+      });
+    }
   }
 
   /**

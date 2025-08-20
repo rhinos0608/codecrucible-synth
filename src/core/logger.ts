@@ -363,29 +363,35 @@ export function configureLogger(config: Partial<LoggerConfig>): void {
   logger.updateConfig(config);
 }
 
-// Graceful shutdown - flush logs
-process.on('beforeExit', async () => {
-  try {
-    await logger.flush();
-  } catch (error) {
-    console.error('Failed to flush logs on exit:', error);
-  }
-});
+// Graceful shutdown - flush logs (only register once)
+let loggerShutdownRegistered = false;
 
-process.on('SIGINT', async () => {
-  try {
-    await logger.flush();
-  } catch (error) {
-    console.error('Failed to flush logs on SIGINT:', error);
-  }
-  process.exit(0);
-});
+if (!loggerShutdownRegistered) {
+  loggerShutdownRegistered = true;
+  
+  process.on('beforeExit', async () => {
+    try {
+      await logger.flush();
+    } catch (error) {
+      console.error('Failed to flush logs on exit:', error);
+    }
+  });
 
-process.on('SIGTERM', async () => {
-  try {
-    await logger.flush();
-  } catch (error) {
-    console.error('Failed to flush logs on SIGTERM:', error);
-  }
-  process.exit(0);
-});
+  process.on('SIGINT', async () => {
+    try {
+      await logger.flush();
+    } catch (error) {
+      console.error('Failed to flush logs on SIGINT:', error);
+    }
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    try {
+      await logger.flush();
+    } catch (error) {
+      console.error('Failed to flush logs on SIGTERM:', error);
+    }
+    process.exit(0);
+  });
+}

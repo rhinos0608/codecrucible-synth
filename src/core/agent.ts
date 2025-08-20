@@ -1034,9 +1034,14 @@ export const globalRAGSystem = {
   indexPath: async (path: string, options?: any) => ({ indexed: true, path })
 };
 
+let shutdownHandlersRegistered = false;
+
 export const registerShutdownHandler = (handler: () => void) => {
-  process.on('SIGINT', handler);
-  process.on('SIGTERM', handler);
+  if (!shutdownHandlersRegistered) {
+    process.on('SIGINT', handler);
+    process.on('SIGTERM', handler);
+    shutdownHandlersRegistered = true;
+  }
 };
 
 export const createManagedInterval = (fn: () => void, interval: number) => {

@@ -92,6 +92,7 @@ export interface SessionMetrics {
 
 // Production Streaming Client
 export class ProductionStreamingClient extends EventEmitter {
+  private static shutdownHandlersRegistered = false;
   private modelClient: UnifiedModelClient;
   private logger: Logger;
   private config: StreamingConfiguration;
@@ -476,8 +477,11 @@ export class ProductionStreamingClient extends EventEmitter {
   }
 
   private setupGracefulShutdown(): void {
-    process.on('SIGTERM', () => this.shutdown());
-    process.on('SIGINT', () => this.shutdown());
+    if (!ProductionStreamingClient.shutdownHandlersRegistered) {
+      ProductionStreamingClient.shutdownHandlersRegistered = true;
+      process.on('SIGTERM', () => this.shutdown());
+      process.on('SIGINT', () => this.shutdown());
+    }
   }
 
   private generateSessionId(): string {

@@ -96,6 +96,7 @@ export class CLI {
   private workingDirectory = process.cwd();
   private fastModeClient: UnifiedModelClient | null = null;
   private streamingClient: StreamingAgentClient;
+  private static globalListenersRegistered = false;
   private contextAwareCLI: ContextAwareCLIIntegration;
   private optimizedContextCLI: OptimizedContextAwareCLI;
   private resilientWrapper: ResilientCLIWrapper;
@@ -160,8 +161,14 @@ export class CLI {
 
   /**
    * Register process cleanup handlers to prevent memory leaks
+   * Only register once globally to prevent listener accumulation
    */
   private registerCleanupHandlers(): void {
+    if (CLI.globalListenersRegistered) {
+      return; // Avoid registering multiple listeners
+    }
+    CLI.globalListenersRegistered = true;
+
     // Cleanup on normal exit
     process.on('exit', () => {
       // Synchronous cleanup only
@@ -389,6 +396,19 @@ export class CLI {
         console.log('CodeCrucible Synth v3.8.5');
         return;
       }
+    }
+    
+    // CRITICAL: Check for direct codebase analysis requests to bypass timeout monitoring
+    const promptText = args.join(' ');
+    if (this.isCodebaseAnalysisRequest(promptText)) {
+      console.log(chalk.blue('🔍 Detected codebase analysis - bypassing timeout monitoring'));
+      try {
+        await this.executeMainCLI(args);
+      } catch (error) {
+        console.error(chalk.red(`❌ Direct CLI execution failed: ${error.message}`));
+        process.exit(1);
+      }
+      return;
     }
     
     // Execute main CLI with resilient error handling for complex commands
@@ -817,6 +837,17 @@ export class CLI {
   private async analyzeDirectory(dirPath: string, options: CLIOptions): Promise<void> {
     try {
       console.log(chalk.cyan(`📁 Analyzing directory: ${dirPath}`));
+      
+      // Special case: if analyzing current directory, use direct codebase analysis
+      const { resolve } = await import('path');
+      const resolvedPath = resolve(dirPath);
+      const currentDir = process.cwd();
+      
+      if (resolvedPath === currentDir || dirPath === '.' || dirPath === './') {
+        console.log(chalk.blue('🔍 Detected current project analysis - using direct analyzer'));
+        await this.executeDirectCodebaseAnalysis('analyze this project directory', options);
+        return;
+      }
       
       // Check if directory exists
       try {
@@ -1323,6 +1354,13 @@ ${fileContent}
       }
       
       console.log(chalk.cyan('🤔 Processing prompt...'));
+      
+      // PRIORITY 0: Direct codebase analysis (bypass complex systems)
+      if (this.isCodebaseAnalysisRequest(cleanPrompt)) {
+        console.log(chalk.blue('🔍 Direct codebase analysis mode activated'));
+        await this.executeDirectCodebaseAnalysis(cleanPrompt, options);
+        return;
+      }
 
       // Enhanced context-aware prompt processing
       let enhancedPrompt = cleanPrompt;
@@ -2233,6 +2271,62 @@ ${fileContent}
     } catch (error) {
       console.error(chalk.red('❌ Failed to start interactive mode:'), error);
       throw error;
+    }
+  }
+  
+  /**
+   * Check if this is a codebase analysis request
+   */
+  private isCodebaseAnalysisRequest(prompt: string): boolean {
+    const lowerPrompt = prompt.toLowerCase();
+    return (
+      lowerPrompt.includes('analyze this codebase') ||
+      lowerPrompt.includes('analyze the codebase') ||
+      lowerPrompt.includes('audit this codebase') ||
+      lowerPrompt.includes('audit the codebase') ||
+      (lowerPrompt.includes('analyze') && lowerPrompt.includes('project')) ||
+      (lowerPrompt.includes('analyze') && lowerPrompt.includes('code')) ||
+      lowerPrompt.includes('comprehensive audit') ||
+      lowerPrompt.includes('thorough audit')
+    );
+  }
+  
+  /**
+   * Execute direct codebase analysis without agent conflicts
+   */
+  private async executeDirectCodebaseAnalysis(prompt: string, options: CLIOptions): Promise<void> {
+    try {
+      const { simpleCodebaseAnalyzer } = await import('./simple-codebase-analyzer.js');
+      
+      console.log(chalk.gray('Using conflict-free direct analysis...'));
+      const result = await simpleCodebaseAnalyzer.analyzeCurrentProject();
+      
+      if (result.success) {
+        console.log(chalk.green('\n✅ Codebase Analysis Complete'));
+        console.log(chalk.blue('─'.repeat(80)));
+        console.log(result.content);
+        console.log(chalk.blue('─'.repeat(80)));
+        
+        console.log(chalk.gray(`\n📊 Analysis Metadata:`));
+        console.log(chalk.gray(`   Duration: ${result.metadata.duration}ms`));
+        console.log(chalk.gray(`   Project structure: ${result.metadata.projectStructure.split('\n').length} items`));
+        console.log(chalk.gray(`   Response length: ${result.metadata.responseLength} characters`));
+        
+        // Handle file output if requested
+        if (options.file) {
+          await this.handleFileOutput(options.file as string, result.content);
+        }
+      } else {
+        console.error(chalk.red('❌ Direct codebase analysis failed:'), result.error);
+        console.log(chalk.yellow('🔄 Falling back to autonomous agent mode...'));
+        
+        // Fallback to autonomous mode if direct analysis fails
+        if (this.context.agentOrchestrator && options.autonomous !== false) {
+          await this.executeAutonomousAgentMode(prompt, options);
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Failed to load direct analyzer:'), error);
     }
   }
 }

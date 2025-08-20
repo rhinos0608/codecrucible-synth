@@ -2,10 +2,10 @@
   {
     "task_id": "task_1755678959300_bd903bdy3",
     "title": "Fix CodeCrucible Synth Critical Issues",
-    "status": "in_progress",
+    "status": "failed",
     "priority": "critical",
     "created_at": "2025-08-20T08:35:59.300Z",
-    "updated_at": "2025-08-20T08:36:03.464Z",
+    "updated_at": "2025-08-20T08:36:50.683Z",
     "estimated_duration": "2 hours",
     "current_phase": 1,
     "total_phases": 3,
@@ -13,7 +13,9 @@
       "fix_context_window",
       "fix_versions",
       "fix_memory_leaks",
-      "fix_unit_tests"
+      "fix_unit_tests",
+      "clean_emergency_scripts",
+      "validate_core_functionality"
     ],
     "failed_attempts": [],
     "agent_assignments": [
@@ -91,6 +93,18 @@
         "agent": "test-runner",
         "timestamp": "2025-08-20T08:36:03.464Z",
         "result": "completed"
+      },
+      "clean_emergency_scripts": {
+        "stepId": "clean_emergency_scripts",
+        "agent": "cleaner",
+        "timestamp": "2025-08-20T08:36:04.554Z",
+        "result": "completed"
+      },
+      "validate_core_functionality": {
+        "stepId": "validate_core_functionality",
+        "agent": "coordinator",
+        "timestamp": "2025-08-20T08:36:05.563Z",
+        "result": "completed"
       }
     },
     "checkpoints": [
@@ -106,6 +120,13 @@
         "git_commit": "[main",
         "id": "checkpoint_1755678960447",
         "timestamp": "2025-08-20T08:36:00.447Z"
+      },
+      {
+        "phase": 1,
+        "description": "Completed fix_unit_tests",
+        "git_commit": "[main",
+        "id": "checkpoint_1755678963541",
+        "timestamp": "2025-08-20T08:36:03.541Z"
       }
     ]
   }

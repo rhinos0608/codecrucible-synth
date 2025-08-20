@@ -3,7 +3,7 @@
 > **Revolutionary AI-Powered Code Generation & Analysis Tool**  
 > *Complete local AI assistance with multi-voice synthesis and hybrid model architecture*
 
-[![Version](https://img.shields.io/badge/version-3.8.1-blue.svg)](https://github.com/rhinos0608/codecrucible-synth)
+[![Version](https://img.shields.io/badge/version-3.8.10-blue.svg)](https://github.com/rhinos0608/codecrucible-synth)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![AI Models](https://img.shields.io/badge/models-Ollama%20%7C%20LM%20Studio-orange.svg)](https://ollama.ai)

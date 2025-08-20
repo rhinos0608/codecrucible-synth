@@ -33,7 +33,7 @@ export class CLICommands {
     
     try {
       // Check model client status
-      const modelStatus = await this.context.modelClient.healthCheck();
+      const modelStatus = await this.context.modelClient.healthCheck().then(() => true).catch(() => false);
       spinner.text = 'Checking voice system...';
       
       // Check voice system
@@ -51,7 +51,7 @@ export class CLICommands {
       
       // Show available models
       try {
-        const models = await this.context.modelClient.listModels();
+        const models = await this.context.modelClient.getAllAvailableModels?.() || [];
         console.log(chalk.cyan(`\n📋 Available Models (${models.length}):`));
         models.slice(0, 5).forEach((model: any) => {
           const perf = CLIDisplay.getModelPerformance(model.name || model);
@@ -88,7 +88,7 @@ export class CLICommands {
     const spinner = ora('Fetching models...').start();
     
     try {
-      const models = await this.context.modelClient.listModels();
+      const models = await this.context.modelClient.getAllAvailableModels?.() || [];
       spinner.succeed(`Found ${models.length} models`);
       
       if (models.length === 0) {
@@ -135,20 +135,12 @@ export class CLICommands {
     const spinner = ora('Generating code...').start();
     
     try {
-      const result = await this.context.modelClient.generateText({
-        prompt,
-        model: options.fast ? 'fast' : 'default',
-        maxTokens: 2000
-      });
+      const result = await this.context.modelClient.generateText(prompt);
       
       spinner.succeed('Code generation complete');
       
       console.log(chalk.green('\n📝 Generated Code:'));
-      console.log(result.content);
-      
-      if (typeof result === 'object' && result.model) {
-        console.log(chalk.gray(`\n🤖 Generated using: ${result.model}`));
-      }
+      console.log(result || 'No code generated');
       
     } catch (error) {
       spinner.fail('Code generation failed');
@@ -197,7 +189,7 @@ export class CLICommands {
     };
     
     try {
-      await startServerMode(serverOptions, this.context);
+      await startServerMode(this.context, serverOptions);
       console.log(chalk.green(`✅ Server running at http://localhost:${port}`));
     } catch (error) {
       console.error(chalk.red('❌ Failed to start server:'), error);
@@ -235,6 +227,8 @@ export class CLICommands {
       
       // Create project context
       const projectContext: ProjectContext = {
+        workingDirectory: dirPath,
+        config: {},
         files: allFiles.slice(0, 50).map(f => ({
           path: f,
           content: '',
@@ -243,11 +237,6 @@ export class CLICommands {
         structure: {
           directories: [],
           fileTypes: {}
-        },
-        metadata: {
-          totalFiles: allFiles.length,
-          analyzedFiles: Math.min(allFiles.length, 50),
-          directory: dirPath
         }
       };
       

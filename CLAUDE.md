@@ -125,7 +125,6 @@ src/
 ├── voices/                 # Voice archetype system
 ├── mcp-servers/           # Model Context Protocol servers
 ├── config/                # Configuration management
-├── desktop/               # Electron desktop app (experimental)
 └── providers/             # LLM provider implementations
 
 config/                    # Configuration files

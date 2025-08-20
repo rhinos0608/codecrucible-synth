@@ -112,7 +112,8 @@
       "Bash(npx jest:*)",
       "Bash(NODE_ENV=test npm test)",
       "Bash(NODE_ENV=test npm test -- --testNamePattern=\"Voice Archetype System\")",
-      "Bash(NODE_ENV=test npm test -- --testNamePattern=\"Voice Archetype System|Response System\")"
+      "Bash(NODE_ENV=test npm test -- --testNamePattern=\"Voice Archetype System|Response System\")",
+      "Bash(rg:*)"
     ],
     "deny": [],
     "ask": [],

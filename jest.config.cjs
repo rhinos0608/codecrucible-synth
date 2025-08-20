@@ -22,6 +22,7 @@ module.exports = {
     "<rootDir>"
   ],
   setupFiles: ["<rootDir>/jest.setup.js"],
+  setupFilesAfterEnv: ["<rootDir>/tests/setup/cleanup-singletons.ts"],
   transformIgnorePatterns: [
     "node_modules/(?!(ora|chalk|inquirer|commander)/)"
   ],
@@ -34,6 +35,7 @@ module.exports = {
   testPathIgnorePatterns: [
     "<rootDir>/archive/",
     "<rootDir>/tests/__mocks__/",
+    "<rootDir>/tests/setup/",
     "<rootDir>/node_modules/",
     "<rootDir>/dist/",
     "<rootDir>/build/"

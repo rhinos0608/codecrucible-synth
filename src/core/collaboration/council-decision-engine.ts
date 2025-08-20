@@ -6,6 +6,7 @@
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { logger } from '../logger.js';
 import { EventEmitter } from 'events';
+import { subAgentIsolationSystem, IsolationLevel } from '../agents/sub-agent-isolation-system.js';
 
 export interface VoicePerspective {
   voiceId: string;
@@ -113,7 +114,7 @@ export class CouncilDecisionEngine extends EventEmitter {
   }
 
   /**
-   * Gather initial perspectives from all voices
+   * Gather initial perspectives from all voices using isolated agents
    */
   private async gatherInitialPerspectives(
     prompt: string,
@@ -121,12 +122,13 @@ export class CouncilDecisionEngine extends EventEmitter {
   ): Promise<VoicePerspective[]> {
     const perspectives: VoicePerspective[] = [];
 
-    for (const voiceId of voices) {
+    // Execute voice perspectives in parallel using isolated agents
+    const perspectivePromises = voices.map(async (voiceId) => {
       try {
         const voice = this.voiceSystem.getVoice(voiceId);
         if (!voice) {
           logger.warn(`Voice not found: ${voiceId}`);
-          continue;
+          return null;
         }
 
         // Create a specialized prompt for gathering perspectives
@@ -147,22 +149,52 @@ ALTERNATIVES: Other approaches you considered
 Be specific and actionable. This will be part of a multi-voice council decision.
         `;
 
-        const response = await this.modelClient.generateVoiceResponse(
-          perspectivePrompt,
-          voiceId,
-          { temperature: voice.temperature }
+        // Execute using isolated agent for security and performance
+        const result = await subAgentIsolationSystem.executeTask(
+          'analysis',
+          {
+            voiceId,
+            prompt: perspectivePrompt,
+            voice: voice,
+            model: this.modelClient
+          },
+          {
+            priority: 'high',
+            timeout: 30000,
+            isolationLevel: IsolationLevel.MEMORY,
+            permissions: {
+              apiAccess: {
+                models: ['*'],
+                rateLimit: 10,
+                features: ['analysis', 'generation']
+              }
+            }
+          }
         );
 
-        // Parse the structured response
-        const perspective = this.parseVoicePerspective(voiceId, response.content);
-        perspectives.push(perspective);
-
+        if (result.success && result.result) {
+          return this.parseVoicePerspective(voiceId, result.result);
+        } else {
+          logger.error(`Failed to get perspective from ${voiceId}:`, result.error);
+          return null;
+        }
       } catch (error) {
-        logger.error(`Failed to gather perspective from ${voiceId}:`, error);
-        // Continue with other voices
+        logger.error(`Error gathering perspective from ${voiceId}:`, error);
+        return null;
+      }
+    });
+
+    // Wait for all perspectives
+    const results = await Promise.allSettled(perspectivePromises);
+    
+    // Collect successful results
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) {
+        perspectives.push(result.value);
       }
     }
 
+    logger.info(`Gathered ${perspectives.length} perspectives from ${voices.length} voices`);
     return perspectives;
   }
 

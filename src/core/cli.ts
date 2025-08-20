@@ -265,7 +265,6 @@ export class CLI {
     const result = await this.context.voiceSystem.generateMultiVoiceSolutions(
       voices,
       prompt,
-      this.context.modelClient,
       { 
         workingDirectory: this.workingDirectory,
         config: {},

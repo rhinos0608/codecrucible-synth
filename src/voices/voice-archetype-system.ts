@@ -290,7 +290,7 @@ export class VoiceArchetypeSystem {
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
 
-  async generateMultiVoiceSolutions(voices: string[], prompt: string, client: any, context?: any) {
+  async generateMultiVoiceSolutions(voices: string[], prompt: string, context?: any) {
     const responses = [];
     
     for (const voiceId of voices) {
@@ -305,17 +305,17 @@ export class VoiceArchetypeSystem {
         
         // Use different client methods based on what's available
         let response;
-        if (client.generateVoiceResponse) {
-          response = await client.generateVoiceResponse(enhancedPrompt, voiceId, {
+        if (this.modelClient && this.modelClient.generateVoiceResponse) {
+          response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
             temperature: voice.temperature
           });
-        } else if (client.processRequest) {
-          response = await client.processRequest({ 
+        } else if (this.modelClient && this.modelClient.processRequest) {
+          response = await this.modelClient.processRequest({ 
             prompt: enhancedPrompt, 
             temperature: voice.temperature 
           });
         } else {
-          throw new Error('Client does not support voice generation');
+          throw new Error('Model client not available or does not support voice generation');
         }
         
         // Normalize response format
@@ -360,7 +360,7 @@ export class VoiceArchetypeSystem {
 
     try {
       // Generate responses from each voice
-      const responses = await this.generateMultiVoiceSolutions(voices, prompt, client);
+      const responses = await this.generateMultiVoiceSolutions(voices, prompt);
       
       // Synthesize based on mode
       let synthesizedContent = '';
@@ -479,7 +479,7 @@ export class VoiceArchetypeSystem {
       consensusRequired: config.consensusRequired || true
     };
     
-    return this.generateMultiVoiceSolutions(['explorer', 'maintainer', 'security'], prompt, client);
+    return this.generateMultiVoiceSolutions(['explorer', 'maintainer', 'security'], prompt);
   }
   
   getLivingSpiralCoordinator(): LivingSpiralCoordinator {

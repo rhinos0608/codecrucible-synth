@@ -208,8 +208,7 @@ Provide a clear, structured breakdown that eliminates unnecessary complexity.
       // Parallel council - all voices respond simultaneously using the voice system
       const responses = await this.voiceSystem.generateMultiVoiceSolutions(
         councilVoices,
-        collapsed.output,
-        this.modelClient
+        collapsed.output
       );
       perspectives.push(...responses.map(r => r.content));
     } else {

@@ -171,7 +171,6 @@ export class CLICommands {
       const results = await this.context.voiceSystem.generateMultiVoiceSolutions(
         Array.isArray(voices) ? voices : [voices],
         prompt,
-        this.context.modelClient,
         { files: [] }
       );
       
@@ -377,7 +376,6 @@ export class CLICommands {
         const analysis = await this.context.voiceSystem.generateMultiVoiceSolutions(
           Array.isArray(voices) ? voices : [voices],
           `Analyze this file: ${filePath}\n\nContent:\n${content.substring(0, 2000)}${content.length > 2000 ? '...' : ''}`,
-          this.context.modelClient,
           { files: [filePath] }
         );
         

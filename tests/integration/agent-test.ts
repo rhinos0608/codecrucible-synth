@@ -59,7 +59,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
   beforeEach(() => {
     // Reset CLI instance for each test - create mock context
     const mockClient = new MockUnifiedModelClient();
-    const mockVoiceSystem = new VoiceArchetypeSystem();
+    const mockVoiceSystem = new VoiceArchetypeSystem(mockClient);
     const mockMcpManager = {
       servers: new Map(),
       isReady: () => true,
@@ -227,8 +227,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
       // Use the voice system from the CLI context that was already properly set up
       const responses = await cli.context.voiceSystem.generateMultiVoiceSolutions(
         ['developer', 'security'], 
-        'How to implement secure authentication?', 
-        cli.context.modelClient
+        'How to implement secure authentication?'
       );
       
       expect(responses).toBeDefined();

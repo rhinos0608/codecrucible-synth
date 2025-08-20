@@ -51,7 +51,7 @@ export async function initializeCLIContext(): Promise<{cli: CLI, context: CLICon
       console.warn('⚠️ Provider initialization failed, continuing in degraded mode:', error.message);
     }
     
-    const voiceSystem = new VoiceArchetypeSystem();
+    const voiceSystem = new VoiceArchetypeSystem(client);
     
     // Make MCP manager optional to prevent hanging
     let mcpManager;

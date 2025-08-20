@@ -210,7 +210,6 @@ async function performAnalysis(
       const chunkResult = await voiceSystem.generateMultiVoiceSolutions(
         voices,
         `Analyze these files: ${chunk.join(', ')}\n\n${task.prompt}`,
-        client,
         { files: chunk }
       );
       

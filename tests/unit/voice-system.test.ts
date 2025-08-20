@@ -147,7 +147,6 @@ describe('Voice Archetype System', () => {
       const result = await voiceSystem.generateMultiVoiceSolutions(
         ['explorer', 'security'],
         'Create a secure login function',
-        mockModelClient,
         { files: [] }
       );
 
@@ -161,7 +160,6 @@ describe('Voice Archetype System', () => {
       const result = await voiceSystem.generateMultiVoiceSolutions(
         ['invalid-voice'],
         'Test prompt',
-        mockModelClient,
         { files: [] }
       );
       

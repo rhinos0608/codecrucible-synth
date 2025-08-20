@@ -128,8 +128,7 @@ Consider security, performance, maintainability, and user experience aspects.`;
     const analysisVoices = ['architect', 'analyzer', 'security'];
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
       analysisVoices,
-      analysisPrompt,
-      this.modelClient
+      analysisPrompt
     );
 
     const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses);
@@ -186,8 +185,7 @@ IMPORTANT:
     const planningVoices = ['architect', 'implementor', 'maintainer'];
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
       planningVoices,
-      planningPrompt,
-      this.modelClient
+      planningPrompt
     );
 
     const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses);

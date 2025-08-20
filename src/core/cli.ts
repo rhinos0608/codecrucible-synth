@@ -504,3 +504,7 @@ export class CLI {
     await this.commands.handleAnalyze(files, options);
   }
 }
+
+// Export alias for backward compatibility
+export const CodeCrucibleCLI = CLI;
+export default CLI;

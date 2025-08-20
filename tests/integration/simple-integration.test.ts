@@ -56,9 +56,8 @@ describe('Simple Integration Tests', () => {
   test('should generate multi-voice solutions', async () => {
     const prompt = 'Test prompt';
     const voices = ['explorer', 'maintainer'];
-    const context = { files: [] };
-
-    const result = await voiceSystem.generateMultiVoiceSolutions(prompt, voices, context);
+    
+    const result = await voiceSystem.generateMultiVoiceSolutions(voices, prompt, mockClient);
     
     expect(result).toBeDefined();
     expect(result.length).toBe(2);

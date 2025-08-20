@@ -8,7 +8,7 @@ import { AgentConfig, AgentContext, ExecutionResult } from '../agent.js';
 import { BaseTool } from '../tools/base-tool.js';
 import { GitStatusTool, GitDiffTool } from '../tools/git-tools.js';
 import { GitOperationsTool, GitAnalysisTool } from '../tools/enhanced-git-tools.js';
-import { TerminalExecuteTool } from '../tools/terminal-tools.js';
+import { TerminalExecuteTool } from '../tools/secure-terminal-tools.js';
 import { logger } from '../console.js';
 
 export class GitManagerAgent extends UnifiedAgent {

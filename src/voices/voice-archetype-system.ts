@@ -256,7 +256,8 @@ export class VoiceArchetypeSystem {
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
   
-
+  async generateMultiVoiceSolutions(voices: string[], prompt: string, modelClient: any) {
+    if (!modelClient) {
       throw new Error('No model client available for voice generation');
     }
     

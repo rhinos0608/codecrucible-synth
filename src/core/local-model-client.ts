@@ -26,6 +26,12 @@ export interface ModelResponse {
   };
 }
 
+export interface VoiceParams {
+  name: string;
+  temperature?: number;
+  systemPrompt?: string;
+}
+
 export interface VoiceResponse {
   content: string;
   voice: string;
@@ -296,7 +302,7 @@ Please provide a comprehensive analysis with specific recommendations.`;
       
     return {
       model,
-      prompt: this.buildVoicePrompt(prompt, voice),
+      prompt: this.buildVoicePrompt(prompt, voice.name),
       stream: false,
       options: {
         temperature,

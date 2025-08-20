@@ -26,6 +26,12 @@ export interface ModelResponse {
   };
 }
 
+export interface VoiceParams {
+  temperature?: number;
+  voice?: string;
+  style?: string;
+}
+
 export interface VoiceResponse {
   content: string;
   voice: string;
@@ -289,14 +295,16 @@ Please provide a comprehensive analysis with specific recommendations.`;
   /**
    * Build Ollama request payload (for testing)
    */
-  private buildOllamaRequest(prompt: string, voice: VoiceParams, model: string): any {
+  private buildOllamaRequest(prompt: string, voice: string | VoiceParams, model: string): any {
     const temperature = (typeof voice === 'object' && voice.temperature) 
       ? voice.temperature 
       : this.config.temperature || 0.7;
       
+    const voiceString = typeof voice === 'string' ? voice : (voice.voice || 'developer');
+      
     return {
       model,
-      prompt: this.buildVoicePrompt(prompt, voice),
+      prompt: this.buildVoicePrompt(prompt, voiceString),
       stream: false,
       options: {
         temperature,
@@ -313,7 +321,7 @@ Please provide a comprehensive analysis with specific recommendations.`;
       ? voice.temperature 
       : this.config.temperature || 0.7;
       
-    const voiceName = (typeof voice === 'object' && voice.name) ? voice.name : voice;
+    const voiceName = (typeof voice === 'object' && voice.voice) ? voice.voice : voice;
     
     return {
       model,

@@ -48,7 +48,7 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov', 'html'],
   coverageDirectory: 'coverage',
-  testTimeout: 60000,
+  testTimeout: 120000, // Increased to 2 minutes for AI operations
   verbose: true,
   // Prevent hanging tests
   forceExit: true,

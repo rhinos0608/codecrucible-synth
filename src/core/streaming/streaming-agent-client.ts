@@ -78,6 +78,9 @@ export class StreamingAgentClient extends EventEmitter {
 
   constructor(modelClient: UnifiedModelClient, config?: Partial<StreamingConfig>) {
     super();
+    // Increase max listeners to prevent memory leak warnings for legitimate use cases
+    this.setMaxListeners(50);
+    
     this.modelClient = modelClient;
     this.logger = new Logger('StreamingAgentClient');
     this.config = this.initializeConfig(config);

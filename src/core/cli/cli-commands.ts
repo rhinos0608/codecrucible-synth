@@ -241,20 +241,47 @@ export class CLICommands {
       };
       
       // Analyze with voice system if available
-      if (this.context.voiceSystem) {
-        const voices = options.voices || ['Analyzer', 'Architect'];
-        const analysis = await this.context.voiceSystem.generateMultiVoiceSolutions(
+      if (this.context.voiceSystem && this.context.modelClient) {
+        const voices = options.voices || ['analyzer', 'architect']; // Use lowercase voice names
+        
+        // Add timeout to prevent hanging
+        const timeoutMs = options.timeout || 60000; // 60 seconds default
+        const analysisPromise = this.context.voiceSystem.generateMultiVoiceSolutions(
           Array.isArray(voices) ? voices : [voices],
           `Analyze this codebase structure and provide insights`,
-          projectContext
+          this.context.modelClient, // Pass the model client as the 3rd parameter
+          projectContext // Pass context as 4th parameter
         );
         
-        spinner.succeed('Directory analysis complete');
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Analysis timeout - operation took too long')), timeoutMs);
+        });
         
-        if (analysis && typeof analysis === 'object' && 'content' in analysis) {
-          CLIDisplay.displayResults(analysis as any, []);
-        } else {
-          console.log(chalk.yellow('Analysis completed but no structured results available'));
+        try {
+          const analysis = await Promise.race([analysisPromise, timeoutPromise]);
+          
+          spinner.succeed('Directory analysis complete');
+          
+          if (analysis && typeof analysis === 'object' && 'content' in analysis) {
+            CLIDisplay.displayResults(analysis as any, []);
+          } else if (Array.isArray(analysis)) {
+            // Handle array of voice responses
+            console.log(chalk.green('\n📊 Analysis Results:'));
+            analysis.forEach((result, index) => {
+              console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Analysis:`));
+              console.log(result.content || 'No content available');
+            });
+          } else {
+            console.log(chalk.yellow('Analysis completed but no structured results available'));
+          }
+        } catch (analysisError) {
+          spinner.fail('Analysis failed');
+          if (analysisError instanceof Error && analysisError.message.includes('timeout')) {
+            console.log(chalk.yellow(`⏱️ Analysis timed out after ${timeoutMs/1000} seconds`));
+            console.log(chalk.cyan('Tip: Use --timeout <seconds> to increase timeout or try analyzing fewer files'));
+          } else {
+            console.error(chalk.red('Error during analysis:'), analysisError);
+          }
         }
       } else {
         spinner.succeed('Basic directory scan complete');
@@ -288,19 +315,46 @@ export class CLICommands {
       console.log(`  Lines: ${content.split('\n').length}`);
       console.log(`  Type: ${extname(filePath)}`);
       
-      if (this.context.voiceSystem) {
-        const voices = options.voices || ['Maintainer', 'Security'];
-        const analysis = await this.context.voiceSystem.generateMultiVoiceSolutions(
+      if (this.context.voiceSystem && this.context.modelClient) {
+        const voices = options.voices || ['maintainer', 'security']; // Use lowercase voice names
+        
+        // Add timeout to prevent hanging
+        const timeoutMs = options.timeout || 60000; // 60 seconds default
+        const analysisPromise = this.context.voiceSystem.generateMultiVoiceSolutions(
           Array.isArray(voices) ? voices : [voices],
           `Analyze this ${extname(filePath)} file for quality, security, and maintainability`,
-          { files: [filePath], structure: {}, metadata: { content: content.substring(0, 5000) } }
+          this.context.modelClient, // Pass the model client as the 3rd parameter
+          { files: [filePath], structure: {}, metadata: { content: content.substring(0, 5000) } } // Pass context as 4th parameter
         );
         
-        spinner.succeed('File analysis complete');
-        if (analysis && typeof analysis === 'object' && 'content' in analysis) {
-          CLIDisplay.displayResults(analysis as any, []);
-        } else {
-          console.log(chalk.yellow('Analysis completed but no structured results available'));
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Analysis timeout - operation took too long')), timeoutMs);
+        });
+        
+        try {
+          const analysis = await Promise.race([analysisPromise, timeoutPromise]);
+          
+          spinner.succeed('File analysis complete');
+          if (analysis && typeof analysis === 'object' && 'content' in analysis) {
+            CLIDisplay.displayResults(analysis as any, []);
+          } else if (Array.isArray(analysis)) {
+            // Handle array of voice responses
+            console.log(chalk.green('\n📊 File Analysis Results:'));
+            analysis.forEach((result, index) => {
+              console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Analysis:`));
+              console.log(result.content || 'No content available');
+            });
+          } else {
+            console.log(chalk.yellow('Analysis completed but no structured results available'));
+          }
+        } catch (analysisError) {
+          spinner.fail('File analysis failed');
+          if (analysisError instanceof Error && analysisError.message.includes('timeout')) {
+            console.log(chalk.yellow(`⏱️ File analysis timed out after ${timeoutMs/1000} seconds`));
+            console.log(chalk.cyan('Tip: Use --timeout <seconds> to increase timeout'));
+          } else {
+            console.error(chalk.red('Error during file analysis:'), analysisError);
+          }
         }
       } else {
         spinner.succeed('Basic file analysis complete');

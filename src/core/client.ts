@@ -90,6 +90,9 @@ export class UnifiedModelClient extends EventEmitter {
   
   constructor(config: UnifiedClientConfig) {
     super();
+    // Increase max listeners to prevent memory leak warnings
+    this.setMaxListeners(50);
+    
     this.config = {
       endpoint: 'http://localhost:11434',
       ...this.getDefaultConfig(),

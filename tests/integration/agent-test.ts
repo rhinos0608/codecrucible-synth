@@ -329,7 +329,7 @@ describe('CodeCrucible Agent Integration Tests', () => {
       } finally {
         console.log = originalLog;
       }
-    }, 30000);
+    }, 120000); // Increased to 2 minutes for complex AI operations
   });
 
   describe('Configuration and State Management', () => {

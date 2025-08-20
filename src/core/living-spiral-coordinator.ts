@@ -6,6 +6,7 @@
 import { logger } from './logger.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
 import { LocalModelClient } from './local-model-client.js';
+import { UnifiedModelClient } from './client.js';
 
 export enum SpiralPhase {
   COLLAPSE = 'collapse',
@@ -49,12 +50,12 @@ export interface SpiralResult {
 
 export class LivingSpiralCoordinator {
   private voiceSystem: VoiceArchetypeSystem;
-  private modelClient: LocalModelClient;
+  private modelClient: UnifiedModelClient | LocalModelClient;
   private config: SpiralConfig;
 
   constructor(
     voiceSystem: VoiceArchetypeSystem,
-    modelClient: LocalModelClient,
+    modelClient: UnifiedModelClient | LocalModelClient,
     config: SpiralConfig
   ) {
     this.voiceSystem = voiceSystem;
@@ -205,18 +206,20 @@ Provide a clear, structured breakdown that eliminates unnecessary complexity.
     const perspectives: string[] = [];
 
     if (this.config.parallelVoices) {
-      // Parallel council - all voices respond simultaneously
-      const responses = await this.modelClient.generateMultiVoiceResponses(
-        collapsed.output, 
-        councilVoices
+      // Parallel council - all voices respond simultaneously using the voice system
+      const responses = await this.voiceSystem.generateMultiVoiceSolutions(
+        councilVoices,
+        collapsed.output,
+        this.modelClient
       );
       perspectives.push(...responses.map(r => r.content));
     } else {
       // Sequential council - voices build on each other
       for (const voice of councilVoices) {
-        const response = await this.modelClient.generateVoiceResponse(
+        const response = await this.voiceSystem.generateSingleVoiceResponse(
+          voice,
           collapsed.output,
-          voice
+          this.modelClient
         );
         perspectives.push(response.content);
       }

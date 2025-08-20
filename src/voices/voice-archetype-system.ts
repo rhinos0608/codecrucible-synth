@@ -255,6 +255,62 @@ export class VoiceArchetypeSystem {
     const enhancedPrompt = voiceConfig.prompt + '\n\n' + prompt;
     return await client.processRequest({ prompt: enhancedPrompt, temperature: voiceConfig.temperature });
   }
+
+  async generateMultiVoiceSolutions(voices: string[], prompt: string, client: any, context?: any) {
+    const responses = [];
+    
+    for (const voiceId of voices) {
+      const voice = this.getVoice(voiceId);
+      if (!voice) {
+        throw new Error(`Voice not found: ${voiceId}`);
+      }
+      
+      try {
+        const enhancedPrompt = voice.systemPrompt + '\n\n' + prompt;
+        
+        // Use different client methods based on what's available
+        let response;
+        if (client.generateVoiceResponse) {
+          response = await client.generateVoiceResponse(enhancedPrompt, voiceId, {
+            temperature: voice.temperature
+          });
+        } else if (client.processRequest) {
+          response = await client.processRequest({ 
+            prompt: enhancedPrompt, 
+            temperature: voice.temperature 
+          });
+        } else {
+          throw new Error('Client does not support voice generation');
+        }
+        
+        // Normalize response format
+        const normalizedResponse = {
+          content: response.content || response.text || response.response || '',
+          voice: voice.name,
+          voiceId: voice.id,
+          confidence: response.confidence || 0.8,
+          tokens_used: response.tokens_used || response.tokensUsed || 0,
+          temperature: voice.temperature
+        };
+        
+        responses.push(normalizedResponse);
+      } catch (error) {
+        console.error(`Error generating response for voice ${voiceId}:`, error);
+        // Add error response to maintain consistency
+        responses.push({
+          content: `Error generating response for ${voice.name}: ${error.message}`,
+          voice: voice.name,
+          voiceId: voice.id,
+          confidence: 0,
+          tokens_used: 0,
+          temperature: voice.temperature,
+          error: true
+        });
+      }
+    }
+    
+    return responses;
+  }
   
   async synthesize(prompt: string, voices: string[], mode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative', client?: any) {
     // If no client provided, return error
@@ -402,7 +458,7 @@ export class VoiceArchetypeSystem {
         parallelVoices: false,
         councilSize: 3
       };
-      this.livingSpiralCoordinator = new LivingSpiralCoordinator(this, null as any, defaultConfig);
+      this.livingSpiralCoordinator = new LivingSpiralCoordinator(this, this.modelClient, defaultConfig);
     }
     return this.livingSpiralCoordinator;
   }

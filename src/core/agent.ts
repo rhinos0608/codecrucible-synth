@@ -59,6 +59,9 @@ export class UnifiedAgent extends EventEmitter {
 
   constructor(modelClient: UnifiedModelClient, performanceMonitor: PerformanceMonitor) {
     super();
+    // Increase max listeners to prevent memory leak warnings
+    this.setMaxListeners(50);
+    
     this.modelClient = modelClient;
     this.performanceMonitor = performanceMonitor;
     this.capabilities = new Map();

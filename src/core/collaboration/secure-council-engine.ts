@@ -240,7 +240,7 @@ export class SecureCouncilDecisionEngine extends CouncilDecisionEngine {
 
     if (!promptValidation.allowed) {
       throw new Error(
-        `Council request failed security validation: ${promptValidation.violations.map(v => v.description).join(', ')}`
+        `Council request failed security validation: ${promptValidation.violations.map((v: any) => v.description).join(', ')}`
       );
     }
 

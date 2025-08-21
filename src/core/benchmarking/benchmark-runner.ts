@@ -554,7 +554,7 @@ except Exception as e:
                 expectedOutput: testCase.expectedOutput,
                 actualOutput: output.result,
                 passed,
-                error: null,
+                error: undefined,
               });
             }
           } catch (parseError) {

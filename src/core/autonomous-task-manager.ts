@@ -234,7 +234,7 @@ export class AutonomousTaskManager extends EventEmitter {
         console.log(chalk.red('❌ Task failed validation'));
       }
     } catch (error) {
-      await taskMemoryDB.recordFailedAttempt(task_id, 'autonomous_execution', error.message);
+      await taskMemoryDB.recordFailedAttempt(task_id, 'autonomous_execution', error instanceof Error ? error.message : String(error));
       await taskMemoryDB.updateTask(task_id, { status: 'failed' });
       console.error(chalk.red('❌ Task execution failed:'), error);
     }
@@ -268,8 +268,8 @@ export class AutonomousTaskManager extends EventEmitter {
           });
         }
       } catch (error) {
-        await taskMemoryDB.recordFailedAttempt(task_id, stepId, error.message, assignment.agent_id);
-        console.error(chalk.red(`  ❌ ${stepId} failed:`), error.message);
+        await taskMemoryDB.recordFailedAttempt(task_id, stepId, error instanceof Error ? error.message : String(error), assignment.agent_id);
+        console.error(chalk.red(`  ❌ ${stepId} failed:`), error instanceof Error ? error.message : String(error));
 
         // Try alternative approach or continue to next step
         console.log(chalk.yellow(`  🔄 Continuing to next step...`));
@@ -363,7 +363,7 @@ ${task.checkpoints.map(c => `- **${c.description}** (${c.timestamp})`).join('\n'
   }
 
   private isAgentSuitableForStep(agentId: string, step: TaskStep): boolean {
-    const agentCapabilities = {
+    const agentCapabilities: Record<string, string[]> = {
       'primary-fixer': ['code', 'analysis'],
       'test-runner': ['test', 'validation'],
       cleaner: ['cleanup'],
@@ -374,7 +374,7 @@ ${task.checkpoints.map(c => `- **${c.description}** (${c.timestamp})`).join('\n'
   }
 
   private getAgentRole(agentId: string): string {
-    const roles = {
+    const roles: Record<string, string> = {
       'primary-fixer': 'Development and Fixes',
       'test-runner': 'Testing and Validation',
       cleaner: 'Cleanup and Optimization',

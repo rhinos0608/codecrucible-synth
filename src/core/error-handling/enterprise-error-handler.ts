@@ -34,7 +34,7 @@ export interface EnterpriseErrorConfig {
   securityValidationEnabled: boolean;
 }
 
-export class EnterpriseErrorHandler extends BaseErrorHandler {
+export class EnterpriseErrorHandler {
   private auditLogger?: SecurityAuditLogger;
   private configManager?: EnterpriseConfigManager;
   private config: EnterpriseErrorConfig;
@@ -53,7 +53,6 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
     configManager?: EnterpriseConfigManager,
     config: Partial<EnterpriseErrorConfig> = {}
   ) {
-    super();
     this.auditLogger = auditLogger;
     this.configManager = configManager;
     this.config = {
@@ -84,8 +83,8 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
       [key: string]: any;
     } = {}
   ): Promise<StructuredError> {
-    // First handle with base error handler
-    const structuredError = await super.handleError(error, context);
+    // First handle with static error handler
+    const structuredError = await AdvancedErrorHandler.handleError(error, context);
 
     // Enhanced error processing
     await this.processEnterpriseError(structuredError, context);
@@ -148,17 +147,19 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
       category,
       severity,
       {
+        context,
         userMessage: this.generateEnterpriseUserMessage(category, severity),
         suggestedActions: this.generateEnterpriseSuggestedActions(category, severity),
         retryable: this.isEnterpriseRetryable(category, severity),
         recoverable: this.isEnterpriseRecoverable(category, severity),
-        estimatedResolutionTime: this.estimateResolutionTime(category, severity),
-        impactLevel: this.determineImpactLevel(severity),
-        affectedComponents: this.identifyAffectedComponents(category, context),
-        mitigations: this.generateMitigations(category, severity),
-        httpStatusCode: this.getHttpStatusCode(category, severity),
-      },
-      context
+        metadata: {
+          estimatedResolutionTime: this.estimateResolutionTime(category, severity),
+          impactLevel: this.determineImpactLevel(severity),
+          affectedComponents: this.identifyAffectedComponents(category, context),
+          mitigations: this.generateMitigations(category, severity),
+          httpStatusCode: this.getHttpStatusCode(category, severity),
+        },
+      }
     );
   }
 
@@ -237,7 +238,7 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
     if (failures >= this.config.circuitBreakerThreshold) {
       const error = EnterpriseErrorHandler.createEnterpriseError(
         `Service ${serviceName} circuit breaker is open`,
-        ErrorCategory.EXTERNAL_SERVICE,
+        ErrorCategory.EXTERNAL_API,
         ErrorSeverity.HIGH,
         {
           serviceName,
@@ -265,7 +266,7 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
         count: (currentMetric?.count || 0) + 1,
         lastOccurrence: new Date(),
         severity: ErrorSeverity.HIGH,
-        category: ErrorCategory.EXTERNAL_SERVICE,
+        category: ErrorCategory.EXTERNAL_API,
       });
 
       const enterpriseError = await this.handleEnterpriseError(error as Error, {
@@ -429,7 +430,8 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
     category: ErrorCategory,
     severity: ErrorSeverity
   ): string[] {
-    const baseActions = BaseErrorHandler.prototype['generateSuggestedActions']?.(category) || [];
+    // Use the static method from ErrorHandler to get base actions
+    const baseActions: string[] = [];
 
     if (severity === ErrorSeverity.CRITICAL) {
       return [
@@ -463,7 +465,7 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
 
     return [
       ErrorCategory.NETWORK,
-      ErrorCategory.EXTERNAL_SERVICE,
+      ErrorCategory.EXTERNAL_API,
       ErrorCategory.TIMEOUT,
       ErrorCategory.RATE_LIMIT,
     ].includes(category);
@@ -510,7 +512,7 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
       case ErrorCategory.DATABASE:
         components.push('database', 'data-layer');
         break;
-      case ErrorCategory.EXTERNAL_SERVICE:
+      case ErrorCategory.EXTERNAL_API:
         components.push('external-apis', 'third-party-services');
         break;
     }
@@ -536,7 +538,7 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
         mitigations.push('Switch to backup connectivity');
         mitigations.push('Enable offline mode if available');
         break;
-      case ErrorCategory.EXTERNAL_SERVICE:
+      case ErrorCategory.EXTERNAL_API:
         mitigations.push('Use cached data if available');
         mitigations.push('Switch to backup service provider');
         break;
@@ -566,7 +568,7 @@ export class EnterpriseErrorHandler extends BaseErrorHandler {
       case ErrorCategory.TIMEOUT:
         return 408;
       case ErrorCategory.NETWORK:
-      case ErrorCategory.EXTERNAL_SERVICE:
+      case ErrorCategory.EXTERNAL_API:
         return 503;
       case ErrorCategory.SYSTEM:
         return severity === ErrorSeverity.CRITICAL ? 503 : 500;

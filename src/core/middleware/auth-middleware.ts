@@ -12,6 +12,7 @@ import { RBACSystem } from '../security/rbac-system.js';
 import { SecretsManager } from '../security/secrets-manager.js';
 import { logger } from '../logger.js';
 import { CLIError, CLIExitCode } from '../types.js';
+import chalk from 'chalk';
 
 export interface AuthenticatedRequest {
   userId?: string;
@@ -482,5 +483,3 @@ export class AuthMiddleware {
   }
 }
 
-// Import chalk dynamically to avoid import issues
-const chalk = await import('chalk').then(m => m.default);

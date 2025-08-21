@@ -17,14 +17,33 @@ describe('Comprehensive Security Audit and Penetration Testing', () => {
   let auditLogger: SecurityAuditLogger;
 
   beforeAll(async () => {
-    secretsManager = new SecretsManager();
-    rbacSystem = new RBACSystem();
+    // Create a secrets manager with test-specific config
+    secretsManager = new SecretsManager({
+      storePath: '/tmp/test-secrets',
+      keyRotation: {
+        intervalDays: 30,
+        retainOldKeys: 2,
+        autoRotate: false,
+      },
+    });
+    await secretsManager.initialize('test-master-password-123');
+    
+    rbacSystem = new RBACSystem(secretsManager);
+    await rbacSystem.initialize();
+    
     authManager = new EnterpriseAuthManager();
     auditLogger = new SecurityAuditLogger();
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     auditLogger?.stop();
+    // Cleanup test files
+    const fs = await import('fs/promises');
+    try {
+      await fs.rm('/tmp/test-secrets', { recursive: true, force: true });
+    } catch (error) {
+      // Ignore cleanup errors
+    }
   });
 
   describe('Cryptographic Security Audit', () => {

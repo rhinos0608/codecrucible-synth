@@ -83,7 +83,7 @@ export class AutoSetup {
 
       return result;
     } catch (error) {
-      result.message = `Setup failed: ${error.message}`;
+      result.message = `Setup failed: ${error instanceof Error ? error.message : String(error)}`;
       return result;
     }
   }

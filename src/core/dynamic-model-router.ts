@@ -54,7 +54,7 @@ export class DynamicModelRouter extends EventEmitter {
       models.push(...ollamaModels);
       logger.info(`Found ${ollamaModels.length} Ollama models`);
     } catch (error) {
-      logger.warn('Failed to scan Ollama models:', error.message);
+      logger.warn('Failed to scan Ollama models:', error instanceof Error ? error.message : String(error));
     }
 
     // Scan LM Studio models
@@ -63,7 +63,7 @@ export class DynamicModelRouter extends EventEmitter {
       models.push(...lmStudioModels);
       logger.info(`Found ${lmStudioModels.length} LM Studio models`);
     } catch (error) {
-      logger.warn('Failed to scan LM Studio models:', error.message);
+      logger.warn('Failed to scan LM Studio models:', error instanceof Error ? error.message : String(error));
     }
 
     this.availableModels = models;
@@ -123,7 +123,7 @@ export class DynamicModelRouter extends EventEmitter {
 
       return models;
     } catch (error) {
-      logger.debug('LM Studio API not available:', error.message);
+      logger.debug('LM Studio API not available:', error instanceof Error ? error.message : String(error));
       return [];
     }
   }

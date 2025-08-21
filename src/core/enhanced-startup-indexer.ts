@@ -688,6 +688,13 @@ export class EnhancedStartupIndexer {
     documentation: Record<string, DocumentationFile>
   ): Promise<ProjectIndex['analysis']> {
     const fileArray = Object.values(files);
+    
+    // Load package data for framework detection
+    const packageJsonPath = join(this.rootPath, 'package.json');
+    let packageData: PackageData = {};
+    if (existsSync(packageJsonPath)) {
+      packageData = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as PackageData;
+    }
 
     // Complexity analysis
     const complexities = fileArray
@@ -737,7 +744,7 @@ export class EnhancedStartupIndexer {
       dependencies: {
         internal: Array.from(internalDeps),
         external: Array.from(externalDeps),
-        circular: [], // TODO: Implement circular dependency detection
+        circular: this.detectCircularDependencies(files),
       },
       coverage: {
         documented: documentedFiles,
@@ -745,7 +752,7 @@ export class EnhancedStartupIndexer {
         total: sourceFiles.length,
       },
       patterns: {
-        frameworksDetected: [], // TODO: Implement pattern detection
+        frameworksDetected: this.detectFrameworks(files, packageData),
         architecturePattern: this.detectArchitecturePattern(files),
         qualityScore: Math.round(qualityScore),
       },
@@ -776,6 +783,90 @@ export class EnhancedStartupIndexer {
     }
 
     return 'Custom/Unknown';
+  }
+
+
+  private detectCircularDependencies(files: Record<string, ProjectFile>): string[] {
+    const circular: string[] = [];
+    const graph = new Map<string, Set<string>>();
+    const visited = new Set<string>();
+    const recursionStack = new Set<string>();
+
+    // Build dependency graph
+    for (const [filePath, file] of Object.entries(files)) {
+      if (!file.imports) continue;
+      
+      graph.set(filePath, new Set());
+      for (const importPath of file.imports) {
+        // Convert relative imports to absolute paths
+        const absoluteImportPath = this.resolveImportPath(filePath, importPath, files);
+        if (absoluteImportPath && files[absoluteImportPath]) {
+          graph.get(filePath)!.add(absoluteImportPath);
+        }
+      }
+    }
+
+    // Detect cycles using DFS
+    const hasCycle = (node: string, path: string[]): boolean => {
+      if (recursionStack.has(node)) {
+        // Found a cycle - add the cycle path
+        const cycleStart = path.indexOf(node);
+        const cyclePath = path.slice(cycleStart).concat([node]);
+        circular.push(cyclePath.map(p => this.getRelativePath(p)).join(' → '));
+        return true;
+      }
+
+      if (visited.has(node)) return false;
+
+      visited.add(node);
+      recursionStack.add(node);
+
+      const dependencies = graph.get(node) || new Set();
+      for (const dep of dependencies) {
+        if (hasCycle(dep, [...path, dep])) {
+          return true;
+        }
+      }
+
+      recursionStack.delete(node);
+      return false;
+    };
+
+    // Check each node for cycles
+    for (const filePath of Object.keys(files)) {
+      if (!visited.has(filePath)) {
+        hasCycle(filePath, [filePath]);
+      }
+    }
+
+    return [...new Set(circular)]; // Remove duplicates
+  }
+
+  private resolveImportPath(currentFile: string, importPath: string, files: Record<string, ProjectFile>): string | null {
+    // Handle relative imports
+    if (importPath.startsWith('./') || importPath.startsWith('../')) {
+      const path = require('path');
+      const resolved = path.resolve(path.dirname(currentFile), importPath);
+      
+      // Try common extensions
+      const extensions = ['.ts', '.tsx', '.js', '.jsx'];
+      for (const ext of extensions) {
+        const withExt = resolved + ext;
+        if (files[withExt]) return withExt;
+      }
+      
+      // Try index files
+      for (const ext of extensions) {
+        const indexFile = path.join(resolved, 'index' + ext);
+        if (files[indexFile]) return indexFile;
+      }
+    }
+    
+    return null;
+  }
+
+  private getRelativePath(absolutePath: string): string {
+    return absolutePath.replace(this.rootPath + '/', '');
   }
 
   private loadGitignore(): ReturnType<typeof ignore> {

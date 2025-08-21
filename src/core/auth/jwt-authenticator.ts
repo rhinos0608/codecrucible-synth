@@ -24,9 +24,9 @@ export class JWTAuthenticator {
 
   constructor(config: AuthConfig) {
     this.config = {
+      ...config,
       algorithms: config.algorithms || ['HS256'],
       clockTolerance: config.clockTolerance || 30,
-      ...config,
     };
 
     // Start cleanup interval for expired sessions

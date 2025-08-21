@@ -260,16 +260,29 @@ export class ConfigManager {
         enableMonitoring: true,
         alertThreshold: 5000,
         metricsRetention: 86400000,
+        enableTracing: false,
+        metricsPort: 3001,
       },
       security: {
         enableValidation: true,
         sandboxMode: true,
         allowUnsafeCommands: false,
+        enableRateLimit: true,
+        maxRequestsPerMinute: 100,
+        enableCors: false,
+        corsOrigins: [],
+        auditLogging: true,
       },
       debug: {
         enabled: false,
         verbose: false,
         logLevel: 'info',
+      },
+      environment: 'development' as const,
+      features: {
+        enableCaching: true,
+        enableMetrics: true,
+        enableSecurity: true,
       },
     };
   }

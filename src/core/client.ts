@@ -1138,7 +1138,7 @@ export class UnifiedModelClient extends EventEmitter {
     
     console.log(`🔄 generateText called with timeout: ${timeout}ms`);
     
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
         console.log('⏰ Timeout triggered!');
@@ -1149,16 +1149,16 @@ export class UnifiedModelClient extends EventEmitter {
     try {
       const generatePromise = this.generate({ prompt });
       const response = await Promise.race([generatePromise, timeoutPromise]);
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       console.log('✅ generateText completed successfully');
       return response.text || response.content || response.response || '';
     } catch (error) {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       if (error.message?.includes('timeout')) {
         logger.warn('generateText timed out, returning fallback response');
         return 'Request timed out. Please try again with a simpler prompt.';
       }
-      console.error('❌ generateText error:', error.message);
+      console.error('❌ generateText error:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }

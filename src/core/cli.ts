@@ -454,16 +454,16 @@ export class CLI {
         console.log('✅ Model response received');
         return response;
       } catch (error) {
-        console.error(chalk.red('❌ Model client error:'), error.message);
-        return `Error: ${error.message}. Please try again with a simpler prompt.`;
+        console.error(chalk.red('❌ Model client error:'), error instanceof Error ? error.message : String(error));
+        return `Error: ${error instanceof Error ? error.message : String(error)}. Please try again with a simpler prompt.`;
       }
 
       // This section is now unreachable - all requests are handled above
       return 'Processing complete';
     } catch (error) {
       logger.error('Prompt processing failed:', error);
-      console.log(chalk.red(`❌ Error: ${error.message}`));
-      return `Error processing prompt: ${error.message}`;
+      console.log(chalk.red(`❌ Error: ${error instanceof Error ? error.message : String(error)}`));
+      return `Error processing prompt: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
 
@@ -565,7 +565,7 @@ ${Object.entries(projectAnalysis.fileCounts)
   .join('\n')}
 
 ## Discovered Components
-${projectAnalysis.discoveredComponents.map(comp => `- **${comp.name}**: ${comp.description} (${comp.files} files)`).join('\n')}
+${projectAnalysis.discoveredComponents.map((comp: any) => `- **${comp.name}**: ${comp.description} (${comp.files} files)`).join('\n')}
 
 ## Dependencies Analysis
 - **Production Dependencies:** ${dependencyAnalysis.prodDeps}
@@ -573,7 +573,7 @@ ${projectAnalysis.discoveredComponents.map(comp => `- **${comp.name}**: ${comp.d
 - **Key Frameworks:** ${dependencyAnalysis.keyFrameworks.join(', ')}
 
 ## Configuration Assessment
-${configAnalysis.configs.map(config => `- **${config.name}**: ${config.status}`).join('\n')}
+${configAnalysis.configs.map((config: any) => `- **${config.name}**: ${config.status}`).join('\n')}
 
 ## Test Coverage Analysis
 - **Test Files Found:** ${testAnalysis.testFiles}
@@ -1238,17 +1238,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
       spinner.stop();
       
       // Handle different types of streaming errors
-      if (error.message?.includes('timeout')) {
+      if (error instanceof Error && error.message?.includes('timeout')) {
         console.error(chalk.yellow('\n⏱️ Streaming timeout - the response took too long'));
         console.log(chalk.gray('Partial response:'), buffer || '(none)');
-      } else if (error.message?.includes('ECONNREFUSED')) {
+      } else if (error instanceof Error && error.message?.includes('ECONNREFUSED')) {
         console.error(chalk.red('\n❌ Connection Error: Cannot connect to the AI model server'));
         console.log(chalk.yellow('Please ensure Ollama or LM Studio is running'));
-      } else if (error.message?.includes('model not found')) {
+      } else if (error instanceof Error && error.message?.includes('model not found')) {
         console.error(chalk.red('\n❌ Model Error: The requested model is not available'));
         console.log(chalk.yellow('Run "crucible models" to see available models'));
       } else {
-        console.error(chalk.red('\n❌ Streaming Error:'), error.message || error);
+        console.error(chalk.red('\n❌ Streaming Error:'), error instanceof Error ? error.message : String(error));
       }
       
       // Don't throw, return gracefully to keep CLI running
@@ -1601,7 +1601,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
           try {
             const models = await provider.listModels();
             console.log(chalk.green(`\n${providerName.toUpperCase()}:`));
-            models.forEach((model, index) => {
+            models.forEach((model: any, index: number) => {
               console.log(chalk.gray(`  ${index + 1}. ${model}`));
             });
           } catch (error) {

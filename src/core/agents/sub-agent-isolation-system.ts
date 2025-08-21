@@ -460,8 +460,8 @@ export class IsolatedAgent extends EventEmitter {
         }
       };
 
-      this.worker.on('message', messageHandler);
-      this.worker.postMessage({
+      this.worker?.on('message', messageHandler);
+      this.worker?.postMessage({
         type: 'execute-task',
         taskId: task.id,
         task,

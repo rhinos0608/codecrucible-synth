@@ -371,7 +371,9 @@ export class SemanticCacheSystem extends EventEmitter {
     // Limit embedding cache size
     if (this.embeddingCache.size > 1000) {
       const firstKey = this.embeddingCache.keys().next().value;
-      this.embeddingCache.delete(firstKey);
+      if (firstKey) {
+        this.embeddingCache.delete(firstKey);
+      }
     }
 
     return embedding;

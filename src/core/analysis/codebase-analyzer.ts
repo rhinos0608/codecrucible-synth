@@ -51,7 +51,7 @@ ${Object.entries(projectAnalysis.fileCounts)
   .join('\n')}
 
 ## Discovered Components
-${projectAnalysis.discoveredComponents.map(comp => `- **${comp.name}**: ${comp.description} (${comp.files} files)`).join('\n')}
+${projectAnalysis.discoveredComponents.map((comp: any) => `- **${comp.name}**: ${comp.description} (${comp.files} files)`).join('\n')}
 
 ## Dependencies Analysis
 - **Production Dependencies:** ${dependencyAnalysis.prodDeps}
@@ -59,7 +59,7 @@ ${projectAnalysis.discoveredComponents.map(comp => `- **${comp.name}**: ${comp.d
 - **Key Frameworks:** ${dependencyAnalysis.keyFrameworks.join(', ')}
 
 ## Configuration Assessment
-${configAnalysis.configs.map(config => `- **${config.name}**: ${config.status}`).join('\n')}
+${configAnalysis.configs.map((config: any) => `- **${config.name}**: ${config.status}`).join('\n')}
 
 ## Test Coverage Analysis
 - **Test Files Found:** ${testAnalysis.testFiles}

@@ -152,14 +152,20 @@ export class ConfigManager {
 
     // Navigate to parent object
     for (let i = 0; i < keys.length - 1; i++) {
-      if (!current[keys[i]]) {
-        current[keys[i]] = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+      const key = keys[i];
+      if (key && !current[key]) {
+        current[key] = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
       }
-      current = current[keys[i]]; // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (key) {
+        current = current[key]; // eslint-disable-line @typescript-eslint/no-explicit-any
+      }
     }
 
     // Set the value
-    current[keys[keys.length - 1]] = value;
+    const finalKey = keys[keys.length - 1];
+    if (finalKey) {
+      current[finalKey] = value;
+    }
 
     await this.saveUserConfig();
     logger.info(`Configuration updated: ${key} = ${JSON.stringify(value)}`);

@@ -2,7 +2,7 @@ import { UnifiedModelClient } from '../client.js';
 import { logger } from '../logger.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { VM } from 'vm2';
+import ivm from 'isolated-vm';
 
 export interface CodingChallenge {
   id: string;
@@ -313,9 +313,8 @@ Function signature and implementation:`;
         // Use hybrid client
         if (this.hybridClient) {
           const result = await Promise.race([
-            this.hybridClient.generateCode(enhancedPrompt, [], {
-              taskType: 'algorithms',
-              complexity: challenge.difficulty === 'easy' ? 'simple' : challenge.difficulty === 'medium' ? 'medium' : 'complex'
+            this.hybridClient.generate({
+              prompt: enhancedPrompt
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
           ]) as any;

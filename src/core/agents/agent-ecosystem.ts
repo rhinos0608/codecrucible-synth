@@ -6,7 +6,7 @@
 
 import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
-import { UnifiedModelClient } from '../client.js';
+// import { UnifiedModelClient } from '../client.js';
 import { WorkflowOrchestrator } from '../workflow/workflow-orchestrator.js';
 import { AdvancedToolOrchestrator } from '../tools/advanced-tool-orchestrator.js';
 import { VectorRAGSystem } from '../rag/vector-rag-system.js';
@@ -357,7 +357,7 @@ export interface QualityFeedback {
 export class AgentEcosystem extends EventEmitter {
   private logger: Logger;
   private agents: Map<string, Agent> = new Map();
-  private workflowOrchestrator: WorkflowOrchestrator;
+  // private workflowOrchestrator: WorkflowOrchestrator;
   private toolOrchestrator: AdvancedToolOrchestrator;
   private ragSystem: VectorRAGSystem;
   private modelRouter: IntelligentModelRouter;
@@ -366,14 +366,14 @@ export class AgentEcosystem extends EventEmitter {
   private performanceMonitor: AgentPerformanceMonitor;
 
   constructor(
-    workflowOrchestrator: WorkflowOrchestrator,
+    _workflowOrchestrator: WorkflowOrchestrator,
     toolOrchestrator: AdvancedToolOrchestrator,
     ragSystem: VectorRAGSystem,
     modelRouter: IntelligentModelRouter
   ) {
     super();
     this.logger = new Logger({ level: 'info' });
-    this.workflowOrchestrator = workflowOrchestrator;
+    // this.workflowOrchestrator = workflowOrchestrator;
     this.toolOrchestrator = toolOrchestrator;
     this.ragSystem = ragSystem;
     this.modelRouter = modelRouter;
@@ -673,7 +673,7 @@ export class AgentEcosystem extends EventEmitter {
       coordinator: 'system',
       phases: [],
       dependencies: [],
-      deadline: originalRequest.deadline
+      deadline: originalRequest.deadline || new Date()
     };
 
     return await this.executeCollaborativeTask(task);
@@ -858,7 +858,7 @@ abstract class BaseAgent implements Agent {
           result: response,
           quality: response.confidence,
           confidence: response.confidence,
-          issues: response.confidence < 0.5 ? ['Low confidence response'] : undefined
+          issues: response.confidence < 0.5 ? ['Low confidence response'] : []
         })),
         synthesis: {
           approach: 'consensus' as const,
@@ -910,7 +910,7 @@ abstract class BaseAgent implements Agent {
       default:
         // Simple consensus: use majority approach or highest confidence
         if (responses.length === 1) {
-          return responses[0].content;
+          return responses[0]?.content || '';
         }
         
         // For multiple responses, combine them intelligently
@@ -1025,7 +1025,7 @@ abstract class BaseAgent implements Agent {
           apiCalls: 0
         }
       },
-      actions
+      actions: actions || []
     };
 
     return response;
@@ -1137,7 +1137,7 @@ class ExplorerAgent extends BaseAgent {
     return `Explored codebase structure for: ${request.content}`;
   }
 
-  private async generateExplorationActions(request: AgentRequest): Promise<AgentAction[]> {
+  private async generateExplorationActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
         type: 'analysis_run',
@@ -1238,7 +1238,7 @@ class AnalyzerAgent extends BaseAgent {
     return `Analyzed code for: ${request.content}`;
   }
 
-  private async generateAnalysisActions(request: AgentRequest): Promise<AgentAction[]> {
+  private async generateAnalysisActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
         type: 'analysis_run',
@@ -1307,7 +1307,7 @@ class ImplementorAgent extends BaseAgent {
     return `Generated implementation for: ${request.content}`;
   }
 
-  private async generateImplementationActions(request: AgentRequest): Promise<AgentAction[]> {
+  private async generateImplementationActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [{
       type: 'file_create',
       target: 'implementation.ts',
@@ -1373,7 +1373,7 @@ class MaintainerAgent extends BaseAgent {
     return `Performed maintenance for: ${request.content}`;
   }
 
-  private async generateMaintenanceActions(request: AgentRequest): Promise<AgentAction[]> {
+  private async generateMaintenanceActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [{
       type: 'file_modify',
       target: 'legacy_file.ts',
@@ -1439,7 +1439,7 @@ class SecurityAgent extends BaseAgent {
     return `Performed security analysis for: ${request.content}`;
   }
 
-  private async generateSecurityActions(request: AgentRequest): Promise<AgentAction[]> {
+  private async generateSecurityActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [{
       type: 'analysis_run',
       target: 'security_scan',
@@ -1716,7 +1716,7 @@ class TesterAgent extends BaseAgent {
     return `Performed testing for: ${request.content}`;
   }
 
-  private async generateTestingActions(request: AgentRequest): Promise<AgentAction[]> {
+  private async generateTestingActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [{
       type: 'test_run',
       target: 'test_suite',
@@ -1782,7 +1782,7 @@ class ArchitectAgent extends BaseAgent {
     return `Designed architecture for: ${request.content}`;
   }
 
-  private async generateArchitectureActions(request: AgentRequest): Promise<AgentAction[]> {
+  private async generateArchitectureActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [{
       type: 'file_create',
       target: 'architecture_design.md',
@@ -1848,7 +1848,7 @@ class ReviewerAgent extends BaseAgent {
     return `Reviewed code for: ${request.content}`;
   }
 
-  private async generateReviewActions(request: AgentRequest): Promise<AgentAction[]> {
+  private async generateReviewActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [{
       type: 'analysis_run',
       target: 'code_review',
@@ -1966,7 +1966,7 @@ class CollaborationManager {
     };
   }
 
-  private measureConsensus(phaseResults: PhaseResult[]): ConsensusMeasure {
+  private measureConsensus(_phaseResults: PhaseResult[]): ConsensusMeasure {
     // Simple consensus measurement
     return {
       agreement: 0.8,
@@ -1994,11 +1994,11 @@ class CollaborationManager {
 }
 
 class AgentLearningEngine {
-  private logger: Logger;
+  private _logger: Logger;
   private learningData: Map<string, AgentLearningData> = new Map();
 
   constructor() {
-    this.logger = new Logger({ level: 'info' });
+    this._logger = new Logger({ level: 'info' });
   }
 
   processFeedback(agentId: string, feedback: AgentFeedback): void {
@@ -2037,23 +2037,23 @@ class AgentLearningEngine {
 class AgentPerformanceMonitor {
   private logger: Logger;
   private metrics: Map<string, AgentMetrics> = new Map();
-  private isRunning: boolean = false;
+  private _isRunning: boolean = false;
 
   constructor() {
     this.logger = new Logger({ level: 'info' });
   }
 
   start(): void {
-    this.isRunning = true;
+    this._isRunning = true;
     this.logger.info('Agent performance monitoring started');
   }
 
   stop(): void {
-    this.isRunning = false;
+    this._isRunning = false;
     this.logger.info('Agent performance monitoring stopped');
   }
 
-  recordRequest(request: AgentRequest, response: AgentResponse): void {
+  recordRequest(_request: AgentRequest, response: AgentResponse): void {
     if (!this.metrics.has(response.agentId)) {
       this.metrics.set(response.agentId, {
         totalRequests: 0,

@@ -4,6 +4,10 @@
 
 CodeCrucible Synth is an advanced local AI coding assistant that combines the speed of LM Studio with the reasoning power of Ollama through an intelligent hybrid architecture. This documentation covers the complete system architecture, implementation, and optimization strategies.
 
+⚠️ **Important**: For the most accurate assessment of current implementation status, see:
+- [COMPREHENSIVE_IMPLEMENTATION_REVIEW.md](./COMPREHENSIVE_IMPLEMENTATION_REVIEW.md) - Complete technical assessment
+- [ACTUAL_IMPLEMENTATION_STATUS.md](./ACTUAL_IMPLEMENTATION_STATUS.md) - Gap analysis and production readiness
+
 ## 📚 Documentation Index
 
 ### Architecture & Design

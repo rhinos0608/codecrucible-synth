@@ -121,19 +121,28 @@ export interface SynthesisResponse {
 export interface SynthesisResult {
   content: string;
   confidence?: number;
-  voicesUsed: any[];
-  voices?: any[];
+  voicesUsed: string[];
+  voices?: string[];
   qualityScore: number;
   combinedCode?: string;
   convergenceReason?: string;
   lessonsLearned?: string[];
-  iterations?: any[];
-  writerVoice?: any;
-  auditorVoice?: any;
-  totalIterations?: any;
+  iterations?: Array<{
+    content: string;
+    feedback: string;
+    improvement: number;
+  }>;
+  writerVoice?: string;
+  auditorVoice?: string;
+  totalIterations?: number;
   finalQualityScore?: number;
   converged?: boolean;
   finalCode?: string;
+  // Properties expected by conversation-store.ts and project-memory.ts
+  synthesis?: string;
+  latency?: number;
+  modelUsed?: string;
+  reasoning?: string;
 }
 
 // Security Types

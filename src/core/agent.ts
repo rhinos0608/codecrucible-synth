@@ -55,7 +55,6 @@ export class UnifiedAgent extends EventEmitter {
   private activeWorkflows: Map<string, Workflow>;
   private metrics: AgentMetrics;
   private executionQueue: Task[];
-  private isProcessing: boolean;
 
   constructor(modelClient: UnifiedModelClient, performanceMonitor: PerformanceMonitor) {
     super();
@@ -67,7 +66,6 @@ export class UnifiedAgent extends EventEmitter {
     this.capabilities = new Map();
     this.activeWorkflows = new Map();
     this.executionQueue = [];
-    this.isProcessing = false;
     this.metrics = {
       tasksCompleted: 0,
       averageExecutionTime: 0,
@@ -175,7 +173,7 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Execute agent request with intelligent routing
    */
-  async execute(request: ExecutionRequest, context?: ProjectContext): Promise<ExecutionResponse> {
+  async execute(request: ExecutionRequest, _context?: ProjectContext): Promise<ExecutionResponse> {
     const startTime = Date.now();
     const workflowId = this.generateWorkflowId();
 
@@ -429,7 +427,8 @@ export class UnifiedAgent extends EventEmitter {
       let analysisPrompt = '';
       
       // Check if this is a project/directory analysis request
-      const inputLower = (typeof task.input === 'string' ? task.input : '').toLowerCase();
+      const taskInput = task.input || '';
+      const inputLower = (typeof taskInput === 'string' ? taskInput : '').toLowerCase();
       const isProjectAnalysis = (
         inputLower.includes('project structure') ||
         inputLower.includes('analyze the project') ||
@@ -442,10 +441,10 @@ export class UnifiedAgent extends EventEmitter {
         inputLower.includes('comprehensive')
       );
       
-      console.log(`🔍 DEBUG: Input analysis - "${task.input}"`);
+      console.log(`🔍 DEBUG: Input analysis - "${task.input || ''}"`);
       console.log(`🔍 DEBUG: Detected as project analysis: ${isProjectAnalysis}`);
       
-      if (typeof task.input === 'string' && isProjectAnalysis) {
+      if (typeof taskInput === 'string' && isProjectAnalysis) {
         // Read project structure
         try {
           // File reading functionality moved to getProjectStructure method
@@ -455,19 +454,19 @@ export class UnifiedAgent extends EventEmitter {
           
           analysisPrompt = `Analyze this project structure and codebase:\n\nProject Root: ${projectRoot}\n\n${projectStructure}\n\nPlease provide:\n1. Overview of the project architecture\n2. Key components and their relationships\n3. Code organization patterns\n4. Potential improvements\n5. Technology stack analysis`;
         } catch (error) {
-          analysisPrompt = `Unable to read project structure: ${error instanceof Error ? error.message : String(error)}\n\nRequest: ${task.input}`;
+          analysisPrompt = `Unable to read project structure: ${error instanceof Error ? error.message : String(error)}\n\nRequest: ${task.input || ''}`;
         }
       }
       // Check if input looks like a file path or contains file extension
-      else if (typeof task.input === 'string' && (task.input.includes('.') || task.input.includes('/'))) {
+      else if (typeof taskInput === 'string' && (taskInput.includes('.') || taskInput.includes('/'))) {
         // Try to read as file path
         try {
           const { readFile } = await import('fs/promises');
           const { resolve, extname } = await import('path');
           
           // Handle multiple potential file paths in the input
-          const words = task.input.split(/\s+/);
-          const potentialPaths = words.filter(word => word.includes('.') && (
+          const words = taskInput.split(/\s+/);
+          const potentialPaths = words.filter((word: string) => word.includes('.') && (
             word.endsWith('.js') || word.endsWith('.ts') || word.endsWith('.jsx') || 
             word.endsWith('.tsx') || word.endsWith('.py') || word.endsWith('.java') ||
             word.endsWith('.c') || word.endsWith('.cpp') || word.endsWith('.h') ||
@@ -475,23 +474,30 @@ export class UnifiedAgent extends EventEmitter {
           ));
           
           if (potentialPaths.length > 0) {
-            const filePath = resolve(potentialPaths[0]);
-            codeContent = await readFile(filePath, 'utf-8');
-            const extension = extname(filePath);
-            analysisPrompt = `Analyze this ${extension} code file (${filePath}) for quality, patterns, and improvements:\n\n${codeContent}`;
+            const firstPath = potentialPaths[0];
+            if (firstPath) {
+              const filePath = resolve(firstPath);
+              codeContent = await readFile(filePath, 'utf-8');
+              const extension = extname(filePath);
+              analysisPrompt = `Analyze this ${extension} code file (${filePath}) for quality, patterns, and improvements:\n\n${codeContent}`;
+            } else {
+              // Treat as direct code content
+              codeContent = taskInput;
+              analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
+            }
           } else {
             // Treat as direct code content
-            codeContent = task.input;
+            codeContent = taskInput;
             analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
           }
         } catch (fileError) {
           // If file reading fails, treat as direct code content
-          codeContent = task.input;
+          codeContent = taskInput;
           analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
         }
       } else {
         // Treat as direct code content
-        codeContent = task.input;
+        codeContent = task.input || '' || '';
         analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
       }
       
@@ -544,7 +550,7 @@ export class UnifiedAgent extends EventEmitter {
     const startTime = Date.now();
     
     try {
-      const prompt = `Generate code based on the following requirements:\n\n${task.input}`;
+      const prompt = `Generate code based on the following requirements:\n\n${task.input || ''}`;
       
       const response = await this.modelClient.synthesize({
         prompt,
@@ -582,7 +588,7 @@ export class UnifiedAgent extends EventEmitter {
     const startTime = Date.now();
     
     try {
-      const prompt = `Generate comprehensive documentation for:\n\n${task.input}`;
+      const prompt = `Generate comprehensive documentation for:\n\n${task.input || ''}`;
       
       const response = await this.modelClient.synthesize({
         prompt,
@@ -620,7 +626,7 @@ export class UnifiedAgent extends EventEmitter {
     const startTime = Date.now();
     
     try {
-      const prompt = `Generate comprehensive tests for:\n\n${task.input}`;
+      const prompt = `Generate comprehensive tests for:\n\n${task.input || ''}`;
       
       const response = await this.modelClient.synthesize({
         prompt,
@@ -658,7 +664,7 @@ export class UnifiedAgent extends EventEmitter {
     const startTime = Date.now();
     
     try {
-      const prompt = `Refactor and optimize the following code:\n\n${task.input}`;
+      const prompt = `Refactor and optimize the following code:\n\n${task.input || ''}`;
       
       const response = await this.modelClient.synthesize({
         prompt,
@@ -696,7 +702,7 @@ export class UnifiedAgent extends EventEmitter {
     const startTime = Date.now();
     
     try {
-      const prompt = `Identify and fix bugs in the following code:\n\n${task.input}`;
+      const prompt = `Identify and fix bugs in the following code:\n\n${task.input || ''}`;
       
       const response = await this.modelClient.synthesize({
         prompt,
@@ -734,7 +740,7 @@ export class UnifiedAgent extends EventEmitter {
     const startTime = Date.now();
     
     try {
-      const prompt = `Optimize the performance of the following code:\n\n${task.input}`;
+      const prompt = `Optimize the performance of the following code:\n\n${task.input || ''}`;
       
       const response = await this.modelClient.synthesize({
         prompt,
@@ -772,7 +778,7 @@ export class UnifiedAgent extends EventEmitter {
     const startTime = Date.now();
     
     try {
-      const prompt = `Analyze the following code for security vulnerabilities:\n\n${task.input}`;
+      const prompt = `Analyze the following code for security vulnerabilities:\n\n${task.input || ''}`;
       
       const response = await this.modelClient.synthesize({
         prompt,
@@ -957,8 +963,7 @@ export class UnifiedAgent extends EventEmitter {
       
       // Clear execution queue
       this.executionQueue.length = 0;
-      this.isProcessing = false;
-      
+        
       // Clean up performance monitor
       if (this.performanceMonitor && typeof this.performanceMonitor.destroy === 'function') {
         this.performanceMonitor.destroy();

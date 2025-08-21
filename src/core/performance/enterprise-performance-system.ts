@@ -13,6 +13,7 @@ import {
   SecurityAuditLogger,
   AuditEventType,
   AuditSeverity,
+  AuditOutcome,
 } from '../security/security-audit-logger.js';
 import { logger } from '../logger.js';
 
@@ -336,7 +337,7 @@ export class EnterprisePerformanceSystem extends EventEmitter {
       this.auditLogger.logEvent(
         AuditEventType.SYSTEM_EVENT,
         AuditSeverity.HIGH,
-        'ERROR',
+        AuditOutcome.ERROR,
         'enterprise-performance-system',
         'slo_violation',
         violation.metric,
@@ -785,7 +786,13 @@ export class EnterprisePerformanceSystem extends EventEmitter {
    * Get enterprise performance dashboard data
    */
   getEnterpriseMetrics(): {
-    slo: ReturnType<typeof this.calculateSLOCompliance>;
+    slo: {
+      overall: number;
+      availability: number;
+      latency: number;
+      errorRate: number;
+      throughput: number;
+    };
     capacity: Record<string, CapacityPrediction>;
     anomalies: AnomalyAlert[];
     optimizations: PerformanceOptimization[];

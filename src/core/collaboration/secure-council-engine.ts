@@ -147,14 +147,16 @@ export enum IsolationLevel {
 }
 
 export class SecureCouncilDecisionEngine extends CouncilDecisionEngine {
-  private securityFramework: EnterpriseSecurityFramework;
   private isolationManager: SubAgentIsolationSystem;
   private auditLogger: CouncilAuditLogger;
   private activeCouncils: Map<string, SecureCouncilSession> = new Map();
+  protected voiceSystemRef: any;
+  protected securityFrameworkRef: any;
 
   constructor(voiceSystem: any, modelClient: any) {
     super(voiceSystem, modelClient);
-    this.securityFramework = new EnterpriseSecurityFramework();
+    this.voiceSystemRef = voiceSystem;
+    this.securityFrameworkRef = new EnterpriseSecurityFramework();
     this.isolationManager = new SubAgentIsolationSystem();
     this.auditLogger = new CouncilAuditLogger();
   }
@@ -225,7 +227,7 @@ export class SecureCouncilDecisionEngine extends CouncilDecisionEngine {
     securityContext: SecurityContext
   ): Promise<void> {
     // Validate prompt for malicious content
-    const promptValidation = await this.securityFramework.validateAgentAction(
+    const promptValidation = await this.securityFrameworkRef.validateAgentAction(
       'council-coordinator',
       {
         type: 'code_generation',
@@ -380,7 +382,7 @@ export class SecureCouncilDecisionEngine extends CouncilDecisionEngine {
     try {
       // Execute voice with isolation
       const response = await this.isolationManager.executeInContext(context, async () => {
-        return await this.voiceSystem.generateVoiceResponse(voiceId, prompt);
+        return await this.voiceSystemRef.generateSingleVoiceResponse(voiceId, prompt, {});
       });
 
       // Security assessment of response
@@ -656,7 +658,7 @@ export class SecureCouncilDecisionEngine extends CouncilDecisionEngine {
     });
   }
 
-  private generateSessionId(): string {
+  protected override generateSessionId(): string {
     return `council_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 

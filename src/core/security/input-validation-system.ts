@@ -521,21 +521,25 @@ export class AdvancedInputValidator {
   private static getPatternGroups(options: ValidationOptions): Record<string, RegExp[]> {
     const groups: Record<string, RegExp[]> = {};
 
+    // Add patterns based on validation level (cumulative)
+    if (options.level === ValidationLevel.PARANOID) {
+      groups.code_execution = SECURITY_PATTERNS.CODE_EXECUTION;
+      groups.file_system_attacks = SECURITY_PATTERNS.FILE_SYSTEM_ATTACKS;
+    }
+    
+    if (options.level === ValidationLevel.PARANOID || options.level === ValidationLevel.STRICT) {
+      groups.sql_injection = SECURITY_PATTERNS.SQL_INJECTION;
+    }
+    
+    // All levels include these patterns
+    groups.command_injection = SECURITY_PATTERNS.COMMAND_INJECTION;
+    groups.path_traversal = SECURITY_PATTERNS.PATH_TRAVERSAL;
+    
+    if (!options.allowScripts) {
+      groups.script_injection = SECURITY_PATTERNS.SCRIPT_INJECTION;
+    }
+    
     switch (options.level) {
-      case ValidationLevel.PARANOID:
-        groups.code_execution = SECURITY_PATTERNS.CODE_EXECUTION;
-        groups.file_system_attacks = SECURITY_PATTERNS.FILE_SYSTEM_ATTACKS;
-      // Fall through
-      case ValidationLevel.STRICT:
-        groups.sql_injection = SECURITY_PATTERNS.SQL_INJECTION;
-      // Fall through
-      case ValidationLevel.STANDARD:
-        groups.command_injection = SECURITY_PATTERNS.COMMAND_INJECTION;
-        groups.path_traversal = SECURITY_PATTERNS.PATH_TRAVERSAL;
-        if (!options.allowScripts) {
-          groups.script_injection = SECURITY_PATTERNS.SCRIPT_INJECTION;
-        }
-      // Fall through
       case ValidationLevel.BASIC:
         // Basic patterns always checked
         break;

@@ -159,7 +159,8 @@ export class PerformanceValidator {
       for (let i = 0; i < iterations; i++) {
         const start = Date.now();
         try {
-          await this.hybridClient?.generateCode(task, [], {
+          await this.hybridClient?.generate({
+            prompt: task,
             taskType: 'template',
             complexity: 'simple',
           });
@@ -236,7 +237,7 @@ export class PerformanceValidator {
         )) || 12700;
       const hybridTime =
         (await this.measureTaskTime(
-          this.hybridClient?.generateCode.bind(this.hybridClient),
+          this.hybridClient?.generate.bind(this.hybridClient),
           task,
           [],
           { taskType: 'format' }
@@ -283,10 +284,9 @@ export class PerformanceValidator {
       try {
         if (this.lmStudioClient) {
           // Measure time to first token from LM Studio
-          const stream = this.lmStudioClient.streamGenerateCode(
-            'Test prompt for first token measurement'
-          );
-          const firstChunk = await stream.next();
+          const result = await this.lmStudioClient.synthesize({
+            prompt: 'Test prompt for first token measurement',
+          });
           const firstTokenTime = Date.now() - start;
           latencies.push(firstTokenTime);
         } else {
@@ -317,7 +317,7 @@ export class PerformanceValidator {
       meetsDocumentedMetric: meetsTarget,
       details: {
         iterations,
-        latencies,
+        times: latencies,
         target: 200,
       },
     };
@@ -347,7 +347,7 @@ export class PerformanceValidator {
         )) || 8200;
       const hybridTime =
         (await this.measureTaskTime(
-          this.hybridClient?.generateCode.bind(this.hybridClient),
+          this.hybridClient?.generate.bind(this.hybridClient),
           task,
           [],
           { taskType: 'edit' }
@@ -399,7 +399,7 @@ export class PerformanceValidator {
         )) || 18900;
       const hybridTime =
         (await this.measureTaskTime(
-          this.hybridClient?.generateCode.bind(this.hybridClient),
+          this.hybridClient?.generate.bind(this.hybridClient),
           task,
           [],
           { taskType: 'boilerplate' }
@@ -451,7 +451,7 @@ export class PerformanceValidator {
         )) || 45200;
       const hybridTime =
         (await this.measureTaskTime(
-          this.hybridClient?.generateCode.bind(this.hybridClient),
+          this.hybridClient?.generate.bind(this.hybridClient),
           task,
           [],
           { taskType: 'analysis', complexity: 'complex' }
@@ -501,7 +501,8 @@ export class PerformanceValidator {
 
     for (const testCase of testTasks) {
       try {
-        const result = await this.hybridClient?.generateCode(testCase.prompt, [], {
+        const result = await this.hybridClient?.generate({
+          prompt: testCase.prompt,
           taskType: this.extractTaskType(testCase.prompt),
           complexity: testCase.complexity as any,
         });
@@ -571,7 +572,7 @@ export class PerformanceValidator {
       const beforeMemory = process.memoryUsage();
 
       try {
-        await this.hybridClient?.generateCode(task);
+        await this.hybridClient?.generate(task);
       } catch (error) {
         // Continue measuring even if generation fails
       }
@@ -659,18 +660,47 @@ export class PerformanceValidator {
           timeoutMs: 30000,
           maxConcurrentRequests: 3,
         },
+        security: {
+          enableSandbox: true,
+          maxInputLength: 10000,
+          allowedCommands: ['node', 'python3'],
+        },
       });
 
       this.ollamaClient = new UnifiedModelClient({
-        endpoint: 'http://localhost:11434',
-        model: 'codellama:34b',
-        timeout: 60000,
+        providers: [
+          { type: 'ollama', endpoint: 'http://localhost:11434', model: 'codellama:34b', timeout: 60000 },
+        ],
+        executionMode: 'quality',
+        fallbackChain: ['ollama'],
+        performanceThresholds: {
+          fastModeMaxTokens: 4096,
+          timeoutMs: 60000,
+          maxConcurrentRequests: 1,
+        },
+        security: {
+          enableSandbox: true,
+          maxInputLength: 20000,
+          allowedCommands: ['node', 'python3'],
+        },
       });
 
       this.lmStudioClient = new UnifiedModelClient({
-        endpoint: 'http://localhost:1234',
-        timeout: 30000,
-        streamingEnabled: true,
+        providers: [
+          { type: 'lm-studio', endpoint: 'http://localhost:1234', timeout: 30000 },
+        ],
+        executionMode: 'fast',
+        fallbackChain: ['lm-studio'],
+        performanceThresholds: {
+          fastModeMaxTokens: 2048,
+          timeoutMs: 30000,
+          maxConcurrentRequests: 2,
+        },
+        security: {
+          enableSandbox: true,
+          maxInputLength: 15000,
+          allowedCommands: ['node'],
+        },
       });
 
       logger.debug('Performance validation clients initialized');

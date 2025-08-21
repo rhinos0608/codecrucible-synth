@@ -439,10 +439,8 @@ Function signature and implementation:`;
    * Execute JavaScript test case using vm2
    */
   private async executeJavaScriptTest(code: string, testCase: TestCase): Promise<TestResult> {
-    const vm = new VM({
-      timeout: 5000,
-      sandbox: {},
-    });
+    const isolate = new ivm.Isolate({ memoryLimit: 128 });
+    const context = await isolate.createContext();
 
     try {
       // Prepare test execution code
@@ -455,7 +453,8 @@ Function signature and implementation:`;
         result;
       `;
 
-      const actualOutput = vm.run(testCode);
+      const script = await isolate.compileScript(testCode);
+      const actualOutput = await script.run(context, { timeout: 5000 });
       const passed = this.compareOutputs(actualOutput, testCase.expectedOutput);
 
       return {
@@ -748,12 +747,29 @@ except Exception as e:
           timeoutMs: 30000,
           maxConcurrentRequests: 3,
         },
+        security: {
+          enableSandbox: true,
+          maxInputLength: 10000,
+          allowedCommands: ['node', 'python3'],
+        },
       });
 
       this.ollamaClient = new UnifiedModelClient({
-        endpoint: 'http://localhost:11434',
-        model: 'codellama:34b',
-        timeout: 60000,
+        providers: [
+          { type: 'ollama', endpoint: 'http://localhost:11434', model: 'codellama:34b', timeout: 60000 },
+        ],
+        executionMode: 'quality',
+        fallbackChain: ['ollama'],
+        performanceThresholds: {
+          fastModeMaxTokens: 4096,
+          timeoutMs: 60000,
+          maxConcurrentRequests: 1,
+        },
+        security: {
+          enableSandbox: true,
+          maxInputLength: 20000,
+          allowedCommands: ['node', 'python3'],
+        },
       });
 
       logger.debug('Benchmark clients initialized');

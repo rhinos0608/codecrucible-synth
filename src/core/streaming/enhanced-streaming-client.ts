@@ -45,7 +45,7 @@ class TokenTransformStream extends Transform {
     });
   }
 
-  _transform(chunk: any, encoding: string, callback: Function): void {
+  override _transform(chunk: any, encoding: string, callback: Function): void {
     try {
       const token: StreamToken = {
         content: chunk.toString(),
@@ -61,7 +61,7 @@ class TokenTransformStream extends Transform {
     }
   }
 
-  _flush(callback: Function): void {
+  override _flush(callback: Function): void {
     // Send final token
     const finalToken: StreamToken = {
       content: '',

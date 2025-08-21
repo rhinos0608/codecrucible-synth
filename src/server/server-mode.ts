@@ -84,7 +84,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
       if (token !== options.auth!.token) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      next();
+      return next();
     });
   }
 
@@ -149,7 +149,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
   });
 
   // Code generation endpoint
-  app.post('/api/generate', async (req, res) => {
+  app.post('/api/generate', async (req, res): Promise<any> => {
     try {
       const {
         prompt,
@@ -211,7 +211,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
   });
 
   // Code analysis endpoint
-  app.post('/api/analyze', async (req, res) => {
+  app.post('/api/analyze', async (req, res): Promise<any> => {
     try {
       const { code, language = 'text', file_path } = req.body;
 
@@ -253,7 +253,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
   });
 
   // File operations endpoint
-  app.post('/api/file/:operation', async (req, res) => {
+  app.post('/api/file/:operation', async (req, res): Promise<any> => {
     try {
       const { operation } = req.params;
       const { file_path, content, prompt } = req.body;
@@ -438,7 +438,7 @@ ${refactorPrompt}`,
     res.json(context.config);
   });
 
-  app.post('/api/config', async (req, res) => {
+  app.post('/api/config', async (req, res): Promise<any> => {
     try {
       const { key, value } = req.body;
       if (!key) {

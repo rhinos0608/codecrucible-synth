@@ -141,7 +141,7 @@ export class ConversationStore {
       embedding,
       metadata: {
         modelUsed: response.modelUsed,
-        reasoning: response.reasoning?.steps?.length || 0,
+        reasoning: (typeof response.reasoning === 'object' && response.reasoning && 'steps' in response.reasoning && Array.isArray((response.reasoning as any).steps) ? (response.reasoning as any).steps.length : 0),
         promptTokens: prompt.length, // Simplified token count
         responseTokens: response.synthesis.length,
       },

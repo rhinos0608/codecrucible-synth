@@ -522,7 +522,7 @@ export class LocalE2BBackend extends E2BBackend {
     });
   }
 
-  async execute(
+  override async execute(
     command: string,
     options: ExecutionOptions = {}
   ): Promise<ServiceResponse<ExecutionResult>> {
@@ -539,7 +539,7 @@ export class LocalE2BBackend extends E2BBackend {
     return result;
   }
 
-  getStatus() {
+  override getStatus() {
     const status = super.getStatus();
     status.type = 'local_e2b';
     return status;

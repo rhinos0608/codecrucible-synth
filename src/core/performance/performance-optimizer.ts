@@ -288,11 +288,16 @@ export class PerformanceOptimizer extends EventEmitter {
           },
         ],
         executionMode: 'auto' as const,
-        fallbackChain: ['ollama'],
+        fallbackChain: ['ollama'] as Array<'ollama' | 'lm-studio' | 'huggingface' | 'auto'>,
         performanceThresholds: {
           fastModeMaxTokens: 1024,
           timeoutMs: 30000,
           maxConcurrentRequests: 1,
+        },
+        security: {
+          enableSandbox: true,
+          maxInputLength: 10000,
+          allowedCommands: ['node'],
         },
       };
 

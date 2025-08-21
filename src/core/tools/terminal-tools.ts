@@ -299,7 +299,13 @@ export class ProcessManagementTool extends BaseTool {
   async execute(args: z.infer<typeof this.definition.parameters>): Promise<any> {
     try {
       // Use secure tool factory instead of direct TerminalExecuteTool
-      const secureToolFactory = new SecureToolFactory();
+      const { RBACSystem } = await import('../security/rbac-system.js');
+      const { SecurityAuditLogger } = await import('../security/security-audit-logger.js');
+      const { SecretsManager } = await import('../security/secrets-manager.js');
+      const secretsManager = new SecretsManager();
+      const rbacSystem = new RBACSystem(secretsManager);
+      const auditLogger = new SecurityAuditLogger(secretsManager);
+      const secureToolFactory = new SecureToolFactory(rbacSystem, auditLogger);
       const terminalTool = secureToolFactory.createTerminalTool(this.agentContext);
 
       switch (args.action) {
@@ -597,7 +603,13 @@ export class PackageManagerTool extends BaseTool {
 
       // Execute command using terminal tool
       // Use secure tool factory for terminal execution
-      const secureToolFactory = new SecureToolFactory();
+      const { RBACSystem } = await import('../security/rbac-system.js');
+      const { SecurityAuditLogger } = await import('../security/security-audit-logger.js');
+      const { SecretsManager } = await import('../security/secrets-manager.js');
+      const secretsManager = new SecretsManager();
+      const rbacSystem = new RBACSystem(secretsManager);
+      const auditLogger = new SecurityAuditLogger(secretsManager);
+      const secureToolFactory = new SecureToolFactory(rbacSystem, auditLogger);
       const terminalTool = secureToolFactory.createTerminalTool(this.agentContext);
       const result = await terminalTool.execute({
         command: command,

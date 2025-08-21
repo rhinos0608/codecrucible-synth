@@ -447,7 +447,12 @@ SOURCES PROCESSED:
    * Get value from nested object using dot notation
    */
   private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-    return path.split('.').reduce((current, key) => current?.[key], obj);
+    return path.split('.').reduce((current, key) => {
+      if (current && typeof current === 'object' && !Array.isArray(current)) {
+        return (current as Record<string, unknown>)[key];
+      }
+      return undefined;
+    }, obj as unknown);
   }
 }
 

@@ -28,25 +28,44 @@
   },
   "agent": {
     "enabled": true,
-    "mode": "balanced",
-    "maxConcurrency": 3,
-    "enableCaching": true,
+    "mode": "thorough",
+    "maxConcurrency": 1,
+    "enableCaching": false,
     "enableMetrics": true,
     "enableSecurity": true
   },
   "performance": {
     "enableMonitoring": true,
     "alertThreshold": 5000,
-    "metricsRetention": 86400000
+    "metricsRetention": 86400000,
+    "enableTracing": true,
+    "metricsPort": 9090
   },
   "security": {
     "enableValidation": true,
     "sandboxMode": true,
-    "allowUnsafeCommands": false
+    "allowUnsafeCommands": false,
+    "enableRateLimit": true,
+    "maxRequestsPerMinute": 60,
+    "enableCors": true,
+    "corsOrigins": [
+      "http://localhost:3000"
+    ],
+    "auditLogging": true
   },
   "debug": {
     "enabled": false,
     "verbose": false,
     "logLevel": "info"
+  },
+  "environment": "development",
+  "features": {
+    "enableVoiceSystem": true,
+    "enableCouncilEngine": true,
+    "enableMcpIntegration": true,
+    "enableHybridModels": true,
+    "enableCaching": true,
+    "maxConcurrentVoices": 5,
+    "cacheExpiry": 3600
   }
 }

@@ -18,7 +18,12 @@ export class CodeInjectionTool extends BaseTool {
     });
   }
 
-  async execute(params: { filePath: string; codeSnippet: string; lineNumber?: number; marker?: string }): Promise<any> {
+  async execute(params: {
+    filePath: string;
+    codeSnippet: string;
+    lineNumber?: number;
+    marker?: string;
+  }): Promise<any> {
     try {
       const { filePath, codeSnippet, lineNumber, marker } = params;
       logger.info(`💉 Injecting code into: ${filePath}`);
@@ -47,7 +52,7 @@ export class CodeInjectionTool extends BaseTool {
     } catch (error) {
       logger.error('Code injection failed:', error);
       return {
-        error: `Code injection failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 
+        error: `Code injection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         ...params,
       };
     }

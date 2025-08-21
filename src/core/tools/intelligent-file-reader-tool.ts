@@ -36,7 +36,7 @@ interface CodeDefinition {
 
 /**
  * Intelligent File Reader Tool - Reads multiple files with smart analysis
- * 
+ *
  * Similar to how Claude Code and other agents read files selectively,
  * this tool reads multiple files and provides rich analysis of their content
  */
@@ -44,17 +44,22 @@ export class IntelligentFileReaderTool extends BaseTool {
   constructor(private agentContext: { workingDirectory: string }) {
     const parameters = z.object({
       files: z.array(z.string()).describe('Array of file paths to read'),
-      maxFileSize: z.number().optional().default(200000).describe('Max size per file in bytes (default: 200KB)'),
+      maxFileSize: z
+        .number()
+        .optional()
+        .default(200000)
+        .describe('Max size per file in bytes (default: 200KB)'),
       includeMetadata: z.boolean().optional().default(true).describe('Include file metadata'),
       extractDefinitions: z.boolean().optional().default(true).describe('Extract code definitions'),
-      maxFiles: z.number().optional().default(20).describe('Limit number of files to read')
+      maxFiles: z.number().optional().default(20).describe('Limit number of files to read'),
     });
 
     super({
       name: 'readFiles',
-      description: 'Intelligently read multiple files with automatic content analysis, definition extraction, and metadata',
+      description:
+        'Intelligently read multiple files with automatic content analysis, definition extraction, and metadata',
       category: 'File System',
-      parameters
+      parameters,
     });
   }
 
@@ -99,8 +104,12 @@ export class IntelligentFileReaderTool extends BaseTool {
       // Show summary statistics
       if (input.includeMetadata) {
         const totalSize = successfulReads.reduce((sum, r) => sum + (r.metadata?.size || 0), 0);
-        const languages = [...new Set(successfulReads.map(r => r.metadata?.language).filter(Boolean))];
-        const avgComplexity = successfulReads.reduce((sum, r) => sum + (r.metadata?.complexity || 0), 0) / successfulReads.length;
+        const languages = [
+          ...new Set(successfulReads.map(r => r.metadata?.language).filter(Boolean)),
+        ];
+        const avgComplexity =
+          successfulReads.reduce((sum, r) => sum + (r.metadata?.complexity || 0), 0) /
+          successfulReads.length;
 
         output += `## 📊 Summary\n\n`;
         output += `- **Total Size**: ${(totalSize / 1024).toFixed(1)} KB\n`;
@@ -110,12 +119,15 @@ export class IntelligentFileReaderTool extends BaseTool {
       }
 
       // Group files by type/language for better organization
-      const filesByLanguage = successfulReads.reduce((acc, result) => {
-        const lang = result.metadata?.language || 'Unknown';
-        if (!acc[lang]) acc[lang] = [];
-        acc[lang].push(result);
-        return acc;
-      }, {} as Record<string, FileReadResult[]>);
+      const filesByLanguage = successfulReads.reduce(
+        (acc, result) => {
+          const lang = result.metadata?.language || 'Unknown';
+          if (!acc[lang]) acc[lang] = [];
+          acc[lang].push(result);
+          return acc;
+        },
+        {} as Record<string, FileReadResult[]>
+      );
 
       // Show files by language
       for (const [language, files] of Object.entries(filesByLanguage)) {
@@ -133,7 +145,8 @@ export class IntelligentFileReaderTool extends BaseTool {
           // Show code definitions if extracted
           if (result.definitions && result.definitions.length > 0) {
             output += `**Code Definitions (${result.definitions.length}):**\n`;
-            for (const def of result.definitions.slice(0, 10)) { // Show first 10
+            for (const def of result.definitions.slice(0, 10)) {
+              // Show first 10
               output += `- \`${def.type}\` **${def.name}** (line ${def.line})${def.isExported ? ' 🔹' : ''}\n`;
             }
             if (result.definitions.length > 10) {
@@ -164,9 +177,10 @@ export class IntelligentFileReaderTool extends BaseTool {
         }
       }
 
-      logger.info(`✅ IntelligentFileReaderTool: Successfully read ${successfulReads.length}/${results.length} files`);
+      logger.info(
+        `✅ IntelligentFileReaderTool: Successfully read ${successfulReads.length}/${results.length} files`
+      );
       return output;
-
     } catch (error) {
       const errorMsg = `❌ IntelligentFileReaderTool failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       logger.error(errorMsg, error);
@@ -175,20 +189,20 @@ export class IntelligentFileReaderTool extends BaseTool {
   }
 
   private async readSingleFile(
-    filePath: string, 
-    maxFileSize: number, 
+    filePath: string,
+    maxFileSize: number,
     options: z.infer<typeof this.definition.parameters>
   ): Promise<FileReadResult> {
     try {
       const fullPath = join(this.agentContext.workingDirectory, filePath);
-      
+
       // Check file size first
       const stats = await stat(fullPath);
       if (stats.size > maxFileSize) {
         return {
           path: filePath,
           content: '',
-          error: `File too large: ${(stats.size / 1024).toFixed(1)}KB (max: ${(maxFileSize / 1024).toFixed(1)}KB)`
+          error: `File too large: ${(stats.size / 1024).toFixed(1)}KB (max: ${(maxFileSize / 1024).toFixed(1)}KB)`,
         };
       }
 
@@ -202,7 +216,7 @@ export class IntelligentFileReaderTool extends BaseTool {
           size: stats.size,
           language: this.detectLanguage(extname(filePath)),
           purpose: this.inferFilePurpose(filePath),
-          complexity: this.calculateComplexity(content, this.detectLanguage(extname(filePath)))
+          complexity: this.calculateComplexity(content, this.detectLanguage(extname(filePath))),
         };
       }
 
@@ -225,22 +239,21 @@ export class IntelligentFileReaderTool extends BaseTool {
         const jestConfig: any = {};
         const transformMatch = content.match(/transform: ({[^}]*})/);
         if (transformMatch) {
-            try {
-                eval(`jestConfig.transform = ${transformMatch[1]}`);
-            } catch(e) {
-                // ignore
-            }
+          try {
+            eval(`jestConfig.transform = ${transformMatch[1]}`);
+          } catch (e) {
+            // ignore
+          }
         }
         result.parsed = jestConfig;
       }
 
       return result;
-
     } catch (error) {
       return {
         path: filePath,
         content: '',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -249,7 +262,7 @@ export class IntelligentFileReaderTool extends BaseTool {
     const langMap: Record<string, string> = {
       '.js': 'JavaScript',
       '.ts': 'TypeScript',
-      '.jsx': 'JSX', 
+      '.jsx': 'JSX',
       '.tsx': 'TSX',
       '.py': 'Python',
       '.java': 'Java',
@@ -267,7 +280,7 @@ export class IntelligentFileReaderTool extends BaseTool {
       '.xml': 'XML',
       '.html': 'HTML',
       '.css': 'CSS',
-      '.scss': 'SCSS'
+      '.scss': 'SCSS',
     };
     return langMap[ext.toLowerCase()] || 'Unknown';
   }
@@ -299,44 +312,44 @@ export class IntelligentFileReaderTool extends BaseTool {
 
     // Language-specific complexity
     const complexityPatterns: Record<string, RegExp> = {
-        'JavaScript': /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
-        'TypeScript': /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
-        'Python': /\b(if|for|while|try|except|and|or)\b/g,
-        'Java': /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
+      JavaScript: /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
+      TypeScript: /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
+      Python: /\b(if|for|while|try|except|and|or)\b/g,
+      Java: /\b(if|for|while|switch|catch|try|&&|\|\|)|\?.*:/g,
     };
 
     const pattern = complexityPatterns[language];
     if (pattern) {
-        for (const line of lines) {
-            const matches = line.match(pattern);
-            if (matches) {
-                complexity += matches.length;
-            }
+      for (const line of lines) {
+        const matches = line.match(pattern);
+        if (matches) {
+          complexity += matches.length;
         }
+      }
     } else {
-        // Generic complexity for other languages
-        for (const line of lines) {
-            const trimmed = line.trim();
-            // Count complexity indicators
-            if (trimmed.match(/\b(if|for|while|switch|catch|try)\b/)) complexity++;
-            if (trimmed.includes('&&') || trimmed.includes('||')) complexity++;
-            if (trimmed.includes('?') && trimmed.includes(':')) complexity++; // ternary
-        }
+      // Generic complexity for other languages
+      for (const line of lines) {
+        const trimmed = line.trim();
+        // Count complexity indicators
+        if (trimmed.match(/\b(if|for|while|switch|catch|try)\b/)) complexity++;
+        if (trimmed.includes('&&') || trimmed.includes('||')) complexity++;
+        if (trimmed.includes('?') && trimmed.includes(':')) complexity++; // ternary
+      }
     }
 
     // Nesting depth
     let nesting = 0;
     for (const line of lines) {
-        if (line.includes('{') || line.includes('(')) {
-            nesting++;
-        }
-        if (line.includes('}') || line.includes(')')) {
-            nesting--;
-        }
-        complexity += nesting > 2 ? 1 : 0;
+      if (line.includes('{') || line.includes('(')) {
+        nesting++;
+      }
+      if (line.includes('}') || line.includes(')')) {
+        nesting--;
+      }
+      complexity += nesting > 2 ? 1 : 0;
     }
 
-    return Math.max(1, Math.round(complexity / Math.max(lines.length, 1) * 100));
+    return Math.max(1, Math.round((complexity / Math.max(lines.length, 1)) * 100));
   }
 
   private extractCodeDefinitions(content: string): CodeDefinition[] {
@@ -367,7 +380,7 @@ export class IntelligentFileReaderTool extends BaseTool {
             type,
             line: i + 1,
             signature: line,
-            isExported: line.includes('export')
+            isExported: line.includes('export'),
           });
         }
       }
@@ -375,5 +388,4 @@ export class IntelligentFileReaderTool extends BaseTool {
 
     return definitions;
   }
-
 }

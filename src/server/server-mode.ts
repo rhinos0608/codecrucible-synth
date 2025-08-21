@@ -19,7 +19,7 @@ export interface ServerOptions {
 
 /**
  * Server Mode for IDE Integration
- * 
+ *
  * Provides HTTP and WebSocket APIs for IDE extensions and external tools
  * Compatible with VS Code, JetBrains IDEs, and other development environments
  */
@@ -28,21 +28,21 @@ export async function startServerMode(context: CLIContext, options: ServerOption
   if (!context) {
     throw new Error('CLI context is required for server mode');
   }
-  
+
   if (!context.modelClient) {
     throw new Error('Model client not initialized');
   }
-  
+
   if (!context.voiceSystem) {
     throw new Error('Voice system not initialized');
   }
-  
+
   if (!context.config) {
     throw new Error('Configuration not loaded');
   }
 
   console.log(chalk.blue('🚀 Starting CodeCrucible Server Mode...'));
-  
+
   // Initialize context components if needed
   try {
     await context.modelClient.initialize();
@@ -54,7 +54,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
   const app = express();
   const server = createServer(app);
   const io = new SocketIOServer(server, {
-    cors: options.cors ? { origin: '*' } : undefined
+    cors: options.cors ? { origin: '*' } : undefined,
   });
 
   // Middleware
@@ -65,7 +65,10 @@ export async function startServerMode(context: CLIContext, options: ServerOption
     app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+      res.header(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, Content-Length, X-Requested-With'
+      );
       if (req.method === 'OPTIONS') {
         res.sendStatus(200);
       } else {
@@ -93,8 +96,8 @@ export async function startServerMode(context: CLIContext, options: ServerOption
       timestamp: Date.now(),
       model: {
         endpoint: context.config.model?.endpoint || 'http://localhost:11434',
-        name: context.config.model?.name || 'llama2'
-      }
+        name: context.config.model?.name || 'llama2',
+      },
     });
   });
 
@@ -106,12 +109,12 @@ export async function startServerMode(context: CLIContext, options: ServerOption
       res.json({
         available: isAvailable,
         endpoint: context.config.model?.endpoint || 'http://localhost:11434',
-        model: context.config.model?.name || 'llama2'
+        model: context.config.model?.name || 'llama2',
       });
     } catch (error) {
       res.status(500).json({
         error: 'Model status check failed',
-        available: false
+        available: false,
       });
     }
   });
@@ -119,7 +122,17 @@ export async function startServerMode(context: CLIContext, options: ServerOption
   // Voice information endpoint
   app.get('/api/voices', (req, res) => {
     res.json({
-      available: context.config.voices?.available || ['explorer', 'maintainer', 'analyzer', 'developer', 'implementor', 'security', 'architect', 'designer', 'optimizer'],
+      available: context.config.voices?.available || [
+        'explorer',
+        'maintainer',
+        'analyzer',
+        'developer',
+        'implementor',
+        'security',
+        'architect',
+        'designer',
+        'optimizer',
+      ],
       default: context.config.voices?.default || ['explorer', 'maintainer'],
       descriptions: {
         explorer: 'Innovation and creative solutions',
@@ -130,8 +143,8 @@ export async function startServerMode(context: CLIContext, options: ServerOption
         security: 'Secure coding practices',
         architect: 'Scalable architecture and design',
         designer: 'UI/UX and interface design',
-        optimizer: 'Performance optimization'
-      }
+        optimizer: 'Performance optimization',
+      },
     });
   });
 
@@ -144,7 +157,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
         mode = 'competitive',
         context: userContext = [],
         language: _language,
-        file_path: _file_path
+        file_path: _file_path,
       } = req.body;
 
       if (!prompt) {
@@ -155,7 +168,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
         prompt: prompt.substring(0, 100),
         voices,
         mode,
-        contextFiles: userContext.length
+        contextFiles: userContext.length,
       });
 
       // Generate responses from selected voices
@@ -173,27 +186,26 @@ export async function startServerMode(context: CLIContext, options: ServerOption
           reasoning: (synthesis as Record<string, unknown>).reasoning || 'No reasoning provided',
           confidence: (synthesis as Record<string, unknown>).confidence || 0.8,
           quality_score: synthesis.qualityScore,
-          voices_used: synthesis.voicesUsed
+          voices_used: synthesis.voicesUsed,
         },
         individual_responses: (synthesis.responses || []).map(r => ({
           voice: r.voice,
           content: r.content,
           confidence: r.confidence,
-          tokens_used: (r.tokens_used || 0)
+          tokens_used: r.tokens_used || 0,
         })),
         metadata: {
           timestamp: Date.now(),
           model: context.config.model?.name || 'llama2',
           mode,
-          voices
-        }
+          voices,
+        },
       });
-
     } catch (error) {
       logger.error('Code generation failed:', error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Generation failed'
+        error: error instanceof Error ? error.message : 'Generation failed',
       });
     }
   });
@@ -209,34 +221,33 @@ export async function startServerMode(context: CLIContext, options: ServerOption
 
       const analysis = await context.modelClient.processRequest({
         prompt: `Analyze this ${language} code for quality, issues, and improvements:\n\n${code}`,
-        temperature: 0.7
+        temperature: 0.7,
       });
 
       // Calculate quality score based on analysis content
       const qualityScore = calculateQualityScore(analysis.content);
       const recommendations = extractRecommendations(analysis.content);
-      
+
       res.json({
         success: true,
         analysis: {
           content: analysis.content,
           quality_score: qualityScore,
           recommendations: recommendations,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
         metadata: {
           file_path,
           language,
           code_length: code.length,
-          model: context.config.model?.name || 'llama2'
-        }
+          model: context.config.model?.name || 'llama2',
+        },
       });
-
     } catch (error) {
       logger.error('Code analysis failed:', error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Analysis failed'
+        error: error instanceof Error ? error.message : 'Analysis failed',
       });
     }
   });
@@ -261,13 +272,13 @@ export async function startServerMode(context: CLIContext, options: ServerOption
               metadata: {
                 size: stats.size,
                 modified: stats.mtime,
-                language: detectLanguage(extname(file_path))
-              }
+                language: detectLanguage(extname(file_path)),
+              },
             });
           } catch (error) {
             res.status(404).json({
               success: false,
-              error: 'File not found'
+              error: 'File not found',
             });
           }
           break;
@@ -279,7 +290,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
           await writeFile(file_path, content, 'utf8');
           res.json({
             success: true,
-            message: `File written to ${file_path}`
+            message: `File written to ${file_path}`,
           });
           break;
 
@@ -287,19 +298,20 @@ export async function startServerMode(context: CLIContext, options: ServerOption
           if (!file_path || !prompt) {
             return res.status(400).json({ error: 'file_path and prompt are required' });
           }
-          
+
           const originalContent = await readFile(file_path, 'utf8');
           const language = detectLanguage(extname(file_path));
-          
+
           // Define the voice archetype for refactoring
           const voice = {
             id: 'refactoring-specialist',
             name: 'Refactoring Specialist',
-            systemPrompt: 'You are a senior software engineer specializing in code refactoring. You excel at improving code structure, readability, and maintainability while preserving functionality. You provide clean, well-documented refactored code with clear explanations of changes made.',
+            systemPrompt:
+              'You are a senior software engineer specializing in code refactoring. You excel at improving code structure, readability, and maintainability while preserving functionality. You provide clean, well-documented refactored code with clear explanations of changes made.',
             temperature: 0.4,
-            style: 'methodical'
+            style: 'methodical',
           };
-          
+
           const refactorPrompt = `You are an expert ${language} developer specializing in code refactoring. Your task is to refactor the provided code based on the specific request: "${prompt}"
 
 **Refactoring Context:**
@@ -326,22 +338,29 @@ ${originalContent}
 
 Focus on delivering production-ready code that addresses the specific refactoring request while improving overall code quality.`;
 
-          const response = await context.modelClient.processRequest({
-            prompt: `${voice.systemPrompt}
+          const response = await context.modelClient.processRequest(
+            {
+              prompt: `${voice.systemPrompt}
 
 ${refactorPrompt}`,
-            temperature: voice.temperature
-          }, {
-            files: [{
-              path: file_path,
-              content: originalContent,
-              type: language,
-              language
-            }],
-            workingDirectory: (context.config as unknown as Record<string, unknown>).workingDirectory as string || process.cwd(),
-            config: {},
-            structure: { directories: [], fileTypes: {} }
-          });
+              temperature: voice.temperature,
+            },
+            {
+              files: [
+                {
+                  path: file_path,
+                  content: originalContent,
+                  type: language,
+                  language,
+                },
+              ],
+              workingDirectory:
+                ((context.config as unknown as Record<string, unknown>)
+                  .workingDirectory as string) || process.cwd(),
+              config: {},
+              structure: { directories: [], fileTypes: {} },
+            }
+          );
 
           // Extract code from response
           const codeMatch = response.content.match(/```[\w]*\n([\s\S]*?)\n```/);
@@ -352,19 +371,19 @@ ${refactorPrompt}`,
             original_code: originalContent,
             refactored_code: refactoredCode,
             explanation: response.content.replace(/```[\s\S]*?```/g, '').trim(),
-            confidence: (response as unknown as Record<string, unknown>).confidence as number || 0.8
+            confidence:
+              ((response as unknown as Record<string, unknown>).confidence as number) || 0.8,
           });
           break;
 
         default:
           res.status(400).json({ error: `Unknown operation: ${operation}` });
       }
-
     } catch (error) {
       logger.error(`File operation ${req.params.operation} failed:`, error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Operation failed'
+        error: error instanceof Error ? error.message : 'Operation failed',
       });
     }
   });
@@ -377,11 +396,11 @@ ${refactorPrompt}`,
       const { glob } = await import('glob');
       const files = await glob(pattern, {
         cwd: directory,
-        ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**']
+        ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
       });
 
       const projectStructure = await Promise.all(
-        files.slice(0, 50).map(async (file) => {
+        files.slice(0, 50).map(async file => {
           try {
             const fullPath = join(directory, file);
             const stats = await stat(fullPath);
@@ -390,7 +409,7 @@ ${refactorPrompt}`,
               full_path: fullPath,
               size: stats.size,
               modified: stats.mtime,
-              language: detectLanguage(extname(file))
+              language: detectLanguage(extname(file)),
             };
           } catch (error) {
             return null;
@@ -403,14 +422,13 @@ ${refactorPrompt}`,
         directory,
         files: projectStructure.filter(Boolean),
         total_files: files.length,
-        scanned_files: projectStructure.filter(Boolean).length
+        scanned_files: projectStructure.filter(Boolean).length,
       });
-
     } catch (error) {
       logger.error('Project scan failed:', error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Scan failed'
+        error: error instanceof Error ? error.message : 'Scan failed',
       });
     }
   });
@@ -433,30 +451,39 @@ ${refactorPrompt}`,
 
       res.json({
         success: true,
-        message: `Configuration updated: ${key}`
+        message: `Configuration updated: ${key}`,
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Config update failed'
+        error: error instanceof Error ? error.message : 'Config update failed',
       });
     }
   });
 
   // WebSocket handling for real-time communication
-  io.on('connection', (socket) => {
+  io.on('connection', socket => {
     console.log(chalk.gray(`🔌 IDE client connected: ${socket.id}`));
 
     // Send initial status
     socket.emit('status', {
       connected: true,
       model_available: true, // Will be updated by actual check
-      voices: context.config.voices?.available || ['explorer', 'maintainer', 'analyzer', 'developer', 'implementor', 'security', 'architect', 'designer', 'optimizer']
+      voices: context.config.voices?.available || [
+        'explorer',
+        'maintainer',
+        'analyzer',
+        'developer',
+        'implementor',
+        'security',
+        'architect',
+        'designer',
+        'optimizer',
+      ],
     });
 
     // Handle real-time code generation
-    socket.on('generate_realtime', async (data) => {
+    socket.on('generate_realtime', async data => {
       try {
         const { prompt, voices, mode, context: _userContext } = data;
 
@@ -473,20 +500,19 @@ ${refactorPrompt}`,
           id: data.id,
           success: true,
           result: synthesis,
-          responses: synthesis.responses || []
+          responses: synthesis.responses || [],
         });
-
       } catch (error) {
         socket.emit('generation_complete', {
           id: data.id,
           success: false,
-          error: error instanceof Error ? error.message : 'Generation failed'
+          error: error instanceof Error ? error.message : 'Generation failed',
         });
       }
     });
 
     // Handle file watching requests
-    socket.on('watch_file', (data) => {
+    socket.on('watch_file', data => {
       const { file_path } = data;
       // Implement file watching logic here
       console.log(chalk.gray(`👀 Watching file: ${file_path}`));
@@ -498,7 +524,7 @@ ${refactorPrompt}`,
   });
 
   // Start server
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     server.listen(options.port, options.host, () => {
       console.log(chalk.green(`✅ Server running on http://${options.host}:${options.port}`));
       console.log(chalk.gray('   Available endpoints:'));
@@ -510,14 +536,14 @@ ${refactorPrompt}`,
       console.log(chalk.gray('   • POST /api/file/:operation'));
       console.log(chalk.gray('   • POST /api/project/scan'));
       console.log(chalk.gray('   • WebSocket support for real-time communication'));
-      
+
       logger.info('Server mode started', {
         host: options.host,
         port: options.port,
         cors: options.cors,
-        auth: options.auth?.enabled
+        auth: options.auth?.enabled,
       });
-      
+
       resolve();
     });
   });
@@ -546,7 +572,7 @@ function detectLanguage(ext: string): string {
     '.css': 'css',
     '.scss': 'scss',
     '.vue': 'vue',
-    '.svelte': 'svelte'
+    '.svelte': 'svelte',
   };
 
   return langMap[ext.toLowerCase()] || 'text';
@@ -557,29 +583,45 @@ function detectLanguage(ext: string): string {
  */
 function calculateQualityScore(analysisContent: string): number {
   let score = 0.5; // Base score
-  
+
   // Positive indicators
-  if (analysisContent.includes('good') || analysisContent.includes('well-written') || analysisContent.includes('excellent')) {
+  if (
+    analysisContent.includes('good') ||
+    analysisContent.includes('well-written') ||
+    analysisContent.includes('excellent')
+  ) {
     score += 0.2;
   }
-  if (analysisContent.includes('clean') || analysisContent.includes('readable') || analysisContent.includes('maintainable')) {
+  if (
+    analysisContent.includes('clean') ||
+    analysisContent.includes('readable') ||
+    analysisContent.includes('maintainable')
+  ) {
     score += 0.15;
   }
   if (analysisContent.includes('optimized') || analysisContent.includes('efficient')) {
     score += 0.1;
   }
-  
+
   // Negative indicators
-  if (analysisContent.includes('issues') || analysisContent.includes('problems') || analysisContent.includes('bugs')) {
+  if (
+    analysisContent.includes('issues') ||
+    analysisContent.includes('problems') ||
+    analysisContent.includes('bugs')
+  ) {
     score -= 0.2;
   }
-  if (analysisContent.includes('improve') || analysisContent.includes('fix') || analysisContent.includes('refactor')) {
+  if (
+    analysisContent.includes('improve') ||
+    analysisContent.includes('fix') ||
+    analysisContent.includes('refactor')
+  ) {
     score -= 0.1;
   }
   if (analysisContent.includes('complex') || analysisContent.includes('difficult')) {
     score -= 0.05;
   }
-  
+
   // Ensure score is between 0 and 1
   return Math.max(0, Math.min(1, score));
 }
@@ -589,24 +631,28 @@ function calculateQualityScore(analysisContent: string): number {
  */
 function extractRecommendations(analysisContent: string): string[] {
   const recommendations: string[] = [];
-  
+
   // Split into sentences and look for recommendation patterns
-  const sentences = analysisContent.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
-  
+  const sentences = analysisContent
+    .split(/[.!?]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+
   for (const sentence of sentences) {
     const lowerSentence = sentence.toLowerCase();
-    
+
     // Look for recommendation patterns
-    if (lowerSentence.includes('should') || 
-        lowerSentence.includes('could') ||
-        lowerSentence.includes('consider') ||
-        lowerSentence.includes('recommend') ||
-        lowerSentence.includes('suggest') ||
-        lowerSentence.includes('improve') ||
-        lowerSentence.includes('add') ||
-        lowerSentence.includes('use') ||
-        lowerSentence.includes('implement')) {
-      
+    if (
+      lowerSentence.includes('should') ||
+      lowerSentence.includes('could') ||
+      lowerSentence.includes('consider') ||
+      lowerSentence.includes('recommend') ||
+      lowerSentence.includes('suggest') ||
+      lowerSentence.includes('improve') ||
+      lowerSentence.includes('add') ||
+      lowerSentence.includes('use') ||
+      lowerSentence.includes('implement')
+    ) {
       // Clean up the sentence
       const recommendation = sentence.trim();
       if (recommendation.length > 10 && recommendation.length < 200) {
@@ -614,6 +660,6 @@ function extractRecommendations(analysisContent: string): string[] {
       }
     }
   }
-  
+
   return recommendations.slice(0, 5); // Return top 5 recommendations
 }

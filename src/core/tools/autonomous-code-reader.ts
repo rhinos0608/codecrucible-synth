@@ -59,10 +59,10 @@ export interface ArchitecturalPattern {
 
 /**
  * Autonomous Code Reader - Intelligently traverses and analyzes codebases
- * 
+ *
  * Mimics how modern agents like Kilo Code and Claude Code understand projects:
  * 1. Discovers project structure and type
- * 2. Identifies key files and entry points  
+ * 2. Identifies key files and entry points
  * 3. Reads and analyzes important code files
  * 4. Extracts code definitions and patterns
  * 5. Maps dependencies and relationships
@@ -81,44 +81,47 @@ export class AutonomousCodeReader {
    */
   async analyzeCodeStructure(): Promise<CodeStructure> {
     logger.info('🔍 Starting autonomous code structure analysis...');
-    
+
     try {
-      return await (await import("../agent.js")).timeoutManager.executeWithRetry(
-        async () => {
-          // Phase 1: Project Discovery
-          const overview = await this.discoverProjectOverview();
-          logger.info(`📋 Discovered ${overview.primaryLanguage} project with ${overview.frameworks.join(', ')}`);
+      return await (
+        await import('../agent.js')
+      ).timeoutManager.executeWithRetry(async () => {
+        // Phase 1: Project Discovery
+        const overview = await this.discoverProjectOverview();
+        logger.info(
+          `📋 Discovered ${overview.primaryLanguage} project with ${overview.frameworks.join(', ')}`
+        );
 
-          // Phase 2: Identify Key Files
-          const keyFiles = await this.identifyKeyFiles(overview);
-          logger.info(`📁 Identified ${keyFiles.length} key files for analysis`);
+        // Phase 2: Identify Key Files
+        const keyFiles = await this.identifyKeyFiles(overview);
+        logger.info(`📁 Identified ${keyFiles.length} key files for analysis`);
 
-          // Phase 3: Read and Analyze Files
-          const analyzedFiles = await this.readAndAnalyzeFiles(keyFiles);
-          logger.info(`📖 Read and analyzed ${analyzedFiles.length} files`);
+        // Phase 3: Read and Analyze Files
+        const analyzedFiles = await this.readAndAnalyzeFiles(keyFiles);
+        logger.info(`📖 Read and analyzed ${analyzedFiles.length} files`);
 
-          // Phase 4: Extract Code Definitions
-          const codeDefinitions = await this.extractCodeDefinitions(analyzedFiles);
-          logger.info(`🔧 Extracted ${codeDefinitions.length} code definitions`);
+        // Phase 4: Extract Code Definitions
+        const codeDefinitions = await this.extractCodeDefinitions(analyzedFiles);
+        logger.info(`🔧 Extracted ${codeDefinitions.length} code definitions`);
 
-          // Phase 5: Map Dependencies
-          const dependencies = await this.mapDependencies(analyzedFiles);
-          logger.info(`🔗 Mapped dependencies: ${Object.keys(dependencies.external).length} external, ${Object.keys(dependencies.internal).length} internal`);
+        // Phase 5: Map Dependencies
+        const dependencies = await this.mapDependencies(analyzedFiles);
+        logger.info(
+          `🔗 Mapped dependencies: ${Object.keys(dependencies.external).length} external, ${Object.keys(dependencies.internal).length} internal`
+        );
 
-          // Phase 6: Identify Patterns
-          const patterns = await this.identifyArchitecturalPatterns(analyzedFiles, codeDefinitions);
-          logger.info(`🏗️ Identified ${patterns.length} architectural patterns`);
+        // Phase 6: Identify Patterns
+        const patterns = await this.identifyArchitecturalPatterns(analyzedFiles, codeDefinitions);
+        logger.info(`🏗️ Identified ${patterns.length} architectural patterns`);
 
-          return {
-            overview,
-            keyFiles: analyzedFiles,
-            codeDefinitions,
-            dependencies,
-            patterns
-          };
-        },
-        3
-      );
+        return {
+          overview,
+          keyFiles: analyzedFiles,
+          codeDefinitions,
+          dependencies,
+          patterns,
+        };
+      }, 3);
     } catch (error) {
       logger.error('❌ Autonomous code analysis failed:', error);
       throw error;
@@ -135,13 +138,13 @@ export class AutonomousCodeReader {
       frameworks: [],
       buildSystem: 'Unknown',
       testFramework: undefined,
-      packageManager: undefined
+      packageManager: undefined,
     };
 
     // Count all source files
     const sourceFiles = await glob('**/*.{js,ts,jsx,tsx,py,java,cpp,c,cs,php,rb,go,rs}', {
       cwd: this.projectPath,
-      ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**']
+      ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
     });
     overview.totalFiles = sourceFiles.length;
 
@@ -151,8 +154,8 @@ export class AutonomousCodeReader {
       const lang = this.detectLanguage(extname(file));
       languageCount[lang] = (languageCount[lang] || 0) + 1;
     }
-    overview.primaryLanguage = Object.entries(languageCount)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || 'Unknown';
+    overview.primaryLanguage =
+      Object.entries(languageCount).sort(([, a], [, b]) => b - a)[0]?.[0] || 'Unknown';
 
     // Detect frameworks and tools
     await this.detectFrameworksAndTools(overview);
@@ -165,27 +168,39 @@ export class AutonomousCodeReader {
    */
   private async identifyKeyFiles(overview: ProjectOverview): Promise<FileAnalysis[]> {
     const keyFiles: FileAnalysis[] = [];
-    
+
     // Priority patterns for different file types
     const priorityPatterns = [
       // Entry points and main files
-      { pattern: '**/index.{js,ts,jsx,tsx}', importance: 'critical' as const, type: 'source' as const },
-      { pattern: '**/main.{js,ts,py,java,cpp,c}', importance: 'critical' as const, type: 'source' as const },
+      {
+        pattern: '**/index.{js,ts,jsx,tsx}',
+        importance: 'critical' as const,
+        type: 'source' as const,
+      },
+      {
+        pattern: '**/main.{js,ts,py,java,cpp,c}',
+        importance: 'critical' as const,
+        type: 'source' as const,
+      },
       { pattern: '**/app.{js,ts,py}', importance: 'critical' as const, type: 'source' as const },
       { pattern: 'src/**/*.{js,ts,jsx,tsx}', importance: 'high' as const, type: 'source' as const },
-      
+
       // Configuration files
       { pattern: 'package.json', importance: 'critical' as const, type: 'config' as const },
       { pattern: 'tsconfig.json', importance: 'high' as const, type: 'config' as const },
       { pattern: '*.config.{js,ts}', importance: 'medium' as const, type: 'config' as const },
-      
+
       // Documentation
       { pattern: 'README.{md,txt}', importance: 'high' as const, type: 'documentation' as const },
       { pattern: 'docs/**/*.md', importance: 'medium' as const, type: 'documentation' as const },
-      
+
       // Tests
-      { pattern: '**/*.{test,spec}.{js,ts,jsx,tsx}', importance: 'medium' as const, type: 'test' as const },
-      { pattern: 'test/**/*.{js,ts}', importance: 'medium' as const, type: 'test' as const }
+      {
+        pattern: '**/*.{test,spec}.{js,ts,jsx,tsx}',
+        importance: 'medium' as const,
+        type: 'test' as const,
+      },
+      { pattern: 'test/**/*.{js,ts}', importance: 'medium' as const, type: 'test' as const },
     ];
 
     // Find files matching priority patterns
@@ -193,13 +208,14 @@ export class AutonomousCodeReader {
       try {
         const files = await glob(pattern, {
           cwd: this.projectPath,
-          ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**']
+          ignore: ['node_modules/**', '.git/**', 'dist/**', 'build/**'],
         });
 
-        for (const file of files.slice(0, 10)) { // Limit per pattern
+        for (const file of files.slice(0, 10)) {
+          // Limit per pattern
           const fullPath = join(this.projectPath, file);
           const stats = await stat(fullPath);
-          
+
           if (stats.isFile() && stats.size <= this.maxFileSize) {
             keyFiles.push({
               path: file,
@@ -208,7 +224,7 @@ export class AutonomousCodeReader {
               size: stats.size,
               complexity: 0, // Will calculate when reading
               purpose: this.inferFilePurpose(file),
-              importance
+              importance,
             });
           }
         }
@@ -243,13 +259,13 @@ export class AutonomousCodeReader {
       try {
         const fullPath = join(this.projectPath, file.path);
         const content = await readFile(fullPath, 'utf-8');
-        
+
         // Store truncated content for analysis
         file.content = content.substring(0, 2000);
-        
+
         // Calculate complexity (simple line-based metric)
         file.complexity = this.calculateComplexity(content);
-        
+
         // Extract code definitions for source files
         if (file.type === 'source' && this.isAnalyzableSourceFile(file.language)) {
           file.definitions = await this.extractDefinitionsFromContent(content, file.path);
@@ -257,7 +273,6 @@ export class AutonomousCodeReader {
 
         analyzedFiles.push(file);
         logger.debug(`📖 Read ${file.path} (${file.size} bytes, complexity: ${file.complexity})`);
-        
       } catch (error) {
         logger.warn(`Failed to read ${file.path}:`, error);
       }
@@ -288,7 +303,7 @@ export class AutonomousCodeReader {
     const dependencies: DependencyMap = {
       internal: {},
       external: {},
-      imports: {}
+      imports: {},
     };
 
     // Extract external dependencies from package.json
@@ -298,7 +313,7 @@ export class AutonomousCodeReader {
         const pkg = JSON.parse(packageJsonFile.content);
         dependencies.external = {
           ...pkg.dependencies,
-          ...pkg.devDependencies
+          ...pkg.devDependencies,
         };
       } catch (error) {
         logger.debug('Failed to parse package.json:', error);
@@ -322,7 +337,7 @@ export class AutonomousCodeReader {
    * Phase 6: Identify architectural patterns
    */
   private async identifyArchitecturalPatterns(
-    files: FileAnalysis[], 
+    files: FileAnalysis[],
     definitions: CodeDefinition[]
   ): Promise<ArchitecturalPattern[]> {
     const patterns: ArchitecturalPattern[] = [];
@@ -330,22 +345,25 @@ export class AutonomousCodeReader {
     // MVC Pattern Detection
     const models = files.filter(f => f.path.includes('model') || f.purpose.includes('Model'));
     const views = files.filter(f => f.path.includes('view') || f.path.includes('component'));
-    const controllers = files.filter(f => f.path.includes('controller') || f.path.includes('handler'));
+    const controllers = files.filter(
+      f => f.path.includes('controller') || f.path.includes('handler')
+    );
 
     if (models.length > 0 && views.length > 0 && controllers.length > 0) {
       patterns.push({
         name: 'MVC (Model-View-Controller)',
         description: 'Classic MVC architecture separating data, presentation, and logic',
         files: [...models, ...views, ...controllers].map(f => f.path),
-        confidence: 0.8
+        confidence: 0.8,
       });
     }
 
     // Component-Based Architecture
-    const components = files.filter(f => 
-      f.path.includes('component') || 
-      f.path.includes('widget') ||
-      definitions.some(d => d.file === f.path && d.name.includes('Component'))
+    const components = files.filter(
+      f =>
+        f.path.includes('component') ||
+        f.path.includes('widget') ||
+        definitions.some(d => d.file === f.path && d.name.includes('Component'))
     );
 
     if (components.length > 3) {
@@ -353,15 +371,16 @@ export class AutonomousCodeReader {
         name: 'Component-Based Architecture',
         description: 'Modular architecture using reusable components',
         files: components.map(f => f.path),
-        confidence: 0.7
+        confidence: 0.7,
       });
     }
 
     // Service Layer Pattern
-    const services = files.filter(f => 
-      f.path.includes('service') || 
-      f.path.includes('api') ||
-      definitions.some(d => d.file === f.path && d.name.includes('Service'))
+    const services = files.filter(
+      f =>
+        f.path.includes('service') ||
+        f.path.includes('api') ||
+        definitions.some(d => d.file === f.path && d.name.includes('Service'))
     );
 
     if (services.length > 2) {
@@ -369,7 +388,7 @@ export class AutonomousCodeReader {
         name: 'Service Layer',
         description: 'Business logic organized in service classes',
         files: services.map(f => f.path),
-        confidence: 0.6
+        confidence: 0.6,
       });
     }
 
@@ -382,38 +401,61 @@ export class AutonomousCodeReader {
 
   private async detectFrameworksAndTools(overview: ProjectOverview): Promise<void> {
     const configChecks = [
-      { file: 'package.json', detect: async (content: string) => {
-        try {
-          const pkg = JSON.parse(content);
-          const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-          
-          // Detect frameworks
-          if (deps.react) overview.frameworks.push('React');
-          if (deps.vue) overview.frameworks.push('Vue');
-          if (deps['@angular/core']) overview.frameworks.push('Angular');
-          if (deps.express) overview.frameworks.push('Express');
-          if (deps.next) overview.frameworks.push('Next.js');
-          
-          // Detect build systems
-          if (deps.webpack) overview.buildSystem = 'Webpack';
-          if (deps.vite) overview.buildSystem = 'Vite';
-          if (deps.rollup) overview.buildSystem = 'Rollup';
-          
-          // Detect test frameworks
-          if (deps.jest) overview.testFramework = 'Jest';
-          if (deps.mocha) overview.testFramework = 'Mocha';
-          if (deps.vitest) overview.testFramework = 'Vitest';
-          
-          // Package manager
-          overview.packageManager = 'npm';
-        } catch (error) {
-          logger.debug('Failed to parse package.json:', error);
-        }
-      }},
-      { file: 'yarn.lock', detect: async () => { overview.packageManager = 'yarn'; }},
-      { file: 'pnpm-lock.yaml', detect: async () => { overview.packageManager = 'pnpm'; }},
-      { file: 'Cargo.toml', detect: async () => { overview.buildSystem = 'Cargo'; }},
-      { file: 'requirements.txt', detect: async () => { overview.packageManager = 'pip'; }},
+      {
+        file: 'package.json',
+        detect: async (content: string) => {
+          try {
+            const pkg = JSON.parse(content);
+            const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+            // Detect frameworks
+            if (deps.react) overview.frameworks.push('React');
+            if (deps.vue) overview.frameworks.push('Vue');
+            if (deps['@angular/core']) overview.frameworks.push('Angular');
+            if (deps.express) overview.frameworks.push('Express');
+            if (deps.next) overview.frameworks.push('Next.js');
+
+            // Detect build systems
+            if (deps.webpack) overview.buildSystem = 'Webpack';
+            if (deps.vite) overview.buildSystem = 'Vite';
+            if (deps.rollup) overview.buildSystem = 'Rollup';
+
+            // Detect test frameworks
+            if (deps.jest) overview.testFramework = 'Jest';
+            if (deps.mocha) overview.testFramework = 'Mocha';
+            if (deps.vitest) overview.testFramework = 'Vitest';
+
+            // Package manager
+            overview.packageManager = 'npm';
+          } catch (error) {
+            logger.debug('Failed to parse package.json:', error);
+          }
+        },
+      },
+      {
+        file: 'yarn.lock',
+        detect: async () => {
+          overview.packageManager = 'yarn';
+        },
+      },
+      {
+        file: 'pnpm-lock.yaml',
+        detect: async () => {
+          overview.packageManager = 'pnpm';
+        },
+      },
+      {
+        file: 'Cargo.toml',
+        detect: async () => {
+          overview.buildSystem = 'Cargo';
+        },
+      },
+      {
+        file: 'requirements.txt',
+        detect: async () => {
+          overview.packageManager = 'pip';
+        },
+      },
     ];
 
     for (const { file, detect } of configChecks) {
@@ -429,7 +471,7 @@ export class AutonomousCodeReader {
   private detectLanguage(ext: string): string {
     const langMap: Record<string, string> = {
       '.js': 'JavaScript',
-      '.ts': 'TypeScript', 
+      '.ts': 'TypeScript',
       '.jsx': 'JSX',
       '.tsx': 'TSX',
       '.py': 'Python',
@@ -442,7 +484,7 @@ export class AutonomousCodeReader {
       '.go': 'Go',
       '.rs': 'Rust',
       '.md': 'Markdown',
-      '.json': 'JSON'
+      '.json': 'JSON',
     };
     return langMap[ext.toLowerCase()] || 'Unknown';
   }
@@ -450,7 +492,7 @@ export class AutonomousCodeReader {
   private inferFilePurpose(filePath: string): string {
     const fileName = basename(filePath).toLowerCase();
     const dirPath = filePath.toLowerCase();
-    
+
     if (fileName === 'index.js' || fileName === 'index.ts') return 'Entry Point';
     if (fileName === 'main.js' || fileName === 'main.ts') return 'Main Module';
     if (fileName === 'app.js' || fileName === 'app.ts') return 'Application Core';
@@ -463,14 +505,14 @@ export class AutonomousCodeReader {
     if (dirPath.includes('controller')) return 'Request Handler';
     if (dirPath.includes('route') || dirPath.includes('api')) return 'API Endpoint';
     if (fileName === 'readme.md') return 'Documentation';
-    
+
     return 'Source Code';
   }
 
   private calculateComplexity(content: string): number {
     const lines = content.split('\n');
     let complexity = 0;
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
       // Simple complexity metrics
@@ -480,21 +522,24 @@ export class AutonomousCodeReader {
       if (trimmed.includes('switch ') || trimmed.includes('switch(')) complexity++;
       if (trimmed.includes('catch ') || trimmed.includes('catch(')) complexity++;
     }
-    
-    return Math.max(1, Math.round(complexity / lines.length * 100));
+
+    return Math.max(1, Math.round((complexity / lines.length) * 100));
   }
 
   private isAnalyzableSourceFile(language: string): boolean {
     return ['JavaScript', 'TypeScript', 'JSX', 'TSX'].includes(language);
   }
 
-  private async extractDefinitionsFromContent(content: string, filePath: string): Promise<CodeDefinition[]> {
+  private async extractDefinitionsFromContent(
+    content: string,
+    filePath: string
+  ): Promise<CodeDefinition[]> {
     const definitions: CodeDefinition[] = [];
     const lines = content.split('\n');
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       // Simple regex-based extraction (would use AST in production)
       const patterns = [
         { regex: /^export\s+class\s+(\w+)/, type: 'class' as const },
@@ -518,29 +563,29 @@ export class AutonomousCodeReader {
             line: i + 1,
             signature: line,
             isExported: line.includes('export'),
-            dependencies: this.extractImports(content, 'TypeScript')
+            dependencies: this.extractImports(content, 'TypeScript'),
           });
         }
       }
     }
-    
+
     return definitions;
   }
 
   private extractImports(content: string, language: string): string[] {
     const imports: string[] = [];
     const lines = content.split('\n');
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
-      
+
       if (language === 'TypeScript' || language === 'JavaScript') {
         // import statements
         const importMatch = trimmed.match(/import.*from\s+['"]([^'"]+)['"]/);
         if (importMatch) {
           imports.push(importMatch[1]);
         }
-        
+
         // require statements
         const requireMatch = trimmed.match(/require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
         if (requireMatch) {
@@ -548,7 +593,7 @@ export class AutonomousCodeReader {
         }
       }
     }
-    
+
     return imports;
   }
 }

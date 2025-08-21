@@ -20,11 +20,11 @@ export interface ActiveProcess {
 }
 
 export interface ResourceThresholds {
-  memoryWarning: number;      // 75% - warn but continue
-  memoryCritical: number;     // 85% - start terminating low priority
-  memoryEmergency: number;    // 95% - terminate all and switch models
-  cpuWarning: number;         // 80%
-  cpuCritical: number;        // 90%
+  memoryWarning: number; // 75% - warn but continue
+  memoryCritical: number; // 85% - start terminating low priority
+  memoryEmergency: number; // 95% - terminate all and switch models
+  cpuWarning: number; // 80%
+  cpuCritical: number; // 90%
 }
 
 export interface ProcessTerminationEvent {
@@ -53,13 +53,13 @@ export class ActiveProcessManager extends EventEmitter {
     super();
     this.logger = new Logger('ActiveProcessManager');
     this.hardwareSelector = hardwareSelector;
-    
+
     this.thresholds = {
-      memoryWarning: 0.80,    // 80% - early warning (less aggressive)
-      memoryCritical: 0.90,   // 90% - start optimizing
-      memoryEmergency: 0.95,  // 95% - emergency model switch
-      cpuWarning: 0.75,       // 75%
-      cpuCritical: 0.85       // 85%
+      memoryWarning: 0.8, // 80% - early warning (less aggressive)
+      memoryCritical: 0.9, // 90% - start optimizing
+      memoryEmergency: 0.95, // 95% - emergency model switch
+      cpuWarning: 0.75, // 75%
+      cpuCritical: 0.85, // 85%
     };
 
     this.startResourceMonitoring();
@@ -69,23 +69,28 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Register a new active process for monitoring
    */
-  registerProcess(process: Omit<ActiveProcess, 'id' | 'startTime' | 'abortController'>): ActiveProcess {
+  registerProcess(
+    process: Omit<ActiveProcess, 'id' | 'startTime' | 'abortController'>
+  ): ActiveProcess {
     const id = this.generateProcessId();
     const abortController = new AbortController();
-    
+
     const activeProcess: ActiveProcess = {
       id,
       startTime: new Date(),
       abortController,
-      ...process
+      ...process,
     };
 
     this.activeProcesses.set(id, activeProcess);
-    
-    this.logger.info(`Registered process ${id} (${process.type}) using model ${process.modelName}`, {
-      estimatedMemory: `${process.estimatedMemoryUsage.toFixed(1)}MB`,
-      priority: process.priority
-    });
+
+    this.logger.info(
+      `Registered process ${id} (${process.type}) using model ${process.modelName}`,
+      {
+        estimatedMemory: `${process.estimatedMemoryUsage.toFixed(1)}MB`,
+        priority: process.priority,
+      }
+    );
 
     // Check if we should immediately terminate due to current resource pressure
     this.checkResourcePressure();
@@ -115,7 +120,7 @@ export class ActiveProcessManager extends EventEmitter {
         console.error('Resource monitoring error:', error);
       }
     }, 2000); // Check every 2 seconds for responsive memory management
-    
+
     // Prevent the interval from keeping the process alive
     if (this.resourceMonitorInterval.unref) {
       this.resourceMonitorInterval.unref();
@@ -131,7 +136,9 @@ export class ActiveProcessManager extends EventEmitter {
     const memoryUsage = this.getCurrentMemoryUsage();
     const cpuUsage = this.getCurrentCpuUsage();
 
-    this.logger.debug(`Resource usage: Memory ${(memoryUsage * 100).toFixed(1)}%, CPU ${(cpuUsage * 100).toFixed(1)}%`);
+    this.logger.debug(
+      `Resource usage: Memory ${(memoryUsage * 100).toFixed(1)}%, CPU ${(cpuUsage * 100).toFixed(1)}%`
+    );
 
     // Memory pressure handling
     if (memoryUsage >= this.thresholds.memoryEmergency) {
@@ -153,16 +160,16 @@ export class ActiveProcessManager extends EventEmitter {
    */
   private async handleEmergencyMemoryPressure(memoryUsage: number): Promise<void> {
     if (this.modelSwitchInProgress) return;
-    
+
     // DISABLED: Emergency warnings disabled for normal operation
-    
+
     this.modelSwitchInProgress = true;
     this.isTerminating = true;
 
     try {
       // Terminate ALL processes immediately
       const terminatedCount = await this.terminateAllProcesses('memory_pressure');
-      
+
       this.logger.warn(`Terminated ${terminatedCount} processes due to memory emergency`);
 
       // Force garbage collection if available
@@ -179,7 +186,6 @@ export class ActiveProcessManager extends EventEmitter {
       if (switched) {
         this.logger.info('✅ Successfully switched to smaller model due to memory pressure');
       }
-
     } catch (error) {
       this.logger.error('Failed to handle emergency memory pressure:', error);
     } finally {
@@ -214,11 +220,13 @@ export class ActiveProcessManager extends EventEmitter {
     for (const process of processesToTerminate) {
       await this.terminateProcess(process.id, 'memory_pressure');
       terminatedCount++;
-      
+
       // Check if memory usage has improved enough
       const currentUsage = this.getCurrentMemoryUsage();
       if (currentUsage < this.thresholds.memoryWarning) {
-        this.logger.info(`✅ Memory pressure relieved after terminating ${terminatedCount} processes`);
+        this.logger.info(
+          `✅ Memory pressure relieved after terminating ${terminatedCount} processes`
+        );
         break;
       }
     }
@@ -237,7 +245,7 @@ export class ActiveProcessManager extends EventEmitter {
     this.emit('memoryWarning', {
       usage: memoryUsage,
       threshold: this.thresholds.memoryWarning,
-      activeProcesses: this.activeProcesses.size
+      activeProcesses: this.activeProcesses.size,
     });
   }
 
@@ -245,7 +253,9 @@ export class ActiveProcessManager extends EventEmitter {
    * Handle critical CPU pressure
    */
   private async handleCriticalCpuPressure(cpuUsage: number): Promise<void> {
-    this.logger.warn(`⚠️ High CPU usage at ${(cpuUsage * 100).toFixed(1)}% - terminating CPU-intensive processes`);
+    this.logger.warn(
+      `⚠️ High CPU usage at ${(cpuUsage * 100).toFixed(1)}% - terminating CPU-intensive processes`
+    );
 
     // Find and terminate CPU-intensive processes
     const cpuIntensiveProcesses = Array.from(this.activeProcesses.values())
@@ -254,7 +264,8 @@ export class ActiveProcessManager extends EventEmitter {
       .sort((a, b) => b.estimatedMemoryUsage - a.estimatedMemoryUsage); // Terminate largest first
 
     let terminatedCount = 0;
-    for (const process of cpuIntensiveProcesses.slice(0, 2)) { // Terminate up to 2 processes
+    for (const process of cpuIntensiveProcesses.slice(0, 2)) {
+      // Terminate up to 2 processes
       await this.terminateProcess(process.id, 'cpu_pressure');
       terminatedCount++;
     }
@@ -267,7 +278,10 @@ export class ActiveProcessManager extends EventEmitter {
   /**
    * Terminate a specific process
    */
-  private async terminateProcess(processId: string, reason: ProcessTerminationEvent['reason']): Promise<boolean> {
+  private async terminateProcess(
+    processId: string,
+    reason: ProcessTerminationEvent['reason']
+  ): Promise<boolean> {
     const process = this.activeProcesses.get(processId);
     if (!process) return false;
 
@@ -286,9 +300,9 @@ export class ActiveProcessManager extends EventEmitter {
         reason,
         resourceUsage: {
           memory: this.getCurrentMemoryUsage(),
-          cpu: this.getCurrentCpuUsage()
+          cpu: this.getCurrentCpuUsage(),
         },
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       this.emit('processTerminated', event);
@@ -338,15 +352,17 @@ export class ActiveProcessManager extends EventEmitter {
    * Setup event listeners for model selector
    */
   private setupModelSelectorEvents(): void {
-    this.hardwareSelector.on('modelSwitch', (event) => {
-      this.logger.info(`Model switched from ${event.fromModel} to ${event.toModel} due to ${event.reason}`);
-      
+    this.hardwareSelector.on('modelSwitch', event => {
+      this.logger.info(
+        `Model switched from ${event.fromModel} to ${event.toModel} due to ${event.reason}`
+      );
+
       // Update all future processes to use the new model
       this.emit('modelSwitched', {
         fromModel: event.fromModel,
         toModel: event.toModel,
         reason: event.reason,
-        timestamp: event.timestamp
+        timestamp: event.timestamp,
       });
     });
   }
@@ -362,16 +378,17 @@ export class ActiveProcessManager extends EventEmitter {
         model_inference: processes.filter(p => p.type === 'model_inference').length,
         analysis: processes.filter(p => p.type === 'analysis').length,
         generation: processes.filter(p => p.type === 'generation').length,
-        streaming: processes.filter(p => p.type === 'streaming').length
+        streaming: processes.filter(p => p.type === 'streaming').length,
       },
       byPriority: {
         critical: processes.filter(p => p.priority === 'critical').length,
         high: processes.filter(p => p.priority === 'high').length,
         medium: processes.filter(p => p.priority === 'medium').length,
-        low: processes.filter(p => p.priority === 'low').length
+        low: processes.filter(p => p.priority === 'low').length,
       },
       totalEstimatedMemory: processes.reduce((sum, p) => sum + p.estimatedMemoryUsage, 0),
-      oldestProcess: processes.length > 0 ? Math.min(...processes.map(p => p.startTime.getTime())) : null
+      oldestProcess:
+        processes.length > 0 ? Math.min(...processes.map(p => p.startTime.getTime())) : null,
     };
   }
 
@@ -380,10 +397,10 @@ export class ActiveProcessManager extends EventEmitter {
    */
   async emergencyShutdown(): Promise<void> {
     this.logger.error('🚨 EMERGENCY SHUTDOWN - terminating all processes immediately');
-    
+
     this.isTerminating = true;
     const terminatedCount = await this.terminateAllProcesses('memory_pressure');
-    
+
     this.logger.error(`Emergency shutdown complete - terminated ${terminatedCount} processes`);
   }
 
@@ -402,7 +419,7 @@ export class ActiveProcessManager extends EventEmitter {
     return {
       memory: this.getCurrentMemoryUsage(),
       cpu: this.getCurrentCpuUsage(),
-      processes: this.activeProcesses.size
+      processes: this.activeProcesses.size,
     };
   }
 
@@ -411,15 +428,15 @@ export class ActiveProcessManager extends EventEmitter {
    */
   destroy(): void {
     this.logger.info('Destroying ActiveProcessManager');
-    
+
     if (this.resourceMonitorInterval) {
       clearInterval(this.resourceMonitorInterval);
       this.resourceMonitorInterval = null;
     }
-    
+
     // Emergency terminate all processes
     this.terminateAllProcesses('memory_pressure');
-    
+
     this.removeAllListeners();
     this.logger.info('ActiveProcessManager destroyed');
   }
@@ -430,8 +447,12 @@ export class ActiveProcessManager extends EventEmitter {
   }
 
   private lastWarningTime: number = 0;
-  private getLastWarningTime(): number { return this.lastWarningTime; }
-  private setLastWarningTime(time: number): void { this.lastWarningTime = time; }
+  private getLastWarningTime(): number {
+    return this.lastWarningTime;
+  }
+  private setLastWarningTime(time: number): void {
+    this.lastWarningTime = time;
+  }
 }
 
 export default ActiveProcessManager;

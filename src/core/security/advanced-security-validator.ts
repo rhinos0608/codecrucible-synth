@@ -25,7 +25,12 @@ export interface ValidationResult {
 }
 
 export interface SecurityViolation {
-  type: 'command_injection' | 'path_traversal' | 'malicious_pattern' | 'excessive_length' | 'suspicious_content';
+  type:
+    | 'command_injection'
+    | 'path_traversal'
+    | 'malicious_pattern'
+    | 'excessive_length'
+    | 'suspicious_content';
   description: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   location?: string;
@@ -58,7 +63,7 @@ export class AdvancedSecurityValidator {
       violations.push({
         type: 'excessive_length',
         description: `Input exceeds maximum length of ${this.policy.maxInputLength} characters`,
-        severity: 'medium'
+        severity: 'medium',
       });
       riskLevel = 'medium';
     }
@@ -101,11 +106,12 @@ export class AdvancedSecurityValidator {
     const sanitizedInput = violations.length === 0 ? input : this.sanitizeInput(input, violations);
 
     return {
-      isValid: riskLevel !== 'critical' && violations.filter(v => v.severity === 'critical').length === 0,
+      isValid:
+        riskLevel !== 'critical' && violations.filter(v => v.severity === 'critical').length === 0,
       riskLevel,
       violations,
       sanitizedInput,
-      recommendations
+      recommendations,
     };
   }
 
@@ -114,7 +120,7 @@ export class AdvancedSecurityValidator {
    */
   private detectCommandInjection(input: string): SecurityViolation[] {
     const violations: SecurityViolation[] = [];
-    
+
     // Shell metacharacters and patterns
     const commandPatterns = [
       { pattern: /[;&|`$(){}]/g, severity: 'high' as const, desc: 'Shell metacharacters detected' },
@@ -122,13 +128,33 @@ export class AdvancedSecurityValidator {
       { pattern: /&&\s*[a-z]/gi, severity: 'critical' as const, desc: 'Command chaining detected' },
       { pattern: /;\s*[a-z]/gi, severity: 'critical' as const, desc: 'Command separator detected' },
       { pattern: /`[^`]+`/g, severity: 'critical' as const, desc: 'Command substitution detected' },
-      { pattern: /\$\([^)]+\)/g, severity: 'critical' as const, desc: 'Command substitution detected' },
-      { pattern: /rm\s+-r?f?\s+/gi, severity: 'critical' as const, desc: 'Dangerous delete command detected' },
-      { pattern: /curl\s+.*(\||>)/gi, severity: 'high' as const, desc: 'Network download with redirection' },
-      { pattern: /wget\s+.*(\||>)/gi, severity: 'high' as const, desc: 'Network download with redirection' },
-      { pattern: /chmod\s+[0-9]+/gi, severity: 'medium' as const, desc: 'File permission modification' },
+      {
+        pattern: /\$\([^)]+\)/g,
+        severity: 'critical' as const,
+        desc: 'Command substitution detected',
+      },
+      {
+        pattern: /rm\s+-r?f?\s+/gi,
+        severity: 'critical' as const,
+        desc: 'Dangerous delete command detected',
+      },
+      {
+        pattern: /curl\s+.*(\||>)/gi,
+        severity: 'high' as const,
+        desc: 'Network download with redirection',
+      },
+      {
+        pattern: /wget\s+.*(\||>)/gi,
+        severity: 'high' as const,
+        desc: 'Network download with redirection',
+      },
+      {
+        pattern: /chmod\s+[0-9]+/gi,
+        severity: 'medium' as const,
+        desc: 'File permission modification',
+      },
       { pattern: /sudo\s+/gi, severity: 'high' as const, desc: 'Privilege escalation attempt' },
-      { pattern: /su\s+/gi, severity: 'high' as const, desc: 'User switching attempt' }
+      { pattern: /su\s+/gi, severity: 'high' as const, desc: 'User switching attempt' },
     ];
 
     for (const { pattern, severity, desc } of commandPatterns) {
@@ -138,7 +164,7 @@ export class AdvancedSecurityValidator {
           type: 'command_injection',
           description: desc,
           severity,
-          pattern: pattern.toString()
+          pattern: pattern.toString(),
         });
       }
     }
@@ -151,15 +177,39 @@ export class AdvancedSecurityValidator {
    */
   private detectPathTraversal(input: string): SecurityViolation[] {
     const violations: SecurityViolation[] = [];
-    
+
     const pathPatterns = [
       { pattern: /\.\.\/+/g, severity: 'high' as const, desc: 'Directory traversal detected' },
-      { pattern: /\.\.\\+/g, severity: 'high' as const, desc: 'Windows directory traversal detected' },
-      { pattern: /\/etc\/passwd/gi, severity: 'critical' as const, desc: 'System file access attempt' },
-      { pattern: /\/etc\/shadow/gi, severity: 'critical' as const, desc: 'Password file access attempt' },
-      { pattern: /C:\\Windows\\System32/gi, severity: 'high' as const, desc: 'Windows system directory access' },
-      { pattern: /\/proc\/self\/environ/gi, severity: 'high' as const, desc: 'Environment variable access' },
-      { pattern: /\/home\/[^\/]+\/\.ssh/gi, severity: 'high' as const, desc: 'SSH key directory access' }
+      {
+        pattern: /\.\.\\+/g,
+        severity: 'high' as const,
+        desc: 'Windows directory traversal detected',
+      },
+      {
+        pattern: /\/etc\/passwd/gi,
+        severity: 'critical' as const,
+        desc: 'System file access attempt',
+      },
+      {
+        pattern: /\/etc\/shadow/gi,
+        severity: 'critical' as const,
+        desc: 'Password file access attempt',
+      },
+      {
+        pattern: /C:\\Windows\\System32/gi,
+        severity: 'high' as const,
+        desc: 'Windows system directory access',
+      },
+      {
+        pattern: /\/proc\/self\/environ/gi,
+        severity: 'high' as const,
+        desc: 'Environment variable access',
+      },
+      {
+        pattern: /\/home\/[^\/]+\/\.ssh/gi,
+        severity: 'high' as const,
+        desc: 'SSH key directory access',
+      },
     ];
 
     for (const { pattern, severity, desc } of pathPatterns) {
@@ -169,7 +219,7 @@ export class AdvancedSecurityValidator {
           type: 'path_traversal',
           description: desc,
           severity,
-          pattern: pattern.toString()
+          pattern: pattern.toString(),
         });
       }
     }
@@ -189,7 +239,7 @@ export class AdvancedSecurityValidator {
           type: 'malicious_pattern',
           description: `Known malicious pattern detected: ${pattern.toString()}`,
           severity: 'critical',
-          pattern: pattern.toString()
+          pattern: pattern.toString(),
         });
       }
     }
@@ -210,7 +260,7 @@ export class AdvancedSecurityValidator {
         violations.push({
           type: 'suspicious_content',
           description: `Suspicious keyword detected: ${keyword}`,
-          severity: 'medium'
+          severity: 'medium',
         });
       }
     }
@@ -220,7 +270,7 @@ export class AdvancedSecurityValidator {
       violations.push({
         type: 'suspicious_content',
         description: 'Potentially encoded malicious content detected',
-        severity: 'high'
+        severity: 'high',
       });
     }
 
@@ -231,7 +281,7 @@ export class AdvancedSecurityValidator {
       /delete\s+from/gi,
       /insert\s+into/gi,
       /update\s+.*set/gi,
-      /'.*or.*'.*=.*'/gi
+      /'.*or.*'.*=.*'/gi,
     ];
 
     for (const pattern of sqlPatterns) {
@@ -240,7 +290,7 @@ export class AdvancedSecurityValidator {
           type: 'suspicious_content',
           description: 'SQL injection pattern detected',
           severity: 'high',
-          pattern: pattern.toString()
+          pattern: pattern.toString(),
         });
       }
     }
@@ -256,7 +306,7 @@ export class AdvancedSecurityValidator {
       // Check for base64 encoded content
       const base64Pattern = /[A-Za-z0-9+/]{20,}={0,2}/g;
       const base64Matches = input.match(base64Pattern);
-      
+
       if (base64Matches) {
         for (const match of base64Matches) {
           try {
@@ -286,14 +336,13 @@ export class AdvancedSecurityValidator {
       // Check for hex encoded content
       const hexPattern = /\\x[0-9A-Fa-f]{2}/g;
       if (hexPattern.test(input)) {
-        const decoded = input.replace(/\\x([0-9A-Fa-f]{2})/g, (_, hex) => 
+        const decoded = input.replace(/\\x([0-9A-Fa-f]{2})/g, (_, hex) =>
           String.fromCharCode(parseInt(hex, 16))
         );
         if (this.containsSuspiciousPatterns(decoded)) {
           return true;
         }
       }
-
     } catch (error) {
       this.logger.warn('Error checking encoded content:', error);
     }
@@ -311,7 +360,7 @@ export class AdvancedSecurityValidator {
       /exploit/i,
       /payload/i,
       /shellcode/i,
-      /backdoor/i
+      /backdoor/i,
     ];
 
     return suspiciousPatterns.some(pattern => pattern.test(text));
@@ -325,17 +374,17 @@ export class AdvancedSecurityValidator {
 
     // Remove shell metacharacters
     sanitized = sanitized.replace(/[;&|`$(){}]/g, '');
-    
+
     // Remove path traversal sequences
     sanitized = sanitized.replace(/\.\.\/+/g, './');
     sanitized = sanitized.replace(/\.\.\\+/g, '.\\');
-    
+
     // Remove dangerous commands
     sanitized = sanitized.replace(/rm\s+-r?f?\s+/gi, '[FILTERED] ');
     sanitized = sanitized.replace(/curl\s+/gi, '[FILTERED] ');
     sanitized = sanitized.replace(/wget\s+/gi, '[FILTERED] ');
     sanitized = sanitized.replace(/sudo\s+/gi, '[FILTERED] ');
-    
+
     // Filter out malicious keywords including "malicious" itself
     const criticalKeywords = ['malicious', 'exploit', 'payload', 'shellcode', 'backdoor'];
     for (const keyword of criticalKeywords) {
@@ -349,12 +398,19 @@ export class AdvancedSecurityValidator {
   /**
    * Generate security recommendations
    */
-  private generateRecommendations(violations: SecurityViolation[], riskLevel: ValidationResult['riskLevel']): string[] {
+  private generateRecommendations(
+    violations: SecurityViolation[],
+    riskLevel: ValidationResult['riskLevel']
+  ): string[] {
     const recommendations: string[] = [];
 
     if (riskLevel === 'critical') {
-      recommendations.push('CRITICAL: Input contains dangerous patterns that could compromise system security');
-      recommendations.push('Recommend rejecting this input and implementing additional validation layers');
+      recommendations.push(
+        'CRITICAL: Input contains dangerous patterns that could compromise system security'
+      );
+      recommendations.push(
+        'Recommend rejecting this input and implementing additional validation layers'
+      );
     }
 
     if (violations.some(v => v.type === 'command_injection')) {
@@ -363,12 +419,16 @@ export class AdvancedSecurityValidator {
     }
 
     if (violations.some(v => v.type === 'path_traversal')) {
-      recommendations.push('Implement path validation and restrict file access to approved directories');
+      recommendations.push(
+        'Implement path validation and restrict file access to approved directories'
+      );
       recommendations.push('Use absolute paths and canonical path resolution');
     }
 
     if (violations.some(v => v.type === 'malicious_pattern')) {
-      recommendations.push('Content matches known malicious patterns - consider blocking this input');
+      recommendations.push(
+        'Content matches known malicious patterns - consider blocking this input'
+      );
       recommendations.push('Update malicious pattern database regularly');
     }
 
@@ -399,27 +459,27 @@ export class AdvancedSecurityValidator {
       /sh.*-c/gi, // Shell command execution
       /powershell.*-c/gi, // PowerShell execution
       /cmd.*\/c/gi, // Windows command execution
-      
+
       // File operations
       /echo.*>>.*\/etc\//gi, // Writing to system files
       /cat.*\/etc\/passwd/gi, // Reading password file
       /ls.*-la.*\/etc/gi, // Listing system directories
-      
+
       // Network operations
       /wget.*\|\s*sh/gi, // Download and execute
       /curl.*\|\s*bash/gi, // Download and execute
-      
+
       // Process manipulation
       /kill\s+-9/gi, // Force kill processes
       /killall/gi, // Kill all processes
       /pkill/gi, // Pattern-based process killing
-      
+
       // System information gathering
       /uname\s+-a/gi, // System information
       /whoami/gi, // Current user
       /id\s*$/gi, // User ID information
       /ps\s+aux/gi, // Process listing
-      
+
       // Privilege escalation
       /sudo\s+su/gi, // Switch to root
       /su\s+-/gi, // Switch user
@@ -434,20 +494,49 @@ export class AdvancedSecurityValidator {
   private initializeSuspiciousKeywords(): void {
     this.suspiciousKeywords = [
       // Hacking/exploitation terms
-      'exploit', 'payload', 'shellcode', 'backdoor', 'trojan', 'virus',
-      'rootkit', 'keylogger', 'botnet', 'ransomware', 'malware',
-      
+      'exploit',
+      'payload',
+      'shellcode',
+      'backdoor',
+      'trojan',
+      'virus',
+      'rootkit',
+      'keylogger',
+      'botnet',
+      'ransomware',
+      'malware',
+
       // Attack methods
-      'injection', 'overflow', 'xss', 'csrf', 'clickjacking', 'phishing',
-      'spoofing', 'sniffing', 'bruteforce', 'dictionary', 'rainbow',
-      
+      'injection',
+      'overflow',
+      'xss',
+      'csrf',
+      'clickjacking',
+      'phishing',
+      'spoofing',
+      'sniffing',
+      'bruteforce',
+      'dictionary',
+      'rainbow',
+
       // System compromise
-      'privilege escalation', 'lateral movement', 'persistence', 'exfiltration',
-      'command and control', 'c2', 'reverse shell', 'bind shell',
-      
+      'privilege escalation',
+      'lateral movement',
+      'persistence',
+      'exfiltration',
+      'command and control',
+      'c2',
+      'reverse shell',
+      'bind shell',
+
       // Sensitive operations (context-dependent)
-      'format disk', 'delete system', 'remove all', 'wipe drive',
-      'master boot record', 'boot sector', 'partition table'
+      'format disk',
+      'delete system',
+      'remove all',
+      'wipe drive',
+      'master boot record',
+      'boot sector',
+      'partition table',
     ];
   }
 
@@ -457,23 +546,35 @@ export class AdvancedSecurityValidator {
   private mergeWithDefaultPolicy(policy: Partial<SecurityPolicy>): SecurityPolicy {
     const defaultPolicy: SecurityPolicy = {
       allowedCommands: [
-        'ls', 'cat', 'grep', 'find', 'head', 'tail', 'wc', 'sort', 'uniq',
-        'git', 'npm', 'node', 'python', 'pip', 'cargo', 'rustc',
-        'tsc', 'eslint', 'prettier', 'jest', 'mocha', 'pytest'
+        'ls',
+        'cat',
+        'grep',
+        'find',
+        'head',
+        'tail',
+        'wc',
+        'sort',
+        'uniq',
+        'git',
+        'npm',
+        'node',
+        'python',
+        'pip',
+        'cargo',
+        'rustc',
+        'tsc',
+        'eslint',
+        'prettier',
+        'jest',
+        'mocha',
+        'pytest',
       ],
-      blockedPatterns: [
-        /rm\s+-rf/,
-        /sudo\s+/,
-        /chmod\s+777/,
-        />\s*\/dev\/null/,
-        /2>&1/,
-        /nohup/
-      ],
+      blockedPatterns: [/rm\s+-rf/, /sudo\s+/, /chmod\s+777/, />\s*\/dev\/null/, /2>&1/, /nohup/],
       maxInputLength: 10000,
       allowCodeExecution: false,
       allowFileAccess: true,
       allowNetworkAccess: false,
-      requireSandbox: true
+      requireSandbox: true,
     };
 
     return { ...defaultPolicy, ...policy };
@@ -502,7 +603,7 @@ export class AdvancedSecurityValidator {
       policy: this.policy,
       maliciousPatternsCount: this.knownMaliciousPatterns.length,
       suspiciousKeywordsCount: this.suspiciousKeywords.length,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
   }
 }

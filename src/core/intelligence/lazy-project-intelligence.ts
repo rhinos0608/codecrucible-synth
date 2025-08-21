@@ -5,7 +5,11 @@
 
 import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
-import { ProjectIntelligenceSystem, ProjectIntelligence, AnalysisOptions } from './project-intelligence-system.js';
+import {
+  ProjectIntelligenceSystem,
+  ProjectIntelligence,
+  AnalysisOptions,
+} from './project-intelligence-system.js';
 
 export interface LazyProjectIntelligence {
   basic: BasicProjectInfo;
@@ -43,14 +47,14 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
     analysisTime: 0,
     memoryUsage: 0,
     cacheHits: 0,
-    cacheMisses: 0
+    cacheMisses: 0,
   };
 
   constructor() {
     super();
     this.logger = new Logger('LazyProjectIntelligence');
     this.fullSystem = new ProjectIntelligenceSystem();
-    
+
     // Cleanup timer to prevent memory leaks
     this.cleanupInterval = setInterval(() => this.cleanupCache(), 300000); // 5 minutes
   }
@@ -60,20 +64,20 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
    */
   async quickAnalysis(rootPath: string): Promise<BasicProjectInfo> {
     const startTime = Date.now();
-    
+
     try {
       const basic = await this.extractBasicInfo(rootPath);
-      
+
       // Cache the basic info
       this.cache.set(rootPath, {
         basic,
         loaded: false,
-        loading: false
+        loading: false,
       });
-      
+
       this.metrics.initTime = Date.now() - startTime;
       this.logger.info(`Quick analysis completed in ${this.metrics.initTime}ms`);
-      
+
       return basic;
     } catch (error) {
       this.logger.warn(`Quick analysis failed: ${error}`);
@@ -86,27 +90,27 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
    */
   async getFullIntelligence(rootPath: string, force = false): Promise<ProjectIntelligence | null> {
     const cached = this.cache.get(rootPath);
-    
+
     // Return cached full intelligence if available
     if (cached?.full && !force) {
       this.metrics.cacheHits++;
       return cached.full;
     }
-    
+
     // Check if already loading
     if (this.loadingPromises.has(rootPath)) {
       return await this.loadingPromises.get(rootPath)!;
     }
-    
+
     this.metrics.cacheMisses++;
-    
+
     // Start loading
     const loadingPromise = this.loadFullIntelligence(rootPath);
     this.loadingPromises.set(rootPath, loadingPromise);
-    
+
     try {
       const intelligence = await loadingPromise;
-      
+
       // Update cache
       const existing = this.cache.get(rootPath);
       if (existing) {
@@ -114,10 +118,9 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
         existing.loaded = true;
         existing.loading = false;
       }
-      
+
       this.emit('intelligence:loaded', { rootPath, intelligence });
       return intelligence;
-      
     } finally {
       this.loadingPromises.delete(rootPath);
     }
@@ -130,14 +133,14 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
     if (!this.cache.has(rootPath) || this.loadingPromises.has(rootPath)) {
       return;
     }
-    
+
     const cached = this.cache.get(rootPath)!;
     if (cached.loaded || cached.loading) {
       return;
     }
-    
+
     cached.loading = true;
-    
+
     // Load in background
     setImmediate(async () => {
       try {
@@ -155,23 +158,23 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   private async extractBasicInfo(rootPath: string): Promise<BasicProjectInfo> {
     const { readdir, stat, readFile } = await import('fs/promises');
     const { join, basename } = await import('path');
-    
+
     let name = basename(rootPath);
     let type: BasicProjectInfo['type'] = 'unknown';
     let language = 'Unknown';
     let hasPackageJson = false;
     let hasTestDir = false;
     let fileCount = 0;
-    
+
     try {
       // Quick directory scan (non-recursive)
       const entries = await readdir(rootPath, { withFileTypes: true });
       fileCount = entries.length;
-      
+
       // Look for key indicators
       for (const entry of entries) {
         const entryName = entry.name.toLowerCase();
-        
+
         if (entry.isFile()) {
           // Package files
           if (entryName === 'package.json') {
@@ -180,7 +183,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
               const packageContent = await readFile(join(rootPath, entry.name), 'utf8');
               const packageJson = JSON.parse(packageContent);
               name = packageJson.name || name;
-              
+
               // Determine type from package.json
               if (packageJson.main || packageJson.bin) {
                 type = packageJson.bin ? 'application' : 'library';
@@ -189,7 +192,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
               // Ignore parsing errors
             }
           }
-          
+
           // Language detection
           if (entryName.endsWith('.ts') || entryName.endsWith('.tsx')) {
             language = 'TypeScript';
@@ -202,23 +205,22 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
           } else if (entryName.endsWith('.go')) {
             language = 'Go';
           }
-          
         } else if (entry.isDirectory()) {
           // Test directories
           if (entryName === 'test' || entryName === 'tests' || entryName === '__tests__') {
             hasTestDir = true;
           }
-          
+
           // Service indicators
           if (entryName === 'api' || entryName === 'server' || entryName === 'service') {
             type = type === 'unknown' ? 'service' : type;
           }
         }
       }
-      
+
       // Estimate project size
       const estimatedSize = this.estimateProjectSize(fileCount);
-      
+
       return {
         name,
         type,
@@ -226,9 +228,8 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
         hasPackageJson,
         hasTestDir,
         estimatedSize,
-        fileCount
+        fileCount,
       };
-      
     } catch (error) {
       this.logger.warn(`Basic info extraction failed: ${error}`);
       return this.getDefaultBasicInfo(rootPath);
@@ -240,19 +241,19 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
    */
   private async loadFullIntelligence(rootPath: string): Promise<ProjectIntelligence> {
     const startTime = Date.now();
-    
+
     const options: AnalysisOptions = {
       force: false,
       maxDepth: 4, // Reduced depth for performance
       skipLargeFiles: true,
-      maxFileSize: 512 * 1024 // 512KB limit
+      maxFileSize: 512 * 1024, // 512KB limit
     };
-    
+
     const intelligence = await this.fullSystem.analyzeProject(rootPath, options);
-    
+
     this.metrics.analysisTime = Date.now() - startTime;
     this.metrics.memoryUsage = process.memoryUsage().heapUsed;
-    
+
     return intelligence;
   }
 
@@ -278,7 +279,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
       hasPackageJson: false,
       hasTestDir: false,
       estimatedSize: 'medium',
-      fileCount: 0
+      fileCount: 0,
     };
   }
 
@@ -288,12 +289,12 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   private cleanupCache(): void {
     const maxAge = 30 * 60 * 1000; // 30 minutes
     const now = Date.now();
-    
+
     // This is a simple cleanup - in production, we'd track timestamps
     if (this.cache.size > 10) {
       const entries = Array.from(this.cache.entries());
       const toRemove = entries.slice(0, Math.floor(entries.length / 2));
-      
+
       for (const [path] of toRemove) {
         this.cache.delete(path);
         this.logger.debug(`Cleaned up cache entry for ${path}`);
@@ -341,7 +342,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
       analysisTime: 0,
       memoryUsage: 0,
       cacheHits: 0,
-      cacheMisses: 0
+      cacheMisses: 0,
     };
   }
 

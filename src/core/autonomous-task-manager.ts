@@ -54,7 +54,7 @@ export class AutonomousTaskManager extends EventEmitter {
 
   async initialize(): Promise<void> {
     await taskMemoryDB.initialize();
-    
+
     // Initialize specialized agents
     this.agents.set('primary-fixer', new AgentWorker('primary-fixer', 'Development and Fixes'));
     this.agents.set('test-runner', new AgentWorker('test-runner', 'Testing and Validation'));
@@ -72,7 +72,7 @@ export class AutonomousTaskManager extends EventEmitter {
 
     // Generate comprehensive task plan
     const plan = await this.generateTaskPlan(taskDescription);
-    
+
     // Create task in memory DB
     const task = await taskMemoryDB.createTask({
       title: plan.title,
@@ -82,8 +82,8 @@ export class AutonomousTaskManager extends EventEmitter {
       context_data: {
         description: plan.description,
         success_criteria: plan.success_criteria,
-        rollback_strategy: plan.rollback_strategy
-      }
+        rollback_strategy: plan.rollback_strategy,
+      },
     });
 
     // Update task.md with detailed plan
@@ -102,95 +102,95 @@ export class AutonomousTaskManager extends EventEmitter {
     // For now, use the current CodeCrucible fix plan
     // In production, this would use AI to generate plans
     return {
-      title: "Fix CodeCrucible Synth Critical Issues",
+      title: 'Fix CodeCrucible Synth Critical Issues',
       description,
-      priority: "critical",
+      priority: 'critical',
       phases: [
         {
-          name: "Critical Fixes",
-          description: "Fix immediate blocking issues",
+          name: 'Critical Fixes',
+          description: 'Fix immediate blocking issues',
           steps: [
             {
-              id: "fix_context_window",
-              description: "Fix Ollama context window size (1024 → 8192)",
-              action_type: "code",
-              files_affected: ["src/providers/ollama.ts"],
-              command: "npm run build",
-              validation_criteria: "Test with long prompt succeeds"
+              id: 'fix_context_window',
+              description: 'Fix Ollama context window size (1024 → 8192)',
+              action_type: 'code',
+              files_affected: ['src/providers/ollama.ts'],
+              command: 'npm run build',
+              validation_criteria: 'Test with long prompt succeeds',
             },
             {
-              id: "fix_versions",
-              description: "Standardize version numbers to v3.8.9",
-              action_type: "code", 
-              files_affected: ["src/index.ts", "src/core/cli.ts", "bin/*.js"]
+              id: 'fix_versions',
+              description: 'Standardize version numbers to v3.8.9',
+              action_type: 'code',
+              files_affected: ['src/index.ts', 'src/core/cli.ts', 'bin/*.js'],
             },
             {
-              id: "fix_memory_leaks",
-              description: "Fix EventEmitter memory leak warnings",
-              action_type: "code",
-              files_affected: ["src/index.ts"]
-            }
+              id: 'fix_memory_leaks',
+              description: 'Fix EventEmitter memory leak warnings',
+              action_type: 'code',
+              files_affected: ['src/index.ts'],
+            },
           ],
-          agents_required: ["primary-fixer", "test-runner"],
-          estimated_duration: "30 minutes",
-          dependencies: []
+          agents_required: ['primary-fixer', 'test-runner'],
+          estimated_duration: '30 minutes',
+          dependencies: [],
         },
         {
-          name: "Test Infrastructure",
-          description: "Fix failing tests and validation",
+          name: 'Test Infrastructure',
+          description: 'Fix failing tests and validation',
           steps: [
             {
-              id: "fix_unit_tests",
-              description: "Fix 36 failing unit tests",
-              action_type: "test",
-              command: "npm test",
-              validation_criteria: "All tests pass"
+              id: 'fix_unit_tests',
+              description: 'Fix 36 failing unit tests',
+              action_type: 'test',
+              command: 'npm test',
+              validation_criteria: 'All tests pass',
             },
             {
-              id: "clean_emergency_scripts",
-              description: "Archive emergency fix scripts",
-              action_type: "cleanup",
-              command: "mkdir emergency-archive && mv *fix*.* emergency-archive/"
-            }
+              id: 'clean_emergency_scripts',
+              description: 'Archive emergency fix scripts',
+              action_type: 'cleanup',
+              command: 'mkdir emergency-archive && mv *fix*.* emergency-archive/',
+            },
           ],
-          agents_required: ["test-runner", "cleaner"],
-          estimated_duration: "45 minutes",
-          dependencies: ["Critical Fixes"]
+          agents_required: ['test-runner', 'cleaner'],
+          estimated_duration: '45 minutes',
+          dependencies: ['Critical Fixes'],
         },
         {
-          name: "Autonomous Systems",
-          description: "Implement full autonomous workflow",
+          name: 'Autonomous Systems',
+          description: 'Implement full autonomous workflow',
           steps: [
             {
-              id: "validate_core_functionality",
-              description: "Test core codebase analysis works",
-              action_type: "validation",
+              id: 'validate_core_functionality',
+              description: 'Test core codebase analysis works',
+              action_type: 'validation',
               command: 'node dist/bin/crucible.js "analyze this codebase"',
-              validation_criteria: "Returns actual project analysis, not generic response"
-            }
+              validation_criteria: 'Returns actual project analysis, not generic response',
+            },
           ],
-          agents_required: ["coordinator"],
-          estimated_duration: "30 minutes",
-          dependencies: ["Critical Fixes", "Test Infrastructure"]
-        }
+          agents_required: ['coordinator'],
+          estimated_duration: '30 minutes',
+          dependencies: ['Critical Fixes', 'Test Infrastructure'],
+        },
       ],
       success_criteria: [
-        "Core codebase analysis functionality works",
-        "All tests pass",
-        "No memory leaks",
-        "Version consistency",
-        "Clean codebase"
+        'Core codebase analysis functionality works',
+        'All tests pass',
+        'No memory leaks',
+        'Version consistency',
+        'Clean codebase',
       ],
-      rollback_strategy: "Git reset to last working commit, restore from backup"
+      rollback_strategy: 'Git reset to last working commit, restore from backup',
     };
   }
 
   private async assignAgentsToTask(task_id: string, plan: TaskPlan): Promise<void> {
     for (const phase of plan.phases) {
       for (const agentId of phase.agents_required) {
-        const steps = phase.steps.filter(step => 
-          this.isAgentSuitableForStep(agentId, step)
-        ).map(step => step.id);
+        const steps = phase.steps
+          .filter(step => this.isAgentSuitableForStep(agentId, step))
+          .map(step => step.id);
 
         if (steps.length > 0) {
           await taskMemoryDB.assignAgent(task_id, agentId, this.getAgentRole(agentId), steps);
@@ -214,7 +214,7 @@ export class AutonomousTaskManager extends EventEmitter {
     // Create initial checkpoint
     await taskMemoryDB.addCheckpoint(task_id, {
       phase: 0,
-      description: 'Task execution started'
+      description: 'Task execution started',
     });
 
     try {
@@ -225,7 +225,7 @@ export class AutonomousTaskManager extends EventEmitter {
 
       // Validate success criteria
       const success = await this.validateTaskCompletion(task_id);
-      
+
       if (success) {
         await taskMemoryDB.updateTask(task_id, { status: 'completed' });
         console.log(chalk.green('✅ Task completed successfully!'));
@@ -233,7 +233,6 @@ export class AutonomousTaskManager extends EventEmitter {
         await taskMemoryDB.updateTask(task_id, { status: 'failed' });
         console.log(chalk.red('❌ Task failed validation'));
       }
-
     } catch (error) {
       await taskMemoryDB.recordFailedAttempt(task_id, 'autonomous_execution', error.message);
       await taskMemoryDB.updateTask(task_id, { status: 'failed' });
@@ -241,7 +240,10 @@ export class AutonomousTaskManager extends EventEmitter {
     }
   }
 
-  private async executeAgentAssignment(task_id: string, assignment: AgentAssignment): Promise<void> {
+  private async executeAgentAssignment(
+    task_id: string,
+    assignment: AgentAssignment
+  ): Promise<void> {
     const agent = this.agents.get(assignment.agent_id);
     if (!agent) {
       logger.error(`Agent not found: ${assignment.agent_id}`);
@@ -254,22 +256,21 @@ export class AutonomousTaskManager extends EventEmitter {
       try {
         const result = await agent.executeStep(stepId);
         await taskMemoryDB.markStepCompleted(task_id, stepId, result);
-        
+
         console.log(chalk.green(`  ✅ ${stepId} completed`));
-        
+
         // Create checkpoint after important steps
         if (stepId.includes('fix_context') || stepId.includes('test')) {
           await taskMemoryDB.addCheckpoint(task_id, {
             phase: 1,
             description: `Completed ${stepId}`,
-            git_commit: await this.createGitCommit(`Automated: ${stepId}`)
+            git_commit: await this.createGitCommit(`Automated: ${stepId}`),
           });
         }
-        
       } catch (error) {
         await taskMemoryDB.recordFailedAttempt(task_id, stepId, error.message, assignment.agent_id);
         console.error(chalk.red(`  ❌ ${stepId} failed:`), error.message);
-        
+
         // Try alternative approach or continue to next step
         console.log(chalk.yellow(`  🔄 Continuing to next step...`));
       }
@@ -306,14 +307,14 @@ export class AutonomousTaskManager extends EventEmitter {
         } catch {
           return false;
         }
-      }
+      },
     ];
 
     const results = await Promise.all(validations.map(v => v()));
     const passCount = results.filter(r => r).length;
-    
+
     console.log(chalk.blue(`  Validation: ${passCount}/${results.length} checks passed`));
-    
+
     return passCount >= 2; // Allow 1 failure
   }
 
@@ -325,7 +326,7 @@ export class AutonomousTaskManager extends EventEmitter {
 
   private async generateTaskMarkdown(task: TaskState, plan: TaskPlan): Promise<string> {
     const progress = await taskMemoryDB.getTaskProgress(task.task_id);
-    
+
     return `# 🎯 AUTONOMOUS TASK: ${task.title}
 
 **Task ID:** ${task.task_id}  
@@ -340,9 +341,9 @@ ${plan.description}
 ${plan.success_criteria.map(c => `- [ ] ${c}`).join('\n')}
 
 ## 🤖 AGENT ASSIGNMENTS
-${task.agent_assignments.map(a => 
-  `- **${a.agent_id}** (${a.role}): ${a.status.toUpperCase()}`
-).join('\n')}
+${task.agent_assignments
+  .map(a => `- **${a.agent_id}** (${a.role}): ${a.status.toUpperCase()}`)
+  .join('\n')}
 
 ## 📋 PROGRESS
 ### Completed Steps:
@@ -355,9 +356,7 @@ ${task.failed_attempts.map(f => `- ❌ ${f.step}: ${f.error} (attempts: ${f.retr
 ${progress?.next_steps.map(s => `- ⏳ ${s}`).join('\n') || '- Calculating...'}
 
 ## 🔄 CHECKPOINTS
-${task.checkpoints.map(c => 
-  `- **${c.description}** (${c.timestamp})`
-).join('\n') || '- None yet'}
+${task.checkpoints.map(c => `- **${c.description}** (${c.timestamp})`).join('\n') || '- None yet'}
 
 ---
 *Auto-generated by AutonomousTaskManager*`;
@@ -367,8 +366,8 @@ ${task.checkpoints.map(c =>
     const agentCapabilities = {
       'primary-fixer': ['code', 'analysis'],
       'test-runner': ['test', 'validation'],
-      'cleaner': ['cleanup'],
-      'coordinator': ['validation', 'analysis']
+      cleaner: ['cleanup'],
+      coordinator: ['validation', 'analysis'],
     };
 
     return agentCapabilities[agentId]?.includes(step.action_type) || false;
@@ -378,8 +377,8 @@ ${task.checkpoints.map(c =>
     const roles = {
       'primary-fixer': 'Development and Fixes',
       'test-runner': 'Testing and Validation',
-      'cleaner': 'Cleanup and Optimization',
-      'coordinator': 'Task Coordination'
+      cleaner: 'Cleanup and Optimization',
+      coordinator: 'Task Coordination',
     };
     return roles[agentId] || 'General';
   }
@@ -389,7 +388,7 @@ ${task.checkpoints.map(c =>
       const phaseMinutes = parseInt(phase.estimated_duration) || 30;
       return sum + phaseMinutes;
     }, 0);
-    
+
     return `${Math.ceil(totalMinutes / 60)} hours`;
   }
 
@@ -405,20 +404,23 @@ ${task.checkpoints.map(c =>
 }
 
 class AgentWorker {
-  constructor(private id: string, private role: string) {}
+  constructor(
+    private id: string,
+    private role: string
+  ) {}
 
   async executeStep(stepId: string): Promise<any> {
     console.log(chalk.gray(`    🔧 ${this.id}: Executing ${stepId}`));
-    
+
     // Simulate work - in production this would call actual tools
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Return mock result
     return {
       stepId,
       agent: this.id,
       timestamp: new Date().toISOString(),
-      result: 'completed'
+      result: 'completed',
     };
   }
 }

@@ -346,7 +346,7 @@ export class ExplorerAgent {
     return {
       content: 'Agent temporarily disabled',
       metadata: {},
-      success: true
+      success: true,
     };
   }
 }

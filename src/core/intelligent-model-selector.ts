@@ -11,7 +11,7 @@ interface RoutingMetric {
 export class IntelligentModelSelector {
   private routingMetrics = new Map<string, RoutingMetric>();
   private endpoint: string;
-  
+
   // OPTIMIZED: Cache health checks to reduce redundant API calls
   private healthCheckCache = new Map<string, { healthy: boolean; timestamp: number }>();
   private readonly HEALTH_CACHE_TTL = 30000; // 30 seconds
@@ -37,17 +37,16 @@ export class IntelligentModelSelector {
     confidence: number;
     reasoning: string;
   }> {
-    
     // Check availability of both services
     const [lmStudioAvailable, ollamaAvailable] = await Promise.all([
       this.checkLMStudioHealth(),
-      this.checkOllamaHealth()
+      this.checkOllamaHealth(),
     ]);
 
     // Decision matrix based on task characteristics
     const decision = this.makeRoutingDecision(taskType, complexity, requirements, {
       lmStudioAvailable,
-      ollamaAvailable
+      ollamaAvailable,
     });
 
     // Log routing decision for learning
@@ -70,32 +69,38 @@ export class IntelligentModelSelector {
     },
     availability: { lmStudioAvailable: boolean; ollamaAvailable: boolean }
   ): { llm: 'lmstudio' | 'ollama'; model: string; confidence: number; reasoning: string } {
-    
     // If only one service is available, use it with optimal model
     if (!availability.lmStudioAvailable && availability.ollamaAvailable) {
       // Use best available Ollama model based on task complexity
-      const ollamaModel = complexity === 'simple' ? 'gemma:2b' : 
-                         complexity === 'medium' ? 'llama3.2' : 'gemma:7b';
+      const ollamaModel =
+        complexity === 'simple' ? 'gemma:2b' : complexity === 'medium' ? 'llama3.2' : 'gemma:7b';
       return {
         llm: 'ollama',
         model: ollamaModel,
         confidence: 0.8,
-        reasoning: `LM Studio unavailable, using optimized Ollama model ${ollamaModel} for ${complexity} task`
+        reasoning: `LM Studio unavailable, using optimized Ollama model ${ollamaModel} for ${complexity} task`,
       };
     }
-    
+
     if (availability.lmStudioAvailable && !availability.ollamaAvailable) {
       return {
         llm: 'lmstudio',
         model: 'codellama-7b-instruct',
         confidence: 0.7,
-        reasoning: 'Ollama unavailable, using LM Studio fallback'
+        reasoning: 'Ollama unavailable, using LM Studio fallback',
       };
     }
 
     // Both available - make optimal choice based on testing results
     const fastTasks = ['template', 'format', 'edit', 'boilerplate', 'simple'];
-    const complexTasks = ['analysis', 'planning', 'debugging', 'architecture', 'security', 'refactor'];
+    const complexTasks = [
+      'analysis',
+      'planning',
+      'debugging',
+      'architecture',
+      'security',
+      'refactor',
+    ];
     const balancedTasks = ['generate', 'create', 'implement', 'test'];
 
     // Ultra-speed prioritized - use gemma:2b (4-6s response time)
@@ -104,7 +109,7 @@ export class IntelligentModelSelector {
         llm: 'ollama',
         model: 'gemma:2b',
         confidence: 0.95,
-        reasoning: 'Fast response required (4-6s), using optimized gemma:2b model'
+        reasoning: 'Fast response required (4-6s), using optimized gemma:2b model',
       };
     }
 
@@ -114,29 +119,33 @@ export class IntelligentModelSelector {
         llm: 'ollama',
         model: 'llama3.2',
         confidence: 0.9,
-        reasoning: 'Balanced speed/quality required (8-10s), using llama3.2 model'
+        reasoning: 'Balanced speed/quality required (8-10s), using llama3.2 model',
       };
     }
 
     // Quality prioritized - use gemma:7b (12s response time, best quality)
-    if (complexity === 'complex' || complexTasks.includes(taskType) || requirements.accuracy === 'high') {
+    if (
+      complexity === 'complex' ||
+      complexTasks.includes(taskType) ||
+      requirements.accuracy === 'high'
+    ) {
       return {
         llm: 'ollama',
         model: 'gemma:7b',
         confidence: 0.95,
-        reasoning: 'Complex task requiring high quality (12s), using gemma:7b model'
+        reasoning: 'Complex task requiring high quality (12s), using gemma:7b model',
       };
     }
 
     // Medium complexity - check historical performance
     const historicalPerformance = this.getHistoricalPerformance(taskType);
-    
+
     if (historicalPerformance.lmStudio > historicalPerformance.ollama) {
       return {
         llm: 'lmstudio',
         model: 'codellama-7b-instruct',
         confidence: 0.8,
-        reasoning: 'Historical performance favors LM Studio for this task type'
+        reasoning: 'Historical performance favors LM Studio for this task type',
       };
     } else {
       // Default to balanced model for unknown patterns
@@ -144,7 +153,7 @@ export class IntelligentModelSelector {
         llm: 'ollama',
         model: 'llama3.2',
         confidence: 0.8,
-        reasoning: 'Using balanced llama3.2 model as default choice'
+        reasoning: 'Using balanced llama3.2 model as default choice',
       };
     }
   }
@@ -155,12 +164,12 @@ export class IntelligentModelSelector {
   private async checkLMStudioHealth(): Promise<boolean> {
     const cacheKey = 'lmstudio';
     const cached = this.healthCheckCache.get(cacheKey);
-    
+
     // Use cached result if less than 30 seconds old
-    if (cached && (Date.now() - cached.timestamp) < this.HEALTH_CACHE_TTL) {
+    if (cached && Date.now() - cached.timestamp < this.HEALTH_CACHE_TTL) {
       return cached.healthy;
     }
-    
+
     try {
       const response = await axios.get('http://localhost:1234/v1/models', { timeout: 5000 });
       const healthy = response.status === 200;
@@ -178,12 +187,12 @@ export class IntelligentModelSelector {
   private async checkOllamaHealth(): Promise<boolean> {
     const cacheKey = 'ollama';
     const cached = this.healthCheckCache.get(cacheKey);
-    
+
     // Use cached result if less than 30 seconds old
-    if (cached && (Date.now() - cached.timestamp) < this.HEALTH_CACHE_TTL) {
+    if (cached && Date.now() - cached.timestamp < this.HEALTH_CACHE_TTL) {
       return cached.healthy;
     }
-    
+
     try {
       const response = await axios.get(`${this.endpoint}/api/tags`, { timeout: 5000 });
       const healthy = response.status === 200;
@@ -200,14 +209,14 @@ export class IntelligentModelSelector {
    */
   private getHistoricalPerformance(taskType: string): { lmStudio: number; ollama: number } {
     const metric = this.routingMetrics.get(taskType);
-    
+
     if (!metric) {
       return { lmStudio: 0.5, ollama: 0.5 }; // Default equal weight
     }
 
     return {
       lmStudio: metric.lmStudioSuccess / Math.max(1, metric.lmStudioAttempts),
-      ollama: metric.ollamaSuccess / Math.max(1, metric.ollamaAttempts)
+      ollama: metric.ollamaSuccess / Math.max(1, metric.ollamaAttempts),
     };
   }
 
@@ -220,18 +229,18 @@ export class IntelligentModelSelector {
     decision: { llm: 'lmstudio' | 'ollama' }
   ): void {
     const key = `${taskType}-${complexity}`;
-    
+
     if (!this.routingMetrics.has(key)) {
       this.routingMetrics.set(key, {
         lmStudioAttempts: 0,
         lmStudioSuccess: 0,
         ollamaAttempts: 0,
-        ollamaSuccess: 0
+        ollamaSuccess: 0,
       });
     }
 
     const metric = this.routingMetrics.get(key)!;
-    
+
     if (decision.llm === 'lmstudio') {
       metric.lmStudioAttempts++;
     } else {
@@ -250,7 +259,7 @@ export class IntelligentModelSelector {
   ): void {
     const key = `${taskType}-${complexity}`;
     const metric = this.routingMetrics.get(key);
-    
+
     if (metric) {
       if (llm === 'lmstudio' && success) {
         metric.lmStudioSuccess++;
@@ -289,7 +298,7 @@ export class IntelligentModelSelector {
   }> {
     const [ollamaModels, lmStudioAvailable] = await Promise.all([
       this.getAvailableModels('ollama'),
-      this.checkLMStudioHealth()
+      this.checkLMStudioHealth(),
     ]);
 
     // Prioritize based on available models and tested performance
@@ -298,7 +307,7 @@ export class IntelligentModelSelector {
         recommendedModel: 'gemma:2b',
         reasoning: 'Ultra-fast responses for quick tasks and simple operations',
         estimatedLatency: '4-6 seconds',
-        qualityScore: 0.8
+        qualityScore: 0.8,
       };
     }
 
@@ -307,7 +316,7 @@ export class IntelligentModelSelector {
         recommendedModel: 'llama3.2',
         reasoning: 'Balanced performance for most development tasks',
         estimatedLatency: '8-10 seconds',
-        qualityScore: 0.85
+        qualityScore: 0.85,
       };
     }
 
@@ -316,7 +325,7 @@ export class IntelligentModelSelector {
         recommendedModel: 'gemma:7b',
         reasoning: 'High-quality responses for complex analysis and architecture',
         estimatedLatency: '12 seconds',
-        qualityScore: 0.9
+        qualityScore: 0.9,
       };
     }
 
@@ -325,7 +334,7 @@ export class IntelligentModelSelector {
         recommendedModel: 'lmstudio-default',
         reasoning: 'Using LM Studio as fallback option',
         estimatedLatency: '10-15 seconds',
-        qualityScore: 0.75
+        qualityScore: 0.75,
       };
     }
 
@@ -333,7 +342,7 @@ export class IntelligentModelSelector {
       recommendedModel: 'none-available',
       reasoning: 'No optimal models currently available',
       estimatedLatency: 'unknown',
-      qualityScore: 0.5
+      qualityScore: 0.5,
     };
   }
 
@@ -353,10 +362,10 @@ export class IntelligentModelSelector {
     for (const [key, metric] of this.routingMetrics.entries()) {
       const requests = metric.lmStudioAttempts + metric.ollamaAttempts;
       const successes = metric.lmStudioSuccess + metric.ollamaSuccess;
-      
+
       totalRequests += requests;
       totalSuccesses += successes;
-      
+
       modelUsage[key] = requests;
     }
 
@@ -364,7 +373,7 @@ export class IntelligentModelSelector {
       totalRequests,
       successRate: totalRequests > 0 ? totalSuccesses / totalRequests : 0,
       averageLatency: 8.5, // Based on our testing results
-      modelUsage
+      modelUsage,
     };
   }
 }

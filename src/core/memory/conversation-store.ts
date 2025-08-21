@@ -72,7 +72,7 @@ export class ConversationStore {
   constructor(workspaceRoot: string) {
     const codecrucibleDir = path.join(workspaceRoot, '.codecrucible');
     this.dbPath = path.join(codecrucibleDir, 'conversations.db');
-    
+
     logger.info('Conversation store initialized', { dbPath: this.dbPath });
   }
 
@@ -89,18 +89,17 @@ export class ConversationStore {
       // Open database
       this.db = await open({
         filename: this.dbPath,
-        driver: sqlite3.Database
+        driver: sqlite3.Database,
       });
 
       // Create tables
       await this.createTables();
-      
+
       // Create indexes for performance
       await this.createIndexes();
 
       this.initialized = true;
       logger.info('Conversation store database initialized');
-      
     } catch (error) {
       logger.error('Failed to initialize conversation store:', error);
       throw error;
@@ -123,7 +122,7 @@ export class ConversationStore {
     const timestamp = Date.now();
     const contextHash = this.hashContext(context);
     const topics = this.extractTopics(prompt, response.synthesis);
-    
+
     // Generate embedding for semantic search (simplified for now)
     const embedding = await this.generateEmbedding(prompt + ' ' + response.synthesis);
 
@@ -144,32 +143,35 @@ export class ConversationStore {
         modelUsed: response.modelUsed,
         reasoning: response.reasoning?.steps?.length || 0,
         promptTokens: prompt.length, // Simplified token count
-        responseTokens: response.synthesis.length
-      }
+        responseTokens: response.synthesis.length,
+      },
     };
 
     try {
-      await this.db!.run(`
+      await this.db!.run(
+        `
         INSERT INTO interactions (
           id, session_id, timestamp, prompt, response, voices_used, 
           confidence, latency, user_feedback, topics, context_hash, 
           embedding, metadata
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        interaction.id,
-        interaction.sessionId,
-        interaction.timestamp,
-        interaction.prompt,
-        interaction.response,
-        JSON.stringify(interaction.voicesUsed),
-        interaction.confidence,
-        interaction.latency,
-        interaction.userFeedback,
-        JSON.stringify(interaction.topics),
-        interaction.contextHash,
-        JSON.stringify(interaction.embedding),
-        JSON.stringify(interaction.metadata)
-      ]);
+      `,
+        [
+          interaction.id,
+          interaction.sessionId,
+          interaction.timestamp,
+          interaction.prompt,
+          interaction.response,
+          JSON.stringify(interaction.voicesUsed),
+          interaction.confidence,
+          interaction.latency,
+          interaction.userFeedback,
+          JSON.stringify(interaction.topics),
+          interaction.contextHash,
+          JSON.stringify(interaction.embedding),
+          JSON.stringify(interaction.metadata),
+        ]
+      );
 
       // Update session statistics
       await this.updateSessionStats(sessionId, interaction);
@@ -178,11 +180,10 @@ export class ConversationStore {
         id: interaction.id,
         sessionId: interaction.sessionId,
         topics: interaction.topics.length,
-        confidence: interaction.confidence
+        confidence: interaction.confidence,
       });
 
       return id;
-
     } catch (error) {
       logger.error('Failed to store interaction:', error);
       throw error;
@@ -201,7 +202,7 @@ export class ConversationStore {
       LEFT JOIN sessions s ON i.session_id = s.id
       WHERE 1=1
     `;
-    
+
     const params: any[] = [];
 
     // Add filters
@@ -243,7 +244,7 @@ export class ConversationStore {
     if (query.limit) {
       sql += ` LIMIT ?`;
       params.push(query.limit);
-      
+
       if (query.offset) {
         sql += ` OFFSET ?`;
         params.push(query.offset);
@@ -252,12 +253,13 @@ export class ConversationStore {
 
     try {
       const rows = await this.db!.all(sql, params);
-      
+
       const interactions: StoredInteraction[] = rows.map(row => this.mapRowToInteraction(row));
-      
+
       // Get total count
-      const countSql = sql.replace(/SELECT i\.\*, s\.workspace_root/, 'SELECT COUNT(*)')
-                         .replace(/ORDER BY i\.timestamp DESC.*$/, '');
+      const countSql = sql
+        .replace(/SELECT i\.\*, s\.workspace_root/, 'SELECT COUNT(*)')
+        .replace(/ORDER BY i\.timestamp DESC.*$/, '');
       const countResult = await this.db!.get(countSql, params.slice(0, -2)); // Remove LIMIT/OFFSET params
       const total = countResult['COUNT(*)'] || 0;
 
@@ -270,15 +272,14 @@ export class ConversationStore {
       logger.debug('Search completed', {
         query: query.text?.substring(0, 50),
         results: interactions.length,
-        total
+        total,
       });
 
       return {
         interactions,
         total,
-        relevanceScores
+        relevanceScores,
       };
-
     } catch (error) {
       logger.error('Search failed:', error);
       throw error;
@@ -292,10 +293,7 @@ export class ConversationStore {
     await this.ensureInitialized();
 
     try {
-      const row = await this.db!.get(
-        'SELECT * FROM sessions WHERE id = ?',
-        [sessionId]
-      );
+      const row = await this.db!.get('SELECT * FROM sessions WHERE id = ?', [sessionId]);
 
       if (!row) return null;
 
@@ -307,9 +305,8 @@ export class ConversationStore {
         averageConfidence: row.average_confidence,
         topics: JSON.parse(row.topics || '[]'),
         workspaceRoot: row.workspace_root,
-        userAgent: row.user_agent
+        userAgent: row.user_agent,
       };
-
     } catch (error) {
       logger.error(`Failed to get session ${sessionId}:`, error);
       return null;
@@ -326,14 +323,16 @@ export class ConversationStore {
     const startTime = Date.now();
 
     try {
-      await this.db!.run(`
+      await this.db!.run(
+        `
         INSERT INTO sessions (id, start_time, workspace_root, user_agent, total_interactions, average_confidence, topics)
         VALUES (?, ?, ?, ?, 0, 0, '[]')
-      `, [sessionId, startTime, workspaceRoot, userAgent]);
+      `,
+        [sessionId, startTime, workspaceRoot, userAgent]
+      );
 
       logger.info('Started conversation session', { sessionId, workspaceRoot });
       return sessionId;
-
     } catch (error) {
       logger.error('Failed to start session:', error);
       throw error;
@@ -347,14 +346,16 @@ export class ConversationStore {
     await this.ensureInitialized();
 
     try {
-      await this.db!.run(`
+      await this.db!.run(
+        `
         UPDATE sessions 
         SET end_time = ?
         WHERE id = ?
-      `, [Date.now(), sessionId]);
+      `,
+        [Date.now(), sessionId]
+      );
 
       logger.info('Ended conversation session', { sessionId });
-
     } catch (error) {
       logger.error(`Failed to end session ${sessionId}:`, error);
     }
@@ -376,7 +377,8 @@ export class ConversationStore {
       }
 
       // Total interactions and sessions
-      const totals = await this.db!.get(`
+      const totals = await this.db!.get(
+        `
         SELECT 
           COUNT(*) as total_interactions,
           COUNT(DISTINCT session_id) as total_sessions,
@@ -384,16 +386,21 @@ export class ConversationStore {
           AVG(latency) as average_latency
         FROM interactions 
         ${whereClause}
-      `, params);
+      `,
+        params
+      );
 
       // Top topics
-      const topicsQuery = await this.db!.all(`
+      const topicsQuery = await this.db!.all(
+        `
         SELECT topics 
         FROM interactions 
         ${whereClause}
         ORDER BY timestamp DESC 
         LIMIT 1000
-      `, params);
+      `,
+        params
+      );
 
       const topicCounts = new Map<string, number>();
       topicsQuery.forEach(row => {
@@ -413,13 +420,16 @@ export class ConversationStore {
         .map(([topic, count]) => ({ topic, count }));
 
       // Voice usage
-      const voicesQuery = await this.db!.all(`
+      const voicesQuery = await this.db!.all(
+        `
         SELECT voices_used 
         FROM interactions 
         ${whereClause}
         ORDER BY timestamp DESC 
         LIMIT 1000
-      `, params);
+      `,
+        params
+      );
 
       const voiceCounts = new Map<string, number>();
       voicesQuery.forEach(row => {
@@ -439,8 +449,9 @@ export class ConversationStore {
         .map(([voice, count]) => ({ voice, count }));
 
       // Daily activity (last 30 days)
-      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-      const dailyQuery = await this.db!.all(`
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const dailyQuery = await this.db!.all(
+        `
         SELECT 
           DATE(timestamp / 1000, 'unixepoch') as date,
           COUNT(*) as interactions
@@ -448,11 +459,13 @@ export class ConversationStore {
         WHERE timestamp > ?
         GROUP BY DATE(timestamp / 1000, 'unixepoch')
         ORDER BY date
-      `, [thirtyDaysAgo]);
+      `,
+        [thirtyDaysAgo]
+      );
 
       const dailyActivity = dailyQuery.map(row => ({
         date: row.date,
-        interactions: row.interactions
+        interactions: row.interactions,
       }));
 
       return {
@@ -462,9 +475,8 @@ export class ConversationStore {
         averageLatency: totals.average_latency || 0,
         topTopics,
         voiceUsage,
-        dailyActivity
+        dailyActivity,
       };
-
     } catch (error) {
       logger.error('Failed to get analytics:', error);
       throw error;
@@ -474,18 +486,23 @@ export class ConversationStore {
   /**
    * Update user feedback for an interaction
    */
-  async updateFeedback(interactionId: string, feedback: 'positive' | 'negative' | 'neutral'): Promise<void> {
+  async updateFeedback(
+    interactionId: string,
+    feedback: 'positive' | 'negative' | 'neutral'
+  ): Promise<void> {
     await this.ensureInitialized();
 
     try {
-      await this.db!.run(`
+      await this.db!.run(
+        `
         UPDATE interactions 
         SET user_feedback = ? 
         WHERE id = ?
-      `, [feedback, interactionId]);
+      `,
+        [feedback, interactionId]
+      );
 
       logger.debug('Updated interaction feedback', { interactionId, feedback });
-
     } catch (error) {
       logger.error(`Failed to update feedback for ${interactionId}:`, error);
       throw error;
@@ -541,7 +558,7 @@ export class ConversationStore {
       'CREATE INDEX IF NOT EXISTS idx_interactions_confidence ON interactions(confidence)',
       'CREATE INDEX IF NOT EXISTS idx_interactions_topics ON interactions(topics)',
       'CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time)',
-      'CREATE INDEX IF NOT EXISTS idx_sessions_workspace ON sessions(workspace_root)'
+      'CREATE INDEX IF NOT EXISTS idx_sessions_workspace ON sessions(workspace_root)',
     ];
 
     for (const indexSql of indexes) {
@@ -566,30 +583,37 @@ export class ConversationStore {
       topics: JSON.parse(row.topics || '[]'),
       contextHash: row.context_hash,
       embedding: JSON.parse(row.embedding || '[]'),
-      metadata: JSON.parse(row.metadata || '{}')
+      metadata: JSON.parse(row.metadata || '{}'),
     };
   }
 
   /**
    * Update session statistics
    */
-  private async updateSessionStats(sessionId: string, interaction: StoredInteraction): Promise<void> {
+  private async updateSessionStats(
+    sessionId: string,
+    interaction: StoredInteraction
+  ): Promise<void> {
     const session = await this.getSession(sessionId);
     if (!session) return;
 
     const newTotal = session.totalInteractions + 1;
-    const newAverage = (session.averageConfidence * session.totalInteractions + interaction.confidence) / newTotal;
-    
+    const newAverage =
+      (session.averageConfidence * session.totalInteractions + interaction.confidence) / newTotal;
+
     // Merge topics
     const existingTopics = new Set(session.topics);
     interaction.topics.forEach(topic => existingTopics.add(topic));
     const mergedTopics = Array.from(existingTopics);
 
-    await this.db!.run(`
+    await this.db!.run(
+      `
       UPDATE sessions 
       SET total_interactions = ?, average_confidence = ?, topics = ?
       WHERE id = ?
-    `, [newTotal, newAverage, JSON.stringify(mergedTopics), sessionId]);
+    `,
+      [newTotal, newAverage, JSON.stringify(mergedTopics), sessionId]
+    );
   }
 
   /**
@@ -600,7 +624,7 @@ export class ConversationStore {
     // In a real implementation, you would use a proper embedding model
     const words = text.toLowerCase().split(/\s+/);
     const embedding = new Array(100).fill(0);
-    
+
     // Simple hash-based embedding
     words.forEach((word, index) => {
       const hash = this.simpleHash(word);
@@ -619,9 +643,12 @@ export class ConversationStore {
   /**
    * Calculate relevance scores for search results
    */
-  private async calculateRelevanceScores(query: string, interactions: StoredInteraction[]): Promise<number[]> {
+  private async calculateRelevanceScores(
+    query: string,
+    interactions: StoredInteraction[]
+  ): Promise<number[]> {
     const queryEmbedding = await this.generateEmbedding(query);
-    
+
     return interactions.map(interaction => {
       if (!interaction.embedding || interaction.embedding.length === 0) {
         // Fallback to text similarity
@@ -653,7 +680,7 @@ export class ConversationStore {
   private calculateTextSimilarity(query: string, text: string): number {
     const queryWords = new Set(query.toLowerCase().split(/\s+/));
     const textWords = text.toLowerCase().split(/\s+/);
-    
+
     const matches = textWords.filter(word => queryWords.has(word)).length;
     return matches / Math.max(queryWords.size, textWords.length);
   }
@@ -666,13 +693,32 @@ export class ConversationStore {
     const topics = new Set<string>();
 
     // Programming languages
-    const languages = ['javascript', 'typescript', 'python', 'java', 'rust', 'go', 'cpp', 'c#', 'php'];
+    const languages = [
+      'javascript',
+      'typescript',
+      'python',
+      'java',
+      'rust',
+      'go',
+      'cpp',
+      'c#',
+      'php',
+    ];
     languages.forEach(lang => {
       if (text.includes(lang)) topics.add(lang);
     });
 
     // Technologies
-    const technologies = ['react', 'vue', 'angular', 'docker', 'kubernetes', 'git', 'database', 'api'];
+    const technologies = [
+      'react',
+      'vue',
+      'angular',
+      'docker',
+      'kubernetes',
+      'git',
+      'database',
+      'api',
+    ];
     technologies.forEach(tech => {
       if (text.includes(tech)) topics.add(tech);
     });
@@ -687,9 +733,9 @@ export class ConversationStore {
     const str = JSON.stringify({
       guidance: context.guidance?.substring(0, 100),
       preferences: context.preferences,
-      patterns: context.patterns.map(p => p.name)
+      patterns: context.patterns.map(p => p.name),
     });
-    
+
     return this.simpleHash(str).toString();
   }
 
@@ -700,7 +746,7 @@ export class ConversationStore {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash);

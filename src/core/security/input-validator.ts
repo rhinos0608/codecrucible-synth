@@ -6,7 +6,17 @@
 import { logger } from '../logger.js';
 
 export interface ValidationRule {
-  type: 'string' | 'number' | 'boolean' | 'email' | 'url' | 'uuid' | 'json' | 'array' | 'object' | 'custom';
+  type:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'email'
+    | 'url'
+    | 'uuid'
+    | 'json'
+    | 'array'
+    | 'object'
+    | 'custom';
   required?: boolean;
   min?: number;
   max?: number;
@@ -67,13 +77,13 @@ export class InputValidator {
       blockedPatterns: [
         /\b(eval|function|script|javascript|vbscript|onload|onerror|onclick)\b/gi,
         /\b(document|window|alert|confirm|prompt)\b/gi,
-        /<\s*script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi
+        /<\s*script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
       ],
       sqlInjectionPatterns: [
         /(\b(select|insert|update|delete|drop|create|alter|exec|execute|union|declare)\b)/gi,
         /(\b(or|and)\b\s*[\'\"]?\s*[\'\"]?\s*=\s*[\'\"]?\s*[\'\"]?)/gi,
         /(;|\-\-|\#|\/\*|\*\/)/gi,
-        /(\b(sleep|benchmark|waitfor)\b\s*\()/gi
+        /(\b(sleep|benchmark|waitfor)\b\s*\()/gi,
       ],
       xssPatterns: [
         /<\s*script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
@@ -81,7 +91,7 @@ export class InputValidator {
         /on\w+\s*=/gi,
         /<\s*iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,
         /<\s*object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi,
-        /<\s*embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi
+        /<\s*embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi,
       ],
       pathTraversalPatterns: [
         /\.\.\//gi,
@@ -89,9 +99,9 @@ export class InputValidator {
         /%2e%2e%2f/gi,
         /%2e%2e%5c/gi,
         /\.\.\%2f/gi,
-        /\.\.\%5c/gi
+        /\.\.\%5c/gi,
       ],
-      ...securityConfig
+      ...securityConfig,
     };
   }
 
@@ -104,7 +114,7 @@ export class InputValidator {
       stripExtraFields: true,
       abortEarly: false,
       skipMissing: false,
-      ...options
+      ...options,
     };
 
     const errors: ValidationError[] = [];
@@ -129,7 +139,7 @@ export class InputValidator {
       if (errors.length > 0) {
         logger.warn('Input validation failed', {
           errorCount: errors.length,
-          errors: errors.map(e => ({ field: e.field, rule: e.rule, message: e.message }))
+          errors: errors.map(e => ({ field: e.field, rule: e.rule, message: e.message })),
         });
       }
 
@@ -137,20 +147,21 @@ export class InputValidator {
         isValid: errors.length === 0,
         errors,
         sanitizedData: errors.length === 0 ? sanitizedData : undefined,
-        warnings
+        warnings,
       };
-
     } catch (error) {
       logger.error('Input validation error', error as Error);
       return {
         isValid: false,
-        errors: [{
-          field: 'root',
-          message: 'Validation system error',
-          value: data,
-          rule: 'system'
-        }],
-        warnings
+        errors: [
+          {
+            field: 'root',
+            message: 'Validation system error',
+            value: data,
+            rule: 'system',
+          },
+        ],
+        warnings,
       };
     }
   }
@@ -164,13 +175,13 @@ export class InputValidator {
 
     // Check data structure depth and complexity
     const complexity = this.analyzeComplexity(data);
-    
+
     if (complexity.depth > this.securityConfig.maxDepth) {
       errors.push({
         field: 'root',
         message: `Data structure too deep (max: ${this.securityConfig.maxDepth})`,
         value: complexity.depth,
-        rule: 'max_depth'
+        rule: 'max_depth',
       });
     }
 
@@ -179,7 +190,7 @@ export class InputValidator {
         field: 'root',
         message: `Too many keys (max: ${this.securityConfig.maxKeys})`,
         value: complexity.keys,
-        rule: 'max_keys'
+        rule: 'max_keys',
       });
     }
 
@@ -189,14 +200,18 @@ export class InputValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
   /**
    * Validate against schema
    */
-  private validateSchema(data: any, schema: ValidationSchema, options: ValidationOptions): {
+  private validateSchema(
+    data: any,
+    schema: ValidationSchema,
+    options: ValidationOptions
+  ): {
     errors: ValidationError[];
     warnings: string[];
     sanitizedData: any;
@@ -209,11 +224,11 @@ export class InputValidator {
     for (const [fieldPath, rule] of Object.entries(schema)) {
       const value = this.getNestedValue(data, fieldPath);
       const fieldResult = this.validateField(fieldPath, value, rule);
-      
+
       if (!fieldResult.isValid) {
         errors.push(...fieldResult.errors);
       }
-      
+
       warnings.push(...fieldResult.warnings);
 
       // Apply sanitization
@@ -235,7 +250,7 @@ export class InputValidator {
     // Handle extra fields
     if (!options.allowExtraFields) {
       const extraFields = this.findExtraFields(data, schema);
-      
+
       for (const extraField of extraFields) {
         if (options.stripExtraFields) {
           this.deleteNestedValue(sanitizedData, extraField);
@@ -245,7 +260,7 @@ export class InputValidator {
             field: extraField,
             message: 'Field not allowed',
             value: this.getNestedValue(data, extraField),
-            rule: 'extra_field'
+            rule: 'extra_field',
           });
         }
       }
@@ -257,7 +272,11 @@ export class InputValidator {
   /**
    * Validate a single field
    */
-  private validateField(fieldPath: string, value: any, rule: ValidationRule): {
+  private validateField(
+    fieldPath: string,
+    value: any,
+    rule: ValidationRule
+  ): {
     isValid: boolean;
     errors: ValidationError[];
     warnings: string[];
@@ -273,7 +292,7 @@ export class InputValidator {
         field: fieldPath,
         message: rule.errorMessage || `${fieldPath} is required`,
         value,
-        rule: 'required'
+        rule: 'required',
       });
       return { isValid: false, errors, warnings };
     }
@@ -306,7 +325,7 @@ export class InputValidator {
           field: fieldPath,
           message: rule.errorMessage || `${fieldPath} format is invalid`,
           value,
-          rule: 'pattern'
+          rule: 'pattern',
         });
       }
     }
@@ -317,7 +336,7 @@ export class InputValidator {
         field: fieldPath,
         message: rule.errorMessage || `${fieldPath} must be one of: ${rule.enum.join(', ')}`,
         value,
-        rule: 'enum'
+        rule: 'enum',
       });
     }
 
@@ -327,9 +346,13 @@ export class InputValidator {
       if (customResult !== true) {
         errors.push({
           field: fieldPath,
-          message: rule.errorMessage || (typeof customResult === 'string' ? customResult : `${fieldPath} failed custom validation`),
+          message:
+            rule.errorMessage ||
+            (typeof customResult === 'string'
+              ? customResult
+              : `${fieldPath} failed custom validation`),
           value,
-          rule: 'custom'
+          rule: 'custom',
         });
       }
     }
@@ -343,14 +366,18 @@ export class InputValidator {
       isValid: errors.length === 0,
       errors,
       warnings,
-      sanitizedValue
+      sanitizedValue,
     };
   }
 
   /**
    * Validate data type
    */
-  private validateType(fieldPath: string, value: any, type: string): {
+  private validateType(
+    fieldPath: string,
+    value: any,
+    type: string
+  ): {
     isValid: boolean;
     errors: ValidationError[];
     sanitizedValue: any;
@@ -368,7 +395,7 @@ export class InputValidator {
               field: fieldPath,
               message: `${fieldPath} must be a string`,
               value,
-              rule: 'type'
+              rule: 'type',
             });
           }
         }
@@ -382,7 +409,7 @@ export class InputValidator {
               field: fieldPath,
               message: `${fieldPath} must be a number`,
               value,
-              rule: 'type'
+              rule: 'type',
             });
           } else {
             sanitizedValue = num;
@@ -401,7 +428,7 @@ export class InputValidator {
               field: fieldPath,
               message: `${fieldPath} must be a boolean`,
               value,
-              rule: 'type'
+              rule: 'type',
             });
           }
         }
@@ -413,7 +440,7 @@ export class InputValidator {
             field: fieldPath,
             message: `${fieldPath} must be a valid email`,
             value,
-            rule: 'type'
+            rule: 'type',
           });
         }
         break;
@@ -424,7 +451,7 @@ export class InputValidator {
             field: fieldPath,
             message: `${fieldPath} must be a valid URL`,
             value,
-            rule: 'type'
+            rule: 'type',
           });
         }
         break;
@@ -435,7 +462,7 @@ export class InputValidator {
             field: fieldPath,
             message: `${fieldPath} must be a valid UUID`,
             value,
-            rule: 'type'
+            rule: 'type',
           });
         }
         break;
@@ -449,7 +476,7 @@ export class InputValidator {
               field: fieldPath,
               message: `${fieldPath} must be valid JSON`,
               value,
-              rule: 'type'
+              rule: 'type',
             });
           }
         }
@@ -461,7 +488,7 @@ export class InputValidator {
             field: fieldPath,
             message: `${fieldPath} must be an array`,
             value,
-            rule: 'type'
+            rule: 'type',
           });
         }
         break;
@@ -472,7 +499,7 @@ export class InputValidator {
             field: fieldPath,
             message: `${fieldPath} must be an object`,
             value,
-            rule: 'type'
+            rule: 'type',
           });
         }
         break;
@@ -481,14 +508,19 @@ export class InputValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      sanitizedValue
+      sanitizedValue,
     };
   }
 
   /**
    * Validate size/length constraints
    */
-  private validateSize(fieldPath: string, value: any, min?: number, max?: number): {
+  private validateSize(
+    fieldPath: string,
+    value: any,
+    min?: number,
+    max?: number
+  ): {
     isValid: boolean;
     errors: ValidationError[];
   } {
@@ -508,7 +540,7 @@ export class InputValidator {
         field: fieldPath,
         message: `${fieldPath} must be at least ${min}`,
         value,
-        rule: 'min'
+        rule: 'min',
       });
     }
 
@@ -517,7 +549,7 @@ export class InputValidator {
         field: fieldPath,
         message: `${fieldPath} must be at most ${max}`,
         value,
-        rule: 'max'
+        rule: 'max',
       });
     }
 
@@ -527,7 +559,12 @@ export class InputValidator {
   /**
    * Scan for security threats
    */
-  private scanForThreats(data: any, path: string, errors: ValidationError[], warnings: string[]): void {
+  private scanForThreats(
+    data: any,
+    path: string,
+    errors: ValidationError[],
+    warnings: string[]
+  ): void {
     if (typeof data === 'string') {
       // Check string length
       if (data.length > this.securityConfig.maxStringLength) {
@@ -535,7 +572,7 @@ export class InputValidator {
           field: path || 'string_field',
           message: `String too long (max: ${this.securityConfig.maxStringLength})`,
           value: data.length,
-          rule: 'max_string_length'
+          rule: 'max_string_length',
         });
       }
 
@@ -546,7 +583,7 @@ export class InputValidator {
             field: path || 'string_field',
             message: 'Potentially malicious content detected',
             value: data.substring(0, 100),
-            rule: 'blocked_pattern'
+            rule: 'blocked_pattern',
           });
         }
       }
@@ -571,21 +608,19 @@ export class InputValidator {
           warnings.push(`Potential path traversal attempt in field: ${path || 'string_field'}`);
         }
       }
-
     } else if (Array.isArray(data)) {
       if (data.length > this.securityConfig.maxArrayLength) {
         errors.push({
           field: path || 'array_field',
           message: `Array too long (max: ${this.securityConfig.maxArrayLength})`,
           value: data.length,
-          rule: 'max_array_length'
+          rule: 'max_array_length',
         });
       }
 
       data.forEach((item, index) => {
         this.scanForThreats(item, `${path}[${index}]`, errors, warnings);
       });
-
     } else if (typeof data === 'object' && data !== null) {
       for (const [key, value] of Object.entries(data)) {
         const newPath = path ? `${path}.${key}` : key;
@@ -695,18 +730,18 @@ export class InputValidator {
 
   private getAllFieldPaths(obj: any, prefix: string = ''): string[] {
     const paths: string[] = [];
-    
+
     if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
       for (const [key, value] of Object.entries(obj)) {
         const path = prefix ? `${prefix}.${key}` : key;
         paths.push(path);
-        
+
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
           paths.push(...this.getAllFieldPaths(value, path));
         }
       }
     }
-    
+
     return paths;
   }
 
@@ -715,48 +750,47 @@ export class InputValidator {
    */
   static middleware(schema: ValidationSchema, options: ValidationOptions = {}) {
     const validator = new InputValidator();
-    
+
     return (req: any, res: any, next: any) => {
       try {
         // Validate request body
         if (req.body && Object.keys(req.body).length > 0) {
           const result = validator.validate(req.body, schema, options);
-          
+
           if (!result.isValid) {
             logger.warn('Request body validation failed', {
               path: req.path,
               method: req.method,
-              errors: result.errors.map(e => ({ field: e.field, rule: e.rule }))
+              errors: result.errors.map(e => ({ field: e.field, rule: e.rule })),
             });
-            
+
             return res.status(400).json({
               error: 'Invalid request data',
               details: result.errors.map(e => ({
                 field: e.field,
                 message: e.message,
-                rule: e.rule
-              }))
+                rule: e.rule,
+              })),
             });
           }
-          
+
           // Replace body with sanitized data
           req.body = result.sanitizedData;
-          
+
           // Log warnings
           if (result.warnings.length > 0) {
             logger.warn('Request validation warnings', {
               path: req.path,
-              warnings: result.warnings
+              warnings: result.warnings,
             });
           }
         }
-        
+
         next();
-        
       } catch (error) {
         logger.error('Input validation middleware error', error as Error);
         return res.status(500).json({
-          error: 'Validation system error'
+          error: 'Validation system error',
         });
       }
     };
@@ -769,39 +803,54 @@ export class InputValidator {
     return {
       // User registration
       userRegistration: {
-        'email': { type: 'email', required: true, max: 254, sanitize: true },
-        'password': { type: 'string', required: true, min: 8, max: 128 },
-        'username': { type: 'string', required: true, min: 3, max: 50, pattern: /^[a-zA-Z0-9_-]+$/, sanitize: true },
-        'fullName': { type: 'string', required: false, max: 100, sanitize: true }
+        email: { type: 'email', required: true, max: 254, sanitize: true },
+        password: { type: 'string', required: true, min: 8, max: 128 },
+        username: {
+          type: 'string',
+          required: true,
+          min: 3,
+          max: 50,
+          pattern: /^[a-zA-Z0-9_-]+$/,
+          sanitize: true,
+        },
+        fullName: { type: 'string', required: false, max: 100, sanitize: true },
       },
 
       // User login
       userLogin: {
-        'email': { type: 'email', required: true, sanitize: true },
-        'password': { type: 'string', required: true }
+        email: { type: 'email', required: true, sanitize: true },
+        password: { type: 'string', required: true },
       },
 
       // Code generation request
       codeGeneration: {
-        'prompt': { type: 'string', required: true, min: 10, max: 5000, sanitize: true },
-        'language': { type: 'string', required: false, enum: ['javascript', 'typescript', 'python', 'java', 'cpp', 'rust', 'go'] },
-        'voices': { type: 'array', required: false, max: 5 },
-        'maxTokens': { type: 'number', required: false, min: 100, max: 4000 }
+        prompt: { type: 'string', required: true, min: 10, max: 5000, sanitize: true },
+        language: {
+          type: 'string',
+          required: false,
+          enum: ['javascript', 'typescript', 'python', 'java', 'cpp', 'rust', 'go'],
+        },
+        voices: { type: 'array', required: false, max: 5 },
+        maxTokens: { type: 'number', required: false, min: 100, max: 4000 },
       },
 
       // File analysis request
       fileAnalysis: {
-        'filePath': { type: 'string', required: true, max: 500, sanitize: true },
-        'analysisType': { type: 'string', required: false, enum: ['security', 'performance', 'quality', 'comprehensive'] },
-        'includeMetrics': { type: 'boolean', required: false }
+        filePath: { type: 'string', required: true, max: 500, sanitize: true },
+        analysisType: {
+          type: 'string',
+          required: false,
+          enum: ['security', 'performance', 'quality', 'comprehensive'],
+        },
+        includeMetrics: { type: 'boolean', required: false },
       },
 
       // Configuration update
       configUpdate: {
-        'key': { type: 'string', required: true, max: 100, pattern: /^[a-zA-Z0-9._-]+$/ },
-        'value': { type: 'string', required: true, max: 1000 },
-        'sensitive': { type: 'boolean', required: false }
-      }
+        key: { type: 'string', required: true, max: 100, pattern: /^[a-zA-Z0-9._-]+$/ },
+        value: { type: 'string', required: true, max: 1000 },
+        sensitive: { type: 'boolean', required: false },
+      },
     };
   }
 }

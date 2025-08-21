@@ -79,7 +79,7 @@ export class DependencyAuditor {
       totalDependencies: this.dependencies.size,
       issues: this.issues,
       recommendations,
-      potentialSavings
+      potentialSavings,
     };
   }
 
@@ -101,20 +101,20 @@ export class DependencyAuditor {
    */
   private async analyzeDependencies(): Promise<void> {
     const allDeps = {
-      ...this.packageJson.dependencies || {},
-      ...this.packageJson.devDependencies || {}
+      ...(this.packageJson.dependencies || {}),
+      ...(this.packageJson.devDependencies || {}),
     };
 
     for (const [name, version] of Object.entries(allDeps)) {
       const type = this.packageJson.dependencies?.[name] ? 'dependency' : 'devDependency';
-      
+
       const depInfo: DependencyInfo = {
         name,
         version: version as string,
         type,
         isUsed: false,
         usageCount: 0,
-        usageLocations: []
+        usageLocations: [],
       };
 
       // Get additional info from npm
@@ -148,10 +148,9 @@ export class DependencyAuditor {
           dependency: depInfo.name,
           description: `Package is deprecated: ${npmInfo.deprecated}`,
           recommendation: 'Find an alternative package or maintain a fork',
-          autoFixable: false
+          autoFixable: false,
         });
       }
-
     } catch (error) {
       // Ignore errors for local/private packages
     }
@@ -162,11 +161,11 @@ export class DependencyAuditor {
    */
   private async checkDependencyUsage(): Promise<void> {
     const sourceFiles = await glob('src/**/*.{ts,js,tsx,jsx}', { ignore: ['node_modules/**'] });
-    
+
     for (const file of sourceFiles) {
       try {
         const content = await fs.readFile(file, 'utf-8');
-        
+
         for (const [name, depInfo] of this.dependencies) {
           // Check for various import patterns
           const importPatterns = [
@@ -174,7 +173,7 @@ export class DependencyAuditor {
             new RegExp(`from\\s+['"\`]${name}['"\`]`, 'g'),
             new RegExp(`require\\(['"\`]${name}['"\`]\\)`, 'g'),
             new RegExp(`import\\s+.*\\s+from\\s+['"\`]${name}/`, 'g'),
-            new RegExp(`require\\(['"\`]${name}/`, 'g')
+            new RegExp(`require\\(['"\`]${name}/`, 'g'),
           ];
 
           for (const pattern of importPatterns) {
@@ -208,16 +207,16 @@ export class DependencyAuditor {
       'webpack.config.*',
       'vite.config.*',
       '.eslintrc.*',
-      'rollup.config.*'
+      'rollup.config.*',
     ];
 
     for (const pattern of configFiles) {
       const files = await glob(pattern);
-      
+
       for (const file of files) {
         try {
           const content = await fs.readFile(file, 'utf-8');
-          
+
           for (const [name, depInfo] of this.dependencies) {
             if (content.includes(name)) {
               depInfo.isUsed = true;
@@ -245,14 +244,14 @@ export class DependencyAuditor {
         for (const [pkgName, vulnInfo] of Object.entries(auditResult.vulnerabilities as any)) {
           const vuln = vulnInfo as any;
           const severity = this.mapNpmSeverity(vuln.severity);
-          
+
           this.issues.push({
             type: 'security',
             severity,
             dependency: pkgName,
             description: `${vuln.via?.length || 0} security vulnerabilities found`,
             recommendation: 'Run `npm audit fix` or update to a secure version',
-            autoFixable: true
+            autoFixable: true,
           });
 
           // Update dependency info
@@ -272,11 +271,16 @@ export class DependencyAuditor {
    */
   private mapNpmSeverity(npmSeverity: string): 'low' | 'medium' | 'high' | 'critical' {
     switch (npmSeverity?.toLowerCase()) {
-      case 'critical': return 'critical';
-      case 'high': return 'high';
-      case 'moderate': return 'medium';
-      case 'low': return 'low';
-      default: return 'medium';
+      case 'critical':
+        return 'critical';
+      case 'high':
+        return 'high';
+      case 'moderate':
+        return 'medium';
+      case 'low':
+        return 'low';
+      default:
+        return 'medium';
     }
   }
 
@@ -293,19 +297,20 @@ export class DependencyAuditor {
           dependency: name,
           description: `Dependency is not used in the codebase`,
           recommendation: `Remove ${name} from ${depInfo.type === 'dependency' ? 'dependencies' : 'devDependencies'}`,
-          autoFixable: true
+          autoFixable: true,
         });
       }
 
       // Oversized dependencies
-      if (depInfo.size && depInfo.size > 10 * 1024 * 1024) { // 10MB
+      if (depInfo.size && depInfo.size > 10 * 1024 * 1024) {
+        // 10MB
         this.issues.push({
           type: 'oversized',
           severity: 'medium',
           dependency: name,
           description: `Large dependency (${this.formatSize(depInfo.size)})`,
           recommendation: 'Consider alternatives or lazy loading',
-          autoFixable: false
+          autoFixable: false,
         });
       }
 
@@ -322,7 +327,7 @@ export class DependencyAuditor {
             dependency: name,
             description: `Package hasn't been updated in over a year`,
             recommendation: 'Check for newer alternatives or security updates',
-            autoFixable: false
+            autoFixable: false,
           });
         }
       }
@@ -340,43 +345,43 @@ export class DependencyAuditor {
       {
         category: 'HTTP Clients',
         packages: ['axios', 'node-fetch', 'cross-fetch', 'isomorphic-fetch'],
-        recommendation: 'Use a single HTTP client'
+        recommendation: 'Use a single HTTP client',
       },
       {
         category: 'CLI Frameworks',
         packages: ['commander', 'yargs', 'meow', 'cac'],
-        recommendation: 'Consolidate to one CLI framework'
+        recommendation: 'Consolidate to one CLI framework',
       },
       {
         category: 'Process Management',
         packages: ['execa', 'cross-spawn', 'child_process'],
-        recommendation: 'Use a single process execution library'
+        recommendation: 'Use a single process execution library',
       },
       {
         category: 'File System',
         packages: ['fs-extra', 'fs', 'graceful-fs'],
-        recommendation: 'Use fs-extra or native fs for consistency'
+        recommendation: 'Use fs-extra or native fs for consistency',
       },
       {
         category: 'Terminal Styling',
         packages: ['chalk', 'kleur', 'colors', 'picocolors'],
-        recommendation: 'Use one terminal coloring library'
+        recommendation: 'Use one terminal coloring library',
       },
       {
         category: 'YAML Processing',
         packages: ['js-yaml', 'yaml'],
-        recommendation: 'Use a single YAML parser'
+        recommendation: 'Use a single YAML parser',
       },
       {
         category: 'Markdown Processing',
         packages: ['markdown-it', 'marked'],
-        recommendation: 'Use one markdown processor'
-      }
+        recommendation: 'Use one markdown processor',
+      },
     ];
 
     for (const group of duplicateGroups) {
       const found = group.packages.filter(pkg => this.dependencies.has(pkg));
-      
+
       if (found.length > 1) {
         this.issues.push({
           type: 'duplicate',
@@ -384,7 +389,7 @@ export class DependencyAuditor {
           dependency: found.join(', '),
           description: `Multiple ${group.category.toLowerCase()}: ${found.join(', ')}`,
           recommendation: group.recommendation,
-          autoFixable: false
+          autoFixable: false,
         });
       }
     }
@@ -434,10 +439,10 @@ export class DependencyAuditor {
       .filter(Boolean);
 
     const totalSize = unusedDeps.reduce((sum, dep) => sum + (dep!.size || 0), 0);
-    
+
     return {
       size: this.formatSize(totalSize),
-      count: unusedDeps.length
+      count: unusedDeps.length,
     };
   }
 
@@ -446,11 +451,11 @@ export class DependencyAuditor {
    */
   private formatSize(bytes: number): string {
     if (bytes === 0) return '0 B';
-    
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
@@ -489,19 +494,27 @@ OVERVIEW:
       report += '─'.repeat(50) + '\n';
 
       for (const [type, issues] of typeGroups) {
-        const icon = type === 'security' ? '🔐' : 
-                    type === 'unused' ? '🗑️' : 
-                    type === 'duplicate' ? '🔄' : 
-                    type === 'outdated' ? '📅' : 
-                    type === 'oversized' ? '📏' : '⚠️';
-        
+        const icon =
+          type === 'security'
+            ? '🔐'
+            : type === 'unused'
+              ? '🗑️'
+              : type === 'duplicate'
+                ? '🔄'
+                : type === 'outdated'
+                  ? '📅'
+                  : type === 'oversized'
+                    ? '📏'
+                    : '⚠️';
+
         report += `${icon} ${type.toUpperCase()} (${issues.length}):\n`;
-        
-        for (const issue of issues.slice(0, 5)) { // Show first 5
+
+        for (const issue of issues.slice(0, 5)) {
+          // Show first 5
           report += `  • ${issue.dependency}: ${issue.description}\n`;
           report += `    💡 ${issue.recommendation}\n`;
         }
-        
+
         if (issues.length > 5) {
           report += `    ... and ${issues.length - 5} more\n`;
         }
@@ -518,7 +531,7 @@ OVERVIEW:
     if (largestDeps.length > 0) {
       report += '📏 LARGEST DEPENDENCIES:\n';
       report += '─'.repeat(50) + '\n';
-      
+
       for (const dep of largestDeps) {
         const used = dep.isUsed ? '✅' : '❌';
         report += `${used} ${dep.name}: ${this.formatSize(dep.size || 0)}\n`;
@@ -531,10 +544,10 @@ OVERVIEW:
     if (securityIssues.length > 0) {
       report += '🔐 SECURITY SUMMARY:\n';
       report += '─'.repeat(50) + '\n';
-      
+
       const criticalSecurity = securityIssues.filter(i => i.severity === 'critical').length;
       const highSecurity = securityIssues.filter(i => i.severity === 'high').length;
-      
+
       report += `🚨 Critical: ${criticalSecurity}\n`;
       report += `🔴 High: ${highSecurity}\n`;
       report += `🟡 Medium/Low: ${securityIssues.length - criticalSecurity - highSecurity}\n\n`;
@@ -548,10 +561,8 @@ OVERVIEW:
    */
   async generateCleanedPackageJson(): Promise<string> {
     const cleaned = JSON.parse(JSON.stringify(this.packageJson));
-    
-    const unusedDeps = this.issues
-      .filter(i => i.type === 'unused')
-      .map(i => i.dependency);
+
+    const unusedDeps = this.issues.filter(i => i.type === 'unused').map(i => i.dependency);
 
     for (const dep of unusedDeps) {
       delete cleaned.dependencies?.[dep];
@@ -593,14 +604,17 @@ OVERVIEW:
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const auditor = new DependencyAuditor();
-  
-  auditor.auditDependencies()
+
+  auditor
+    .auditDependencies()
     .then(result => {
       console.log(auditor.generateReport());
-      
+
       if (result.issues.length > 0) {
         console.log(`\n🔧 Found ${result.issues.length} issues to address`);
-        console.log(`💾 Potential savings: ${result.potentialSavings.size} from ${result.potentialSavings.count} unused packages`);
+        console.log(
+          `💾 Potential savings: ${result.potentialSavings.size} from ${result.potentialSavings.count} unused packages`
+        );
       } else {
         console.log('\n✅ No dependency issues found!');
       }

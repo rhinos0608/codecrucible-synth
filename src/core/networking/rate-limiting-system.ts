@@ -1,18 +1,18 @@
 /**
  * Rate Limiting and Timeout Handling System
- * 
+ *
  * Provides comprehensive rate limiting, timeout management, and
  * external API call optimization with retry mechanisms.
  */
 
 import { logger } from '../logger.js';
-import { 
-  ErrorFactory, 
-  ErrorCategory, 
+import {
+  ErrorFactory,
+  ErrorCategory,
   ErrorSeverity,
   ServiceResponse,
   ErrorResponse,
-  ErrorHandler
+  ErrorHandler,
 } from '../error-handling/structured-error-system.js';
 
 // Rate limiting configuration
@@ -90,37 +90,42 @@ export class RateLimitManager {
     windowMs: 60000, // 1 minute
     blockDuration: 300000, // 5 minutes
     skipSuccessfulRequests: false,
-    skipFailedRequests: false
+    skipFailedRequests: false,
   };
 
   /**
    * Check if request is allowed under rate limit
    */
-  async checkRateLimit(identifier: string, config?: Partial<RateLimitConfig>): Promise<ServiceResponse<boolean>> {
+  async checkRateLimit(
+    identifier: string,
+    config?: Partial<RateLimitConfig>
+  ): Promise<ServiceResponse<boolean>> {
     const rateLimitConfig = { ...this.defaultConfig, ...config };
-    const key = rateLimitConfig.keyGenerator ? rateLimitConfig.keyGenerator(identifier) : identifier;
+    const key = rateLimitConfig.keyGenerator
+      ? rateLimitConfig.keyGenerator(identifier)
+      : identifier;
 
     try {
       const bucket = this.getBucket(key, rateLimitConfig);
-      
+
       // Check if currently blocked
       if (bucket.blocked && bucket.blockExpiry && Date.now() < bucket.blockExpiry) {
         const remainingTime = bucket.blockExpiry - Date.now();
-        
+
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
             `Rate limit exceeded for ${identifier}`,
             ErrorCategory.SYSTEM,
             ErrorSeverity.MEDIUM,
             {
-              context: { 
-                identifier, 
+              context: {
+                identifier,
                 remainingBlockTime: remainingTime,
-                rateLimitConfig 
+                rateLimitConfig,
               },
               userMessage: 'Too many requests, please wait before trying again',
               suggestedActions: [`Wait ${Math.ceil(remainingTime / 1000)} seconds before retrying`],
-              retryable: true
+              retryable: true,
             }
           )
         );
@@ -134,12 +139,12 @@ export class RateLimitManager {
         // Block if no tokens available
         bucket.blocked = true;
         bucket.blockExpiry = Date.now() + (rateLimitConfig.blockDuration || 300000);
-        
+
         logger.warn(`Rate limit bucket exhausted for ${identifier}`, {
           bucket: { ...bucket },
-          config: rateLimitConfig
+          config: rateLimitConfig,
         });
-        
+
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
             `Rate limit bucket exhausted for ${identifier}`,
@@ -149,7 +154,7 @@ export class RateLimitManager {
               context: { identifier, rateLimitConfig },
               userMessage: 'Request rate limit exceeded',
               suggestedActions: ['Reduce request frequency', 'Wait before retrying'],
-              retryable: true
+              retryable: true,
             }
           )
         );
@@ -157,9 +162,8 @@ export class RateLimitManager {
 
       // Consume token
       bucket.tokens -= 1;
-      
-      return ErrorHandler.createSuccessResponse(true);
 
+      return ErrorHandler.createSuccessResponse(true);
     } catch (error) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
@@ -170,7 +174,7 @@ export class RateLimitManager {
             context: { identifier },
             originalError: error as Error,
             userMessage: 'Rate limiting system error',
-            suggestedActions: ['Try again', 'Contact support if issue persists']
+            suggestedActions: ['Try again', 'Contact support if issue persists'],
           }
         )
       );
@@ -182,10 +186,12 @@ export class RateLimitManager {
    */
   recordRequest(identifier: string, success: boolean, config?: Partial<RateLimitConfig>): void {
     const rateLimitConfig = { ...this.defaultConfig, ...config };
-    
+
     // Skip recording based on configuration
-    if ((success && rateLimitConfig.skipSuccessfulRequests) ||
-        (!success && rateLimitConfig.skipFailedRequests)) {
+    if (
+      (success && rateLimitConfig.skipSuccessfulRequests) ||
+      (!success && rateLimitConfig.skipFailedRequests)
+    ) {
       return;
     }
 
@@ -216,7 +222,7 @@ export class RateLimitManager {
       return {
         tokens: this.defaultConfig.maxRequests,
         blocked: false,
-        nextRefill: Date.now() + this.defaultConfig.windowMs
+        nextRefill: Date.now() + this.defaultConfig.windowMs,
       };
     }
 
@@ -224,18 +230,18 @@ export class RateLimitManager {
       tokens: bucket.tokens,
       blocked: bucket.blocked,
       blockExpiry: bucket.blockExpiry,
-      nextRefill: bucket.lastRefill + this.defaultConfig.windowMs
+      nextRefill: bucket.lastRefill + this.defaultConfig.windowMs,
     };
   }
 
   private getBucket(key: string, config: RateLimitConfig): RateLimitBucket {
     let bucket = this.buckets.get(key);
-    
+
     if (!bucket) {
       bucket = {
         tokens: config.maxRequests,
         lastRefill: Date.now(),
-        blocked: false
+        blocked: false,
       };
       this.buckets.set(key, bucket);
     }
@@ -246,7 +252,7 @@ export class RateLimitManager {
   private refillBucket(bucket: RateLimitBucket, config: RateLimitConfig): void {
     const now = Date.now();
     const timePassed = now - bucket.lastRefill;
-    
+
     if (timePassed >= config.windowMs) {
       // Full refill
       bucket.tokens = config.maxRequests;
@@ -257,7 +263,7 @@ export class RateLimitManager {
       // Partial refill based on time passed
       const tokensToAdd = (timePassed / config.windowMs) * config.maxRequests;
       bucket.tokens = Math.min(config.maxRequests, bucket.tokens + tokensToAdd);
-      
+
       if (bucket.tokens >= 1) {
         bucket.blocked = false;
         bucket.blockExpiry = undefined;
@@ -274,7 +280,7 @@ export class TimeoutRetryManager {
     connectionTimeout: 10000,
     responseTimeout: 30000,
     totalTimeout: 60000,
-    retryTimeout: 5000
+    retryTimeout: 5000,
   };
 
   private defaultRetryConfig: RetryConfig = {
@@ -292,7 +298,7 @@ export class TimeoutRetryManager {
         (error.response && error.response.status >= 500) ||
         error.timeout === true
       );
-    }
+    },
   };
 
   /**
@@ -316,14 +322,13 @@ export class TimeoutRetryManager {
     while (attempt <= retryConfig.maxRetries) {
       try {
         const result = await this.executeWithTimeout(requestFn, timeoutConfig, identifier);
-        
+
         logger.debug(`Request succeeded for ${identifier}`, {
           attempt: attempt + 1,
-          totalAttempts: retryConfig.maxRetries + 1
+          totalAttempts: retryConfig.maxRetries + 1,
         });
-        
-        return ErrorHandler.createSuccessResponse(result);
 
+        return ErrorHandler.createSuccessResponse(result);
       } catch (error) {
         lastError = error;
         attempt++;
@@ -331,21 +336,22 @@ export class TimeoutRetryManager {
         logger.warn(`Request attempt ${attempt} failed for ${identifier}`, {
           error: (error as Error).message,
           attempt,
-          maxRetries: retryConfig.maxRetries
+          maxRetries: retryConfig.maxRetries,
         });
 
         // Check if we should retry
-        if (attempt <= retryConfig.maxRetries && 
-            retryConfig.retryCondition && 
-            retryConfig.retryCondition(error)) {
-          
+        if (
+          attempt <= retryConfig.maxRetries &&
+          retryConfig.retryCondition &&
+          retryConfig.retryCondition(error)
+        ) {
           const delay = this.calculateDelay(attempt, retryConfig);
-          
+
           logger.info(`Retrying request for ${identifier} in ${delay}ms`, {
             attempt: attempt + 1,
-            delay
+            delay,
           });
-          
+
           await this.sleep(delay);
         } else {
           break;
@@ -360,21 +366,21 @@ export class TimeoutRetryManager {
         ErrorCategory.NETWORK,
         ErrorSeverity.HIGH,
         {
-          context: { 
-            identifier, 
-            attempts: attempt, 
+          context: {
+            identifier,
+            attempts: attempt,
             lastError: lastError?.message,
             timeoutConfig,
-            retryConfig
+            retryConfig,
           },
           originalError: lastError,
           userMessage: 'Network request failed after multiple attempts',
           suggestedActions: [
             'Check network connection',
             'Verify service availability',
-            'Try again later'
+            'Try again later',
           ],
-          retryable: true
+          retryable: true,
         }
       )
     );
@@ -387,18 +393,20 @@ export class TimeoutRetryManager {
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       const timeoutHandle = setTimeout(() => {
-        reject(ErrorFactory.createError(
-          `Request timeout after ${config.totalTimeout}ms`,
-          ErrorCategory.NETWORK,
-          ErrorSeverity.MEDIUM,
-          {
-            context: { identifier, timeout: config.totalTimeout },
-            userMessage: 'Request timed out',
-            suggestedActions: ['Try again with longer timeout', 'Check network connection'],
-            retryable: true,
-            metadata: { timeout: true }
-          }
-        ));
+        reject(
+          ErrorFactory.createError(
+            `Request timeout after ${config.totalTimeout}ms`,
+            ErrorCategory.NETWORK,
+            ErrorSeverity.MEDIUM,
+            {
+              context: { identifier, timeout: config.totalTimeout },
+              userMessage: 'Request timed out',
+              suggestedActions: ['Try again with longer timeout', 'Check network connection'],
+              retryable: true,
+              metadata: { timeout: true },
+            }
+          )
+        );
       }, config.totalTimeout);
 
       requestFn()
@@ -438,10 +446,7 @@ export class APICallQueue {
   /**
    * Queue an API call with configuration
    */
-  async queueAPICall<T>(
-    requestFn: () => Promise<T>,
-    config: APICallConfig
-  ): Promise<T> {
+  async queueAPICall<T>(requestFn: () => Promise<T>, config: APICallConfig): Promise<T> {
     // Check cache first
     if (config.cacheEnabled) {
       const cached = this.getCachedResult(config.identifier);
@@ -469,16 +474,16 @@ export class APICallQueue {
         resolve,
         reject,
         priority: this.getPriorityValue(config.priority || 'normal'),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       this.queue.push(request);
       this.sortQueue();
-      
+
       logger.debug(`Queued API call: ${config.identifier}`, {
         requestId: request.id,
         queueLength: this.queue.length,
-        priority: config.priority
+        priority: config.priority,
       });
 
       this.processQueue();
@@ -507,8 +512,8 @@ export class APICallQueue {
         id: req.id,
         identifier: req.config.identifier,
         priority: req.config.priority || 'normal',
-        age: Date.now() - req.timestamp
-      }))
+        age: Date.now() - req.timestamp,
+      })),
     };
   }
 
@@ -527,7 +532,7 @@ export class APICallQueue {
     this.queue = [];
     this.cache.clear();
     this.processing = false;
-    
+
     logger.info('API call queue cleared');
   }
 
@@ -541,7 +546,7 @@ export class APICallQueue {
     try {
       while (this.queue.length > 0) {
         const request = this.queue.shift()!;
-        
+
         try {
           await this.executeRequest(request);
         } catch (error) {
@@ -558,17 +563,14 @@ export class APICallQueue {
 
     try {
       logger.debug(`Executing API call: ${config.identifier}`, {
-        requestId: request.id
+        requestId: request.id,
       });
 
-      const result = await this.timeoutRetryManager.executeWithTimeoutAndRetry(
-        requestFn,
-        {
-          timeout: config.timeout,
-          retry: config.retry,
-          identifier: config.identifier
-        }
-      );
+      const result = await this.timeoutRetryManager.executeWithTimeoutAndRetry(requestFn, {
+        timeout: config.timeout,
+        retry: config.retry,
+        identifier: config.identifier,
+      });
 
       if (!result.success) {
         // Record failed request for rate limiting
@@ -586,7 +588,6 @@ export class APICallQueue {
       }
 
       resolve(result.data);
-
     } catch (error) {
       this.rateLimitManager.recordRequest(config.identifier, false, config.rateLimit);
       reject(error);
@@ -605,10 +606,10 @@ export class APICallQueue {
 
   private getPriorityValue(priority: string): number {
     const priorities = {
-      'low': 1,
-      'normal': 2,
-      'high': 3,
-      'critical': 4
+      low: 1,
+      normal: 2,
+      high: 3,
+      critical: 4,
     };
     return priorities[priority as keyof typeof priorities] || 2;
   }
@@ -629,7 +630,7 @@ export class APICallQueue {
     this.cache.set(identifier, {
       data,
       timestamp: Date.now(),
-      ttl
+      ttl,
     });
 
     // Clean up old cache entries periodically

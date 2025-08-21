@@ -224,7 +224,7 @@ export class ObservabilitySystem extends EventEmitter {
     super();
     this.logger = new Logger('ObservabilitySystem');
     this.config = config;
-    
+
     // Initialize components
     this.metricsCollector = new MetricsCollector(config.metrics, this);
     this.tracingSystem = new TracingSystem(config.tracing, this);
@@ -256,7 +256,6 @@ export class ObservabilitySystem extends EventEmitter {
       this.isRunning = true;
       this.logger.info('Observability System initialized successfully');
       this.emit('system:initialized');
-
     } catch (error) {
       this.logger.error('Failed to initialize observability system:', error);
       throw error;
@@ -266,14 +265,19 @@ export class ObservabilitySystem extends EventEmitter {
   /**
    * Record a metric
    */
-  recordMetric(name: string, value: number, tags?: Record<string, string>, unit: string = 'count'): void {
+  recordMetric(
+    name: string,
+    value: number,
+    tags?: Record<string, string>,
+    unit: string = 'count'
+  ): void {
     const metric: MetricPoint = {
       name,
       value,
       timestamp: new Date(),
       tags: tags || {},
       unit,
-      type: 'gauge'
+      type: 'gauge',
     };
 
     this.metricsCollector.record(metric);
@@ -289,7 +293,7 @@ export class ObservabilitySystem extends EventEmitter {
       timestamp: new Date(),
       tags: tags || {},
       unit: 'count',
-      type: 'counter'
+      type: 'counter',
     };
 
     this.metricsCollector.record(metric);
@@ -305,7 +309,7 @@ export class ObservabilitySystem extends EventEmitter {
       timestamp: new Date(),
       tags: tags || {},
       unit: 'ms',
-      type: 'timer'
+      type: 'timer',
     };
 
     this.metricsCollector.record(metric);
@@ -376,32 +380,35 @@ export class ObservabilitySystem extends EventEmitter {
    */
   getSystemStats(): ObservabilityStats {
     const uptime = Date.now() - this.systemStartTime.getTime();
-    
+
     return {
       systemInfo: {
         uptime,
         version: '3.5.0',
         nodeVersion: process.version,
         platform: process.platform,
-        arch: process.arch
+        arch: process.arch,
       },
       metrics: this.metricsCollector.getStats(),
       tracing: this.tracingSystem.getStats(),
       health: this.healthMonitor.getStats(),
       alerts: this.alertManager.getStats(),
       performance: this.performanceProfiler.getStats(),
-      storage: this.dataStorage.getStats()
+      storage: this.dataStorage.getStats(),
     };
   }
 
   /**
    * Export observability data
    */
-  async exportData(format: 'json' | 'csv' | 'prometheus', timeRange?: { start: Date; end: Date }): Promise<string> {
+  async exportData(
+    format: 'json' | 'csv' | 'prometheus',
+    timeRange?: { start: Date; end: Date }
+  ): Promise<string> {
     const data = {
       metrics: this.metricsCollector.exportData(timeRange),
       traces: this.tracingSystem.exportData(timeRange),
-      alerts: this.alertManager.exportData(timeRange)
+      alerts: this.alertManager.exportData(timeRange),
     };
 
     switch (format) {
@@ -490,7 +497,7 @@ export class ObservabilitySystem extends EventEmitter {
 
   private measureEventLoopLag(): number {
     const start = performance.now();
-    return new Promise<number>((resolve) => {
+    return new Promise<number>(resolve => {
       setImmediate(() => {
         const lag = performance.now() - start;
         resolve(lag);
@@ -501,27 +508,29 @@ export class ObservabilitySystem extends EventEmitter {
   private convertToCSV(data: any): string {
     // Simple CSV conversion - in production would be more sophisticated
     let csv = 'timestamp,type,name,value,tags\n';
-    
+
     for (const metric of data.metrics || []) {
-      const tags = Object.entries(metric.tags).map(([k, v]) => `${k}=${v}`).join(';');
+      const tags = Object.entries(metric.tags)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(';');
       csv += `${metric.timestamp},metric,${metric.name},${metric.value},"${tags}"\n`;
     }
-    
+
     return csv;
   }
 
   private convertToPrometheus(data: any): string {
     // Convert to Prometheus format
     let prometheus = '';
-    
+
     for (const metric of data.metrics || []) {
       const labels = Object.entries(metric.tags)
         .map(([k, v]) => `${k}="${v}"`)
         .join(',');
-      
+
       prometheus += `${metric.name.replace(/\./g, '_')}{${labels}} ${metric.value} ${metric.timestamp.getTime()}\n`;
     }
-    
+
     return prometheus;
   }
 }
@@ -534,14 +543,17 @@ class MetricsCollector {
   private exporters: MetricExporter[] = [];
   private logger: Logger;
 
-  constructor(private config: any, private observabilitySystem: ObservabilitySystem) {
+  constructor(
+    private config: any,
+    private observabilitySystem: ObservabilitySystem
+  ) {
     this.logger = new Logger('MetricsCollector');
     this.exporters = config.exporters || [];
   }
 
   async initialize(): Promise<void> {
     this.logger.info('Initializing metrics collection...');
-    
+
     // Start periodic export
     if (this.config.exportInterval > 0) {
       setInterval(() => {
@@ -553,40 +565,38 @@ class MetricsCollector {
   record(metric: MetricPoint): void {
     this.metrics.push(metric);
     this.updateAggregatedMetrics(metric);
-    
+
     // Cleanup old metrics
     this.cleanupOldMetrics();
   }
 
   getSummary(timeRange?: { start: Date; end: Date }): MetricsSummary {
     let metricsToAnalyze = this.metrics;
-    
+
     if (timeRange) {
-      metricsToAnalyze = this.metrics.filter(m => 
-        m.timestamp >= timeRange.start && m.timestamp <= timeRange.end
+      metricsToAnalyze = this.metrics.filter(
+        m => m.timestamp >= timeRange.start && m.timestamp <= timeRange.end
       );
     }
-    
+
     const summary: MetricsSummary = {
       totalMetrics: metricsToAnalyze.length,
       uniqueMetrics: new Set(metricsToAnalyze.map(m => m.name)).size,
       timeRange: timeRange || {
         start: new Date(Math.min(...metricsToAnalyze.map(m => m.timestamp.getTime()))),
-        end: new Date(Math.max(...metricsToAnalyze.map(m => m.timestamp.getTime())))
+        end: new Date(Math.max(...metricsToAnalyze.map(m => m.timestamp.getTime()))),
       },
       topMetrics: this.getTopMetrics(metricsToAnalyze),
-      aggregations: this.getAggregations(metricsToAnalyze)
+      aggregations: this.getAggregations(metricsToAnalyze),
     };
-    
+
     return summary;
   }
 
   exportData(timeRange?: { start: Date; end: Date }): MetricPoint[] {
     if (!timeRange) return [...this.metrics];
-    
-    return this.metrics.filter(m => 
-      m.timestamp >= timeRange.start && m.timestamp <= timeRange.end
-    );
+
+    return this.metrics.filter(m => m.timestamp >= timeRange.start && m.timestamp <= timeRange.end);
   }
 
   getStats(): MetricsStats {
@@ -595,7 +605,7 @@ class MetricsCollector {
       uniqueNames: new Set(this.metrics.map(m => m.name)).size,
       aggregatedMetrics: this.aggregatedMetrics.size,
       memoryUsage: this.estimateMemoryUsage(),
-      exporterStatus: this.exporters.map(e => ({ type: e.type, healthy: true }))
+      exporterStatus: this.exporters.map(e => ({ type: e.type, healthy: true })),
     };
   }
 
@@ -606,7 +616,7 @@ class MetricsCollector {
 
   private updateAggregatedMetrics(metric: MetricPoint): void {
     const key = `${metric.name}:${JSON.stringify(metric.tags)}`;
-    
+
     if (!this.aggregatedMetrics.has(key)) {
       this.aggregatedMetrics.set(key, {
         name: metric.name,
@@ -615,17 +625,17 @@ class MetricsCollector {
         sum: 0,
         min: Number.MAX_VALUE,
         max: Number.MIN_VALUE,
-        values: []
+        values: [],
       });
     }
-    
+
     const agg = this.aggregatedMetrics.get(key)!;
     agg.count++;
     agg.sum += metric.value;
     agg.min = Math.min(agg.min, metric.value);
     agg.max = Math.max(agg.max, metric.value);
     agg.values.push(metric.value);
-    
+
     // Keep only recent values for percentile calculations
     if (agg.values.length > 1000) {
       agg.values = agg.values.slice(-500);
@@ -634,7 +644,7 @@ class MetricsCollector {
 
   private cleanupOldMetrics(): void {
     if (this.metrics.length > 10000) {
-      const cutoff = new Date(Date.now() - (this.config.retentionDays * 24 * 60 * 60 * 1000));
+      const cutoff = new Date(Date.now() - this.config.retentionDays * 24 * 60 * 60 * 1000);
       this.metrics = this.metrics.filter(m => m.timestamp > cutoff);
     }
   }
@@ -654,21 +664,23 @@ class MetricsCollector {
     this.logger.debug(`Exporting metrics to ${exporter.type}`);
   }
 
-  private getTopMetrics(metrics: MetricPoint[]): Array<{ name: string; count: number; avgValue: number }> {
+  private getTopMetrics(
+    metrics: MetricPoint[]
+  ): Array<{ name: string; count: number; avgValue: number }> {
     const metricCounts = new Map<string, { count: number; sum: number }>();
-    
+
     for (const metric of metrics) {
       const existing = metricCounts.get(metric.name) || { count: 0, sum: 0 };
       existing.count++;
       existing.sum += metric.value;
       metricCounts.set(metric.name, existing);
     }
-    
+
     return Array.from(metricCounts.entries())
       .map(([name, data]) => ({
         name,
         count: data.count,
-        avgValue: data.sum / data.count
+        avgValue: data.sum / data.count,
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
@@ -676,7 +688,7 @@ class MetricsCollector {
 
   private getAggregations(metrics: MetricPoint[]): Record<string, any> {
     const aggregations: Record<string, any> = {};
-    
+
     for (const [key, agg] of this.aggregatedMetrics.entries()) {
       aggregations[key] = {
         count: agg.count,
@@ -685,10 +697,10 @@ class MetricsCollector {
         min: agg.min,
         max: agg.max,
         p95: this.calculatePercentile(agg.values, 0.95),
-        p99: this.calculatePercentile(agg.values, 0.99)
+        p99: this.calculatePercentile(agg.values, 0.99),
       };
     }
-    
+
     return aggregations;
   }
 
@@ -709,7 +721,10 @@ class TracingSystem {
   private activeSpans: Map<string, TraceSpan> = new Map();
   private logger: Logger;
 
-  constructor(private config: any, private observabilitySystem: ObservabilitySystem) {
+  constructor(
+    private config: any,
+    private observabilitySystem: ObservabilitySystem
+  ) {
     this.logger = new Logger('TracingSystem');
   }
 
@@ -720,7 +735,7 @@ class TracingSystem {
   startSpan(operationName: string, parentSpan?: TraceSpan): TraceSpan {
     const traceId = parentSpan?.traceId || this.generateTraceId();
     const spanId = this.generateSpanId();
-    
+
     const span: TraceSpan = {
       traceId,
       spanId,
@@ -729,29 +744,29 @@ class TracingSystem {
       startTime: new Date(),
       tags: {},
       logs: [],
-      status: 'ok'
+      status: 'ok',
     };
-    
+
     this.activeSpans.set(spanId, span);
-    
+
     if (!this.traces.has(traceId)) {
       this.traces.set(traceId, []);
     }
     this.traces.get(traceId)!.push(span);
-    
+
     return span;
   }
 
   finishSpan(span: TraceSpan, tags?: Record<string, string>): void {
     span.endTime = new Date();
     span.duration = span.endTime.getTime() - span.startTime.getTime();
-    
+
     if (tags) {
       span.tags = { ...span.tags, ...tags };
     }
-    
+
     this.activeSpans.delete(span.spanId);
-    
+
     this.observabilitySystem.recordTimer(
       `span.duration.${span.operationName}`,
       span.duration,
@@ -761,28 +776,27 @@ class TracingSystem {
 
   exportData(timeRange?: { start: Date; end: Date }): TraceSpan[] {
     const allSpans: TraceSpan[] = [];
-    
+
     for (const spans of this.traces.values()) {
       allSpans.push(...spans);
     }
-    
+
     if (!timeRange) return allSpans;
-    
-    return allSpans.filter(s => 
-      s.startTime >= timeRange.start && 
-      (s.endTime || new Date()) <= timeRange.end
+
+    return allSpans.filter(
+      s => s.startTime >= timeRange.start && (s.endTime || new Date()) <= timeRange.end
     );
   }
 
   getStats(): TracingStats {
     const allSpans = this.exportData();
-    
+
     return {
       totalTraces: this.traces.size,
       totalSpans: allSpans.length,
       activeSpans: this.activeSpans.size,
       averageSpansPerTrace: allSpans.length / Math.max(1, this.traces.size),
-      averageDuration: this.calculateAverageDuration(allSpans)
+      averageDuration: this.calculateAverageDuration(allSpans),
     };
   }
 
@@ -801,7 +815,7 @@ class TracingSystem {
   private calculateAverageDuration(spans: TraceSpan[]): number {
     const completedSpans = spans.filter(s => s.duration !== undefined);
     if (completedSpans.length === 0) return 0;
-    
+
     const totalDuration = completedSpans.reduce((sum, s) => sum + (s.duration || 0), 0);
     return totalDuration / completedSpans.length;
   }
@@ -811,7 +825,10 @@ class HealthMonitor {
   private components: Map<string, ComponentHealth> = new Map();
   private logger: Logger;
 
-  constructor(private config: any, private observabilitySystem: ObservabilitySystem) {
+  constructor(
+    private config: any,
+    private observabilitySystem: ObservabilitySystem
+  ) {
     this.logger = new Logger('HealthMonitor');
   }
 
@@ -823,48 +840,55 @@ class HealthMonitor {
   async checkHealth(): Promise<SystemHealth> {
     const componentHealths: ComponentHealth[] = [];
     let totalScore = 0;
-    
+
     for (const [name, component] of this.components.entries()) {
       try {
         const health = await this.checkComponentHealth(name, component);
         componentHealths.push(health);
-        
+
         // Calculate health score (healthy=1, degraded=0.5, critical=0, unknown=0.25)
-        const score = health.status === 'healthy' ? 1 : 
-                     health.status === 'degraded' ? 0.5 :
-                     health.status === 'unknown' ? 0.25 : 0;
+        const score =
+          health.status === 'healthy'
+            ? 1
+            : health.status === 'degraded'
+              ? 0.5
+              : health.status === 'unknown'
+                ? 0.25
+                : 0;
         totalScore += score;
-        
       } catch (error) {
         this.logger.error(`Health check failed for ${name}:`, error);
         componentHealths.push({
           ...component,
           status: 'critical',
           lastChecked: new Date(),
-          errorRate: 1.0
+          errorRate: 1.0,
         });
       }
     }
-    
+
     const overallScore = componentHealths.length > 0 ? totalScore / componentHealths.length : 0;
     const status = this.determineOverallStatus(componentHealths, overallScore);
-    
+
     return {
       status,
       components: componentHealths,
       overallScore,
       lastChecked: new Date(),
       uptime: Date.now() - (this.observabilitySystem as any).systemStartTime.getTime(),
-      version: '3.5.0'
+      version: '3.5.0',
     };
   }
 
   async performHealthCheck(): Promise<void> {
     const health = await this.checkHealth();
-    
+
     this.observabilitySystem.recordMetric('system.health.score', health.overallScore);
-    this.observabilitySystem.recordMetric('system.health.components.total', health.components.length);
-    
+    this.observabilitySystem.recordMetric(
+      'system.health.components.total',
+      health.components.length
+    );
+
     const healthyCount = health.components.filter(c => c.status === 'healthy').length;
     this.observabilitySystem.recordMetric('system.health.components.healthy', healthyCount);
   }
@@ -876,10 +900,13 @@ class HealthMonitor {
   getStats(): HealthStats {
     return {
       totalComponents: this.components.size,
-      healthyComponents: Array.from(this.components.values()).filter(c => c.status === 'healthy').length,
-      degradedComponents: Array.from(this.components.values()).filter(c => c.status === 'degraded').length,
-      criticalComponents: Array.from(this.components.values()).filter(c => c.status === 'critical').length,
-      lastHealthCheck: new Date()
+      healthyComponents: Array.from(this.components.values()).filter(c => c.status === 'healthy')
+        .length,
+      degradedComponents: Array.from(this.components.values()).filter(c => c.status === 'degraded')
+        .length,
+      criticalComponents: Array.from(this.components.values()).filter(c => c.status === 'critical')
+        .length,
+      lastHealthCheck: new Date(),
     };
   }
 
@@ -899,12 +926,12 @@ class HealthMonitor {
         networkLatency: 0,
         errorCount: 0,
         requestCount: 0,
-        customMetrics: {}
+        customMetrics: {},
       },
       dependencies: [],
       lastChecked: new Date(),
       errorRate: 0,
-      responseTime: 0
+      responseTime: 0,
     });
 
     this.registerComponent('event-loop', {
@@ -917,16 +944,19 @@ class HealthMonitor {
         networkLatency: 0,
         errorCount: 0,
         requestCount: 0,
-        customMetrics: {}
+        customMetrics: {},
       },
       dependencies: [],
       lastChecked: new Date(),
       errorRate: 0,
-      responseTime: 0
+      responseTime: 0,
     });
   }
 
-  private async checkComponentHealth(name: string, component: ComponentHealth): Promise<ComponentHealth> {
+  private async checkComponentHealth(
+    name: string,
+    component: ComponentHealth
+  ): Promise<ComponentHealth> {
     switch (name) {
       case 'memory':
         return this.checkMemoryHealth(component);
@@ -940,45 +970,45 @@ class HealthMonitor {
   private checkMemoryHealth(component: ComponentHealth): ComponentHealth {
     const memUsage = process.memoryUsage();
     const heapUsedPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-    
+
     let status: 'healthy' | 'degraded' | 'critical' | 'unknown' = 'healthy';
     if (heapUsedPercent > 90) {
       status = 'critical';
     } else if (heapUsedPercent > 75) {
       status = 'degraded';
     }
-    
+
     return {
       ...component,
       status,
       metrics: {
         ...component.metrics,
-        memory: heapUsedPercent
+        memory: heapUsedPercent,
       },
-      lastChecked: new Date()
+      lastChecked: new Date(),
     };
   }
 
   private checkEventLoopHealth(component: ComponentHealth): ComponentHealth {
     // Simple event loop lag check
     const start = performance.now();
-    
-    return new Promise<ComponentHealth>((resolve) => {
+
+    return new Promise<ComponentHealth>(resolve => {
       setImmediate(() => {
         const lag = performance.now() - start;
-        
+
         let status: 'healthy' | 'degraded' | 'critical' | 'unknown' = 'healthy';
         if (lag > 100) {
           status = 'critical';
         } else if (lag > 50) {
           status = 'degraded';
         }
-        
+
         resolve({
           ...component,
           status,
           responseTime: lag,
-          lastChecked: new Date()
+          lastChecked: new Date(),
         });
       });
     }) as any;
@@ -987,21 +1017,21 @@ class HealthMonitor {
   private checkGenericComponentHealth(component: ComponentHealth): ComponentHealth {
     return {
       ...component,
-      lastChecked: new Date()
+      lastChecked: new Date(),
     };
   }
 
   private determineOverallStatus(
-    components: ComponentHealth[], 
+    components: ComponentHealth[],
     overallScore: number
   ): 'healthy' | 'degraded' | 'critical' | 'unknown' {
     const criticalComponents = components.filter(c => c.status === 'critical').length;
     const degradedComponents = components.filter(c => c.status === 'degraded').length;
-    
+
     if (criticalComponents > 0) return 'critical';
     if (degradedComponents > 0 || overallScore < 0.8) return 'degraded';
     if (overallScore < 0.5) return 'critical';
-    
+
     return 'healthy';
   }
 }
@@ -1012,13 +1042,16 @@ class AlertManager {
   private alertHistory: Alert[] = [];
   private logger: Logger;
 
-  constructor(private config: any, private observabilitySystem: ObservabilitySystem) {
+  constructor(
+    private config: any,
+    private observabilitySystem: ObservabilitySystem
+  ) {
     this.logger = new Logger('AlertManager');
   }
 
   async initialize(): Promise<void> {
     this.logger.info('Initializing alert management...');
-    
+
     // Load default rules
     if (this.config.rules) {
       for (const rule of this.config.rules) {
@@ -1035,7 +1068,7 @@ class AlertManager {
   evaluateRules(): void {
     for (const rule of this.rules.values()) {
       if (!rule.enabled) continue;
-      
+
       try {
         this.evaluateRule(rule);
       } catch (error) {
@@ -1058,27 +1091,28 @@ class AlertManager {
 
   exportData(timeRange?: { start: Date; end: Date }): Alert[] {
     let alerts = this.alertHistory;
-    
+
     if (timeRange) {
-      alerts = alerts.filter(a => 
-        a.triggeredAt >= timeRange.start && a.triggeredAt <= timeRange.end
+      alerts = alerts.filter(
+        a => a.triggeredAt >= timeRange.start && a.triggeredAt <= timeRange.end
       );
     }
-    
+
     return alerts;
   }
 
   getStats(): AlertStats {
-    const recentAlerts = this.alertHistory.filter(a => 
-      a.triggeredAt > new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const recentAlerts = this.alertHistory.filter(
+      a => a.triggeredAt > new Date(Date.now() - 24 * 60 * 60 * 1000)
     );
-    
+
     return {
       totalRules: this.rules.size,
       activeAlerts: this.activeAlerts.size,
       alertsLast24h: recentAlerts.length,
-      criticalAlerts: Array.from(this.activeAlerts.values()).filter(a => a.severity === 'critical').length,
-      resolvedAlertsLast24h: recentAlerts.filter(a => a.status === 'resolved').length
+      criticalAlerts: Array.from(this.activeAlerts.values()).filter(a => a.severity === 'critical')
+        .length,
+      resolvedAlertsLast24h: recentAlerts.filter(a => a.status === 'resolved').length,
     };
   }
 
@@ -1089,7 +1123,7 @@ class AlertManager {
   private evaluateRule(rule: AlertRule): void {
     // Simplified rule evaluation - in production would query actual metrics
     const shouldTrigger = Math.random() < 0.01; // 1% chance for demo
-    
+
     if (shouldTrigger && !this.activeAlerts.has(rule.id)) {
       this.triggerAlert(rule);
     }
@@ -1105,16 +1139,16 @@ class AlertManager {
       message: `Alert triggered: ${rule.name}`,
       details: {
         rule: rule.name,
-        description: rule.description
-      }
+        description: rule.description,
+      },
     };
-    
+
     this.activeAlerts.set(alert.id, alert);
     this.alertHistory.push(alert);
-    
+
     // Execute alert actions
     this.executeAlertActions(rule, alert);
-    
+
     this.observabilitySystem.emit('alert:triggered', alert);
     this.logger.warn(`Alert triggered: ${rule.name} (${alert.id})`);
   }
@@ -1122,7 +1156,7 @@ class AlertManager {
   private executeAlertActions(rule: AlertRule, alert: Alert): void {
     for (const action of rule.actions) {
       if (!action.enabled) continue;
-      
+
       try {
         this.executeAction(action, alert);
       } catch (error) {
@@ -1161,10 +1195,10 @@ class PerformanceProfiler {
   ): Promise<T> {
     const startTime = performance.now();
     const startMemory = process.memoryUsage();
-    
+
     let result: T;
     let success = true;
-    
+
     try {
       result = await operation();
     } catch (error) {
@@ -1173,19 +1207,19 @@ class PerformanceProfiler {
     } finally {
       const endTime = performance.now();
       const endMemory = process.memoryUsage();
-      
+
       const measurement: PerformanceMeasurement = {
         timestamp: new Date(),
         duration: endTime - startTime,
         memoryUsage: endMemory.heapUsed - startMemory.heapUsed,
         cpuUsage: 0, // Would need more sophisticated CPU monitoring
         success,
-        metadata: metadata || {}
+        metadata: metadata || {},
       };
-      
+
       this.recordMeasurement(operationName, measurement);
     }
-    
+
     return result!;
   }
 
@@ -1196,12 +1230,12 @@ class PerformanceProfiler {
   getStats(): PerformanceStats {
     const allProfiles = this.getProfiles();
     const totalMeasurements = allProfiles.reduce((sum, p) => sum + p.measurements.length, 0);
-    
+
     return {
       totalOperations: this.profiles.size,
       totalMeasurements,
       averageDuration: this.calculateOverallAverageDuration(allProfiles),
-      memoryEfficiency: this.calculateMemoryEfficiency(allProfiles)
+      memoryEfficiency: this.calculateMemoryEfficiency(allProfiles),
     };
   }
 
@@ -1211,18 +1245,18 @@ class PerformanceProfiler {
         operation: operationName,
         measurements: [],
         statistics: this.createEmptyStatistics(),
-        trends: []
+        trends: [],
       });
     }
-    
+
     const profile = this.profiles.get(operationName)!;
     profile.measurements.push(measurement);
-    
+
     // Keep only recent measurements
     if (profile.measurements.length > 1000) {
       profile.measurements = profile.measurements.slice(-500);
     }
-    
+
     // Update statistics
     profile.statistics = this.calculateStatistics(profile.measurements);
     profile.trends = this.calculateTrends(profile.measurements);
@@ -1230,17 +1264,17 @@ class PerformanceProfiler {
 
   private calculateStatistics(measurements: PerformanceMeasurement[]): PerformanceStatistics {
     if (measurements.length === 0) return this.createEmptyStatistics();
-    
+
     const durations = measurements.map(m => m.duration);
     const sortedDurations = [...durations].sort((a, b) => a - b);
-    
+
     const sum = durations.reduce((s, d) => s + d, 0);
     const mean = sum / durations.length;
     const median = sortedDurations[Math.floor(sortedDurations.length / 2)];
-    
+
     const variance = durations.reduce((v, d) => v + Math.pow(d - mean, 2), 0) / durations.length;
     const stdDev = Math.sqrt(variance);
-    
+
     return {
       count: measurements.length,
       mean,
@@ -1249,35 +1283,39 @@ class PerformanceProfiler {
       p99: sortedDurations[Math.floor(sortedDurations.length * 0.99)],
       min: Math.min(...durations),
       max: Math.max(...durations),
-      stdDev
+      stdDev,
     };
   }
 
   private calculateTrends(measurements: PerformanceMeasurement[]): PerformanceTrend[] {
     // Simplified trend calculation
     if (measurements.length < 10) return [];
-    
+
     const recentMeasurements = measurements.slice(-50);
     const olderMeasurements = measurements.slice(-100, -50);
-    
+
     if (olderMeasurements.length === 0) return [];
-    
-    const recentAvg = recentMeasurements.reduce((sum, m) => sum + m.duration, 0) / recentMeasurements.length;
-    const olderAvg = olderMeasurements.reduce((sum, m) => sum + m.duration, 0) / olderMeasurements.length;
-    
+
+    const recentAvg =
+      recentMeasurements.reduce((sum, m) => sum + m.duration, 0) / recentMeasurements.length;
+    const olderAvg =
+      olderMeasurements.reduce((sum, m) => sum + m.duration, 0) / olderMeasurements.length;
+
     const changePercent = ((recentAvg - olderAvg) / olderAvg) * 100;
-    
+
     let direction: 'improving' | 'degrading' | 'stable' = 'stable';
     if (Math.abs(changePercent) > 5) {
       direction = changePercent < 0 ? 'improving' : 'degrading';
     }
-    
-    return [{
-      period: 'recent',
-      direction,
-      changePercent: Math.abs(changePercent),
-      significance: Math.min(1, Math.abs(changePercent) / 20)
-    }];
+
+    return [
+      {
+        period: 'recent',
+        direction,
+        changePercent: Math.abs(changePercent),
+        significance: Math.min(1, Math.abs(changePercent) / 20),
+      },
+    ];
   }
 
   private createEmptyStatistics(): PerformanceStatistics {
@@ -1289,25 +1327,26 @@ class PerformanceProfiler {
       p99: 0,
       min: 0,
       max: 0,
-      stdDev: 0
+      stdDev: 0,
     };
   }
 
   private calculateOverallAverageDuration(profiles: PerformanceProfile[]): number {
     const allDurations = profiles.flatMap(p => p.measurements.map(m => m.duration));
     if (allDurations.length === 0) return 0;
-    
+
     return allDurations.reduce((sum, d) => sum + d, 0) / allDurations.length;
   }
 
   private calculateMemoryEfficiency(profiles: PerformanceProfile[]): number {
     const allMeasurements = profiles.flatMap(p => p.measurements);
     if (allMeasurements.length === 0) return 1;
-    
-    const avgMemoryUsage = allMeasurements.reduce((sum, m) => sum + m.memoryUsage, 0) / allMeasurements.length;
-    
+
+    const avgMemoryUsage =
+      allMeasurements.reduce((sum, m) => sum + m.memoryUsage, 0) / allMeasurements.length;
+
     // Simple efficiency metric: lower memory usage = higher efficiency
-    return Math.max(0, Math.min(1, 1 - (avgMemoryUsage / (100 * 1024 * 1024)))); // Normalize to 100MB
+    return Math.max(0, Math.min(1, 1 - avgMemoryUsage / (100 * 1024 * 1024))); // Normalize to 100MB
   }
 }
 
@@ -1320,7 +1359,7 @@ class ObservabilityStorage {
 
   async initialize(): Promise<void> {
     this.logger.info('Initializing observability storage...');
-    
+
     // Ensure data directory exists
     try {
       await fs.mkdir(this.config.dataPath, { recursive: true });
@@ -1335,7 +1374,7 @@ class ObservabilityStorage {
       dataPath: this.config.dataPath,
       totalSize: 0, // Would calculate actual size
       compressionEnabled: this.config.compressionEnabled,
-      encryptionEnabled: this.config.encryptionEnabled
+      encryptionEnabled: this.config.encryptionEnabled,
     };
   }
 

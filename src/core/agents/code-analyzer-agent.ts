@@ -16,7 +16,7 @@ export class CodeAnalyzerAgent extends UnifiedAgent {
 
   async processRequest(input: string): Promise<ExecutionResponse> {
     logger.info('🔍 Code Analyzer Agent processing request');
-    
+
     const request: ExecutionRequest = {
       id: `code-analysis-${Date.now()}`,
       input: `Code Analysis Task: ${input}
@@ -30,24 +30,30 @@ Please provide a comprehensive analysis including:
 6. Best practices compliance
 7. Improvement recommendations`,
       type: 'analysis', // Routes to Ollama for deep analysis
-      mode: 'quality' // Use quality mode for thorough analysis
+      mode: 'quality', // Use quality mode for thorough analysis
     };
 
     const response = await this.execute(request);
-    
+
     // Enhance with code analysis specific metadata
     if (response.success && response.result) {
-      const enhancedResult = await this.enhanceCodeAnalysis(input, response.result as Record<string, unknown>);
+      const enhancedResult = await this.enhanceCodeAnalysis(
+        input,
+        response.result as Record<string, unknown>
+      );
       return {
         ...response,
-        result: enhancedResult
+        result: enhancedResult,
       };
     }
 
     return response;
   }
 
-  private async enhanceCodeAnalysis(input: string, result: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async enhanceCodeAnalysis(
+    input: string,
+    result: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     return {
       ...result,
       analysisType: 'comprehensive-code-analysis',
@@ -56,12 +62,12 @@ Please provide a comprehensive analysis including:
         backend: 'Ollama (quality reasoning)',
         focus_areas: [
           'Code Quality',
-          'Architecture Assessment', 
+          'Architecture Assessment',
           'Performance Analysis',
           'Security Review',
           'Maintainability',
-          'Best Practices'
-        ]
+          'Best Practices',
+        ],
       },
       recommendations: {
         priority: 'high',
@@ -70,15 +76,15 @@ Please provide a comprehensive analysis including:
           'Review analysis findings',
           'Prioritize improvements',
           'Implement recommendations',
-          'Re-analyze for verification'
-        ]
+          'Re-analyze for verification',
+        ],
       },
       metadata: {
         ...((result.metadata as Record<string, unknown>) || {}),
         agentType: 'code-analyzer',
         voiceArchetype: 'analyzer',
-        llmBackend: 'ollama-quality'
-      }
+        llmBackend: 'ollama-quality',
+      },
     };
   }
 }

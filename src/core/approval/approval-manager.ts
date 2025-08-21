@@ -3,13 +3,22 @@ import { SandboxMode } from '../sandbox/sandbox-manager.js';
 import * as readline from 'readline';
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
-export type OperationType = 'file-read' | 'file-write' | 'file-delete' | 'command-exec' | 'network-access' | 'git-operation' | 'package-install' | 'code-generation' | 'fine-tuning';
+export type OperationType =
+  | 'file-read'
+  | 'file-write'
+  | 'file-delete'
+  | 'command-exec'
+  | 'network-access'
+  | 'git-operation'
+  | 'package-install'
+  | 'code-generation'
+  | 'fine-tuning';
 
 export enum ApprovalMode {
   READ_ONLY = 'read-only',
-  WORKSPACE_READ = 'workspace-read', 
+  WORKSPACE_READ = 'workspace-read',
   WORKSPACE_WRITE = 'workspace-write',
-  FULL_ACCESS = 'full-access'
+  FULL_ACCESS = 'full-access',
 }
 export type ApprovalStatus = 'approved' | 'denied' | 'pending';
 
@@ -82,32 +91,29 @@ export class ApprovalManager {
     this.approvalHistory = new Map();
     this.userInterface = readline.createInterface({
       input: process.stdin,
-      output: process.stdout
+      output: process.stdout,
     });
     this.initializePolicies();
-    
+
     logger.info('Approval manager initialized with three-tier policy system');
   }
 
   /**
    * Request approval for an operation
    */
-  async requestApproval(
-    operation: Operation,
-    context: OperationContext
-  ): Promise<ApprovalResult> {
+  async requestApproval(operation: Operation, context: OperationContext): Promise<ApprovalResult> {
     const startTime = Date.now();
     const sessionHistory = this.approvalHistory.get(context.sessionId) || [];
-    
+
     logger.info(`Approval request: ${operation.type} on ${operation.target}`, {
       sandboxMode: context.sandboxMode,
-      userIntent: context.userIntent
+      userIntent: context.userIntent,
     });
 
     try {
       // Assess risk level
       const riskAssessment = await this.assessRisk(operation, context);
-      
+
       // Get applicable policy
       const policy = this.policies.get(context.sandboxMode);
       if (!policy) {
@@ -116,29 +122,28 @@ export class ApprovalManager {
 
       // Apply approval rules
       const result = await this.applyApprovalRules(operation, context, riskAssessment, policy);
-      
+
       // Store in history
       sessionHistory.push(result);
       this.approvalHistory.set(context.sessionId, sessionHistory);
-      
+
       const duration = Date.now() - startTime;
-      
+
       logger.info(`Approval ${result.status}: ${operation.type} (${duration}ms)`, {
         riskLevel: riskAssessment.level,
         riskScore: riskAssessment.score,
-        autoApproved: result.autoApproved
+        autoApproved: result.autoApproved,
       });
 
       return result;
-      
     } catch (error) {
       logger.error(`Approval request failed for ${operation.type}:`, error);
-      
+
       return {
         status: 'denied',
         granted: false,
         reason: `Approval system error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        suggestions: ['Check approval system configuration', 'Try again with simpler operation']
+        suggestions: ['Check approval system configuration', 'Try again with simpler operation'],
       };
     }
   }
@@ -146,7 +151,10 @@ export class ApprovalManager {
   /**
    * Assess risk level for an operation
    */
-  private async assessRisk(operation: Operation, context: OperationContext): Promise<RiskAssessment> {
+  private async assessRisk(
+    operation: Operation,
+    context: OperationContext
+  ): Promise<RiskAssessment> {
     const factors: RiskFactor[] = [];
     let score = 0;
 
@@ -186,7 +194,7 @@ export class ApprovalManager {
       level,
       score,
       factors,
-      recommendations
+      recommendations,
     };
   }
 
@@ -209,7 +217,7 @@ export class ApprovalManager {
         const conditionMet = this.evaluateCondition(rule.condition, {
           operation,
           context,
-          riskAssessment
+          riskAssessment,
         });
 
         if (conditionMet) {
@@ -219,17 +227,17 @@ export class ApprovalManager {
                 status: 'approved',
                 granted: true,
                 reason: rule.reason,
-                autoApproved: true
+                autoApproved: true,
               };
-            
+
             case 'deny':
               return {
                 status: 'denied',
                 granted: false,
                 reason: rule.reason,
-                suggestions: riskAssessment.recommendations
+                suggestions: riskAssessment.recommendations,
               };
-            
+
             case 'require-confirmation':
               return await this.requestUserConfirmation(operation, context, riskAssessment);
           }
@@ -257,7 +265,7 @@ export class ApprovalManager {
       status: 'approved',
       granted: true,
       reason: `Auto-approved: ${riskAssessment.level} risk (score: ${riskAssessment.score})`,
-      autoApproved: true
+      autoApproved: true,
     };
   }
 
@@ -275,9 +283,11 @@ export class ApprovalManager {
     console.log(`Operation: ${operation.type}`);
     console.log(`Target: ${operation.target}`);
     console.log(`Description: ${operation.description}`);
-    console.log(`Risk Level: ${riskAssessment.level.toUpperCase()} (score: ${riskAssessment.score})`);
+    console.log(
+      `Risk Level: ${riskAssessment.level.toUpperCase()} (score: ${riskAssessment.score})`
+    );
     console.log(`Sandbox Mode: ${context.sandboxMode}`);
-    
+
     if (riskAssessment.factors.length > 0) {
       console.log('\nRisk Factors:');
       riskAssessment.factors.forEach(factor => {
@@ -299,11 +309,11 @@ export class ApprovalManager {
     console.log('  [q] Quit/cancel');
     console.log('='.repeat(60));
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const askForInput = () => {
-        this.userInterface.question('Your choice (y/n/s/q): ', (answer) => {
+        this.userInterface.question('Your choice (y/n/s/q): ', answer => {
           const choice = answer.toLowerCase().trim();
-          
+
           switch (choice) {
             case 'y':
             case 'yes':
@@ -311,10 +321,10 @@ export class ApprovalManager {
                 status: 'approved',
                 granted: true,
                 reason: 'User approved after confirmation',
-                reviewerId: 'user'
+                reviewerId: 'user',
               });
               break;
-              
+
             case 'n':
             case 'no':
               resolve({
@@ -322,26 +332,26 @@ export class ApprovalManager {
                 granted: false,
                 reason: 'User denied after review',
                 suggestions: riskAssessment.recommendations,
-                reviewerId: 'user'
+                reviewerId: 'user',
               });
               break;
-              
+
             case 's':
             case 'show':
               this.showDetailedInformation(operation, context, riskAssessment);
               askForInput(); // Ask again after showing details
               break;
-              
+
             case 'q':
             case 'quit':
               resolve({
                 status: 'denied',
                 granted: false,
                 reason: 'User cancelled operation',
-                reviewerId: 'user'
+                reviewerId: 'user',
               });
               break;
-              
+
             default:
               console.log('Invalid choice. Please enter y, n, s, or q.');
               askForInput();
@@ -361,7 +371,7 @@ export class ApprovalManager {
       status: 'denied',
       granted: false,
       reason: `Operation denied: ${riskAssessment.level} risk (score: ${riskAssessment.score})`,
-      suggestions: riskAssessment.recommendations
+      suggestions: riskAssessment.recommendations,
     };
   }
 
@@ -376,12 +386,12 @@ export class ApprovalManager {
     console.log('\n' + '='.repeat(60));
     console.log('📊 DETAILED OPERATION ANALYSIS');
     console.log('='.repeat(60));
-    
+
     console.log('Operation Details:');
     console.log(`  Type: ${operation.type}`);
     console.log(`  Target: ${operation.target}`);
     console.log(`  Description: ${operation.description}`);
-    
+
     if (operation.metadata) {
       console.log('  Metadata:');
       Object.entries(operation.metadata).forEach(([key, value]) => {
@@ -398,7 +408,7 @@ export class ApprovalManager {
     console.log('\nRisk Assessment:');
     console.log(`  Overall Level: ${riskAssessment.level.toUpperCase()}`);
     console.log(`  Risk Score: ${riskAssessment.score}/100`);
-    
+
     console.log('\nRisk Factors:');
     riskAssessment.factors.forEach((factor, index) => {
       console.log(`  ${index + 1}. ${factor.description}`);
@@ -422,51 +432,70 @@ export class ApprovalManager {
    */
   private getOperationTypeRisk(operationType: OperationType): RiskFactor[] {
     const riskMap: Record<OperationType, RiskFactor[]> = {
-      'file-read': [{
-        category: 'data',
-        severity: 2,
-        description: 'Reading file contents may expose sensitive information'
-      }],
-      'file-write': [{
-        category: 'data',
-        severity: 5,
-        description: 'Writing files can modify or corrupt existing data'
-      }],
-      'file-delete': [{
-        category: 'data',
-        severity: 8,
-        description: 'Deleting files is irreversible and may cause data loss'
-      }],
-      'command-exec': [{
-        category: 'system',
-        severity: 7,
-        description: 'Command execution can modify system state or access sensitive resources'
-      }],
-      'network-access': [{
-        category: 'network',
-        severity: 6,
-        description: 'Network access may leak data or download malicious content'
-      }],
-      'git-operation': [{
-        category: 'data',
-        severity: 4,
-        description: 'Git operations can modify version control history'
-      }],
-      'package-install': [{
-        category: 'security',
-        severity: 7,
-        description: 'Package installation can introduce security vulnerabilities or malicious code'
-      }],
-      'code-generation': [{
-        category: 'data',
-        severity: 3,
-        description: 'Code generation may create files or modify existing code'
-      }],
-      'fine-tuning': [{
-        category: 'system',
-        severity: 6,
-        description: 'Fine-tuning models requires significant system resources and file access'
-      }]
+      'file-read': [
+        {
+          category: 'data',
+          severity: 2,
+          description: 'Reading file contents may expose sensitive information',
+        },
+      ],
+      'file-write': [
+        {
+          category: 'data',
+          severity: 5,
+          description: 'Writing files can modify or corrupt existing data',
+        },
+      ],
+      'file-delete': [
+        {
+          category: 'data',
+          severity: 8,
+          description: 'Deleting files is irreversible and may cause data loss',
+        },
+      ],
+      'command-exec': [
+        {
+          category: 'system',
+          severity: 7,
+          description: 'Command execution can modify system state or access sensitive resources',
+        },
+      ],
+      'network-access': [
+        {
+          category: 'network',
+          severity: 6,
+          description: 'Network access may leak data or download malicious content',
+        },
+      ],
+      'git-operation': [
+        {
+          category: 'data',
+          severity: 4,
+          description: 'Git operations can modify version control history',
+        },
+      ],
+      'package-install': [
+        {
+          category: 'security',
+          severity: 7,
+          description:
+            'Package installation can introduce security vulnerabilities or malicious code',
+        },
+      ],
+      'code-generation': [
+        {
+          category: 'data',
+          severity: 3,
+          description: 'Code generation may create files or modify existing code',
+        },
+      ],
+      'fine-tuning': [
+        {
+          category: 'system',
+          severity: 6,
+          description: 'Fine-tuning models requires significant system resources and file access',
+        },
+      ],
     };
 
     return riskMap[operationType] || [];
@@ -485,7 +514,7 @@ export class ApprovalManager {
         category: 'system',
         severity: 9,
         description: 'Operation targets system directory',
-        mitigation: 'Consider using workspace-relative paths'
+        mitigation: 'Consider using workspace-relative paths',
       });
     }
 
@@ -495,7 +524,7 @@ export class ApprovalManager {
         category: 'security',
         severity: 6,
         description: 'Operation targets path outside workspace',
-        mitigation: 'Use paths within the project workspace'
+        mitigation: 'Use paths within the project workspace',
       });
     }
 
@@ -505,7 +534,7 @@ export class ApprovalManager {
         category: 'data',
         severity: 4,
         description: 'Operation targets hidden or configuration files',
-        mitigation: 'Review if access to hidden files is necessary'
+        mitigation: 'Review if access to hidden files is necessary',
       });
     }
 
@@ -518,26 +547,32 @@ export class ApprovalManager {
   private getSandboxModeRisk(sandboxMode: SandboxMode): RiskFactor[] {
     switch (sandboxMode) {
       case 'read-only':
-        return [{
-          category: 'security',
-          severity: 1,
-          description: 'Read-only mode provides maximum security'
-        }];
-      
+        return [
+          {
+            category: 'security',
+            severity: 1,
+            description: 'Read-only mode provides maximum security',
+          },
+        ];
+
       case 'workspace-write':
-        return [{
-          category: 'security',
-          severity: 3,
-          description: 'Workspace-write mode allows modifications within project'
-        }];
-      
+        return [
+          {
+            category: 'security',
+            severity: 3,
+            description: 'Workspace-write mode allows modifications within project',
+          },
+        ];
+
       case 'full-access':
-        return [{
-          category: 'security',
-          severity: 6,
-          description: 'Full-access mode provides minimal restrictions'
-        }];
-      
+        return [
+          {
+            category: 'security',
+            severity: 6,
+            description: 'Full-access mode provides minimal restrictions',
+          },
+        ];
+
       default:
         return [];
     }
@@ -552,14 +587,14 @@ export class ApprovalManager {
     // Dangerous commands
     const dangerousCommands = ['rm', 'del', 'format', 'sudo', 'chmod', 'chown'];
     const cmdParts = command.toLowerCase().split(' ');
-    
+
     for (const dangerous of dangerousCommands) {
       if (cmdParts.includes(dangerous)) {
         factors.push({
           category: 'system',
           severity: 9,
           description: `Command contains dangerous operation: ${dangerous}`,
-          mitigation: 'Use safer alternatives or review command carefully'
+          mitigation: 'Use safer alternatives or review command carefully',
         });
       }
     }
@@ -572,7 +607,7 @@ export class ApprovalManager {
           category: 'network',
           severity: 6,
           description: `Command includes network operation: ${netCmd}`,
-          mitigation: 'Review network endpoints and data transfer'
+          mitigation: 'Review network endpoints and data transfer',
         });
       }
     }
@@ -585,7 +620,7 @@ export class ApprovalManager {
           category: 'system',
           severity: 5,
           description: `Command executes scripts with: ${executor}`,
-          mitigation: 'Review script content for security implications'
+          mitigation: 'Review script content for security implications',
         });
       }
     }
@@ -657,7 +692,7 @@ export class ApprovalManager {
           condition: 'true',
           action: 'auto-approve',
           reason: 'File reading is safe in read-only mode',
-          priority: 10
+          priority: 10,
         },
         {
           id: 'readonly-file-write',
@@ -665,9 +700,9 @@ export class ApprovalManager {
           condition: 'true',
           action: 'deny',
           reason: 'File writing not allowed in read-only mode',
-          priority: 10
-        }
-      ]
+          priority: 10,
+        },
+      ],
     });
 
     // Workspace-write mode policy
@@ -682,7 +717,7 @@ export class ApprovalManager {
           condition: 'true',
           action: 'auto-approve',
           reason: 'File reading is generally safe',
-          priority: 10
+          priority: 10,
         },
         {
           id: 'workspace-file-write-safe',
@@ -690,7 +725,7 @@ export class ApprovalManager {
           condition: 'operation.target.startsWith(context.workspaceRoot)',
           action: 'auto-approve',
           reason: 'Writing within workspace is allowed',
-          priority: 10
+          priority: 10,
         },
         {
           id: 'workspace-dangerous-command',
@@ -698,9 +733,9 @@ export class ApprovalManager {
           condition: 'riskAssessment.score > 20',
           action: 'require-confirmation',
           reason: 'High-risk command requires confirmation',
-          priority: 5
-        }
-      ]
+          priority: 5,
+        },
+      ],
     });
 
     // Full-access mode policy
@@ -715,12 +750,11 @@ export class ApprovalManager {
           condition: 'riskAssessment.level === "critical"',
           action: 'require-confirmation',
           reason: 'Critical operations require confirmation even in full-access mode',
-          priority: 10
-        }
-      ]
+          priority: 10,
+        },
+      ],
     });
   }
-
 
   /**
    * Set the approval mode

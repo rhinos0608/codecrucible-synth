@@ -34,18 +34,77 @@ const DEFAULT_SECURITY_POLICY: SecurityPolicy = {
   allowEnvironmentAccess: false,
   maxExecutionTime: 30000, // 30 seconds
   allowedCommands: [
-    'ls', 'cat', 'echo', 'pwd', 'whoami', 'date', 'grep', 'find', 'sort', 'uniq',
-    'head', 'tail', 'wc', 'cut', 'awk', 'sed', 'diff', 'file', 'which', 'type'
+    'ls',
+    'cat',
+    'echo',
+    'pwd',
+    'whoami',
+    'date',
+    'grep',
+    'find',
+    'sort',
+    'uniq',
+    'head',
+    'tail',
+    'wc',
+    'cut',
+    'awk',
+    'sed',
+    'diff',
+    'file',
+    'which',
+    'type',
   ],
   blockedCommands: [
-    'rm', 'rmdir', 'delete', 'del', 'format', 'fdisk', 'mkfs', 'dd',
-    'shutdown', 'reboot', 'halt', 'poweroff', 'init', 'service', 'systemctl',
-    'sudo', 'su', 'passwd', 'chmod', 'chown', 'chgrp', 'umask', 'setuid',
-    'mount', 'umount', 'crontab', 'at', 'batch', 'nohup', 'screen', 'tmux',
-    'ssh', 'scp', 'rsync', 'wget', 'curl', 'nc', 'netcat', 'telnet', 'ftp',
-    'mail', 'sendmail', 'postfix', 'apache', 'nginx', 'mysql', 'postgres'
+    'rm',
+    'rmdir',
+    'delete',
+    'del',
+    'format',
+    'fdisk',
+    'mkfs',
+    'dd',
+    'shutdown',
+    'reboot',
+    'halt',
+    'poweroff',
+    'init',
+    'service',
+    'systemctl',
+    'sudo',
+    'su',
+    'passwd',
+    'chmod',
+    'chown',
+    'chgrp',
+    'umask',
+    'setuid',
+    'mount',
+    'umount',
+    'crontab',
+    'at',
+    'batch',
+    'nohup',
+    'screen',
+    'tmux',
+    'ssh',
+    'scp',
+    'rsync',
+    'wget',
+    'curl',
+    'nc',
+    'netcat',
+    'telnet',
+    'ftp',
+    'mail',
+    'sendmail',
+    'postfix',
+    'apache',
+    'nginx',
+    'mysql',
+    'postgres',
   ],
-  allowedLanguages: ['python', 'javascript', 'bash', 'shell']
+  allowedLanguages: ['python', 'javascript', 'bash', 'shell'],
 };
 
 /**
@@ -130,7 +189,7 @@ const SECURITY_PATTERNS = {
     /getattr\s*\(/, // Dynamic attribute access
     /setattr\s*\(/, // Dynamic attribute setting
     /delattr\s*\(/, // Dynamic attribute deletion
-  ]
+  ],
 };
 
 /**
@@ -148,12 +207,12 @@ export class SecurityValidator {
    */
   validateCommand(command: string): ValidationResult {
     const trimmedCommand = command.trim();
-    
+
     if (!trimmedCommand) {
       return {
         isValid: false,
         reason: 'Empty command not allowed',
-        severity: 'low'
+        severity: 'low',
       };
     }
 
@@ -164,7 +223,7 @@ export class SecurityValidator {
         isValid: false,
         reason: `Command '${commandWord}' is explicitly blocked`,
         severity: 'critical',
-        suggestedAlternative: this.getSafeAlternative(commandWord)
+        suggestedAlternative: this.getSafeAlternative(commandWord),
       };
     }
 
@@ -181,7 +240,7 @@ export class SecurityValidator {
           return {
             isValid: false,
             reason: 'Network access is not allowed',
-            severity: 'high'
+            severity: 'high',
           };
         }
       }
@@ -194,7 +253,7 @@ export class SecurityValidator {
           return {
             isValid: false,
             reason: 'Process spawning/manipulation is not allowed',
-            severity: 'high'
+            severity: 'high',
           };
         }
       }
@@ -203,7 +262,7 @@ export class SecurityValidator {
     // All checks passed
     return {
       isValid: true,
-      severity: 'low'
+      severity: 'low',
     };
   }
 
@@ -216,7 +275,7 @@ export class SecurityValidator {
       return {
         isValid: false,
         reason: `Language '${language}' is not allowed`,
-        severity: 'critical'
+        severity: 'critical',
       };
     }
 
@@ -226,7 +285,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: 'Potentially dangerous code injection pattern detected',
-          severity: 'critical'
+          severity: 'critical',
         };
       }
     }
@@ -266,7 +325,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: 'Dangerous Python pattern detected',
-          severity: 'high'
+          severity: 'high',
         };
       }
     }
@@ -294,7 +353,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: 'Dangerous JavaScript pattern detected',
-          severity: 'high'
+          severity: 'high',
         };
       }
     }
@@ -327,7 +386,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: 'Potentially dangerous code pattern detected',
-          severity: 'medium'
+          severity: 'medium',
         };
       }
     }
@@ -344,8 +403,16 @@ export class SecurityValidator {
 
     // Check for system file access
     const systemPaths = [
-      '/etc/', '/proc/', '/sys/', '/dev/', '/boot/', '/root/',
-      '/usr/bin/', '/usr/sbin/', '/bin/', '/sbin/'
+      '/etc/',
+      '/proc/',
+      '/sys/',
+      '/dev/',
+      '/boot/',
+      '/root/',
+      '/usr/bin/',
+      '/usr/sbin/',
+      '/bin/',
+      '/sbin/',
     ];
 
     for (const systemPath of systemPaths) {
@@ -353,7 +420,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: `Access to system path '${systemPath}' is not allowed`,
-          severity: 'critical'
+          severity: 'critical',
         };
       }
     }
@@ -363,19 +430,19 @@ export class SecurityValidator {
       return {
         isValid: false,
         reason: 'File system write operations are not allowed',
-        severity: 'high'
+        severity: 'high',
       };
     }
 
     // Check for dangerous file types
     const dangerousExtensions = ['.sh', '.bat', '.exe', '.com', '.scr', '.pif'];
     const fileExtension = path.toLowerCase().substring(path.lastIndexOf('.'));
-    
+
     if (dangerousExtensions.includes(fileExtension)) {
       return {
         isValid: false,
         reason: `File type '${fileExtension}' is not allowed`,
-        severity: 'high'
+        severity: 'high',
       };
     }
 
@@ -392,7 +459,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: 'Command injection pattern detected',
-          severity: 'critical'
+          severity: 'critical',
         };
       }
     }
@@ -403,7 +470,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: 'File system abuse pattern detected',
-          severity: 'critical'
+          severity: 'critical',
         };
       }
     }
@@ -414,7 +481,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: 'Privilege escalation attempt detected',
-          severity: 'critical'
+          severity: 'critical',
         };
       }
     }
@@ -425,7 +492,7 @@ export class SecurityValidator {
         return {
           isValid: false,
           reason: 'Environment manipulation detected',
-          severity: 'high'
+          severity: 'high',
         };
       }
     }
@@ -438,13 +505,13 @@ export class SecurityValidator {
    */
   private getSafeAlternative(command: string): string | undefined {
     const alternatives: Record<string, string> = {
-      'rm': 'Use file management operations instead',
-      'sudo': 'Operations run in isolated sandbox',
-      'wget': 'Use file upload functionality',
-      'curl': 'Use file upload functionality',
-      'ssh': 'Not available in sandbox environment',
-      'mount': 'Filesystem is managed automatically',
-      'chmod': 'File permissions are managed automatically'
+      rm: 'Use file management operations instead',
+      sudo: 'Operations run in isolated sandbox',
+      wget: 'Use file upload functionality',
+      curl: 'Use file upload functionality',
+      ssh: 'Not available in sandbox environment',
+      mount: 'Filesystem is managed automatically',
+      chmod: 'File permissions are managed automatically',
     };
 
     return alternatives[command];
@@ -454,16 +521,16 @@ export class SecurityValidator {
    * Log security violation
    */
   logSecurityViolation(
-    sessionId: string, 
-    violationType: string, 
-    content: string, 
+    sessionId: string,
+    violationType: string,
+    content: string,
     severity: string
   ): void {
     logger.warn(`🚨 Security violation in session ${sessionId}:`, {
       type: violationType,
       severity,
       content: content.substring(0, 200),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -493,7 +560,7 @@ export class SecurityValidator {
       allowEnvironmentAccess: false,
       maxExecutionTime: 15000, // 15 seconds
       blockedCommands: [...DEFAULT_SECURITY_POLICY.blockedCommands, 'pip', 'npm', 'apt', 'yum'],
-      allowedLanguages: ['python']
+      allowedLanguages: ['python'],
     });
   }
 
@@ -507,7 +574,7 @@ export class SecurityValidator {
       allowProcessSpawning: false,
       allowEnvironmentAccess: false,
       maxExecutionTime: 60000, // 60 seconds
-      allowedLanguages: ['python', 'javascript', 'bash', 'shell']
+      allowedLanguages: ['python', 'javascript', 'bash', 'shell'],
     });
   }
 }

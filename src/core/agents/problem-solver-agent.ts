@@ -16,30 +16,36 @@ export class ProblemSolverAgent extends UnifiedAgent {
 
   async processRequest(input: string): Promise<ExecutionResponse> {
     logger.info('🧩 Problem Solver Agent processing request');
-    
+
     const request: ExecutionRequest = {
       id: `problem-${Date.now()}`,
       input,
       type: 'problem-solving',
-      mode: 'quality' // Use quality mode for complex problem solving
+      mode: 'quality', // Use quality mode for complex problem solving
     };
 
     // Use the sophisticated Living Spiral methodology through UnifiedAgent
     const response = await this.execute(request);
-    
+
     // Enhance with problem-solving specific analysis
     if (response.success && response.result) {
-      const enhancedResult = await this.enhanceProblemSolution(input, response.result as Record<string, unknown>);
+      const enhancedResult = await this.enhanceProblemSolution(
+        input,
+        response.result as Record<string, unknown>
+      );
       return {
         ...response,
-        result: enhancedResult
+        result: enhancedResult,
       };
     }
 
     return response;
   }
 
-  private async enhanceProblemSolution(originalProblem: string, solution: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async enhanceProblemSolution(
+    originalProblem: string,
+    solution: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     // Add problem-solving specific enhancements
     return {
       ...solution,
@@ -49,15 +55,15 @@ export class ProblemSolverAgent extends UnifiedAgent {
         confidence: 'High - uses sophisticated agent architecture',
         nextSteps: [
           'Review proposed solution',
-          'Test implementation approach', 
-          'Iterate based on feedback'
-        ]
+          'Test implementation approach',
+          'Iterate based on feedback',
+        ],
       },
       metadata: {
         ...((solution.metadata as Record<string, unknown>) || {}),
         agentType: 'problem-solver',
-        methodology: 'living-spiral'
-      }
+        methodology: 'living-spiral',
+      },
     };
   }
 }

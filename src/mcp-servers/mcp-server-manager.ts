@@ -6,7 +6,10 @@ import chalk from 'chalk';
 import { readFile, writeFile, access, stat, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import axios from 'axios';
-import { AdvancedSecurityValidator, ValidationResult } from '../core/security/advanced-security-validator.js';
+import {
+  AdvancedSecurityValidator,
+  ValidationResult,
+} from '../core/security/advanced-security-validator.js';
 import { InputSanitizer } from '../core/security/input-sanitizer.js';
 
 export interface MCPServerConfig {
@@ -39,16 +42,52 @@ export interface MCPServerConfig {
 }
 
 export interface MCPServer {
+  id: string;
   name: string;
   process?: ChildProcess;
   enabled: boolean;
   status: 'stopped' | 'starting' | 'running' | 'error';
   lastError?: string;
+  capabilities?: ServerCapabilities;
+  performance?: PerformanceMetrics;
+}
+
+export interface ServerCapabilities {
+  tools: ToolInfo[];
+  resources: ResourceInfo[];
+  prompts: PromptInfo[];
+  lastDiscovered: Date;
+}
+
+export interface ToolInfo {
+  name: string;
+  description: string;
+  inputSchema: any;
+}
+
+export interface ResourceInfo {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export interface PromptInfo {
+  name: string;
+  description?: string;
+  arguments?: any[];
+}
+
+export interface PerformanceMetrics {
+  avgResponseTime: number;
+  successRate: number;
+  lastHealthCheck: Date;
+  availability: number;
 }
 
 /**
  * MCP Server Manager
- * 
+ *
  * Manages Model Context Protocol servers for extended functionality
  * Provides safe, sandboxed access to file system, git, terminal, and package management
  */
@@ -66,7 +105,7 @@ export class MCPServerManager {
       allowFileAccess: true,
       allowNetworkAccess: false,
       requireSandbox: true,
-      maxInputLength: 10000
+      maxInputLength: 10000,
     });
     this.initializeServers();
   }
@@ -80,14 +119,15 @@ export class MCPServerManager {
       { name: 'git', enabled: this.config.git.enabled },
       { name: 'terminal', enabled: this.config.terminal.enabled },
       { name: 'packageManager', enabled: this.config.packageManager.enabled },
-      { name: 'smithery', enabled: this.config.smithery?.enabled ?? false }
+      { name: 'smithery', enabled: this.config.smithery?.enabled ?? false },
     ];
 
     serverConfigs.forEach(({ name, enabled }) => {
       this.servers.set(name, {
+        id: name,
         name,
         enabled,
-        status: 'stopped'
+        status: 'stopped',
       });
     });
 
@@ -135,7 +175,6 @@ export class MCPServerManager {
 
       server.status = 'running';
       logger.info(`MCP server started: ${serverName}`);
-
     } catch (error) {
       server.status = 'error';
       server.lastError = error instanceof Error ? error.message : 'Unknown error';
@@ -149,7 +188,7 @@ export class MCPServerManager {
   private async initializeBuiltinServer(serverName: string): Promise<void> {
     // For this implementation, we're creating built-in MCP-like functionality
     // In a full implementation, you might spawn actual MCP server processes
-    
+
     switch (serverName) {
       case 'filesystem':
         await this.initializeFilesystemServer();
@@ -200,7 +239,6 @@ export class MCPServerManager {
 
       server.status = 'stopped';
       logger.info(`MCP server stopped: ${serverName}`);
-
     } catch (error) {
       logger.error(`Failed to stop MCP server ${serverName}:`, error);
     }
@@ -288,7 +326,7 @@ export class MCPServerManager {
   async readFileSecure(filePath: string): Promise<string> {
     // SECURITY FIX: Additional validation using InputSanitizer
     const pathValidation = InputSanitizer.validateFilePath(filePath);
-    
+
     if (!pathValidation.isValid) {
       const securityError = InputSanitizer.createSecurityError(pathValidation, 'file-read');
       logger.error('Path traversal attempt blocked', securityError);
@@ -304,7 +342,9 @@ export class MCPServerManager {
       return await readFile(filePath, 'utf8');
     } catch (error) {
       logger.error('File read operation failed', { filePath, error });
-      throw new Error(`Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -317,7 +357,9 @@ export class MCPServerManager {
       await writeFile(filePath, content, 'utf8');
       logger.info(`File written: ${filePath}`);
     } catch (error) {
-      throw new Error(`Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -329,7 +371,9 @@ export class MCPServerManager {
     try {
       return await readdir(dirPath);
     } catch (error) {
-      throw new Error(`Failed to list directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to list directory: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -351,7 +395,7 @@ export class MCPServerManager {
         isFile: stats.isFile(),
         isDirectory: stats.isDirectory(),
         size: stats.size,
-        modified: stats.mtime.toISOString()
+        modified: stats.mtime.toISOString(),
       };
     } catch (error) {
       return {
@@ -359,7 +403,7 @@ export class MCPServerManager {
         isFile: false,
         isDirectory: false,
         size: 0,
-        modified: ''
+        modified: '',
       };
     }
   }
@@ -371,7 +415,7 @@ export class MCPServerManager {
     // Input validation and sanitization
     const sanitizedCommand = await this.sanitizeCommandInput(command);
     const sanitizedArgs = await Promise.all(args.map(arg => this.sanitizeCommandInput(arg)));
-    
+
     if (!this.isCommandAllowed(sanitizedCommand)) {
       throw new Error(`Command not allowed: ${sanitizedCommand}`);
     }
@@ -385,16 +429,17 @@ export class MCPServerManager {
         stdio: 'pipe',
         shell: false, // Prevent shell injection
         env: this.getSafeEnvironment(),
-        timeout: 30000 // Built-in timeout
+        timeout: 30000, // Built-in timeout
       });
 
       let stdout = '';
       let stderr = '';
 
-      child.stdout?.on('data', (data) => {
+      child.stdout?.on('data', data => {
         const chunk = data.toString();
         // Limit output size to prevent memory exhaustion
-        if (stdout.length + chunk.length > 1024 * 1024) { // 1MB limit
+        if (stdout.length + chunk.length > 1024 * 1024) {
+          // 1MB limit
           child.kill();
           reject(new Error('Command output too large'));
           return;
@@ -402,9 +447,10 @@ export class MCPServerManager {
         stdout += chunk;
       });
 
-      child.stderr?.on('data', (data) => {
+      child.stderr?.on('data', data => {
         const chunk = data.toString();
-        if (stderr.length + chunk.length > 1024 * 1024) { // 1MB limit
+        if (stderr.length + chunk.length > 1024 * 1024) {
+          // 1MB limit
           child.kill();
           reject(new Error('Command error output too large'));
           return;
@@ -412,7 +458,7 @@ export class MCPServerManager {
         stderr += chunk;
       });
 
-      child.on('close', (code) => {
+      child.on('close', code => {
         if (code === 0) {
           resolve(stdout);
         } else {
@@ -420,7 +466,7 @@ export class MCPServerManager {
         }
       });
 
-      child.on('error', (error) => {
+      child.on('error', error => {
         reject(new Error(`Command execution error: ${error.message}`));
       });
 
@@ -443,35 +489,40 @@ export class MCPServerManager {
     }
 
     // Use the advanced security validator
-    const validationResult: ValidationResult = await this.securityValidator.validateInput(input, 'command');
-    
+    const validationResult: ValidationResult = await this.securityValidator.validateInput(
+      input,
+      'command'
+    );
+
     if (!validationResult.isValid || validationResult.riskLevel === 'critical') {
       logger.warn('Command blocked due to security violations:', {
         input: input.substring(0, 100) + '...',
         violations: validationResult.violations,
-        riskLevel: validationResult.riskLevel
+        riskLevel: validationResult.riskLevel,
       });
-      throw new Error(`Command blocked: ${validationResult.violations[0]?.description || 'Security violation detected'}`);
+      throw new Error(
+        `Command blocked: ${validationResult.violations[0]?.description || 'Security violation detected'}`
+      );
     }
 
     if (validationResult.riskLevel === 'high') {
       logger.warn('High-risk command detected but allowed:', {
         input: input.substring(0, 100) + '...',
-        violations: validationResult.violations
+        violations: validationResult.violations,
       });
     }
 
     // Use sanitized input from validator
     const sanitized = validationResult.sanitizedInput || input;
-    
+
     if (sanitized.trim().length === 0) {
       throw new Error('Command cannot be empty after sanitization');
     }
-    
+
     if (sanitized.length > 255) {
       throw new Error('Command too long');
     }
-    
+
     return sanitized.trim();
   }
 
@@ -483,7 +534,7 @@ export class MCPServerManager {
     if (command.includes('..') || args.some(arg => arg.includes('..'))) {
       throw new Error('Path traversal attempt detected');
     }
-    
+
     // Check for suspicious patterns
     const suspiciousPatterns = [
       /rm\s+-rf/i,
@@ -495,16 +546,16 @@ export class MCPServerManager {
       /nc\s+.*-e/i, // netcat backdoor
       /python.*-c/i, // python one-liners can be dangerous
       /eval/i,
-      /exec/i
+      /exec/i,
     ];
-    
+
     const fullCommand = [command, ...args].join(' ');
     for (const pattern of suspiciousPatterns) {
       if (pattern.test(fullCommand)) {
         throw new Error(`Suspicious command pattern detected: ${pattern.source}`);
       }
     }
-    
+
     // Limit number of arguments
     if (args.length > 20) {
       throw new Error('Too many command arguments');
@@ -534,13 +585,13 @@ export class MCPServerManager {
   private getSafeEnvironment(): Record<string, string> {
     const safeVars = ['PATH', 'HOME', 'USER', 'PWD', 'LANG', 'LC_ALL'];
     const safeEnv: Record<string, string> = {};
-    
+
     for (const varName of safeVars) {
       if (process.env[varName]) {
         safeEnv[varName] = process.env[varName]!;
       }
     }
-    
+
     return safeEnv;
   }
 
@@ -617,17 +668,17 @@ export class MCPServerManager {
       const response = await axios.get(`${this.config.smithery.baseUrl}/exa/mcp`, {
         params: {
           api_key: this.config.smithery.apiKey,
-          profile: this.config.smithery.profile
+          profile: this.config.smithery.profile,
         },
         headers: {
-          'Accept': 'application/json'
-        }
+          Accept: 'application/json',
+        },
       });
 
       return {
         query,
         results: response.data,
-        numResults
+        numResults,
       };
     } catch (error: any) {
       throw new Error(`Smithery web search failed: ${error.message || 'Unknown error'}`);
@@ -649,7 +700,7 @@ export class MCPServerManager {
       // Normalize and resolve the path to prevent traversal
       const resolvedPath = path.resolve(filePath);
       const cwd = process.cwd();
-      
+
       // Check for directory traversal attempts
       if (filePath.includes('..') || filePath.includes('~')) {
         return false;
@@ -657,9 +708,10 @@ export class MCPServerManager {
 
       // Ensure the resolved path is within the current working directory or explicitly allowed paths
       const normalizedPath = path.normalize(resolvedPath);
-      
+
       // Additional security checks
-      if (normalizedPath.includes('\0')) { // Null byte injection
+      if (normalizedPath.includes('\0')) {
+        // Null byte injection
         return false;
       }
 
@@ -721,19 +773,194 @@ export class MCPServerManager {
   }
 
   /**
-   * Health check for all servers
+   * Enhanced MCP capability discovery following Claude Code patterns
+   */
+  async listServers(): Promise<MCPServer[]> {
+    return Array.from(this.servers.values());
+  }
+
+  async discoverServerCapabilities(serverId: string): Promise<ServerCapabilities | null> {
+    const server = this.servers.get(serverId);
+    if (!server || server.status !== 'running') {
+      return null;
+    }
+
+    try {
+      // Discover capabilities based on server type
+      const capabilities = await this.performCapabilityDiscovery(serverId);
+
+      // Cache capabilities
+      server.capabilities = capabilities;
+
+      return capabilities;
+    } catch (error) {
+      logger.error(`Capability discovery failed for ${serverId}:`, error);
+      return null;
+    }
+  }
+
+  private async performCapabilityDiscovery(serverId: string): Promise<ServerCapabilities> {
+    // Implement capability discovery based on server type
+    const tools: ToolInfo[] = [];
+    const resources: ResourceInfo[] = [];
+    const prompts: PromptInfo[] = [];
+
+    switch (serverId) {
+      case 'filesystem':
+        tools.push(
+          {
+            name: 'read_file',
+            description: 'Read file contents securely',
+            inputSchema: { path: 'string' },
+          },
+          {
+            name: 'write_file',
+            description: 'Write file contents securely',
+            inputSchema: { path: 'string', content: 'string' },
+          },
+          {
+            name: 'list_directory',
+            description: 'List directory contents',
+            inputSchema: { path: 'string' },
+          }
+        );
+        break;
+
+      case 'git':
+        tools.push(
+          { name: 'git_status', description: 'Get git repository status', inputSchema: {} },
+          {
+            name: 'git_add',
+            description: 'Stage files for commit',
+            inputSchema: { files: 'string[]' },
+          },
+          {
+            name: 'git_commit',
+            description: 'Commit staged changes',
+            inputSchema: { message: 'string' },
+          }
+        );
+        break;
+
+      case 'terminal':
+        tools.push({
+          name: 'execute_command',
+          description: 'Execute terminal command securely',
+          inputSchema: { command: 'string', args: 'string[]' },
+        });
+        break;
+
+      case 'packageManager':
+        tools.push(
+          {
+            name: 'install_package',
+            description: 'Install npm package',
+            inputSchema: { packageName: 'string', dev: 'boolean' },
+          },
+          {
+            name: 'run_script',
+            description: 'Run npm script',
+            inputSchema: { scriptName: 'string' },
+          }
+        );
+        break;
+
+      case 'smithery':
+        tools.push({
+          name: 'web_search',
+          description: 'Search the web using Smithery',
+          inputSchema: { query: 'string', numResults: 'number' },
+        });
+        break;
+    }
+
+    return {
+      tools,
+      resources,
+      prompts,
+      lastDiscovered: new Date(),
+    };
+  }
+
+  /**
+   * Health check for all servers with performance metrics
    */
   async healthCheck(): Promise<{ [key: string]: any }> {
     const health: { [key: string]: any } = {};
 
     for (const [name, server] of this.servers) {
+      const startTime = Date.now();
+      let isHealthy = false;
+
+      try {
+        // Perform health check based on server type
+        await this.performHealthCheck(server);
+        isHealthy = true;
+      } catch (error) {
+        // Health check failed
+      }
+
+      const responseTime = Date.now() - startTime;
+
+      // Update performance metrics
+      if (!server.performance) {
+        server.performance = {
+          avgResponseTime: responseTime,
+          successRate: isHealthy ? 1 : 0,
+          lastHealthCheck: new Date(),
+          availability: isHealthy ? 1 : 0,
+        };
+      } else {
+        // Update running averages
+        server.performance.avgResponseTime =
+          server.performance.avgResponseTime * 0.9 + responseTime * 0.1;
+        server.performance.successRate =
+          server.performance.successRate * 0.9 + (isHealthy ? 0.1 : 0);
+        server.performance.lastHealthCheck = new Date();
+        server.performance.availability =
+          server.performance.availability * 0.95 + (isHealthy ? 0.05 : 0);
+      }
+
       health[name] = {
         enabled: server.enabled,
         status: server.status,
-        lastError: server.lastError
+        lastError: server.lastError,
+        performance: server.performance,
+        capabilities: server.capabilities
+          ? {
+              toolCount: server.capabilities.tools.length,
+              resourceCount: server.capabilities.resources.length,
+              promptCount: server.capabilities.prompts.length,
+              lastDiscovered: server.capabilities.lastDiscovered,
+            }
+          : null,
       };
     }
 
     return health;
+  }
+
+  private async performHealthCheck(server: MCPServer): Promise<void> {
+    // Simple health check - in production would be more sophisticated
+    if (server.status !== 'running') {
+      throw new Error('Server not running');
+    }
+
+    // Server-specific health checks could be added here
+    switch (server.id) {
+      case 'filesystem':
+        // Check if we can access current directory
+        await this.listDirectorySecure('.');
+        break;
+      case 'git':
+        // Check if git is available (if in a git repo)
+        try {
+          await this.gitStatus();
+        } catch (error) {
+          // Git might not be available, which is OK
+        }
+        break;
+      // Add other server-specific health checks as needed
+    }
   }
 }

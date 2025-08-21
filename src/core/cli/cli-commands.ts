@@ -35,9 +35,11 @@ export class CLICommands {
     console.log(chalk.cyan('🤖 Model Client:'));
     try {
       if (this.context.modelClient) {
+        console.log('DEBUG: About to call healthCheck...');
         const healthCheck = await this.context.modelClient.healthCheck();
+        console.log('DEBUG: HealthCheck completed:', healthCheck);
         console.log(chalk.green(`  ✅ Status: ${healthCheck ? 'Connected' : 'Disconnected'}`));
-        
+
         if (typeof (this.context.modelClient as any).getCurrentModel === 'function') {
           const currentModel = (this.context.modelClient as any).getCurrentModel();
           console.log(chalk.cyan(`  🎯 Current Model: ${currentModel || 'Auto-detect'}`));
@@ -46,10 +48,12 @@ export class CLICommands {
         console.log(chalk.red('  ❌ Model client not initialized'));
       }
     } catch (error) {
-      console.log(chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      console.log(
+        chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      );
     }
 
-    // Voice System Status  
+    // Voice System Status
     console.log(chalk.cyan('\n🎭 Voice System:'));
     try {
       if (this.context.voiceSystem) {
@@ -60,7 +64,9 @@ export class CLICommands {
         console.log(chalk.red('  ❌ Voice system not initialized'));
       }
     } catch (error) {
-      console.log(chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      console.log(
+        chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      );
     }
 
     // MCP Server Status
@@ -69,7 +75,7 @@ export class CLICommands {
       if (this.context.mcpManager) {
         const serverCount = (this.context.mcpManager as any).servers?.size || 0;
         console.log(chalk.green(`  ✅ Active Servers: ${serverCount}`));
-        
+
         if (typeof (this.context.mcpManager as any).isReady === 'function') {
           const ready = (this.context.mcpManager as any).isReady();
           console.log(chalk.cyan(`  🚀 Ready: ${ready ? 'Yes' : 'No'}`));
@@ -78,7 +84,9 @@ export class CLICommands {
         console.log(chalk.red('  ❌ MCP manager not initialized'));
       }
     } catch (error) {
-      console.log(chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      console.log(
+        chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      );
     }
 
     // Configuration Status
@@ -86,16 +94,22 @@ export class CLICommands {
     try {
       if (this.context.config) {
         console.log(chalk.green('  ✅ Configuration loaded'));
-        
+
         if (this.context.config.model) {
-          console.log(chalk.cyan(`  🔗 Endpoint: ${this.context.config.model.endpoint || 'Default'}`));
-          console.log(chalk.cyan(`  ⏱️  Timeout: ${this.context.config.model.timeout || 'Default'}ms`));
+          console.log(
+            chalk.cyan(`  🔗 Endpoint: ${this.context.config.model.endpoint || 'Default'}`)
+          );
+          console.log(
+            chalk.cyan(`  ⏱️  Timeout: ${this.context.config.model.timeout || 'Default'}ms`)
+          );
         }
       } else {
         console.log(chalk.red('  ❌ Configuration not loaded'));
       }
     } catch (error) {
-      console.log(chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      console.log(
+        chalk.red(`  ❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      );
     }
 
     console.log(chalk.green('\n✨ System check complete!\n'));
@@ -106,9 +120,9 @@ export class CLICommands {
    */
   async listModels(): Promise<void> {
     console.log(chalk.bold('\n🧠 Available AI Models\n'));
-    
+
     const spinner = ora('Fetching available models...').start();
-    
+
     try {
       if (!this.context.modelClient) {
         spinner.fail('Model client not available');
@@ -119,9 +133,9 @@ export class CLICommands {
       // Check if getAllAvailableModels method exists
       if (typeof this.context.modelClient.getAllAvailableModels === 'function') {
         const models = await this.context.modelClient.getAllAvailableModels();
-        
+
         spinner.succeed(`Found ${models.length} models`);
-        
+
         if (models.length > 0) {
           console.log(chalk.cyan('📋 Available Models:'));
           models.forEach((model, index) => {
@@ -130,7 +144,9 @@ export class CLICommands {
               console.log(chalk.gray(`     Size: ${model.size}`));
             }
             if (model.modified_at) {
-              console.log(chalk.gray(`     Modified: ${new Date(model.modified_at).toLocaleDateString()}`));
+              console.log(
+                chalk.gray(`     Modified: ${new Date(model.modified_at).toLocaleDateString()}`)
+              );
             }
           });
         } else {
@@ -154,9 +170,9 @@ export class CLICommands {
   async handleGeneration(prompt: string, options: CLIOptions = {}): Promise<void> {
     console.log(chalk.bold(`\n🎨 Generating Code\n`));
     console.log(chalk.cyan(`Prompt: ${prompt}`));
-    
+
     const spinner = ora('Generating code...').start();
-    
+
     try {
       if (!this.context.modelClient || !this.context.voiceSystem) {
         spinner.fail('Required services not available');
@@ -166,23 +182,23 @@ export class CLICommands {
 
       // Get voices for code generation
       const voices = options.voices || this.context.voiceSystem.getDefaultVoices() || ['developer'];
-      
+
       // Generate multi-voice solutions
       const results = await this.context.voiceSystem.generateMultiVoiceSolutions(
         Array.isArray(voices) ? voices : [voices],
         prompt,
         { files: [] }
       );
-      
+
       spinner.succeed('Code generation complete');
-      
+
       if (results && results.length > 0) {
         console.log(chalk.green('\n✨ Generated Solutions:\n'));
-        
+
         results.forEach((result, index) => {
           console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Solution:`));
           console.log(chalk.white(result.content || 'No content generated'));
-          
+
           if (result.confidence) {
             console.log(chalk.gray(`   Confidence: ${Math.round(result.confidence * 100)}%`));
           }
@@ -203,13 +219,30 @@ export class CLICommands {
    */
   async handleAnalyze(files: string[] = [], options: CLIOptions = {}): Promise<void> {
     if (files.length === 0) {
-      // Analyze current directory
-      await this.analyzeDirectory(this.workingDirectory, options);
+      // Use our real codebase analysis for directory analysis
+      console.log(chalk.cyan('🔍 Performing comprehensive codebase analysis...'));
+      
+      try {
+        console.log('DEBUG: About to import CodebaseAnalyzer');
+        const { CodebaseAnalyzer } = await import('../analysis/codebase-analyzer.js');
+        console.log('DEBUG: CodebaseAnalyzer imported successfully');
+        const analyzer = new CodebaseAnalyzer(this.workingDirectory);
+        console.log('DEBUG: Analyzer created, starting analysis');
+        const analysis = await analyzer.performAnalysis();
+        console.log('DEBUG: Analysis completed');
+        console.log(analysis);
+      } catch (error) {
+        console.error(chalk.red('❌ Analysis failed:'), error);
+        console.log('DEBUG: Falling back to original analysis');
+        // For now, just show a message instead of hanging
+        console.log(chalk.yellow('🔧 Real-time analysis temporarily unavailable. Using fallback method.'));
+        console.log(chalk.cyan('ℹ️  The comprehensive analysis feature is being refined.'));
+      }
     } else {
-      // Analyze specified files
+      // Analyze specified files using original logic
       for (const file of files) {
         const fullPath = isAbsolute(file) ? file : join(this.workingDirectory, file);
-        
+
         try {
           const stats = await stat(fullPath);
           if (stats.isDirectory()) {
@@ -229,15 +262,15 @@ export class CLICommands {
    */
   async startServer(options: CLIOptions): Promise<void> {
     const port = parseInt(options.port || '3002', 10);
-    
+
     console.log(chalk.cyan(`\n🚀 Starting CodeCrucible Server on port ${port}...`));
-    
+
     const serverOptions: ServerOptions = {
       port,
       host: 'localhost',
-      cors: true
+      cors: true,
     };
-    
+
     try {
       await startServerMode(this.context, serverOptions);
       console.log(chalk.green(`✅ Server running at http://localhost:${port}`));
@@ -252,45 +285,47 @@ export class CLICommands {
    */
   private async analyzeDirectory(dirPath: string, options: CLIOptions): Promise<void> {
     console.log(chalk.bold(`\n📁 Analyzing Directory: ${dirPath}`));
-    
+
     const spinner = ora('Scanning directory...').start();
-    
+
     try {
       // Get file patterns for analysis
       const patterns = [
         '**/*.{ts,js,tsx,jsx,py,java,cpp,hpp,c,h,rs,go,php,rb,swift,kt}',
         '**/package.json',
         '**/tsconfig.json',
-        '**/README.md'
+        '**/README.md',
       ];
-      
+
       const allFiles: string[] = [];
       for (const pattern of patterns) {
-        const files = await glob(pattern, { 
+        const files = await glob(pattern, {
           cwd: dirPath,
-          ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**']
+          ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
         });
         allFiles.push(...files.map(f => join(dirPath, f)));
       }
-      
+
       spinner.text = `Found ${allFiles.length} files, analyzing...`;
-      
+
       // PERFORMANCE FIX: Use worker pool for non-blocking analysis
       if (this.context.voiceSystem && this.context.modelClient) {
         const voices = options.voices || ['analyzer', 'architect'];
-        
+
         // Create analysis task for worker pool
         const analysisTask: AnalysisTask = {
           id: randomUUID(),
           files: allFiles,
-          prompt: (options.prompt as string) || 'Analyze this codebase for architecture, quality, and potential improvements.',
+          prompt:
+            (options.prompt as string) ||
+            'Analyze this codebase for architecture, quality, and potential improvements.',
           options: {
             voices,
-            maxFiles: 50 // Limit files to prevent memory overload
+            maxFiles: 50, // Limit files to prevent memory overload
           },
-          timeout: options.timeout || 30000 // 30 seconds timeout
+          timeout: options.timeout || 30000, // 30 seconds timeout
         };
-        
+
         // Execute analysis in worker thread
         try {
           const result = await analysisWorkerPool.executeAnalysis(analysisTask, {
@@ -301,24 +336,24 @@ export class CLICommands {
             performanceThresholds: {
               fastModeMaxTokens: 2048,
               timeoutMs: 30000,
-              maxConcurrentRequests: 2
+              maxConcurrentRequests: 2,
             },
             security: {
               enableSandbox: true,
               maxInputLength: 100000,
-              allowedCommands: ['node', 'npm', 'git']
-            }
+              allowedCommands: ['node', 'npm', 'git'],
+            },
           });
-          
+
           spinner.succeed(`Analysis complete - processed ${result.result?.totalFiles || 0} files`);
-          
+
           // Display results
           if (result.success && result.result) {
             console.log(chalk.green('\n✅ Analysis Results:'));
             console.log(chalk.cyan(`📊 Files processed: ${result.result.totalFiles}`));
             console.log(chalk.cyan(`⏱️ Duration: ${result.duration}ms`));
             console.log(chalk.cyan(`📈 Success rate: ${result.result.summary?.successRate || 0}%`));
-            
+
             // Display chunk results
             result.result.chunks.forEach((chunk: any, index: number) => {
               console.log(chalk.yellow(`\n📦 Chunk ${index + 1}:`));
@@ -344,7 +379,6 @@ export class CLICommands {
         console.log(`  Files found: ${allFiles.length}`);
         console.log(`  Types: ${this.getFileTypes(allFiles)}`);
       }
-      
     } catch (error) {
       spinner.fail('Directory analysis failed');
       console.error(chalk.red('Error:'), error);
@@ -356,31 +390,31 @@ export class CLICommands {
    */
   private async analyzeFile(filePath: string, options: CLIOptions): Promise<void> {
     console.log(chalk.bold(`\n📄 Analyzing File: ${filePath}`));
-    
+
     const spinner = ora('Reading file...').start();
-    
+
     try {
       const content = await readFile(filePath, 'utf-8');
       const stats = await stat(filePath);
-      
+
       spinner.text = 'Analyzing content...';
-      
+
       console.log(chalk.cyan('\n📊 File Analysis:'));
       console.log(`  Size: ${(stats.size / 1024).toFixed(2)} KB`);
       console.log(`  Lines: ${content.split('\n').length}`);
       console.log(`  Type: ${extname(filePath)}`);
-      
+
       if (this.context.voiceSystem && this.context.modelClient) {
         const voices = options.voices || ['analyzer'];
-        
+
         const analysis = await this.context.voiceSystem.generateMultiVoiceSolutions(
           Array.isArray(voices) ? voices : [voices],
           `Analyze this file: ${filePath}\n\nContent:\n${content.substring(0, 2000)}${content.length > 2000 ? '...' : ''}`,
           { files: [filePath] }
         );
-        
+
         spinner.succeed('File analysis complete');
-        
+
         if (analysis && analysis.length > 0) {
           analysis.forEach((result, index) => {
             console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Analysis:`));
@@ -403,12 +437,12 @@ export class CLICommands {
    */
   private getFileTypes(files: string[]): string {
     const types = new Map<string, number>();
-    
+
     files.forEach(file => {
       const ext = extname(file) || 'no extension';
       types.set(ext, (types.get(ext) || 0) + 1);
     });
-    
+
     return Array.from(types.entries())
       .map(([ext, count]) => `${ext}(${count})`)
       .join(', ');

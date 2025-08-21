@@ -1,4 +1,3 @@
-
 export interface UnifiedClientConfig {
   endpoint?: string;
   model?: string;

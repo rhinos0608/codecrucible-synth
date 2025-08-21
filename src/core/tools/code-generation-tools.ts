@@ -6,8 +6,13 @@ import { UnifiedModelClient } from '../client.js';
 
 const GenerateCodeSchema = z.object({
   specification: z.string().describe('Natural language description of what code to generate'),
-  language: z.enum(['typescript', 'javascript', 'python', 'java', 'cpp', 'csharp']).default('typescript').describe('Programming language to generate'),
-  codeType: z.enum(['function', 'class', 'component', 'module', 'interface', 'type', 'hook', 'service']).describe('Type of code structure to generate'),
+  language: z
+    .enum(['typescript', 'javascript', 'python', 'java', 'cpp', 'csharp'])
+    .default('typescript')
+    .describe('Programming language to generate'),
+  codeType: z
+    .enum(['function', 'class', 'component', 'module', 'interface', 'type', 'hook', 'service'])
+    .describe('Type of code structure to generate'),
   fileName: z.string().optional().describe('Optional file name to save the generated code'),
   context: z.string().optional().describe('Additional context about the project or existing code'),
 });
@@ -33,34 +38,38 @@ export class CodeGeneratorTool extends BaseTool {
       const { specification, language, codeType, fileName, context } = args;
 
       // Create a comprehensive prompt for code generation
-      const codeGenPrompt = this.buildCodeGenerationPrompt(specification, language, codeType, context);
-      
+      const codeGenPrompt = this.buildCodeGenerationPrompt(
+        specification,
+        language,
+        codeType,
+        context
+      );
+
       // Generate code using the AI model
       const generatedCode = await this.modelClient.generateText(codeGenPrompt);
-      
+
       // Extract clean code from the response
       const cleanCode = this.extractCodeFromResponse(generatedCode);
-      
+
       // If fileName is provided, save the code to file
       if (fileName) {
         const filePath = this.resolvePath(fileName);
         await this.ensureDirectoryExists(filePath);
         await fs.writeFile(filePath, cleanCode, 'utf-8');
-        
+
         return `Generated ${codeType} code and saved to ${fileName}:\n\n${cleanCode}`;
       }
-      
+
       return `Generated ${codeType} code:\n\n${cleanCode}`;
-      
     } catch (error) {
       return `Error generating code: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   }
 
   private buildCodeGenerationPrompt(
-    specification: string, 
-    language: string, 
-    codeType: string, 
+    specification: string,
+    language: string,
+    codeType: string,
     context?: string
   ): string {
     const languageTemplates = {
@@ -69,10 +78,11 @@ export class CodeGeneratorTool extends BaseTool {
       python: this.getPythonTemplate(codeType),
       java: this.getJavaTemplate(codeType),
       cpp: this.getCppTemplate(codeType),
-      csharp: this.getCSharpTemplate(codeType)
+      csharp: this.getCSharpTemplate(codeType),
     };
 
-    const template = languageTemplates[language as keyof typeof languageTemplates] || languageTemplates.typescript;
+    const template =
+      languageTemplates[language as keyof typeof languageTemplates] || languageTemplates.typescript;
 
     return `You are an expert ${language} developer. Generate clean, production-ready ${codeType} code based on the following specification.
 
@@ -201,7 +211,7 @@ export const serviceInstance = new ServiceName();
 
 // Exports
 export { };
-\`\`\``
+\`\`\``,
     };
 
     return templates[codeType as keyof typeof templates] || templates.function;
@@ -251,7 +261,7 @@ export const ComponentName = ({ }) => {
 };
 
 export default ComponentName;
-\`\`\``
+\`\`\``,
     };
 
     return templates[codeType as keyof typeof templates] || templates.function;
@@ -286,7 +296,7 @@ class ClassName:
         """[Method description]"""
         # Method implementation
         pass
-\`\`\``
+\`\`\``,
     };
 
     return templates[codeType as keyof typeof templates] || templates.function;
@@ -315,7 +325,7 @@ public class ClassName {
         // Method implementation
     }
 }
-\`\`\``
+\`\`\``,
     };
 
     return templates[codeType as keyof typeof templates] || templates.class;
@@ -342,7 +352,7 @@ public:
      */
     ReturnType methodName();
 };
-\`\`\``
+\`\`\``,
     };
 
     return templates[codeType as keyof typeof templates] || templates.class;
@@ -374,7 +384,7 @@ public class ClassName
         // Method implementation
     }
 }
-\`\`\``
+\`\`\``,
     };
 
     return templates[codeType as keyof typeof templates] || templates.class;
@@ -385,15 +395,15 @@ public class ClassName
     const codeBlockRegex = /```[\w]*\n([\s\S]*?)\n```/g;
     const matches = [];
     let match;
-    
+
     while ((match = codeBlockRegex.exec(response)) !== null) {
       matches.push(match[1]);
     }
-    
+
     if (matches.length > 0) {
       return matches.join('\n\n');
     }
-    
+
     // If no code blocks found, return the response as-is
     return response.trim();
   }
@@ -418,8 +428,14 @@ public class ClassName
 const ModifyCodeSchema = z.object({
   filePath: z.string().describe('Path to the file to modify'),
   modification: z.string().describe('Description of the modification to make'),
-  preserveFormatting: z.boolean().default(true).describe('Whether to preserve existing code formatting'),
-  createBackup: z.boolean().default(true).describe('Whether to create a backup before modification'),
+  preserveFormatting: z
+    .boolean()
+    .default(true)
+    .describe('Whether to preserve existing code formatting'),
+  createBackup: z
+    .boolean()
+    .default(true)
+    .describe('Whether to create a backup before modification'),
 });
 
 export class CodeModifierTool extends BaseTool {
@@ -441,36 +457,43 @@ export class CodeModifierTool extends BaseTool {
   async execute(args: z.infer<typeof ModifyCodeSchema>): Promise<string> {
     try {
       const { filePath, modification, preserveFormatting, createBackup } = args;
-      
+
       const fullPath = this.resolvePath(filePath);
-      
+
       // Read the existing file
       const existingCode = await fs.readFile(fullPath, 'utf-8');
-      
+
       // Create backup if requested
       if (createBackup) {
         const backupPath = `${fullPath}.backup.${Date.now()}`;
         await fs.writeFile(backupPath, existingCode, 'utf-8');
       }
-      
+
       // Generate the modification prompt
-      const modificationPrompt = this.buildModificationPrompt(existingCode, modification, preserveFormatting);
-      
+      const modificationPrompt = this.buildModificationPrompt(
+        existingCode,
+        modification,
+        preserveFormatting
+      );
+
       // Get modified code from AI
       const modifiedResponse = await this.modelClient.generateText(modificationPrompt);
       const modifiedCode = this.extractCodeFromResponse(modifiedResponse);
-      
+
       // Write the modified code back to the file
       await fs.writeFile(fullPath, modifiedCode, 'utf-8');
-      
+
       return `Successfully modified ${filePath}. ${createBackup ? 'Backup created.' : ''}\n\nModification applied: ${modification}`;
-      
     } catch (error) {
       return `Error modifying code: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   }
 
-  private buildModificationPrompt(existingCode: string, modification: string, preserveFormatting: boolean): string {
+  private buildModificationPrompt(
+    existingCode: string,
+    modification: string,
+    preserveFormatting: boolean
+  ): string {
     return `You are an expert code editor. Modify the following code according to the specified instructions.
 
 EXISTING CODE:
@@ -498,15 +521,15 @@ Return ONLY the complete modified code wrapped in triple backticks. Do not inclu
     const codeBlockRegex = /```[\w]*\n([\s\S]*?)\n```/g;
     const matches = [];
     let match;
-    
+
     while ((match = codeBlockRegex.exec(response)) !== null) {
       matches.push(match[1]);
     }
-    
+
     if (matches.length > 0) {
       return matches.join('\n\n');
     }
-    
+
     // If no code blocks found, return the response as-is
     return response.trim();
   }
@@ -521,25 +544,33 @@ Return ONLY the complete modified code wrapped in triple backticks. Do not inclu
 
 const RefactorCodeSchema = z.object({
   filePath: z.string().describe('Path to the file to refactor'),
-  refactorType: z.enum([
-    'extract_function',
-    'extract_class',
-    'rename_variable',
-    'inline_function',
-    'move_method',
-    'split_class',
-    'merge_classes',
-    'optimize_imports',
-    'modernize_syntax',
-    'improve_naming'
-  ]).describe('Type of refactoring to perform'),
-  targetElement: z.string().optional().describe('Specific element to refactor (function name, variable name, etc.)'),
+  refactorType: z
+    .enum([
+      'extract_function',
+      'extract_class',
+      'rename_variable',
+      'inline_function',
+      'move_method',
+      'split_class',
+      'merge_classes',
+      'optimize_imports',
+      'modernize_syntax',
+      'improve_naming',
+    ])
+    .describe('Type of refactoring to perform'),
+  targetElement: z
+    .string()
+    .optional()
+    .describe('Specific element to refactor (function name, variable name, etc.)'),
   newName: z.string().optional().describe('New name for rename operations'),
-  extractionOptions: z.object({
-    startLine: z.number().optional(),
-    endLine: z.number().optional(),
-    newFunctionName: z.string().optional()
-  }).optional().describe('Options for extraction refactorings'),
+  extractionOptions: z
+    .object({
+      startLine: z.number().optional(),
+      endLine: z.number().optional(),
+      newFunctionName: z.string().optional(),
+    })
+    .optional()
+    .describe('Options for extraction refactorings'),
 });
 
 export class RefactoringTool extends BaseTool {
@@ -561,32 +592,31 @@ export class RefactoringTool extends BaseTool {
   async execute(args: z.infer<typeof RefactorCodeSchema>): Promise<string> {
     try {
       const { filePath, refactorType, targetElement, newName, extractionOptions } = args;
-      
+
       const fullPath = this.resolvePath(filePath);
       const existingCode = await fs.readFile(fullPath, 'utf-8');
-      
+
       // Create backup
       const backupPath = `${fullPath}.backup.${Date.now()}`;
       await fs.writeFile(backupPath, existingCode, 'utf-8');
-      
+
       // Generate refactoring prompt based on type
       const refactoringPrompt = this.buildRefactoringPrompt(
-        existingCode, 
-        refactorType, 
-        targetElement, 
-        newName, 
+        existingCode,
+        refactorType,
+        targetElement,
+        newName,
         extractionOptions
       );
-      
+
       // Get refactored code from AI
       const refactoredResponse = await this.modelClient.generateText(refactoringPrompt);
       const refactoredCode = this.extractCodeFromResponse(refactoredResponse);
-      
+
       // Write the refactored code back to the file
       await fs.writeFile(fullPath, refactoredCode, 'utf-8');
-      
+
       return `Successfully performed ${refactorType} refactoring on ${filePath}. Backup created at ${backupPath}`;
-      
     } catch (error) {
       return `Error refactoring code: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
@@ -609,10 +639,12 @@ export class RefactoringTool extends BaseTool {
       merge_classes: `Merge related classes into a single cohesive class`,
       optimize_imports: `Optimize and organize import statements`,
       modernize_syntax: `Update code to use modern language features and syntax`,
-      improve_naming: `Improve variable, function, and class names for better readability`
+      improve_naming: `Improve variable, function, and class names for better readability`,
     };
 
-    const instruction = refactorInstructions[refactorType as keyof typeof refactorInstructions] || `Perform ${refactorType} refactoring`;
+    const instruction =
+      refactorInstructions[refactorType as keyof typeof refactorInstructions] ||
+      `Perform ${refactorType} refactoring`;
 
     return `You are an expert code refactoring specialist. Perform the following refactoring on the provided code.
 
@@ -640,15 +672,15 @@ Return ONLY the complete refactored code wrapped in triple backticks. Do not inc
     const codeBlockRegex = /```[\w]*\n([\s\S]*?)\n```/g;
     const matches = [];
     let match;
-    
+
     while ((match = codeBlockRegex.exec(response)) !== null) {
       matches.push(match[1]);
     }
-    
+
     if (matches.length > 0) {
       return matches.join('\n\n');
     }
-    
+
     return response.trim();
   }
 

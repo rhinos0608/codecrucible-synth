@@ -43,7 +43,7 @@ export class ChainOfThoughtDisplay extends EventEmitter {
 
   constructor(options: Partial<ChainOfThoughtOptions> = {}) {
     super();
-    
+
     this.options = {
       showTimestamps: true,
       showDuration: true,
@@ -52,7 +52,7 @@ export class ChainOfThoughtDisplay extends EventEmitter {
       indentLevel: 0,
       colorOutput: true,
       realTimeDisplay: true,
-      ...options
+      ...options,
     };
   }
 
@@ -63,7 +63,7 @@ export class ChainOfThoughtDisplay extends EventEmitter {
     this.steps = [];
     this.currentIndentLevel = 0;
     this.startTime = Date.now();
-    
+
     console.log(chalk.blue('╔══════════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue(`║ 🤔 ${title.padEnd(56)} ║`));
     console.log(chalk.blue('╚══════════════════════════════════════════════════════════════╝'));
@@ -83,13 +83,13 @@ export class ChainOfThoughtDisplay extends EventEmitter {
       metadata: {
         confidence,
         nextAction,
-        reasoning
+        reasoning,
       },
-      level: 'info'
+      level: 'info',
     };
 
     this.steps.push(step);
-    
+
     if (this.options.realTimeDisplay) {
       this.displayStep(step);
     }
@@ -107,13 +107,13 @@ export class ChainOfThoughtDisplay extends EventEmitter {
       content: description,
       metadata: {
         toolName,
-        ...parameters
+        ...parameters,
       },
-      level: 'info'
+      level: 'info',
     };
 
     this.steps.push(step);
-    
+
     if (this.options.realTimeDisplay) {
       this.displayStep(step);
     }
@@ -133,13 +133,13 @@ export class ChainOfThoughtDisplay extends EventEmitter {
         fileName,
         fileSize,
         linesRead,
-        reasoning: reason
+        reasoning: reason,
       },
-      level: 'info'
+      level: 'info',
     };
 
     this.steps.push(step);
-    
+
     if (this.options.realTimeDisplay) {
       this.displayStep(step);
     }
@@ -157,13 +157,13 @@ export class ChainOfThoughtDisplay extends EventEmitter {
       content: findings,
       metadata: {
         confidence,
-        reasoning: findings
+        reasoning: findings,
       },
-      level: confidence > 0.7 ? 'success' : 'warning'
+      level: confidence > 0.7 ? 'success' : 'warning',
     };
 
     this.steps.push(step);
-    
+
     if (this.options.realTimeDisplay) {
       this.displayStep(step);
     }
@@ -181,16 +181,16 @@ export class ChainOfThoughtDisplay extends EventEmitter {
       content: reasoning,
       metadata: {
         reasoning,
-        nextAction: decision
+        nextAction: decision,
       },
-      level: 'success'
+      level: 'success',
     };
 
     this.steps.push(step);
-    
+
     if (this.options.realTimeDisplay) {
       this.displayStep(step);
-      
+
       // Show alternatives if provided
       if (alternatives && alternatives.length > 0) {
         console.log(chalk.gray(`    ${this.getIndent()}💭 Alternatives considered:`));
@@ -213,13 +213,13 @@ export class ChainOfThoughtDisplay extends EventEmitter {
       content: conclusion,
       metadata: {
         confidence,
-        reasoning: conclusion
+        reasoning: conclusion,
       },
-      level: 'success'
+      level: 'success',
     };
 
     this.steps.push(step);
-    
+
     if (this.options.realTimeDisplay) {
       this.displayStep(step);
     }
@@ -236,13 +236,13 @@ export class ChainOfThoughtDisplay extends EventEmitter {
       title: `❌ Error`,
       content: `${error}\nContext: ${context}${resolution ? `\nResolution: ${resolution}` : ''}`,
       metadata: {
-        reasoning: context
+        reasoning: context,
       },
-      level: 'error'
+      level: 'error',
     };
 
     this.steps.push(step);
-    
+
     if (this.options.realTimeDisplay) {
       this.displayStep(step);
     }
@@ -267,15 +267,16 @@ export class ChainOfThoughtDisplay extends EventEmitter {
    */
   private displayStep(step: ThoughtStep): void {
     const indent = this.getIndent();
-    const timestamp = this.options.showTimestamps ? 
-      chalk.gray(`[${this.formatTimestamp(step.timestamp)}] `) : '';
-    
+    const timestamp = this.options.showTimestamps
+      ? chalk.gray(`[${this.formatTimestamp(step.timestamp)}] `)
+      : '';
+
     // Choose color based on step type and level
     const color = this.getStepColor(step);
-    
+
     // Display main step
     console.log(`${indent}${timestamp}${color(step.title)}`);
-    
+
     // Display content with proper indentation
     if (step.content) {
       const contentLines = step.content.split('\n');
@@ -300,23 +301,27 @@ export class ChainOfThoughtDisplay extends EventEmitter {
    */
   private displayMetadata(step: ThoughtStep, indent: string): void {
     const meta = step.metadata!;
-    
+
     if (meta.duration && this.options.showDuration) {
       console.log(`${indent}  ${chalk.gray(`⏱️  Duration: ${meta.duration}ms`)}`);
     }
-    
+
     if (meta.confidence) {
-      const confidenceColor = meta.confidence > 0.8 ? chalk.green : 
-                             meta.confidence > 0.6 ? chalk.yellow : chalk.red;
-      console.log(`${indent}  ${chalk.gray('🎯 Confidence:')} ${confidenceColor(`${Math.round(meta.confidence * 100)}%`)}`);
+      const confidenceColor =
+        meta.confidence > 0.8 ? chalk.green : meta.confidence > 0.6 ? chalk.yellow : chalk.red;
+      console.log(
+        `${indent}  ${chalk.gray('🎯 Confidence:')} ${confidenceColor(`${Math.round(meta.confidence * 100)}%`)}`
+      );
     }
-    
+
     if (meta.nextAction && this.options.showReasoningDetails) {
       console.log(`${indent}  ${chalk.gray('➡️  Next:')} ${chalk.cyan(meta.nextAction)}`);
     }
-    
+
     if (meta.fileSize) {
-      console.log(`${indent}  ${chalk.gray(`📊 Size: ${this.formatFileSize(meta.fileSize)}`)}${meta.linesRead ? ` (${meta.linesRead} lines)` : ''}`);
+      console.log(
+        `${indent}  ${chalk.gray(`📊 Size: ${this.formatFileSize(meta.fileSize)}`)}${meta.linesRead ? ` (${meta.linesRead} lines)` : ''}`
+      );
     }
   }
 
@@ -329,11 +334,16 @@ export class ChainOfThoughtDisplay extends EventEmitter {
     }
 
     switch (step.level) {
-      case 'success': return chalk.green;
-      case 'warning': return chalk.yellow;
-      case 'error': return chalk.red;
-      case 'debug': return chalk.gray;
-      default: return chalk.cyan;
+      case 'success':
+        return chalk.green;
+      case 'warning':
+        return chalk.yellow;
+      case 'error':
+        return chalk.red;
+      case 'debug':
+        return chalk.gray;
+      default:
+        return chalk.cyan;
     }
   }
 
@@ -359,7 +369,7 @@ export class ChainOfThoughtDisplay extends EventEmitter {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 B';
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 10) / 10 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(1024, i)) * 10) / 10 + ' ' + sizes[i];
   }
 
   /**
@@ -374,30 +384,33 @@ export class ChainOfThoughtDisplay extends EventEmitter {
    */
   endSession(summary?: string): void {
     const totalDuration = Date.now() - this.startTime;
-    
+
     console.log(chalk.blue('┌──────────────────────────────────────────────────────────────┐'));
     console.log(chalk.blue('│ 🎯 Chain of Thought Summary                                 │'));
     console.log(chalk.blue('└──────────────────────────────────────────────────────────────┘'));
-    
+
     console.log(chalk.gray(`Total steps: ${this.steps.length}`));
     console.log(chalk.gray(`Total duration: ${totalDuration}ms`));
-    
+
     // Count step types
-    const typeCount = this.steps.reduce((acc, step) => {
-      acc[step.type] = (acc[step.type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
+    const typeCount = this.steps.reduce(
+      (acc, step) => {
+        acc[step.type] = (acc[step.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
     Object.entries(typeCount).forEach(([type, count]) => {
       console.log(chalk.gray(`${this.getTypeEmoji(type)} ${type}: ${count}`));
     });
-    
+
     if (summary) {
       console.log();
       console.log(chalk.cyan('📝 Summary:'));
       console.log(chalk.gray(summary));
     }
-    
+
     console.log();
   }
 
@@ -412,7 +425,7 @@ export class ChainOfThoughtDisplay extends EventEmitter {
       analysis: '🔍',
       conclusion: '✅',
       decision: '⚡',
-      error: '❌'
+      error: '❌',
     };
     return emojis[type] || '📋';
   }
@@ -428,19 +441,26 @@ export class ChainOfThoughtDisplay extends EventEmitter {
    * Export session as JSON
    */
   exportSession(): string {
-    return JSON.stringify({
-      startTime: this.startTime,
-      endTime: Date.now(),
-      steps: this.steps,
-      summary: {
-        totalSteps: this.steps.length,
-        duration: Date.now() - this.startTime,
-        stepTypes: this.steps.reduce((acc, step) => {
-          acc[step.type] = (acc[step.type] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
-      }
-    }, null, 2);
+    return JSON.stringify(
+      {
+        startTime: this.startTime,
+        endTime: Date.now(),
+        steps: this.steps,
+        summary: {
+          totalSteps: this.steps.length,
+          duration: Date.now() - this.startTime,
+          stepTypes: this.steps.reduce(
+            (acc, step) => {
+              acc[step.type] = (acc[step.type] || 0) + 1;
+              return acc;
+            },
+            {} as Record<string, number>
+          ),
+        },
+      },
+      null,
+      2
+    );
   }
 }
 
@@ -450,7 +470,7 @@ export const chainOfThought = new ChainOfThoughtDisplay({
   showTimestamps: true,
   showDuration: true,
   showMetadata: true,
-  colorOutput: true
+  colorOutput: true,
 });
 
 export default chainOfThought;

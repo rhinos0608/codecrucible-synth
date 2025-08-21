@@ -1,6 +1,6 @@
 /**
  * Intelligent File Watching System
- * 
+ *
  * Provides comprehensive file watching with intelligent change detection,
  * agent integration, and proactive suggestions based on file changes.
  */
@@ -11,12 +11,12 @@ import { join, relative, extname, dirname, basename } from 'path';
 import { EventEmitter } from 'events';
 import { glob } from 'glob';
 import { logger } from '../logger.js';
-import { 
-  ErrorFactory, 
-  ErrorCategory, 
+import {
+  ErrorFactory,
+  ErrorCategory,
   ErrorSeverity,
   ServiceResponse,
-  ErrorHandler
+  ErrorHandler,
 } from '../error-handling/structured-error-system.js';
 
 // File change types
@@ -24,7 +24,7 @@ export enum FileChangeType {
   CREATED = 'created',
   MODIFIED = 'modified',
   DELETED = 'deleted',
-  MOVED = 'moved'
+  MOVED = 'moved',
 }
 
 // File change event
@@ -111,7 +111,7 @@ export class IntelligentFileWatcher extends EventEmitter {
 
   constructor(config: Partial<FileWatcherConfig> = {}) {
     super();
-    
+
     this.config = {
       watchPaths: ['.'],
       includePatterns: ['**/*'],
@@ -125,7 +125,7 @@ export class IntelligentFileWatcher extends EventEmitter {
         '*.log',
         '.env*',
         '*.tmp',
-        '*.temp'
+        '*.temp',
       ],
       ignoreInitial: true,
       persistWatchers: true,
@@ -136,16 +136,16 @@ export class IntelligentFileWatcher extends EventEmitter {
       significanceThreshold: {
         smallChange: 100,
         mediumChange: 1000,
-        largeChange: 10000
+        largeChange: 10000,
       },
       fileCategories: {
         source: ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.go', '.rs'],
         config: ['.json', '.yaml', '.yml', '.toml', '.ini', '.config', '.env'],
         documentation: ['.md', '.txt', '.rst', '.adoc'],
         build: ['package.json', 'Cargo.toml', 'pom.xml', 'build.gradle', 'Makefile'],
-        test: ['.test.js', '.test.ts', '.spec.js', '.spec.ts', '_test.py', '_test.go']
+        test: ['.test.js', '.test.ts', '.spec.js', '.spec.ts', '_test.py', '_test.go'],
       },
-      ...config
+      ...config,
     };
 
     this.setupEventHandlers();
@@ -172,7 +172,7 @@ export class IntelligentFileWatcher extends EventEmitter {
             ErrorSeverity.MEDIUM,
             {
               userMessage: 'File watching is already active',
-              suggestedActions: ['Stop current watcher before starting new one']
+              suggestedActions: ['Stop current watcher before starting new one'],
             }
           )
         );
@@ -181,7 +181,7 @@ export class IntelligentFileWatcher extends EventEmitter {
       logger.info('Starting intelligent file watcher', {
         watchPaths: this.config.watchPaths,
         includePatterns: this.config.includePatterns,
-        excludePatterns: this.config.excludePatterns
+        excludePatterns: this.config.excludePatterns,
       });
 
       // Initialize file stats for existing files
@@ -197,11 +197,10 @@ export class IntelligentFileWatcher extends EventEmitter {
 
       this.emit('watcherStarted', {
         paths: this.config.watchPaths,
-        timestamp: this.watchStartTime
+        timestamp: this.watchStartTime,
       });
 
       return ErrorHandler.createSuccessResponse(undefined);
-
     } catch (error) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
@@ -214,8 +213,8 @@ export class IntelligentFileWatcher extends EventEmitter {
             suggestedActions: [
               'Check file permissions',
               'Verify watch paths exist',
-              'Try with fewer paths'
-            ]
+              'Try with fewer paths',
+            ],
           }
         )
       );
@@ -241,7 +240,7 @@ export class IntelligentFileWatcher extends EventEmitter {
     this.watchers.clear();
     this.fileStats.clear();
     this.changeBuffer = [];
-    
+
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
@@ -250,7 +249,7 @@ export class IntelligentFileWatcher extends EventEmitter {
     this.isWatching = false;
 
     this.emit('watcherStopped', {
-      duration: Date.now() - this.watchStartTime
+      duration: Date.now() - this.watchStartTime,
     });
 
     logger.info('File watcher stopped');
@@ -273,7 +272,7 @@ export class IntelligentFileWatcher extends EventEmitter {
       watchedFiles: this.fileStats.size,
       uptime: this.isWatching ? Date.now() - this.watchStartTime : 0,
       recentChanges: this.changeBuffer.length,
-      bufferSize: this.changeBuffer.length
+      bufferSize: this.changeBuffer.length,
     };
   }
 
@@ -299,7 +298,7 @@ export class IntelligentFileWatcher extends EventEmitter {
         const files = await glob(this.config.includePatterns, {
           cwd: watchPath,
           ignore: this.config.excludePatterns,
-          absolute: true
+          absolute: true,
         });
 
         for (const file of files) {
@@ -328,14 +327,13 @@ export class IntelligentFileWatcher extends EventEmitter {
         }
       });
 
-      watcher.on('error', (error) => {
+      watcher.on('error', error => {
         logger.error(`File watcher error for ${watchPath}:`, error);
         this.emit('watcherError', { path: watchPath, error });
       });
 
       this.watchers.set(watchPath, watcher);
       logger.debug(`Started watching: ${watchPath}`);
-
     } catch (error) {
       logger.error(`Failed to start watching ${watchPath}:`, error);
       throw error;
@@ -366,11 +364,13 @@ export class IntelligentFileWatcher extends EventEmitter {
 
   private shouldWatchFile(filePath: string): boolean {
     const relativePath = relative(process.cwd(), filePath);
-    
+
     // Check exclude patterns
     for (const pattern of this.config.excludePatterns) {
-      if (relativePath.includes(pattern.replace('/**', '')) || 
-          relativePath.match(pattern.replace('**/', '').replace('*', '.*'))) {
+      if (
+        relativePath.includes(pattern.replace('/**', '')) ||
+        relativePath.match(pattern.replace('**/', '').replace('*', '.*'))
+      ) {
         return false;
       }
     }
@@ -379,7 +379,10 @@ export class IntelligentFileWatcher extends EventEmitter {
     return true;
   }
 
-  private async createChangeEvent(eventType: string, filePath: string): Promise<FileChangeEvent | null> {
+  private async createChangeEvent(
+    eventType: string,
+    filePath: string
+  ): Promise<FileChangeEvent | null> {
     try {
       const relativePath = relative(process.cwd(), filePath);
       const extension = extname(filePath);
@@ -399,17 +402,18 @@ export class IntelligentFileWatcher extends EventEmitter {
 
       if (currentStats) {
         const previousStats = this.fileStats.get(filePath);
-        
+
         if (!previousStats) {
           changeType = FileChangeType.CREATED;
         } else {
           changeType = FileChangeType.MODIFIED;
-          
+
           // Calculate change metadata
           metadata.previousSize = previousStats.size;
           metadata.changeSize = currentStats.size - previousStats.size;
-          metadata.isLargeChange = Math.abs(metadata.changeSize) > this.config.significanceThreshold.largeChange;
-          
+          metadata.isLargeChange =
+            Math.abs(metadata.changeSize) > this.config.significanceThreshold.largeChange;
+
           // Determine significance
           const absChange = Math.abs(metadata.changeSize);
           if (absChange < this.config.significanceThreshold.smallChange) {
@@ -435,11 +439,12 @@ export class IntelligentFileWatcher extends EventEmitter {
       metadata.language = this.detectLanguage(extension);
 
       // Content analysis for significant changes
-      if (this.config.enableContentAnalysis && 
-          currentStats && 
-          currentStats.size <= this.config.maxFileSize &&
-          metadata.significance !== 'low') {
-        
+      if (
+        this.config.enableContentAnalysis &&
+        currentStats &&
+        currentStats.size <= this.config.maxFileSize &&
+        metadata.significance !== 'low'
+      ) {
         try {
           const content = await readFile(filePath, 'utf8');
           metadata.contentSummary = this.generateContentSummary(content, extension);
@@ -457,9 +462,8 @@ export class IntelligentFileWatcher extends EventEmitter {
         extension,
         directory,
         filename,
-        metadata
+        metadata,
       };
-
     } catch (error) {
       logger.error(`Failed to create change event for ${filePath}:`, error);
       return null;
@@ -485,7 +489,8 @@ export class IntelligentFileWatcher extends EventEmitter {
     try {
       // Group changes for analysis
       const significantChanges = changes.filter(
-        change => change.metadata?.significance === 'high' || change.metadata?.significance === 'critical'
+        change =>
+          change.metadata?.significance === 'high' || change.metadata?.significance === 'critical'
       );
 
       // Generate project change summary
@@ -515,9 +520,9 @@ export class IntelligentFileWatcher extends EventEmitter {
             const suggestions = await this.agentIntegration.generateSuggestions(changes);
             if (suggestions.length > 0) {
               this.emit('suggestions', { changes, suggestions });
-              logger.info('Generated proactive suggestions', { 
-                changesCount: changes.length, 
-                suggestionsCount: suggestions.length 
+              logger.info('Generated proactive suggestions', {
+                changesCount: changes.length,
+                suggestionsCount: suggestions.length,
               });
             }
           } catch (error) {
@@ -528,9 +533,8 @@ export class IntelligentFileWatcher extends EventEmitter {
 
       logger.info(`Processed ${changes.length} file changes`, {
         significantChanges: significantChanges.length,
-        summary: summary.summary
+        summary: summary.summary,
       });
-
     } catch (error) {
       logger.error('Error processing change buffer:', error);
     }
@@ -541,7 +545,7 @@ export class IntelligentFileWatcher extends EventEmitter {
       [FileChangeType.CREATED]: 0,
       [FileChangeType.MODIFIED]: 0,
       [FileChangeType.DELETED]: 0,
-      [FileChangeType.MOVED]: 0
+      [FileChangeType.MOVED]: 0,
     };
 
     const changesByCategory: Record<string, number> = {
@@ -550,7 +554,7 @@ export class IntelligentFileWatcher extends EventEmitter {
       documentation: 0,
       build: 0,
       test: 0,
-      other: 0
+      other: 0,
     };
 
     const significantFiles: string[] = [];
@@ -558,11 +562,14 @@ export class IntelligentFileWatcher extends EventEmitter {
     // Analyze changes
     for (const change of changes) {
       changesByType[change.type]++;
-      
+
       const category = this.categorizeFile(change.extension, change.filename);
       changesByCategory[category]++;
 
-      if (change.metadata?.significance === 'high' || change.metadata?.significance === 'critical') {
+      if (
+        change.metadata?.significance === 'high' ||
+        change.metadata?.significance === 'critical'
+      ) {
         significantFiles.push(change.relativePath);
       }
     }
@@ -572,14 +579,18 @@ export class IntelligentFileWatcher extends EventEmitter {
       buildImpact: changesByCategory.build > 0 || changesByCategory.config > 0,
       testImpact: changesByCategory.test > 0,
       configImpact: changesByCategory.config > 0,
-      documentationImpact: changesByCategory.documentation > 0
+      documentationImpact: changesByCategory.documentation > 0,
     };
 
     // Generate summary text
     const summary = this.generateSummaryText(changes, changesByType, changesByCategory);
 
     // Generate suggestions
-    const suggestions = this.generateBasicSuggestions(impactAnalysis, changesByType, significantFiles);
+    const suggestions = this.generateBasicSuggestions(
+      impactAnalysis,
+      changesByType,
+      significantFiles
+    );
 
     return {
       totalChanges: changes.length,
@@ -588,7 +599,7 @@ export class IntelligentFileWatcher extends EventEmitter {
       significantFiles,
       summary,
       suggestions,
-      impactAnalysis
+      impactAnalysis,
     };
   }
 
@@ -600,9 +611,7 @@ export class IntelligentFileWatcher extends EventEmitter {
 
     // Check by extension
     for (const [category, extensions] of Object.entries(this.config.fileCategories)) {
-      if (extensions.some(ext => 
-        extension.endsWith(ext) || filename.includes(ext)
-      )) {
+      if (extensions.some(ext => extension.endsWith(ext) || filename.includes(ext))) {
         return category;
       }
     }
@@ -638,7 +647,7 @@ export class IntelligentFileWatcher extends EventEmitter {
       '.html': 'html',
       '.css': 'css',
       '.scss': 'scss',
-      '.sass': 'sass'
+      '.sass': 'sass',
     };
 
     return languageMap[extension] || 'unknown';
@@ -648,7 +657,7 @@ export class IntelligentFileWatcher extends EventEmitter {
     const lines = content.split('\n');
     const totalLines = lines.length;
     const nonEmptyLines = lines.filter(line => line.trim().length > 0).length;
-    
+
     // Basic analysis
     if (extension === '.js' || extension === '.ts') {
       const functions = (content.match(/function\s+\w+|const\s+\w+\s*=\s*\(/g) || []).length;
@@ -668,13 +677,13 @@ export class IntelligentFileWatcher extends EventEmitter {
     changesByCategory: Record<string, number>
   ): string {
     const parts: string[] = [];
-    
+
     if (changes.length === 1) {
       const change = changes[0];
       parts.push(`${change.type} ${change.relativePath}`);
     } else {
       parts.push(`${changes.length} files changed`);
-      
+
       if (changesByType.created > 0) parts.push(`${changesByType.created} created`);
       if (changesByType.modified > 0) parts.push(`${changesByType.modified} modified`);
       if (changesByType.deleted > 0) parts.push(`${changesByType.deleted} deleted`);
@@ -727,14 +736,14 @@ export class IntelligentFileWatcher extends EventEmitter {
       logger.debug('File change event', {
         type: event.type,
         path: event.relativePath,
-        significance: event.metadata?.significance
+        significance: event.metadata?.significance,
       });
     });
 
     this.on('suggestions', ({ changes, suggestions }) => {
       logger.info('Proactive suggestions generated', {
         changesCount: changes.length,
-        suggestions
+        suggestions,
       });
     });
 

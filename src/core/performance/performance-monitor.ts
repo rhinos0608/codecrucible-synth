@@ -98,11 +98,11 @@ export class PerformanceMonitor extends EventEmitter {
   private metrics = new Map<string, PerformanceMetric[]>();
   private transactions = new Map<string, TransactionTrace>();
   private thresholds = new Map<string, PerformanceThreshold>();
-  
+
   private performanceObserver?: PerformanceObserver;
   private monitoringInterval?: NodeJS.Timeout;
   private snapshotInterval?: NodeJS.Timeout;
-  
+
   private startTime = Date.now();
   private lastSnapshot?: PerformanceSnapshot;
   private gcStats = { collections: 0, totalTime: 0 };
@@ -124,9 +124,15 @@ export class PerformanceMonitor extends EventEmitter {
         { metric: 'memory_usage', warning: 80, critical: 95, unit: 'percent', action: 'alert' },
         { metric: 'cpu_usage', warning: 70, critical: 90, unit: 'percent', action: 'alert' },
         { metric: 'event_loop_delay', warning: 10, critical: 50, unit: 'ms', action: 'alert' },
-        { metric: 'error_rate', warning: 5, critical: 10, unit: 'percent', action: 'circuit-break' }
+        {
+          metric: 'error_rate',
+          warning: 5,
+          critical: 10,
+          unit: 'percent',
+          action: 'circuit-break',
+        },
       ],
-      ...config
+      ...config,
     };
 
     // Register thresholds
@@ -164,7 +170,7 @@ export class PerformanceMonitor extends EventEmitter {
       realTimeMonitoring: this.config.enableRealTimeMonitoring,
       webVitals: this.config.enableWebVitals,
       resourceTiming: this.config.enableResourceTiming,
-      sampleRate: this.config.sampleRate
+      sampleRate: this.config.sampleRate,
     });
   }
 
@@ -179,11 +185,11 @@ export class PerformanceMonitor extends EventEmitter {
       startTime: Date.now(),
       status: 'active',
       spans: [],
-      metadata
+      metadata,
     };
 
     this.transactions.set(id, transaction);
-    
+
     logger.debug('Transaction started', { id, name });
     this.emit('transaction-start', transaction);
 
@@ -200,7 +206,7 @@ export class PerformanceMonitor extends EventEmitter {
     transaction.endTime = Date.now();
     transaction.duration = transaction.endTime - transaction.startTime;
     transaction.status = error ? 'failed' : 'completed';
-    
+
     if (error) {
       transaction.error = error;
     }
@@ -208,17 +214,17 @@ export class PerformanceMonitor extends EventEmitter {
     // Record metric
     this.recordMetric('transaction_duration', transaction.duration, 'ms', {
       transaction: transaction.name,
-      status: transaction.status
+      status: transaction.status,
     });
 
     // Check thresholds
     this.checkThreshold('transaction_duration', transaction.duration);
 
-    logger.debug('Transaction ended', { 
-      id, 
-      name: transaction.name, 
+    logger.debug('Transaction ended', {
+      id,
+      name: transaction.name,
       duration: transaction.duration,
-      status: transaction.status
+      status: transaction.status,
     });
 
     this.emit('transaction-end', transaction);
@@ -245,11 +251,11 @@ export class PerformanceMonitor extends EventEmitter {
       name,
       startTime: Date.now(),
       tags: {},
-      logs: []
+      logs: [],
     };
 
     transaction.spans.push(span);
-    
+
     logger.debug('Span started', { transactionId, spanId, name });
     this.emit('span-start', { transaction, span });
 
@@ -274,14 +280,14 @@ export class PerformanceMonitor extends EventEmitter {
     this.recordMetric('span_duration', span.duration, 'ms', {
       transaction: transaction.name,
       span: span.name,
-      ...tags
+      ...tags,
     });
 
-    logger.debug('Span ended', { 
-      transactionId, 
-      spanId, 
-      name: span.name, 
-      duration: span.duration 
+    logger.debug('Span ended', {
+      transactionId,
+      spanId,
+      name: span.name,
+      duration: span.duration,
     });
 
     this.emit('span-end', { transaction, span });
@@ -300,7 +306,7 @@ export class PerformanceMonitor extends EventEmitter {
     span.logs.push({
       timestamp: Date.now(),
       message,
-      level
+      level,
     });
   }
 
@@ -308,9 +314,9 @@ export class PerformanceMonitor extends EventEmitter {
    * Record a custom metric
    */
   recordMetric(
-    name: string, 
-    value: number, 
-    unit: PerformanceMetric['unit'], 
+    name: string,
+    value: number,
+    unit: PerformanceMetric['unit'],
     tags: Record<string, string> = {},
     metadata?: Record<string, any>
   ): void {
@@ -325,14 +331,14 @@ export class PerformanceMonitor extends EventEmitter {
       unit,
       timestamp: Date.now(),
       tags,
-      metadata
+      metadata,
     };
 
     // Store metric
     if (!this.metrics.has(name)) {
       this.metrics.set(name, []);
     }
-    
+
     const metricHistory = this.metrics.get(name)!;
     metricHistory.push(metric);
 
@@ -351,7 +357,10 @@ export class PerformanceMonitor extends EventEmitter {
   /**
    * Get metric statistics
    */
-  getMetricStats(name: string, timeWindow?: number): {
+  getMetricStats(
+    name: string,
+    timeWindow?: number
+  ): {
     count: number;
     min: number;
     max: number;
@@ -368,7 +377,7 @@ export class PerformanceMonitor extends EventEmitter {
     const window = timeWindow || this.config.aggregationWindow;
     const cutoff = Date.now() - window;
     const filteredMetrics = metrics.filter(m => m.timestamp > cutoff);
-    
+
     if (filteredMetrics.length === 0) {
       return null;
     }
@@ -383,7 +392,7 @@ export class PerformanceMonitor extends EventEmitter {
       avg: values.reduce((sum, val) => sum + val, 0) / count,
       p50: this.percentile(values, 50),
       p95: this.percentile(values, 95),
-      p99: this.percentile(values, 99)
+      p99: this.percentile(values, 99),
     };
   }
 
@@ -407,18 +416,17 @@ export class PerformanceMonitor extends EventEmitter {
         metric: metricName,
         value,
         threshold: threshold.critical,
-        unit: threshold.unit
+        unit: threshold.unit,
       });
 
       this.emit('threshold-critical', { metric: metricName, value, threshold });
       this.executeThresholdAction(threshold, 'critical', value);
-
     } else if (value >= threshold.warning) {
       logger.warn('Performance threshold warning exceeded', {
         metric: metricName,
         value,
         threshold: threshold.warning,
-        unit: threshold.unit
+        unit: threshold.unit,
       });
 
       this.emit('threshold-warning', { metric: metricName, value, threshold });
@@ -429,20 +437,24 @@ export class PerformanceMonitor extends EventEmitter {
   /**
    * Execute threshold action
    */
-  private executeThresholdAction(threshold: PerformanceThreshold, level: 'warning' | 'critical', value: number): void {
+  private executeThresholdAction(
+    threshold: PerformanceThreshold,
+    level: 'warning' | 'critical',
+    value: number
+  ): void {
     switch (threshold.action) {
       case 'alert':
         this.emit('performance-alert', { threshold, level, value });
         break;
-        
+
       case 'throttle':
         this.emit('performance-throttle', { threshold, level, value });
         break;
-        
+
       case 'circuit-break':
         this.emit('performance-circuit-break', { threshold, level, value });
         break;
-        
+
       case 'log':
       default:
         // Already logged above
@@ -463,27 +475,26 @@ export class PerformanceMonitor extends EventEmitter {
    * Start resource timing observer
    */
   private startResourceTimingObserver(): void {
-    this.performanceObserver = new PerformanceObserver((list) => {
+    this.performanceObserver = new PerformanceObserver(list => {
       const entries = list.getEntries();
-      
+
       for (const entry of entries) {
         if (entry.entryType === 'measure') {
-          this.recordMetric(
-            `custom_${entry.name}`,
-            entry.duration,
-            'ms',
-            { type: 'measure' }
-          );
-        } else if (entry.entryType === 'navigation') {
+          this.recordMetric(`custom_${entry.name}`, entry.duration, 'ms', { type: 'measure' });
+        } else if ((entry as any).entryType === 'navigation') {
           const navEntry = entry as any; // PerformanceNavigationTiming
           this.recordMetric('page_load_time', navEntry.loadEventEnd - navEntry.fetchStart, 'ms');
-          this.recordMetric('dns_lookup_time', navEntry.domainLookupEnd - navEntry.domainLookupStart, 'ms');
+          this.recordMetric(
+            'dns_lookup_time',
+            navEntry.domainLookupEnd - navEntry.domainLookupStart,
+            'ms'
+          );
           this.recordMetric('tcp_connect_time', navEntry.connectEnd - navEntry.connectStart, 'ms');
         }
       }
     });
 
-    this.performanceObserver.observe({ entryTypes: ['measure', 'navigation', 'resource'] });
+    this.performanceObserver.observe({ entryTypes: ['measure', 'resource'] as any });
   }
 
   /**
@@ -492,16 +503,15 @@ export class PerformanceMonitor extends EventEmitter {
   private startMemoryMonitoring(): void {
     setInterval(() => {
       const memUsage = process.memoryUsage();
-      
+
       this.recordMetric('memory_heap_used', memUsage.heapUsed, 'bytes');
       this.recordMetric('memory_heap_total', memUsage.heapTotal, 'bytes');
       this.recordMetric('memory_rss', memUsage.rss, 'bytes');
       this.recordMetric('memory_external', memUsage.external, 'bytes');
-      
+
       // Calculate memory usage percentage
       const usagePercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
       this.recordMetric('memory_usage_percent', usagePercent, 'percent');
-      
     }, 10000); // Every 10 seconds
   }
 
@@ -511,12 +521,11 @@ export class PerformanceMonitor extends EventEmitter {
   private startEventLoopMonitoring(): void {
     setInterval(() => {
       const start = process.hrtime.bigint();
-      
+
       setImmediate(() => {
         const delay = Number(process.hrtime.bigint() - start) / 1000000; // Convert to ms
         this.recordMetric('event_loop_delay', delay, 'ms');
       });
-      
     }, 5000); // Every 5 seconds
   }
 
@@ -562,7 +571,7 @@ export class PerformanceMonitor extends EventEmitter {
       metrics: {
         cpu: {
           usage: (cpuUsage.user + cpuUsage.system) / 1000000, // Convert to seconds
-          loadAverage: []
+          loadAverage: [],
         },
         memory: {
           used: memUsage.heapUsed,
@@ -570,25 +579,26 @@ export class PerformanceMonitor extends EventEmitter {
           heapUsed: memUsage.heapUsed,
           heapTotal: memUsage.heapTotal,
           external: memUsage.external,
-          rss: memUsage.rss
+          rss: memUsage.rss,
         },
         eventLoop: {
           delay: 0, // Would need to measure
-          utilization: 0
+          utilization: 0,
         },
         gc: {
           collections: this.gcStats.collections,
           totalTime: this.gcStats.totalTime,
-          averageTime: this.gcStats.collections > 0 ? this.gcStats.totalTime / this.gcStats.collections : 0
+          averageTime:
+            this.gcStats.collections > 0 ? this.gcStats.totalTime / this.gcStats.collections : 0,
         },
         http: {
           activeConnections: 0, // Would track in HTTP middleware
           requestsPerSecond: 0,
           averageResponseTime: 0,
-          errorRate: 0
+          errorRate: 0,
         },
-        custom: {}
-      }
+        custom: {},
+      },
     };
   }
 
@@ -601,26 +611,25 @@ export class PerformanceMonitor extends EventEmitter {
     tags: Record<string, string> = {}
   ): Promise<T> {
     const start = performance.now();
-    
+
     try {
       const result = await fn();
       const duration = performance.now() - start;
-      
+
       this.recordMetric(`function_${name}_duration`, duration, 'ms', {
         ...tags,
-        status: 'success'
+        status: 'success',
       });
-      
+
       return result;
-      
     } catch (error) {
       const duration = performance.now() - start;
-      
+
       this.recordMetric(`function_${name}_duration`, duration, 'ms', {
         ...tags,
-        status: 'error'
+        status: 'error',
       });
-      
+
       throw error;
     }
   }
@@ -635,7 +644,7 @@ export class PerformanceMonitor extends EventEmitter {
         method: req.method,
         path: req.path,
         userAgent: req.get('User-Agent'),
-        ip: req.ip
+        ip: req.ip,
       });
 
       // Track active requests
@@ -645,19 +654,22 @@ export class PerformanceMonitor extends EventEmitter {
       const originalEnd = res.end;
       res.end = (chunk: any, encoding: any) => {
         const duration = performance.now() - start;
-        
+
         // Record HTTP metrics
         this.recordMetric('http_request_duration', duration, 'ms', {
           method: req.method,
           status: res.statusCode.toString(),
-          route: req.route?.path || req.path
+          route: req.route?.path || req.path,
         });
 
         this.recordMetric('http_active_requests', -1, 'count', { method: req.method });
-        
+
         // End transaction
-        this.endTransaction(transactionId, res.statusCode >= 400 ? new Error(`HTTP ${res.statusCode}`) : undefined);
-        
+        this.endTransaction(
+          transactionId,
+          res.statusCode >= 400 ? new Error(`HTTP ${res.statusCode}`) : undefined
+        );
+
         originalEnd.call(this, chunk, encoding);
       };
 
@@ -710,9 +722,12 @@ export class PerformanceMonitor extends EventEmitter {
       uptime: Date.now() - this.startTime,
       totalTransactions: this.transactions.size,
       activeTransactions: this.getActiveTransactions().length,
-      totalMetrics: Array.from(this.metrics.values()).reduce((sum, metrics) => sum + metrics.length, 0),
+      totalMetrics: Array.from(this.metrics.values()).reduce(
+        (sum, metrics) => sum + metrics.length,
+        0
+      ),
       lastSnapshot: this.lastSnapshot,
-      topMetrics
+      topMetrics,
     };
   }
 

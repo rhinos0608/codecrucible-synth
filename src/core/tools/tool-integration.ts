@@ -46,7 +46,7 @@ export class ToolIntegration {
     for (const tool of fsTools) {
       this.availableTools.set(tool.id, tool);
     }
-    
+
     logger.info(`Initialized ${this.availableTools.size} tools for LLM integration`);
   }
 
@@ -55,7 +55,7 @@ export class ToolIntegration {
    */
   getLLMFunctions(): LLMFunction[] {
     const functions: LLMFunction[] = [];
-    
+
     for (const tool of this.availableTools.values()) {
       functions.push({
         type: 'function',
@@ -65,12 +65,12 @@ export class ToolIntegration {
           parameters: {
             type: 'object',
             properties: tool.inputSchema.properties || {},
-            required: tool.inputSchema.required || []
-          }
-        }
+            required: tool.inputSchema.required || [],
+          },
+        },
       });
     }
-    
+
     return functions;
   }
 
@@ -81,30 +81,29 @@ export class ToolIntegration {
     try {
       const functionName = toolCall.function.name;
       const args = JSON.parse(toolCall.function.arguments);
-      
+
       logger.info(`Executing tool: ${functionName} with args:`, args);
-      
+
       const tool = this.availableTools.get(functionName);
       if (!tool) {
         throw new Error(`Unknown tool: ${functionName}`);
       }
-      
+
       const context = {
         startTime: Date.now(),
         userId: 'system',
         requestId: `tool_${Date.now()}`,
-        environment: 'development'
+        environment: 'development',
       };
-      
+
       const result = await tool.execute(args, context);
-      
+
       logger.info(`Tool ${functionName} executed successfully:`, {
         success: result.success,
-        executionTime: result.metadata?.executionTime
+        executionTime: result.metadata?.executionTime,
       });
-      
+
       return result;
-      
     } catch (error) {
       logger.error(`Tool execution failed:`, error);
       throw error;

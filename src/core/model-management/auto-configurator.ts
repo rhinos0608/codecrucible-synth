@@ -1,5 +1,5 @@
 /**
- * Auto-Configurator - Iteration 7: Enhanced Model Management & Auto-Configuration  
+ * Auto-Configurator - Iteration 7: Enhanced Model Management & Auto-Configuration
  * Automatically configures optimal dual-agent setup based on available models
  */
 
@@ -35,11 +35,11 @@ export class AutoConfigurator {
     const recommendations: string[] = [];
 
     this.logger.info('Starting auto-configuration...');
-    
+
     try {
       // Detect available models
       await this.modelDetector.scanAvailableModels();
-      
+
       // Check platform health
       const platformHealth = this.modelDetector.getPlatformHealth();
       if (!platformHealth.ollama) {
@@ -57,7 +57,7 @@ export class AutoConfigurator {
       this.logger.info('Optimal configuration found:', {
         writer: `${configuration.writer.model} (${configuration.writer.platform})`,
         auditor: `${configuration.auditor.model} (${configuration.auditor.platform})`,
-        confidence: `${(configuration.confidence * 100).toFixed(1)}%`
+        confidence: `${(configuration.confidence * 100).toFixed(1)}%`,
       });
 
       // Create dual-agent system with optimal config
@@ -69,7 +69,9 @@ export class AutoConfigurator {
         recommendations.push('Consider installing larger models for better code review quality');
       }
       if (configuration.writer.platform === configuration.auditor.platform) {
-        recommendations.push('Using different platforms (Ollama + LM Studio) would improve performance');
+        recommendations.push(
+          'Using different platforms (Ollama + LM Studio) would improve performance'
+        );
       }
 
       return {
@@ -77,29 +79,31 @@ export class AutoConfigurator {
         configuration,
         dualAgentSystem,
         warnings,
-        recommendations
+        recommendations,
       };
-
     } catch (error) {
       this.logger.error('Auto-configuration failed:', error);
-      
+
       // Try fallback configuration
       try {
         const fallbackConfig = await this.createFallbackConfiguration();
-        
+
         return {
           success: true,
           configuration: fallbackConfig,
           dualAgentSystem: this.createDualAgentSystem(fallbackConfig),
           warnings: [...warnings, 'Using fallback configuration - limited functionality'],
-          recommendations: [...recommendations, 'Install recommended models for full dual-agent capabilities']
+          recommendations: [
+            ...recommendations,
+            'Install recommended models for full dual-agent capabilities',
+          ],
         };
       } catch (fallbackError) {
         return {
           success: false,
           configuration: this.getMinimalConfiguration(),
           warnings: [...warnings, 'Auto-configuration failed - minimal functionality only'],
-          recommendations: [...recommendations, 'Please install Ollama with at least one model']
+          recommendations: [...recommendations, 'Please install Ollama with at least one model'],
         };
       }
     }
@@ -116,19 +120,22 @@ export class AutoConfigurator {
         endpoint: 'http://localhost:11434',
         temperature: 0.7,
         maxTokens: 2048,
-        keepAlive: '24h'
+        keepAlive: '24h',
       },
       auditor: {
         platform: 'lmstudio' as const,
         model: config.auditor.model,
-        endpoint: config.auditor.platform === 'lmstudio' ? 'http://localhost:1234/v1' : 'http://localhost:11434',
+        endpoint:
+          config.auditor.platform === 'lmstudio'
+            ? 'http://localhost:1234/v1'
+            : 'http://localhost:11434',
         temperature: 0.2,
         maxTokens: 1024,
-        contextLength: 8192
+        contextLength: 8192,
       },
       enableRealTimeAudit: true,
       auditInBackground: true,
-      autoApplyFixes: false
+      autoApplyFixes: false,
     });
   }
 
@@ -137,26 +144,26 @@ export class AutoConfigurator {
    */
   private async createFallbackConfiguration(): Promise<OptimalConfiguration> {
     const models = await this.modelDetector.scanAvailableModels();
-    
+
     if (models.length === 0) {
       throw new Error('No models available');
     }
 
     // Use the largest available model for both roles
     const bestModel = models.sort((a, b) => (b.sizeBytes || 0) - (a.sizeBytes || 0))[0];
-    
+
     return {
       writer: {
         model: bestModel.name,
         platform: bestModel.platform,
-        reasoning: 'Fallback: using best available model for writing'
+        reasoning: 'Fallback: using best available model for writing',
       },
       auditor: {
         model: bestModel.name,
         platform: bestModel.platform,
-        reasoning: 'Fallback: using same model for auditing'
+        reasoning: 'Fallback: using same model for auditing',
       },
-      confidence: 0.4
+      confidence: 0.4,
     };
   }
 
@@ -168,14 +175,14 @@ export class AutoConfigurator {
       writer: {
         model: 'llama3.2:latest',
         platform: 'ollama',
-        reasoning: 'Default model - may not be available'
+        reasoning: 'Default model - may not be available',
       },
       auditor: {
         model: 'llama3.2:latest',
-        platform: 'ollama', 
-        reasoning: 'Default model - may not be available'
+        platform: 'ollama',
+        reasoning: 'Default model - may not be available',
       },
-      confidence: 0.1
+      confidence: 0.1,
     };
   }
 
@@ -185,40 +192,56 @@ export class AutoConfigurator {
   displayConfiguration(result: AutoConfigResult): void {
     console.log(chalk.cyan('\n🤖 Dual-Agent Auto-Configuration'));
     console.log(chalk.gray('━'.repeat(50)));
-    
+
     if (result.success) {
-      console.log(chalk.green(`✅ Configuration successful (${(result.configuration.confidence * 100).toFixed(1)}% confidence)`));
-      
+      console.log(
+        chalk.green(
+          `✅ Configuration successful (${(result.configuration.confidence * 100).toFixed(1)}% confidence)`
+        )
+      );
+
       console.log(chalk.yellow('\n📝 Writer Model:'));
-      console.log(chalk.gray(`   ${result.configuration.writer.model} (${result.configuration.writer.platform})`));
+      console.log(
+        chalk.gray(
+          `   ${result.configuration.writer.model} (${result.configuration.writer.platform})`
+        )
+      );
       console.log(chalk.gray(`   ${result.configuration.writer.reasoning}`));
-      
+
       console.log(chalk.yellow('\n🔍 Auditor Model:'));
-      console.log(chalk.gray(`   ${result.configuration.auditor.model} (${result.configuration.auditor.platform})`));
+      console.log(
+        chalk.gray(
+          `   ${result.configuration.auditor.model} (${result.configuration.auditor.platform})`
+        )
+      );
       console.log(chalk.gray(`   ${result.configuration.auditor.reasoning}`));
-      
+
       if (result.configuration.fallback) {
         console.log(chalk.yellow('\n🔄 Fallback Model:'));
-        console.log(chalk.gray(`   ${result.configuration.fallback.model} (${result.configuration.fallback.platform})`));
+        console.log(
+          chalk.gray(
+            `   ${result.configuration.fallback.model} (${result.configuration.fallback.platform})`
+          )
+        );
       }
     } else {
       console.log(chalk.red('❌ Auto-configuration failed'));
     }
-    
+
     if (result.warnings.length > 0) {
       console.log(chalk.yellow('\n⚠️  Warnings:'));
       result.warnings.forEach(warning => {
         console.log(chalk.yellow(`   • ${warning}`));
       });
     }
-    
+
     if (result.recommendations.length > 0) {
       console.log(chalk.blue('\n💡 Recommendations:'));
       result.recommendations.forEach(rec => {
         console.log(chalk.blue(`   • ${rec}`));
       });
     }
-    
+
     console.log(chalk.gray('━'.repeat(50)));
   }
 
@@ -241,11 +264,11 @@ export class AutoConfigurator {
    */
   async refresh(): Promise<AutoConfigResult> {
     this.logger.info('Refreshing configuration...');
-    
+
     if (this.currentDualAgent) {
       await this.currentDualAgent.shutdown();
     }
-    
+
     return await this.autoConfigureDualAgent();
   }
 
@@ -255,25 +278,27 @@ export class AutoConfigurator {
   async getStatusReport(): Promise<any> {
     const platformHealth = this.modelDetector.getPlatformHealth();
     const modelsSummary = this.modelDetector.getModelsSummary();
-    
+
     return {
       platforms: {
         ollama: {
           status: platformHealth.ollama ? 'connected' : 'disconnected',
-          endpoint: 'http://localhost:11434'
+          endpoint: 'http://localhost:11434',
         },
         lmstudio: {
           status: platformHealth.lmstudio ? 'connected' : 'disconnected',
-          endpoint: 'http://localhost:1234'
-        }
+          endpoint: 'http://localhost:1234',
+        },
       },
       models: modelsSummary,
-      configuration: this.currentConfiguration ? {
-        writer: this.currentConfiguration.writer.model,
-        auditor: this.currentConfiguration.auditor.model,
-        confidence: this.currentConfiguration.confidence
-      } : null,
-      dualAgentReady: this.currentDualAgent !== null
+      configuration: this.currentConfiguration
+        ? {
+            writer: this.currentConfiguration.writer.model,
+            auditor: this.currentConfiguration.auditor.model,
+            confidence: this.currentConfiguration.confidence,
+          }
+        : null,
+      dualAgentReady: this.currentDualAgent !== null,
     };
   }
 }

@@ -42,7 +42,7 @@ export class SecurityValidator {
       'test*.js',
       'config/**/*.yaml',
       'config/**/*.json',
-      '.env*'
+      '.env*',
     ];
 
     for (const pattern of patterns) {
@@ -58,7 +58,7 @@ export class SecurityValidator {
     return {
       passed,
       issues: this.issues,
-      summary
+      summary,
     };
   }
 
@@ -81,7 +81,7 @@ export class SecurityValidator {
             line: lineNum,
             severity: 'critical',
             issue: 'Sandbox execution is disabled',
-            recommendation: 'Set enableSandbox: true to ensure secure execution'
+            recommendation: 'Set enableSandbox: true to ensure secure execution',
           });
         }
 
@@ -94,7 +94,7 @@ export class SecurityValidator {
               line: lineNum,
               severity: 'medium',
               issue: `Excessive maxInputLength: ${match[1]}`,
-              recommendation: 'Reduce maxInputLength to 50000 or less to prevent DoS attacks'
+              recommendation: 'Reduce maxInputLength to 50000 or less to prevent DoS attacks',
             });
           }
         }
@@ -106,7 +106,7 @@ export class SecurityValidator {
             line: lineNum,
             severity: 'high',
             issue: 'Wildcard in allowedCommands',
-            recommendation: 'Specify exact commands instead of using wildcards'
+            recommendation: 'Specify exact commands instead of using wildcards',
           });
         }
 
@@ -120,7 +120,7 @@ export class SecurityValidator {
                 line: lineNum,
                 severity: 'high',
                 issue: `Dangerous command '${cmd}' in allowedCommands`,
-                recommendation: `Remove '${cmd}' from allowedCommands list`
+                recommendation: `Remove '${cmd}' from allowedCommands list`,
               });
             }
           }
@@ -133,7 +133,7 @@ export class SecurityValidator {
             line: lineNum,
             severity: 'high',
             issue: 'Insecure path configuration with wildcards or traversal',
-            recommendation: 'Use specific absolute paths in allowedPaths'
+            recommendation: 'Use specific absolute paths in allowedPaths',
           });
         }
 
@@ -142,7 +142,7 @@ export class SecurityValidator {
           /api[_-]?key\s*[:=]\s*['"][^'"]{20,}['"]/i,
           /password\s*[:=]\s*['"][^'"]+['"]/i,
           /secret\s*[:=]\s*['"][^'"]{10,}['"]/i,
-          /token\s*[:=]\s*['"][^'"]{20,}['"]/i
+          /token\s*[:=]\s*['"][^'"]{20,}['"]/i,
         ];
 
         for (const pattern of secretPatterns) {
@@ -152,7 +152,7 @@ export class SecurityValidator {
               line: lineNum,
               severity: 'critical',
               issue: 'Hardcoded secret detected',
-              recommendation: 'Move secrets to environment variables or secure configuration'
+              recommendation: 'Move secrets to environment variables or secure configuration',
             });
           }
         }
@@ -164,7 +164,7 @@ export class SecurityValidator {
             line: lineNum,
             severity: 'high',
             issue: 'Dynamic code execution detected',
-            recommendation: 'Avoid eval(), exec(), or Function() for security'
+            recommendation: 'Avoid eval(), exec(), or Function() for security',
           });
         }
 
@@ -175,7 +175,7 @@ export class SecurityValidator {
             line: lineNum,
             severity: 'medium',
             issue: 'Synchronous file operations detected',
-            recommendation: 'Use async file operations (fs.promises) for better performance'
+            recommendation: 'Use async file operations (fs.promises) for better performance',
           });
         }
       }
@@ -199,7 +199,7 @@ export class SecurityValidator {
       critical: this.issues.filter(i => i.severity === 'critical').length,
       high: this.issues.filter(i => i.severity === 'high').length,
       medium: this.issues.filter(i => i.severity === 'medium').length,
-      low: this.issues.filter(i => i.severity === 'low').length
+      low: this.issues.filter(i => i.severity === 'low').length,
     };
   }
 
@@ -230,15 +230,22 @@ SUMMARY:
 
     // Group issues by severity
     const severities = ['critical', 'high', 'medium', 'low'] as const;
-    
+
     for (const severity of severities) {
       const severityIssues = this.issues.filter(i => i.severity === severity);
-      
+
       if (severityIssues.length > 0) {
-        const icon = severity === 'critical' ? '🚨' : severity === 'high' ? '🔴' : severity === 'medium' ? '🟡' : '🔵';
+        const icon =
+          severity === 'critical'
+            ? '🚨'
+            : severity === 'high'
+              ? '🔴'
+              : severity === 'medium'
+                ? '🟡'
+                : '🔵';
         report += `${icon} ${severity.toUpperCase()} ISSUES (${severityIssues.length}):\n`;
         report += '─'.repeat(50) + '\n';
-        
+
         for (const issue of severityIssues) {
           report += `📁 File: ${issue.file}:${issue.line}\n`;
           report += `❌ Issue: ${issue.issue}\n`;
@@ -295,19 +302,22 @@ SUMMARY:
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const validator = new SecurityValidator();
-  
-  validator.validateAllConfigurations().then(result => {
-    console.log(validator.generateReport());
-    
-    if (!result.passed) {
-      console.log('❌ Security audit failed. Please fix the issues above.');
+
+  validator
+    .validateAllConfigurations()
+    .then(result => {
+      console.log(validator.generateReport());
+
+      if (!result.passed) {
+        console.log('❌ Security audit failed. Please fix the issues above.');
+        process.exit(1);
+      } else {
+        console.log('✅ Security audit passed!');
+        process.exit(0);
+      }
+    })
+    .catch(error => {
+      console.error('Security validation failed:', error);
       process.exit(1);
-    } else {
-      console.log('✅ Security audit passed!');
-      process.exit(0);
-    }
-  }).catch(error => {
-    console.error('Security validation failed:', error);
-    process.exit(1);
-  });
+    });
 }

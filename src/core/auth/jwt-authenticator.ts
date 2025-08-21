@@ -7,13 +7,13 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { logger } from '../logger.js';
-import { 
-  AuthConfig, 
-  User, 
-  TokenPayload, 
-  RefreshTokenPayload, 
-  AuthResult, 
-  AuthSession
+import {
+  AuthConfig,
+  User,
+  TokenPayload,
+  RefreshTokenPayload,
+  AuthResult,
+  AuthSession,
 } from './auth-types.js';
 
 export class JWTAuthenticator {
@@ -26,9 +26,9 @@ export class JWTAuthenticator {
     this.config = {
       algorithms: ['HS256'],
       clockTolerance: 30,
-      ...config
+      ...config,
     };
-    
+
     // Start cleanup interval for expired sessions
     setInterval(() => this.cleanupExpiredSessions(), 60000); // Every minute
   }
@@ -41,7 +41,7 @@ export class JWTAuthenticator {
       const sessionId = crypto.randomUUID();
       const tokenFamily = crypto.randomUUID();
       const now = Math.floor(Date.now() / 1000);
-      
+
       // Create session
       const session: AuthSession = {
         id: sessionId,
@@ -51,9 +51,9 @@ export class JWTAuthenticator {
         ipAddress,
         userAgent,
         isActive: true,
-        expiresAt: new Date(Date.now() + this.config.expiry * 1000)
+        expiresAt: new Date(Date.now() + this.config.expiry * 1000),
       };
-      
+
       this.activeSessions.set(sessionId, session);
 
       // Create access token payload
@@ -67,29 +67,29 @@ export class JWTAuthenticator {
         username: user.username,
         roles: user.roles,
         permissions: user.permissions,
-        sessionId
+        sessionId,
       };
 
       // Generate access token
       const accessToken = jwt.sign(accessPayload, this.config.secret, {
         algorithm: this.config.algorithms[0] as jwt.Algorithm,
-        expiresIn: this.config.expiry
+        expiresIn: this.config.expiry,
       });
 
       let refreshToken: string | undefined;
-      
+
       if (this.config.refreshTokens) {
         // Create refresh token payload
         const refreshPayload: RefreshTokenPayload = {
           userId: user.id,
           sessionId,
           tokenFamily,
-          exp: now + (this.config.expiry * 7) // Refresh tokens last 7x longer
+          exp: now + this.config.expiry * 7, // Refresh tokens last 7x longer
         };
 
         refreshToken = jwt.sign(refreshPayload, this.config.secret + '_refresh', {
           algorithm: this.config.algorithms[0] as jwt.Algorithm,
-          expiresIn: this.config.expiry * 7
+          expiresIn: this.config.expiry * 7,
         });
 
         this.refreshTokens.set(tokenFamily, refreshPayload);
@@ -99,7 +99,7 @@ export class JWTAuthenticator {
         userId: user.id,
         sessionId,
         ipAddress,
-        userAgent: userAgent.substring(0, 100)
+        userAgent: userAgent.substring(0, 100),
       });
 
       return {
@@ -107,18 +107,17 @@ export class JWTAuthenticator {
         user,
         accessToken,
         refreshToken,
-        expiresIn: this.config.expiry
+        expiresIn: this.config.expiry,
       };
-
     } catch (error) {
       logger.error('Token generation failed', error as Error, {
         userId: user.id,
-        ipAddress
+        ipAddress,
       });
 
       throw new AuthenticationError('Token generation failed', {
         code: 'TOKEN_GENERATION_ERROR',
-        statusCode: 500
+        statusCode: 500,
       });
     }
   }
@@ -132,7 +131,7 @@ export class JWTAuthenticator {
       if (this.blacklistedTokens.has(token)) {
         throw new AuthenticationError('Token has been revoked', {
           code: 'TOKEN_REVOKED',
-          statusCode: 401
+          statusCode: 401,
         });
       }
 
@@ -140,7 +139,7 @@ export class JWTAuthenticator {
         algorithms: this.config.algorithms as jwt.Algorithm[],
         issuer: this.config.issuer,
         audience: this.config.audience,
-        clockTolerance: this.config.clockTolerance
+        clockTolerance: this.config.clockTolerance,
       }) as TokenPayload;
 
       // Verify session is still active
@@ -148,7 +147,7 @@ export class JWTAuthenticator {
       if (!session || !session.isActive || session.expiresAt < new Date()) {
         throw new AuthenticationError('Session expired or invalid', {
           code: 'SESSION_INVALID',
-          statusCode: 401
+          statusCode: 401,
         });
       }
 
@@ -156,19 +155,18 @@ export class JWTAuthenticator {
       session.lastAccessedAt = new Date();
 
       return payload;
-
     } catch (error) {
       if (error instanceof jwt.JsonWebTokenError) {
         throw new AuthenticationError('Invalid token', {
           code: 'TOKEN_INVALID',
-          statusCode: 401
+          statusCode: 401,
         });
       }
-      
+
       if (error instanceof jwt.TokenExpiredError) {
         throw new AuthenticationError('Token expired', {
           code: 'TOKEN_EXPIRED',
-          statusCode: 401
+          statusCode: 401,
         });
       }
 
@@ -181,14 +179,17 @@ export class JWTAuthenticator {
    */
   async refreshAccessToken(refreshToken: string): Promise<AuthResult> {
     try {
-      const payload = jwt.verify(refreshToken, this.config.secret + '_refresh') as RefreshTokenPayload;
-      
+      const payload = jwt.verify(
+        refreshToken,
+        this.config.secret + '_refresh'
+      ) as RefreshTokenPayload;
+
       // Verify refresh token exists and is valid
       const storedPayload = this.refreshTokens.get(payload.tokenFamily);
       if (!storedPayload || storedPayload.exp < Math.floor(Date.now() / 1000)) {
         throw new AuthenticationError('Refresh token expired or invalid', {
           code: 'REFRESH_TOKEN_INVALID',
-          statusCode: 401
+          statusCode: 401,
         });
       }
 
@@ -197,7 +198,7 @@ export class JWTAuthenticator {
       if (!session || !session.isActive) {
         throw new AuthenticationError('Session invalid', {
           code: 'SESSION_INVALID',
-          statusCode: 401
+          statusCode: 401,
         });
       }
 
@@ -211,12 +212,11 @@ export class JWTAuthenticator {
         permissions: ['read:own'],
         metadata: {},
         createdAt: new Date(),
-        isActive: true
+        isActive: true,
       };
 
       // Generate new tokens
       return await this.generateTokens(user, session.ipAddress, session.userAgent);
-
     } catch (error) {
       logger.error('Token refresh failed', error as Error);
       throw error;
@@ -229,7 +229,7 @@ export class JWTAuthenticator {
   async revokeToken(token: string): Promise<void> {
     try {
       const payload = jwt.decode(token) as TokenPayload;
-      
+
       if (payload && payload.sessionId) {
         // Deactivate session
         const session = this.activeSessions.get(payload.sessionId);
@@ -243,9 +243,8 @@ export class JWTAuthenticator {
 
       logger.info('Token revoked', {
         userId: payload?.userId,
-        sessionId: payload?.sessionId
+        sessionId: payload?.sessionId,
       });
-
     } catch (error) {
       logger.error('Token revocation failed', error as Error);
       throw error;
@@ -277,8 +276,9 @@ export class JWTAuthenticator {
    * Get active sessions for user
    */
   getUserSessions(userId: string): AuthSession[] {
-    return Array.from(this.activeSessions.values())
-      .filter(session => session.userId === userId && session.isActive);
+    return Array.from(this.activeSessions.values()).filter(
+      session => session.userId === userId && session.isActive
+    );
   }
 
   /**
@@ -309,7 +309,7 @@ export class JWTAuthenticator {
     if (cleanedSessions > 0 || cleanedRefreshTokens > 0) {
       logger.debug('Cleaned up expired auth artifacts', {
         cleanedSessions,
-        cleanedRefreshTokens
+        cleanedRefreshTokens,
       });
     }
   }
@@ -321,11 +321,11 @@ export class JWTAuthenticator {
     return async (req: any, res: any, next: any) => {
       try {
         const authHeader = req.headers.authorization;
-        
+
         if (!authHeader) {
           return res.status(401).json({
             error: 'Authentication required',
-            code: 'NO_AUTH_HEADER'
+            code: 'NO_AUTH_HEADER',
           });
         }
 
@@ -333,31 +333,30 @@ export class JWTAuthenticator {
         if (parts.length !== 2 || parts[0] !== 'Bearer') {
           return res.status(401).json({
             error: 'Invalid authorization header format',
-            code: 'INVALID_AUTH_FORMAT'
+            code: 'INVALID_AUTH_FORMAT',
           });
         }
 
         const token = parts[1];
         const payload = await this.verifyToken(token);
-        
+
         // Attach user info to request
         req.user = payload;
         req.sessionId = payload.sessionId;
-        
-        next();
 
+        next();
       } catch (error) {
         if (error instanceof AuthenticationError) {
           return res.status(error.statusCode).json({
             error: error.message,
-            code: error.code
+            code: error.code,
           });
         }
 
         logger.error('Authentication middleware error', error as Error);
         return res.status(500).json({
           error: 'Internal authentication error',
-          code: 'AUTH_INTERNAL_ERROR'
+          code: 'AUTH_INTERNAL_ERROR',
         });
       }
     };
@@ -387,7 +386,10 @@ class AuthenticationError extends Error {
   public statusCode: number;
   public details?: Record<string, any>;
 
-  constructor(message: string, options: { code: string; statusCode: number; details?: Record<string, any> }) {
+  constructor(
+    message: string,
+    options: { code: string; statusCode: number; details?: Record<string, any> }
+  ) {
     super(message);
     this.name = 'AuthenticationError';
     this.code = options.code;

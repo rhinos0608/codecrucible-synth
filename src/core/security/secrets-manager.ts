@@ -21,9 +21,11 @@ export interface SecretConfig {
 
 export interface EncryptedSecret {
   name: string;
+  encryptedData: string;
   encryptedValue: string;
   iv: string;
   salt: string;
+  authTag: string;
   algorithm: string;
   keyDerivation: string;
   metadata: {
@@ -65,7 +67,8 @@ export class SecretsManager {
   private config: SecretsManagerConfig;
   private masterKey: Buffer | null = null;
   private secrets = new Map<string, SecretConfig>();
-  private accessLog: Array<{ secret: string; timestamp: Date; user?: string; success: boolean }> = [];
+  private accessLog: Array<{ secret: string; timestamp: Date; user?: string; success: boolean }> =
+    [];
   private keyRotationTimer?: NodeJS.Timeout;
 
   constructor(config: Partial<SecretsManagerConfig> = {}) {
@@ -76,21 +79,21 @@ export class SecretsManager {
         enabled: true,
         intervalDays: 90,
         retainOldKeys: 3,
-        autoRotate: false
+        autoRotate: false,
       },
       encryption: {
         algorithm: 'aes-256-gcm',
         keyLength: 32,
         ivLength: 16,
         saltLength: 32,
-        iterations: 100000
+        iterations: 100000,
       },
       access: {
         auditLog: true,
         maxAccessAttempts: 5,
-        requireAuthentication: true
+        requireAuthentication: true,
       },
-      ...config
+      ...config,
     };
   }
 
@@ -115,9 +118,8 @@ export class SecretsManager {
 
       logger.info('Secrets manager initialized', {
         storePath: this.config.storePath,
-        secretsCount: this.secrets.size
+        secretsCount: this.secrets.size,
       });
-
     } catch (error) {
       logger.error('Failed to initialize secrets manager', error as Error);
       throw error;
@@ -128,8 +130,8 @@ export class SecretsManager {
    * Store a secret securely
    */
   async storeSecret(
-    name: string, 
-    value: string, 
+    name: string,
+    value: string,
     options: {
       description?: string;
       tags?: string[];
@@ -152,11 +154,11 @@ export class SecretsManager {
         tags: options.tags || [],
         expiresAt: options.expiresAt,
         createdAt: new Date(),
-        accessCount: 0
+        accessCount: 0,
       };
 
       // Encrypt and store
-      const encrypted = await this.encryptSecret(secret);
+      const encrypted = await this.encryptSecretInternal(secret);
       await this.saveEncryptedSecret(encrypted);
 
       // Update in-memory cache
@@ -165,13 +167,54 @@ export class SecretsManager {
       logger.info('Secret stored', {
         name,
         hasExpiration: !!options.expiresAt,
-        tags: options.tags
+        tags: options.tags,
       });
-
     } catch (error) {
       logger.error('Failed to store secret', error as Error, { name });
       throw error;
     }
+  }
+
+  /**
+   * Encrypt a secret and return encrypted data (for testing purposes)
+   */
+  async encryptSecret(name: string, value: string): Promise<EncryptedSecret> {
+    try {
+      if (!this.masterKey) {
+        await this.initialize();
+      }
+
+      // Validate secret name
+      this.validateSecretName(name);
+
+      // Create secret config
+      const secret: SecretConfig = {
+        name,
+        value,
+        createdAt: new Date(),
+        accessCount: 0,
+      };
+
+      // Store in memory for decryption
+      this.secrets.set(name, secret);
+
+      // Encrypt and return the encrypted secret
+      return await this.encryptSecretInternal(secret);
+    } catch (error) {
+      logger.error('Failed to encrypt secret', error as Error, { name });
+      throw error;
+    }
+  }
+
+  /**
+   * Decrypt a secret (for testing purposes)
+   */
+  async decryptSecret(name: string): Promise<string> {
+    const secret = await this.getSecret(name);
+    if (!secret) {
+      throw new Error('Secret not found');
+    }
+    return secret;
   }
 
   /**
@@ -207,11 +250,10 @@ export class SecretsManager {
       logger.debug('Secret accessed', {
         name,
         accessCount: secret.accessCount,
-        userId
+        userId,
       });
 
       return secret.value;
-
     } catch (error) {
       logger.error('Failed to retrieve secret', error as Error, { name, userId });
       this.logAccess(name, false, userId, 'error');
@@ -223,8 +265,8 @@ export class SecretsManager {
    * Update a secret
    */
   async updateSecret(
-    name: string, 
-    newValue: string, 
+    name: string,
+    newValue: string,
     options: {
       description?: string;
       tags?: string[];
@@ -243,18 +285,17 @@ export class SecretsManager {
         value: newValue,
         description: options.description ?? existingSecret.description,
         tags: options.tags ?? existingSecret.tags,
-        expiresAt: options.expiresAt ?? existingSecret.expiresAt
+        expiresAt: options.expiresAt ?? existingSecret.expiresAt,
       };
 
       // Encrypt and store
-      const encrypted = await this.encryptSecret(updatedSecret);
+      const encrypted = await this.encryptSecretInternal(updatedSecret);
       await this.saveEncryptedSecret(encrypted);
 
       // Update in-memory cache
       this.secrets.set(name, updatedSecret);
 
       logger.info('Secret updated', { name });
-
     } catch (error) {
       logger.error('Failed to update secret', error as Error, { name });
       throw error;
@@ -279,7 +320,6 @@ export class SecretsManager {
 
       logger.info('Secret deleted', { name });
       return true;
-
     } catch (error) {
       logger.error('Failed to delete secret', error as Error, { name });
       throw error;
@@ -289,23 +329,23 @@ export class SecretsManager {
   /**
    * List all secret names (not values)
    */
-  async listSecrets(tags?: string[]): Promise<Array<{
-    name: string;
-    description?: string;
-    tags?: string[];
-    expiresAt?: Date;
-    createdAt: Date;
-    lastAccessed?: Date;
-    accessCount: number;
-  }>> {
+  async listSecrets(tags?: string[]): Promise<
+    Array<{
+      name: string;
+      description?: string;
+      tags?: string[];
+      expiresAt?: Date;
+      createdAt: Date;
+      lastAccessed?: Date;
+      accessCount: number;
+    }>
+  > {
     try {
       let secrets = Array.from(this.secrets.values());
 
       // Filter by tags if specified
       if (tags && tags.length > 0) {
-        secrets = secrets.filter(secret => 
-          secret.tags?.some(tag => tags.includes(tag))
-        );
+        secrets = secrets.filter(secret => secret.tags?.some(tag => tags.includes(tag)));
       }
 
       // Return metadata only (no values)
@@ -316,9 +356,8 @@ export class SecretsManager {
         expiresAt: secret.expiresAt,
         createdAt: secret.createdAt,
         lastAccessed: secret.lastAccessed,
-        accessCount: secret.accessCount
+        accessCount: secret.accessCount,
       }));
-
     } catch (error) {
       logger.error('Failed to list secrets', error as Error);
       throw error;
@@ -341,7 +380,7 @@ export class SecretsManager {
 
       // Re-encrypt all secrets with new key
       for (const [name, secret] of secretsBackup.entries()) {
-        const encrypted = await this.encryptSecret(secret);
+        const encrypted = await this.encryptSecretInternal(secret);
         await this.saveEncryptedSecret(encrypted);
       }
 
@@ -351,9 +390,8 @@ export class SecretsManager {
       }
 
       logger.info('Master key rotation completed', {
-        secretsReencrypted: secretsBackup.size
+        secretsReencrypted: secretsBackup.size,
       });
-
     } catch (error) {
       logger.error('Master key rotation failed', error as Error);
       throw error;
@@ -368,11 +406,10 @@ export class SecretsManager {
       const exportData = {
         version: '1.0',
         timestamp: new Date().toISOString(),
-        secrets: await this.getAllEncryptedSecrets()
+        secrets: await this.getAllEncryptedSecrets(),
       };
 
       return JSON.stringify(exportData, null, 2);
-
     } catch (error) {
       logger.error('Failed to export secrets', error as Error);
       throw error;
@@ -385,7 +422,7 @@ export class SecretsManager {
   async importSecrets(exportData: string): Promise<void> {
     try {
       const data = JSON.parse(exportData);
-      
+
       if (data.version !== '1.0') {
         throw new Error('Unsupported export format version');
       }
@@ -393,18 +430,17 @@ export class SecretsManager {
       let importCount = 0;
       for (const encrypted of data.secrets) {
         await this.saveEncryptedSecret(encrypted);
-        
+
         // Decrypt and add to memory cache
-        const secret = await this.decryptSecret(encrypted);
+        const secret = await this.decryptSecretInternal(encrypted);
         this.secrets.set(secret.name, secret);
         importCount++;
       }
 
       logger.info('Secrets imported successfully', {
         importCount,
-        totalSecrets: this.secrets.size
+        totalSecrets: this.secrets.size,
       });
-
     } catch (error) {
       logger.error('Failed to import secrets', error as Error);
       throw error;
@@ -421,17 +457,17 @@ export class SecretsManager {
     success: boolean;
     reason?: string;
   }> {
-    const cutoff = new Date(Date.now() - (hours * 60 * 60 * 1000));
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
     return this.accessLog.filter(entry => entry.timestamp >= cutoff);
   }
 
   /**
-   * Encrypt a secret
+   * Encrypt a secret (internal method)
    */
-  private async encryptSecret(secret: SecretConfig): Promise<EncryptedSecret> {
+  private async encryptSecretInternal(secret: SecretConfig): Promise<EncryptedSecret> {
     const salt = crypto.randomBytes(this.config.encryption.saltLength);
     const iv = crypto.randomBytes(this.config.encryption.ivLength);
-    
+
     // Derive encryption key from master key and salt
     const key = crypto.pbkdf2Sync(
       this.masterKey!,
@@ -441,16 +477,19 @@ export class SecretsManager {
       'sha256'
     );
 
-    // Encrypt the secret value
-    const cipher = crypto.createCipher(this.config.encryption.algorithm, key);
+    // Encrypt the secret value using GCM for authenticated encryption
+    const cipher = crypto.createCipheriv(this.config.encryption.algorithm, key, iv);
     let encrypted = cipher.update(secret.value, 'utf8', 'base64');
     encrypted += cipher.final('base64');
+    const authTag = (cipher as any).getAuthTag();
 
     return {
       name: secret.name,
+      encryptedData: encrypted,
       encryptedValue: encrypted,
       iv: iv.toString('base64'),
       salt: salt.toString('base64'),
+      authTag: authTag.toString('base64'),
       algorithm: this.config.encryption.algorithm,
       keyDerivation: 'pbkdf2',
       metadata: {
@@ -459,17 +498,19 @@ export class SecretsManager {
         expiresAt: secret.expiresAt?.toISOString(),
         createdAt: secret.createdAt.toISOString(),
         lastAccessed: secret.lastAccessed?.toISOString(),
-        accessCount: secret.accessCount
-      }
+        accessCount: secret.accessCount,
+      },
     };
   }
 
   /**
-   * Decrypt a secret
+   * Decrypt a secret (internal method)
    */
-  private async decryptSecret(encrypted: EncryptedSecret): Promise<SecretConfig> {
+  private async decryptSecretInternal(encrypted: EncryptedSecret): Promise<SecretConfig> {
     const salt = Buffer.from(encrypted.salt, 'base64');
-    
+    const iv = Buffer.from(encrypted.iv, 'base64');
+    const authTag = Buffer.from(encrypted.authTag, 'base64');
+
     // Derive decryption key
     const key = crypto.pbkdf2Sync(
       this.masterKey!,
@@ -479,8 +520,9 @@ export class SecretsManager {
       'sha256'
     );
 
-    // Decrypt the value
-    const decipher = crypto.createDecipher(encrypted.algorithm, key);
+    // Decrypt the value using GCM for authenticated decryption
+    const decipher = crypto.createDecipheriv(encrypted.algorithm, key, iv);
+    (decipher as any).setAuthTag(authTag);
     let decrypted = decipher.update(encrypted.encryptedValue, 'base64', 'utf8');
     decrypted += decipher.final('utf8');
 
@@ -491,8 +533,10 @@ export class SecretsManager {
       tags: encrypted.metadata.tags || [],
       expiresAt: encrypted.metadata.expiresAt ? new Date(encrypted.metadata.expiresAt) : undefined,
       createdAt: new Date(encrypted.metadata.createdAt),
-      lastAccessed: encrypted.metadata.lastAccessed ? new Date(encrypted.metadata.lastAccessed) : undefined,
-      accessCount: encrypted.metadata.accessCount
+      lastAccessed: encrypted.metadata.lastAccessed
+        ? new Date(encrypted.metadata.lastAccessed)
+        : undefined,
+      accessCount: encrypted.metadata.accessCount,
     };
   }
 
@@ -502,14 +546,16 @@ export class SecretsManager {
   private async loadOrGenerateMasterKey(password?: string): Promise<void> {
     try {
       // Try to load existing master key
-      const keyExists = await fs.access(this.config.masterKeyPath).then(() => true).catch(() => false);
-      
+      const keyExists = await fs
+        .access(this.config.masterKeyPath)
+        .then(() => true)
+        .catch(() => false);
+
       if (keyExists) {
         await this.loadMasterKey(password);
       } else {
         await this.generateMasterKey(password);
       }
-
     } catch (error) {
       logger.error('Failed to load or generate master key', error as Error);
       throw error;
@@ -521,16 +567,16 @@ export class SecretsManager {
    */
   private async loadMasterKey(password?: string): Promise<void> {
     const keyData = await fs.readFile(this.config.masterKeyPath, 'utf8');
-    
+
     if (password) {
       // Decrypt master key with password
       const [encryptedKey, salt, iv] = keyData.split(':');
       const derivedKey = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
-      
+
       const decipher = crypto.createDecipheriv('aes-256-cbc', derivedKey, Buffer.from(iv, 'hex'));
       let decrypted = decipher.update(encryptedKey, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
-      
+
       this.masterKey = Buffer.from(decrypted, 'hex');
     } else {
       // Use key directly (for development only)
@@ -543,30 +589,30 @@ export class SecretsManager {
    */
   private async generateMasterKey(password?: string): Promise<void> {
     this.masterKey = crypto.randomBytes(32);
-    
+
     let keyData: string;
-    
+
     if (password) {
       // Encrypt master key with password
       const salt = crypto.randomBytes(16).toString('hex');
       const iv = crypto.randomBytes(16);
       const derivedKey = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
-      
+
       const cipher = crypto.createCipheriv('aes-256-cbc', derivedKey, iv);
       let encrypted = cipher.update(this.masterKey.toString('hex'), 'utf8', 'hex');
       encrypted += cipher.final('hex');
-      
+
       keyData = `${encrypted}:${salt}:${iv.toString('hex')}`;
     } else {
       // Store key directly (for development only)
       keyData = this.masterKey.toString('hex');
     }
-    
+
     await fs.writeFile(this.config.masterKeyPath, keyData, { mode: 0o600 });
-    
+
     logger.info('New master key generated', {
       keyPath: this.config.masterKeyPath,
-      encrypted: !!password
+      encrypted: !!password,
     });
   }
 
@@ -583,19 +629,17 @@ export class SecretsManager {
           const filePath = path.join(this.config.storePath, file);
           const encryptedData = await fs.readFile(filePath, 'utf8');
           const encrypted: EncryptedSecret = JSON.parse(encryptedData);
-          
-          const secret = await this.decryptSecret(encrypted);
+
+          const secret = await this.decryptSecretInternal(encrypted);
           this.secrets.set(secret.name, secret);
-          
         } catch (error) {
           logger.error('Failed to load secret file', error as Error, { file });
         }
       }
 
       logger.info('Secrets loaded from storage', {
-        count: this.secrets.size
+        count: this.secrets.size,
       });
-
     } catch (error) {
       logger.error('Failed to load secrets', error as Error);
       throw error;
@@ -615,12 +659,12 @@ export class SecretsManager {
    */
   private async getAllEncryptedSecrets(): Promise<EncryptedSecret[]> {
     const encryptedSecrets: EncryptedSecret[] = [];
-    
+
     for (const secret of this.secrets.values()) {
-      const encrypted = await this.encryptSecret(secret);
+      const encrypted = await this.encryptSecretInternal(secret);
       encryptedSecrets.push(encrypted);
     }
-    
+
     return encryptedSecrets;
   }
 
@@ -631,11 +675,13 @@ export class SecretsManager {
     if (!name || typeof name !== 'string') {
       throw new Error('Secret name must be a non-empty string');
     }
-    
+
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      throw new Error('Secret name can only contain alphanumeric characters, underscores, and hyphens');
+      throw new Error(
+        'Secret name can only contain alphanumeric characters, underscores, and hyphens'
+      );
     }
-    
+
     if (name.length > 100) {
       throw new Error('Secret name cannot exceed 100 characters');
     }
@@ -651,7 +697,7 @@ export class SecretsManager {
         timestamp: new Date(),
         user: userId,
         success,
-        ...(reason && { reason })
+        ...(reason && { reason }),
       });
 
       // Trim access log if too large
@@ -667,12 +713,12 @@ export class SecretsManager {
   private async archiveMasterKey(oldKey: Buffer): Promise<void> {
     const archivePath = path.join(this.config.storePath, 'archived-keys');
     await fs.mkdir(archivePath, { recursive: true });
-    
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const archiveFile = path.join(archivePath, `master-key-${timestamp}.bak`);
-    
+
     await fs.writeFile(archiveFile, oldKey.toString('hex'), { mode: 0o600 });
-    
+
     logger.info('Old master key archived', { archiveFile });
   }
 
@@ -681,7 +727,7 @@ export class SecretsManager {
    */
   private startKeyRotationTimer(): void {
     const intervalMs = this.config.keyRotation.intervalDays * 24 * 60 * 60 * 1000;
-    
+
     this.keyRotationTimer = setInterval(async () => {
       try {
         logger.info('Starting automatic key rotation');
@@ -699,12 +745,62 @@ export class SecretsManager {
     if (this.keyRotationTimer) {
       clearInterval(this.keyRotationTimer);
     }
-    
+
     // Clear sensitive data from memory
     this.masterKey?.fill(0);
     this.masterKey = null;
     this.secrets.clear();
-    
+
     logger.info('Secrets manager stopped');
+  }
+
+  // Test helper methods
+  async deleteTestSecret(name: string): Promise<boolean> {
+    const exists = this.secrets.has(name);
+    if (exists) {
+      this.secrets.delete(name);
+      // Also try to delete from storage if it exists
+      try {
+        const secretPath = path.join(this.config.storePath, `${name}.json`);
+        await fs.unlink(secretPath);
+      } catch {
+        // Ignore if file doesn't exist
+      }
+    }
+    return exists;
+  }
+
+  async rotateEncryptionKey(): Promise<void> {
+    // Generate new master key
+    const newMasterKey = crypto.randomBytes(32);
+    const oldMasterKey = this.masterKey;
+
+    // Set new master key
+    this.masterKey = newMasterKey;
+
+    // Re-encrypt all secrets with new key
+    for (const [name, secret] of this.secrets.entries()) {
+      const encrypted = await this.encryptSecretInternal(secret);
+      await this.saveEncryptedSecret(encrypted);
+    }
+
+    // Clear old key from memory
+    if (oldMasterKey) {
+      oldMasterKey.fill(0);
+    }
+
+    logger.info('Encryption key rotated successfully');
+  }
+
+  setEncryptionKey(key: Buffer): void {
+    if (key.length < 32) {
+      throw new Error('Encryption key must be at least 32 bytes');
+    }
+    this.masterKey = key;
+  }
+
+  get secretStorage() {
+    // For testing access to internal storage
+    return this.secrets;
   }
 }

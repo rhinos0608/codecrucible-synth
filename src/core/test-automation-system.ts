@@ -76,7 +76,7 @@ export class TestAutomationSystem {
       overall,
       files: this.coverage,
       gaps: this.gaps,
-      recommendations
+      recommendations,
     };
   }
 
@@ -86,15 +86,17 @@ export class TestAutomationSystem {
   private async discoverFiles(): Promise<void> {
     // Source files
     this.sourceFiles = await glob('src/**/*.{ts,js}', {
-      ignore: ['src/**/*.test.ts', 'src/**/*.spec.ts', 'src/**/*.d.ts']
+      ignore: ['src/**/*.test.ts', 'src/**/*.spec.ts', 'src/**/*.d.ts'],
     });
 
     // Test files
     this.testFiles = await glob('tests/**/*.{ts,js}', {
-      ignore: ['tests/__mocks__/**', 'tests/**/node_modules/**']
+      ignore: ['tests/__mocks__/**', 'tests/**/node_modules/**'],
     });
 
-    logger.info(`📁 Found ${this.sourceFiles.length} source files, ${this.testFiles.length} test files`);
+    logger.info(
+      `📁 Found ${this.sourceFiles.length} source files, ${this.testFiles.length} test files`
+    );
   }
 
   /**
@@ -104,7 +106,7 @@ export class TestAutomationSystem {
     try {
       // Run Jest with coverage
       const { stdout } = await execAsync('npm test -- --coverage --silent --json', {
-        timeout: 120000 // 2 minutes
+        timeout: 120000, // 2 minutes
       });
 
       const jestOutput = JSON.parse(stdout);
@@ -121,7 +123,7 @@ export class TestAutomationSystem {
           branches: coverage ? this.calculatePercentage(coverage.b) : 0,
           statements: coverage ? this.calculatePercentage(coverage.s) : 0,
           uncoveredLines: coverage ? this.getUncoveredLines(coverage) : [],
-          hasTest: this.hasCorrespondingTest(filePath)
+          hasTest: this.hasCorrespondingTest(filePath),
         };
 
         if (testCoverage.hasTest) {
@@ -142,7 +144,7 @@ export class TestAutomationSystem {
   private async fallbackCoverageAnalysis(): Promise<void> {
     for (const filePath of this.sourceFiles) {
       const hasTest = this.hasCorrespondingTest(filePath);
-      
+
       this.coverage.push({
         file: filePath,
         lines: hasTest ? 50 : 0, // Estimate
@@ -151,7 +153,7 @@ export class TestAutomationSystem {
         statements: hasTest ? 45 : 0,
         uncoveredLines: [],
         hasTest,
-        testFile: hasTest ? this.findCorrespondingTest(filePath) : undefined
+        testFile: hasTest ? this.findCorrespondingTest(filePath) : undefined,
       });
     }
   }
@@ -161,10 +163,10 @@ export class TestAutomationSystem {
    */
   private calculatePercentage(data: any): number {
     if (!data) return 0;
-    
+
     const covered = Object.values(data).filter((count: any) => count > 0).length;
     const total = Object.keys(data).length;
-    
+
     return total > 0 ? Math.round((covered / total) * 100) : 0;
   }
 
@@ -175,7 +177,7 @@ export class TestAutomationSystem {
     if (!coverage.statementMap || !coverage.s) return [];
 
     const uncovered: number[] = [];
-    
+
     for (const [id, count] of Object.entries(coverage.s)) {
       if (count === 0) {
         const statement = coverage.statementMap[id];
@@ -201,7 +203,7 @@ export class TestAutomationSystem {
   private findCorrespondingTest(sourceFile: string): string | null {
     const baseName = basename(sourceFile, '.ts').replace('.js', '');
     const sourceDir = dirname(sourceFile);
-    
+
     // Common test patterns
     const testPatterns = [
       `tests/unit/${baseName}.test.ts`,
@@ -210,16 +212,17 @@ export class TestAutomationSystem {
       `${sourceDir}/${baseName}.test.ts`,
       `${sourceDir}/${baseName}.spec.ts`,
       `tests/**/${baseName}.test.ts`,
-      `tests/**/${baseName}.spec.ts`
+      `tests/**/${baseName}.spec.ts`,
     ];
 
     for (const pattern of testPatterns) {
       try {
-        const matches = this.testFiles.filter(testFile => 
-          testFile.includes(baseName) && 
-          (testFile.includes('.test.') || testFile.includes('.spec.'))
+        const matches = this.testFiles.filter(
+          testFile =>
+            testFile.includes(baseName) &&
+            (testFile.includes('.test.') || testFile.includes('.spec.'))
         );
-        
+
         if (matches.length > 0) {
           return matches[0];
         }
@@ -243,7 +246,7 @@ export class TestAutomationSystem {
           type: 'missing_test',
           severity: this.determineSeverity(coverage.file),
           description: 'No test file found for this source file',
-          suggestedTests: this.generateTestSuggestions(coverage.file)
+          suggestedTests: this.generateTestSuggestions(coverage.file),
         });
       }
 
@@ -254,7 +257,7 @@ export class TestAutomationSystem {
           type: 'low_coverage',
           severity: coverage.lines < 30 ? 'high' : 'medium',
           description: `Low test coverage: ${coverage.lines}% lines covered`,
-          suggestedTests: this.generateCoverageSuggestions(coverage.file)
+          suggestedTests: this.generateCoverageSuggestions(coverage.file),
         });
       }
 
@@ -265,7 +268,7 @@ export class TestAutomationSystem {
           type: 'missing_integration',
           severity: 'high',
           description: 'Critical file missing integration tests',
-          suggestedTests: this.generateIntegrationSuggestions(coverage.file)
+          suggestedTests: this.generateIntegrationSuggestions(coverage.file),
         });
       }
     }
@@ -294,7 +297,7 @@ export class TestAutomationSystem {
       'authentication',
       'authorization',
       'payment',
-      'data-validation'
+      'data-validation',
     ];
 
     return criticalPatterns.some(pattern => filePath.includes(pattern));
@@ -305,8 +308,8 @@ export class TestAutomationSystem {
    */
   private hasIntegrationTest(filePath: string): boolean {
     const baseName = basename(filePath, '.ts').replace('.js', '');
-    return this.testFiles.some(testFile => 
-      testFile.includes('integration') && testFile.includes(baseName)
+    return this.testFiles.some(
+      testFile => testFile.includes('integration') && testFile.includes(baseName)
     );
   }
 
@@ -393,7 +396,8 @@ export class TestAutomationSystem {
   async generateMissingTests(): Promise<void> {
     const missingTests = this.gaps.filter(gap => gap.type === 'missing_test');
 
-    for (const gap of missingTests.slice(0, 5)) { // Limit to 5 for now
+    for (const gap of missingTests.slice(0, 5)) {
+      // Limit to 5 for now
       await this.generateTestFile(gap.file);
     }
   }
@@ -405,16 +409,16 @@ export class TestAutomationSystem {
     try {
       const sourceContent = await fs.readFile(sourceFile, 'utf-8');
       const testContent = await this.createTestContent(sourceFile, sourceContent);
-      
+
       const baseName = basename(sourceFile, '.ts').replace('.js', '');
       const testFilePath = `tests/unit/${baseName}.test.ts`;
-      
+
       // Ensure directory exists
       await fs.mkdir(dirname(testFilePath), { recursive: true });
-      
+
       // Write test file
       await fs.writeFile(testFilePath, testContent);
-      
+
       logger.info(`✅ Generated test file: ${testFilePath}`);
     } catch (error) {
       logger.error(`Failed to generate test for ${sourceFile}:`, error);
@@ -427,7 +431,7 @@ export class TestAutomationSystem {
   private async createTestContent(sourceFile: string, sourceContent: string): Promise<string> {
     const relativePath = relative('tests/unit', sourceFile);
     const baseName = basename(sourceFile, '.ts').replace('.js', '');
-    
+
     // Extract classes and functions
     const classes = this.extractClasses(sourceContent);
     const functions = this.extractFunctions(sourceContent);
@@ -519,7 +523,7 @@ describe('${baseName}', () => {
    */
   private generateFunctionTests(functionName: string, sourceContent: string): string {
     const isAsync = sourceContent.includes(`async function ${functionName}`);
-    
+
     return `
   describe('${functionName}', () => {
     test('should execute successfully', ${isAsync ? 'async ' : ''}() => {
@@ -556,18 +560,18 @@ describe('${baseName}', () => {
         lines: acc.lines + cov.lines,
         functions: acc.functions + cov.functions,
         branches: acc.branches + cov.branches,
-        statements: acc.statements + cov.statements
+        statements: acc.statements + cov.statements,
       }),
       { lines: 0, functions: 0, branches: 0, statements: 0 }
     );
 
     const count = this.coverage.length;
-    
+
     return {
       lines: Math.round(totals.lines / count),
       functions: Math.round(totals.functions / count),
       branches: Math.round(totals.branches / count),
-      statements: Math.round(totals.statements / count)
+      statements: Math.round(totals.statements / count),
     };
   }
 
@@ -740,7 +744,7 @@ jobs:
    */
   private async generateTestScripts(): Promise<void> {
     const packageJson = JSON.parse(await fs.readFile('package.json', 'utf-8'));
-    
+
     // Add test scripts
     packageJson.scripts = {
       ...packageJson.scripts,
@@ -753,7 +757,7 @@ jobs:
       'test:ci': 'jest --coverage --watchAll=false --passWithNoTests',
       'test:mutation': 'stryker run',
       'test:e2e': 'jest tests/e2e --runInBand',
-      'coverage:report': 'npm run test:coverage && open coverage/lcov-report/index.html'
+      'coverage:report': 'npm run test:coverage && open coverage/lcov-report/index.html',
     };
 
     await fs.writeFile('package.json', JSON.stringify(packageJson, null, 2));
@@ -787,18 +791,16 @@ OVERVIEW:
       { name: 'Excellent (80-100%)', min: 80, max: 100 },
       { name: 'Good (60-79%)', min: 60, max: 79 },
       { name: 'Fair (40-59%)', min: 40, max: 59 },
-      { name: 'Poor (0-39%)', min: 0, max: 39 }
+      { name: 'Poor (0-39%)', min: 0, max: 39 },
     ];
 
     report += 'COVERAGE DISTRIBUTION:\n';
     report += '─'.repeat(50) + '\n';
 
     for (const range of coverageRanges) {
-      const count = this.coverage.filter(c => 
-        c.lines >= range.min && c.lines <= range.max
-      ).length;
+      const count = this.coverage.filter(c => c.lines >= range.min && c.lines <= range.max).length;
       const percentage = Math.round((count / totalFiles) * 100);
-      
+
       report += `${range.name}: ${count} files (${percentage}%)\n`;
     }
 
@@ -816,21 +818,26 @@ OVERVIEW:
       }
 
       for (const [type, gaps] of gapTypes) {
-        const icon = type === 'missing_test' ? '📝' : 
-                    type === 'low_coverage' ? '📉' : 
-                    type === 'missing_integration' ? '🔗' : '⚠️';
-        
+        const icon =
+          type === 'missing_test'
+            ? '📝'
+            : type === 'low_coverage'
+              ? '📉'
+              : type === 'missing_integration'
+                ? '🔗'
+                : '⚠️';
+
         report += `${icon} ${type.replace('_', ' ').toUpperCase()}: ${gaps.length} files\n`;
-        
+
         // Show critical/high severity first
         const criticalGaps = gaps
           .filter(g => g.severity === 'critical' || g.severity === 'high')
           .slice(0, 5);
-        
+
         for (const gap of criticalGaps) {
           report += `   🔴 ${gap.file}: ${gap.description}\n`;
         }
-        
+
         if (gaps.length > criticalGaps.length) {
           report += `   ... and ${gaps.length - criticalGaps.length} more\n`;
         }
@@ -847,7 +854,7 @@ OVERVIEW:
     if (lowestCoverage.length > 0) {
       report += '📉 LOWEST COVERAGE FILES:\n';
       report += '─'.repeat(50) + '\n';
-      
+
       for (const file of lowestCoverage) {
         report += `${file.lines}% - ${file.file}\n`;
       }
@@ -861,11 +868,12 @@ OVERVIEW:
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const testSystem = new TestAutomationSystem();
-  
-  testSystem.analyzeCoverage()
+
+  testSystem
+    .analyzeCoverage()
     .then(result => {
       console.log(testSystem.generateReport());
-      
+
       if (result.gaps.length > 0) {
         console.log(`\n🔧 Found ${result.gaps.length} test gaps to address`);
         console.log('📋 Recommendations:');
@@ -873,7 +881,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
           console.log(`  • ${rec}`);
         }
       }
-      
+
       return testSystem.generateCICD();
     })
     .then(() => {

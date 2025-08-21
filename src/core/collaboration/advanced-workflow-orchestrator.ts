@@ -13,7 +13,13 @@ export interface WorkflowTask {
   id: string;
   name: string;
   description: string;
-  type: 'code_generation' | 'code_review' | 'testing' | 'documentation' | 'analysis' | 'refactoring';
+  type:
+    | 'code_generation'
+    | 'code_review'
+    | 'testing'
+    | 'documentation'
+    | 'analysis'
+    | 'refactoring';
   priority: 'low' | 'medium' | 'high' | 'critical';
   dependencies: string[];
   estimatedDuration: number;
@@ -84,11 +90,11 @@ export interface WorkflowStage {
   dependencies: string[];
 }
 
-export type CollaborationType = 
-  | 'sequential' 
-  | 'parallel' 
-  | 'peer_review' 
-  | 'mentor_guided' 
+export type CollaborationType =
+  | 'sequential'
+  | 'parallel'
+  | 'peer_review'
+  | 'mentor_guided'
   | 'consensus_driven'
   | 'competitive'
   | 'hierarchical';
@@ -109,7 +115,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     this.logger = new Logger('WorkflowOrchestrator');
     this.voiceSystem = voiceSystem;
     this.modelClient = modelClient;
-    
+
     this.initializeWorkflowPatterns();
     this.startOrchestrationLoop();
   }
@@ -131,30 +137,30 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
           tasks: ['requirements_analysis', 'architecture_design', 'task_breakdown'],
           parallelizable: false,
           reviewRequired: true,
-          dependencies: []
+          dependencies: [],
         },
         {
           name: 'implementation',
           tasks: ['frontend_development', 'backend_development', 'database_design'],
           parallelizable: true,
           reviewRequired: true,
-          dependencies: ['planning']
+          dependencies: ['planning'],
         },
         {
           name: 'integration',
           tasks: ['api_integration', 'end_to_end_testing', 'performance_optimization'],
           parallelizable: false,
           reviewRequired: true,
-          dependencies: ['implementation']
+          dependencies: ['implementation'],
         },
         {
           name: 'deployment',
           tasks: ['deployment_setup', 'monitoring_configuration', 'documentation'],
           parallelizable: true,
           reviewRequired: true,
-          dependencies: ['integration']
-        }
-      ]
+          dependencies: ['integration'],
+        },
+      ],
     });
 
     // Code Review & Improvement Workflow
@@ -170,23 +176,23 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
           tasks: ['code_analysis', 'pattern_detection', 'quality_assessment'],
           parallelizable: true,
           reviewRequired: false,
-          dependencies: []
+          dependencies: [],
         },
         {
           name: 'collaborative_review',
           tasks: ['peer_review', 'security_audit', 'performance_review'],
           parallelizable: true,
           reviewRequired: false,
-          dependencies: ['initial_analysis']
+          dependencies: ['initial_analysis'],
         },
         {
           name: 'improvement_implementation',
           tasks: ['refactoring', 'optimization', 'bug_fixes'],
           parallelizable: false,
           reviewRequired: true,
-          dependencies: ['collaborative_review']
-        }
-      ]
+          dependencies: ['collaborative_review'],
+        },
+      ],
     });
 
     // Testing & QA Workflow
@@ -202,23 +208,23 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
           tasks: ['test_strategy', 'test_case_design', 'automation_setup'],
           parallelizable: true,
           reviewRequired: true,
-          dependencies: []
+          dependencies: [],
         },
         {
           name: 'test_execution',
           tasks: ['unit_testing', 'integration_testing', 'e2e_testing'],
           parallelizable: true,
           reviewRequired: false,
-          dependencies: ['test_planning']
+          dependencies: ['test_planning'],
         },
         {
           name: 'validation',
           tasks: ['manual_testing', 'performance_testing', 'security_testing'],
           parallelizable: true,
           reviewRequired: true,
-          dependencies: ['test_execution']
-        }
-      ]
+          dependencies: ['test_execution'],
+        },
+      ],
     });
 
     // Research & Exploration Workflow
@@ -234,23 +240,23 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
           tasks: ['literature_review', 'technology_survey', 'competitive_analysis'],
           parallelizable: true,
           reviewRequired: false,
-          dependencies: []
+          dependencies: [],
         },
         {
           name: 'experimentation',
           tasks: ['prototype_development', 'feasibility_testing', 'performance_benchmarking'],
           parallelizable: true,
           reviewRequired: true,
-          dependencies: ['information_gathering']
+          dependencies: ['information_gathering'],
         },
         {
           name: 'synthesis',
           tasks: ['findings_consolidation', 'recommendation_development', 'documentation'],
           parallelizable: false,
           reviewRequired: true,
-          dependencies: ['experimentation']
-        }
-      ]
+          dependencies: ['experimentation'],
+        },
+      ],
     });
   }
 
@@ -283,7 +289,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     }
   ): Promise<WorkflowExecution> {
     const workflowId = `workflow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     this.logger.info(`Starting workflow: ${workflowType}`, { workflowId });
 
     // Get workflow pattern
@@ -308,8 +314,8 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
         completedTasks: 0,
         successRate: 0,
         averageTaskTime: 0,
-        collaborationScore: 0
-      }
+        collaborationScore: 0,
+      },
     };
 
     this.activeWorkflows.set(workflowId, execution);
@@ -317,30 +323,29 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     try {
       // Generate tasks from workflow pattern
       const tasks = await this.generateTasksFromPattern(pattern, requirements);
-      
+
       // Assign tasks to agents
       const assignments = await this.assignTasksToAgents(tasks);
-      
+
       // Execute workflow stages
       execution.status = 'executing';
       await this.executeWorkflowStages(execution, assignments);
-      
+
       execution.status = 'completed';
       execution.endTime = Date.now();
-      
+
       this.logger.info(`Workflow completed: ${workflowId}`, {
         duration: execution.endTime - execution.startTime,
-        tasksCompleted: execution.metrics.completedTasks
+        tasksCompleted: execution.metrics.completedTasks,
       });
 
       this.orchestrationHistory.push(execution);
       return execution;
-      
     } catch (error) {
       execution.status = 'failed';
       execution.error = (error as Error).message;
       execution.endTime = Date.now();
-      
+
       this.logger.error(`Workflow failed: ${workflowId}`, error);
       throw error;
     }
@@ -370,11 +375,11 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
           context: {
             stage: stage.name,
             pattern: pattern.name,
-            requirements
+            requirements,
           },
-          status: 'pending'
+          status: 'pending',
         };
-        
+
         tasks.push(task);
       }
     }
@@ -387,10 +392,10 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
    */
   private async assignTasksToAgents(tasks: WorkflowTask[]): Promise<Map<string, string[]>> {
     const assignments = new Map<string, string[]>();
-    
+
     for (const task of tasks) {
       const bestAgent = await this.findBestAgent(task);
-      
+
       if (bestAgent) {
         if (!assignments.has(bestAgent.agentId)) {
           assignments.set(bestAgent.agentId, []);
@@ -413,7 +418,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
 
     for (const [agentId, agent] of this.agents) {
       const score = this.calculateAgentTaskFit(agent, task);
-      
+
       if (score > bestScore && agent.currentLoad < agent.maxConcurrentTasks) {
         bestScore = score;
         bestAgent = agent;
@@ -430,8 +435,8 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     let score = 0;
 
     // Skill match
-    const skillOverlap = task.requiredSkills.filter(skill => 
-      agent.skills.includes(skill) || agent.specializations.includes(skill)
+    const skillOverlap = task.requiredSkills.filter(
+      skill => agent.skills.includes(skill) || agent.specializations.includes(skill)
     ).length;
     score += skillOverlap * 0.3;
 
@@ -460,11 +465,11 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     for (let stageIndex = 0; stageIndex < execution.pattern.stages.length; stageIndex++) {
       const stage = execution.pattern.stages[stageIndex];
       execution.currentStage = stageIndex;
-      
-      this.logger.info(`Executing stage: ${stage.name}`, { 
+
+      this.logger.info(`Executing stage: ${stage.name}`, {
         workflowId: execution.id,
         stage: stageIndex + 1,
-        total: execution.pattern.stages.length
+        total: execution.pattern.stages.length,
       });
 
       if (stage.parallelizable) {
@@ -489,7 +494,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
   ): Promise<void> {
     const stageTasks = this.getStageTaskIds(stage);
     const promises = stageTasks.map(taskId => this.executeTask(taskId));
-    
+
     await Promise.allSettled(promises);
   }
 
@@ -502,7 +507,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     assignments: Map<string, string[]>
   ): Promise<void> {
     const stageTasks = this.getStageTaskIds(stage);
-    
+
     for (const taskId of stageTasks) {
       await this.executeTask(taskId);
     }
@@ -524,29 +529,28 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
 
     task.status = 'in_progress';
     const startTime = Date.now();
-    
+
     try {
       // Simulate task execution (in real implementation, this would call actual agents)
       const result = await this.simulateTaskExecution(task, agent);
-      
+
       const duration = Date.now() - startTime;
       const taskResult: TaskResult = {
         taskId,
         success: true,
         duration,
         qualityScore: Math.random() * 0.3 + 0.7, // Simulate quality score
-        feedback: result.feedback
+        feedback: result.feedback,
       };
 
       task.status = 'completed';
       task.result = result;
-      
+
       // Update agent performance
       this.updateAgentPerformance(agent, taskResult);
-      
+
       this.emit('task:completed', { task, result: taskResult });
       return taskResult;
-      
     } catch (error) {
       const duration = Date.now() - startTime;
       const taskResult: TaskResult = {
@@ -554,12 +558,12 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
         success: false,
         duration,
         qualityScore: 0,
-        feedback: `Task failed: ${(error as Error).message}`
+        feedback: `Task failed: ${(error as Error).message}`,
       };
 
       task.status = 'failed';
       this.updateAgentPerformance(agent, taskResult);
-      
+
       this.emit('task:failed', { task, error });
       throw error;
     }
@@ -572,15 +576,15 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     // In real implementation, this would use the actual UnifiedAgent
     const delay = Math.random() * 2000 + 500; // 0.5-2.5 second delay
     await new Promise(resolve => setTimeout(resolve, delay));
-    
+
     return {
       output: `${task.name} completed by ${agent.voice}`,
       feedback: `Task executed successfully using ${agent.voice} capabilities`,
       metadata: {
         agent: agent.agentId,
         voice: agent.voice,
-        duration: delay
-      }
+        duration: delay,
+      },
     };
   }
 
@@ -590,28 +594,33 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
   private updateAgentPerformance(agent: AgentCapability, result: TaskResult): void {
     const history = agent.performanceHistory;
     history.recentTasks.push(result);
-    
+
     // Keep only last 10 tasks
     if (history.recentTasks.length > 10) {
       history.recentTasks.shift();
     }
-    
+
     // Recalculate metrics
     const recentTasks = history.recentTasks;
     history.successRate = recentTasks.filter(t => t.success).length / recentTasks.length;
-    history.averageCompletionTime = recentTasks.reduce((sum, t) => sum + t.duration, 0) / recentTasks.length;
-    history.qualityScore = recentTasks.reduce((sum, t) => sum + t.qualityScore, 0) / recentTasks.length;
+    history.averageCompletionTime =
+      recentTasks.reduce((sum, t) => sum + t.duration, 0) / recentTasks.length;
+    history.qualityScore =
+      recentTasks.reduce((sum, t) => sum + t.qualityScore, 0) / recentTasks.length;
   }
 
   /**
    * Conduct stage review
    */
-  private async conductStageReview(execution: WorkflowExecution, stage: WorkflowStage): Promise<void> {
+  private async conductStageReview(
+    execution: WorkflowExecution,
+    stage: WorkflowStage
+  ): Promise<void> {
     this.logger.info(`Conducting review for stage: ${stage.name}`);
-    
+
     // In real implementation, this would involve peer reviews, quality checks, etc.
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate review time
-    
+
     this.emit('stage:reviewed', { execution: execution.id, stage: stage.name });
   }
 
@@ -662,12 +671,12 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
 
   private mapTaskTypeToCategory(taskType: string): WorkflowTask['type'] {
     const mapping: Record<string, WorkflowTask['type']> = {
-      'code_generation': 'code_generation',
-      'peer_review': 'code_review',
-      'unit_testing': 'testing',
-      'documentation': 'documentation',
-      'code_analysis': 'analysis',
-      'refactoring': 'refactoring'
+      code_generation: 'code_generation',
+      peer_review: 'code_review',
+      unit_testing: 'testing',
+      documentation: 'documentation',
+      code_analysis: 'analysis',
+      refactoring: 'refactoring',
     };
     return mapping[taskType] || 'code_generation';
   }
@@ -686,26 +695,26 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     // Return duration in milliseconds
     const baseDuration = 5000; // 5 seconds base
     const multipliers: Record<string, number> = {
-      'architecture_design': 2.0,
-      'code_generation': 1.5,
-      'testing': 1.2,
-      'documentation': 1.0,
-      'review': 0.8
+      architecture_design: 2.0,
+      code_generation: 1.5,
+      testing: 1.2,
+      documentation: 1.0,
+      review: 0.8,
     };
-    
+
     const multiplier = multipliers[taskType] || 1.0;
     return baseDuration * multiplier;
   }
 
   private getRequiredSkills(taskType: string): string[] {
     const skillMap: Record<string, string[]> = {
-      'frontend_development': ['html', 'css', 'javascript', 'react'],
-      'backend_development': ['node.js', 'api_design', 'database'],
-      'testing': ['unit_testing', 'integration_testing', 'jest'],
-      'security_audit': ['security', 'vulnerability_assessment'],
-      'performance_optimization': ['performance', 'profiling', 'optimization']
+      frontend_development: ['html', 'css', 'javascript', 'react'],
+      backend_development: ['node.js', 'api_design', 'database'],
+      testing: ['unit_testing', 'integration_testing', 'jest'],
+      security_audit: ['security', 'vulnerability_assessment'],
+      performance_optimization: ['performance', 'profiling', 'optimization'],
     };
-    
+
     return skillMap[taskType] || ['general_programming'];
   }
 
@@ -731,17 +740,17 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
       availablePatterns: this.workflows.size,
       completedWorkflows: this.orchestrationHistory.length,
       averageWorkflowDuration: this.calculateAverageWorkflowDuration(),
-      systemHealth: this.calculateSystemHealth()
+      systemHealth: this.calculateSystemHealth(),
     };
   }
 
   private calculateAverageWorkflowDuration(): number {
     if (this.orchestrationHistory.length === 0) return 0;
-    
+
     const total = this.orchestrationHistory
       .filter(w => w.endTime)
       .reduce((sum, w) => sum + (w.endTime! - w.startTime), 0);
-    
+
     return total / this.orchestrationHistory.length;
   }
 
@@ -750,7 +759,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     const failedRecentCount = this.orchestrationHistory
       .slice(-10)
       .filter(w => w.status === 'failed').length;
-    
+
     if (failedRecentCount > 3) return 'degraded';
     if (activeCount > 10) return 'busy';
     return 'healthy';

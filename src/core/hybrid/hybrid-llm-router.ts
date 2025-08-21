@@ -52,9 +52,10 @@ export class HybridLLMRouter extends EventEmitter {
   private config: HybridConfig;
   private taskHistory: Map<string, RoutingDecision & { actualPerformance: any }> = new Map();
   private currentLoads: { lmStudio: number; ollama: number } = { lmStudio: 0, ollama: 0 };
-  
+
   // PERFORMANCE OPTIMIZATIONS: Caching and metrics
-  private routingDecisionCache: Map<string, { decision: RoutingDecision; timestamp: number }> = new Map();
+  private routingDecisionCache: Map<string, { decision: RoutingDecision; timestamp: number }> =
+    new Map();
   private performanceMetrics: Map<string, number[]> = new Map();
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_CACHE_SIZE = 1000;
@@ -69,7 +70,11 @@ export class HybridLLMRouter extends EventEmitter {
    * Determine which LLM should handle a task based on complexity and current load
    * PERFORMANCE OPTIMIZED: Includes caching and intelligent fallback
    */
-  async routeTask(taskType: string, prompt: string, metrics?: TaskComplexityMetrics): Promise<RoutingDecision> {
+  async routeTask(
+    taskType: string,
+    prompt: string,
+    metrics?: TaskComplexityMetrics
+  ): Promise<RoutingDecision> {
     try {
       // PERFORMANCE FIX: Check cache first
       const cacheKey = this.generateCacheKey(taskType, prompt, metrics);
@@ -78,10 +83,10 @@ export class HybridLLMRouter extends EventEmitter {
         logger.debug('Using cached routing decision');
         return cached;
       }
-      
+
       const complexity = this.analyzeTaskComplexity(taskType, prompt, metrics);
       const decision = this.makeRoutingDecision(taskType, complexity);
-      
+
       // Learn from historical performance if enabled
       if (this.config.routing.learningEnabled) {
         this.adjustDecisionBasedOnHistory(decision, taskType);
@@ -89,7 +94,7 @@ export class HybridLLMRouter extends EventEmitter {
 
       // Check current system load and adjust if necessary
       const loadAdjustedDecision = this.adjustForCurrentLoad(decision);
-      
+
       // PERFORMANCE FIX: Cache the decision
       this.cacheDecision(cacheKey, loadAdjustedDecision);
 
@@ -98,7 +103,7 @@ export class HybridLLMRouter extends EventEmitter {
         taskType,
         decision: loadAdjustedDecision,
         complexity,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       return loadAdjustedDecision;
@@ -111,21 +116,25 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * Analyze task complexity to inform routing decisions
    */
-  private analyzeTaskComplexity(taskType: string, prompt: string, metrics?: TaskComplexityMetrics): number {
+  private analyzeTaskComplexity(
+    taskType: string,
+    prompt: string,
+    metrics?: TaskComplexityMetrics
+  ): number {
     let complexityScore = 0;
 
     // Base complexity by task type
     const taskTypeComplexity: Record<string, number> = {
-      'template': 0.2,          // LM Studio territory
-      'format': 0.1,            // LM Studio territory  
-      'edit': 0.3,              // Could go either way
-      'boilerplate': 0.2,       // LM Studio territory
-      'analysis': 0.8,          // Ollama territory
-      'security': 0.9,          // Ollama territory
-      'architecture': 0.9,      // Ollama territory
-      'multi-file': 0.7,        // Ollama territory
-      'debugging': 0.6,         // Moderate complexity
-      'documentation': 0.4      // Moderate complexity
+      template: 0.2, // LM Studio territory
+      format: 0.1, // LM Studio territory
+      edit: 0.3, // Could go either way
+      boilerplate: 0.2, // LM Studio territory
+      analysis: 0.8, // Ollama territory
+      security: 0.9, // Ollama territory
+      architecture: 0.9, // Ollama territory
+      'multi-file': 0.7, // Ollama territory
+      debugging: 0.6, // Moderate complexity
+      documentation: 0.4, // Moderate complexity
     };
 
     complexityScore += taskTypeComplexity[taskType] || 0.5;
@@ -162,7 +171,10 @@ export class HybridLLMRouter extends EventEmitter {
         confidence: 0.9,
         reasoning: `Forced to ${routing.defaultProvider} by configuration`,
         fallbackStrategy: routing.defaultProvider === 'lm-studio' ? 'ollama' : 'lm-studio',
-        estimatedResponseTime: this.estimateResponseTime(routing.defaultProvider as any, complexity)
+        estimatedResponseTime: this.estimateResponseTime(
+          routing.defaultProvider as any,
+          complexity
+        ),
       };
     }
 
@@ -175,7 +187,7 @@ export class HybridLLMRouter extends EventEmitter {
         reasoning: 'Low complexity task suited for fast generation',
         fallbackStrategy: 'ollama',
         estimatedResponseTime: this.estimateResponseTime('lm-studio', complexity),
-        escalationThreshold: routing.escalationThreshold
+        escalationThreshold: routing.escalationThreshold,
       };
     } else if (complexity > 0.7) {
       // Complex tasks → Ollama
@@ -184,7 +196,7 @@ export class HybridLLMRouter extends EventEmitter {
         confidence: 0.9,
         reasoning: 'High complexity task requiring deep reasoning',
         fallbackStrategy: 'lm-studio',
-        estimatedResponseTime: this.estimateResponseTime('ollama', complexity)
+        estimatedResponseTime: this.estimateResponseTime('ollama', complexity),
       };
     } else {
       // Medium complexity → Start with LM Studio, escalate if needed
@@ -194,7 +206,7 @@ export class HybridLLMRouter extends EventEmitter {
         reasoning: 'Medium complexity task - start fast, escalate if needed',
         fallbackStrategy: 'ollama',
         estimatedResponseTime: this.estimateResponseTime('lm-studio', complexity),
-        escalationThreshold: routing.escalationThreshold
+        escalationThreshold: routing.escalationThreshold,
       };
     }
   }
@@ -204,7 +216,7 @@ export class HybridLLMRouter extends EventEmitter {
    */
   private adjustDecisionBasedOnHistory(decision: RoutingDecision, taskType: string): void {
     const historicalPerformance = this.getHistoricalPerformance(taskType, decision.selectedLLM);
-    
+
     if (historicalPerformance.successRate < 0.7 && decision.confidence > 0.5) {
       // Lower confidence if historically poor performance
       decision.confidence *= 0.8;
@@ -235,7 +247,7 @@ export class HybridLLMRouter extends EventEmitter {
           ...decision,
           selectedLLM: 'ollama',
           reasoning: decision.reasoning + ' (LM Studio overloaded, using Ollama)',
-          confidence: Math.max(decision.confidence - 0.2, 0.3)
+          confidence: Math.max(decision.confidence - 0.2, 0.3),
         };
       }
     } else if (decision.selectedLLM === 'ollama' && ollama >= maxOllama) {
@@ -244,7 +256,7 @@ export class HybridLLMRouter extends EventEmitter {
           ...decision,
           selectedLLM: 'lm-studio',
           reasoning: decision.reasoning + ' (Ollama overloaded, using LM Studio)',
-          confidence: Math.max(decision.confidence - 0.2, 0.3)
+          confidence: Math.max(decision.confidence - 0.2, 0.3),
         };
       }
     }
@@ -257,18 +269,21 @@ export class HybridLLMRouter extends EventEmitter {
    */
   private estimateResponseTime(llm: 'lm-studio' | 'ollama', complexity: number): number {
     const baseTimes = {
-      'lm-studio': 1000,    // 1 second base
-      'ollama': 15000       // 15 seconds base
+      'lm-studio': 1000, // 1 second base
+      ollama: 15000, // 15 seconds base
     };
 
-    const complexityMultiplier = 1 + (complexity * 2); // 1x to 3x based on complexity
+    const complexityMultiplier = 1 + complexity * 2; // 1x to 3x based on complexity
     return baseTimes[llm] * complexityMultiplier;
   }
 
   /**
    * Get historical performance for a task type and LLM
    */
-  private getHistoricalPerformance(taskType: string, llm: string): {
+  private getHistoricalPerformance(
+    taskType: string,
+    llm: string
+  ): {
     successRate: number;
     avgResponseTime: number;
     sampleSize: number;
@@ -282,12 +297,14 @@ export class HybridLLMRouter extends EventEmitter {
     }
 
     const successes = relevantHistory.filter(h => h.actualPerformance?.success).length;
-    const avgTime = relevantHistory.reduce((sum, h) => sum + (h.actualPerformance?.responseTime || 0), 0) / relevantHistory.length;
+    const avgTime =
+      relevantHistory.reduce((sum, h) => sum + (h.actualPerformance?.responseTime || 0), 0) /
+      relevantHistory.length;
 
     return {
       successRate: successes / relevantHistory.length,
       avgResponseTime: avgTime,
-      sampleSize: relevantHistory.length
+      sampleSize: relevantHistory.length,
     };
   }
 
@@ -300,20 +317,23 @@ export class HybridLLMRouter extends EventEmitter {
       confidence: 0.5,
       reasoning: 'Failsafe routing due to error',
       fallbackStrategy: 'lm-studio',
-      estimatedResponseTime: 20000
+      estimatedResponseTime: 20000,
     };
   }
 
   /**
    * Record task performance for learning
    */
-  recordPerformance(taskId: string, performance: {
-    success: boolean;
-    responseTime: number;
-    qualityScore?: number;
-    errorType?: string;
-    taskType: string;
-  }): void {
+  recordPerformance(
+    taskId: string,
+    performance: {
+      success: boolean;
+      responseTime: number;
+      qualityScore?: number;
+      errorType?: string;
+      taskType: string;
+    }
+  ): void {
     const decision = this.taskHistory.get(taskId);
     if (decision) {
       decision.actualPerformance = performance;
@@ -325,7 +345,7 @@ export class HybridLLMRouter extends EventEmitter {
       taskId,
       decision,
       performance,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -341,7 +361,7 @@ export class HybridLLMRouter extends EventEmitter {
 
     this.emit('load-updated', {
       loads: { ...this.currentLoads },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -353,7 +373,7 @@ export class HybridLLMRouter extends EventEmitter {
       config: this.config,
       currentLoads: { ...this.currentLoads },
       historySize: this.taskHistory.size,
-      performance: this.getAggregatePerformance()
+      performance: this.getAggregatePerformance(),
     };
   }
 
@@ -368,7 +388,7 @@ export class HybridLLMRouter extends EventEmitter {
     return {
       lmStudio: this.calculateAggregateMetrics(lmStudioHistory),
       ollama: this.calculateAggregateMetrics(ollamaHistory),
-      total: this.calculateAggregateMetrics(allHistory)
+      total: this.calculateAggregateMetrics(allHistory),
     };
   }
 
@@ -382,12 +402,14 @@ export class HybridLLMRouter extends EventEmitter {
 
     const withPerformance = history.filter(h => h.actualPerformance);
     const successes = withPerformance.filter(h => h.actualPerformance.success).length;
-    const avgTime = withPerformance.reduce((sum, h) => sum + (h.actualPerformance.responseTime || 0), 0) / withPerformance.length;
+    const avgTime =
+      withPerformance.reduce((sum, h) => sum + (h.actualPerformance.responseTime || 0), 0) /
+      withPerformance.length;
 
     return {
       successRate: withPerformance.length > 0 ? successes / withPerformance.length : 0,
       avgResponseTime: avgTime || 0,
-      sampleSize: withPerformance.length
+      sampleSize: withPerformance.length,
     };
   }
 
@@ -402,18 +424,22 @@ export class HybridLLMRouter extends EventEmitter {
   /**
    * PERFORMANCE FIX: Generate cache key for routing decisions
    */
-  private generateCacheKey(taskType: string, prompt: string, metrics?: TaskComplexityMetrics): string {
+  private generateCacheKey(
+    taskType: string,
+    prompt: string,
+    metrics?: TaskComplexityMetrics
+  ): string {
     const metricHash = metrics ? JSON.stringify(metrics) : '';
     const promptHash = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
     return `${taskType}:${promptHash}:${metricHash}`.replace(/[^a-zA-Z0-9:]/g, '_');
   }
-  
+
   /**
    * PERFORMANCE FIX: Get cached routing decision
    */
   private getFromCache(key: string): RoutingDecision | null {
     const cached = this.routingDecisionCache.get(key);
-    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
       return cached.decision;
     }
     // Remove expired entry
@@ -422,7 +448,7 @@ export class HybridLLMRouter extends EventEmitter {
     }
     return null;
   }
-  
+
   /**
    * PERFORMANCE FIX: Cache routing decision
    */
@@ -432,51 +458,51 @@ export class HybridLLMRouter extends EventEmitter {
       const firstKey = this.routingDecisionCache.keys().next().value;
       this.routingDecisionCache.delete(firstKey);
     }
-    
+
     this.routingDecisionCache.set(key, {
       decision,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
-  
+
   /**
    * PERFORMANCE FIX: Track performance metrics for learning
    */
   trackPerformance(provider: string, responseTime: number, success: boolean): void {
     const key = `${provider}_${success ? 'success' : 'failure'}`;
-    
+
     if (!this.performanceMetrics.has(key)) {
       this.performanceMetrics.set(key, []);
     }
-    
+
     const metrics = this.performanceMetrics.get(key)!;
     metrics.push(responseTime);
-    
+
     // Keep only last 100 measurements
     if (metrics.length > 100) {
       metrics.shift();
     }
-    
+
     logger.debug(`Performance tracked: ${key} - ${responseTime}ms`);
   }
-  
+
   /**
    * Get performance statistics for a provider
    */
   getPerformanceStats(provider: string): { avgResponseTime: number; successRate: number } {
     const successMetrics = this.performanceMetrics.get(`${provider}_success`) || [];
     const failureMetrics = this.performanceMetrics.get(`${provider}_failure`) || [];
-    
+
     const totalRequests = successMetrics.length + failureMetrics.length;
-    const successRate = totalRequests > 0 ? (successMetrics.length / totalRequests) : 0;
-    
+    const successRate = totalRequests > 0 ? successMetrics.length / totalRequests : 0;
+
     const allTimes = [...successMetrics, ...failureMetrics];
-    const avgResponseTime = allTimes.length > 0 ? 
-      allTimes.reduce((sum, time) => sum + time, 0) / allTimes.length : 0;
-    
+    const avgResponseTime =
+      allTimes.length > 0 ? allTimes.reduce((sum, time) => sum + time, 0) / allTimes.length : 0;
+
     return { avgResponseTime, successRate };
   }
-  
+
   /**
    * Clear performance cache (for memory management)
    */
@@ -485,7 +511,7 @@ export class HybridLLMRouter extends EventEmitter {
     this.performanceMetrics.clear();
     logger.info('Hybrid router cache cleared');
   }
-  
+
   /**
    * Get current cache status
    */
@@ -493,7 +519,7 @@ export class HybridLLMRouter extends EventEmitter {
     return {
       size: this.routingDecisionCache.size,
       maxSize: this.MAX_CACHE_SIZE,
-      hitRate: 0.0 // TODO: Implement hit rate tracking
+      hitRate: 0.0, // TODO: Implement hit rate tracking
     };
   }
 

@@ -76,7 +76,7 @@ export enum ResponseType {
   ERROR_DIAGNOSIS = 'error_diagnosis',
   REFACTORING = 'refactoring',
   TESTING = 'testing',
-  GENERAL = 'general'
+  GENERAL = 'general',
 }
 
 // Specialized Response Types
@@ -191,7 +191,7 @@ export class ResponseFactory {
       confidence: options.confidence || 0.8,
       voiceId: options.voiceId,
       tokensUsed: options.tokensUsed || 0,
-      reasoning: options.reasoning || 'Agent response generated'
+      reasoning: options.reasoning || 'Agent response generated',
     };
   }
 
@@ -216,7 +216,7 @@ export class ResponseFactory {
       confidence: options.confidence || 0.8,
       qualityScore: options.qualityScore || 85,
       synthesisMode: options.synthesisMode || 'competitive',
-      reasoning: options.reasoning || 'Multi-voice synthesis completed'
+      reasoning: options.reasoning || 'Multi-voice synthesis completed',
     };
   }
 
@@ -239,7 +239,7 @@ export class ResponseFactory {
       result,
       executionTime: options.executionTime,
       retryCount: options.retryCount,
-      metadata: options.metadata
+      metadata: options.metadata,
     };
   }
 
@@ -265,7 +265,7 @@ export class ResponseFactory {
       content: options.content,
       size: options.size,
       language: options.language,
-      metadata: options.metadata
+      metadata: options.metadata,
     };
   }
 
@@ -277,7 +277,7 @@ export class ResponseFactory {
       code,
       message,
       details,
-      stack: new Error().stack
+      stack: new Error().stack,
     };
   }
   /**
@@ -298,8 +298,8 @@ export class ResponseFactory {
         duration: 0,
         model: 'unknown',
         tokens: 0,
-        ...metadata
-      }
+        ...metadata,
+      },
     };
   }
 
@@ -317,13 +317,17 @@ export class ResponseFactory {
     } = {}
   ): CodeGenerationResponse {
     return {
-      ...this.createLegacyAgentResponse(`Generated ${language} code`, ResponseType.CODE_GENERATION, metadata),
+      ...this.createLegacyAgentResponse(
+        `Generated ${language} code`,
+        ResponseType.CODE_GENERATION,
+        metadata
+      ),
       code,
       language,
       framework: options.framework,
       dependencies: options.dependencies || [],
       tests: options.tests,
-      type: ResponseType.CODE_GENERATION
+      type: ResponseType.CODE_GENERATION,
     };
   }
 
@@ -338,7 +342,7 @@ export class ResponseFactory {
     return {
       ...this.createLegacyAgentResponse(content, ResponseType.CODE_ANALYSIS, metadata),
       analysis,
-      type: ResponseType.CODE_ANALYSIS
+      type: ResponseType.CODE_ANALYSIS,
     };
   }
 
@@ -353,7 +357,7 @@ export class ResponseFactory {
     return {
       ...this.createLegacyAgentResponse(content, ResponseType.CODE_REVIEW, metadata),
       review,
-      type: ResponseType.CODE_REVIEW
+      type: ResponseType.CODE_REVIEW,
     };
   }
 
@@ -362,35 +366,63 @@ export class ResponseFactory {
    */
   static inferResponseType(content: string): ResponseType {
     const lowerContent = content.toLowerCase();
-    
-    if (lowerContent.includes('```') || lowerContent.includes('function') || lowerContent.includes('class')) {
+
+    if (
+      lowerContent.includes('```') ||
+      lowerContent.includes('function') ||
+      lowerContent.includes('class')
+    ) {
       return ResponseType.CODE_GENERATION;
     }
-    
-    if (lowerContent.includes('analysis') || lowerContent.includes('complexity') || lowerContent.includes('bug')) {
+
+    if (
+      lowerContent.includes('analysis') ||
+      lowerContent.includes('complexity') ||
+      lowerContent.includes('bug')
+    ) {
       return ResponseType.CODE_ANALYSIS;
     }
-    
-    if (lowerContent.includes('review') || lowerContent.includes('approve') || lowerContent.includes('changes')) {
+
+    if (
+      lowerContent.includes('review') ||
+      lowerContent.includes('approve') ||
+      lowerContent.includes('changes')
+    ) {
       return ResponseType.CODE_REVIEW;
     }
-    
-    if (lowerContent.includes('error') || lowerContent.includes('exception') || lowerContent.includes('debug')) {
+
+    if (
+      lowerContent.includes('error') ||
+      lowerContent.includes('exception') ||
+      lowerContent.includes('debug')
+    ) {
       return ResponseType.ERROR_DIAGNOSIS;
     }
-    
-    if (lowerContent.includes('refactor') || lowerContent.includes('improve') || lowerContent.includes('optimize')) {
+
+    if (
+      lowerContent.includes('refactor') ||
+      lowerContent.includes('improve') ||
+      lowerContent.includes('optimize')
+    ) {
       return ResponseType.REFACTORING;
     }
-    
-    if (lowerContent.includes('test') || lowerContent.includes('spec') || lowerContent.includes('assert')) {
+
+    if (
+      lowerContent.includes('test') ||
+      lowerContent.includes('spec') ||
+      lowerContent.includes('assert')
+    ) {
       return ResponseType.TESTING;
     }
-    
-    if (lowerContent.includes('document') || lowerContent.includes('readme') || lowerContent.includes('guide')) {
+
+    if (
+      lowerContent.includes('document') ||
+      lowerContent.includes('readme') ||
+      lowerContent.includes('guide')
+    ) {
       return ResponseType.DOCUMENTATION;
     }
-    
+
     return ResponseType.GENERAL;
   }
 }
@@ -400,10 +432,12 @@ export class ResponseValidator {
    * Check if response is valid (test-compatible)
    */
   static isValidResponse(response: any): boolean {
-    return response && 
-           typeof response === 'object' && 
-           typeof response.success === 'boolean' && 
-           typeof response.timestamp === 'number';
+    return (
+      response &&
+      typeof response === 'object' &&
+      typeof response.success === 'boolean' &&
+      typeof response.timestamp === 'number'
+    );
   }
 
   /**
@@ -444,7 +478,7 @@ export class ResponseValidator {
       errors.push({
         field: 'content',
         message: 'Response content cannot be empty',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -452,7 +486,7 @@ export class ResponseValidator {
       errors.push({
         field: 'quality',
         message: 'Quality score must be between 0 and 1',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -460,7 +494,7 @@ export class ResponseValidator {
       errors.push({
         field: 'confidence',
         message: 'Confidence score must be between 0 and 1',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -469,14 +503,14 @@ export class ResponseValidator {
       warnings.push({
         field: 'metadata.timestamp',
         message: 'Timestamp should be provided',
-        suggestion: 'Add timestamp for better tracking'
+        suggestion: 'Add timestamp for better tracking',
       });
     }
 
     if (response.metadata.duration < 0) {
       warnings.push({
         field: 'metadata.duration',
-        message: 'Duration cannot be negative'
+        message: 'Duration cannot be negative',
       });
     }
 
@@ -495,7 +529,7 @@ export class ResponseValidator {
       isValid: errors.length === 0,
       errors,
       warnings,
-      score
+      score,
     };
   }
 
@@ -508,7 +542,7 @@ export class ResponseValidator {
       errors.push({
         field: 'code',
         message: 'Generated code cannot be empty',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -516,7 +550,7 @@ export class ResponseValidator {
       errors.push({
         field: 'language',
         message: 'Programming language must be specified',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -524,7 +558,7 @@ export class ResponseValidator {
       warnings.push({
         field: 'dependencies',
         message: 'Dependencies array should be provided',
-        suggestion: 'Include empty array if no dependencies'
+        suggestion: 'Include empty array if no dependencies',
       });
     }
   }
@@ -538,13 +572,13 @@ export class ResponseValidator {
       errors.push({
         field: 'analysis',
         message: 'Analysis object is required',
-        severity: 'error'
+        severity: 'error',
       });
       return;
     }
 
     const { analysis } = response;
-    
+
     // Validate score ranges
     const scores = ['complexity', 'maintainability', 'performance', 'security'];
     scores.forEach(score => {
@@ -552,7 +586,7 @@ export class ResponseValidator {
         errors.push({
           field: `analysis.${score}`,
           message: `${score} score must be a number between 0 and 100`,
-          severity: 'error'
+          severity: 'error',
         });
       }
     });
@@ -561,7 +595,7 @@ export class ResponseValidator {
       errors.push({
         field: 'analysis.bugs',
         message: 'Bugs must be an array',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -569,7 +603,7 @@ export class ResponseValidator {
       errors.push({
         field: 'analysis.suggestions',
         message: 'Suggestions must be an array',
-        severity: 'error'
+        severity: 'error',
       });
     }
   }
@@ -583,7 +617,7 @@ export class ResponseValidator {
       errors.push({
         field: 'review',
         message: 'Review object is required',
-        severity: 'error'
+        severity: 'error',
       });
       return;
     }
@@ -594,7 +628,7 @@ export class ResponseValidator {
       errors.push({
         field: 'review.overall',
         message: 'Overall score is required',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -602,7 +636,7 @@ export class ResponseValidator {
       errors.push({
         field: 'review.approvalStatus',
         message: 'Invalid approval status',
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -610,7 +644,7 @@ export class ResponseValidator {
       errors.push({
         field: 'review.comments',
         message: 'Comments must be an array',
-        severity: 'error'
+        severity: 'error',
       });
     }
   }
@@ -630,7 +664,7 @@ export class ResponseValidator {
    */
   static sanitizeResponse(response: AgentResponse): AgentResponse {
     const sanitized = { ...response };
-    
+
     // Remove potentially harmful content
     sanitized.content = sanitized.content
       .replace(/<script[^>]*>.*?<\/script>/gi, '')
@@ -658,7 +692,7 @@ export class ResponseProcessor {
     while ((match = codeBlockRegex.exec(content)) !== null) {
       blocks.push({
         language: match[1] || 'text',
-        code: match[2]
+        code: match[2],
       });
     }
 
@@ -670,27 +704,37 @@ export class ResponseProcessor {
    */
   static calculateComplexity(response: AgentResponse): number {
     let complexity = 0;
-    
+
     // Length factor
     complexity += Math.min(response.content.length / 1000, 5);
-    
+
     // Code presence
     const codeBlocks = this.extractCodeBlocks(response.content);
     complexity += codeBlocks.length * 2;
-    
+
     // Technical terms
     const technicalTerms = [
-      'function', 'class', 'interface', 'async', 'await',
-      'database', 'api', 'http', 'json', 'xml',
-      'algorithm', 'optimization', 'performance'
+      'function',
+      'class',
+      'interface',
+      'async',
+      'await',
+      'database',
+      'api',
+      'http',
+      'json',
+      'xml',
+      'algorithm',
+      'optimization',
+      'performance',
     ];
-    
+
     technicalTerms.forEach(term => {
       if (response.content.toLowerCase().includes(term)) {
         complexity += 0.5;
       }
     });
-    
+
     return Math.min(complexity, 10);
   }
 
@@ -712,15 +756,11 @@ export class ResponseProcessor {
     const totalDuration = responses.reduce((sum, r) => sum + r.metadata.duration, 0);
     const totalTokens = responses.reduce((sum, r) => sum + r.metadata.tokens, 0);
 
-    return ResponseFactory.createLegacyAgentResponse(
-      mergedContent,
-      ResponseType.GENERAL,
-      {
-        duration: totalDuration,
-        tokens: totalTokens,
-        model: responses[0].metadata.model
-      }
-    );
+    return ResponseFactory.createLegacyAgentResponse(mergedContent, ResponseType.GENERAL, {
+      duration: totalDuration,
+      tokens: totalTokens,
+      model: responses[0].metadata.model,
+    });
   }
 }
 
@@ -729,5 +769,5 @@ export default {
   ResponseFactory,
   ResponseValidator,
   ResponseProcessor,
-  ResponseType
+  ResponseType,
 };

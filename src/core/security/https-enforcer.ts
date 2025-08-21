@@ -28,7 +28,15 @@ export interface SecurityHeadersConfig {
   };
   referrerPolicy?: {
     enabled: boolean;
-    policy: 'no-referrer' | 'no-referrer-when-downgrade' | 'origin' | 'origin-when-cross-origin' | 'same-origin' | 'strict-origin' | 'strict-origin-when-cross-origin' | 'unsafe-url';
+    policy:
+      | 'no-referrer'
+      | 'no-referrer-when-downgrade'
+      | 'origin'
+      | 'origin-when-cross-origin'
+      | 'same-origin'
+      | 'strict-origin'
+      | 'strict-origin-when-cross-origin'
+      | 'unsafe-url';
   };
   permissionsPolicy?: {
     enabled: boolean;
@@ -84,54 +92,54 @@ export class HttpsEnforcer {
             'worker-src': ["'none'"],
             'frame-ancestors': ["'none'"],
             'form-action': ["'self'"],
-            'upgrade-insecure-requests': []
+            'upgrade-insecure-requests': [],
           },
-          reportOnly: false
+          reportOnly: false,
         },
         hsts: {
           enabled: true,
           maxAge: 31536000, // 1 year
           includeSubDomains: true,
-          preload: true
+          preload: true,
         },
         frameOptions: {
           enabled: true,
-          policy: 'DENY'
+          policy: 'DENY',
         },
         contentTypeOptions: {
-          enabled: true
+          enabled: true,
         },
         referrerPolicy: {
           enabled: true,
-          policy: 'strict-origin-when-cross-origin'
+          policy: 'strict-origin-when-cross-origin',
         },
         permissionsPolicy: {
           enabled: true,
           directives: {
-            'camera': [],
-            'microphone': [],
-            'geolocation': [],
-            'payment': [],
-            'usb': [],
-            'magnetometer': [],
-            'gyroscope': [],
-            'accelerometer': []
-          }
+            camera: [],
+            microphone: [],
+            geolocation: [],
+            payment: [],
+            usb: [],
+            magnetometer: [],
+            gyroscope: [],
+            accelerometer: [],
+          },
         },
         crossOriginEmbedderPolicy: {
           enabled: true,
-          policy: 'require-corp'
+          policy: 'require-corp',
         },
         crossOriginOpenerPolicy: {
           enabled: true,
-          policy: 'same-origin'
+          policy: 'same-origin',
         },
         crossOriginResourcePolicy: {
           enabled: true,
-          policy: 'same-origin'
-        }
+          policy: 'same-origin',
+        },
       },
-      ...config
+      ...config,
     };
   }
 
@@ -153,16 +161,16 @@ export class HttpsEnforcer {
             path: req.path,
             method: req.method,
             ip: req.ip,
-            userAgent: req.get('User-Agent')
+            userAgent: req.get('User-Agent'),
           });
 
           if (this.config.redirectHttps) {
             // Redirect to HTTPS
             const httpsUrl = this.buildHttpsUrl(req);
-            
+
             logger.info('Redirecting to HTTPS', {
               from: req.url,
-              to: httpsUrl
+              to: httpsUrl,
             });
 
             return res.redirect(301, httpsUrl);
@@ -170,13 +178,12 @@ export class HttpsEnforcer {
             // Block request
             return res.status(403).json({
               error: 'HTTPS required',
-              message: 'This endpoint requires a secure connection'
+              message: 'This endpoint requires a secure connection',
             });
           }
         }
 
         next();
-
       } catch (error) {
         logger.error('HTTPS enforcement error', error as Error);
         next(); // Fail open for security middleware
@@ -208,8 +215,8 @@ export class HttpsEnforcer {
     // Content Security Policy
     if (headers.contentSecurityPolicy?.enabled) {
       const csp = this.buildCSPHeader(headers.contentSecurityPolicy);
-      const headerName = headers.contentSecurityPolicy.reportOnly 
-        ? 'Content-Security-Policy-Report-Only' 
+      const headerName = headers.contentSecurityPolicy.reportOnly
+        ? 'Content-Security-Policy-Report-Only'
         : 'Content-Security-Policy';
       res.setHeader(headerName, csp);
     }
@@ -315,7 +322,7 @@ export class HttpsEnforcer {
   private buildHttpsUrl(req: any): string {
     const host = req.get('Host') || 'localhost';
     const hostWithoutPort = host.split(':')[0];
-    
+
     let httpsHost = hostWithoutPort;
     if (this.config.httpsPort !== 443) {
       httpsHost += `:${this.config.httpsPort}`;
@@ -368,7 +375,9 @@ export class HttpsEnforcer {
   /**
    * Build Frame Options header
    */
-  private buildFrameOptionsHeader(frameOptions: NonNullable<SecurityHeadersConfig['frameOptions']>): string {
+  private buildFrameOptionsHeader(
+    frameOptions: NonNullable<SecurityHeadersConfig['frameOptions']>
+  ): string {
     if (frameOptions.policy === 'ALLOW-FROM' && frameOptions.uri) {
       return `${frameOptions.policy} ${frameOptions.uri}`;
     }
@@ -378,18 +387,22 @@ export class HttpsEnforcer {
   /**
    * Build Permissions Policy header
    */
-  private buildPermissionsPolicyHeader(permissionsPolicy: NonNullable<SecurityHeadersConfig['permissionsPolicy']>): string {
+  private buildPermissionsPolicyHeader(
+    permissionsPolicy: NonNullable<SecurityHeadersConfig['permissionsPolicy']>
+  ): string {
     const directives: string[] = [];
 
     for (const [feature, allowlist] of Object.entries(permissionsPolicy.directives)) {
       if (allowlist.length === 0) {
         directives.push(`${feature}=()`);
       } else {
-        const sources = allowlist.map(source => {
-          if (source === 'self') return '"self"';
-          if (source === '*') return '*';
-          return `"${source}"`;
-        }).join(' ');
+        const sources = allowlist
+          .map(source => {
+            if (source === 'self') return '"self"';
+            if (source === '*') return '*';
+            return `"${source}"`;
+          })
+          .join(' ');
         directives.push(`${feature}=(${sources})`);
       }
     }
@@ -404,23 +417,22 @@ export class HttpsEnforcer {
     return (req: any, res: any) => {
       try {
         const report = req.body;
-        
+
         logger.warn('CSP violation reported', {
           violation: {
             documentUri: report['csp-report']?.['document-uri'],
             violatedDirective: report['csp-report']?.['violated-directive'],
             blockedUri: report['csp-report']?.['blocked-uri'],
-            originalPolicy: report['csp-report']?.['original-policy']
+            originalPolicy: report['csp-report']?.['original-policy'],
           },
           userAgent: req.get('User-Agent'),
-          ip: req.ip
+          ip: req.ip,
         });
 
         // Store violation for analysis (implement storage as needed)
         this.storeCSPViolation(report);
 
         res.status(204).end();
-
       } catch (error) {
         logger.error('CSP reporting error', error as Error);
         res.status(400).json({ error: 'Invalid report format' });
@@ -436,7 +448,7 @@ export class HttpsEnforcer {
     // For now, just emit an event
     logger.info('CSP violation stored for analysis', {
       timestamp: new Date().toISOString(),
-      report: JSON.stringify(report, null, 2)
+      report: JSON.stringify(report, null, 2),
     });
   }
 
@@ -444,10 +456,7 @@ export class HttpsEnforcer {
    * Create comprehensive security middleware stack
    */
   createSecurityMiddleware() {
-    return [
-      this.httpsMiddleware(),
-      this.securityHeadersMiddleware()
-    ];
+    return [this.httpsMiddleware(), this.securityHeadersMiddleware()];
   }
 
   /**
@@ -459,7 +468,7 @@ export class HttpsEnforcer {
     // Validate CSP directives
     if (this.config.headers.contentSecurityPolicy?.enabled) {
       const csp = this.config.headers.contentSecurityPolicy;
-      
+
       if (!csp.directives['default-src']) {
         errors.push('CSP default-src directive is required');
       }
@@ -473,7 +482,7 @@ export class HttpsEnforcer {
     // Validate HSTS configuration
     if (this.config.headers.hsts?.enabled) {
       const hsts = this.config.headers.hsts;
-      
+
       if (hsts.maxAge < 300) {
         errors.push('HSTS max-age should be at least 300 seconds');
       }
@@ -486,7 +495,7 @@ export class HttpsEnforcer {
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -495,12 +504,12 @@ export class HttpsEnforcer {
    */
   getSecurityHeaders(): Record<string, string> {
     const headers: Record<string, string> = {};
-    
+
     // Mock response object to collect headers
     const mockRes = {
       setHeader: (name: string, value: string) => {
         headers[name] = value;
-      }
+      },
     };
 
     this.setSecurityHeaders(mockRes);
@@ -512,10 +521,10 @@ export class HttpsEnforcer {
    */
   updateConfig(config: Partial<HttpsConfig>): void {
     this.config = { ...this.config, ...config };
-    
+
     logger.info('HTTPS enforcer configuration updated', {
       enforceHttps: this.config.enforceHttps,
-      redirectHttps: this.config.redirectHttps
+      redirectHttps: this.config.redirectHttps,
     });
   }
 
@@ -533,16 +542,16 @@ export class HttpsEnforcer {
             'default-src': ["'self'"],
             'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // More permissive for dev
             'style-src': ["'self'", "'unsafe-inline'"],
-            'img-src': ["'self'", 'data:', 'https:', 'http:'] // Allow HTTP images in dev
-          }
+            'img-src': ["'self'", 'data:', 'https:', 'http:'], // Allow HTTP images in dev
+          },
         },
         hsts: {
           enabled: false, // Don't use HSTS in development
           maxAge: 0,
           includeSubDomains: false,
-          preload: false
-        }
-      }
+          preload: false,
+        },
+      },
     };
   }
 
@@ -569,17 +578,17 @@ export class HttpsEnforcer {
             'child-src': ["'none'"],
             'frame-ancestors': ["'none'"],
             'form-action': ["'self'"],
-            'upgrade-insecure-requests': []
+            'upgrade-insecure-requests': [],
           },
-          reportOnly: false
+          reportOnly: false,
         },
         hsts: {
           enabled: true,
           maxAge: 63072000, // 2 years
           includeSubDomains: true,
-          preload: true
-        }
-      }
+          preload: true,
+        },
+      },
     };
   }
 }

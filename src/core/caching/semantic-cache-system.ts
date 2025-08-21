@@ -72,19 +72,19 @@ class MockRedisClient implements RedisClient {
   async get(key: string): Promise<string | null> {
     const item = this.store.get(key);
     if (!item) return null;
-    
+
     if (Date.now() > item.expiry) {
       this.store.delete(key);
       return null;
     }
-    
+
     return item.value;
   }
 
   async setex(key: string, ttl: number, value: string): Promise<void> {
     this.store.set(key, {
       value,
-      expiry: Date.now() + (ttl * 1000)
+      expiry: Date.now() + ttl * 1000,
     });
   }
 
@@ -121,19 +121,20 @@ class MockVectorIndex implements VectorIndex {
     this.vectors.set(id, vector);
   }
 
-  async search(queryVector: number[], options: { threshold: number; limit: number }): Promise<SearchResult[]> {
+  async search(
+    queryVector: number[],
+    options: { threshold: number; limit: number }
+  ): Promise<SearchResult[]> {
     const results: SearchResult[] = [];
-    
+
     for (const [id, vector] of this.vectors.entries()) {
       const similarity = this.cosineSimilarity(queryVector, vector);
       if (similarity >= options.threshold) {
         results.push({ id, score: similarity });
       }
     }
-    
-    return results
-      .sort((a, b) => b.score - a.score)
-      .slice(0, options.limit);
+
+    return results.sort((a, b) => b.score - a.score).slice(0, options.limit);
   }
 
   async delete(id: string): Promise<void> {
@@ -146,17 +147,17 @@ class MockVectorIndex implements VectorIndex {
 
   private cosineSimilarity(a: number[], b: number[]): number {
     if (a.length !== b.length) return 0;
-    
+
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
-    
+
     for (let i = 0; i < a.length; i++) {
       dotProduct += a[i] * b[i];
       normA += a[i] * a[i];
       normB += b[i] * b[i];
     }
-    
+
     if (normA === 0 || normB === 0) return 0;
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
@@ -174,12 +175,12 @@ export class SemanticCacheSystem extends EventEmitter {
     hits: 0,
     misses: 0,
     totalRequests: 0,
-    semanticMatches: 0
+    semanticMatches: 0,
   };
-  
+
   constructor(config: SemanticCacheConfig = {}) {
     super();
-    
+
     this.config = {
       redisUrl: config.redisUrl || 'redis://localhost:6379',
       ttl: config.ttl || 3600, // 1 hour default
@@ -195,16 +196,16 @@ export class SemanticCacheSystem extends EventEmitter {
       encryptionEnabled: config.encryptionEnabled || false,
       performanceMode: config.performanceMode || 'balanced',
       circuitBreakerThreshold: config.circuitBreakerThreshold || 5,
-      adaptiveThresholds: config.adaptiveThresholds || true
+      adaptiveThresholds: config.adaptiveThresholds || true,
     };
-    
+
     // Initialize Redis client (using mock for now)
     this.redis = new MockRedisClient();
     this.vectorIndex = new MockVectorIndex();
-    
+
     this.initializeCache();
   }
-  
+
   /**
    * Initialize cache and load existing entries
    */
@@ -212,7 +213,7 @@ export class SemanticCacheSystem extends EventEmitter {
     try {
       const info = await this.redis.info();
       logger.info('Semantic cache initialized', { info });
-      
+
       // Emit ready event
       this.emit('cache-ready');
     } catch (error) {
@@ -220,29 +221,29 @@ export class SemanticCacheSystem extends EventEmitter {
       this.emit('cache-error', error);
     }
   }
-  
+
   /**
    * Get cached response with semantic similarity search
    */
   async getCachedResponse(prompt: string, context: string[] = []): Promise<CachedResponse | null> {
     this.cacheStats.totalRequests++;
-    
+
     try {
       // Try exact match first
       const exactKey = this.generateCacheKey(prompt, context);
       const exactMatch = await this.redis.get(`response:${exactKey}`);
-      
+
       if (exactMatch) {
         this.cacheStats.hits++;
         logger.debug('Exact cache hit', { key: exactKey });
-        
+
         return {
           ...JSON.parse(exactMatch),
           similarity: 1.0,
-          cacheHit: true
+          cacheHit: true,
         };
       }
-      
+
       // Try semantic similarity search if enabled
       if (this.config.enableSemanticSearch) {
         const semanticResult = await this.searchSemantically(prompt, context);
@@ -252,152 +253,148 @@ export class SemanticCacheSystem extends EventEmitter {
           return semanticResult;
         }
       }
-      
+
       this.cacheStats.misses++;
       return null;
-      
     } catch (error) {
       logger.error('Cache retrieval error:', error);
       this.cacheStats.misses++;
       return null;
     }
   }
-  
+
   /**
    * Search for semantically similar cached responses
    */
-  private async searchSemantically(prompt: string, context: string[]): Promise<CachedResponse | null> {
+  private async searchSemantically(
+    prompt: string,
+    context: string[]
+  ): Promise<CachedResponse | null> {
     try {
       // Generate embedding for the prompt
       const embedding = await this.getEmbedding(prompt + ' ' + context.join(' '));
-      
+
       // Search for similar vectors
       const similarResults = await this.vectorIndex.search(embedding, {
         threshold: this.config.similarityThreshold,
-        limit: 5
+        limit: 5,
       });
-      
+
       if (similarResults.length === 0) {
         return null;
       }
-      
+
       // Get the most similar result
       const bestMatch = similarResults[0];
       const cached = await this.redis.get(`response:${bestMatch.id}`);
-      
+
       if (cached) {
-        logger.debug('Semantic cache hit', { 
+        logger.debug('Semantic cache hit', {
           similarity: bestMatch.score,
-          threshold: this.config.similarityThreshold 
+          threshold: this.config.similarityThreshold,
         });
-        
+
         return {
           ...JSON.parse(cached),
           similarity: bestMatch.score,
-          cacheHit: true
+          cacheHit: true,
         };
       }
-      
+
       return null;
-      
     } catch (error) {
       logger.error('Semantic search error:', error);
       return null;
     }
   }
-  
+
   /**
    * Cache a response with semantic indexing
    */
   async cacheResponse(
-    prompt: string, 
-    response: string, 
+    prompt: string,
+    response: string,
     context: string[] = [],
     metadata?: Record<string, any>
   ): Promise<void> {
     try {
       const cacheKey = this.generateCacheKey(prompt, context);
       const fullText = prompt + ' ' + context.join(' ');
-      
+
       // Store in Redis with TTL
       const cacheData = {
         content: response,
         prompt,
         context,
         metadata,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
-      await this.redis.setex(
-        `response:${cacheKey}`,
-        this.config.ttl,
-        JSON.stringify(cacheData)
-      );
-      
+
+      await this.redis.setex(`response:${cacheKey}`, this.config.ttl, JSON.stringify(cacheData));
+
       // Index for semantic search if enabled
       if (this.config.enableSemanticSearch) {
         const embedding = await this.getEmbedding(fullText);
         await this.vectorIndex.add(cacheKey, embedding);
       }
-      
+
       logger.debug('Response cached', { key: cacheKey, ttl: this.config.ttl });
-      
+
       // Emit cache event
       this.emit('response-cached', { key: cacheKey, size: response.length });
-      
+
       // Check cache size and evict if necessary
       await this.checkCacheSize();
-      
     } catch (error) {
       logger.error('Cache storage error:', error);
       this.emit('cache-error', error);
     }
   }
-  
+
   /**
    * Generate embedding for text (mock implementation - replace with actual embedding service)
    */
   private async getEmbedding(text: string): Promise<number[]> {
     // Check embedding cache first
     const hash = createHash('md5').update(text).digest('hex');
-    
+
     if (this.embeddingCache.has(hash)) {
       return this.embeddingCache.get(hash)!;
     }
-    
+
     // Generate mock embedding (replace with actual embedding generation)
     const embedding = await this.generateMockEmbedding(text);
-    
+
     // Cache the embedding
     this.embeddingCache.set(hash, embedding);
-    
+
     // Limit embedding cache size
     if (this.embeddingCache.size > 1000) {
       const firstKey = this.embeddingCache.keys().next().value;
       this.embeddingCache.delete(firstKey);
     }
-    
+
     return embedding;
   }
-  
+
   /**
    * Generate mock embedding for testing (replace with actual embedding model)
    */
   private async generateMockEmbedding(text: string): Promise<number[]> {
     // Simulate async embedding generation
     await new Promise(resolve => setTimeout(resolve, 10));
-    
+
     // Generate deterministic mock embedding based on text
     const embedding = new Array(this.config.embeddingDimension).fill(0);
     const hash = createHash('sha256').update(text).digest();
-    
+
     for (let i = 0; i < this.config.embeddingDimension; i++) {
       embedding[i] = (hash[i % hash.length] / 255) * 2 - 1; // Normalize to [-1, 1]
     }
-    
+
     return embedding;
   }
-  
+
   /**
    * Generate cache key from prompt and context
    */
@@ -405,24 +402,24 @@ export class SemanticCacheSystem extends EventEmitter {
     const combined = prompt + '::' + context.join('::');
     return createHash('sha256').update(combined).digest('hex');
   }
-  
+
   /**
    * Check cache size and evict old entries if necessary
    */
   private async checkCacheSize(): Promise<void> {
     try {
       const keys = await this.redis.keys('response:*');
-      
+
       if (keys.length > this.config.maxCacheSize) {
         // Evict oldest entries (simple FIFO for now)
         const toEvict = keys.slice(0, keys.length - this.config.maxCacheSize);
-        
+
         for (const key of toEvict) {
           await this.redis.del(key);
           const cacheKey = key.replace('response:', '');
           await this.vectorIndex.delete(cacheKey);
         }
-        
+
         logger.info(`Evicted ${toEvict.length} cache entries`);
         this.emit('cache-eviction', { evicted: toEvict.length });
       }
@@ -430,38 +427,37 @@ export class SemanticCacheSystem extends EventEmitter {
       logger.error('Cache size check error:', error);
     }
   }
-  
+
   /**
    * Clear all cache entries
    */
   async clearCache(): Promise<void> {
     try {
       const keys = await this.redis.keys('response:*');
-      
+
       for (const key of keys) {
         await this.redis.del(key);
       }
-      
+
       await this.vectorIndex.clear();
       this.embeddingCache.clear();
-      
+
       // Reset stats
       this.cacheStats = {
         hits: 0,
         misses: 0,
         totalRequests: 0,
-        semanticMatches: 0
+        semanticMatches: 0,
       };
-      
+
       logger.info('Cache cleared');
       this.emit('cache-cleared');
-      
     } catch (error) {
       logger.error('Cache clear error:', error);
       throw error;
     }
   }
-  
+
   /**
    * Get cache statistics
    */
@@ -472,63 +468,59 @@ export class SemanticCacheSystem extends EventEmitter {
     semanticMatchRate: number;
     totalRequests: number;
   } {
-    const hitRate = this.cacheStats.totalRequests > 0 
-      ? this.cacheStats.hits / this.cacheStats.totalRequests 
-      : 0;
-      
-    const semanticMatchRate = this.cacheStats.hits > 0
-      ? this.cacheStats.semanticMatches / this.cacheStats.hits
-      : 0;
-    
+    const hitRate =
+      this.cacheStats.totalRequests > 0 ? this.cacheStats.hits / this.cacheStats.totalRequests : 0;
+
+    const semanticMatchRate =
+      this.cacheStats.hits > 0 ? this.cacheStats.semanticMatches / this.cacheStats.hits : 0;
+
     return {
       ...this.cacheStats,
       hitRate,
-      semanticMatchRate
+      semanticMatchRate,
     };
   }
-  
+
   /**
    * Warm up cache with common queries
    */
-  async warmupCache(commonQueries: { prompt: string; response: string; context?: string[] }[]): Promise<void> {
+  async warmupCache(
+    commonQueries: { prompt: string; response: string; context?: string[] }[]
+  ): Promise<void> {
     logger.info(`Warming up cache with ${commonQueries.length} queries`);
-    
+
     for (const query of commonQueries) {
-      await this.cacheResponse(
-        query.prompt,
-        query.response,
-        query.context || []
-      );
+      await this.cacheResponse(query.prompt, query.response, query.context || []);
     }
-    
+
     logger.info('Cache warmup complete');
     this.emit('cache-warmed-up', { entries: commonQueries.length });
   }
-  
+
   /**
    * Export cache for backup or migration
    */
   async exportCache(): Promise<{ key: string; data: any }[]> {
     const keys = await this.redis.keys('response:*');
     const exports = [];
-    
+
     for (const key of keys) {
       const data = await this.redis.get(key);
       if (data) {
         exports.push({ key, data: JSON.parse(data) });
       }
     }
-    
+
     return exports;
   }
-  
+
   /**
    * Import cache from backup
    */
   async importCache(data: { key: string; data: any }[]): Promise<void> {
     for (const item of data) {
       await this.redis.setex(item.key, this.config.ttl, JSON.stringify(item.data));
-      
+
       // Re-index for semantic search
       if (this.config.enableSemanticSearch && item.data.prompt) {
         const embedding = await this.getEmbedding(
@@ -538,11 +530,11 @@ export class SemanticCacheSystem extends EventEmitter {
         await this.vectorIndex.add(cacheKey, embedding);
       }
     }
-    
+
     logger.info(`Imported ${data.length} cache entries`);
     this.emit('cache-imported', { entries: data.length });
   }
-  
+
   /**
    * Cleanup and close connections
    */

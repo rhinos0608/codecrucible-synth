@@ -21,14 +21,14 @@ export class InteractiveREPL {
     this.cli = cli;
     this.context = context;
     this.logger = new Logger('InteractiveREPL');
-    
+
     // Create readline interface for interactive input
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
       prompt: chalk.cyan('\nCC> '),
       historySize: 100,
-      removeHistoryDuplicates: true
+      removeHistoryDuplicates: true,
     });
 
     this.setupEventHandlers();
@@ -41,10 +41,10 @@ export class InteractiveREPL {
   async start(): Promise<void> {
     // Show welcome banner
     this.showBanner();
-    
+
     // Show initial status
     await this.showQuickStatus();
-    
+
     // Start the REPL
     this.rl.prompt();
   }
@@ -77,7 +77,7 @@ export class InteractiveREPL {
     // Handle each line of input
     this.rl.on('line', async (input: string) => {
       const trimmedInput = input.trim();
-      
+
       // Skip empty input
       if (!trimmedInput) {
         this.rl.prompt();
@@ -133,35 +133,35 @@ export class InteractiveREPL {
       case 'help':
         this.showHelp();
         break;
-      
+
       case 'exit':
       case 'quit':
         this.handleExit();
         return;
-      
+
       case 'clear':
         console.clear();
         this.showBanner();
         break;
-      
+
       case 'status':
         await this.cli.showStatus();
         break;
-      
+
       case 'models':
         await this.cli.listModels();
         break;
-      
+
       case 'history':
         this.showHistory();
         break;
-      
+
       case 'reset':
         console.log(chalk.yellow('🔄 Resetting conversation context...'));
         // Reset context if needed
         console.log(chalk.green('✅ Context reset'));
         break;
-      
+
       default:
         console.log(chalk.red(`Unknown command: ${cmd}`));
     }
@@ -194,10 +194,10 @@ export class InteractiveREPL {
    */
   private async processPrompt(prompt: string): Promise<void> {
     this.isProcessing = true;
-    
+
     try {
       console.log(chalk.gray('🤔 Processing...\n'));
-      
+
       // Check if this is a codebase analysis request
       if (this.isCodebaseAnalysisRequest(prompt)) {
         console.log(chalk.blue('🔍 Direct codebase analysis mode activated'));
@@ -207,10 +207,9 @@ export class InteractiveREPL {
         await this.cli.executePromptProcessing(prompt, {
           stream: true,
           autonomous: true,
-          contextAware: true
+          contextAware: true,
         });
       }
-      
     } catch (error) {
       console.error(chalk.red('❌ Error:'), error.message);
     } finally {
@@ -218,7 +217,7 @@ export class InteractiveREPL {
       this.rl.prompt();
     }
   }
-  
+
   /**
    * Check if this is a codebase analysis request
    */
@@ -235,32 +234,38 @@ export class InteractiveREPL {
       lowerPrompt.includes('thorough audit')
     );
   }
-  
+
   /**
    * Execute direct codebase analysis in interactive mode
    */
   private async executeDirectCodebaseAnalysis(prompt: string): Promise<void> {
     try {
       const { simpleCodebaseAnalyzer } = await import('./simple-codebase-analyzer.js');
-      
+
       console.log(chalk.gray('Using conflict-free direct analysis...'));
       console.log(chalk.yellow('⏳ This may take 1-2 minutes for comprehensive analysis\n'));
-      
+
       const result = await simpleCodebaseAnalyzer.analyzeCurrentProject();
-      
+
       if (result.success) {
         console.log(chalk.green('\n✅ Codebase Analysis Complete'));
         console.log(chalk.blue('═'.repeat(80)));
         console.log(result.content);
         console.log(chalk.blue('═'.repeat(80)));
-        
+
         console.log(chalk.gray(`\n📊 Analysis Statistics:`));
         console.log(chalk.gray(`   Duration: ${(result.metadata.duration / 1000).toFixed(1)}s`));
         console.log(chalk.gray(`   Response length: ${result.metadata.responseLength} characters`));
-        console.log(chalk.gray(`   Project items analyzed: ${result.metadata.projectStructure.split('\n').length}`));
+        console.log(
+          chalk.gray(
+            `   Project items analyzed: ${result.metadata.projectStructure.split('\n').length}`
+          )
+        );
       } else {
         console.error(chalk.red('❌ Direct codebase analysis failed:'), result.error);
-        console.log(chalk.yellow('🔄 You can try rephrasing your request or use a simpler prompt.'));
+        console.log(
+          chalk.yellow('🔄 You can try rephrasing your request or use a simpler prompt.')
+        );
       }
     } catch (error) {
       console.error(chalk.red('Failed to load direct analyzer:'), error);
@@ -283,7 +288,7 @@ export class InteractiveREPL {
   private handleExit(): void {
     console.log(chalk.cyan('\n👋 Goodbye!'));
     this.rl.close();
-    
+
     // Don't call process.exit in test environments
     if (process.env.NODE_ENV !== 'test') {
       process.exit(0);
@@ -296,12 +301,12 @@ export class InteractiveREPL {
   destroy(): void {
     this.rl.close();
   }
-  
+
   /**
    * Cleanup method for graceful shutdown
    */
   async cleanup(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       if (this.rl) {
         this.rl.close();
       }

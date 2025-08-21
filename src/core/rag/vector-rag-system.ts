@@ -184,7 +184,7 @@ export class VectorRAGSystem extends EventEmitter {
     this.config = config;
     this.modelClient = modelClient;
     this.performanceMetrics = new RAGMetrics();
-    
+
     // Initialize components based on config
     this.initializeComponents();
   }
@@ -194,22 +194,21 @@ export class VectorRAGSystem extends EventEmitter {
    */
   async initialize(): Promise<void> {
     this.logger.info('Initializing Vector RAG System...');
-    
+
     try {
       // Initialize vector store
       await this.vectorStore.initialize();
-      
+
       // Start file watching if enabled
       if (this.config.indexing.enabled) {
         await this.startFileWatching();
       }
-      
+
       // Perform initial indexing
       await this.performInitialIndexing();
-      
+
       this.logger.info('Vector RAG System initialized successfully');
       this.emit('initialized');
-      
     } catch (error) {
       this.logger.error('Failed to initialize RAG system:', error);
       throw error;
@@ -226,10 +225,10 @@ export class VectorRAGSystem extends EventEmitter {
     try {
       // Generate query embedding
       const queryEmbedding = await this.embeddingModel.embed(ragQuery.query);
-      
+
       let results: ScoredDocument[];
       let retrievalMethod: string;
-      
+
       // Choose retrieval strategy
       switch (ragQuery.queryType) {
         case 'semantic':
@@ -268,12 +267,11 @@ export class VectorRAGSystem extends EventEmitter {
         totalFound: results.length,
         queryTime,
         retrievalMethod,
-        reranked
+        reranked,
       };
 
       this.emit('query:completed', { query: ragQuery, result: ragResult });
       return ragResult;
-
     } catch (error) {
       this.logger.error('RAG query failed:', error);
       this.emit('query:failed', { query: ragQuery, error });
@@ -297,7 +295,6 @@ export class VectorRAGSystem extends EventEmitter {
 
       this.logger.debug(`Indexed document: ${filePath}`);
       this.emit('document:indexed', { filePath, document });
-
     } catch (error) {
       this.logger.error(`Failed to index document ${filePath}:`, error);
       this.emit('document:failed', { filePath, error });
@@ -321,7 +318,10 @@ export class VectorRAGSystem extends EventEmitter {
       }
 
       // Check if document actually changed
-      if (existingDoc && !this.codeChunker.shouldReindex(existingDoc.metadata, newDocument.metadata)) {
+      if (
+        existingDoc &&
+        !this.codeChunker.shouldReindex(existingDoc.metadata, newDocument.metadata)
+      ) {
         this.logger.debug(`Document unchanged, skipping: ${filePath}`);
         return;
       }
@@ -331,7 +331,6 @@ export class VectorRAGSystem extends EventEmitter {
 
       this.logger.debug(`Updated document: ${filePath}`);
       this.emit('document:updated', { filePath, document: newDocument });
-
     } catch (error) {
       this.logger.error(`Failed to update document ${filePath}:`, error);
     }
@@ -342,7 +341,7 @@ export class VectorRAGSystem extends EventEmitter {
    */
   async getStats(): Promise<RAGSystemStats> {
     const storeStats = await this.vectorStore.getStats();
-    
+
     return {
       vectorStore: storeStats,
       performance: this.performanceMetrics.getStats(),
@@ -350,9 +349,9 @@ export class VectorRAGSystem extends EventEmitter {
         queueSize: this.indexingQueue.size,
         isIndexing: this.isIndexing,
         watchedPaths: this.config.indexing.watchPaths.length,
-        cacheSize: this.embeddingCache.size
+        cacheSize: this.embeddingCache.size,
       },
-      config: this.config
+      config: this.config,
     };
   }
 
@@ -397,7 +396,7 @@ export class VectorRAGSystem extends EventEmitter {
     this.fileWatcher = chokidar.watch(this.config.indexing.watchPaths, {
       ignored: this.config.indexing.excludePatterns,
       persistent: true,
-      ignoreInitial: true
+      ignoreInitial: true,
     });
 
     const debouncedIndex = this.debounce(
@@ -408,28 +407,28 @@ export class VectorRAGSystem extends EventEmitter {
     this.fileWatcher
       .on('add', debouncedIndex)
       .on('change', debouncedIndex)
-      .on('unlink', (filePath) => this.vectorStore.deleteDocument(filePath));
+      .on('unlink', filePath => this.vectorStore.deleteDocument(filePath));
 
     this.logger.info(`Watching ${this.config.indexing.watchPaths.length} paths for changes`);
   }
 
   private async performInitialIndexing(): Promise<void> {
     this.logger.info('Starting initial indexing...');
-    
+
     for (const watchPath of this.config.indexing.watchPaths) {
       await this.indexDirectory(watchPath);
     }
-    
+
     this.logger.info('Initial indexing completed');
   }
 
   private async indexDirectory(dirPath: string): Promise<void> {
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dirPath, entry.name);
-        
+
         if (entry.isDirectory()) {
           await this.indexDirectory(fullPath);
         } else if (this.shouldIndexFile(fullPath)) {
@@ -445,7 +444,7 @@ export class VectorRAGSystem extends EventEmitter {
     const ext = path.extname(filePath).toLowerCase();
     const codeExtensions = ['.ts', '.js', '.py', '.java', '.cpp', '.c', '.h', '.rs', '.go', '.php'];
     const docExtensions = ['.md', '.txt', '.rst', '.adoc'];
-    
+
     return codeExtensions.includes(ext) || docExtensions.includes(ext);
   }
 
@@ -463,20 +462,19 @@ export class VectorRAGSystem extends EventEmitter {
         size: stats.size,
         hash,
         semanticType: this.detectSemanticType(filePath),
-        extractedSymbols: this.codeChunker.extractSymbols(content, this.detectLanguage(filePath))
+        extractedSymbols: this.codeChunker.extractSymbols(content, this.detectLanguage(filePath)),
       };
 
       const document: VectorDocument = {
         id: filePath,
         content,
-        metadata
+        metadata,
       };
 
       // Generate chunks
       document.chunks = await this.codeChunker.chunkDocument(document);
 
       return document;
-
     } catch (error) {
       this.logger.error(`Failed to create document for ${filePath}:`, error);
       return null;
@@ -490,7 +488,7 @@ export class VectorRAGSystem extends EventEmitter {
       document.embedding = this.embeddingCache.get(cacheKey);
     } else {
       document.embedding = await this.embeddingModel.embed(document.content);
-      
+
       if (this.config.embedding.cacheEmbeddings) {
         this.embeddingCache.set(cacheKey, document.embedding);
       }
@@ -500,14 +498,17 @@ export class VectorRAGSystem extends EventEmitter {
     if (document.chunks) {
       const chunkTexts = document.chunks.map(chunk => chunk.content);
       const chunkEmbeddings = await this.embeddingModel.embedBatch(chunkTexts);
-      
+
       document.chunks.forEach((chunk, index) => {
         chunk.embedding = chunkEmbeddings[index];
       });
     }
   }
 
-  private async semanticSearch(queryEmbedding: number[], ragQuery: RAGQuery): Promise<ScoredDocument[]> {
+  private async semanticSearch(
+    queryEmbedding: number[],
+    ragQuery: RAGQuery
+  ): Promise<ScoredDocument[]> {
     return await this.vectorStore.search(
       queryEmbedding,
       ragQuery.filters,
@@ -515,7 +516,11 @@ export class VectorRAGSystem extends EventEmitter {
     );
   }
 
-  private async hybridSearch(query: string, queryEmbedding: number[], ragQuery: RAGQuery): Promise<ScoredDocument[]> {
+  private async hybridSearch(
+    query: string,
+    queryEmbedding: number[],
+    ragQuery: RAGQuery
+  ): Promise<ScoredDocument[]> {
     return await this.vectorStore.hybridSearch(query, queryEmbedding, ragQuery.filters);
   }
 
@@ -540,12 +545,11 @@ export class VectorRAGSystem extends EventEmitter {
     try {
       const response = await this.modelClient.synthesize({
         prompt: rerankPrompt,
-        maxTokens: 100
+        maxTokens: 100,
       });
 
       const rankings = this.parseRankings(response.content);
       return this.applyRankings(results, rankings);
-
     } catch (error) {
       this.logger.warn('Reranking failed, returning original results:', error);
       return results;
@@ -559,21 +563,21 @@ export class VectorRAGSystem extends EventEmitter {
 
   private applyRankings(results: ScoredDocument[], rankings: number[]): ScoredDocument[] {
     if (rankings.length === 0) return results;
-    
+
     const reranked: ScoredDocument[] = [];
     for (const rank of rankings) {
       if (rank >= 0 && rank < results.length) {
         reranked.push(results[rank]);
       }
     }
-    
+
     // Add any remaining results
     for (let i = 0; i < results.length; i++) {
       if (!rankings.includes(i)) {
         reranked.push(results[i]);
       }
     }
-    
+
     return reranked;
   }
 
@@ -595,7 +599,7 @@ export class VectorRAGSystem extends EventEmitter {
       this.logger.error('Batch indexing failed:', error);
     } finally {
       this.isIndexing = false;
-      
+
       // Process any new items that were added
       if (this.indexingQueue.size > 0) {
         setTimeout(() => this.processIndexingQueue(), 100);
@@ -617,19 +621,21 @@ export class VectorRAGSystem extends EventEmitter {
       '.go': 'go',
       '.php': 'php',
       '.md': 'markdown',
-      '.txt': 'text'
+      '.txt': 'text',
     };
-    
+
     return languageMap[ext] || 'unknown';
   }
 
-  private detectSemanticType(filePath: string): 'code' | 'documentation' | 'configuration' | 'test' {
+  private detectSemanticType(
+    filePath: string
+  ): 'code' | 'documentation' | 'configuration' | 'test' {
     const fileName = path.basename(filePath).toLowerCase();
-    
+
     if (fileName.includes('test') || fileName.includes('spec')) return 'test';
     if (fileName.includes('config') || fileName.includes('setting')) return 'configuration';
     if (fileName.endsWith('.md') || fileName.endsWith('.txt')) return 'documentation';
-    
+
     return 'code';
   }
 
@@ -638,13 +644,16 @@ export class VectorRAGSystem extends EventEmitter {
     let hash = 0;
     for (let i = 0; i < content.length; i++) {
       const char = content.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return hash.toString(36);
   }
 
-  private debounce<T extends (...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
+  private debounce<T extends (...args: any[]) => void>(
+    func: T,
+    delay: number
+  ): (...args: Parameters<T>) => void {
     let timeoutId: NodeJS.Timeout;
     return (...args: any[]) => {
       clearTimeout(timeoutId);
@@ -657,14 +666,14 @@ export class VectorRAGSystem extends EventEmitter {
    */
   async shutdown(): Promise<void> {
     this.logger.info('Shutting down RAG system...');
-    
+
     if (this.fileWatcher) {
       await this.fileWatcher.close();
     }
-    
+
     await this.vectorStore.close();
     this.embeddingCache.clear();
-    
+
     this.logger.info('RAG system shutdown completed');
   }
 
@@ -719,7 +728,7 @@ class RAGMetrics {
       averageQueryTime: this.queries > 0 ? this.totalQueryTime / this.queries : 0,
       averageResultsPerQuery: this.queries > 0 ? this.totalResults / this.queries : 0,
       cacheHitRate: 0, // Would be calculated based on cache metrics
-      methodBreakdown: Object.fromEntries(this.methodCounts)
+      methodBreakdown: Object.fromEntries(this.methodCounts),
     };
   }
 }
@@ -727,79 +736,141 @@ class RAGMetrics {
 // Placeholder implementations - these would be separate files in production
 class LanceDBVectorStore implements VectorStore {
   constructor(private config: any) {}
-  async initialize(): Promise<void> { /* Implementation */ }
-  async addDocuments(documents: VectorDocument[]): Promise<void> { /* Implementation */ }
-  async updateDocument(document: VectorDocument): Promise<void> { /* Implementation */ }
-  async deleteDocument(id: string): Promise<void> { /* Implementation */ }
-  async search(query: number[], filters?: QueryFilter[], maxResults?: number): Promise<ScoredDocument[]> { return []; }
-  async hybridSearch(query: string, vector: number[], filters?: QueryFilter[]): Promise<ScoredDocument[]> { return []; }
-  async getDocument(id: string): Promise<VectorDocument | null> { return null; }
-  async getStats(): Promise<VectorStoreStats> { return {} as VectorStoreStats; }
-  async compact(): Promise<void> { /* Implementation */ }
-  async close(): Promise<void> { /* Implementation */ }
+  async initialize(): Promise<void> {
+    /* Implementation */
+  }
+  async addDocuments(documents: VectorDocument[]): Promise<void> {
+    /* Implementation */
+  }
+  async updateDocument(document: VectorDocument): Promise<void> {
+    /* Implementation */
+  }
+  async deleteDocument(id: string): Promise<void> {
+    /* Implementation */
+  }
+  async search(
+    query: number[],
+    filters?: QueryFilter[],
+    maxResults?: number
+  ): Promise<ScoredDocument[]> {
+    return [];
+  }
+  async hybridSearch(
+    query: string,
+    vector: number[],
+    filters?: QueryFilter[]
+  ): Promise<ScoredDocument[]> {
+    return [];
+  }
+  async getDocument(id: string): Promise<VectorDocument | null> {
+    return null;
+  }
+  async getStats(): Promise<VectorStoreStats> {
+    return {} as VectorStoreStats;
+  }
+  async compact(): Promise<void> {
+    /* Implementation */
+  }
+  async close(): Promise<void> {
+    /* Implementation */
+  }
 }
 
 class HNSWSQLiteVectorStore implements VectorStore {
   constructor(private config: any) {}
-  async initialize(): Promise<void> { /* Implementation */ }
-  async addDocuments(documents: VectorDocument[]): Promise<void> { /* Implementation */ }
-  async updateDocument(document: VectorDocument): Promise<void> { /* Implementation */ }
-  async deleteDocument(id: string): Promise<void> { /* Implementation */ }
-  async search(query: number[], filters?: QueryFilter[], maxResults?: number): Promise<ScoredDocument[]> { return []; }
-  async hybridSearch(query: string, vector: number[], filters?: QueryFilter[]): Promise<ScoredDocument[]> { return []; }
-  async getDocument(id: string): Promise<VectorDocument | null> { return null; }
-  async getStats(): Promise<VectorStoreStats> { return {} as VectorStoreStats; }
-  async compact(): Promise<void> { /* Implementation */ }
-  async close(): Promise<void> { /* Implementation */ }
+  async initialize(): Promise<void> {
+    /* Implementation */
+  }
+  async addDocuments(documents: VectorDocument[]): Promise<void> {
+    /* Implementation */
+  }
+  async updateDocument(document: VectorDocument): Promise<void> {
+    /* Implementation */
+  }
+  async deleteDocument(id: string): Promise<void> {
+    /* Implementation */
+  }
+  async search(
+    query: number[],
+    filters?: QueryFilter[],
+    maxResults?: number
+  ): Promise<ScoredDocument[]> {
+    return [];
+  }
+  async hybridSearch(
+    query: string,
+    vector: number[],
+    filters?: QueryFilter[]
+  ): Promise<ScoredDocument[]> {
+    return [];
+  }
+  async getDocument(id: string): Promise<VectorDocument | null> {
+    return null;
+  }
+  async getStats(): Promise<VectorStoreStats> {
+    return {} as VectorStoreStats;
+  }
+  async compact(): Promise<void> {
+    /* Implementation */
+  }
+  async close(): Promise<void> {
+    /* Implementation */
+  }
 }
 
 class MemoryVectorStore implements VectorStore {
   private documents: Map<string, VectorDocument> = new Map();
 
   constructor(private config: any) {}
-  
+
   async initialize(): Promise<void> {}
-  
+
   async addDocuments(documents: VectorDocument[]): Promise<void> {
     for (const doc of documents) {
       this.documents.set(doc.id, doc);
     }
   }
-  
+
   async updateDocument(document: VectorDocument): Promise<void> {
     this.documents.set(document.id, document);
   }
-  
+
   async deleteDocument(id: string): Promise<void> {
     this.documents.delete(id);
   }
-  
-  async search(query: number[], filters?: QueryFilter[], maxResults?: number): Promise<ScoredDocument[]> {
+
+  async search(
+    query: number[],
+    filters?: QueryFilter[],
+    maxResults?: number
+  ): Promise<ScoredDocument[]> {
     const results: ScoredDocument[] = [];
-    
+
     for (const doc of this.documents.values()) {
       if (doc.embedding) {
         const similarity = this.cosineSimilarity(query, doc.embedding);
         results.push({
           document: doc,
-          score: similarity
+          score: similarity,
         });
       }
     }
-    
-    return results
-      .sort((a, b) => b.score - a.score)
-      .slice(0, maxResults || 10);
+
+    return results.sort((a, b) => b.score - a.score).slice(0, maxResults || 10);
   }
-  
-  async hybridSearch(query: string, vector: number[], filters?: QueryFilter[]): Promise<ScoredDocument[]> {
+
+  async hybridSearch(
+    query: string,
+    vector: number[],
+    filters?: QueryFilter[]
+  ): Promise<ScoredDocument[]> {
     return this.search(vector, filters);
   }
-  
+
   async getDocument(id: string): Promise<VectorDocument | null> {
     return this.documents.get(id) || null;
   }
-  
+
   async getStats(): Promise<VectorStoreStats> {
     return {
       totalDocuments: this.documents.size,
@@ -807,10 +878,10 @@ class MemoryVectorStore implements VectorStore {
       indexSize: 0,
       memoryUsage: 0,
       lastUpdated: new Date(),
-      averageDocumentSize: 0
+      averageDocumentSize: 0,
     };
   }
-  
+
   async compact(): Promise<void> {}
   async close(): Promise<void> {}
 
@@ -818,13 +889,13 @@ class MemoryVectorStore implements VectorStore {
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
-    
+
     for (let i = 0; i < a.length; i++) {
       dotProduct += a[i] * b[i];
       normA += a[i] * a[i];
       normB += b[i] * b[i];
     }
-    
+
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 }
@@ -851,7 +922,10 @@ class OllamaEmbedding implements EmbeddingModel {
   dimensions = 4096;
   maxTokens = 2048;
 
-  constructor(private config: any, private modelClient: UnifiedModelClient) {}
+  constructor(
+    private config: any,
+    private modelClient: UnifiedModelClient
+  ) {}
 
   async embed(text: string): Promise<number[]> {
     // Placeholder - would use Ollama embedding API
@@ -887,15 +961,15 @@ class ASTBasedCodeChunker implements CodeChunker {
     const chunks: DocumentChunk[] = [];
     const content = document.content;
     const lines = content.split('\n');
-    
+
     // Simple line-based chunking for now
     const chunkSize = this.config.maxChunkSize || 500;
     const overlap = this.config.overlapSize || 50;
-    
+
     for (let i = 0; i < lines.length; i += chunkSize - overlap) {
       const chunkLines = lines.slice(i, i + chunkSize);
       const chunkContent = chunkLines.join('\n');
-      
+
       chunks.push({
         id: `${document.id}:chunk:${i}`,
         content: chunkContent,
@@ -904,25 +978,25 @@ class ASTBasedCodeChunker implements CodeChunker {
         endOffset: i + chunkLines.length,
         chunkType: 'block',
         parentDocument: document.id,
-        semanticWeight: 1.0
+        semanticWeight: 1.0,
       });
     }
-    
+
     return chunks;
   }
 
   extractSymbols(content: string, language: string): ExtractedSymbol[] {
     const symbols: ExtractedSymbol[] = [];
     const lines = content.split('\n');
-    
+
     // Simple regex-based symbol extraction
     const patterns = {
       function: /function\s+(\w+)\s*\(/,
       class: /class\s+(\w+)/,
       interface: /interface\s+(\w+)/,
-      variable: /(?:const|let|var)\s+(\w+)/
+      variable: /(?:const|let|var)\s+(\w+)/,
     };
-    
+
     lines.forEach((line, index) => {
       for (const [type, pattern] of Object.entries(patterns)) {
         const match = line.match(pattern);
@@ -932,17 +1006,19 @@ class ASTBasedCodeChunker implements CodeChunker {
             type: type as any,
             startLine: index + 1,
             endLine: index + 1,
-            signature: line.trim()
+            signature: line.trim(),
           });
         }
       }
     });
-    
+
     return symbols;
   }
 
   shouldReindex(oldMetadata: DocumentMetadata, newMetadata: DocumentMetadata): boolean {
-    return oldMetadata.hash !== newMetadata.hash || 
-           oldMetadata.lastModified.getTime() !== newMetadata.lastModified.getTime();
+    return (
+      oldMetadata.hash !== newMetadata.hash ||
+      oldMetadata.lastModified.getTime() !== newMetadata.lastModified.getTime()
+    );
   }
 }

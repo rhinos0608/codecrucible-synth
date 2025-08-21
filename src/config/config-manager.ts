@@ -69,7 +69,11 @@ export interface AppConfig {
   performance: {
     responseCache: { enabled: boolean; maxAge: number; maxSize: number };
     voiceParallelism: { maxConcurrent: number; batchSize: number };
-    contextManagement: { maxContextLength: number; compressionThreshold: number; retentionStrategy: string };
+    contextManagement: {
+      maxContextLength: number;
+      compressionThreshold: number;
+      retentionStrategy: string;
+    };
   };
   logging: {
     level: string;
@@ -117,10 +121,10 @@ export class ConfigManager {
       await access(this.configPath);
       const userConfigContent = await readFile(this.configPath, 'utf8');
       this.config = YAML.parse(userConfigContent);
-      
+
       // Decrypt sensitive fields
       this.decryptSensitiveFields(this.config);
-      
+
       logger.info('Loaded user configuration', { path: this.configPath });
     } catch (error) {
       // User config doesn't exist, try default config
@@ -128,7 +132,7 @@ export class ConfigManager {
         const defaultConfigContent = await readFile(this.defaultConfigPath, 'utf8');
         this.config = YAML.parse(defaultConfigContent);
         logger.info('Loaded default configuration', { path: this.defaultConfigPath });
-        
+
         // Create user config from default
         await this.saveUserConfig();
       } catch (defaultError) {
@@ -142,7 +146,8 @@ export class ConfigManager {
     return this.config!;
   }
 
-  async set(key: string, value: any): Promise<void> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  async set(key: string, value: any): Promise<void> {
+    // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!this.config) {
       await this.loadConfiguration();
     }
@@ -165,7 +170,8 @@ export class ConfigManager {
     logger.info(`Configuration updated: ${key} = ${JSON.stringify(value)}`);
   }
 
-  async get(key: string): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  async get(key: string): Promise<any> {
+    // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!this.config) {
       await this.loadConfiguration();
     }
@@ -200,14 +206,14 @@ export class ConfigManager {
     try {
       const configDir = dirname(this.configPath);
       await mkdir(configDir, { recursive: true });
-      
+
       // Create a copy of config with encrypted sensitive fields
       const configToSave = JSON.parse(JSON.stringify(this.config));
       this.encryptSensitiveFields(configToSave);
-      
+
       const yamlContent = YAML.stringify(configToSave);
       await writeFile(this.configPath, yamlContent, 'utf8');
-      
+
       logger.debug('User configuration saved', { path: this.configPath });
     } catch (error) {
       logger.error('Failed to save user configuration:', error);
@@ -218,131 +224,141 @@ export class ConfigManager {
   private getHardcodedDefaults(): AppConfig {
     return {
       model: {
-        endpoint: "http://localhost:11434",
-        name: "", // Will be auto-detected from available models
+        endpoint: 'http://localhost:11434',
+        name: '', // Will be auto-detected from available models
         timeout: 180000, // 3 minutes for cold model starts
         maxTokens: 20000,
-        temperature: 0.7
+        temperature: 0.7,
       },
       llmProviders: {
-        default: "ollama-local",
+        default: 'ollama-local',
         providers: {
-          "ollama-local": {
-            provider: "ollama",
-            endpoint: "http://localhost:11434",
-            model: "auto",
+          'ollama-local': {
+            provider: 'ollama',
+            endpoint: 'http://localhost:11434',
+            model: 'auto',
             maxTokens: 4096,
             temperature: 0.7,
             timeout: 30000,
-            enabled: true
+            enabled: true,
           },
-          "openai-gpt4": {
-            provider: "openai",
-            model: "gpt-4o",
+          'openai-gpt4': {
+            provider: 'openai',
+            model: 'gpt-4o',
             maxTokens: 4096,
             temperature: 0.7,
             timeout: 30000,
-            enabled: false
+            enabled: false,
           },
-          "anthropic-claude": {
-            provider: "anthropic",
-            model: "claude-3-5-sonnet-20241022",
+          'anthropic-claude': {
+            provider: 'anthropic',
+            model: 'claude-3-5-sonnet-20241022',
             maxTokens: 4096,
             temperature: 0.7,
             timeout: 30000,
-            enabled: false
+            enabled: false,
           },
-          "google-gemini": {
-            provider: "google",
-            model: "gemini-1.5-pro",
+          'google-gemini': {
+            provider: 'google',
+            model: 'gemini-1.5-pro',
             maxTokens: 4096,
             temperature: 0.7,
             timeout: 30000,
-            enabled: false
-          }
-        }
+            enabled: false,
+          },
+        },
       },
       voices: {
-        default: ["explorer", "maintainer"],
-        available: ["explorer", "maintainer", "analyzer", "developer", "implementor", "security", "architect", "designer", "optimizer"],
+        default: ['explorer', 'maintainer'],
+        available: [
+          'explorer',
+          'maintainer',
+          'analyzer',
+          'developer',
+          'implementor',
+          'security',
+          'architect',
+          'designer',
+          'optimizer',
+        ],
         parallel: true,
-        maxConcurrent: 3
+        maxConcurrent: 3,
       },
       database: {
-        path: "codecrucible.db",
+        path: 'codecrucible.db',
         inMemory: false,
         enableWAL: true,
         backupEnabled: true,
-        backupInterval: 86400000 // 24 hours in milliseconds
+        backupInterval: 86400000, // 24 hours in milliseconds
       },
       safety: {
         commandValidation: true,
         fileSystemRestrictions: true,
-        requireConsent: ["delete", "execute"]
+        requireConsent: ['delete', 'execute'],
       },
       terminal: {
-        shell: "auto",
-        prompt: "CC> ",
+        shell: 'auto',
+        prompt: 'CC> ',
         historySize: 1000,
-        colorOutput: true
+        colorOutput: true,
       },
       vscode: {
         autoActivate: true,
         inlineGeneration: true,
-        showVoicePanel: true
+        showVoicePanel: true,
       },
       mcp: {
         servers: {
           filesystem: {
             enabled: true,
-            restrictedPaths: ["/etc", "/sys", "/proc"],
-            allowedPaths: ["~/", "./"]
+            restrictedPaths: ['/etc', '/sys', '/proc'],
+            allowedPaths: ['~/', './'],
           },
           git: {
             enabled: true,
             autoCommitMessages: false,
-            safeModeEnabled: true
+            safeModeEnabled: true,
           },
           terminal: {
             enabled: true,
-            allowedCommands: ["ls", "cat", "grep", "find", "git", "npm", "node", "python"],
-            blockedCommands: ["rm -rf", "sudo", "su", "chmod +x"]
+            allowedCommands: ['ls', 'cat', 'grep', 'find', 'git', 'npm', 'node', 'python'],
+            blockedCommands: ['rm -rf', 'sudo', 'su', 'chmod +x'],
           },
           packageManager: {
             enabled: true,
             autoInstall: false,
-            securityScan: true
+            securityScan: true,
           },
           smithery: {
             enabled: false,
-            apiKey: "",
-            profile: "",
-            baseUrl: "https://server.smithery.ai"
-          }
-        }
+            apiKey: '',
+            profile: '',
+            baseUrl: 'https://server.smithery.ai',
+          },
+        },
       },
       performance: {
         responseCache: {
           enabled: true,
           maxAge: 3600000,
-          maxSize: 100
+          maxSize: 100,
         },
         voiceParallelism: {
           maxConcurrent: 3,
-          batchSize: 2
+          batchSize: 2,
         },
         contextManagement: {
           maxContextLength: 100000,
           compressionThreshold: 80000,
-          retentionStrategy: "sliding"
-        }
+          retentionStrategy: 'sliding',
+        },
       },
       logging: {
-        level: "info",
+        level: 'info',
         toFile: true,
-        maxFileSize: "10MB",
-        maxFiles: 5
-      }
+        maxFileSize: '10MB',
+        maxFiles: 5,
+      },
     };
   }
 
@@ -354,12 +370,17 @@ export class ConfigManager {
       'mcp.servers.smithery.apiKey',
       'model.apiKey',
       'database.password',
-      'security.encryptionKey'
+      'security.encryptionKey',
     ];
 
     for (const fieldPath of sensitiveFields) {
       const value = this.getNestedValue(config, fieldPath);
-      if (value && typeof value === 'string' && value.length > 0 && !SecurityUtils.isEncrypted(value)) {
+      if (
+        value &&
+        typeof value === 'string' &&
+        value.length > 0 &&
+        !SecurityUtils.isEncrypted(value)
+      ) {
         try {
           const encrypted = SecurityUtils.encrypt(value);
           this.setNestedValue(config, fieldPath, encrypted);
@@ -378,7 +399,7 @@ export class ConfigManager {
       'mcp.servers.smithery.apiKey',
       'model.apiKey',
       'database.password',
-      'security.encryptionKey'
+      'security.encryptionKey',
     ];
 
     for (const fieldPath of sensitiveFields) {

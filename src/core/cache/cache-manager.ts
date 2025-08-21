@@ -174,7 +174,7 @@ class RedisCache {
   async set(key: string, value: string, ttl?: number): Promise<void> {
     const fullKey = `${this.config.keyPrefix}${key}`;
     this.mockStorage.set(fullKey, value);
-    
+
     // In real implementation, set TTL
     if (ttl) {
       setTimeout(() => {
@@ -222,26 +222,26 @@ export class CacheManager extends EventEmitter {
         memory: {
           enabled: true,
           maxSize: 1000,
-          algorithm: 'lru'
+          algorithm: 'lru',
         },
         redis: {
           enabled: false,
           host: 'localhost',
           port: 6379,
           db: 0,
-          keyPrefix: 'codecrucible:'
+          keyPrefix: 'codecrucible:',
         },
         disk: {
           enabled: false,
           path: './cache',
-          maxSize: '1GB'
-        }
+          maxSize: '1GB',
+        },
       },
-      ...config
+      ...config,
     };
 
     this.memoryCache = new LRUCache(this.config.layers.memory.maxSize);
-    
+
     if (this.config.layers.redis.enabled) {
       this.redisCache = new RedisCache(this.config.layers.redis);
     }
@@ -255,7 +255,7 @@ export class CacheManager extends EventEmitter {
       hitRate: 0,
       memoryUsage: 0,
       keyCount: 0,
-      lastCleanup: new Date()
+      lastCleanup: new Date(),
     };
 
     if (this.config.enableEncryption && this.config.encryptionKey) {
@@ -271,17 +271,17 @@ export class CacheManager extends EventEmitter {
   async get<T = any>(key: string): Promise<T | null> {
     try {
       const cacheKey = this.generateCacheKey(key);
-      
+
       // Try memory cache first
       if (this.config.layers.memory.enabled) {
         const memoryEntry = this.memoryCache.get(cacheKey);
         if (memoryEntry) {
           this.stats.hits++;
           this.updateHitRate();
-          
+
           logger.debug('Cache hit (memory)', { key: cacheKey });
           this.emit('cache-hit', { key: cacheKey, layer: 'memory' });
-          
+
           return this.deserializeValue(memoryEntry.value);
         }
       }
@@ -291,20 +291,20 @@ export class CacheManager extends EventEmitter {
         const redisValue = await this.redisCache.get(cacheKey);
         if (redisValue) {
           const entry: CacheEntry<T> = JSON.parse(redisValue);
-          
+
           // Check expiration
           if (entry.expiresAt === 0 || Date.now() < entry.expiresAt) {
             this.stats.hits++;
             this.updateHitRate();
-            
+
             // Promote to memory cache
             if (this.config.layers.memory.enabled) {
               this.memoryCache.set(cacheKey, entry);
             }
-            
+
             logger.debug('Cache hit (redis)', { key: cacheKey });
             this.emit('cache-hit', { key: cacheKey, layer: 'redis' });
-            
+
             return this.deserializeValue(entry.value);
           } else {
             // Expired, remove from Redis
@@ -316,12 +316,11 @@ export class CacheManager extends EventEmitter {
       // Cache miss
       this.stats.misses++;
       this.updateHitRate();
-      
+
       logger.debug('Cache miss', { key: cacheKey });
       this.emit('cache-miss', { key: cacheKey });
-      
-      return null;
 
+      return null;
     } catch (error) {
       logger.error('Cache get error', error as Error, { key });
       this.emit('cache-error', { operation: 'get', key, error });
@@ -337,7 +336,7 @@ export class CacheManager extends EventEmitter {
       const cacheKey = this.generateCacheKey(key);
       const now = Date.now();
       const ttl = options.ttl || this.config.defaultTTL;
-      const expiresAt = ttl > 0 ? now + (ttl * 1000) : 0;
+      const expiresAt = ttl > 0 ? now + ttl * 1000 : 0;
 
       const entry: CacheEntry<T> = {
         key: cacheKey,
@@ -347,7 +346,7 @@ export class CacheManager extends EventEmitter {
         lastAccessed: now,
         accessCount: 0,
         tags: options.tags || [],
-        metadata: options.metadata
+        metadata: options.metadata,
       };
 
       // Store in memory cache
@@ -363,17 +362,16 @@ export class CacheManager extends EventEmitter {
 
       this.stats.sets++;
       this.updateStats();
-      
-      logger.debug('Cache set', { 
-        key: cacheKey, 
-        ttl, 
+
+      logger.debug('Cache set', {
+        key: cacheKey,
+        ttl,
         tags: options.tags,
         compressed: options.compress,
-        encrypted: options.encrypt
+        encrypted: options.encrypt,
       });
-      
-      this.emit('cache-set', { key: cacheKey, ttl, options });
 
+      this.emit('cache-set', { key: cacheKey, ttl, options });
     } catch (error) {
       logger.error('Cache set error', error as Error, { key });
       this.emit('cache-error', { operation: 'set', key, error });
@@ -396,19 +394,18 @@ export class CacheManager extends EventEmitter {
 
       // Delete from Redis cache
       if (this.config.layers.redis.enabled && this.redisCache) {
-        deleted = await this.redisCache.delete(cacheKey) || deleted;
+        deleted = (await this.redisCache.delete(cacheKey)) || deleted;
       }
 
       if (deleted) {
         this.stats.deletes++;
         this.updateStats();
-        
+
         logger.debug('Cache delete', { key: cacheKey });
         this.emit('cache-delete', { key: cacheKey });
       }
 
       return deleted;
-
     } catch (error) {
       logger.error('Cache delete error', error as Error, { key });
       this.emit('cache-error', { operation: 'delete', key, error });
@@ -457,7 +454,6 @@ export class CacheManager extends EventEmitter {
       this.emit('cache-clear-tags', { tags, deletedCount });
 
       return deletedCount;
-
     } catch (error) {
       logger.error('Cache clear by tags error', error as Error, { tags });
       this.emit('cache-error', { operation: 'clear-tags', tags, error });
@@ -489,12 +485,11 @@ export class CacheManager extends EventEmitter {
         deletes: 0,
         evictions: 0,
         hitRate: 0,
-        keyCount: 0
+        keyCount: 0,
       };
 
       logger.info('Cache cleared');
       this.emit('cache-clear');
-
     } catch (error) {
       logger.error('Cache clear error', error as Error);
       this.emit('cache-error', { operation: 'clear', error });
@@ -527,12 +522,11 @@ export class CacheManager extends EventEmitter {
 
       // Generate value
       const value = await factory();
-      
+
       // Store in cache
       await this.set(key, value, options);
-      
-      return value;
 
+      return value;
     } catch (error) {
       logger.error('Cache getOrSet error', error as Error, { key });
       throw error;
@@ -544,15 +538,12 @@ export class CacheManager extends EventEmitter {
    */
   async warmUp(data: Array<{ key: string; value: any; options?: CacheOptions }>): Promise<void> {
     try {
-      const promises = data.map(({ key, value, options }) => 
-        this.set(key, value, options)
-      );
-      
+      const promises = data.map(({ key, value, options }) => this.set(key, value, options));
+
       await Promise.allSettled(promises);
-      
+
       logger.info('Cache warmed up', { entries: data.length });
       this.emit('cache-warmup', { entries: data.length });
-
     } catch (error) {
       logger.error('Cache warmup error', error as Error);
       throw error;
@@ -567,7 +558,7 @@ export class CacheManager extends EventEmitter {
     if (key.length > 250) {
       return crypto.createHash('sha256').update(key).digest('hex');
     }
-    
+
     return key.replace(/[^a-zA-Z0-9_:-]/g, '_');
   }
 
@@ -632,13 +623,13 @@ export class CacheManager extends EventEmitter {
    */
   private encrypt(value: string): string {
     if (!this.encryptionKey) return value;
-    
+
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey);
-    
+
     let encrypted = cipher.update(value, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     return `encrypted:${iv.toString('hex')}:${encrypted}`;
   }
 
@@ -647,18 +638,18 @@ export class CacheManager extends EventEmitter {
    */
   private decrypt(encryptedValue: string): string {
     if (!this.encryptionKey) return encryptedValue;
-    
+
     const parts = encryptedValue.split(':');
     if (parts.length !== 3) return encryptedValue;
-    
+
     const iv = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
-    
+
     const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
-    
+
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 
@@ -684,12 +675,12 @@ export class CacheManager extends EventEmitter {
    */
   private estimateMemoryUsage(): number {
     let total = 0;
-    
+
     for (const [key, entry] of this.memoryCache.entries()) {
       total += key.length * 2; // Approximate string size
       total += JSON.stringify(entry).length * 2; // Approximate entry size
     }
-    
+
     return total;
   }
 
@@ -729,7 +720,6 @@ export class CacheManager extends EventEmitter {
         logger.debug('Cache cleanup completed', { cleanedEntries: cleaned });
         this.emit('cache-cleanup', { cleanedEntries: cleaned });
       }
-
     } catch (error) {
       logger.error('Cache cleanup error', error as Error);
     }
@@ -738,12 +728,14 @@ export class CacheManager extends EventEmitter {
   /**
    * Create Express caching middleware
    */
-  middleware(options: { 
-    ttl?: number; 
-    keyGenerator?: (req: any) => string;
-    skipIf?: (req: any) => boolean;
-    tags?: string[];
-  } = {}) {
+  middleware(
+    options: {
+      ttl?: number;
+      keyGenerator?: (req: any) => string;
+      skipIf?: (req: any) => boolean;
+      tags?: string[];
+    } = {}
+  ) {
     return async (req: any, res: any, next: any) => {
       try {
         // Skip caching if specified
@@ -769,7 +761,7 @@ export class CacheManager extends EventEmitter {
           try {
             await this.set(cacheKey, data, {
               ttl: options.ttl,
-              tags: options.tags
+              tags: options.tags,
             });
           } catch (error) {
             logger.error('Failed to cache response', error as Error, { key: cacheKey });
@@ -779,7 +771,6 @@ export class CacheManager extends EventEmitter {
         };
 
         next();
-
       } catch (error) {
         logger.error('Cache middleware error', error as Error);
         next(); // Continue without caching
@@ -803,7 +794,7 @@ export class CacheManager extends EventEmitter {
     }
 
     await this.clear();
-    
+
     logger.info('Cache manager stopped');
     this.emit('cache-stop');
   }

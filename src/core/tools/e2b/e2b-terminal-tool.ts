@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 /**
  * Secure E2B Terminal Tool
- * 
+ *
  * Replaces the unsafe TerminalExecuteTool with sandboxed command execution
  * using E2B infrastructure for complete isolation and security.
  */
@@ -14,11 +14,7 @@ export class E2BTerminalTool extends BaseTool {
   private e2bService: E2BService;
   private securityValidator: SecurityValidator;
 
-  constructor(
-    e2bService: E2BService,
-    agentContext: any,
-    securityValidator?: SecurityValidator
-  ) {
+  constructor(e2bService: E2BService, agentContext: any, securityValidator?: SecurityValidator) {
     super({
       name: 'executeTerminalCommand',
       description: 'Execute terminal commands safely in an isolated E2B sandbox environment',
@@ -29,9 +25,13 @@ export class E2BTerminalTool extends BaseTool {
         sessionId: z.string().optional().describe('Session ID for persistent terminal context'),
         timeout: z.number().optional().default(30000).describe('Command timeout in milliseconds'),
         environment: z.record(z.string()).optional().describe('Environment variables for command'),
-        expectInteractive: z.boolean().optional().default(false).describe('Whether command expects interactive input'),
-        description: z.string().optional().describe('Description of what the command does')
-      })
+        expectInteractive: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe('Whether command expects interactive input'),
+        description: z.string().optional().describe('Description of what the command does'),
+      }),
     });
 
     this.e2bService = e2bService;
@@ -40,15 +40,15 @@ export class E2BTerminalTool extends BaseTool {
 
   async execute(args: any): Promise<any> {
     const startTime = Date.now();
-    
+
     try {
       logger.info(`🖥️ E2B Terminal Command: ${args.command}`);
-      
+
       // Security validation
       const validationResult = this.securityValidator.validateCommand(args.command);
       if (!validationResult.isValid) {
         logger.warn(`🚨 Terminal command blocked: ${validationResult.reason}`);
-        
+
         this.securityValidator.logSecurityViolation(
           args.sessionId || 'unknown',
           'terminal_command',
@@ -62,7 +62,7 @@ export class E2BTerminalTool extends BaseTool {
           exitCode: 1,
           executionTime: Date.now() - startTime,
           sessionId: args.sessionId || 'none',
-          securityWarnings: [validationResult.reason]
+          securityWarnings: [validationResult.reason],
         };
       }
 
@@ -82,7 +82,9 @@ export class E2BTerminalTool extends BaseTool {
       // Parse command execution result
       const commandResult = this.parseCommandResult(executionResult);
 
-      logger.info(`✅ Terminal command completed - Success: ${commandResult.success}, Exit: ${commandResult.exitCode}, Time: ${commandResult.executionTime}ms`);
+      logger.info(
+        `✅ Terminal command completed - Success: ${commandResult.success}, Exit: ${commandResult.exitCode}, Time: ${commandResult.executionTime}ms`
+      );
 
       return {
         success: commandResult.success,
@@ -92,9 +94,9 @@ export class E2BTerminalTool extends BaseTool {
         executionTime: commandResult.executionTime,
         sessionId,
         workingDirectory: args.workingDirectory,
-        securityWarnings: validationResult.severity !== 'low' ? [validationResult.reason] : undefined
+        securityWarnings:
+          validationResult.severity !== 'low' ? [validationResult.reason] : undefined,
       };
-
     } catch (error) {
       const executionTime = Date.now() - startTime;
       logger.error('❌ E2B Terminal execution failed:', error);
@@ -104,7 +106,7 @@ export class E2BTerminalTool extends BaseTool {
         stderr: `Terminal execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         exitCode: 1,
         executionTime,
-        sessionId: args.sessionId || 'none'
+        sessionId: args.sessionId || 'none',
       };
     }
   }
@@ -116,7 +118,7 @@ export class E2BTerminalTool extends BaseTool {
     const command = args.command.trim();
     const workingDir = args.workingDirectory || '/tmp';
     const timeout = args.timeout / 1000; // Convert to seconds
-    
+
     // Build environment variables
     const envVars = args.environment || {};
     const envSetup = Object.entries(envVars)
@@ -237,17 +239,17 @@ except Exception as e:
           stdout: '',
           stderr: 'No output received from command execution',
           exitCode: 1,
-          executionTime: executionResult.executionTime
+          executionTime: executionResult.executionTime,
         };
       }
 
       // Extract JSON result from wrapper output
       const startMarker = 'COMMAND_RESULT_START';
       const endMarker = 'COMMAND_RESULT_END';
-      
+
       const startIndex = executionResult.output.indexOf(startMarker);
       const endIndex = executionResult.output.indexOf(endMarker);
-      
+
       if (startIndex === -1 || endIndex === -1) {
         // Fallback: treat entire output as stdout
         return {
@@ -255,34 +257,32 @@ except Exception as e:
           stdout: executionResult.output,
           stderr: executionResult.error || '',
           exitCode: executionResult.error ? 1 : 0,
-          executionTime: executionResult.executionTime
+          executionTime: executionResult.executionTime,
         };
       }
-      
-      const jsonStr = executionResult.output.substring(
-        startIndex + startMarker.length,
-        endIndex
-      ).trim();
-      
+
+      const jsonStr = executionResult.output
+        .substring(startIndex + startMarker.length, endIndex)
+        .trim();
+
       const result = JSON.parse(jsonStr);
-      
+
       return {
         success: result.success,
         stdout: result.stdout || '',
         stderr: result.stderr || '',
         exitCode: result.exitCode || (result.success ? 0 : 1),
-        executionTime: result.executionTime || executionResult.executionTime
+        executionTime: result.executionTime || executionResult.executionTime,
       };
-      
     } catch (error) {
       logger.warn('Failed to parse command result, using fallback:', error);
-      
+
       return {
         success: !executionResult.error,
         stdout: executionResult.output || '',
         stderr: executionResult.error || 'Failed to parse command result',
         exitCode: executionResult.error ? 1 : 0,
-        executionTime: executionResult.executionTime
+        executionTime: executionResult.executionTime,
       };
     }
   }
@@ -292,10 +292,41 @@ except Exception as e:
    */
   getSafeCommands(): string[] {
     return [
-      'ls', 'dir', 'pwd', 'whoami', 'date', 'echo', 'cat', 'head', 'tail',
-      'grep', 'find', 'sort', 'uniq', 'wc', 'cut', 'awk', 'sed', 'diff',
-      'file', 'which', 'type', 'help', 'man', 'info', 'history', 'alias',
-      'ps', 'top', 'df', 'du', 'free', 'uptime', 'uname', 'env', 'printenv'
+      'ls',
+      'dir',
+      'pwd',
+      'whoami',
+      'date',
+      'echo',
+      'cat',
+      'head',
+      'tail',
+      'grep',
+      'find',
+      'sort',
+      'uniq',
+      'wc',
+      'cut',
+      'awk',
+      'sed',
+      'diff',
+      'file',
+      'which',
+      'type',
+      'help',
+      'man',
+      'info',
+      'history',
+      'alias',
+      'ps',
+      'top',
+      'df',
+      'du',
+      'free',
+      'uptime',
+      'uname',
+      'env',
+      'printenv',
     ];
   }
 
@@ -319,26 +350,26 @@ except Exception as e:
   async executeCommandSequence(commands: string[], sessionId?: string): Promise<any[]> {
     const results: any[] = [];
     const actualSessionId = sessionId || this.generateSessionId();
-    
+
     for (let i = 0; i < commands.length; i++) {
       const command = commands[i];
       logger.info(`🔄 Executing command ${i + 1}/${commands.length}: ${command}`);
-      
+
       const result = await this.execute({
         command,
         sessionId: actualSessionId,
-        description: `Command ${i + 1} of sequence`
+        description: `Command ${i + 1} of sequence`,
       });
-      
+
       results.push(result);
-      
+
       // Stop sequence if a command fails
       if (!result.success) {
         logger.warn(`🛑 Command sequence stopped at step ${i + 1} due to failure`);
         break;
       }
     }
-    
+
     return results;
   }
 
@@ -346,18 +377,18 @@ except Exception as e:
    * Execute command with interactive mode simulation
    */
   async executeInteractiveCommand(
-    command: string, 
-    inputs: string[], 
+    command: string,
+    inputs: string[],
     sessionId?: string
   ): Promise<any> {
     // For interactive commands, we'll prepare inputs and execute as a batch
     const interactiveCommand = this.prepareInteractiveCommand(command, inputs);
-    
+
     return await this.execute({
       command: interactiveCommand,
       sessionId,
       expectInteractive: true,
-      description: 'Interactive command execution'
+      description: 'Interactive command execution',
     });
   }
 
@@ -388,7 +419,7 @@ except Exception as e:
       securityPolicy: this.securityValidator.getPolicy(),
       safeCommands: this.getSafeCommands().length,
       blockedCommands: this.getDangerousCommands().length,
-      e2bServiceStats: this.e2bService.getStats()
+      e2bServiceStats: this.e2bService.getStats(),
     };
   }
 

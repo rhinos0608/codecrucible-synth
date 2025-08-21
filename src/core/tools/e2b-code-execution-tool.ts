@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 /**
  * E2B Code Execution Tool - Secure sandboxed code execution
- * 
+ *
  * Replaces unsafe direct code execution with secure E2B sandboxes
  */
 export class E2BCodeExecutionTool extends BaseTool {
@@ -15,23 +15,35 @@ export class E2BCodeExecutionTool extends BaseTool {
   constructor(agentContext: { workingDirectory: string }, e2bService?: E2BService) {
     super({
       name: 'e2bExecuteCode',
-      description: 'Execute code safely in an isolated E2B sandbox environment. Supports Python, JavaScript, and Bash.',
+      description:
+        'Execute code safely in an isolated E2B sandbox environment. Supports Python, JavaScript, and Bash.',
       category: 'execution',
       parameters: z.object({
         code: z.string().describe('The code to execute'),
-        language: z.enum(['python', 'javascript', 'bash']).default('python').describe('Programming language'),
+        language: z
+          .enum(['python', 'javascript', 'bash'])
+          .default('python')
+          .describe('Programming language'),
         sessionId: z.string().optional().describe('Session ID for maintaining state (optional)'),
-        installPackages: z.array(z.string()).optional().describe('Packages to install before execution'),
-        files: z.array(z.object({
-          path: z.string(),
-          content: z.string()
-        })).optional().describe('Files to upload before execution')
+        installPackages: z
+          .array(z.string())
+          .optional()
+          .describe('Packages to install before execution'),
+        files: z
+          .array(
+            z.object({
+              path: z.string(),
+              content: z.string(),
+            })
+          )
+          .optional()
+          .describe('Files to upload before execution'),
       }),
       examples: [
         'Execute Python code: { code: "print(\\"Hello, World!\\")", language: "python" }',
         'Execute with packages: { code: "import requests", language: "python", installPackages: ["requests"] }',
-        'Execute bash: { code: "ls -la", language: "bash" }'
-      ]
+        'Execute bash: { code: "ls -la", language: "bash" }',
+      ],
     });
 
     this.e2bService = e2bService || new E2BService();
@@ -56,7 +68,7 @@ export class E2BCodeExecutionTool extends BaseTool {
             error: 'E2B API key not configured. Code execution disabled for security.',
             executionTime: 0,
             sandbox: 'disabled',
-            security: 'E2B API key required'
+            security: 'E2B API key required',
           };
         }
       }
@@ -71,7 +83,7 @@ export class E2BCodeExecutionTool extends BaseTool {
           error: `Security check failed: ${securityCheck.reason}`,
           executionTime: 0,
           sandbox: actualSessionId,
-          security: 'blocked'
+          security: 'blocked',
         };
       }
 
@@ -88,11 +100,11 @@ export class E2BCodeExecutionTool extends BaseTool {
         for (const pkg of installPackages) {
           logger.info(`📦 Installing package: ${pkg}`);
           const installResult = await this.e2bService.installPackage(
-            actualSessionId, 
-            pkg, 
+            actualSessionId,
+            pkg,
             language === 'javascript' ? 'javascript' : 'python'
           );
-          
+
           if (!installResult.success) {
             logger.warn(`⚠️ Package installation failed: ${pkg} - ${installResult.error}`);
           }
@@ -106,17 +118,18 @@ export class E2BCodeExecutionTool extends BaseTool {
       const enhancedResult = {
         ...result,
         sandbox: actualSessionId,
-        security: 'e2b_sandboxed'
+        security: 'e2b_sandboxed',
       };
 
       // Log execution for audit
-      logger.info(`🔍 Code execution completed - Success: ${result.success}, Time: ${result.executionTime}ms`);
+      logger.info(
+        `🔍 Code execution completed - Success: ${result.success}, Time: ${result.executionTime}ms`
+      );
       if (result.error) {
         logger.warn(`⚠️ Execution error: ${result.error}`);
       }
 
       return enhancedResult;
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ E2B code execution failed:', error);
@@ -127,7 +140,7 @@ export class E2BCodeExecutionTool extends BaseTool {
         error: `E2B execution failed: ${errorMessage}`,
         executionTime: 0,
         sandbox: args.sessionId || this.sessionId,
-        security: 'error'
+        security: 'error',
       };
     }
   }
@@ -147,14 +160,14 @@ export class E2BCodeExecutionTool extends BaseTool {
       // System manipulation
       /SHUTDOWN|REBOOT|HALT|KILL\s+-9|KILLALL/i,
       // Process manipulation
-      /FORK\s*\(\)|EXEC\s*\(|SYSTEM\s*\(/i
+      /FORK\s*\(\)|EXEC\s*\(|SYSTEM\s*\(/i,
     ];
 
     for (const pattern of dangerousPatterns) {
       if (pattern.test(code)) {
-        return { 
-          safe: false, 
-          reason: `Potentially dangerous pattern detected: ${pattern.source}` 
+        return {
+          safe: false,
+          reason: `Potentially dangerous pattern detected: ${pattern.source}`,
         };
       }
     }
@@ -162,9 +175,12 @@ export class E2BCodeExecutionTool extends BaseTool {
     // Language-specific checks
     if (language === 'bash') {
       // Bash-specific dangerous patterns
-      if (codeUpper.includes(':(){ :|:& }') || // Fork bomb
-          codeUpper.includes('DD IF=/DEV/ZERO') || // Disk fill
-          codeUpper.includes(':(){ :|:& };:')) { // Fork bomb variant
+      if (
+        codeUpper.includes(':(){ :|:& }') || // Fork bomb
+        codeUpper.includes('DD IF=/DEV/ZERO') || // Disk fill
+        codeUpper.includes(':(){ :|:& };:')
+      ) {
+        // Fork bomb variant
         return { safe: false, reason: 'Dangerous bash pattern detected' };
       }
     }
@@ -183,7 +199,7 @@ export class E2BCodeExecutionTool extends BaseTool {
   async getSandboxStatus(): Promise<{ active: boolean; sessions: string[] }> {
     return {
       active: this.e2bService.getStats().isInitialized,
-      sessions: this.e2bService.getActiveSessions()
+      sessions: this.e2bService.getActiveSessions(),
     };
   }
 

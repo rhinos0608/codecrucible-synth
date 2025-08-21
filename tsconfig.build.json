@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    // Temporarily exclude enterprise files with missing dependencies
+    "src/core/collaboration/**/*",
+    "src/core/error-handling/enterprise-error-handler.ts", 
+    "src/core/mcp/enterprise-mcp-orchestrator.ts",
+    "src/infrastructure/**/*",
+    "src/testing/**/*",
+    "src/core/security/security-audit-logger.ts",
+    "src/core/security/secure-tool-factory.ts",
+    "src/core/security/enterprise-security-framework.ts",
+    "src/core/tools/**/*",
+    "src/core/performance/**/*",
+    "src/core/benchmarking/**/*",
+    "src/core/memory/**/*",
+    "src/mcp-servers/git-mcp-server.ts"
+  ]
+}

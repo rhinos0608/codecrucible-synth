@@ -35,12 +35,12 @@ export class LMStudioProvider implements LLMProvider {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       const response = await fetch(`${this.endpoint}/v1/models`, {
         method: 'GET',
-        signal: controller.signal
+        signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
@@ -60,7 +60,7 @@ export class LMStudioProvider implements LLMProvider {
     try {
       const response = await this.makeRequest(prompt, options);
       const responseTime = Date.now() - startTime;
-      
+
       // Track response time
       this.responseTimeHistory.push(responseTime);
       if (this.responseTimeHistory.length > 100) {
@@ -80,10 +80,9 @@ export class LMStudioProvider implements LLMProvider {
           tokens: response.usage?.total_tokens,
           promptTokens: response.usage?.prompt_tokens,
           completionTokens: response.usage?.completion_tokens,
-          finishReason: response.choices?.[0]?.finish_reason
-        }
+          finishReason: response.choices?.[0]?.finish_reason,
+        },
       };
-
     } catch (error) {
       this.errorCount++;
       this.lastError = (error as Error).message;
@@ -102,16 +101,16 @@ export class LMStudioProvider implements LLMProvider {
       messages: [
         {
           role: 'system',
-          content: this.getSystemPrompt(options.taskType)
+          content: this.getSystemPrompt(options.taskType),
         },
         {
           role: 'user',
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
       temperature: this.getTemperature(options.taskType),
       max_tokens: this.getMaxTokens(options.taskType),
-      stream: false
+      stream: false,
     };
 
     const controller = new AbortController();
@@ -121,10 +120,10 @@ export class LMStudioProvider implements LLMProvider {
       const response = await fetch(`${this.endpoint}/v1/chat/completions`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -132,7 +131,7 @@ export class LMStudioProvider implements LLMProvider {
       }
 
       const data = await response.json();
-      
+
       if (!data.choices || data.choices.length === 0) {
         throw new Error('No response choices returned from LM Studio');
       }
@@ -141,9 +140,8 @@ export class LMStudioProvider implements LLMProvider {
         content: data.choices[0].message.content,
         model: data.model,
         usage: data.usage,
-        choices: data.choices
+        choices: data.choices,
       };
-
     } finally {
       clearTimeout(timeout);
     }
@@ -154,12 +152,13 @@ export class LMStudioProvider implements LLMProvider {
    */
   private getSystemPrompt(taskType: string): string {
     const prompts: Record<string, string> = {
-      template: 'You are a code template generator. Create clean, well-structured code templates quickly.',
+      template:
+        'You are a code template generator. Create clean, well-structured code templates quickly.',
       format: 'You are a code formatter. Format the provided code cleanly and consistently.',
       edit: 'You are a code editor. Make precise, minimal edits to improve the code.',
       boilerplate: 'You are a boilerplate generator. Create standard code patterns and structures.',
       documentation: 'You are a documentation generator. Create clear, concise documentation.',
-      default: 'You are a helpful coding assistant. Generate clean, efficient code.'
+      default: 'You are a helpful coding assistant. Generate clean, efficient code.',
     };
 
     return prompts[taskType] || prompts.default;
@@ -170,12 +169,12 @@ export class LMStudioProvider implements LLMProvider {
    */
   private getTemperature(taskType: string): number {
     const temperatures: Record<string, number> = {
-      template: 0.1,     // Very deterministic for templates
-      format: 0.0,       // Completely deterministic for formatting
-      edit: 0.2,         // Low creativity for edits
-      boilerplate: 0.1,  // Consistent boilerplate
+      template: 0.1, // Very deterministic for templates
+      format: 0.0, // Completely deterministic for formatting
+      edit: 0.2, // Low creativity for edits
+      boilerplate: 0.1, // Consistent boilerplate
       documentation: 0.3, // Slightly more creative for docs
-      default: 0.4
+      default: 0.4,
     };
 
     return temperatures[taskType] || temperatures.default;
@@ -191,7 +190,7 @@ export class LMStudioProvider implements LLMProvider {
       edit: 800,
       boilerplate: 1500,
       documentation: 2000,
-      default: 1500
+      default: 1500,
     };
 
     return maxTokens[taskType] || maxTokens.default;
@@ -237,11 +236,16 @@ export class LMStudioProvider implements LLMProvider {
   getCapabilities(): LLMCapabilities {
     return {
       strengths: ['speed', 'templates', 'formatting', 'boilerplate', 'quick-edits'],
-      optimalFor: ['template-generation', 'code-formatting', 'simple-edits', 'boilerplate-creation'],
+      optimalFor: [
+        'template-generation',
+        'code-formatting',
+        'simple-edits',
+        'boilerplate-creation',
+      ],
       responseTime: '<1s',
-      contextWindow: 4096,
+      contextWindow: 32768,
       supportsStreaming: true,
-      maxConcurrent: 4
+      maxConcurrent: 4,
     };
   }
 
@@ -250,10 +254,12 @@ export class LMStudioProvider implements LLMProvider {
    */
   async getStatus(): Promise<LLMStatus> {
     const isAvailable = await this.isAvailable();
-    const avgResponseTime = this.responseTimeHistory.length > 0
-      ? this.responseTimeHistory.reduce((sum, time) => sum + time, 0) / this.responseTimeHistory.length
-      : 0;
-    
+    const avgResponseTime =
+      this.responseTimeHistory.length > 0
+        ? this.responseTimeHistory.reduce((sum, time) => sum + time, 0) /
+          this.responseTimeHistory.length
+        : 0;
+
     const errorRate = this.requestCount > 0 ? this.errorCount / this.requestCount : 0;
 
     return {
@@ -262,7 +268,7 @@ export class LMStudioProvider implements LLMProvider {
       maxLoad: 4, // Based on capabilities
       responseTime: avgResponseTime,
       errorRate,
-      lastError: this.lastError
+      lastError: this.lastError,
     };
   }
 

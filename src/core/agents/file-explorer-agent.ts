@@ -18,7 +18,7 @@ export class FileExplorerAgent extends UnifiedAgent {
 
   async processRequest(input: string): Promise<ExecutionResponse> {
     logger.info('📁 File Explorer Agent processing request');
-    
+
     // Check if this is a file system operation request
     if (this.isFileSystemRequest(input)) {
       return await this.handleFileSystemOperation(input);
@@ -29,17 +29,20 @@ export class FileExplorerAgent extends UnifiedAgent {
       id: `file-explorer-${Date.now()}`,
       input: `File System Analysis: ${input}`,
       type: 'file-analysis',
-      mode: 'fast' // File operations should be fast
+      mode: 'fast', // File operations should be fast
     };
 
     const response = await this.execute(request);
-    
+
     // Enhance with file-specific metadata
     if (response.success && response.result) {
-      const enhancedResult = await this.enhanceWithFileContext(input, response.result as Record<string, unknown>);
+      const enhancedResult = await this.enhanceWithFileContext(
+        input,
+        response.result as Record<string, unknown>
+      );
       return {
         ...response,
-        result: enhancedResult
+        result: enhancedResult,
       };
     }
 
@@ -48,8 +51,14 @@ export class FileExplorerAgent extends UnifiedAgent {
 
   private isFileSystemRequest(input: string): boolean {
     const fileSystemKeywords = [
-      'list files', 'show directory', 'file structure', 'explore folder',
-      'find file', 'search files', 'directory tree', 'project structure'
+      'list files',
+      'show directory',
+      'file structure',
+      'explore folder',
+      'find file',
+      'search files',
+      'directory tree',
+      'project structure',
     ];
     return fileSystemKeywords.some(keyword => input.toLowerCase().includes(keyword));
   }
@@ -57,18 +66,21 @@ export class FileExplorerAgent extends UnifiedAgent {
   private async handleFileSystemOperation(input: string): Promise<ExecutionResponse> {
     try {
       const workingDir = process.cwd();
-      
-      if (input.toLowerCase().includes('project structure') || input.toLowerCase().includes('directory tree')) {
+
+      if (
+        input.toLowerCase().includes('project structure') ||
+        input.toLowerCase().includes('directory tree')
+      ) {
         const structure = await this.getProjectStructureInternal(workingDir);
         return {
           success: true,
           result: {
             content: structure,
             operation: 'project-structure',
-            directory: workingDir
+            directory: workingDir,
           },
           workflowId: `file-op-${Date.now()}`,
-          executionTime: 0
+          executionTime: 0,
         };
       }
 
@@ -80,10 +92,10 @@ export class FileExplorerAgent extends UnifiedAgent {
             content: `Files in ${workingDir}:\n${files.join('\n')}`,
             operation: 'list-files',
             files,
-            directory: workingDir
+            directory: workingDir,
           },
           workflowId: `file-op-${Date.now()}`,
-          executionTime: 0
+          executionTime: 0,
         };
       }
 
@@ -95,19 +107,18 @@ export class FileExplorerAgent extends UnifiedAgent {
           content: `Directory analysis for ${workingDir}:\n${JSON.stringify(stats, null, 2)}`,
           operation: 'directory-stats',
           stats,
-          directory: workingDir
+          directory: workingDir,
         },
         workflowId: `file-op-${Date.now()}`,
-        executionTime: 0
+        executionTime: 0,
       };
-
     } catch (error) {
       return {
         success: false,
         result: {},
         error: `File system operation failed: ${error instanceof Error ? error.message : String(error)}`,
         workflowId: `file-op-${Date.now()}`,
-        executionTime: 0
+        executionTime: 0,
       };
     }
   }
@@ -122,14 +133,14 @@ export class FileExplorerAgent extends UnifiedAgent {
 
       try {
         const items = await fs.readdir(dirPath);
-        
+
         for (const item of items) {
           if (ignorePatterns.some(pattern => item.includes(pattern))) continue;
-          
+
           const itemPath = join(dirPath, item);
           const stats = await fs.stat(itemPath);
           const relativePath = relative(rootPath, itemPath);
-          
+
           if (stats.isDirectory()) {
             structure.push(`${'  '.repeat(depth)}📁 ${relativePath}/`);
             await walkDirectory(itemPath, depth + 1);
@@ -152,7 +163,7 @@ export class FileExplorerAgent extends UnifiedAgent {
     try {
       const items = await fs.readdir(dirPath);
       const files: string[] = [];
-      
+
       for (const item of items) {
         const stats = await fs.stat(join(dirPath, item));
         if (stats.isFile()) {
@@ -161,7 +172,7 @@ export class FileExplorerAgent extends UnifiedAgent {
           files.push(`${item}/`);
         }
       }
-      
+
       return files;
     } catch (error) {
       return [`Error reading directory: ${error instanceof Error ? error.message : String(error)}`];
@@ -190,36 +201,39 @@ export class FileExplorerAgent extends UnifiedAgent {
         totalFiles: fileCount,
         totalDirectories: dirCount,
         fileTypeBreakdown: fileTypes,
-        path: dirPath
+        path: dirPath,
       };
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : String(error),
-        path: dirPath
+        path: dirPath,
       };
     }
   }
 
   private getFileIcon(ext?: string): string {
     const iconMap: Record<string, string> = {
-      'js': '📄',
-      'ts': '📄', 
-      'tsx': '📄',
-      'jsx': '📄',
-      'json': '⚙️',
-      'md': '📝',
-      'css': '🎨',
-      'html': '🌐',
-      'py': '🐍',
-      'java': '☕',
-      'cpp': '⚡',
-      'c': '⚡',
-      'rs': '🦀'
+      js: '📄',
+      ts: '📄',
+      tsx: '📄',
+      jsx: '📄',
+      json: '⚙️',
+      md: '📝',
+      css: '🎨',
+      html: '🌐',
+      py: '🐍',
+      java: '☕',
+      cpp: '⚡',
+      c: '⚡',
+      rs: '🦀',
     };
     return iconMap[ext || ''] || '📄';
   }
 
-  private async enhanceWithFileContext(input: string, result: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async enhanceWithFileContext(
+    input: string,
+    result: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     return {
       ...result,
       fileSystemContext: {
@@ -227,16 +241,16 @@ export class FileExplorerAgent extends UnifiedAgent {
         requestType: 'file-exploration',
         capabilities: [
           'Project structure analysis',
-          'File listing and navigation', 
+          'File listing and navigation',
           'Directory statistics',
-          'File type analysis'
-        ]
+          'File type analysis',
+        ],
       },
       metadata: {
         ...((result.metadata as Record<string, unknown>) || {}),
         agentType: 'file-explorer',
-        enhanced: true
-      }
+        enhanced: true,
+      },
     };
   }
 }

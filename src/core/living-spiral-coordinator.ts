@@ -9,10 +9,10 @@ import { UnifiedModelClient } from './client.js';
 
 export enum SpiralPhase {
   COLLAPSE = 'collapse',
-  COUNCIL = 'council', 
+  COUNCIL = 'council',
   SYNTHESIS = 'synthesis',
   REBIRTH = 'rebirth',
-  REFLECTION = 'reflection'
+  REFLECTION = 'reflection',
 }
 
 export interface SpiralConfig {
@@ -71,14 +71,14 @@ export class LivingSpiralCoordinator {
     let convergenceAchieved = false;
     let iterationCount = 0;
 
-    logger.info('🌀 Starting Living Spiral process', { 
+    logger.info('🌀 Starting Living Spiral process', {
       prompt: initialPrompt.substring(0, 100),
-      config: this.config 
+      config: this.config,
     });
 
     while (iterationCount < this.config.maxIterations && !convergenceAchieved) {
       iterationCount++;
-      
+
       const spiralIteration = await this.executeSingleSpiral(
         currentInput,
         iterationCount,
@@ -92,7 +92,7 @@ export class LivingSpiralCoordinator {
         convergenceAchieved = true;
         logger.info('✅ Spiral convergence achieved', {
           iteration: iterationCount,
-          quality: spiralIteration.quality
+          quality: spiralIteration.quality,
         });
       } else {
         // Prepare input for next iteration
@@ -106,13 +106,13 @@ export class LivingSpiralCoordinator {
       convergenceAchieved,
       totalIterations: iterationCount,
       quality: iterations[iterations.length - 1]?.quality || 0,
-      synthesisResults: this.extractSynthesisResults(iterations)
+      synthesisResults: this.extractSynthesisResults(iterations),
     };
 
     logger.info('🎯 Living Spiral process completed', {
       iterations: iterationCount,
       converged: convergenceAchieved,
-      finalQuality: result.quality
+      finalQuality: result.quality,
     });
 
     return result;
@@ -127,23 +127,23 @@ export class LivingSpiralCoordinator {
     previousIterations: SpiralIteration[]
   ): Promise<SpiralIteration> {
     const startTime = Date.now();
-    
+
     logger.info(`🌀 Spiral iteration ${iteration} starting`, { phase: 'beginning' });
 
     // Phase 1: Collapse - Break down the problem
     const collapsed = await this.collapsePhase(input);
-    
-    // Phase 2: Council - Gather diverse perspectives  
+
+    // Phase 2: Council - Gather diverse perspectives
     const councilResults = await this.councilPhase(collapsed);
-    
+
     // Phase 3: Synthesis - Merge wisdom
     const synthesized = await this.synthesisPhase(councilResults);
-    
+
     // Phase 4: Rebirth - Implement solution
     const reborn = await this.rebirthPhase(synthesized);
-    
+
     // Phase 5: Reflection - Learn and adapt
-    const reflected = this.config.enableReflection 
+    const reflected = this.config.enableReflection
       ? await this.reflectionPhase(reborn, previousIterations)
       : reborn;
 
@@ -161,8 +161,8 @@ export class LivingSpiralCoordinator {
       metadata: {
         timestamp: new Date(),
         duration,
-        convergence
-      }
+        convergence,
+      },
     };
   }
 
@@ -171,7 +171,7 @@ export class LivingSpiralCoordinator {
    */
   private async collapsePhase(input: string): Promise<{ output: string; voices: string[] }> {
     logger.debug('📉 Collapse phase starting');
-    
+
     const collapsePrompt = `
 Act as The Explorer archetype. Decompose this complex problem into its essential components:
 
@@ -188,19 +188,22 @@ Provide a clear, structured breakdown that eliminates unnecessary complexity.
 `;
 
     const output = await this.modelClient.generate(collapsePrompt);
-    
+
     return {
       output,
-      voices: ['explorer']
+      voices: ['explorer'],
     };
   }
 
   /**
    * Phase 2: Council - Gather diverse perspectives and expertise
    */
-  private async councilPhase(collapsed: { output: string; voices: string[] }): Promise<{ output: string; voices: string[] }> {
+  private async councilPhase(collapsed: {
+    output: string;
+    voices: string[];
+  }): Promise<{ output: string; voices: string[] }> {
     logger.debug('🏛️ Council phase starting');
-    
+
     const councilVoices = this.selectCouncilVoices();
     const perspectives: string[] = [];
 
@@ -226,24 +229,31 @@ Provide a clear, structured breakdown that eliminates unnecessary complexity.
     const councilOutput = `
 COUNCIL PERSPECTIVES:
 
-${perspectives.map((p, i) => `
+${perspectives
+  .map(
+    (p, i) => `
 ### ${councilVoices[i].toUpperCase()} PERSPECTIVE:
 ${p}
-`).join('\n')}
+`
+  )
+  .join('\n')}
 `;
 
     return {
       output: councilOutput,
-      voices: councilVoices
+      voices: councilVoices,
     };
   }
 
   /**
    * Phase 3: Synthesis - Merge wisdom into unified design
    */
-  private async synthesisPhase(council: { output: string; voices: string[] }): Promise<{ output: string; voices: string[] }> {
+  private async synthesisPhase(council: {
+    output: string;
+    voices: string[];
+  }): Promise<{ output: string; voices: string[] }> {
     logger.debug('⚗️ Synthesis phase starting');
-    
+
     const synthesisPrompt = `
 Act as The Architect archetype. You must synthesize the following council perspectives into a unified, coherent solution:
 
@@ -260,19 +270,22 @@ Deliver a comprehensive synthesis that represents the collective wisdom of the c
 `;
 
     const output = await this.modelClient.generate(synthesisPrompt);
-    
+
     return {
       output,
-      voices: [...council.voices, 'architect']
+      voices: [...council.voices, 'architect'],
     };
   }
 
   /**
    * Phase 4: Rebirth - Implement, test, and deploy
    */
-  private async rebirthPhase(synthesis: { output: string; voices: string[] }): Promise<{ output: string; voices: string[] }> {
+  private async rebirthPhase(synthesis: {
+    output: string;
+    voices: string[];
+  }): Promise<{ output: string; voices: string[] }> {
     logger.debug('🎯 Rebirth phase starting');
-    
+
     const rebirthPrompt = `
 Act as The Implementor archetype. Transform this synthesized design into concrete, actionable implementation:
 
@@ -290,10 +303,10 @@ Focus on practical, executable solutions that can be immediately implemented.
 `;
 
     const output = await this.modelClient.generate(rebirthPrompt);
-    
+
     return {
       output,
-      voices: [...synthesis.voices, 'implementor']
+      voices: [...synthesis.voices, 'implementor'],
     };
   }
 
@@ -305,12 +318,13 @@ Focus on practical, executable solutions that can be immediately implemented.
     previousIterations: SpiralIteration[]
   ): Promise<{ output: string; voices: string[] }> {
     logger.debug('🔄 Reflection phase starting');
-    
-    const iterationHistory = previousIterations.length > 0
-      ? `\nPREVIOUS ITERATIONS:\n${previousIterations.map(iter => 
-          `Iteration ${iter.iteration}: Quality ${iter.quality.toFixed(2)}`
-        ).join('\n')}`
-      : '';
+
+    const iterationHistory =
+      previousIterations.length > 0
+        ? `\nPREVIOUS ITERATIONS:\n${previousIterations
+            .map(iter => `Iteration ${iter.iteration}: Quality ${iter.quality.toFixed(2)}`)
+            .join('\n')}`
+        : '';
 
     const reflectionPrompt = `
 Act as The Guardian archetype. Reflect on this implementation and the overall spiral process:
@@ -331,7 +345,7 @@ Be honest about quality and provide specific guidance for next steps.
 `;
 
     const reflectionContent = await this.modelClient.generate(reflectionPrompt);
-    
+
     // Combine rebirth output with reflection insights
     const finalOutput = `
 ${rebirth.output}
@@ -344,7 +358,7 @@ ${reflectionContent}
 
     return {
       output: finalOutput,
-      voices: [...rebirth.voices, 'guardian']
+      voices: [...rebirth.voices, 'guardian'],
     };
   }
 
@@ -353,20 +367,20 @@ ${reflectionContent}
    */
   private selectCouncilVoices(): string[] {
     const allVoices = ['explorer', 'maintainer', 'analyzer', 'developer', 'security', 'architect'];
-    
+
     if (this.config.councilSize >= allVoices.length) {
       return allVoices;
     }
-    
+
     // Select diverse set of voices
     const selected = ['explorer', 'maintainer', 'security']; // Always include these core voices
     const remaining = allVoices.filter(v => !selected.includes(v));
-    
+
     while (selected.length < this.config.councilSize && remaining.length > 0) {
       const randomIndex = Math.floor(Math.random() * remaining.length);
       selected.push(remaining.splice(randomIndex, 1)[0]);
     }
-    
+
     return selected;
   }
 
@@ -379,35 +393,38 @@ ${reflectionContent}
     const hasStructure = /#{1,3}/.test(output) || /\d+\./.test(output);
     const hasDetail = output.length > 500;
     const hasActionable = /step|implement|create|build|deploy/.test(output.toLowerCase());
-    
+
     let score = 0.5; // Base score
-    
+
     if (hasCode) score += 0.15;
     if (hasStructure) score += 0.15;
     if (hasDetail) score += 0.1;
     if (hasActionable) score += 0.1;
-    
+
     return Math.min(score, 1.0);
   }
 
   /**
    * Calculate convergence towards optimal solution
    */
-  private calculateConvergence(previousIterations: SpiralIteration[], currentQuality: number): number {
+  private calculateConvergence(
+    previousIterations: SpiralIteration[],
+    currentQuality: number
+  ): number {
     if (previousIterations.length === 0) {
       return currentQuality;
     }
-    
+
     const qualityTrend = previousIterations.map(iter => iter.quality);
     qualityTrend.push(currentQuality);
-    
+
     // Calculate improvement rate
     if (qualityTrend.length < 2) {
       return currentQuality;
     }
-    
+
     const improvement = currentQuality - qualityTrend[qualityTrend.length - 2];
-    return Math.max(0, Math.min(1, currentQuality + (improvement * 0.5)));
+    return Math.max(0, Math.min(1, currentQuality + improvement * 0.5));
   }
 
   /**
@@ -437,7 +454,7 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
       quality: iter.quality,
       convergence: iter.metadata.convergence,
       duration: iter.metadata.duration,
-      voiceCount: iter.voices.length
+      voiceCount: iter.voices.length,
     }));
   }
 }

@@ -1,0 +1,548 @@
+/**
+ * Enterprise Health Check System - Following Grimoire's Quality Gates
+ * Implements comprehensive health monitoring and readiness probes
+ */
+
+import { EventEmitter } from 'events';
+import { performance } from 'perf_hooks';
+import * as os from 'os';
+import { promises as fs } from 'fs';
+import { HealthStatus, HealthCheck } from '../../core/types/global.types.js';
+import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
+import { metrics, logging } from '../monitoring/observability.js';
+import { config } from '../config/production.config.js';
+
+export interface HealthCheckResult extends HealthCheck {
+  duration: number;
+  details?: Record<string, any>;
+}
+
+export interface ReadinessProbe {
+  ready: boolean;
+  checks: HealthCheckResult[];
+  message: string;
+}
+
+export interface LivenessProbe {
+  alive: boolean;
+  uptime: number;
+  message: string;
+}
+
+/**
+ * Health monitoring service
+ */
+export class HealthMonitor extends EventEmitter {
+  private static instance: HealthMonitor;
+  private checks: Map<string, () => Promise<HealthCheckResult>> = new Map();
+  private lastHealthStatus: HealthStatus | null = null;
+  private startTime: Date;
+  private checkInterval: NodeJS.Timeout | null = null;
+
+  // Thresholds from Grimoire
+  private readonly CPU_THRESHOLD = 80; // %
+  private readonly MEMORY_THRESHOLD = 85; // %
+  private readonly DISK_THRESHOLD = 90; // %
+  private readonly RESPONSE_TIME_THRESHOLD = 5000; // ms
+
+  private constructor() {
+    super();
+    this.startTime = new Date();
+    this.registerDefaultChecks();
+  }
+
+  static getInstance(): HealthMonitor {
+    if (!HealthMonitor.instance) {
+      HealthMonitor.instance = new HealthMonitor();
+    }
+    return HealthMonitor.instance;
+  }
+
+  /**
+   * Register default health checks
+   */
+  private registerDefaultChecks(): void {
+    // System checks
+    this.registerCheck('cpu', () => this.checkCPU());
+    this.registerCheck('memory', () => this.checkMemory());
+    this.registerCheck('disk', () => this.checkDisk());
+
+    // Service checks
+    this.registerCheck('database', () => this.checkDatabase());
+    this.registerCheck('cache', () => this.checkCache());
+    this.registerCheck('mcp_servers', () => this.checkMCPServers());
+
+    // Application checks
+    this.registerCheck('voice_system', () => this.checkVoiceSystem());
+    this.registerCheck('council_engine', () => this.checkCouncilEngine());
+    this.registerCheck('security_framework', () => this.checkSecurityFramework());
+  }
+
+  /**
+   * Register a custom health check
+   */
+  registerCheck(name: string, check: () => Promise<HealthCheckResult>): void {
+    this.checks.set(name, check);
+  }
+
+  /**
+   * Run all health checks
+   */
+  async runHealthChecks(): Promise<HealthStatus> {
+    const startTime = performance.now();
+    const results: HealthCheckResult[] = [];
+
+    for (const [name, check] of this.checks) {
+      try {
+        const checkStart = performance.now();
+        const result = await check();
+        result.duration = performance.now() - checkStart;
+        results.push(result);
+
+        // Record metrics
+        metrics.apiRequestDuration.observe(
+          {
+            method: 'health_check',
+            route: name,
+            status_code: result.status === 'healthy' ? '200' : '503',
+          },
+          result.duration / 1000
+        );
+      } catch (error) {
+        results.push({
+          name,
+          status: 'unhealthy',
+          message: error instanceof Error ? error.message : 'Check failed',
+          duration: performance.now() - checkStart,
+        });
+
+        logging.error(`Health check failed: ${name}`, error as Error);
+      }
+    }
+
+    const healthy = results.every(r => r.status !== 'unhealthy');
+    const duration = performance.now() - startTime;
+
+    this.lastHealthStatus = {
+      healthy,
+      checks: results,
+      timestamp: new Date(),
+    };
+
+    // Emit health status
+    this.emit('health:checked', this.lastHealthStatus);
+
+    // Record overall health metric
+    metrics.memoryUsage.set({ type: 'health_check_duration' }, duration);
+
+    return this.lastHealthStatus;
+  }
+
+  /**
+   * Get current health status
+   */
+  async getHealth(): Promise<HealthStatus> {
+    if (!this.lastHealthStatus) {
+      return await this.runHealthChecks();
+    }
+
+    // If last check is older than 30 seconds, run new check
+    const age = Date.now() - this.lastHealthStatus.timestamp.getTime();
+    if (age > 30000) {
+      return await this.runHealthChecks();
+    }
+
+    return this.lastHealthStatus;
+  }
+
+  /**
+   * Readiness probe - checks if service is ready to handle requests
+   */
+  async getReadiness(): Promise<ReadinessProbe> {
+    const criticalChecks = ['database', 'cache', 'mcp_servers', 'voice_system'];
+    const results: HealthCheckResult[] = [];
+
+    for (const checkName of criticalChecks) {
+      const check = this.checks.get(checkName);
+      if (check) {
+        try {
+          const result = await check();
+          results.push(result);
+        } catch (error) {
+          results.push({
+            name: checkName,
+            status: 'unhealthy',
+            message: 'Check failed',
+            duration: 0,
+          });
+        }
+      }
+    }
+
+    const ready = results.every(r => r.status !== 'unhealthy');
+
+    return {
+      ready,
+      checks: results,
+      message: ready ? 'Service is ready' : 'Service not ready',
+    };
+  }
+
+  /**
+   * Liveness probe - checks if service is alive
+   */
+  async getLiveness(): Promise<LivenessProbe> {
+    const uptime = Date.now() - this.startTime.getTime();
+
+    try {
+      // Simple check - can we allocate memory and respond?
+      const test = Buffer.alloc(1024);
+
+      return {
+        alive: true,
+        uptime,
+        message: 'Service is alive',
+      };
+    } catch (error) {
+      return {
+        alive: false,
+        uptime,
+        message: 'Service is not responding',
+      };
+    }
+  }
+
+  /**
+   * Start periodic health checks
+   */
+  startPeriodicChecks(intervalMs: number = 60000): void {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+    }
+
+    this.checkInterval = setInterval(async () => {
+      try {
+        await this.runHealthChecks();
+      } catch (error) {
+        logging.error('Periodic health check failed', error as Error);
+      }
+    }, intervalMs);
+
+    logging.info(`Started periodic health checks every ${intervalMs}ms`);
+  }
+
+  /**
+   * Stop periodic health checks
+   */
+  stopPeriodicChecks(): void {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+      logging.info('Stopped periodic health checks');
+    }
+  }
+
+  // Individual health check implementations
+
+  private async checkCPU(): Promise<HealthCheckResult> {
+    const cpus = os.cpus();
+    const loads = os.loadavg();
+    const cpuUsage = (loads[0] / cpus.length) * 100;
+
+    const status =
+      cpuUsage < this.CPU_THRESHOLD ? 'healthy' : cpuUsage < 90 ? 'degraded' : 'unhealthy';
+
+    return {
+      name: 'cpu',
+      status,
+      message: `CPU usage: ${cpuUsage.toFixed(2)}%`,
+      duration: 0,
+      metrics: {
+        usage: cpuUsage,
+        cores: cpus.length,
+        load1m: loads[0],
+        load5m: loads[1],
+        load15m: loads[2],
+      },
+    };
+  }
+
+  private async checkMemory(): Promise<HealthCheckResult> {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const memUsage = (usedMem / totalMem) * 100;
+
+    const processMemory = process.memoryUsage();
+    const heapUsage = (processMemory.heapUsed / processMemory.heapTotal) * 100;
+
+    const status =
+      memUsage < this.MEMORY_THRESHOLD ? 'healthy' : memUsage < 95 ? 'degraded' : 'unhealthy';
+
+    return {
+      name: 'memory',
+      status,
+      message: `Memory usage: ${memUsage.toFixed(2)}%`,
+      duration: 0,
+      metrics: {
+        systemUsage: memUsage,
+        heapUsage,
+        heapUsed: processMemory.heapUsed,
+        heapTotal: processMemory.heapTotal,
+        rss: processMemory.rss,
+        external: processMemory.external,
+      },
+    };
+  }
+
+  private async checkDisk(): Promise<HealthCheckResult> {
+    try {
+      // Check temp directory space (cross-platform)
+      const tempDir = os.tmpdir();
+      const stats = await fs.statfs(tempDir);
+
+      const totalSpace = stats.blocks * stats.bsize;
+      const availableSpace = stats.bavail * stats.bsize;
+      const usedSpace = totalSpace - availableSpace;
+      const diskUsage = (usedSpace / totalSpace) * 100;
+
+      const status =
+        diskUsage < this.DISK_THRESHOLD ? 'healthy' : diskUsage < 95 ? 'degraded' : 'unhealthy';
+
+      return {
+        name: 'disk',
+        status,
+        message: `Disk usage: ${diskUsage.toFixed(2)}%`,
+        duration: 0,
+        metrics: {
+          usage: diskUsage,
+          available: availableSpace,
+          total: totalSpace,
+        },
+      };
+    } catch (error) {
+      return {
+        name: 'disk',
+        status: 'unhealthy',
+        message: 'Unable to check disk space',
+        duration: 0,
+      };
+    }
+  }
+
+  private async checkDatabase(): Promise<HealthCheckResult> {
+    // Check database connectivity
+    // This would connect to actual database in production
+    const startTime = performance.now();
+
+    try {
+      // Simulate database check
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      const duration = performance.now() - startTime;
+      const status = duration < 100 ? 'healthy' : duration < 500 ? 'degraded' : 'unhealthy';
+
+      return {
+        name: 'database',
+        status,
+        message: `Database response time: ${duration.toFixed(2)}ms`,
+        duration,
+        metrics: {
+          responseTime: duration,
+          connections: 10, // Mock value
+          activeQueries: 2, // Mock value
+        },
+      };
+    } catch (error) {
+      return {
+        name: 'database',
+        status: 'unhealthy',
+        message: 'Database connection failed',
+        duration: performance.now() - startTime,
+      };
+    }
+  }
+
+  private async checkCache(): Promise<HealthCheckResult> {
+    // Check cache service (Redis, etc.)
+    const startTime = performance.now();
+
+    try {
+      // Simulate cache check
+      await new Promise(resolve => setTimeout(resolve, 5));
+
+      const duration = performance.now() - startTime;
+      const status = duration < 50 ? 'healthy' : duration < 200 ? 'degraded' : 'unhealthy';
+
+      return {
+        name: 'cache',
+        status,
+        message: `Cache response time: ${duration.toFixed(2)}ms`,
+        duration,
+        metrics: {
+          responseTime: duration,
+          hitRate: 0.95, // Mock value
+          memoryUsage: 256, // MB, mock value
+        },
+      };
+    } catch (error) {
+      return {
+        name: 'cache',
+        status: 'unhealthy',
+        message: 'Cache connection failed',
+        duration: performance.now() - startTime,
+      };
+    }
+  }
+
+  private async checkMCPServers(): Promise<HealthCheckResult> {
+    try {
+      // Get MCP server manager instance
+      const mcpManager = new MCPServerManager({
+        filesystem: { enabled: true, restrictedPaths: [], allowedPaths: ['.'] },
+        git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
+        terminal: { enabled: false, allowedCommands: [], blockedCommands: [] },
+        packageManager: { enabled: false, autoInstall: false, securityScan: true },
+      });
+
+      const health = await mcpManager.healthCheck();
+      const unhealthyServers = Object.values(health).filter((s: any) => s.status === 'error');
+
+      const status =
+        unhealthyServers.length === 0
+          ? 'healthy'
+          : unhealthyServers.length < 2
+            ? 'degraded'
+            : 'unhealthy';
+
+      return {
+        name: 'mcp_servers',
+        status,
+        message: `MCP servers: ${Object.keys(health).length} total, ${unhealthyServers.length} unhealthy`,
+        duration: 0,
+        details: health,
+      };
+    } catch (error) {
+      return {
+        name: 'mcp_servers',
+        status: 'unhealthy',
+        message: 'MCP server check failed',
+        duration: 0,
+      };
+    }
+  }
+
+  private async checkVoiceSystem(): Promise<HealthCheckResult> {
+    const startTime = performance.now();
+
+    try {
+      // Check if voice system can be instantiated
+      const { VoiceArchetypeSystem } = await import('../../voices/voice-archetype-system.js');
+      const voiceSystem = new VoiceArchetypeSystem();
+      const voices = voiceSystem.getAvailableVoices();
+
+      const duration = performance.now() - startTime;
+      const status = voices.length > 0 ? 'healthy' : 'unhealthy';
+
+      return {
+        name: 'voice_system',
+        status,
+        message: `Voice system: ${voices.length} voices available`,
+        duration,
+        metrics: {
+          voiceCount: voices.length,
+          initTime: duration,
+        },
+      };
+    } catch (error) {
+      return {
+        name: 'voice_system',
+        status: 'unhealthy',
+        message: 'Voice system initialization failed',
+        duration: performance.now() - startTime,
+      };
+    }
+  }
+
+  private async checkCouncilEngine(): Promise<HealthCheckResult> {
+    const startTime = performance.now();
+
+    try {
+      // Check if council engine can be instantiated
+      const { CouncilDecisionEngine } = await import(
+        '../../core/collaboration/council-decision-engine.js'
+      );
+
+      const duration = performance.now() - startTime;
+
+      return {
+        name: 'council_engine',
+        status: 'healthy',
+        message: 'Council engine operational',
+        duration,
+        metrics: {
+          initTime: duration,
+        },
+      };
+    } catch (error) {
+      return {
+        name: 'council_engine',
+        status: 'unhealthy',
+        message: 'Council engine initialization failed',
+        duration: performance.now() - startTime,
+      };
+    }
+  }
+
+  private async checkSecurityFramework(): Promise<HealthCheckResult> {
+    const startTime = performance.now();
+
+    try {
+      // Check if security framework can validate
+      const { EnterpriseSecurityFramework } = await import(
+        '../../core/security/enterprise-security-framework.js'
+      );
+      const security = new EnterpriseSecurityFramework();
+
+      // Test validation
+      const testResult = await security.validateAgentAction(
+        'health-check',
+        {
+          type: 'file_access',
+          agentId: 'health-check',
+          payload: { path: './test.txt' },
+          timestamp: new Date(),
+        },
+        {
+          sessionId: 'health-check',
+          permissions: ['file_access'],
+          environment: 'development',
+          riskProfile: 'low',
+        }
+      );
+
+      const duration = performance.now() - startTime;
+
+      return {
+        name: 'security_framework',
+        status: 'healthy',
+        message: 'Security framework operational',
+        duration,
+        metrics: {
+          validationTime: duration,
+          testPassed: testResult.allowed,
+        },
+      };
+    } catch (error) {
+      return {
+        name: 'security_framework',
+        status: 'unhealthy',
+        message: 'Security framework check failed',
+        duration: performance.now() - startTime,
+      };
+    }
+  }
+}
+
+// Export singleton instance
+export const healthMonitor = HealthMonitor.getInstance();

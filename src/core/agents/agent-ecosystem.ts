@@ -22,7 +22,7 @@ export interface Agent {
   expertise: ExpertiseDomain[];
   status: AgentStatus;
   configuration: AgentConfiguration;
-  
+
   // Core methods
   initialize(): Promise<void>;
   process(request: AgentRequest): Promise<AgentResponse>;
@@ -32,7 +32,16 @@ export interface Agent {
 }
 
 export interface AgentRole {
-  type: 'explorer' | 'analyzer' | 'implementor' | 'maintainer' | 'security' | 'optimizer' | 'tester' | 'architect' | 'reviewer';
+  type:
+    | 'explorer'
+    | 'analyzer'
+    | 'implementor'
+    | 'maintainer'
+    | 'security'
+    | 'optimizer'
+    | 'tester'
+    | 'architect'
+    | 'reviewer';
   description: string;
   responsibilities: string[];
   authority: 'advisory' | 'decision-making' | 'implementation' | 'review';
@@ -40,7 +49,14 @@ export interface AgentRole {
 }
 
 export interface AgentPersonality {
-  approach: 'methodical' | 'creative' | 'pragmatic' | 'perfectionist' | 'innovative' | 'conservative' | 'aggressive';
+  approach:
+    | 'methodical'
+    | 'creative'
+    | 'pragmatic'
+    | 'perfectionist'
+    | 'innovative'
+    | 'conservative'
+    | 'aggressive';
   communication: 'detailed' | 'concise' | 'technical' | 'narrative' | 'analytical';
   riskTolerance: 'low' | 'medium' | 'high';
   decisionStyle: 'quick' | 'deliberate' | 'collaborative' | 'independent';
@@ -140,7 +156,14 @@ export interface ResourceLimits {
 
 export interface AgentRequest {
   id: string;
-  type: 'analysis' | 'implementation' | 'review' | 'optimization' | 'testing' | 'documentation' | 'planning';
+  type:
+    | 'analysis'
+    | 'implementation'
+    | 'review'
+    | 'optimization'
+    | 'testing'
+    | 'documentation'
+    | 'planning';
   content: string;
   context?: AgentContext;
   constraints?: AgentConstraints;
@@ -248,7 +271,13 @@ export interface ResourceUsage {
 }
 
 export interface AgentAction {
-  type: 'file_create' | 'file_modify' | 'file_delete' | 'command_execute' | 'analysis_run' | 'test_run';
+  type:
+    | 'file_create'
+    | 'file_modify'
+    | 'file_delete'
+    | 'command_execute'
+    | 'analysis_run'
+    | 'test_run';
   target: string;
   parameters: Record<string, any>;
   confirmation?: boolean;
@@ -377,7 +406,7 @@ export class AgentEcosystem extends EventEmitter {
     this.toolOrchestrator = toolOrchestrator;
     this.ragSystem = ragSystem;
     this.modelRouter = modelRouter;
-    
+
     this.collaborationManager = new CollaborationManager(this);
     this.learningEngine = new AgentLearningEngine();
     this.performanceMonitor = new AgentPerformanceMonitor();
@@ -392,16 +421,15 @@ export class AgentEcosystem extends EventEmitter {
     try {
       // Create specialized agents
       await this.createSpecializedAgents();
-      
+
       // Initialize collaboration manager
       await this.collaborationManager.initialize();
-      
+
       // Start performance monitoring
       this.performanceMonitor.start();
-      
+
       this.logger.info('Agent Ecosystem initialized successfully');
       this.emit('ecosystem:initialized');
-
     } catch (error) {
       this.logger.error('Failed to initialize agent ecosystem:', error);
       throw error;
@@ -417,22 +445,24 @@ export class AgentEcosystem extends EventEmitter {
     try {
       // Select optimal agent for the request
       const selectedAgent = await this.selectAgent(request);
-      
+
       // Process the request
       const response = await selectedAgent.process(request);
-      
+
       // Monitor performance
       this.performanceMonitor.recordRequest(request, response);
-      
+
       // Check if collaboration is needed
       if (response.collaboration) {
-        const collaborativeResponse = await this.handleCollaboration(response.collaboration, request);
+        const collaborativeResponse = await this.handleCollaboration(
+          response.collaboration,
+          request
+        );
         return this.synthesizeCollaborativeResponse(response, collaborativeResponse);
       }
-      
+
       this.emit('request:completed', { request, response });
       return response;
-
     } catch (error) {
       this.logger.error(`Failed to process request ${request.id}:`, error);
       throw error;
@@ -444,7 +474,7 @@ export class AgentEcosystem extends EventEmitter {
    */
   async executeCollaborativeTask(task: CollaborativeTask): Promise<CollaborativeResponse> {
     this.logger.info(`Executing collaborative task: ${task.title}`);
-    
+
     return await this.collaborationManager.executeTask(task);
   }
 
@@ -473,8 +503,8 @@ export class AgentEcosystem extends EventEmitter {
    * Get available agents
    */
   getAvailableAgents(): Agent[] {
-    return Array.from(this.agents.values()).filter(agent => 
-      agent.status.availability && agent.status.state !== 'offline'
+    return Array.from(this.agents.values()).filter(
+      agent => agent.status.availability && agent.status.state !== 'offline'
     );
   }
 
@@ -484,7 +514,7 @@ export class AgentEcosystem extends EventEmitter {
   async addAgent(agent: Agent): Promise<void> {
     await agent.initialize();
     this.agents.set(agent.id, agent);
-    
+
     this.logger.info(`Added agent: ${agent.name} (${agent.role.type})`);
     this.emit('agent:added', agent);
   }
@@ -497,7 +527,7 @@ export class AgentEcosystem extends EventEmitter {
     if (agent) {
       await agent.shutdown();
       this.agents.delete(agentId);
-      
+
       this.logger.info(`Removed agent: ${agent.name}`);
       this.emit('agent:removed', { agentId });
     }
@@ -508,7 +538,7 @@ export class AgentEcosystem extends EventEmitter {
    */
   getEcosystemStats(): EcosystemStats {
     const agents = Array.from(this.agents.values());
-    
+
     return {
       totalAgents: agents.length,
       activeAgents: agents.filter(a => a.status.state !== 'offline').length,
@@ -516,7 +546,7 @@ export class AgentEcosystem extends EventEmitter {
       averageWorkload: this.calculateAverageWorkload(),
       performanceMetrics: this.performanceMonitor.getStats(),
       collaborationStats: this.collaborationManager.getStats(),
-      learningProgress: this.learningEngine.getStats()
+      learningProgress: this.learningEngine.getStats(),
     };
   }
 
@@ -631,16 +661,16 @@ export class AgentEcosystem extends EventEmitter {
 
   private async selectAgent(request: AgentRequest): Promise<Agent> {
     const availableAgents = this.getAvailableAgents();
-    
+
     // Simple selection based on request type
     const preferredRoles: Record<string, string> = {
-      'analysis': 'analyzer',
-      'implementation': 'implementor',
-      'review': 'reviewer',
-      'optimization': 'optimizer',
-      'testing': 'tester',
-      'documentation': 'maintainer',
-      'planning': 'architect'
+      analysis: 'analyzer',
+      implementation: 'implementor',
+      review: 'reviewer',
+      optimization: 'optimizer',
+      testing: 'tester',
+      documentation: 'maintainer',
+      planning: 'architect',
     };
 
     const preferredRole = preferredRoles[request.type];
@@ -673,7 +703,7 @@ export class AgentEcosystem extends EventEmitter {
       coordinator: 'system',
       phases: [],
       dependencies: [],
-      deadline: originalRequest.deadline
+      deadline: originalRequest.deadline,
     };
 
     return await this.executeCollaborativeTask(task);
@@ -687,26 +717,29 @@ export class AgentEcosystem extends EventEmitter {
     return {
       ...originalResponse,
       content: collaborativeResponse.finalRecommendation,
-      confidence: Math.max(originalResponse.confidence, collaborativeResponse.synthesis.confidenceScore),
-      reasoning: `${originalResponse.reasoning}\n\nCollaborative Analysis: ${collaborativeResponse.synthesis.finalOutput}`
+      confidence: Math.max(
+        originalResponse.confidence,
+        collaborativeResponse.synthesis.confidenceScore
+      ),
+      reasoning: `${originalResponse.reasoning}\n\nCollaborative Analysis: ${collaborativeResponse.synthesis.finalOutput}`,
     };
   }
 
   private getAgentDistribution(): Record<string, number> {
     const distribution: Record<string, number> = {};
-    
+
     for (const agent of this.agents.values()) {
       const role = agent.role.type;
       distribution[role] = (distribution[role] || 0) + 1;
     }
-    
+
     return distribution;
   }
 
   private calculateAverageWorkload(): number {
     const agents = Array.from(this.agents.values());
     if (agents.length === 0) return 0;
-    
+
     const totalWorkload = agents.reduce((sum, agent) => sum + agent.status.workload, 0);
     return totalWorkload / agents.length;
   }
@@ -744,9 +777,9 @@ abstract class BaseAgent implements Agent {
     this.ragSystem = ragSystem;
     this.toolOrchestrator = toolOrchestrator;
     this.modelRouter = modelRouter;
-    
+
     this.logger = new Logger({ level: 'info' });
-    
+
     // Initialize default status
     this.status = {
       state: 'idle',
@@ -759,8 +792,8 @@ abstract class BaseAgent implements Agent {
         responseTime: 0,
         memoryUsage: 0,
         issueCount: 0,
-        lastHealthCheck: new Date()
-      }
+        lastHealthCheck: new Date(),
+      },
     };
 
     // Initialize default configuration
@@ -782,11 +815,13 @@ abstract class BaseAgent implements Agent {
       // Default collaboration implementation using round-robin approach
       const responses: AgentResponse[] = [];
       const participatingAgents = agents.filter(agent => agent !== this);
-      
-      this.logger.info(`Starting collaboration with ${participatingAgents.length} agents for task: ${task.type}`);
-      
+
+      this.logger.info(
+        `Starting collaboration with ${participatingAgents.length} agents for task: ${task.type}`
+      );
+
       const startTime = Date.now();
-      
+
       // Execute task with each participating agent
       for (const agent of participatingAgents) {
         try {
@@ -794,16 +829,17 @@ abstract class BaseAgent implements Agent {
             prompt: (task as any).prompt || task.description,
             context: (task as any).context,
             type: task.type,
-            constraints: (task as any).constraints
+            constraints: (task as any).constraints,
           });
-          
+
           responses.push({
             id: `resp_${Date.now()}_${agent.id}`,
             requestId: (task as any).id || `task_${Date.now()}`,
             agentId: agent.id,
             content: response.content || response.result?.toString() || '',
             confidence: response.confidence || 0.8,
-            reasoning: response.reasoning || `Response from ${(agent as any).type || 'unknown'} agent`,
+            reasoning:
+              response.reasoning || `Response from ${(agent as any).type || 'unknown'} agent`,
             metadata: {
               processingTime: Date.now() - startTime,
               tokensUsed: 0,
@@ -815,9 +851,9 @@ abstract class BaseAgent implements Agent {
                 cpu: 0.1,
                 memory: 0.1,
                 cost: 0.01,
-                apiCalls: 1
-              }
-            }
+                apiCalls: 1,
+              },
+            },
           });
         } catch (error) {
           this.logger.warn(`Agent ${agent.id} failed in collaboration:`, error);
@@ -839,17 +875,21 @@ abstract class BaseAgent implements Agent {
                 cpu: 0.1,
                 memory: 0.1,
                 cost: 0.01,
-                apiCalls: 1
-              }
-            }
+                apiCalls: 1,
+              },
+            },
           });
         }
       }
-      
+
       // Synthesize collaborative response
-      const synthesizedContent = this.synthesizeResponses(responses, (task as any).synthesis || 'consensus');
-      const averageConfidence = responses.reduce((sum, r) => sum + r.confidence, 0) / responses.length;
-      
+      const synthesizedContent = this.synthesizeResponses(
+        responses,
+        (task as any).synthesis || 'consensus'
+      );
+      const averageConfidence =
+        responses.reduce((sum, r) => sum + r.confidence, 0) / responses.length;
+
       return {
         taskId: (task as any).id || `task_${Date.now()}`,
         phases: responses.map(response => ({
@@ -858,71 +898,75 @@ abstract class BaseAgent implements Agent {
           result: response,
           quality: response.confidence,
           confidence: response.confidence,
-          issues: response.confidence < 0.5 ? ['Low confidence response'] : undefined
+          issues: response.confidence < 0.5 ? ['Low confidence response'] : undefined,
         })),
         synthesis: {
           approach: 'consensus' as const,
           weights: responses.reduce((acc, r) => ({ ...acc, [r.agentId]: r.confidence }), {}),
           conflicts: [],
           finalOutput: synthesizedContent,
-          confidenceScore: averageConfidence
+          confidenceScore: averageConfidence,
         },
         consensus: {
           agreement: averageConfidence,
           conflicts: responses.filter(r => r.confidence < 0.5).length,
           convergence: averageConfidence,
-          stability: averageConfidence
+          stability: averageConfidence,
         },
         finalRecommendation: synthesizedContent,
         metadata: {
           totalTime: responses.reduce((sum, r) => sum + (r.metadata?.processingTime || 0), 0),
-          participationLevel: responses.reduce((acc, r) => ({ ...acc, [r.agentId]: r.confidence }), {}),
+          participationLevel: responses.reduce(
+            (acc, r) => ({ ...acc, [r.agentId]: r.confidence }),
+            {}
+          ),
           communicationRounds: 1,
           decisionsReached: 1,
-          escalationsRequired: 0
-        }
+          escalationsRequired: 0,
+        },
       };
     } catch (error) {
-      throw new Error(`Collaboration failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Collaboration failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
-  
-  private synthesizeResponses(responses: AgentResponse[], method: 'consensus' | 'best' | 'merge'): string {
+
+  private synthesizeResponses(
+    responses: AgentResponse[],
+    method: 'consensus' | 'best' | 'merge'
+  ): string {
     if (responses.length === 0) {
       return 'No responses available for synthesis';
     }
-    
+
     switch (method) {
       case 'best':
         // Return the response with highest confidence
-        const bestResponse = responses.reduce((best, current) => 
+        const bestResponse = responses.reduce((best, current) =>
           current.confidence > best.confidence ? current : best
         );
         return bestResponse.content;
-        
+
       case 'merge':
         // Merge all responses with separators
-        return responses
-          .map(r => `**${r.agentId}**: ${r.content}`)
-          .join('\n\n---\n\n');
-        
+        return responses.map(r => `**${r.agentId}**: ${r.content}`).join('\n\n---\n\n');
+
       case 'consensus':
       default:
         // Simple consensus: use majority approach or highest confidence
         if (responses.length === 1) {
           return responses[0].content;
         }
-        
+
         // For multiple responses, combine them intelligently
         const highConfidenceResponses = responses.filter(r => r.confidence > 0.7);
         if (highConfidenceResponses.length > 0) {
-          return highConfidenceResponses
-            .map(r => r.content)
-            .join('\n\n');
+          return highConfidenceResponses.map(r => r.content).join('\n\n');
         }
-        
+
         // Fallback to best response
-        return responses.reduce((best, current) => 
+        return responses.reduce((best, current) =>
           current.confidence > best.confidence ? current : best
         ).content;
     }
@@ -931,7 +975,7 @@ abstract class BaseAgent implements Agent {
   async learn(feedback: AgentFeedback): Promise<void> {
     // Basic learning implementation
     this.logger.debug(`Received feedback for request ${feedback.requestId}: ${feedback.rating}/5`);
-    
+
     // Update expertise based on feedback
     this.updateExpertiseFromFeedback(feedback);
   }
@@ -955,35 +999,35 @@ abstract class BaseAgent implements Agent {
           modelId: 'codellama:34b',
           priority: 1,
           useCase: ['analysis', 'reasoning'],
-          configuration: {}
-        }
+          configuration: {},
+        },
       ],
       behaviorSettings: {
         verbosity: 'normal',
         responseStyle: 'explanatory',
         errorHandling: 'adaptive',
-        optimizationLevel: 'balanced'
+        optimizationLevel: 'balanced',
       },
       collaborationSettings: {
         preferredTeamSize: 3,
         leadershipStyle: 'situational',
         communicationFrequency: 'regular',
-        conflictResolution: 'consensus'
+        conflictResolution: 'consensus',
       },
       learningSettings: {
         adaptationRate: 0.1,
         feedbackSensitivity: 0.8,
         explorationRate: 0.2,
         memoryRetention: 30,
-        learningMethods: ['feedback', 'observation', 'experimentation']
+        learningMethods: ['feedback', 'observation', 'experimentation'],
       },
       resourceLimits: {
         maxMemoryUsage: 512,
         maxProcessingTime: 300,
         maxConcurrentTasks: 3,
         maxToolsPerTask: 10,
-        costBudget: 1.0
-      }
+        costBudget: 1.0,
+      },
     };
   }
 
@@ -1022,10 +1066,10 @@ abstract class BaseAgent implements Agent {
           cpu: 0,
           memory: 0,
           cost: 0,
-          apiCalls: 0
-        }
+          apiCalls: 0,
+        },
       },
-      actions
+      actions,
     };
 
     return response;
@@ -1034,13 +1078,13 @@ abstract class BaseAgent implements Agent {
   protected assessComplexity(request: AgentRequest): number {
     // Simple complexity assessment
     let complexity = 0.5;
-    
+
     if (request.content.length > 1000) complexity += 0.2;
     if (request.context?.codebase?.complexity) {
       complexity += request.context.codebase.complexity * 0.3;
     }
     if (request.priority === 'critical') complexity += 0.1;
-    
+
     return Math.min(1.0, complexity);
   }
 }
@@ -1060,16 +1104,21 @@ class ExplorerAgent extends BaseAgent {
       {
         type: 'explorer',
         description: 'Discovers and maps code structures, dependencies, and patterns',
-        responsibilities: ['file discovery', 'dependency analysis', 'pattern recognition', 'code mapping'],
+        responsibilities: [
+          'file discovery',
+          'dependency analysis',
+          'pattern recognition',
+          'code mapping',
+        ],
         authority: 'advisory',
-        scope: 'project'
+        scope: 'project',
       },
       {
         approach: 'methodical',
         communication: 'detailed',
         riskTolerance: 'low',
         decisionStyle: 'deliberate',
-        learningStyle: 'observational'
+        learningStyle: 'observational',
       },
       ragSystem,
       toolOrchestrator,
@@ -1079,14 +1128,13 @@ class ExplorerAgent extends BaseAgent {
 
   async process(request: AgentRequest): Promise<AgentResponse> {
     this.status.state = 'busy';
-    
+
     try {
       // Explorer-specific processing logic
       const analysis = await this.exploreCodebase(request);
       const actions = await this.generateExplorationActions(request);
-      
+
       return await this.generateResponse(request, analysis, actions);
-      
     } finally {
       this.status.state = 'idle';
     }
@@ -1107,15 +1155,15 @@ class ExplorerAgent extends BaseAgent {
         level: 'expert',
         description: 'Discover and catalog files in a codebase',
         tools: ['file_scanner', 'dependency_analyzer'],
-        learnable: true
+        learnable: true,
       },
       {
         name: 'pattern_recognition',
         level: 'expert',
         description: 'Identify architectural and code patterns',
         tools: ['ast_analyzer', 'pattern_matcher'],
-        learnable: true
-      }
+        learnable: true,
+      },
     ];
   }
 
@@ -1127,8 +1175,8 @@ class ExplorerAgent extends BaseAgent {
         technologies: ['git', 'ast', 'static_analysis'],
         frameworks: ['typescript', 'javascript', 'python'],
         patterns: ['mvc', 'repository', 'factory'],
-        experience: []
-      }
+        experience: [],
+      },
     ];
   }
 
@@ -1143,8 +1191,8 @@ class ExplorerAgent extends BaseAgent {
         type: 'analysis_run',
         target: 'codebase',
         parameters: { type: 'structure_analysis' },
-        reversible: true
-      }
+        reversible: true,
+      },
     ];
   }
 }
@@ -1162,16 +1210,21 @@ class AnalyzerAgent extends BaseAgent {
       {
         type: 'analyzer',
         description: 'Performs deep analysis of code quality, complexity, and issues',
-        responsibilities: ['quality analysis', 'complexity assessment', 'issue detection', 'metrics calculation'],
+        responsibilities: [
+          'quality analysis',
+          'complexity assessment',
+          'issue detection',
+          'metrics calculation',
+        ],
         authority: 'advisory',
-        scope: 'project'
+        scope: 'project',
       },
       {
         approach: 'methodical',
         communication: 'analytical',
         riskTolerance: 'medium',
         decisionStyle: 'deliberate',
-        learningStyle: 'theoretical'
+        learningStyle: 'theoretical',
       },
       ragSystem,
       toolOrchestrator,
@@ -1181,13 +1234,12 @@ class AnalyzerAgent extends BaseAgent {
 
   async process(request: AgentRequest): Promise<AgentResponse> {
     this.status.state = 'busy';
-    
+
     try {
       const analysis = await this.analyzeCode(request);
       const actions = await this.generateAnalysisActions(request);
-      
+
       return await this.generateResponse(request, analysis, actions);
-      
     } finally {
       this.status.state = 'idle';
     }
@@ -1208,15 +1260,15 @@ class AnalyzerAgent extends BaseAgent {
         level: 'expert',
         description: 'Analyze code quality and identify issues',
         tools: ['linter', 'complexity_analyzer', 'security_scanner'],
-        learnable: true
+        learnable: true,
       },
       {
         name: 'performance_analysis',
         level: 'expert',
         description: 'Identify performance bottlenecks and optimization opportunities',
         tools: ['profiler', 'benchmarker', 'memory_analyzer'],
-        learnable: true
-      }
+        learnable: true,
+      },
     ];
   }
 
@@ -1228,8 +1280,8 @@ class AnalyzerAgent extends BaseAgent {
         technologies: ['static_analysis', 'dynamic_analysis', 'profiling'],
         frameworks: ['eslint', 'sonarqube', 'codecov'],
         patterns: ['solid', 'clean_code', 'design_patterns'],
-        experience: []
-      }
+        experience: [],
+      },
     ];
   }
 
@@ -1244,28 +1296,41 @@ class AnalyzerAgent extends BaseAgent {
         type: 'analysis_run',
         target: 'code',
         parameters: { type: 'quality_analysis' },
-        reversible: true
-      }
+        reversible: true,
+      },
     ];
   }
 }
 
 // Additional specialized agents would be implemented similarly...
 class ImplementorAgent extends BaseAgent {
-  constructor(id: string, ragSystem: VectorRAGSystem, toolOrchestrator: AdvancedToolOrchestrator, modelRouter: IntelligentModelRouter) {
-    super(id, 'Code Implementor', {
-      type: 'implementor',
-      description: 'Generates and implements code solutions',
-      responsibilities: ['code generation', 'feature implementation', 'bug fixes', 'prototyping'],
-      authority: 'implementation',
-      scope: 'local'
-    }, {
-      approach: 'pragmatic',
-      communication: 'concise',
-      riskTolerance: 'medium',
-      decisionStyle: 'quick',
-      learningStyle: 'experiential'
-    }, ragSystem, toolOrchestrator, modelRouter);
+  constructor(
+    id: string,
+    ragSystem: VectorRAGSystem,
+    toolOrchestrator: AdvancedToolOrchestrator,
+    modelRouter: IntelligentModelRouter
+  ) {
+    super(
+      id,
+      'Code Implementor',
+      {
+        type: 'implementor',
+        description: 'Generates and implements code solutions',
+        responsibilities: ['code generation', 'feature implementation', 'bug fixes', 'prototyping'],
+        authority: 'implementation',
+        scope: 'local',
+      },
+      {
+        approach: 'pragmatic',
+        communication: 'concise',
+        riskTolerance: 'medium',
+        decisionStyle: 'quick',
+        learningStyle: 'experiential',
+      },
+      ragSystem,
+      toolOrchestrator,
+      modelRouter
+    );
   }
 
   async process(request: AgentRequest): Promise<AgentResponse> {
@@ -1281,26 +1346,30 @@ class ImplementorAgent extends BaseAgent {
 
   protected async customInitialization(): Promise<void> {}
   protected async customShutdown(): Promise<void> {}
-  
+
   protected getDefaultCapabilities(): AgentCapability[] {
-    return [{
-      name: 'code_generation',
-      level: 'expert',
-      description: 'Generate high-quality code solutions',
-      tools: ['code_generator', 'template_engine', 'scaffolder'],
-      learnable: true
-    }];
+    return [
+      {
+        name: 'code_generation',
+        level: 'expert',
+        description: 'Generate high-quality code solutions',
+        tools: ['code_generator', 'template_engine', 'scaffolder'],
+        learnable: true,
+      },
+    ];
   }
 
   protected getDefaultExpertise(): ExpertiseDomain[] {
-    return [{
-      area: 'software_implementation',
-      level: 88,
-      technologies: ['typescript', 'javascript', 'python', 'go'],
-      frameworks: ['react', 'node', 'express', 'fastapi'],
-      patterns: ['mvc', 'repository', 'factory', 'observer'],
-      experience: []
-    }];
+    return [
+      {
+        area: 'software_implementation',
+        level: 88,
+        technologies: ['typescript', 'javascript', 'python', 'go'],
+        frameworks: ['react', 'node', 'express', 'fastapi'],
+        patterns: ['mvc', 'repository', 'factory', 'observer'],
+        experience: [],
+      },
+    ];
   }
 
   private async generateImplementation(request: AgentRequest): Promise<string> {
@@ -1308,30 +1377,45 @@ class ImplementorAgent extends BaseAgent {
   }
 
   private async generateImplementationActions(request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'file_create',
-      target: 'implementation.ts',
-      parameters: { content: 'generated code' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'file_create',
+        target: 'implementation.ts',
+        parameters: { content: 'generated code' },
+        reversible: true,
+      },
+    ];
   }
 }
 
 class MaintainerAgent extends BaseAgent {
-  constructor(id: string, ragSystem: VectorRAGSystem, toolOrchestrator: AdvancedToolOrchestrator, modelRouter: IntelligentModelRouter) {
-    super(id, 'Code Maintainer', {
-      type: 'maintainer',
-      description: 'Maintains and refactors existing code',
-      responsibilities: ['refactoring', 'documentation', 'dependency updates', 'code cleanup'],
-      authority: 'implementation',
-      scope: 'project'
-    }, {
-      approach: 'conservative',
-      communication: 'detailed',
-      riskTolerance: 'low',
-      decisionStyle: 'deliberate',
-      learningStyle: 'observational'
-    }, ragSystem, toolOrchestrator, modelRouter);
+  constructor(
+    id: string,
+    ragSystem: VectorRAGSystem,
+    toolOrchestrator: AdvancedToolOrchestrator,
+    modelRouter: IntelligentModelRouter
+  ) {
+    super(
+      id,
+      'Code Maintainer',
+      {
+        type: 'maintainer',
+        description: 'Maintains and refactors existing code',
+        responsibilities: ['refactoring', 'documentation', 'dependency updates', 'code cleanup'],
+        authority: 'implementation',
+        scope: 'project',
+      },
+      {
+        approach: 'conservative',
+        communication: 'detailed',
+        riskTolerance: 'low',
+        decisionStyle: 'deliberate',
+        learningStyle: 'observational',
+      },
+      ragSystem,
+      toolOrchestrator,
+      modelRouter
+    );
   }
 
   async process(request: AgentRequest): Promise<AgentResponse> {
@@ -1347,26 +1431,30 @@ class MaintainerAgent extends BaseAgent {
 
   protected async customInitialization(): Promise<void> {}
   protected async customShutdown(): Promise<void> {}
-  
+
   protected getDefaultCapabilities(): AgentCapability[] {
-    return [{
-      name: 'refactoring',
-      level: 'expert',
-      description: 'Refactor code while preserving functionality',
-      tools: ['refactoring_engine', 'test_runner', 'dependency_updater'],
-      learnable: true
-    }];
+    return [
+      {
+        name: 'refactoring',
+        level: 'expert',
+        description: 'Refactor code while preserving functionality',
+        tools: ['refactoring_engine', 'test_runner', 'dependency_updater'],
+        learnable: true,
+      },
+    ];
   }
 
   protected getDefaultExpertise(): ExpertiseDomain[] {
-    return [{
-      area: 'code_maintenance',
-      level: 85,
-      technologies: ['refactoring', 'legacy_systems', 'migration'],
-      frameworks: ['jest', 'mocha', 'pytest'],
-      patterns: ['refactoring_patterns', 'legacy_patterns'],
-      experience: []
-    }];
+    return [
+      {
+        area: 'code_maintenance',
+        level: 85,
+        technologies: ['refactoring', 'legacy_systems', 'migration'],
+        frameworks: ['jest', 'mocha', 'pytest'],
+        patterns: ['refactoring_patterns', 'legacy_patterns'],
+        experience: [],
+      },
+    ];
   }
 
   private async performMaintenance(request: AgentRequest): Promise<string> {
@@ -1374,30 +1462,50 @@ class MaintainerAgent extends BaseAgent {
   }
 
   private async generateMaintenanceActions(request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'file_modify',
-      target: 'legacy_file.ts',
-      parameters: { refactor: true },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'file_modify',
+        target: 'legacy_file.ts',
+        parameters: { refactor: true },
+        reversible: true,
+      },
+    ];
   }
 }
 
 class SecurityAgent extends BaseAgent {
-  constructor(id: string, ragSystem: VectorRAGSystem, toolOrchestrator: AdvancedToolOrchestrator, modelRouter: IntelligentModelRouter) {
-    super(id, 'Security Specialist', {
-      type: 'security',
-      description: 'Analyzes and improves security aspects of code',
-      responsibilities: ['vulnerability scanning', 'security hardening', 'compliance checking', 'threat modeling'],
-      authority: 'advisory',
-      scope: 'system'
-    }, {
-      approach: 'perfectionist',
-      communication: 'technical',
-      riskTolerance: 'low',
-      decisionStyle: 'deliberate',
-      learningStyle: 'theoretical'
-    }, ragSystem, toolOrchestrator, modelRouter);
+  constructor(
+    id: string,
+    ragSystem: VectorRAGSystem,
+    toolOrchestrator: AdvancedToolOrchestrator,
+    modelRouter: IntelligentModelRouter
+  ) {
+    super(
+      id,
+      'Security Specialist',
+      {
+        type: 'security',
+        description: 'Analyzes and improves security aspects of code',
+        responsibilities: [
+          'vulnerability scanning',
+          'security hardening',
+          'compliance checking',
+          'threat modeling',
+        ],
+        authority: 'advisory',
+        scope: 'system',
+      },
+      {
+        approach: 'perfectionist',
+        communication: 'technical',
+        riskTolerance: 'low',
+        decisionStyle: 'deliberate',
+        learningStyle: 'theoretical',
+      },
+      ragSystem,
+      toolOrchestrator,
+      modelRouter
+    );
   }
 
   async process(request: AgentRequest): Promise<AgentResponse> {
@@ -1413,26 +1521,30 @@ class SecurityAgent extends BaseAgent {
 
   protected async customInitialization(): Promise<void> {}
   protected async customShutdown(): Promise<void> {}
-  
+
   protected getDefaultCapabilities(): AgentCapability[] {
-    return [{
-      name: 'vulnerability_detection',
-      level: 'expert',
-      description: 'Detect security vulnerabilities in code',
-      tools: ['security_scanner', 'sast_tools', 'dependency_checker'],
-      learnable: true
-    }];
+    return [
+      {
+        name: 'vulnerability_detection',
+        level: 'expert',
+        description: 'Detect security vulnerabilities in code',
+        tools: ['security_scanner', 'sast_tools', 'dependency_checker'],
+        learnable: true,
+      },
+    ];
   }
 
   protected getDefaultExpertise(): ExpertiseDomain[] {
-    return [{
-      area: 'cybersecurity',
-      level: 92,
-      technologies: ['owasp', 'sast', 'dast', 'penetration_testing'],
-      frameworks: ['snyk', 'sonarqube', 'checkmarx'],
-      patterns: ['secure_coding', 'authentication', 'authorization'],
-      experience: []
-    }];
+    return [
+      {
+        area: 'cybersecurity',
+        level: 92,
+        technologies: ['owasp', 'sast', 'dast', 'penetration_testing'],
+        frameworks: ['snyk', 'sonarqube', 'checkmarx'],
+        patterns: ['secure_coding', 'authentication', 'authorization'],
+        experience: [],
+      },
+    ];
   }
 
   private async analyzeSecurity(request: AgentRequest): Promise<string> {
@@ -1440,30 +1552,50 @@ class SecurityAgent extends BaseAgent {
   }
 
   private async generateSecurityActions(request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'analysis_run',
-      target: 'security_scan',
-      parameters: { type: 'vulnerability_scan' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'analysis_run',
+        target: 'security_scan',
+        parameters: { type: 'vulnerability_scan' },
+        reversible: true,
+      },
+    ];
   }
 }
 
 class OptimizerAgent extends BaseAgent {
-  constructor(id: string, ragSystem: VectorRAGSystem, toolOrchestrator: AdvancedToolOrchestrator, modelRouter: IntelligentModelRouter) {
-    super(id, 'Performance Optimizer', {
-      type: 'optimizer',
-      description: 'Optimizes code and system performance',
-      responsibilities: ['performance tuning', 'resource optimization', 'bottleneck identification', 'scaling recommendations'],
-      authority: 'implementation',
-      scope: 'system'
-    }, {
-      approach: 'innovative',
-      communication: 'technical',
-      riskTolerance: 'medium',
-      decisionStyle: 'quick',
-      learningStyle: 'experiential'
-    }, ragSystem, toolOrchestrator, modelRouter);
+  constructor(
+    id: string,
+    ragSystem: VectorRAGSystem,
+    toolOrchestrator: AdvancedToolOrchestrator,
+    modelRouter: IntelligentModelRouter
+  ) {
+    super(
+      id,
+      'Performance Optimizer',
+      {
+        type: 'optimizer',
+        description: 'Optimizes code and system performance',
+        responsibilities: [
+          'performance tuning',
+          'resource optimization',
+          'bottleneck identification',
+          'scaling recommendations',
+        ],
+        authority: 'implementation',
+        scope: 'system',
+      },
+      {
+        approach: 'innovative',
+        communication: 'technical',
+        riskTolerance: 'medium',
+        decisionStyle: 'quick',
+        learningStyle: 'experiential',
+      },
+      ragSystem,
+      toolOrchestrator,
+      modelRouter
+    );
   }
 
   async process(request: AgentRequest): Promise<AgentResponse> {
@@ -1479,75 +1611,82 @@ class OptimizerAgent extends BaseAgent {
 
   protected async customInitialization(): Promise<void> {}
   protected async customShutdown(): Promise<void> {}
-  
+
   protected getDefaultCapabilities(): AgentCapability[] {
-    return [{
-      name: 'performance_optimization',
-      level: 'expert',
-      description: 'Optimize system and code performance',
-      tools: ['profiler', 'benchmarker', 'optimizer'],
-      learnable: true
-    }, {
-      name: 'memory_management',
-      level: 'expert',
-      description: 'Detect and prevent memory leaks',
-      tools: ['memory_profiler', 'gc_analyzer', 'leak_detector'],
-      learnable: true
-    }, {
-      name: 'algorithm_optimization',
-      level: 'expert',
-      description: 'Optimize algorithms and data structures',
-      tools: ['complexity_analyzer', 'benchmark_suite', 'profiler'],
-      learnable: true
-    }, {
-      name: 'async_optimization',
-      level: 'expert',
-      description: 'Optimize asynchronous operations',
-      tools: ['concurrency_analyzer', 'event_loop_monitor', 'promise_tracker'],
-      learnable: true
-    }];
+    return [
+      {
+        name: 'performance_optimization',
+        level: 'expert',
+        description: 'Optimize system and code performance',
+        tools: ['profiler', 'benchmarker', 'optimizer'],
+        learnable: true,
+      },
+      {
+        name: 'memory_management',
+        level: 'expert',
+        description: 'Detect and prevent memory leaks',
+        tools: ['memory_profiler', 'gc_analyzer', 'leak_detector'],
+        learnable: true,
+      },
+      {
+        name: 'algorithm_optimization',
+        level: 'expert',
+        description: 'Optimize algorithms and data structures',
+        tools: ['complexity_analyzer', 'benchmark_suite', 'profiler'],
+        learnable: true,
+      },
+      {
+        name: 'async_optimization',
+        level: 'expert',
+        description: 'Optimize asynchronous operations',
+        tools: ['concurrency_analyzer', 'event_loop_monitor', 'promise_tracker'],
+        learnable: true,
+      },
+    ];
   }
 
   protected getDefaultExpertise(): ExpertiseDomain[] {
-    return [{
-      area: 'performance_engineering',
-      level: 87,
-      technologies: ['profiling', 'benchmarking', 'caching', 'optimization'],
-      frameworks: ['performance_monitoring', 'apm_tools'],
-      patterns: ['caching_patterns', 'optimization_patterns'],
-      experience: []
-    }];
+    return [
+      {
+        area: 'performance_engineering',
+        level: 87,
+        technologies: ['profiling', 'benchmarking', 'caching', 'optimization'],
+        frameworks: ['performance_monitoring', 'apm_tools'],
+        patterns: ['caching_patterns', 'optimization_patterns'],
+        experience: [],
+      },
+    ];
   }
 
   private async optimizePerformance(request: AgentRequest): Promise<string> {
     try {
       // Analyze the request content for performance optimization opportunities
       const performanceAnalysis = await this.analyzePerformance(request.content);
-      
+
       // Generate optimization recommendations
       const optimizations = [];
-      
+
       // Check for common performance issues
       if (performanceAnalysis.hasMemoryLeaks) {
         optimizations.push('Memory leak detection and prevention');
       }
-      
+
       if (performanceAnalysis.hasInefficientLoops) {
         optimizations.push('Loop optimization and algorithmic improvements');
       }
-      
+
       if (performanceAnalysis.hasBlockingOperations) {
         optimizations.push('Async/await optimization for non-blocking operations');
       }
-      
+
       if (performanceAnalysis.hasCachingOpportunities) {
         optimizations.push('Caching strategy implementation');
       }
-      
+
       if (performanceAnalysis.hasLargePayloads) {
         optimizations.push('Data compression and payload optimization');
       }
-      
+
       return `Performance optimization analysis complete:\n${optimizations.map(opt => `• ${opt}`).join('\n')}`;
     } catch (error) {
       return `Performance optimization failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -1560,12 +1699,14 @@ class OptimizerAgent extends BaseAgent {
       hasInefficientLoops: false,
       hasBlockingOperations: false,
       hasCachingOpportunities: false,
-      hasLargePayloads: false
+      hasLargePayloads: false,
     };
 
     // Check for memory leak patterns
-    if (/new\s+\w+|setInterval|addEventListener/gi.test(content) && 
-        !/cleanup|dispose|removeEventListener|clearInterval/gi.test(content)) {
+    if (
+      /new\s+\w+|setInterval|addEventListener/gi.test(content) &&
+      !/cleanup|dispose|removeEventListener|clearInterval/gi.test(content)
+    ) {
       analysis.hasMemoryLeaks = true;
     }
 
@@ -1580,8 +1721,10 @@ class OptimizerAgent extends BaseAgent {
     }
 
     // Check for caching opportunities
-    if (/fetch\(|axios\.|http\.|database\.|query\(/gi.test(content) && 
-        !/cache|memoize|store/gi.test(content)) {
+    if (
+      /fetch\(|axios\.|http\.|database\.|query\(/gi.test(content) &&
+      !/cache|memoize|store/gi.test(content)
+    ) {
       analysis.hasCachingOpportunities = true;
     }
 
@@ -1595,86 +1738,108 @@ class OptimizerAgent extends BaseAgent {
 
   private async generateOptimizationActions(request: AgentRequest): Promise<AgentAction[]> {
     const actions: AgentAction[] = [];
-    
+
     try {
       const performanceAnalysis = await this.analyzePerformance(request.content);
-      
+
       // Generate specific optimization actions based on analysis
       if (performanceAnalysis.hasMemoryLeaks) {
         actions.push({
           type: 'file_modify',
           target: 'memory-optimization.ts',
-          parameters: { 
+          parameters: {
             optimization: 'memory_leak_prevention',
-            techniques: ['weak_references', 'disposal_patterns', 'gc_optimization']
+            techniques: ['weak_references', 'disposal_patterns', 'gc_optimization'],
           },
-          reversible: true
+          reversible: true,
         });
       }
-      
+
       if (performanceAnalysis.hasInefficientLoops) {
         actions.push({
           type: 'file_modify',
           target: 'algorithm-optimization.ts',
-          parameters: { 
+          parameters: {
             optimization: 'loop_optimization',
-            techniques: ['vectorization', 'early_termination', 'complexity_reduction']
+            techniques: ['vectorization', 'early_termination', 'complexity_reduction'],
           },
-          reversible: true
+          reversible: true,
         });
       }
-      
+
       if (performanceAnalysis.hasBlockingOperations) {
         actions.push({
           type: 'file_modify',
           target: 'async-optimization.ts',
-          parameters: { 
+          parameters: {
             optimization: 'async_conversion',
-            techniques: ['promise_batching', 'concurrent_execution', 'stream_processing']
+            techniques: ['promise_batching', 'concurrent_execution', 'stream_processing'],
           },
-          reversible: true
+          reversible: true,
         });
       }
-      
+
       if (performanceAnalysis.hasCachingOpportunities) {
         actions.push({
           type: 'file_modify',
           target: 'caching-strategy.ts',
-          parameters: { 
+          parameters: {
             optimization: 'intelligent_caching',
-            techniques: ['lru_cache', 'distributed_cache', 'cache_invalidation']
+            techniques: ['lru_cache', 'distributed_cache', 'cache_invalidation'],
           },
-          reversible: true
+          reversible: true,
         });
       }
-      
+
       return actions;
     } catch (error) {
-      return [{
-        type: 'analysis_run',
-        target: 'optimization-error.log',
-        parameters: { error: error instanceof Error ? error.message : 'Unknown optimization error' },
-        reversible: false
-      }];
+      return [
+        {
+          type: 'analysis_run',
+          target: 'optimization-error.log',
+          parameters: {
+            error: error instanceof Error ? error.message : 'Unknown optimization error',
+          },
+          reversible: false,
+        },
+      ];
     }
   }
 }
 
 class TesterAgent extends BaseAgent {
-  constructor(id: string, ragSystem: VectorRAGSystem, toolOrchestrator: AdvancedToolOrchestrator, modelRouter: IntelligentModelRouter) {
-    super(id, 'Quality Tester', {
-      type: 'tester',
-      description: 'Creates and executes tests for quality assurance',
-      responsibilities: ['test creation', 'test execution', 'coverage analysis', 'quality validation'],
-      authority: 'advisory',
-      scope: 'project'
-    }, {
-      approach: 'methodical',
-      communication: 'detailed',
-      riskTolerance: 'low',
-      decisionStyle: 'deliberate',
-      learningStyle: 'experiential'
-    }, ragSystem, toolOrchestrator, modelRouter);
+  constructor(
+    id: string,
+    ragSystem: VectorRAGSystem,
+    toolOrchestrator: AdvancedToolOrchestrator,
+    modelRouter: IntelligentModelRouter
+  ) {
+    super(
+      id,
+      'Quality Tester',
+      {
+        type: 'tester',
+        description: 'Creates and executes tests for quality assurance',
+        responsibilities: [
+          'test creation',
+          'test execution',
+          'coverage analysis',
+          'quality validation',
+        ],
+        authority: 'advisory',
+        scope: 'project',
+      },
+      {
+        approach: 'methodical',
+        communication: 'detailed',
+        riskTolerance: 'low',
+        decisionStyle: 'deliberate',
+        learningStyle: 'experiential',
+      },
+      ragSystem,
+      toolOrchestrator,
+      modelRouter
+    );
   }
 
   async process(request: AgentRequest): Promise<AgentResponse> {
@@ -1690,26 +1855,30 @@ class TesterAgent extends BaseAgent {
 
   protected async customInitialization(): Promise<void> {}
   protected async customShutdown(): Promise<void> {}
-  
+
   protected getDefaultCapabilities(): AgentCapability[] {
-    return [{
-      name: 'test_automation',
-      level: 'expert',
-      description: 'Create and manage automated tests',
-      tools: ['test_generator', 'test_runner', 'coverage_analyzer'],
-      learnable: true
-    }];
+    return [
+      {
+        name: 'test_automation',
+        level: 'expert',
+        description: 'Create and manage automated tests',
+        tools: ['test_generator', 'test_runner', 'coverage_analyzer'],
+        learnable: true,
+      },
+    ];
   }
 
   protected getDefaultExpertise(): ExpertiseDomain[] {
-    return [{
-      area: 'quality_assurance',
-      level: 89,
-      technologies: ['unit_testing', 'integration_testing', 'e2e_testing'],
-      frameworks: ['jest', 'cypress', 'playwright', 'pytest'],
-      patterns: ['tdd', 'bdd', 'test_patterns'],
-      experience: []
-    }];
+    return [
+      {
+        area: 'quality_assurance',
+        level: 89,
+        technologies: ['unit_testing', 'integration_testing', 'e2e_testing'],
+        frameworks: ['jest', 'cypress', 'playwright', 'pytest'],
+        patterns: ['tdd', 'bdd', 'test_patterns'],
+        experience: [],
+      },
+    ];
   }
 
   private async performTesting(request: AgentRequest): Promise<string> {
@@ -1717,30 +1886,50 @@ class TesterAgent extends BaseAgent {
   }
 
   private async generateTestingActions(request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'test_run',
-      target: 'test_suite',
-      parameters: { type: 'full_suite' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'test_run',
+        target: 'test_suite',
+        parameters: { type: 'full_suite' },
+        reversible: true,
+      },
+    ];
   }
 }
 
 class ArchitectAgent extends BaseAgent {
-  constructor(id: string, ragSystem: VectorRAGSystem, toolOrchestrator: AdvancedToolOrchestrator, modelRouter: IntelligentModelRouter) {
-    super(id, 'System Architect', {
-      type: 'architect',
-      description: 'Designs system architecture and technical solutions',
-      responsibilities: ['system design', 'architecture planning', 'technology selection', 'scalability design'],
-      authority: 'decision-making',
-      scope: 'global'
-    }, {
-      approach: 'innovative',
-      communication: 'narrative',
-      riskTolerance: 'medium',
-      decisionStyle: 'collaborative',
-      learningStyle: 'theoretical'
-    }, ragSystem, toolOrchestrator, modelRouter);
+  constructor(
+    id: string,
+    ragSystem: VectorRAGSystem,
+    toolOrchestrator: AdvancedToolOrchestrator,
+    modelRouter: IntelligentModelRouter
+  ) {
+    super(
+      id,
+      'System Architect',
+      {
+        type: 'architect',
+        description: 'Designs system architecture and technical solutions',
+        responsibilities: [
+          'system design',
+          'architecture planning',
+          'technology selection',
+          'scalability design',
+        ],
+        authority: 'decision-making',
+        scope: 'global',
+      },
+      {
+        approach: 'innovative',
+        communication: 'narrative',
+        riskTolerance: 'medium',
+        decisionStyle: 'collaborative',
+        learningStyle: 'theoretical',
+      },
+      ragSystem,
+      toolOrchestrator,
+      modelRouter
+    );
   }
 
   async process(request: AgentRequest): Promise<AgentResponse> {
@@ -1756,26 +1945,30 @@ class ArchitectAgent extends BaseAgent {
 
   protected async customInitialization(): Promise<void> {}
   protected async customShutdown(): Promise<void> {}
-  
+
   protected getDefaultCapabilities(): AgentCapability[] {
-    return [{
-      name: 'system_design',
-      level: 'master',
-      description: 'Design scalable and maintainable system architectures',
-      tools: ['architecture_designer', 'pattern_library', 'decision_framework'],
-      learnable: true
-    }];
+    return [
+      {
+        name: 'system_design',
+        level: 'master',
+        description: 'Design scalable and maintainable system architectures',
+        tools: ['architecture_designer', 'pattern_library', 'decision_framework'],
+        learnable: true,
+      },
+    ];
   }
 
   protected getDefaultExpertise(): ExpertiseDomain[] {
-    return [{
-      area: 'system_architecture',
-      level: 95,
-      technologies: ['microservices', 'distributed_systems', 'cloud_architecture'],
-      frameworks: ['enterprise_patterns', 'architectural_patterns'],
-      patterns: ['layered', 'microservices', 'event_driven', 'cqrs'],
-      experience: []
-    }];
+    return [
+      {
+        area: 'system_architecture',
+        level: 95,
+        technologies: ['microservices', 'distributed_systems', 'cloud_architecture'],
+        frameworks: ['enterprise_patterns', 'architectural_patterns'],
+        patterns: ['layered', 'microservices', 'event_driven', 'cqrs'],
+        experience: [],
+      },
+    ];
   }
 
   private async designArchitecture(request: AgentRequest): Promise<string> {
@@ -1783,30 +1976,50 @@ class ArchitectAgent extends BaseAgent {
   }
 
   private async generateArchitectureActions(request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'file_create',
-      target: 'architecture_design.md',
-      parameters: { content: 'architecture_documentation' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'file_create',
+        target: 'architecture_design.md',
+        parameters: { content: 'architecture_documentation' },
+        reversible: true,
+      },
+    ];
   }
 }
 
 class ReviewerAgent extends BaseAgent {
-  constructor(id: string, ragSystem: VectorRAGSystem, toolOrchestrator: AdvancedToolOrchestrator, modelRouter: IntelligentModelRouter) {
-    super(id, 'Code Reviewer', {
-      type: 'reviewer',
-      description: 'Reviews code for quality, standards, and best practices',
-      responsibilities: ['code review', 'standards compliance', 'best practices validation', 'quality assessment'],
-      authority: 'review',
-      scope: 'project'
-    }, {
-      approach: 'perfectionist',
-      communication: 'detailed',
-      riskTolerance: 'low',
-      decisionStyle: 'deliberate',
-      learningStyle: 'observational'
-    }, ragSystem, toolOrchestrator, modelRouter);
+  constructor(
+    id: string,
+    ragSystem: VectorRAGSystem,
+    toolOrchestrator: AdvancedToolOrchestrator,
+    modelRouter: IntelligentModelRouter
+  ) {
+    super(
+      id,
+      'Code Reviewer',
+      {
+        type: 'reviewer',
+        description: 'Reviews code for quality, standards, and best practices',
+        responsibilities: [
+          'code review',
+          'standards compliance',
+          'best practices validation',
+          'quality assessment',
+        ],
+        authority: 'review',
+        scope: 'project',
+      },
+      {
+        approach: 'perfectionist',
+        communication: 'detailed',
+        riskTolerance: 'low',
+        decisionStyle: 'deliberate',
+        learningStyle: 'observational',
+      },
+      ragSystem,
+      toolOrchestrator,
+      modelRouter
+    );
   }
 
   async process(request: AgentRequest): Promise<AgentResponse> {
@@ -1822,26 +2035,30 @@ class ReviewerAgent extends BaseAgent {
 
   protected async customInitialization(): Promise<void> {}
   protected async customShutdown(): Promise<void> {}
-  
+
   protected getDefaultCapabilities(): AgentCapability[] {
-    return [{
-      name: 'code_review',
-      level: 'expert',
-      description: 'Comprehensive code review and quality assessment',
-      tools: ['review_analyzer', 'standards_checker', 'quality_metrics'],
-      learnable: true
-    }];
+    return [
+      {
+        name: 'code_review',
+        level: 'expert',
+        description: 'Comprehensive code review and quality assessment',
+        tools: ['review_analyzer', 'standards_checker', 'quality_metrics'],
+        learnable: true,
+      },
+    ];
   }
 
   protected getDefaultExpertise(): ExpertiseDomain[] {
-    return [{
-      area: 'code_quality',
-      level: 93,
-      technologies: ['code_review', 'quality_standards', 'best_practices'],
-      frameworks: ['review_tools', 'quality_gates'],
-      patterns: ['review_patterns', 'quality_patterns'],
-      experience: []
-    }];
+    return [
+      {
+        area: 'code_quality',
+        level: 93,
+        technologies: ['code_review', 'quality_standards', 'best_practices'],
+        frameworks: ['review_tools', 'quality_gates'],
+        patterns: ['review_patterns', 'quality_patterns'],
+        experience: [],
+      },
+    ];
   }
 
   private async reviewCode(request: AgentRequest): Promise<string> {
@@ -1849,12 +2066,14 @@ class ReviewerAgent extends BaseAgent {
   }
 
   private async generateReviewActions(request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'analysis_run',
-      target: 'code_review',
-      parameters: { type: 'comprehensive_review' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'analysis_run',
+        target: 'code_review',
+        parameters: { type: 'comprehensive_review' },
+        reversible: true,
+      },
+    ];
   }
 }
 
@@ -1868,7 +2087,7 @@ class CollaborationManager {
     completedTasks: 0,
     averageParticipants: 0,
     averageDuration: 0,
-    successRate: 0
+    successRate: 0,
   };
 
   constructor(private ecosystem: AgentEcosystem) {
@@ -1881,14 +2100,14 @@ class CollaborationManager {
 
   async executeTask(task: CollaborativeTask): Promise<CollaborativeResponse> {
     this.logger.info(`Executing collaborative task: ${task.title}`);
-    
+
     this.activeTasks.set(task.id, task);
     const startTime = Date.now();
-    
+
     try {
       // Execute task phases
       const phaseResults: PhaseResult[] = [];
-      
+
       for (const phase of task.phases) {
         const agent = this.ecosystem.getAgent(phase.assignedAgent);
         if (agent) {
@@ -1898,25 +2117,25 @@ class CollaborationManager {
             type: 'analysis', // Default type
             content: phase.description,
             priority: 'medium',
-            requester: 'collaboration_manager'
+            requester: 'collaboration_manager',
           };
-          
+
           const result = await agent.process(phaseRequest);
-          
+
           phaseResults.push({
             phaseId: phase.id,
             agentId: agent.id,
             result,
             quality: result.metadata.qualityScore,
-            confidence: result.confidence
+            confidence: result.confidence,
           });
         }
       }
-      
+
       // Synthesize results
       const synthesis = this.synthesizeResults(phaseResults);
       const consensus = this.measureConsensus(phaseResults);
-      
+
       const response: CollaborativeResponse = {
         taskId: task.id,
         phases: phaseResults,
@@ -1928,15 +2147,14 @@ class CollaborationManager {
           participationLevel: this.calculateParticipation(task.participants),
           communicationRounds: phaseResults.length,
           decisionsReached: 1,
-          escalationsRequired: 0
-        }
+          escalationsRequired: 0,
+        },
       };
-      
+
       this.updateStats(task, response);
       this.activeTasks.delete(task.id);
-      
+
       return response;
-      
     } catch (error) {
       this.logger.error(`Collaborative task failed: ${task.id}`, error);
       this.activeTasks.delete(task.id);
@@ -1955,14 +2173,15 @@ class CollaborationManager {
   private synthesizeResults(phaseResults: PhaseResult[]): CollaborativeSynthesis {
     // Simple synthesis - in production would be more sophisticated
     const outputs = phaseResults.map(pr => pr.result.content);
-    const avgConfidence = phaseResults.reduce((sum, pr) => sum + pr.confidence, 0) / phaseResults.length;
-    
+    const avgConfidence =
+      phaseResults.reduce((sum, pr) => sum + pr.confidence, 0) / phaseResults.length;
+
     return {
       approach: 'consensus',
       weights: {},
       conflicts: [],
       finalOutput: outputs.join('\n\n'),
-      confidenceScore: avgConfidence
+      confidenceScore: avgConfidence,
     };
   }
 
@@ -1972,23 +2191,25 @@ class CollaborationManager {
       agreement: 0.8,
       conflicts: 0,
       convergence: 0.9,
-      stability: 0.85
+      stability: 0.85,
     };
   }
 
   private calculateParticipation(participants: string[]): Record<string, number> {
     const participation: Record<string, number> = {};
-    participants.forEach(p => participation[p] = 1.0);
+    participants.forEach(p => (participation[p] = 1.0));
     return participation;
   }
 
   private updateStats(task: CollaborativeTask, response: CollaborativeResponse): void {
     this.stats.totalTasks++;
     this.stats.completedTasks++;
-    this.stats.averageParticipants = 
-      (this.stats.averageParticipants * (this.stats.totalTasks - 1) + task.participants.length) / this.stats.totalTasks;
-    this.stats.averageDuration = 
-      (this.stats.averageDuration * (this.stats.totalTasks - 1) + response.metadata.totalTime) / this.stats.totalTasks;
+    this.stats.averageParticipants =
+      (this.stats.averageParticipants * (this.stats.totalTasks - 1) + task.participants.length) /
+      this.stats.totalTasks;
+    this.stats.averageDuration =
+      (this.stats.averageDuration * (this.stats.totalTasks - 1) + response.metadata.totalTime) /
+      this.stats.totalTasks;
     this.stats.successRate = this.stats.completedTasks / this.stats.totalTasks;
   }
 }
@@ -2007,15 +2228,15 @@ class AgentLearningEngine {
         totalFeedback: 0,
         averageRating: 0,
         improvementAreas: [],
-        learningProgress: 0
+        learningProgress: 0,
       });
     }
 
     const data = this.learningData.get(agentId)!;
     data.totalFeedback++;
-    data.averageRating = 
+    data.averageRating =
       (data.averageRating * (data.totalFeedback - 1) + feedback.rating) / data.totalFeedback;
-    
+
     // Analyze improvement areas
     if (feedback.rating < 3) {
       data.improvementAreas.push(...feedback.issues);
@@ -2024,12 +2245,13 @@ class AgentLearningEngine {
 
   getStats(): LearningStats {
     const agentStats = Array.from(this.learningData.values());
-    
+
     return {
       totalAgentsLearning: this.learningData.size,
-      averageImprovement: agentStats.reduce((sum, data) => sum + data.learningProgress, 0) / agentStats.length || 0,
+      averageImprovement:
+        agentStats.reduce((sum, data) => sum + data.learningProgress, 0) / agentStats.length || 0,
       feedbackVolume: agentStats.reduce((sum, data) => sum + data.totalFeedback, 0),
-      learningVelocity: 0.5 // Would calculate actual velocity
+      learningVelocity: 0.5, // Would calculate actual velocity
     };
   }
 }
@@ -2060,26 +2282,31 @@ class AgentPerformanceMonitor {
         averageResponseTime: 0,
         successRate: 0,
         qualityScore: 0,
-        errorCount: 0
+        errorCount: 0,
       });
     }
 
     const metrics = this.metrics.get(response.agentId)!;
     metrics.totalRequests++;
-    metrics.averageResponseTime = 
-      (metrics.averageResponseTime * (metrics.totalRequests - 1) + response.metadata.processingTime) / metrics.totalRequests;
-    metrics.qualityScore = 
-      (metrics.qualityScore * (metrics.totalRequests - 1) + response.metadata.qualityScore) / metrics.totalRequests;
+    metrics.averageResponseTime =
+      (metrics.averageResponseTime * (metrics.totalRequests - 1) +
+        response.metadata.processingTime) /
+      metrics.totalRequests;
+    metrics.qualityScore =
+      (metrics.qualityScore * (metrics.totalRequests - 1) + response.metadata.qualityScore) /
+      metrics.totalRequests;
   }
 
   getStats(): PerformanceMonitorStats {
     const allMetrics = Array.from(this.metrics.values());
-    
+
     return {
-      averageResponseTime: allMetrics.reduce((sum, m) => sum + m.averageResponseTime, 0) / allMetrics.length || 0,
-      averageQuality: allMetrics.reduce((sum, m) => sum + m.qualityScore, 0) / allMetrics.length || 0,
+      averageResponseTime:
+        allMetrics.reduce((sum, m) => sum + m.averageResponseTime, 0) / allMetrics.length || 0,
+      averageQuality:
+        allMetrics.reduce((sum, m) => sum + m.qualityScore, 0) / allMetrics.length || 0,
       totalRequests: allMetrics.reduce((sum, m) => sum + m.totalRequests, 0),
-      systemHealth: 0.9
+      systemHealth: 0.9,
     };
   }
 }

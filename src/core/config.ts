@@ -17,7 +17,7 @@ const ModelConfigSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().positive().default(4000),
   timeout: z.number().positive().default(30000),
-  retries: z.number().min(0).max(5).default(3)
+  retries: z.number().min(0).max(5).default(3),
 });
 
 const AgentConfigSchema = z.object({
@@ -26,7 +26,7 @@ const AgentConfigSchema = z.object({
   maxConcurrency: z.number().positive().default(3),
   enableCaching: z.boolean().default(true),
   enableMetrics: z.boolean().default(true),
-  enableSecurity: z.boolean().default(true)
+  enableSecurity: z.boolean().default(true),
 });
 
 const SystemConfigSchema = z.object({
@@ -35,18 +35,36 @@ const SystemConfigSchema = z.object({
   performance: z.object({
     enableMonitoring: z.boolean().default(true),
     alertThreshold: z.number().positive().default(5000),
-    metricsRetention: z.number().positive().default(86400000)
+    metricsRetention: z.number().positive().default(86400000),
+    enableTracing: z.boolean().default(true),
+    tracingEndpoint: z.string().url().optional(),
+    metricsPort: z.number().positive().default(9090),
   }),
   security: z.object({
     enableValidation: z.boolean().default(true),
     sandboxMode: z.boolean().default(true),
-    allowUnsafeCommands: z.boolean().default(false)
+    allowUnsafeCommands: z.boolean().default(false),
+    enableRateLimit: z.boolean().default(true),
+    maxRequestsPerMinute: z.number().positive().default(60),
+    enableCors: z.boolean().default(true),
+    corsOrigins: z.array(z.string()).default(['http://localhost:3000']),
+    auditLogging: z.boolean().default(true),
   }),
   debug: z.object({
     enabled: z.boolean().default(false),
     verbose: z.boolean().default(false),
-    logLevel: z.enum(['error', 'warn', 'info', 'debug']).default('info')
-  })
+    logLevel: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+  }),
+  environment: z.enum(['development', 'staging', 'production']).default('development'),
+  features: z.record(z.union([z.boolean(), z.string(), z.number()])).default({
+    enableVoiceSystem: true,
+    enableCouncilEngine: true,
+    enableMcpIntegration: true,
+    enableHybridModels: true,
+    enableCaching: true,
+    maxConcurrentVoices: 5,
+    cacheExpiry: 3600,
+  }),
 });
 
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
@@ -98,7 +116,6 @@ export class ConfigManager {
       this.config = this.createDefaultConfig();
       await this.saveConfig();
       return this.config;
-
     } catch (error) {
       console.error('Failed to load configuration:', error);
       this.config = this.createDefaultConfig();
@@ -122,7 +139,7 @@ export class ConfigManager {
   async updateConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
     const currentConfig = await this.getConfig();
     const updatedConfig = { ...currentConfig, ...updates };
-    
+
     this.config = this.validateConfig(updatedConfig);
     await this.saveConfig();
     return this.config;
@@ -211,7 +228,7 @@ export class ConfigManager {
           temperature: 0.7,
           maxTokens: 4000,
           timeout: 30000,
-          retries: 3
+          retries: 3,
         },
         'claude-3-sonnet': {
           provider: 'anthropic',
@@ -219,7 +236,7 @@ export class ConfigManager {
           temperature: 0.7,
           maxTokens: 4000,
           timeout: 30000,
-          retries: 3
+          retries: 3,
         },
         'local-llama': {
           provider: 'ollama',
@@ -228,8 +245,8 @@ export class ConfigManager {
           temperature: 0.7,
           maxTokens: 4000,
           timeout: 60000,
-          retries: 2
-        }
+          retries: 2,
+        },
       },
       agent: {
         enabled: true,
@@ -237,23 +254,23 @@ export class ConfigManager {
         maxConcurrency: 3,
         enableCaching: true,
         enableMetrics: true,
-        enableSecurity: true
+        enableSecurity: true,
       },
       performance: {
         enableMonitoring: true,
         alertThreshold: 5000,
-        metricsRetention: 86400000
+        metricsRetention: 86400000,
       },
       security: {
         enableValidation: true,
         sandboxMode: true,
-        allowUnsafeCommands: false
+        allowUnsafeCommands: false,
       },
       debug: {
         enabled: false,
         verbose: false,
-        logLevel: 'info'
-      }
+        logLevel: 'info',
+      },
     };
   }
 
@@ -301,14 +318,51 @@ export class ConfigManager {
     agentMode: string;
     securityEnabled: boolean;
     debugEnabled: boolean;
+    environment: string;
+    featuresEnabled: number;
   }> {
     const config = await this.getConfig();
     return {
       modelsCount: Object.keys(config.models).length,
       agentMode: config.agent.mode,
       securityEnabled: config.security.enableValidation,
-      debugEnabled: config.debug.enabled
+      debugEnabled: config.debug.enabled,
+      environment: config.environment,
+      featuresEnabled: Object.values(config.features).filter(Boolean).length,
     };
+  }
+
+  /**
+   * Check if feature is enabled
+   */
+  async isFeatureEnabled(feature: string): Promise<boolean> {
+    const config = await this.getConfig();
+    const value = config.features[feature];
+    return value === true || value === 'true';
+  }
+
+  /**
+   * Get feature value
+   */
+  async getFeatureValue(feature: string): Promise<boolean | string | number | undefined> {
+    const config = await this.getConfig();
+    return config.features[feature];
+  }
+
+  /**
+   * Get environment
+   */
+  async getEnvironment(): Promise<'development' | 'staging' | 'production'> {
+    const config = await this.getConfig();
+    return config.environment;
+  }
+
+  /**
+   * Load secrets from environment variables (production)
+   */
+  getSecret(key: string): string | undefined {
+    // In production, these would come from secure vault
+    return process.env[key];
   }
 }
 

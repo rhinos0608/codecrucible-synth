@@ -1,19 +1,19 @@
 /**
  * Comprehensive Input Validation and Sanitization System
- * 
+ *
  * Provides robust input validation, sanitization, and security
  * measures to prevent injection attacks and ensure data integrity.
  */
 
 import { z } from 'zod';
 import { logger } from '../logger.js';
-import { 
-  ErrorFactory, 
-  ErrorCategory, 
+import {
+  ErrorFactory,
+  ErrorCategory,
   ErrorSeverity,
   ServiceResponse,
   ErrorResponse,
-  ErrorHandler
+  ErrorHandler,
 } from '../error-handling/structured-error-system.js';
 
 // Security patterns for detecting potential threats
@@ -25,7 +25,7 @@ const SECURITY_PATTERNS = {
     /\b(sudo|su|chmod|chown)\b/i,
     /[<>|&;`]/,
     /\$\([^)]*\)/,
-    /`[^`]*`/
+    /`[^`]*`/,
   ],
 
   // Script injection patterns
@@ -37,7 +37,7 @@ const SECURITY_PATTERNS = {
     /eval\s*\(/i,
     /setTimeout\s*\(/i,
     /setInterval\s*\(/i,
-    /Function\s*\(/i
+    /Function\s*\(/i,
   ],
 
   // SQL injection patterns
@@ -49,18 +49,11 @@ const SECURITY_PATTERNS = {
     /(delete\s+from)/i,
     /(update\s+\w+\s+set)/i,
     /--/,
-    /\/\*/
+    /\/\*/,
   ],
 
   // Path traversal patterns
-  PATH_TRAVERSAL: [
-    /\.\./,
-    /~+/,
-    /\/\.\./,
-    /\\\.\./,
-    /%2e%2e/i,
-    /%c0%ae/i
-  ],
+  PATH_TRAVERSAL: [/\.\./, /~+/, /\/\.\./, /\\\.\./, /%2e%2e/i, /%c0%ae/i],
 
   // File system manipulation
   FILE_SYSTEM_ATTACKS: [
@@ -71,7 +64,7 @@ const SECURITY_PATTERNS = {
     /\/etc\/shadow/,
     /\.ssh\//,
     /\.aws\//,
-    /\.env/
+    /\.env/,
   ],
 
   // Code execution patterns
@@ -83,23 +76,53 @@ const SECURITY_PATTERNS = {
     /system\s*\(/,
     /subprocess/,
     /os\.system/,
-    /shell_exec/
-  ]
+    /shell_exec/,
+  ],
 };
 
 // Common dangerous file extensions
 const DANGEROUS_EXTENSIONS = [
-  '.exe', '.bat', '.cmd', '.com', '.scr', '.pif', '.vbs', '.vbe', '.js', '.jse',
-  '.jar', '.app', '.deb', '.pkg', '.dmg', '.iso', '.msi', '.sh', '.bash', '.zsh',
-  '.ps1', '.psm1', '.psd1', '.ps1xml', '.psc1', '.ps2', '.ps2xml', '.psc2',
-  '.msh', '.msh1', '.msh2', '.mshxml', '.msh1xml', '.msh2xml'
+  '.exe',
+  '.bat',
+  '.cmd',
+  '.com',
+  '.scr',
+  '.pif',
+  '.vbs',
+  '.vbe',
+  '.js',
+  '.jse',
+  '.jar',
+  '.app',
+  '.deb',
+  '.pkg',
+  '.dmg',
+  '.iso',
+  '.msi',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.ps1',
+  '.psm1',
+  '.psd1',
+  '.ps1xml',
+  '.psc1',
+  '.ps2',
+  '.ps2xml',
+  '.psc2',
+  '.msh',
+  '.msh1',
+  '.msh2',
+  '.mshxml',
+  '.msh1xml',
+  '.msh2xml',
 ];
 
 export enum ValidationLevel {
   BASIC = 'basic',
   STANDARD = 'standard',
   STRICT = 'strict',
-  PARANOID = 'paranoid'
+  PARANOID = 'paranoid',
 }
 
 export interface ValidationOptions {
@@ -140,7 +163,7 @@ export class AdvancedInputValidator {
     allowFileOperations: false,
     allowSystemCommands: false,
     maxLength: 10000,
-    customPatterns: []
+    customPatterns: [],
   };
 
   private static defaultSanitizationOptions: SanitizationOptions = {
@@ -149,7 +172,7 @@ export class AdvancedInputValidator {
     normalizeWhitespace: true,
     removeControlChars: true,
     maxLength: 10000,
-    allowedChars: null
+    allowedChars: null,
   };
 
   /**
@@ -162,10 +185,10 @@ export class AdvancedInputValidator {
   ): ServiceResponse<ValidationResult> {
     try {
       const opts = { ...this.defaultValidationOptions, ...options };
-      
+
       // Convert to string for analysis
       const stringInput = String(input || '');
-      
+
       // Basic validation
       if (stringInput.length === 0) {
         return ErrorHandler.createErrorResponse(
@@ -175,7 +198,7 @@ export class AdvancedInputValidator {
             ErrorSeverity.MEDIUM,
             {
               userMessage: `Please provide a value for ${fieldName}`,
-              suggestedActions: [`Enter a valid ${fieldName}`]
+              suggestedActions: [`Enter a valid ${fieldName}`],
             }
           )
         );
@@ -190,7 +213,7 @@ export class AdvancedInputValidator {
             {
               context: { current_length: stringInput.length, max_length: opts.maxLength },
               userMessage: `Input is too long (${stringInput.length} characters)`,
-              suggestedActions: [`Reduce input to ${opts.maxLength} characters or less`]
+              suggestedActions: [`Reduce input to ${opts.maxLength} characters or less`],
             }
           )
         );
@@ -202,7 +225,7 @@ export class AdvancedInputValidator {
 
       // Security assessment
       const securityScore = this.assessSecurityRisk(stringInput, threats, warnings);
-      
+
       if (threats.length > 0 && opts.level !== ValidationLevel.BASIC) {
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
@@ -215,9 +238,9 @@ export class AdvancedInputValidator {
               suggestedActions: [
                 'Remove suspicious patterns from input',
                 'Use simpler, safer input',
-                'Contact administrator if legitimate'
+                'Contact administrator if legitimate',
               ],
-              recoverable: false
+              recoverable: false,
             }
           )
         );
@@ -226,7 +249,7 @@ export class AdvancedInputValidator {
       // Sanitization
       const sanitized = this.sanitizeInput(stringInput, {
         ...this.defaultSanitizationOptions,
-        maxLength: opts.maxLength
+        maxLength: opts.maxLength,
       });
 
       const result: ValidationResult = {
@@ -234,11 +257,10 @@ export class AdvancedInputValidator {
         sanitizedValue: sanitized,
         threats,
         warnings,
-        confidence: securityScore
+        confidence: securityScore,
       };
 
       return ErrorHandler.createSuccessResponse(result);
-
     } catch (error) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
@@ -248,7 +270,7 @@ export class AdvancedInputValidator {
           {
             originalError: error as Error,
             userMessage: 'Input validation error',
-            suggestedActions: ['Check input format', 'Try with simpler input']
+            suggestedActions: ['Check input format', 'Try with simpler input'],
           }
         )
       );
@@ -262,7 +284,7 @@ export class AdvancedInputValidator {
     const validation = this.validateInput(path, 'file path', {
       level: ValidationLevel.STRICT,
       allowFileOperations: true,
-      maxLength: 1000
+      maxLength: 1000,
     });
 
     if (!validation.success) {
@@ -301,9 +323,9 @@ export class AdvancedInputValidator {
             userMessage: 'File path contains security risks',
             suggestedActions: [
               'Use safe file paths within project directory',
-              'Avoid system directories and executable files'
+              'Avoid system directories and executable files',
             ],
-            recoverable: false
+            recoverable: false,
           }
         )
       );
@@ -319,7 +341,7 @@ export class AdvancedInputValidator {
     const validation = this.validateInput(command, 'command', {
       level: ValidationLevel.PARANOID,
       allowSystemCommands: false,
-      maxLength: 500
+      maxLength: 500,
     });
 
     if (!validation.success) {
@@ -339,8 +361,22 @@ export class AdvancedInputValidator {
 
     // Check for dangerous commands
     const dangerousCommands = [
-      'rm', 'del', 'format', 'fdisk', 'mkfs', 'dd', 'sudo', 'su', 'chmod',
-      'chown', 'passwd', 'useradd', 'userdel', 'shutdown', 'reboot', 'halt'
+      'rm',
+      'del',
+      'format',
+      'fdisk',
+      'mkfs',
+      'dd',
+      'sudo',
+      'su',
+      'chmod',
+      'chown',
+      'passwd',
+      'useradd',
+      'userdel',
+      'shutdown',
+      'reboot',
+      'halt',
     ];
 
     for (const cmd of dangerousCommands) {
@@ -361,9 +397,9 @@ export class AdvancedInputValidator {
             suggestedActions: [
               'Use safer alternative commands',
               'Avoid system administration commands',
-              'Contact administrator for privileged operations'
+              'Contact administrator for privileged operations',
             ],
-            recoverable: false
+            recoverable: false,
           }
         )
       );
@@ -378,7 +414,7 @@ export class AdvancedInputValidator {
   static validateUrl(url: any): ServiceResponse<string> {
     const validation = this.validateInput(url, 'URL', {
       level: ValidationLevel.STANDARD,
-      maxLength: 2000
+      maxLength: 2000,
     });
 
     if (!validation.success) {
@@ -389,7 +425,7 @@ export class AdvancedInputValidator {
 
     try {
       const parsedUrl = new URL(sanitizedValue);
-      
+
       // Check for dangerous protocols
       const dangerousProtocols = ['file:', 'ftp:', 'javascript:', 'data:', 'vbscript:'];
       if (dangerousProtocols.includes(parsedUrl.protocol)) {
@@ -402,7 +438,7 @@ export class AdvancedInputValidator {
               context: { url: sanitizedValue, protocol: parsedUrl.protocol },
               userMessage: 'URL uses an unsafe protocol',
               suggestedActions: ['Use HTTP or HTTPS URLs only'],
-              recoverable: false
+              recoverable: false,
             }
           )
         );
@@ -412,13 +448,12 @@ export class AdvancedInputValidator {
       const hostname = parsedUrl.hostname.toLowerCase();
       const internalHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
       const privateNetworks = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
-      
+
       if (internalHosts.includes(hostname) || privateNetworks.test(hostname)) {
         logger.warn(`Potential internal network access attempt: ${hostname}`);
       }
 
       return ErrorHandler.createSuccessResponse(sanitizedValue);
-
     } catch (error) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
@@ -428,7 +463,7 @@ export class AdvancedInputValidator {
           {
             context: { url: sanitizedValue },
             userMessage: 'URL format is invalid',
-            suggestedActions: ['Check URL syntax', 'Include protocol (http:// or https://)']
+            suggestedActions: ['Check URL syntax', 'Include protocol (http:// or https://)'],
           }
         )
       );
@@ -490,17 +525,17 @@ export class AdvancedInputValidator {
       case ValidationLevel.PARANOID:
         groups.code_execution = SECURITY_PATTERNS.CODE_EXECUTION;
         groups.file_system_attacks = SECURITY_PATTERNS.FILE_SYSTEM_ATTACKS;
-        // Fall through
+      // Fall through
       case ValidationLevel.STRICT:
         groups.sql_injection = SECURITY_PATTERNS.SQL_INJECTION;
-        // Fall through
+      // Fall through
       case ValidationLevel.STANDARD:
         groups.command_injection = SECURITY_PATTERNS.COMMAND_INJECTION;
         groups.path_traversal = SECURITY_PATTERNS.PATH_TRAVERSAL;
         if (!options.allowScripts) {
           groups.script_injection = SECURITY_PATTERNS.SCRIPT_INJECTION;
         }
-        // Fall through
+      // Fall through
       case ValidationLevel.BASIC:
         // Basic patterns always checked
         break;
@@ -518,7 +553,7 @@ export class AdvancedInputValidator {
     // Base score for threats
     score += threats.length * 0.3;
 
-    // Base score for warnings  
+    // Base score for warnings
     score += warnings.length * 0.1;
 
     // Additional factors
@@ -590,11 +625,9 @@ export class SchemaValidator {
     try {
       // First validate against schema
       const result = schema.safeParse(data);
-      
+
       if (!result.success) {
-        const errors = result.error.errors.map(e => 
-          `${e.path.join('.')}: ${e.message}`
-        ).join(', ');
+        const errors = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
 
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
@@ -604,7 +637,7 @@ export class SchemaValidator {
             {
               context: { validation_errors: result.error.errors },
               userMessage: 'Input format is invalid',
-              suggestedActions: ['Check input format and required fields']
+              suggestedActions: ['Check input format and required fields'],
             }
           )
         );
@@ -617,7 +650,6 @@ export class SchemaValidator {
       }
 
       return ErrorHandler.createSuccessResponse(result.data);
-
     } catch (error) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
@@ -627,7 +659,7 @@ export class SchemaValidator {
           {
             originalError: error as Error,
             userMessage: 'Data validation failed',
-            suggestedActions: ['Check data structure and types']
+            suggestedActions: ['Check data structure and types'],
           }
         )
       );

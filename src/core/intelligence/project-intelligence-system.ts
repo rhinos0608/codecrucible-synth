@@ -103,10 +103,33 @@ export interface IntelligentRecommendations {
 }
 
 // Supporting interfaces
-export type DirectoryPurpose = 'source' | 'tests' | 'build' | 'config' | 'docs' | 'assets' | 'dependencies' | 'other';
-export type FilePurpose = 'core' | 'utility' | 'test' | 'config' | 'documentation' | 'build' | 'assets' | 'entry';
+export type DirectoryPurpose =
+  | 'source'
+  | 'tests'
+  | 'build'
+  | 'config'
+  | 'docs'
+  | 'assets'
+  | 'dependencies'
+  | 'other';
+export type FilePurpose =
+  | 'core'
+  | 'utility'
+  | 'test'
+  | 'config'
+  | 'documentation'
+  | 'build'
+  | 'assets'
+  | 'entry';
 export type ProjectType = 'library' | 'application' | 'service' | 'tool' | 'framework' | 'unknown';
-export type ArchitecturePattern = 'mvc' | 'microservices' | 'layered' | 'hexagonal' | 'modular' | 'monolithic' | 'unknown';
+export type ArchitecturePattern =
+  | 'mvc'
+  | 'microservices'
+  | 'layered'
+  | 'hexagonal'
+  | 'modular'
+  | 'monolithic'
+  | 'unknown';
 
 export interface FrameworkInfo {
   name: string;
@@ -393,9 +416,12 @@ export class ProjectIntelligenceSystem extends EventEmitter {
   /**
    * Analyze project and generate comprehensive intelligence
    */
-  async analyzeProject(rootPath: string, options: AnalysisOptions = {}): Promise<ProjectIntelligence> {
+  async analyzeProject(
+    rootPath: string,
+    options: AnalysisOptions = {}
+  ): Promise<ProjectIntelligence> {
     const normalizedPath = join(rootPath);
-    
+
     // Check if analysis is already in progress
     if (this.analysisInProgress.has(normalizedPath)) {
       throw new Error(`Analysis already in progress for ${normalizedPath}`);
@@ -417,26 +443,32 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       // Phase 1: Structural Analysis
       this.emit('analysis:phase', { phase: 'structure', progress: 0 });
       const structure = await this.analyzeProjectStructure(rootPath, options);
-      
+
       // Phase 2: Code Analysis
       this.emit('analysis:phase', { phase: 'code', progress: 20 });
       const insights = await this.generateProjectInsights(structure, options);
-      
+
       // Phase 3: Dependency Analysis
       this.emit('analysis:phase', { phase: 'dependencies', progress: 40 });
       const dependencies = await this.analyzeDependencies(structure, options);
-      
+
       // Phase 4: Architecture Analysis
       this.emit('analysis:phase', { phase: 'architecture', progress: 60 });
       const patterns = await this.identifyArchitecturePatterns(structure, insights, dependencies);
-      
+
       // Phase 5: Metadata Extraction
       this.emit('analysis:phase', { phase: 'metadata', progress: 80 });
       const metadata = await this.extractProjectMetadata(structure, options);
-      
+
       // Phase 6: Generate Recommendations
       this.emit('analysis:phase', { phase: 'recommendations', progress: 90 });
-      const recommendations = await this.generateRecommendations(structure, insights, dependencies, patterns, metadata);
+      const recommendations = await this.generateRecommendations(
+        structure,
+        insights,
+        dependencies,
+        patterns,
+        metadata
+      );
 
       const intelligence: ProjectIntelligence = {
         structure,
@@ -444,18 +476,17 @@ export class ProjectIntelligenceSystem extends EventEmitter {
         dependencies,
         patterns,
         metadata,
-        recommendations
+        recommendations,
       };
 
       // Cache the results
       this.cache.set(normalizedPath, intelligence);
-      
+
       const analysisTime = Date.now() - startTime;
       this.logger.info(`Project analysis completed in ${analysisTime}ms`);
       this.emit('analysis:complete', { path: normalizedPath, intelligence, time: analysisTime });
 
       return intelligence;
-
     } finally {
       this.analysisInProgress.delete(normalizedPath);
     }
@@ -464,7 +495,10 @@ export class ProjectIntelligenceSystem extends EventEmitter {
   /**
    * Analyze project structure and file organization
    */
-  private async analyzeProjectStructure(rootPath: string, options: AnalysisOptions): Promise<ProjectStructure> {
+  private async analyzeProjectStructure(
+    rootPath: string,
+    options: AnalysisOptions
+  ): Promise<ProjectStructure> {
     const files: FileNode[] = [];
     const directories: DirectoryNode[] = [];
     const packageFiles: PackageFile[] = [];
@@ -477,7 +511,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
     const scanDirectory = async (dirPath: string, depth = 0): Promise<void> => {
       try {
         const entries = await readdir(dirPath, { withFileTypes: true });
-        
+
         for (const entry of entries) {
           const fullPath = join(dirPath, entry.name);
           const relativePath = relative(rootPath, fullPath);
@@ -493,7 +527,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
               fileCount: 0,
               childDirectories: [],
               purpose: this.determineDirectoryPurpose(entry.name, relativePath),
-              importance: this.assessDirectoryImportance(entry.name, relativePath)
+              importance: this.assessDirectoryImportance(entry.name, relativePath),
             };
             directories.push(dirNode);
 
@@ -508,7 +542,14 @@ export class ProjectIntelligenceSystem extends EventEmitter {
             totalSize += stats.size;
 
             // Categorize special files
-            this.categorizeSpecialFile(fileNode, packageFiles, configFiles, documentationFiles, testFiles, buildFiles);
+            this.categorizeSpecialFile(
+              fileNode,
+              packageFiles,
+              configFiles,
+              documentationFiles,
+              testFiles,
+              buildFiles
+            );
           }
         }
       } catch (error) {
@@ -532,17 +573,23 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       buildFiles,
       totalFiles: files.length,
       totalDirectories: directories.length,
-      codebaseSize: totalSize
+      codebaseSize: totalSize,
     };
   }
 
   /**
    * Generate comprehensive project insights
    */
-  private async generateProjectInsights(structure: ProjectStructure, options: AnalysisOptions): Promise<ProjectInsights> {
+  private async generateProjectInsights(
+    structure: ProjectStructure,
+    options: AnalysisOptions
+  ): Promise<ProjectInsights> {
     // Analyze languages
     const languageStats = this.analyzeLanguageDistribution(structure.files);
-    const primaryLanguage = Object.keys(languageStats).reduce((a, b) => languageStats[a] > languageStats[b] ? a : b, '');
+    const primaryLanguage = Object.keys(languageStats).reduce(
+      (a, b) => (languageStats[a] > languageStats[b] ? a : b),
+      ''
+    );
 
     // Detect frameworks
     const frameworksDetected = await this.detectFrameworks(structure);
@@ -570,17 +617,20 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       codeQuality,
       technicalDebt,
       securityConcerns,
-      performanceIndicators
+      performanceIndicators,
     };
   }
 
   /**
    * Analyze project dependencies and relationships
    */
-  private async analyzeDependencies(structure: ProjectStructure, options: AnalysisOptions): Promise<DependencyGraph> {
+  private async analyzeDependencies(
+    structure: ProjectStructure,
+    options: AnalysisOptions
+  ): Promise<DependencyGraph> {
     // This is a simplified implementation - in practice, this would involve
     // parsing import statements, package files, etc.
-    
+
     const nodes: DependencyNode[] = [];
     const edges: DependencyEdge[] = [];
     const externalDependencies: ExternalDependency[] = [];
@@ -594,7 +644,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
           version: 'unknown',
           type: 'production',
           usage: [],
-          risk: 'low'
+          risk: 'low',
         });
       }
     }
@@ -605,7 +655,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
         id: file.path,
         name: file.name,
         type: 'internal',
-        importance: file.importance === 'critical' ? 1 : file.importance === 'high' ? 0.8 : 0.5
+        importance: file.importance === 'critical' ? 1 : file.importance === 'high' ? 0.8 : 0.5,
       });
     }
 
@@ -618,10 +668,10 @@ export class ProjectIntelligenceSystem extends EventEmitter {
         cohesion: 0.7,
         coupling: 0.3,
         modularity: 0.8,
-        instability: 0.4
+        instability: 0.4,
       },
       externalDependencies,
-      internalDependencies
+      internalDependencies,
     };
   }
 
@@ -635,23 +685,26 @@ export class ProjectIntelligenceSystem extends EventEmitter {
   ): Promise<ArchitecturePatterns> {
     // Simplified pattern detection
     const primaryPattern = insights.architecturePattern || 'modular';
-    
+
     return {
       primaryPattern,
       secondaryPatterns: ['layered'],
       designPrinciples: ['separation of concerns', 'single responsibility'],
       antiPatterns: [],
-      refactoringOpportunities: []
+      refactoringOpportunities: [],
     };
   }
 
   /**
    * Extract project metadata
    */
-  private async extractProjectMetadata(structure: ProjectStructure, options: AnalysisOptions): Promise<ProjectMetadata> {
+  private async extractProjectMetadata(
+    structure: ProjectStructure,
+    options: AnalysisOptions
+  ): Promise<ProjectMetadata> {
     let metadata: Partial<ProjectMetadata> = {
       name: basename(structure.rootPath),
-      lastModified: new Date()
+      lastModified: new Date(),
     };
 
     // Try to extract from package.json or similar
@@ -665,11 +718,17 @@ export class ProjectIntelligenceSystem extends EventEmitter {
             name: packageInfo.name || metadata.name,
             version: packageInfo.version,
             description: packageInfo.description,
-            author: typeof packageInfo.author === 'string' ? packageInfo.author : packageInfo.author?.name,
+            author:
+              typeof packageInfo.author === 'string'
+                ? packageInfo.author
+                : packageInfo.author?.name,
             license: packageInfo.license,
-            repository: typeof packageInfo.repository === 'string' ? packageInfo.repository : packageInfo.repository?.url,
+            repository:
+              typeof packageInfo.repository === 'string'
+                ? packageInfo.repository
+                : packageInfo.repository?.url,
             homepage: packageInfo.homepage,
-            keywords: packageInfo.keywords
+            keywords: packageInfo.keywords,
           };
           break;
         } catch (error) {
@@ -691,7 +750,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       homepage: metadata.homepage,
       keywords: metadata.keywords,
       lastModified: metadata.lastModified!,
-      stats
+      stats,
     };
   }
 
@@ -712,38 +771,47 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       security: [],
       testing: [],
       documentation: [],
-      maintenance: []
+      maintenance: [],
     };
   }
 
   // Helper methods (simplified implementations)
   private shouldIgnoreFile(path: string): boolean {
     const ignorePatterns = [
-      'node_modules', '.git', '.vscode', '.idea', 'dist', 'build', 'coverage',
-      '.nyc_output', '.DS_Store', 'Thumbs.db', '*.log'
+      'node_modules',
+      '.git',
+      '.vscode',
+      '.idea',
+      'dist',
+      'build',
+      'coverage',
+      '.nyc_output',
+      '.DS_Store',
+      'Thumbs.db',
+      '*.log',
     ];
     return ignorePatterns.some(pattern => path.includes(pattern));
   }
 
   private determineDirectoryPurpose(name: string, path: string): DirectoryPurpose {
     const purposeMap: Record<string, DirectoryPurpose> = {
-      'src': 'source',
-      'source': 'source',
-      'lib': 'source',
-      'test': 'tests',
-      'tests': 'tests',
-      '__tests__': 'tests',
-      'spec': 'tests',
-      'build': 'build',
-      'dist': 'build',
-      'config': 'config',
-      'docs': 'docs',
-      'doc': 'docs',
-      'assets': 'assets',
-      'static': 'assets',
-      'node_modules': 'dependencies'
+      src: 'source',
+      source: 'source',
+      lib: 'source',
+      test: 'tests',
+      tests: 'tests',
+      __tests__: 'tests',
+      spec: 'tests',
+      build: 'build',
+      dist: 'build',
+      config: 'config',
+      docs: 'docs',
+      doc: 'docs',
+      assets: 'assets',
+      static: 'assets',
+      node_modules: 'dependencies',
     };
-    
+
     return purposeMap[name.toLowerCase()] || 'other';
   }
 
@@ -757,14 +825,14 @@ export class ProjectIntelligenceSystem extends EventEmitter {
     const ext = extname(relativePath);
     const name = basename(relativePath);
     const language = this.detectLanguage(ext);
-    
+
     let linesOfCode = 0;
     let complexity: CodeComplexity = {
       cyclomaticComplexity: 0,
       cognitiveComplexity: 0,
       nestingDepth: 0,
       functionCount: 0,
-      classCount: 0
+      classCount: 0,
     };
 
     // Read and analyze file content for code files
@@ -794,7 +862,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       interfaces: [],
       purpose: this.determineFilePurpose(name, relativePath),
       lastModified: stats.mtime,
-      importance: this.assessFileImportance(name, relativePath)
+      importance: this.assessFileImportance(name, relativePath),
     };
   }
 
@@ -814,31 +882,64 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       '.php': 'PHP',
       '.rb': 'Ruby',
       '.swift': 'Swift',
-      '.kt': 'Kotlin'
+      '.kt': 'Kotlin',
     };
-    
+
     return languageMap[extension.toLowerCase()] || 'Unknown';
   }
 
   private isCodeFile(extension: string): boolean {
     const codeExtensions = [
-      '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cs', '.cpp', '.c',
-      '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.r', '.m'
+      '.js',
+      '.ts',
+      '.jsx',
+      '.tsx',
+      '.py',
+      '.java',
+      '.cs',
+      '.cpp',
+      '.c',
+      '.go',
+      '.rs',
+      '.php',
+      '.rb',
+      '.swift',
+      '.kt',
+      '.scala',
+      '.r',
+      '.m',
     ];
     return codeExtensions.includes(extension.toLowerCase());
   }
 
   private determineFilePurpose(name: string, path: string): FilePurpose {
-    if (name.toLowerCase().includes('test') || path.includes('/test/') || path.includes('/__tests__/')) return 'test';
+    if (
+      name.toLowerCase().includes('test') ||
+      path.includes('/test/') ||
+      path.includes('/__tests__/')
+    )
+      return 'test';
     if (name.toLowerCase().includes('config') || name.includes('.config.')) return 'config';
-    if (['index.js', 'index.ts', 'main.js', 'main.ts', 'app.js', 'app.ts'].includes(name.toLowerCase())) return 'entry';
-    if (name.toLowerCase().includes('util') || name.toLowerCase().includes('helper')) return 'utility';
-    if (['readme.md', 'readme.txt', 'changelog.md'].includes(name.toLowerCase())) return 'documentation';
+    if (
+      ['index.js', 'index.ts', 'main.js', 'main.ts', 'app.js', 'app.ts'].includes(
+        name.toLowerCase()
+      )
+    )
+      return 'entry';
+    if (name.toLowerCase().includes('util') || name.toLowerCase().includes('helper'))
+      return 'utility';
+    if (['readme.md', 'readme.txt', 'changelog.md'].includes(name.toLowerCase()))
+      return 'documentation';
     return 'core';
   }
 
   private assessFileImportance(name: string, path: string): 'critical' | 'high' | 'medium' | 'low' {
-    if (['index.js', 'index.ts', 'main.js', 'main.ts', 'app.js', 'app.ts'].includes(name.toLowerCase())) return 'critical';
+    if (
+      ['index.js', 'index.ts', 'main.js', 'main.ts', 'app.js', 'app.ts'].includes(
+        name.toLowerCase()
+      )
+    )
+      return 'critical';
     if (path.startsWith('src/') && !path.includes('/test/')) return 'high';
     if (name.toLowerCase().includes('test')) return 'medium';
     return 'low';
@@ -849,13 +950,16 @@ export class ProjectIntelligenceSystem extends EventEmitter {
     const lines = content.split('\n');
     const functionMatches = content.match(/function\s+\w+|def\s+\w+|class\s+\w+/gi) || [];
     const classMatches = content.match(/class\s+\w+/gi) || [];
-    
+
     return {
       cyclomaticComplexity: Math.min(functionMatches.length * 2, 50),
       cognitiveComplexity: Math.min(functionMatches.length * 1.5, 40),
-      nestingDepth: Math.min(lines.filter(line => line.trim().startsWith('if') || line.trim().startsWith('for')).length, 10),
+      nestingDepth: Math.min(
+        lines.filter(line => line.trim().startsWith('if') || line.trim().startsWith('for')).length,
+        10
+      ),
       functionCount: functionMatches.length,
-      classCount: classMatches.length
+      classCount: classMatches.length,
     };
   }
 
@@ -868,50 +972,60 @@ export class ProjectIntelligenceSystem extends EventEmitter {
     buildFiles: BuildFile[]
   ): void {
     const name = file.name.toLowerCase();
-    
-    if (name === 'package.json' || name === 'requirements.txt' || name === 'cargo.toml' || name === 'pom.xml') {
+
+    if (
+      name === 'package.json' ||
+      name === 'requirements.txt' ||
+      name === 'cargo.toml' ||
+      name === 'pom.xml'
+    ) {
       packageFiles.push({
         path: file.path,
         type: name.includes('.json') ? 'package.json' : 'other',
         dependencies: [],
         devDependencies: [],
-        scripts: {}
+        scripts: {},
       } as PackageFile);
     }
-    
+
     if (name.includes('config') || name.includes('.config.') || name.includes('.env')) {
       configFiles.push({
         path: file.path,
         type: file.extension,
         purpose: 'configuration',
-        settings: {}
+        settings: {},
       });
     }
-    
+
     if (name.includes('readme') || name.includes('doc') || file.extension === '.md') {
       documentationFiles.push({
         path: file.path,
         type: name.includes('readme') ? 'readme' : 'other',
         quality: 'fair',
-        coverage: []
+        coverage: [],
       });
     }
-    
+
     if (file.purpose === 'test') {
       testFiles.push({
         path: file.path,
         type: 'unit',
         framework: 'unknown',
-        coverage: []
+        coverage: [],
       });
     }
-    
-    if (name.includes('build') || name.includes('webpack') || name.includes('rollup') || name.includes('gulp')) {
+
+    if (
+      name.includes('build') ||
+      name.includes('webpack') ||
+      name.includes('rollup') ||
+      name.includes('gulp')
+    ) {
       buildFiles.push({
         path: file.path,
         type: file.extension,
         commands: [],
-        targets: []
+        targets: [],
       });
     }
   }
@@ -927,19 +1041,19 @@ export class ProjectIntelligenceSystem extends EventEmitter {
 
   private analyzeLanguageDistribution(files: FileNode[]): Record<string, number> {
     const distribution: Record<string, number> = {};
-    
+
     for (const file of files) {
       if (this.isCodeFile(file.extension)) {
         distribution[file.language] = (distribution[file.language] || 0) + file.linesOfCode;
       }
     }
-    
+
     return distribution;
   }
 
   private async detectFrameworks(structure: ProjectStructure): Promise<FrameworkInfo[]> {
     const frameworks: FrameworkInfo[] = [];
-    
+
     // Check package files for framework dependencies
     for (const pkg of structure.packageFiles) {
       if (pkg.dependencies.includes('react')) {
@@ -955,54 +1069,66 @@ export class ProjectIntelligenceSystem extends EventEmitter {
         frameworks.push({ name: 'Express', confidence: 0.9, evidence: ['package dependency'] });
       }
     }
-    
+
     return frameworks;
   }
 
-  private determineProjectType(structure: ProjectStructure, frameworks: FrameworkInfo[]): ProjectType {
+  private determineProjectType(
+    structure: ProjectStructure,
+    frameworks: FrameworkInfo[]
+  ): ProjectType {
     // Check for library indicators
     if (structure.packageFiles.some(pkg => pkg.path.includes('package.json'))) {
       return 'library';
     }
-    
+
     // Check for application indicators
     if (frameworks.some(f => ['React', 'Vue', 'Angular'].includes(f.name))) {
       return 'application';
     }
-    
+
     // Check for service indicators
     if (frameworks.some(f => f.name === 'Express')) {
       return 'service';
     }
-    
+
     return 'unknown';
   }
 
-  private identifyPrimaryArchitecture(structure: ProjectStructure, frameworks: FrameworkInfo[]): ArchitecturePattern {
+  private identifyPrimaryArchitecture(
+    structure: ProjectStructure,
+    frameworks: FrameworkInfo[]
+  ): ArchitecturePattern {
     // Simple architecture detection based on directory structure
-    const hasControllers = structure.directories.some(d => d.name.toLowerCase().includes('controller'));
+    const hasControllers = structure.directories.some(d =>
+      d.name.toLowerCase().includes('controller')
+    );
     const hasModels = structure.directories.some(d => d.name.toLowerCase().includes('model'));
     const hasViews = structure.directories.some(d => d.name.toLowerCase().includes('view'));
-    
+
     if (hasControllers && hasModels && hasViews) {
       return 'mvc';
     }
-    
+
     if (structure.directories.some(d => d.name.toLowerCase().includes('service'))) {
       return 'microservices';
     }
-    
+
     return 'modular';
   }
 
-  private assessProjectMaturity(structure: ProjectStructure): 'prototype' | 'development' | 'production' | 'legacy' {
+  private assessProjectMaturity(
+    structure: ProjectStructure
+  ): 'prototype' | 'development' | 'production' | 'legacy' {
     const hasTests = structure.testFiles.length > 0;
     const hasDocumentation = structure.documentationFiles.length > 0;
     const hasConfig = structure.configFiles.length > 0;
     const hasBuildSystem = structure.buildFiles.length > 0;
-    
-    const maturityScore = [hasTests, hasDocumentation, hasConfig, hasBuildSystem].filter(Boolean).length;
-    
+
+    const maturityScore = [hasTests, hasDocumentation, hasConfig, hasBuildSystem].filter(
+      Boolean
+    ).length;
+
     if (maturityScore >= 3) return 'production';
     if (maturityScore >= 2) return 'development';
     return 'prototype';
@@ -1012,7 +1138,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
     // Simplified quality assessment
     const totalFiles = structure.files.filter(f => this.isCodeFile(f.extension)).length;
     const testFiles = structure.testFiles.length;
-    
+
     return {
       maintainabilityIndex: 75,
       duplication: 0.1,
@@ -1020,7 +1146,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       commentDensity: 0.15,
       naming: { score: 0.8, issues: [], suggestions: [] },
       structure: { score: 0.75, issues: [], suggestions: [] },
-      consistency: { score: 0.85, issues: [], suggestions: [] }
+      consistency: { score: 0.85, issues: [], suggestions: [] },
     };
   }
 
@@ -1030,7 +1156,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       totalDebt: 5,
       debtItems: [],
       debtRatio: 0.1,
-      prioritizedFixes: []
+      prioritizedFixes: [],
     };
   }
 
@@ -1039,7 +1165,9 @@ export class ProjectIntelligenceSystem extends EventEmitter {
     return [];
   }
 
-  private async analyzePerformanceIndicators(structure: ProjectStructure): Promise<PerformanceIndicator[]> {
+  private async analyzePerformanceIndicators(
+    structure: ProjectStructure
+  ): Promise<PerformanceIndicator[]> {
     // Simplified performance analysis
     return [];
   }
@@ -1047,16 +1175,16 @@ export class ProjectIntelligenceSystem extends EventEmitter {
   private calculateProjectStats(structure: ProjectStructure): ProjectStats {
     const codeFiles = structure.files.filter(f => this.isCodeFile(f.extension));
     const totalLines = codeFiles.reduce((sum, file) => sum + file.linesOfCode, 0);
-    
+
     return {
       totalFiles: structure.files.length,
       totalLines,
       codeLines: Math.floor(totalLines * 0.8), // Estimate
-      commentLines: Math.floor(totalLines * 0.15), // Estimate  
+      commentLines: Math.floor(totalLines * 0.15), // Estimate
       blankLines: Math.floor(totalLines * 0.05), // Estimate
       testFiles: structure.testFiles.length,
       configFiles: structure.configFiles.length,
-      documentFiles: structure.documentationFiles.length
+      documentFiles: structure.documentationFiles.length,
     };
   }
 
@@ -1085,7 +1213,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
     return {
       cachedAnalyses: this.cache.size,
       activeAnalyses: this.analysisInProgress.size,
-      memoryUsage: process.memoryUsage()
+      memoryUsage: process.memoryUsage(),
     };
   }
 }

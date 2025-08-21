@@ -1,4 +1,3 @@
-
 export interface CLIOutputManager {
   outputError: (message: string, exitCode?: number) => void;
   outputInfo: (message: string) => void;
@@ -28,6 +27,6 @@ export function createCLIOutputManager(): CLIOutputManager {
     },
     configure: (options: Record<string, unknown>) => {
       // Configuration logic
-    }
+    },
   };
 }

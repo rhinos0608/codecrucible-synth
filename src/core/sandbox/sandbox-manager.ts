@@ -20,7 +20,7 @@ export interface SandboxConfig {
     blockedCommands: string[];
     resourceLimits: {
       memory: number; // MB
-      cpu: number;    // percentage
+      cpu: number; // percentage
       timeout: number; // ms
     };
   };
@@ -82,9 +82,9 @@ export class SandboxManager {
    */
   async createSandbox(config: SandboxConfig): Promise<Sandbox> {
     const sandboxId = this.generateSandboxId();
-    
+
     let sandbox: Sandbox;
-    
+
     switch (this.platform) {
       case 'macos':
         sandbox = new MacOSSandbox(config, sandboxId);
@@ -101,7 +101,7 @@ export class SandboxManager {
 
     await sandbox.validatePath(config.workspaceRoot);
     this.activeSandboxes.set(sandboxId, sandbox);
-    
+
     logger.info(`Created sandbox: ${sandboxId} (${config.mode} mode)`);
     return sandbox;
   }
@@ -117,21 +117,30 @@ export class SandboxManager {
    * Cleanup all active sandboxes
    */
   async cleanupAll(): Promise<void> {
-    const cleanupPromises = Array.from(this.activeSandboxes.values())
-      .map(sandbox => sandbox.cleanup());
-    
+    const cleanupPromises = Array.from(this.activeSandboxes.values()).map(sandbox =>
+      sandbox.cleanup()
+    );
+
     await Promise.all(cleanupPromises);
     this.activeSandboxes.clear();
-    
+
     logger.info('All sandboxes cleaned up');
   }
 
   /**
    * Get status of all active sandboxes
    */
-  getOverallStatus(): { total: number; byMode: Record<SandboxMode, number>; byPlatform: Record<Platform, number> } {
+  getOverallStatus(): {
+    total: number;
+    byMode: Record<SandboxMode, number>;
+    byPlatform: Record<Platform, number>;
+  } {
     const sandboxes = Array.from(this.activeSandboxes.values());
-    const byMode: Record<SandboxMode, number> = { 'read-only': 0, 'workspace-write': 0, 'full-access': 0 };
+    const byMode: Record<SandboxMode, number> = {
+      'read-only': 0,
+      'workspace-write': 0,
+      'full-access': 0,
+    };
     const byPlatform: Record<Platform, number> = { windows: 0, macos: 0, linux: 0 };
 
     sandboxes.forEach(sandbox => {
@@ -143,13 +152,13 @@ export class SandboxManager {
     return {
       total: sandboxes.length,
       byMode,
-      byPlatform
+      byPlatform,
     };
   }
 
   private detectPlatform(): Platform {
     const platform = os.platform();
-    
+
     switch (platform) {
       case 'darwin':
         return 'macos';
@@ -233,13 +242,26 @@ abstract class BaseSandbox implements Sandbox {
    */
   protected isCommandBlocked(command: string): boolean {
     const baseCommand = command.split(' ')[0].toLowerCase();
-    
+
     // Always block dangerous commands
     const dangerousCommands = [
-      'rm', 'del', 'format', 'fdisk', 'mkfs',
-      'chmod', 'chown', 'sudo', 'su',
-      'wget', 'curl', 'nc', 'netcat',
-      'python', 'node', 'powershell', 'cmd'
+      'rm',
+      'del',
+      'format',
+      'fdisk',
+      'mkfs',
+      'chmod',
+      'chown',
+      'sudo',
+      'su',
+      'wget',
+      'curl',
+      'nc',
+      'netcat',
+      'python',
+      'node',
+      'powershell',
+      'cmd',
     ];
 
     if (dangerousCommands.includes(baseCommand)) {
@@ -268,12 +290,12 @@ abstract class BaseSandbox implements Sandbox {
       platform: this.config.platform,
       resourceUsage: {
         memory: 0, // To be implemented by platform-specific classes
-        cpu: 0
+        cpu: 0,
       },
       restrictions: {
         pathsAllowed: this.config.restrictions.allowedPaths.length,
-        commandsBlocked: this.config.restrictions.blockedCommands.length
-      }
+        commandsBlocked: this.config.restrictions.blockedCommands.length,
+      },
     };
   }
 
@@ -304,7 +326,7 @@ class MacOSSandbox extends BaseSandbox {
         exitCode: 1,
         duration: Date.now() - startTime,
         blocked: true,
-        blockReason: 'Command not allowed in current sandbox mode'
+        blockReason: 'Command not allowed in current sandbox mode',
       };
     }
 
@@ -315,12 +337,12 @@ class MacOSSandbox extends BaseSandbox {
 
       // Execute with sandbox-exec
       const sandboxedCommand = `sandbox-exec -f ${profilePath} ${command}`;
-      
+
       const { stdout, stderr } = await execAsync(sandboxedCommand, {
         timeout: this.config.restrictions.resourceLimits.timeout,
         maxBuffer: 1024 * 1024, // 1MB buffer
         cwd: context?.workingDirectory || this.config.workspaceRoot,
-        env: { ...process.env, ...context?.environment }
+        env: { ...process.env, ...context?.environment },
       });
 
       // Cleanup profile file
@@ -331,27 +353,28 @@ class MacOSSandbox extends BaseSandbox {
         stdout,
         stderr,
         exitCode: 0,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       };
-
     } catch (error: any) {
       return {
         success: false,
         stdout: '',
         stderr: error.message || 'Command execution failed',
         exitCode: error.code || 1,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       };
     }
   }
 
   private generateSandboxProfile(): string {
     const allowedPaths = this.config.restrictions.allowedPaths
-      .map(p => `(allow file-read* (subpath "${path.resolve(p)}"))`).join('\n');
+      .map(p => `(allow file-read* (subpath "${path.resolve(p)}"))`)
+      .join('\n');
 
-    const workspaceAccess = this.config.mode === 'read-only' 
-      ? `(allow file-read* (subpath "${this.config.workspaceRoot}"))`
-      : `(allow file-read* file-write* (subpath "${this.config.workspaceRoot}"))`;
+    const workspaceAccess =
+      this.config.mode === 'read-only'
+        ? `(allow file-read* (subpath "${this.config.workspaceRoot}"))`
+        : `(allow file-read* file-write* (subpath "${this.config.workspaceRoot}"))`;
 
     return `
 (version 1)
@@ -378,7 +401,7 @@ ${this.config.mode === 'full-access' ? '(allow network*)' : '(deny network*)'}
     // Cleanup any temporary files
     const profilePath = `/tmp/sandbox_${this.sandboxId}.sb`;
     await fs.unlink(profilePath).catch(() => {}); // Ignore errors
-    
+
     logger.debug(`macOS sandbox ${this.sandboxId} cleaned up`);
   }
 }
@@ -406,7 +429,7 @@ class LinuxSandbox extends BaseSandbox {
         exitCode: 1,
         duration: Date.now() - startTime,
         blocked: true,
-        blockReason: 'Command not allowed in current sandbox mode'
+        blockReason: 'Command not allowed in current sandbox mode',
       };
     }
 
@@ -416,12 +439,12 @@ class LinuxSandbox extends BaseSandbox {
 
       // Use unshare for namespace isolation
       const namespacedCommand = this.buildNamespacedCommand(command, context);
-      
+
       const { stdout, stderr } = await execAsync(namespacedCommand, {
         timeout: this.config.restrictions.resourceLimits.timeout,
         maxBuffer: 1024 * 1024, // 1MB buffer
         cwd: context?.workingDirectory || this.config.workspaceRoot,
-        env: { ...process.env, ...context?.environment }
+        env: { ...process.env, ...context?.environment },
       });
 
       return {
@@ -429,26 +452,25 @@ class LinuxSandbox extends BaseSandbox {
         stdout,
         stderr,
         exitCode: 0,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       };
-
     } catch (error: any) {
       return {
         success: false,
         stdout: '',
         stderr: error.message || 'Command execution failed',
         exitCode: error.code || 1,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       };
     }
   }
 
   private buildNamespacedCommand(command: string, context?: OperationContext): string {
     const nsFlags = [
-      '--mount',  // Mount namespace
-      '--pid',    // PID namespace
-      '--ipc',    // IPC namespace
-      '--uts'     // UTS namespace
+      '--mount', // Mount namespace
+      '--pid', // PID namespace
+      '--ipc', // IPC namespace
+      '--uts', // UTS namespace
     ];
 
     // Add network namespace unless full-access mode
@@ -457,13 +479,12 @@ class LinuxSandbox extends BaseSandbox {
     }
 
     // Build bind mounts for allowed paths
-    const bindMounts = this.config.restrictions.allowedPaths
-      .map(p => `--bind ${p} ${p}`)
-      .join(' ');
+    const bindMounts = this.config.restrictions.allowedPaths.map(p => `--bind ${p} ${p}`).join(' ');
 
-    const workspaceMount = this.config.mode === 'read-only'
-      ? `--bind-ro ${this.config.workspaceRoot} ${this.config.workspaceRoot}`
-      : `--bind ${this.config.workspaceRoot} ${this.config.workspaceRoot}`;
+    const workspaceMount =
+      this.config.mode === 'read-only'
+        ? `--bind-ro ${this.config.workspaceRoot} ${this.config.workspaceRoot}`
+        : `--bind ${this.config.workspaceRoot} ${this.config.workspaceRoot}`;
 
     return `unshare ${nsFlags.join(' ')} --map-root-user cgexec -g memory,cpu:codecrucible/${this.sandboxId} -- ${workspaceMount} ${bindMounts} ${command}`;
   }
@@ -521,19 +542,19 @@ class WindowsSandbox extends BaseSandbox {
         exitCode: 1,
         duration: Date.now() - startTime,
         blocked: true,
-        blockReason: 'Command not allowed in current sandbox mode'
+        blockReason: 'Command not allowed in current sandbox mode',
       };
     }
 
     try {
       // Use PowerShell with execution policy and constrained session
       const psCommand = this.buildPowerShellCommand(command, context);
-      
+
       const { stdout, stderr } = await execAsync(psCommand, {
         timeout: this.config.restrictions.resourceLimits.timeout,
         maxBuffer: 1024 * 1024, // 1MB buffer
         cwd: context?.workingDirectory || this.config.workspaceRoot,
-        env: { ...process.env, ...context?.environment }
+        env: { ...process.env, ...context?.environment },
       });
 
       return {
@@ -541,16 +562,15 @@ class WindowsSandbox extends BaseSandbox {
         stdout,
         stderr,
         exitCode: 0,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       };
-
     } catch (error: any) {
       return {
         success: false,
         stdout: '',
         stderr: error.message || 'Command execution failed',
         exitCode: error.code || 1,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       };
     }
   }
@@ -558,7 +578,7 @@ class WindowsSandbox extends BaseSandbox {
   private buildPowerShellCommand(command: string, context?: OperationContext): string {
     // Create a restricted PowerShell session
     const sessionConfig = this.generateSessionConfiguration();
-    
+
     const allowedPaths = this.config.restrictions.allowedPaths
       .map(p => `"${path.resolve(p)}"`)
       .join(',');

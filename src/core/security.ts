@@ -34,40 +34,40 @@ export class SecurityUtils {
       allowedCommands: ['npm', 'node', 'git', 'tsc', 'eslint'],
       allowedPaths: [process.cwd()],
       blockedPatterns: [
-        /rm\s+-rf\s+\/[^/\s]*/gi,     // Dangerous delete commands with actual paths
-        /sudo\s+rm/gi,                // Sudo with dangerous commands
-        /eval\s*\(\s*[^)]*\$_/gi,     // Dynamic code evaluation with user input
-        /exec\s*\(\s*[^)]*\$_/gi,     // Dynamic code execution with user input
-        /system\s*\(\s*[^)]*\$_/gi,   // Dynamic system calls with user input
+        /rm\s+-rf\s+\/[^/\s]*/gi, // Dangerous delete commands with actual paths
+        /sudo\s+rm/gi, // Sudo with dangerous commands
+        /eval\s*\(\s*[^)]*\$_/gi, // Dynamic code evaluation with user input
+        /exec\s*\(\s*[^)]*\$_/gi, // Dynamic code execution with user input
+        /system\s*\(\s*[^)]*\$_/gi, // Dynamic system calls with user input
         /shell_exec\s*\(\s*[^)]*\$_/gi, // Dynamic shell execution with user input
-        /curl\s+.*\|\s*sh/gi,         // Remote execution
-        /wget\s+.*\|\s*sh/gi,         // Remote execution
+        /curl\s+.*\|\s*sh/gi, // Remote execution
+        /wget\s+.*\|\s*sh/gi, // Remote execution
         /powershell\s+-[Cc]ommand/gi, // PowerShell remote execution
-        /cmd\s+\/c\s+.*&/gi,          // Chained command execution
-        /net\s+user\s+.*\/add/gi,     // User creation
-        /reg\s+add\s+HKEY/gi,         // Registry modification
-        /schtasks/gi,          // Task scheduling
-        /wmic/gi,              // WMI commands
-        /format\s+c:/gi,       // Format commands
-        /del\s+\/[sqa]/gi,     // Dangerous delete flags
-        /taskkill\s+\/f/gi,    // Force kill processes
-        /shutdown/gi,          // System shutdown
-        /reboot/gi,            // System reboot
-        /halt/gi,              // System halt
-        /chmod\s+777/gi,       // Dangerous permissions
-        /chown\s+root/gi,      // Ownership changes
-        /passwd/gi,            // Password changes
-        /su\s+/gi,             // Switch user
-        /mount\s+/gi,          // Mount operations
-        /umount\s+/gi,         // Unmount operations
-        /dd\s+if=/gi,          // Disk operations
-        /fdisk/gi,             // Disk partitioning
-        /mkfs/gi,              // File system creation
-        /cryptsetup/gi,        // Encryption operations
+        /cmd\s+\/c\s+.*&/gi, // Chained command execution
+        /net\s+user\s+.*\/add/gi, // User creation
+        /reg\s+add\s+HKEY/gi, // Registry modification
+        /schtasks/gi, // Task scheduling
+        /wmic/gi, // WMI commands
+        /format\s+c:/gi, // Format commands
+        /del\s+\/[sqa]/gi, // Dangerous delete flags
+        /taskkill\s+\/f/gi, // Force kill processes
+        /shutdown/gi, // System shutdown
+        /reboot/gi, // System reboot
+        /halt/gi, // System halt
+        /chmod\s+777/gi, // Dangerous permissions
+        /chown\s+root/gi, // Ownership changes
+        /passwd/gi, // Password changes
+        /su\s+/gi, // Switch user
+        /mount\s+/gi, // Mount operations
+        /umount\s+/gi, // Unmount operations
+        /dd\s+if=/gi, // Disk operations
+        /fdisk/gi, // Disk partitioning
+        /mkfs/gi, // File system creation
+        /cryptsetup/gi, // Encryption operations
       ],
       scanDependencies: true,
       enableCSPProtection: true,
-      ...config
+      ...config,
     };
 
     this.blockedPatterns = this.config.blockedPatterns;
@@ -84,22 +84,24 @@ export class SecurityUtils {
         return {
           isValid: false,
           reason: `Input exceeds maximum length of ${this.config.maxInputLength} characters`,
-          riskLevel: 'medium'
+          riskLevel: 'medium',
         };
       }
 
       // Check if this is legitimate code analysis context
       const isCodeAnalysis = this.isLegitimateCodeAnalysis(input);
-      
+
       // Check for blocked patterns (skip if legitimate code analysis)
       if (!isCodeAnalysis) {
         for (const pattern of this.blockedPatterns) {
           if (pattern.test(input)) {
-            logger.warn('🚨 Blocked potentially dangerous input pattern', { pattern: pattern.source });
+            logger.warn('🚨 Blocked potentially dangerous input pattern', {
+              pattern: pattern.source,
+            });
             return {
               isValid: false,
               reason: `Input contains potentially dangerous pattern: ${pattern.source}`,
-              riskLevel: 'high'
+              riskLevel: 'high',
             };
           }
         }
@@ -120,26 +122,25 @@ export class SecurityUtils {
           return {
             isValid: false,
             reason: 'Input contains suspicious file operation patterns',
-            riskLevel: 'high'
+            riskLevel: 'high',
           };
         }
       }
 
       // Sanitize and validate
       const sanitizedInput = this.sanitizeInput(input);
-      
+
       return {
         isValid: true,
         sanitizedInput,
-        riskLevel: 'low'
+        riskLevel: 'low',
       };
-
     } catch (error) {
       logger.error('Error validating input:', error);
       return {
         isValid: false,
         reason: 'Input validation failed',
-        riskLevel: 'high'
+        riskLevel: 'high',
       };
     }
   }
@@ -150,16 +151,16 @@ export class SecurityUtils {
   private sanitizeInput(input: string): string {
     // Remove null bytes
     let sanitized = input.replace(/\0/g, '');
-    
+
     // Normalize line endings
     sanitized = sanitized.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    
+
     // Limit consecutive newlines
     sanitized = sanitized.replace(/\n{5,}/g, '\n\n\n\n');
-    
+
     // Remove or escape potentially dangerous sequences
     sanitized = sanitized.replace(/`{3,}/g, '```'); // Limit code blocks
-    
+
     return sanitized.trim();
   }
 
@@ -168,22 +169,22 @@ export class SecurityUtils {
    */
   async validateCommand(command: string, args: string[] = []): Promise<SecurityValidation> {
     const baseCommand = command.split(' ')[0];
-    
+
     if (!this.allowedCommands.has(baseCommand)) {
       return {
         isValid: false,
         reason: `Command '${baseCommand}' is not in the allowed commands list`,
-        riskLevel: 'high'
+        riskLevel: 'high',
       };
     }
 
     // Check for command injection patterns
     const fullCommand = `${command} ${args.join(' ')}`;
     const injectionPatterns = [
-      /[;&|`$(){}]/,  // Command separators and substitution
+      /[;&|`$(){}]/, // Command separators and substitution
       />\s*\/dev\//, // Redirecting to device files
-      /\|\s*sh/,     // Piping to shell
-      /\|\s*bash/,   // Piping to bash
+      /\|\s*sh/, // Piping to shell
+      /\|\s*bash/, // Piping to bash
     ];
 
     for (const pattern of injectionPatterns) {
@@ -191,14 +192,14 @@ export class SecurityUtils {
         return {
           isValid: false,
           reason: 'Command contains potential injection patterns',
-          riskLevel: 'high'
+          riskLevel: 'high',
         };
       }
     }
 
     return {
       isValid: true,
-      riskLevel: 'low'
+      riskLevel: 'low',
     };
   }
 
@@ -208,7 +209,7 @@ export class SecurityUtils {
   async validatePath(filePath: string): Promise<SecurityValidation> {
     try {
       const normalizedPath = normalize(resolve(filePath));
-      
+
       // Check if path is within allowed directories
       const isAllowed = this.config.allowedPaths.some(allowedPath => {
         const normalizedAllowed = normalize(resolve(allowedPath));
@@ -219,19 +220,19 @@ export class SecurityUtils {
         return {
           isValid: false,
           reason: 'Path is outside allowed directories',
-          riskLevel: 'high'
+          riskLevel: 'high',
         };
       }
 
       // Check for directory traversal and dangerous patterns
       const dangerousPatterns = [
-        /\.\.[\/\\]/,          // Directory traversal
-        /~[\/\\]/,             // Home directory access
-        /[\/\\][.]+[\/\\]/,   // Hidden directory access
-        /\$\{/,                // Variable substitution
-        /%[0-9A-Fa-f]{2}/,     // URL encoded characters
-        /\\x[0-9A-Fa-f]{2}/,   // Hex encoded characters
-        /\\u[0-9A-Fa-f]{4}/,   // Unicode encoded characters
+        /\.\.[\/\\]/, // Directory traversal
+        /~[\/\\]/, // Home directory access
+        /[\/\\][.]+[\/\\]/, // Hidden directory access
+        /\$\{/, // Variable substitution
+        /%[0-9A-Fa-f]{2}/, // URL encoded characters
+        /\\x[0-9A-Fa-f]{2}/, // Hex encoded characters
+        /\\u[0-9A-Fa-f]{4}/, // Unicode encoded characters
       ];
 
       for (const pattern of dangerousPatterns) {
@@ -239,18 +240,30 @@ export class SecurityUtils {
           return {
             isValid: false,
             reason: 'Path contains dangerous traversal or encoding patterns',
-            riskLevel: 'high'
+            riskLevel: 'high',
           };
         }
       }
 
       // Check for system file access
       const systemPaths = [
-        '/etc', '/proc', '/sys', '/dev', '/root', '/boot',
-        '/var/log', '/var/run', '/tmp', '/var/tmp',
-        'C:\\Windows', 'C:\\System32', 'C:\\Program Files',
-        'C:\\ProgramData', 'C:\\Users\\All Users',
-        'C:\\$Recycle.Bin', 'C:\\Recovery'
+        '/etc',
+        '/proc',
+        '/sys',
+        '/dev',
+        '/root',
+        '/boot',
+        '/var/log',
+        '/var/run',
+        '/tmp',
+        '/var/tmp',
+        'C:\\Windows',
+        'C:\\System32',
+        'C:\\Program Files',
+        'C:\\ProgramData',
+        'C:\\Users\\All Users',
+        'C:\\$Recycle.Bin',
+        'C:\\Recovery',
       ];
 
       for (const systemPath of systemPaths) {
@@ -258,21 +271,20 @@ export class SecurityUtils {
           return {
             isValid: false,
             reason: 'Attempted access to system directories',
-            riskLevel: 'high'
+            riskLevel: 'high',
           };
         }
       }
 
       return {
         isValid: true,
-        riskLevel: 'low'
+        riskLevel: 'low',
       };
-
     } catch (error) {
       return {
         isValid: false,
         reason: 'Path validation failed',
-        riskLevel: 'medium'
+        riskLevel: 'medium',
       };
     }
   }
@@ -285,9 +297,11 @@ export class SecurityUtils {
     args: string[] = [],
     options: { timeout?: number; cwd?: string } = {}
   ): Promise<{ success: boolean; output: string; error?: string }> {
-    
     if (!this.config.enableSandbox) {
-      logger.error('🚨 CRITICAL: Attempted to execute command with sandbox disabled', { command, args });
+      logger.error('🚨 CRITICAL: Attempted to execute command with sandbox disabled', {
+        command,
+        args,
+      });
       throw new SecurityError('Sandbox execution is REQUIRED and cannot be disabled');
     }
 
@@ -305,7 +319,7 @@ export class SecurityUtils {
       }
     }
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const timeout = options.timeout || 30000;
       let output = '';
       let error = '';
@@ -317,31 +331,31 @@ export class SecurityUtils {
         // Add additional security constraints
         env: {
           PATH: process.env.PATH,
-          NODE_ENV: process.env.NODE_ENV || 'production'
-        }
+          NODE_ENV: process.env.NODE_ENV || 'production',
+        },
       });
 
-      child.stdout?.on('data', (data) => {
+      child.stdout?.on('data', data => {
         output += data.toString();
       });
 
-      child.stderr?.on('data', (data) => {
+      child.stderr?.on('data', data => {
         error += data.toString();
       });
 
-      child.on('close', (code) => {
+      child.on('close', code => {
         resolve({
           success: code === 0,
           output: output.trim(),
-          error: error.trim() || undefined
+          error: error.trim() || undefined,
         });
       });
 
-      child.on('error', (err) => {
+      child.on('error', err => {
         resolve({
           success: false,
           output: '',
-          error: err.message
+          error: err.message,
         });
       });
 
@@ -380,23 +394,23 @@ export class SecurityUtils {
       const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
       const dependencies = {
         ...packageJson.dependencies,
-        ...packageJson.devDependencies
+        ...packageJson.devDependencies,
       };
 
       const vulnerabilities = [];
-      
+
       // Known problematic packages
       const knownIssues = {
-        'vm2': {
+        vm2: {
           severity: 'high' as const,
           description: 'vm2 is deprecated and has known security vulnerabilities',
-          recommendation: 'Use isolated-vm or proper sandboxing alternatives'
+          recommendation: 'Use isolated-vm or proper sandboxing alternatives',
         },
-        'lodash': {
+        lodash: {
           severity: 'medium' as const,
           description: 'Some versions of lodash have prototype pollution vulnerabilities',
-          recommendation: 'Update to latest version or use lodash-es'
-        }
+          recommendation: 'Update to latest version or use lodash-es',
+        },
       };
 
       for (const [pkg, version] of Object.entries(dependencies)) {
@@ -404,7 +418,7 @@ export class SecurityUtils {
           vulnerabilities.push({
             package: pkg,
             version: version as string,
-            ...knownIssues[pkg as keyof typeof knownIssues]
+            ...knownIssues[pkg as keyof typeof knownIssues],
           });
         }
       }
@@ -413,11 +427,10 @@ export class SecurityUtils {
       const riskLevel = vulnerabilities.some(v => v.severity === 'high')
         ? 'high'
         : vulnerabilities.some(v => v.severity === 'medium')
-        ? 'medium'
-        : 'low';
+          ? 'medium'
+          : 'low';
 
       return { vulnerabilities, riskLevel };
-
     } catch (error) {
       logger.error('Error scanning dependencies:', error);
       return { vulnerabilities: [], riskLevel: 'medium' };
@@ -436,7 +449,9 @@ export class SecurityUtils {
    */
   hashSensitiveData(data: string, salt?: string): string {
     const actualSalt = salt || randomBytes(16).toString('hex');
-    return createHash('sha256').update(data + actualSalt).digest('hex');
+    return createHash('sha256')
+      .update(data + actualSalt)
+      .digest('hex');
   }
 
   /**
@@ -466,12 +481,12 @@ export class SecurityUtils {
         "font-src 'self'",
         "frame-src 'none'",
         "object-src 'none'",
-        "base-uri 'self'"
+        "base-uri 'self'",
       ].join('; '),
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'X-XSS-Protection': '1; mode=block',
-      'Referrer-Policy': 'strict-origin-when-cross-origin'
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
     };
   }
 
@@ -492,7 +507,10 @@ export class SecurityUtils {
 
     // SECURITY: Log all security configuration changes
     const changes = Object.keys(newConfig);
-    logger.warn('🔒 Security configuration updated', { changes, timestamp: new Date().toISOString() });
+    logger.warn('🔒 Security configuration updated', {
+      changes,
+      timestamp: new Date().toISOString(),
+    });
 
     this.config = { ...this.config, ...newConfig };
     this.allowedCommands = new Set(this.config.allowedCommands);
@@ -525,7 +543,7 @@ export class SecurityUtils {
       /quality\s+assessment/gi,
       /potential\s+issues/gi,
       /security\s+concerns/gi,
-      /\.(js|ts|tsx|jsx|py|java|cpp|c|h|css|html|json|md|yml|yaml)\s+code\s+file/gi
+      /\.(js|ts|tsx|jsx|py|java|cpp|c|h|css|html|json|md|yml|yaml)\s+code\s+file/gi,
     ];
 
     // Check for legitimate code patterns
@@ -543,7 +561,7 @@ export class SecurityUtils {
 
     // Check if input looks like legitimate code
     const looksLikeCode = codePatterns.some(pattern => pattern.test(input.trim()));
-    
+
     if (looksLikeCode) {
       return true;
     }

@@ -2,6 +2,7 @@ import { writeFile, mkdir, access } from 'fs/promises';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import chalk from 'chalk';
+import * as api from '@opentelemetry/api';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -11,6 +12,11 @@ export interface LogEntry {
   message: string;
   data?: any;
   error?: Error;
+  traceId?: string;
+  spanId?: string;
+  correlationId?: string;
+  userId?: string;
+  sessionId?: string;
 }
 
 export interface LoggerConfig {
@@ -24,7 +30,7 @@ export interface LoggerConfig {
 
 /**
  * Enhanced Logger with file and console output
- * 
+ *
  * Provides structured logging with different levels, file rotation,
  * and pretty console output with colors
  */
@@ -45,7 +51,7 @@ class Logger {
         toConsole: true,
         maxFileSize: '10MB',
         maxFiles: 5,
-        ...config
+        ...config,
       };
     } else {
       this.config = {
@@ -54,7 +60,7 @@ class Logger {
         toConsole: true,
         maxFileSize: '10MB',
         maxFiles: 5,
-        ...nameOrConfig
+        ...nameOrConfig,
       };
     }
 
@@ -104,7 +110,7 @@ class Logger {
    */
   private getColoredPrefix(level: LogLevel): string {
     const timestamp = chalk.gray(this.formatTimestamp(new Date()));
-    
+
     switch (level) {
       case 'debug':
         return `${timestamp} ${chalk.blue('DEBUG')}`;
@@ -125,9 +131,8 @@ class Logger {
     let message = `${prefix} ${entry.message}`;
 
     if (entry.data) {
-      const dataStr = typeof entry.data === 'string' 
-        ? entry.data 
-        : JSON.stringify(entry.data, null, 2);
+      const dataStr =
+        typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data, null, 2);
       message += `\\n${chalk.gray(dataStr)}`;
     }
 
@@ -144,13 +149,11 @@ class Logger {
   private formatFileMessage(entry: LogEntry): string {
     const timestamp = this.formatTimestamp(entry.timestamp);
     const level = entry.level.toUpperCase().padEnd(5);
-    
+
     let message = `${timestamp} ${level} ${entry.message}`;
 
     if (entry.data) {
-      const dataStr = typeof entry.data === 'string' 
-        ? entry.data 
-        : JSON.stringify(entry.data);
+      const dataStr = typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data);
       message += ` | Data: ${dataStr}`;
     }
 
@@ -172,12 +175,21 @@ class Logger {
       return;
     }
 
+    // Get trace context from OpenTelemetry
+    const span = api.trace.getActiveSpan();
+    const spanContext = span?.spanContext();
+
     const entry: LogEntry = {
       timestamp: new Date(),
       level,
       message,
       data,
-      error
+      error,
+      traceId: spanContext?.traceId,
+      spanId: spanContext?.spanId,
+      correlationId: data?.correlationId,
+      userId: data?.userId,
+      sessionId: data?.sessionId,
     };
 
     // Console output
@@ -204,14 +216,11 @@ class Logger {
 
     try {
       const entries = this.logQueue.splice(0, 100); // Process in batches
-      const logContent = entries
-        .map(entry => this.formatFileMessage(entry))
-        .join('\\n') + '\\n';
+      const logContent = entries.map(entry => this.formatFileMessage(entry)).join('\\n') + '\\n';
 
       const logFile = join(this.logDirectory, `codecrucible-${this.getCurrentDateString()}.log`);
-      
-      await writeFile(logFile, logContent, { flag: 'a' });
 
+      await writeFile(logFile, logContent, { flag: 'a' });
     } catch (error) {
       // Fallback to console if file writing fails
       console.error('Failed to write to log file:', error);
@@ -297,7 +306,7 @@ class Logger {
    */
   child(context: string): Logger {
     const childLogger = new Logger(this.config);
-    
+
     // Override log method to include context
     const originalLog = childLogger.log.bind(childLogger);
     childLogger.log = (level: LogLevel, message: string, data?: any, error?: Error) => {
@@ -312,7 +321,7 @@ class Logger {
    */
   time(label: string): () => void {
     const start = Date.now();
-    
+
     return () => {
       const duration = Date.now() - start;
       this.debug(`Timer ${label}: ${duration}ms`);
@@ -324,7 +333,7 @@ class Logger {
    */
   async profile<T>(label: string, operation: () => Promise<T>): Promise<T> {
     const start = Date.now();
-    
+
     try {
       const result = await operation();
       const duration = Date.now() - start;
@@ -347,7 +356,75 @@ class Logger {
       nodeVersion: process.version,
       memoryUsage: process.memoryUsage(),
       uptime: process.uptime(),
-      cwd: process.cwd()
+      cwd: process.cwd(),
+    });
+  }
+
+  /**
+   * Audit log for compliance and security
+   */
+  audit(
+    action: string,
+    details: {
+      userId?: string;
+      sessionId?: string;
+      ip?: string;
+      userAgent?: string;
+      resource?: string;
+      status?: 'success' | 'failure';
+      [key: string]: any;
+    }
+  ): void {
+    this.info(`AUDIT: ${action}`, {
+      ...details,
+      auditType: 'security',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Security event logging
+   */
+  security(
+    event: string,
+    details: {
+      severity: 'low' | 'medium' | 'high' | 'critical';
+      threatType?: string;
+      userId?: string;
+      ip?: string;
+      mitigated?: boolean;
+      [key: string]: any;
+    }
+  ): void {
+    this.warn(`SECURITY: ${event}`, {
+      ...details,
+      eventType: 'security_event',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Performance metrics logging
+   */
+  metric(name: string, value: number, unit: string = 'ms', tags?: Record<string, string>): void {
+    this.debug(`METRIC: ${name}`, {
+      metricName: name,
+      metricValue: value,
+      metricUnit: unit,
+      metricTags: tags,
+      metricType: 'performance',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Business event logging
+   */
+  business(event: string, details: Record<string, any>): void {
+    this.info(`BUSINESS: ${event}`, {
+      ...details,
+      eventType: 'business_event',
+      timestamp: new Date().toISOString(),
     });
   }
 }
@@ -368,7 +445,7 @@ let loggerShutdownRegistered = false;
 
 if (!loggerShutdownRegistered) {
   loggerShutdownRegistered = true;
-  
+
   process.on('beforeExit', async () => {
     try {
       await logger.flush();

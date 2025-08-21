@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { spawn } from 'child_process';
@@ -12,7 +11,7 @@ export class GitStatusTool extends BaseTool {
       description: 'Gets the current git status.',
       category: 'Git',
       parameters: GitStatusSchema,
-      examples: ['{}']
+      examples: ['{}'],
     });
   }
 
@@ -26,15 +25,15 @@ export class GitStatusTool extends BaseTool {
       let stdout = '';
       let stderr = '';
 
-      git.stdout.on('data', (data) => {
+      git.stdout.on('data', data => {
         stdout += data.toString();
       });
 
-      git.stderr.on('data', (data) => {
+      git.stderr.on('data', data => {
         stderr += data.toString();
       });
 
-      git.on('close', (code) => {
+      git.on('close', code => {
         if (code === 0) {
           resolve(stdout);
         } else {
@@ -54,7 +53,7 @@ export class GitDiffTool extends BaseTool {
       description: 'Gets the current git diff.',
       category: 'Git',
       parameters: GitDiffSchema,
-      examples: ['{}']
+      examples: ['{}'],
     });
   }
 
@@ -68,15 +67,15 @@ export class GitDiffTool extends BaseTool {
       let stdout = '';
       let stderr = '';
 
-      git.stdout.on('data', (data) => {
+      git.stdout.on('data', data => {
         stdout += data.toString();
       });
 
-      git.stderr.on('data', (data) => {
+      git.stderr.on('data', data => {
         stderr += data.toString();
       });
 
-      git.on('close', (code) => {
+      git.on('close', code => {
         if (code === 0) {
           resolve(stdout);
         } else {

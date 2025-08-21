@@ -119,3 +119,22 @@ electron-dist/
 
 # Archive folder (legacy code)
 archive/
+
+# Security-sensitive files
+master.key
+*.key
+.secrets/
+secrets/test*.json
+secrets/key-test*.json
+audit-logs/
+custom-test-logs/
+test-logs/
+
+# Encryption keys and certificates
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+private-keys/
+certificates/

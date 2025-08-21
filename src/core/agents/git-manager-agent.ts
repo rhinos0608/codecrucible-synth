@@ -20,7 +20,7 @@ export class GitManagerAgent extends UnifiedAgent {
 
   async processRequest(input: string): Promise<ExecutionResponse> {
     logger.info('🔧 Git Manager Agent processing request');
-    
+
     // Check if this is a direct git operation
     if (this.isGitOperation(input)) {
       return await this.handleGitOperation(input);
@@ -31,16 +31,19 @@ export class GitManagerAgent extends UnifiedAgent {
       id: `git-manager-${Date.now()}`,
       input: `Git/Version Control Task: ${input}`,
       type: 'git-analysis',
-      mode: 'fast' // Git operations should be fast
+      mode: 'fast', // Git operations should be fast
     };
 
     const response = await this.execute(request);
-    
+
     if (response.success && response.result) {
-      const enhancedResult = await this.enhanceWithGitContext(input, response.result as Record<string, unknown>);
+      const enhancedResult = await this.enhanceWithGitContext(
+        input,
+        response.result as Record<string, unknown>
+      );
       return {
         ...response,
-        result: enhancedResult
+        result: enhancedResult,
       };
     }
 
@@ -49,8 +52,15 @@ export class GitManagerAgent extends UnifiedAgent {
 
   private isGitOperation(input: string): boolean {
     const gitKeywords = [
-      'git status', 'git log', 'git branch', 'git diff', 'git show',
-      'check git status', 'show git log', 'list branches', 'show changes'
+      'git status',
+      'git log',
+      'git branch',
+      'git diff',
+      'git show',
+      'check git status',
+      'show git log',
+      'list branches',
+      'show changes',
     ];
     return gitKeywords.some(keyword => input.toLowerCase().includes(keyword));
   }
@@ -58,7 +68,7 @@ export class GitManagerAgent extends UnifiedAgent {
   private async handleGitOperation(input: string): Promise<ExecutionResponse> {
     try {
       let command = '';
-      
+
       if (input.toLowerCase().includes('status')) {
         command = 'git status --porcelain -b';
       } else if (input.toLowerCase().includes('log')) {
@@ -71,31 +81,30 @@ export class GitManagerAgent extends UnifiedAgent {
         command = 'git status'; // Default
       }
 
-      const { stdout, stderr } = await execAsync(command, { 
+      const { stdout, stderr } = await execAsync(command, {
         cwd: process.cwd(),
-        timeout: 10000 
+        timeout: 10000,
       });
 
       const output = stdout || stderr;
-      
+
       return {
         success: true,
         result: {
           content: this.formatGitOutput(command, output),
           operation: command,
-          rawOutput: output
+          rawOutput: output,
         },
         workflowId: `git-op-${Date.now()}`,
-        executionTime: 0
+        executionTime: 0,
       };
-
     } catch (error) {
       return {
         success: false,
         result: {},
         error: `Git operation failed: ${error instanceof Error ? error.message : String(error)}`,
         workflowId: `git-op-${Date.now()}`,
-        executionTime: 0
+        executionTime: 0,
       };
     }
   }
@@ -106,7 +115,7 @@ export class GitManagerAgent extends UnifiedAgent {
     }
 
     let formatted = `🔧 Git Command: ${command}\n\n`;
-    
+
     if (command.includes('status')) {
       formatted += this.formatStatusOutput(output);
     } else if (command.includes('log')) {
@@ -178,7 +187,10 @@ export class GitManagerAgent extends UnifiedAgent {
     return formatted;
   }
 
-  private async enhanceWithGitContext(input: string, result: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async enhanceWithGitContext(
+    input: string,
+    result: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     return {
       ...result,
       gitContext: {
@@ -187,15 +199,15 @@ export class GitManagerAgent extends UnifiedAgent {
           'Git status checking',
           'Commit history review',
           'Branch management',
-          'Change analysis'
+          'Change analysis',
         ],
-        safeOperations: true // Only read operations, no destructive changes
+        safeOperations: true, // Only read operations, no destructive changes
       },
       metadata: {
         ...((result.metadata as Record<string, unknown>) || {}),
         agentType: 'git-manager',
-        safeMode: true
-      }
+        safeMode: true,
+      },
     };
   }
 }

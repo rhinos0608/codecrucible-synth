@@ -22,7 +22,7 @@ export class DatabaseManager {
   constructor(config: DatabaseConfig) {
     this.config = {
       enableWAL: true,
-      ...config
+      ...config,
     };
   }
 
@@ -38,19 +38,22 @@ export class DatabaseManager {
         // Ensure directory exists
         const dbDir = join(process.cwd(), 'data');
         mkdirSync(dbDir, { recursive: true });
-        
+
         const dbPath = join(dbDir, this.config.path);
         logger.info('Initializing SQLite database at:', dbPath);
-        
+
         this.db = new Database(dbPath, {
           readonly: this.config.readonly || false,
           fileMustExist: false,
           timeout: 5000,
-          verbose: process.env.NODE_ENV === 'development' ? (message?: unknown, ...additionalArgs: unknown[]) => {
-          if (typeof message === 'string') {
-            logger.debug(message, ...additionalArgs);
-          }
-        } : undefined
+          verbose:
+            process.env.NODE_ENV === 'development'
+              ? (message?: unknown, ...additionalArgs: unknown[]) => {
+                  if (typeof message === 'string') {
+                    logger.debug(message, ...additionalArgs);
+                  }
+                }
+              : undefined,
         });
       }
 
@@ -65,7 +68,7 @@ export class DatabaseManager {
 
       // Initialize schema
       await this.createTables();
-      
+
       logger.info('Database initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize database:', error);
@@ -147,12 +150,12 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_voice_interactions_session 
       ON voice_interactions(session_id);
     `);
-    
+
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_voice_interactions_voice 
       ON voice_interactions(voice_name);
     `);
-    
+
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_code_analysis_project 
       ON code_analysis(project_id);
@@ -243,7 +246,7 @@ export class DatabaseManager {
     if (!this.db) throw new Error('Database not initialized');
 
     const existing = await this.getProjectByPath(project.path);
-    
+
     if (existing) {
       const stmt = this.db.prepare(`
         UPDATE projects 
@@ -312,7 +315,11 @@ export class DatabaseManager {
       totalInteractions: this.db.prepare('SELECT COUNT(*) as count FROM voice_interactions').get(),
       totalProjects: this.db.prepare('SELECT COUNT(*) as count FROM projects').get(),
       totalAnalysis: this.db.prepare('SELECT COUNT(*) as count FROM code_analysis').get(),
-      dbSize: this.db.prepare("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()").get()
+      dbSize: this.db
+        .prepare(
+          'SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()'
+        )
+        .get(),
     };
 
     return stats;
@@ -325,7 +332,9 @@ export class DatabaseManager {
     if (!this.db) throw new Error('Database not initialized');
     if (this.config.inMemory) throw new Error('Cannot backup in-memory database');
 
-    const targetPath = backupPath || this.config.backupPath || 
+    const targetPath =
+      backupPath ||
+      this.config.backupPath ||
       join(process.cwd(), 'data', `backup_${Date.now()}.db`);
 
     await this.db.backup(targetPath);

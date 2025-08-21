@@ -8,6 +8,9 @@ import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
 import { UnifiedModelClient } from '../client.js';
 import { SecureToolFactory } from '../security/secure-tool-factory.js';
+import { RBACSystem } from '../security/rbac-system.js';
+import { SecurityAuditLogger } from '../security/security-audit-logger.js';
+import { SecretsManager } from '../security/secrets-manager.js';
 
 // Core Tool Interfaces
 export interface Tool {
@@ -139,7 +142,7 @@ export enum ToolCategory {
   DATA_PROCESSING = 'data_processing',
   EXTERNAL_API = 'external_api',
   SYSTEM = 'system',
-  CUSTOM = 'custom'
+  CUSTOM = 'custom',
 }
 
 export interface JSONSchema {
@@ -173,18 +176,34 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     this.costOptimizer = new CostOptimizer();
     this.performanceMonitor = new PerformanceMonitor();
     this.errorRecovery = new ErrorRecoveryManager();
-    this.secureToolFactory = new SecureToolFactory();
+    
+    // Initialize SecureToolFactory with required dependencies
+    this.initializeSecureToolFactory();
 
     this.initializeBuiltInTools();
   }
 
   /**
+   * Initialize SecureToolFactory with required dependencies
+   */
+  private initializeSecureToolFactory(): void {
+    try {
+      const rbacSystem = new RBACSystem();
+      const secretsManager = new SecretsManager();
+      const auditLogger = new SecurityAuditLogger(secretsManager);
+      
+      this.secureToolFactory = new SecureToolFactory(rbacSystem, auditLogger);
+    } catch (error) {
+      this.logger.error('Failed to initialize SecureToolFactory', error as Error);
+      // Create a minimal implementation to prevent blocking
+      this.secureToolFactory = null as any;
+    }
+  }
+
+  /**
    * Execute a complex tool orchestration plan
    */
-  async executePlan(
-    toolCalls: ToolCall[],
-    context: ToolContext
-  ): Promise<Map<string, ToolResult>> {
+  async executePlan(toolCalls: ToolCall[], context: ToolContext): Promise<Map<string, ToolResult>> {
     const planId = this.generatePlanId();
     this.logger.info(`Executing tool plan ${planId} with ${toolCalls.length} tools`);
 
@@ -204,7 +223,6 @@ export class AdvancedToolOrchestrator extends EventEmitter {
 
       this.emit('plan:completed', { planId, results });
       return results;
-
     } catch (error) {
       this.logger.error(`Plan execution failed:`, error);
       this.emit('plan:failed', { planId, error });
@@ -234,16 +252,16 @@ export class AdvancedToolOrchestrator extends EventEmitter {
 
     const response = await this.modelClient.synthesize({
       prompt: analysisPrompt,
-      maxTokens: 2000
+      maxTokens: 2000,
     });
 
     // Parse AI response and validate
     const suggestedCalls = this.parseToolSuggestions(response.content);
-    
+
     // Apply constraint filtering
-    const filteredCalls = constraints ? 
-      this.filterByConstraints(suggestedCalls, constraints) : 
-      suggestedCalls;
+    const filteredCalls = constraints
+      ? this.filterByConstraints(suggestedCalls, constraints)
+      : suggestedCalls;
 
     // Optimize selection
     return this.optimizeToolSelection(filteredCalls, context);
@@ -284,7 +302,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
       executionOrder,
       estimatedCost,
       estimatedTime,
-      riskAssessment
+      riskAssessment,
     };
   }
 
@@ -305,7 +323,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
         retryPolicy: suggestion.retryPolicy || this.getDefaultRetryPolicy(),
         fallbackTools: suggestion.fallbackTools || [],
         timeout: suggestion.timeout,
-        dependsOn: suggestion.dependsOn || []
+        dependsOn: suggestion.dependsOn || [],
       }));
     } catch (error) {
       this.logger.warn('Failed to parse AI tool suggestions, using fallback');
@@ -313,10 +331,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     }
   }
 
-  private filterByConstraints(
-    toolCalls: ToolCall[],
-    constraints: ToolConstraints
-  ): ToolCall[] {
+  private filterByConstraints(toolCalls: ToolCall[], constraints: ToolConstraints): ToolCall[] {
     return toolCalls.filter(call => {
       const tool = this.toolRegistry.getTool(call.toolId);
       if (!tool) return false;
@@ -335,15 +350,12 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     });
   }
 
-  private optimizeToolSelection(
-    toolCalls: ToolCall[],
-    context: ToolContext
-  ): ToolCall[] {
+  private optimizeToolSelection(toolCalls: ToolCall[], context: ToolContext): ToolCall[] {
     // Sort by priority and reliability
     return toolCalls.sort((a, b) => {
       const toolA = this.toolRegistry.getTool(a.toolId);
       const toolB = this.toolRegistry.getTool(b.toolId);
-      
+
       if (!toolA || !toolB) return 0;
 
       // Primary sort by priority
@@ -363,16 +375,13 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     }, 0);
   }
 
-  private calculateEstimatedTime(
-    toolCalls: ToolCall[],
-    executionOrder: string[][]
-  ): number {
+  private calculateEstimatedTime(toolCalls: ToolCall[], executionOrder: string[][]): number {
     // Calculate time for parallel execution batches
     let totalTime = 0;
 
     for (const batch of executionOrder) {
       let maxBatchTime = 0;
-      
+
       for (const callId of batch) {
         const call = toolCalls.find(c => c.id === callId);
         if (call) {
@@ -381,17 +390,14 @@ export class AdvancedToolOrchestrator extends EventEmitter {
           maxBatchTime = Math.max(maxBatchTime, toolTime);
         }
       }
-      
+
       totalTime += maxBatchTime;
     }
 
     return totalTime;
   }
 
-  private async assessRisks(
-    toolCalls: ToolCall[],
-    context: ToolContext
-  ): Promise<RiskAssessment> {
+  private async assessRisks(toolCalls: ToolCall[], context: ToolContext): Promise<RiskAssessment> {
     const riskFactors: RiskFactor[] = [];
 
     // Assess security risks
@@ -404,7 +410,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
       riskFactors.push({
         type: 'security',
         severity: writeTools.length / toolCalls.length,
-        description: `${writeTools.length} tools require write permissions`
+        description: `${writeTools.length} tools require write permissions`,
       });
     }
 
@@ -418,18 +424,19 @@ export class AdvancedToolOrchestrator extends EventEmitter {
       riskFactors.push({
         type: 'reliability',
         severity: unreliableTools.length / toolCalls.length,
-        description: `${unreliableTools.length} tools have low reliability scores`
+        description: `${unreliableTools.length} tools have low reliability scores`,
       });
     }
 
     // Calculate overall risk
-    const avgSeverity = riskFactors.reduce((sum, factor) => sum + factor.severity, 0) / riskFactors.length;
+    const avgSeverity =
+      riskFactors.reduce((sum, factor) => sum + factor.severity, 0) / riskFactors.length;
     const overall = avgSeverity > 0.7 ? 'high' : avgSeverity > 0.4 ? 'medium' : 'low';
 
     return {
       overall,
       factors: riskFactors,
-      mitigations: this.suggestMitigations(riskFactors)
+      mitigations: this.suggestMitigations(riskFactors),
     };
   }
 
@@ -462,7 +469,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
       backoffStrategy: 'exponential',
       initialDelay: 1000,
       maxDelay: 10000,
-      retryableErrors: ['TIMEOUT', 'NETWORK_ERROR', 'TEMPORARY_FAILURE']
+      retryableErrors: ['TIMEOUT', 'NETWORK_ERROR', 'TEMPORARY_FAILURE'],
     };
   }
 
@@ -475,11 +482,11 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     this.registerTool(new FileReadTool());
     this.registerTool(new FileWriteTool());
     this.registerTool(new NetworkRequestTool());
-    
+
     // Create a secure code execution tool adapter
     const agentContext = { workingDirectory: process.cwd() }; // Basic context
     const secureCodeTool = this.secureToolFactory.createCodeExecutionTool(agentContext);
-    
+
     // Create an adapter that implements the Tool interface
     const secureCodeToolAdapter = {
       id: 'secure_code_execution',
@@ -490,17 +497,17 @@ export class AdvancedToolOrchestrator extends EventEmitter {
         type: 'object',
         properties: {
           code: { type: 'string' },
-          language: { type: 'string' }
+          language: { type: 'string' },
         },
-        required: ['code', 'language']
+        required: ['code', 'language'],
       },
       outputSchema: {
         type: 'object',
         properties: {
           success: { type: 'boolean' },
           output: { type: 'string' },
-          error: { type: 'string' }
-        }
+          error: { type: 'string' },
+        },
       },
       execute: async (input: any, context: any) => {
         return await secureCodeTool.execute(input);
@@ -515,18 +522,20 @@ export class AdvancedToolOrchestrator extends EventEmitter {
         performance: 4,
         dependencies: [],
         conflictsWith: [],
-        capabilities: [{
-          type: 'execute' as const,
-          scope: 'sandboxed',
-          permissions: ['code_execution']
-        }],
-        requirements: []
-      }
+        capabilities: [
+          {
+            type: 'execute' as const,
+            scope: 'sandboxed',
+            permissions: ['code_execution'],
+          },
+        ],
+        requirements: [],
+      },
     };
-    
+
     this.registerTool(secureCodeToolAdapter);
     this.registerTool(new DataAnalysisTool());
-    
+
     this.logger.info('🔒 Initialized built-in tools with secure execution');
   }
 
@@ -586,20 +595,17 @@ class ExecutionEngine {
     this.logger = new Logger('ExecutionEngine');
   }
 
-  async execute(
-    plan: ExecutionPlan,
-    context: ToolContext
-  ): Promise<Map<string, ToolResult>> {
+  async execute(plan: ExecutionPlan, context: ToolContext): Promise<Map<string, ToolResult>> {
     const results = new Map<string, ToolResult>();
 
     for (const batch of plan.executionOrder) {
       // Execute batch in parallel
-      const batchPromises = batch.map(callId => 
+      const batchPromises = batch.map(callId =>
         this.executeToolCall(callId, plan, context, results)
       );
 
       const batchResults = await Promise.allSettled(batchPromises);
-      
+
       // Check for failures that should stop execution
       const failures = batchResults.filter(r => r.status === 'rejected');
       if (failures.length > 0) {
@@ -645,8 +651,8 @@ class ExecutionEngine {
           executionTime: 0,
           memoryUsed: 0,
           cost: 0,
-          version: tool.metadata.version
-        }
+          version: tool.metadata.version,
+        },
       };
 
       results.set(callId, errorResult);
@@ -680,11 +686,11 @@ class DependencyResolver {
 
       visiting.add(nodeId);
       const deps = dependencies.get(nodeId) || [];
-      
+
       for (const dep of deps) {
         visit(dep);
       }
-      
+
       visiting.delete(nodeId);
       visited.add(nodeId);
     };
@@ -696,23 +702,23 @@ class DependencyResolver {
 
     // Create execution batches
     const remaining = new Set(dependencies.keys());
-    
+
     while (remaining.size > 0) {
       const batch: string[] = [];
-      
+
       for (const nodeId of remaining) {
         const deps = dependencies.get(nodeId) || [];
         const allDepsCompleted = deps.every(dep => !remaining.has(dep));
-        
+
         if (allDepsCompleted) {
           batch.push(nodeId);
         }
       }
-      
+
       if (batch.length === 0) {
         throw new Error('Unable to resolve dependencies - possible circular reference');
       }
-      
+
       order.push(batch);
       batch.forEach(nodeId => remaining.delete(nodeId));
     }
@@ -740,7 +746,7 @@ class PerformanceMonitor {
     return {
       totalExecutions: 0,
       averageExecutionTime: 0,
-      successRate: 1.0
+      successRate: 1.0,
     };
   }
 }
@@ -758,15 +764,15 @@ class FileReadTool implements Tool {
   inputSchema = {
     type: 'object',
     properties: {
-      path: { type: 'string' }
+      path: { type: 'string' },
     },
-    required: ['path']
+    required: ['path'],
   };
   outputSchema = {
     type: 'object',
     properties: {
-      content: { type: 'string' }
-    }
+      content: { type: 'string' },
+    },
   };
   metadata: ToolMetadata = {
     version: '1.0.0',
@@ -777,10 +783,8 @@ class FileReadTool implements Tool {
     reliability: 0.95,
     dependencies: [],
     conflictsWith: [],
-    capabilities: [
-      { type: 'read', scope: 'filesystem', permissions: ['read'] }
-    ],
-    requirements: []
+    capabilities: [{ type: 'read', scope: 'filesystem', permissions: ['read'] }],
+    requirements: [],
   };
 
   async execute(input: any, context: ToolContext): Promise<ToolResult> {
@@ -793,8 +797,8 @@ class FileReadTool implements Tool {
         executionTime: 50,
         memoryUsed: 1024,
         cost: 1,
-        version: this.metadata.version
-      }
+        version: this.metadata.version,
+      },
     };
   }
 }
@@ -808,15 +812,15 @@ class FileWriteTool implements Tool {
     type: 'object',
     properties: {
       path: { type: 'string' },
-      content: { type: 'string' }
+      content: { type: 'string' },
     },
-    required: ['path', 'content']
+    required: ['path', 'content'],
   };
   outputSchema = {
     type: 'object',
     properties: {
-      success: { type: 'boolean' }
-    }
+      success: { type: 'boolean' },
+    },
   };
   metadata: ToolMetadata = {
     version: '1.0.0',
@@ -824,13 +828,11 @@ class FileWriteTool implements Tool {
     tags: ['file', 'write'],
     cost: 2,
     latency: 150,
-    reliability: 0.90,
+    reliability: 0.9,
     dependencies: [],
     conflictsWith: [],
-    capabilities: [
-      { type: 'write', scope: 'filesystem', permissions: ['write'] }
-    ],
-    requirements: []
+    capabilities: [{ type: 'write', scope: 'filesystem', permissions: ['write'] }],
+    requirements: [],
   };
 
   async execute(input: any, context: ToolContext): Promise<ToolResult> {
@@ -842,15 +844,15 @@ class FileWriteTool implements Tool {
         executionTime: 75,
         memoryUsed: 512,
         cost: 2,
-        version: this.metadata.version
+        version: this.metadata.version,
       },
       side_effects: [
         {
           type: 'file_created',
           description: `Created file at ${input.path}`,
-          reversible: true
-        }
-      ]
+          reversible: true,
+        },
+      ],
     };
   }
 }
@@ -866,16 +868,16 @@ class NetworkRequestTool implements Tool {
       url: { type: 'string' },
       method: { type: 'string' },
       headers: { type: 'object' },
-      body: { type: 'string' }
+      body: { type: 'string' },
     },
-    required: ['url']
+    required: ['url'],
   };
   outputSchema = {
     type: 'object',
     properties: {
       status: { type: 'number' },
-      data: { type: 'string' }
-    }
+      data: { type: 'string' },
+    },
   };
   metadata: ToolMetadata = {
     version: '1.0.0',
@@ -886,12 +888,8 @@ class NetworkRequestTool implements Tool {
     reliability: 0.85,
     dependencies: [],
     conflictsWith: [],
-    capabilities: [
-      { type: 'network', scope: 'external', permissions: ['http'] }
-    ],
-    requirements: [
-      { type: 'environment', value: 'NETWORK_ACCESS' }
-    ]
+    capabilities: [{ type: 'network', scope: 'external', permissions: ['http'] }],
+    requirements: [{ type: 'environment', value: 'NETWORK_ACCESS' }],
   };
 
   async execute(input: any, context: ToolContext): Promise<ToolResult> {
@@ -903,8 +901,8 @@ class NetworkRequestTool implements Tool {
         executionTime: 800,
         memoryUsed: 2048,
         cost: 3,
-        version: this.metadata.version
-      }
+        version: this.metadata.version,
+      },
     };
   }
 }
@@ -918,16 +916,16 @@ class CodeExecutionTool implements Tool {
     type: 'object',
     properties: {
       code: { type: 'string' },
-      language: { type: 'string' }
+      language: { type: 'string' },
     },
-    required: ['code', 'language']
+    required: ['code', 'language'],
   };
   outputSchema = {
     type: 'object',
     properties: {
       result: { type: 'string' },
-      error: { type: 'string' }
-    }
+      error: { type: 'string' },
+    },
   };
   metadata: ToolMetadata = {
     version: '1.0.0',
@@ -935,15 +933,11 @@ class CodeExecutionTool implements Tool {
     tags: ['code', 'execution'],
     cost: 5,
     latency: 2000,
-    reliability: 0.80,
+    reliability: 0.8,
     dependencies: [],
     conflictsWith: [],
-    capabilities: [
-      { type: 'execute', scope: 'sandbox', permissions: ['code_execution'] }
-    ],
-    requirements: [
-      { type: 'environment', value: 'SANDBOX' }
-    ]
+    capabilities: [{ type: 'execute', scope: 'sandbox', permissions: ['code_execution'] }],
+    requirements: [{ type: 'environment', value: 'SANDBOX' }],
   };
 
   async execute(input: any, context: ToolContext): Promise<ToolResult> {
@@ -955,8 +949,8 @@ class CodeExecutionTool implements Tool {
         executionTime: 1500,
         memoryUsed: 4096,
         cost: 5,
-        version: this.metadata.version
-      }
+        version: this.metadata.version,
+      },
     };
   }
 }
@@ -970,15 +964,15 @@ class DataAnalysisTool implements Tool {
     type: 'object',
     properties: {
       data: { type: 'array' },
-      analysis_type: { type: 'string' }
+      analysis_type: { type: 'string' },
     },
-    required: ['data', 'analysis_type']
+    required: ['data', 'analysis_type'],
   };
   outputSchema = {
     type: 'object',
     properties: {
-      results: { type: 'object' }
-    }
+      results: { type: 'object' },
+    },
   };
   metadata: ToolMetadata = {
     version: '1.0.0',
@@ -986,13 +980,11 @@ class DataAnalysisTool implements Tool {
     tags: ['data', 'analysis'],
     cost: 4,
     latency: 1500,
-    reliability: 0.90,
+    reliability: 0.9,
     dependencies: [],
     conflictsWith: [],
-    capabilities: [
-      { type: 'compute', scope: 'memory', permissions: ['data_processing'] }
-    ],
-    requirements: []
+    capabilities: [{ type: 'compute', scope: 'memory', permissions: ['data_processing'] }],
+    requirements: [],
   };
 
   async execute(input: any, context: ToolContext): Promise<ToolResult> {
@@ -1004,8 +996,8 @@ class DataAnalysisTool implements Tool {
         executionTime: 1200,
         memoryUsed: 8192,
         cost: 4,
-        version: this.metadata.version
-      }
+        version: this.metadata.version,
+      },
     };
   }
 }

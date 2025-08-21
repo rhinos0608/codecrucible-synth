@@ -1,793 +1,834 @@
 /**
- * Enterprise Performance System - Industry Grade Implementation
- * Based on Claude Code, GitHub Copilot CLI, and Cursor performance standards
- * Implements: 60% latency reduction, batch processing, V8 optimization
+ * Enterprise Performance Monitoring and Optimization System
+ * Integrates with existing PerformanceMonitor to provide enterprise-grade capabilities
  */
 
-import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
-import { performance, PerformanceObserver } from 'perf_hooks';
 import { EventEmitter } from 'events';
-import { createHash } from 'crypto';
+import {
+  PerformanceMonitor,
+  PerformanceMetric,
+  PerformanceSnapshot,
+} from './performance-monitor.js';
+import {
+  SecurityAuditLogger,
+  AuditEventType,
+  AuditSeverity,
+} from '../security/security-audit-logger.js';
 import { logger } from '../logger.js';
 
-// Performance Targets (Industry Standards)
-export const PERFORMANCE_TARGETS = {
-  RESPONSE_LATENCY: {
-    FAST: 50,        // <50ms warm start (GitHub Copilot standard)
-    STANDARD: 300,   // <300ms command suggestions
-    COMPLEX: 818,    // <818ms Claude Code average
-  },
-  THROUGHPUT: {
-    MIN: 15,         // 15 commands/minute (Cursor standard)
-    TARGET: 35,      // 35% productivity boost (GitHub Copilot)
-  },
-  CACHE_HIT_RATE: {
-    TARGET: 60,      // 60% latency reduction goal
-    EXCELLENT: 80,   // Excellent performance
-  },
-  MEMORY: {
-    MAX_HEAP: '4gb', // V8 heap optimization
-    GC_THRESHOLD: 80, // Trigger GC at 80% memory
-  }
-} as const;
-
-export interface PerformanceConfig {
-  enableBatchProcessing: boolean;
-  enableWorkerThreads: boolean;
-  maxWorkerThreads: number;
-  enableV8Optimization: boolean;
-  enableStreamProcessing: boolean;
-  enablePredictivePreloading: boolean;
-  performanceMode: 'fast' | 'balanced' | 'quality';
-  circuitBreakerThreshold: number;
-  adaptiveThresholds: boolean;
-  cacheConfig: {
-    enableL1: boolean;  // Memory cache
-    enableL2: boolean;  // Redis cache
-    enableL3: boolean;  // Persistent cache
+export interface EnterprisePerformanceConfig {
+  enableSLOMonitoring: boolean;
+  enableCapacityPlanning: boolean;
+  enableAnomalyDetection: boolean;
+  enablePredictiveScaling: boolean;
+  enableCostOptimization: boolean;
+  enableBusinessMetrics: boolean;
+  alerting: {
+    enabled: boolean;
+    channels: string[];
+    escalationRules: EscalationRule[];
+  };
+  slo: {
+    availability: number; // e.g., 99.9%
+    latencyP99: number; // e.g., 1000ms
+    errorRate: number; // e.g., 0.1%
+    throughput: number; // e.g., 1000 RPS
   };
 }
 
-export interface PerformanceMetrics {
-  responseTime: {
-    p50: number;
-    p95: number;
-    p99: number;
-    avg: number;
-  };
-  throughput: {
-    requestsPerMinute: number;
-    tokensPerSecond: number;
-    commandsPerMinute: number;
-  };
-  cacheMetrics: {
-    hitRate: number;
-    l1HitRate: number;
-    l2HitRate: number;
-    l3HitRate: number;
-    evictionRate: number;
-  };
-  memoryMetrics: {
-    heapUsed: number;
-    heapTotal: number;
-    external: number;
-    gcMetrics: {
-      count: number;
-      duration: number;
-      type: string;
-    }[];
-  };
-  workerMetrics: {
-    activeWorkers: number;
-    queuedTasks: number;
-    completedTasks: number;
-    failedTasks: number;
-  };
+export interface EscalationRule {
+  condition: string;
+  delay: number;
+  channels: string[];
+  severity: 'warning' | 'critical';
 }
 
-export interface BatchRequest {
-  id: string;
-  prompt: string;
-  context?: string[];
-  priority: 'low' | 'medium' | 'high';
-  timeout: number;
+export interface SLOViolation {
+  metric: string;
+  target: number;
+  actual: number;
+  duration: number;
+  impact: 'low' | 'medium' | 'high' | 'critical';
+  timestamp: number;
 }
 
-export interface BatchResponse {
-  id: string;
-  result?: any;
-  error?: Error;
-  processingTime: number;
-  cacheHit: boolean;
+export interface CapacityPrediction {
+  resource: string;
+  currentUsage: number;
+  predictedUsage: number;
+  timeToCapacity: number; // hours
+  confidence: number;
+  recommendations: string[];
 }
 
-/**
- * Circuit Breaker Implementation
- */
-class CircuitBreaker extends EventEmitter {
-  private failures = 0;
-  private successes = 0;
-  private lastFailureTime = 0;
-  private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
-
-  constructor(
-    private threshold: number = 5,
-    private timeout: number = 60000,
-    private resetTimeout: number = 30000
-  ) {
-    super();
-  }
-
-  async execute<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.state === 'OPEN') {
-      if (Date.now() - this.lastFailureTime > this.resetTimeout) {
-        this.state = 'HALF_OPEN';
-        this.emit('circuit-half-open');
-      } else {
-        throw new Error('Circuit breaker is OPEN - rejecting request');
-      }
-    }
-
-    try {
-      const result = await operation();
-      this.onSuccess();
-      return result;
-    } catch (error) {
-      this.onFailure();
-      throw error;
-    }
-  }
-
-  private onSuccess(): void {
-    this.failures = 0;
-    if (this.state === 'HALF_OPEN') {
-      this.successes++;
-      if (this.successes >= this.threshold) {
-        this.state = 'CLOSED';
-        this.successes = 0;
-        this.emit('circuit-closed');
-      }
-    }
-  }
-
-  private onFailure(): void {
-    this.failures++;
-    this.lastFailureTime = Date.now();
-    if (this.failures >= this.threshold) {
-      this.state = 'OPEN';
-      this.emit('circuit-open', { failures: this.failures });
-    }
-  }
-
-  getState(): string {
-    return this.state;
-  }
+export interface BusinessMetric {
+  name: string;
+  value: number;
+  unit: string;
+  timestamp: number;
+  correlations: Record<string, number>;
 }
 
-/**
- * Batch Processor for reducing per-call overhead by 50%
- */
-class BatchProcessor extends EventEmitter {
-  private batchQueue: BatchRequest[] = [];
-  private processing = false;
-  private batchTimer?: NodeJS.Timeout;
-  private readonly batchSize: number;
-  private readonly batchTimeout: number;
-
-  constructor(
-    batchSize: number = 10,
-    batchTimeoutMs: number = 100
-  ) {
-    super();
-    this.batchSize = batchSize;
-    this.batchTimeout = batchTimeoutMs;
-  }
-
-  async addRequest(request: BatchRequest): Promise<BatchResponse> {
-    return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`Batch request ${request.id} timed out`));
-      }, request.timeout);
-
-      const requestWithCallback = {
-        ...request,
-        resolve: (response: BatchResponse) => {
-          clearTimeout(timeoutId);
-          resolve(response);
-        },
-        reject: (error: Error) => {
-          clearTimeout(timeoutId);
-          reject(error);
-        }
-      };
-
-      this.batchQueue.push(requestWithCallback as any);
-      
-      // Process immediately if batch is full
-      if (this.batchQueue.length >= this.batchSize) {
-        this.processBatch();
-      } else if (!this.batchTimer) {
-        // Set timer for partial batch
-        this.batchTimer = setTimeout(() => {
-          this.processBatch();
-        }, this.batchTimeout);
-      }
-    });
-  }
-
-  private async processBatch(): Promise<void> {
-    if (this.processing || this.batchQueue.length === 0) {
-      return;
-    }
-
-    this.processing = true;
-    
-    if (this.batchTimer) {
-      clearTimeout(this.batchTimer);
-      this.batchTimer = undefined;
-    }
-
-    const batch = this.batchQueue.splice(0, this.batchSize);
-    const startTime = performance.now();
-
-    try {
-      logger.debug(`Processing batch of ${batch.length} requests`);
-      
-      // Process batch in parallel
-      const results = await Promise.allSettled(
-        batch.map(async (request) => {
-          const requestStart = performance.now();
-          try {
-            // Simulate batch processing optimization
-            // In real implementation, this would be the actual AI model call
-            const result = await this.processRequest(request);
-            
-            return {
-              id: request.id,
-              result,
-              processingTime: performance.now() - requestStart,
-              cacheHit: false
-            } as BatchResponse;
-          } catch (error) {
-            return {
-              id: request.id,
-              error: error as Error,
-              processingTime: performance.now() - requestStart,
-              cacheHit: false
-            } as BatchResponse;
-          }
-        })
-      );
-
-      // Resolve individual requests
-      batch.forEach((request, index) => {
-        const result = results[index];
-        if (result.status === 'fulfilled') {
-          (request as any).resolve(result.value);
-        } else {
-          (request as any).reject(result.reason);
-        }
-      });
-
-      const totalTime = performance.now() - startTime;
-      logger.info(`Batch processed in ${totalTime.toFixed(2)}ms`, {
-        batchSize: batch.length,
-        avgTimePerRequest: (totalTime / batch.length).toFixed(2)
-      });
-
-      this.emit('batch-processed', { 
-        size: batch.length, 
-        totalTime, 
-        avgTime: totalTime / batch.length 
-      });
-
-    } catch (error) {
-      logger.error('Batch processing error:', error);
-      
-      // Reject all requests in batch
-      batch.forEach((request) => {
-        (request as any).reject(error);
-      });
-
-      this.emit('batch-error', { error, batchSize: batch.length });
-    } finally {
-      this.processing = false;
-      
-      // Process next batch if queue not empty
-      if (this.batchQueue.length > 0) {
-        setImmediate(() => this.processBatch());
-      }
-    }
-  }
-
-  private async processRequest(request: BatchRequest): Promise<any> {
-    // Mock processing - replace with actual implementation
-    await new Promise(resolve => setTimeout(resolve, 10 + Math.random() * 40));
-    return `Response for ${request.prompt}`;
-  }
-
-  getQueueSize(): number {
-    return this.batchQueue.length;
-  }
-
-  destroy(): void {
-    if (this.batchTimer) {
-      clearTimeout(this.batchTimer);
-    }
-    this.batchQueue = [];
-    this.removeAllListeners();
-  }
+export interface PerformanceOptimization {
+  area: string;
+  currentValue: number;
+  optimizedValue: number;
+  improvement: number;
+  confidence: number;
+  effort: 'low' | 'medium' | 'high';
+  risk: 'low' | 'medium' | 'high';
+  recommendations: string[];
 }
 
-/**
- * Worker Thread Pool for CPU-bound tasks
- */
-class WorkerPool extends EventEmitter {
-  private workers: Worker[] = [];
-  private taskQueue: Array<{
-    id: string;
-    task: any;
-    resolve: (result: any) => void;
-    reject: (error: Error) => void;
-  }> = [];
-  private activeWorkers = 0;
-
-  constructor(private maxWorkers: number = 4) {
-    super();
-    this.initializeWorkers();
-  }
-
-  private initializeWorkers(): void {
-    // Worker thread implementation would go here
-    // For now, simulate with setTimeout
-    logger.info(`Initializing ${this.maxWorkers} worker threads`);
-    this.emit('workers-ready', { count: this.maxWorkers });
-  }
-
-  async executeTask<T>(task: any): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const taskId = createHash('md5').update(JSON.stringify(task)).digest('hex');
-      
-      this.taskQueue.push({
-        id: taskId,
-        task,
-        resolve,
-        reject
-      });
-
-      this.processNextTask();
-    });
-  }
-
-  private async processNextTask(): Promise<void> {
-    if (this.taskQueue.length === 0 || this.activeWorkers >= this.maxWorkers) {
-      return;
-    }
-
-    const taskItem = this.taskQueue.shift();
-    if (!taskItem) return;
-
-    this.activeWorkers++;
-    
-    try {
-      // Simulate worker processing
-      const result = await this.simulateWorkerTask(taskItem.task);
-      taskItem.resolve(result);
-      
-      this.emit('task-completed', { 
-        id: taskItem.id, 
-        activeWorkers: this.activeWorkers 
-      });
-    } catch (error) {
-      taskItem.reject(error as Error);
-      this.emit('task-failed', { 
-        id: taskItem.id, 
-        error: error as Error 
-      });
-    } finally {
-      this.activeWorkers--;
-      // Process next task
-      setImmediate(() => this.processNextTask());
-    }
-  }
-
-  private async simulateWorkerTask(task: any): Promise<any> {
-    // Simulate CPU-intensive work
-    await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
-    return { processed: true, task };
-  }
-
-  getMetrics(): { activeWorkers: number; queuedTasks: number } {
-    return {
-      activeWorkers: this.activeWorkers,
-      queuedTasks: this.taskQueue.length
-    };
-  }
-
-  destroy(): void {
-    this.workers.forEach(worker => worker.terminate());
-    this.workers = [];
-    this.taskQueue = [];
-    this.removeAllListeners();
-  }
+export interface AnomalyAlert {
+  metric: string;
+  anomalyType: 'spike' | 'drop' | 'trend' | 'outlier';
+  severity: number; // 0-1
+  confidence: number; // 0-1
+  description: string;
+  timestamp: number;
+  context: Record<string, any>;
 }
 
-/**
- * V8 Optimization Manager
- */
-class V8OptimizationManager extends EventEmitter {
-  private gcObserver?: PerformanceObserver;
-  private heapSnapshots: Array<{ timestamp: number; heap: NodeJS.MemoryUsage }> = [];
-
-  constructor() {
-    super();
-    this.initializeOptimizations();
-    this.setupGCMonitoring();
-  }
-
-  private initializeOptimizations(): void {
-    // V8 heap size optimization
-    if (process.env.NODE_OPTIONS?.includes('--max-old-space-size')) {
-      logger.info('V8 heap size already optimized via NODE_OPTIONS');
-    } else {
-      logger.warn('Consider setting --max-old-space-size for better performance');
-    }
-
-    // Enable optimization flags
-    if (typeof global.gc === 'function') {
-      logger.info('Manual GC available for optimization');
-    }
-
-    this.emit('v8-optimized');
-  }
-
-  private setupGCMonitoring(): void {
-    this.gcObserver = new PerformanceObserver((list) => {
-      const entries = list.getEntries();
-      entries.forEach((entry) => {
-        if (entry.entryType === 'gc') {
-          this.emit('gc-event', {
-            kind: entry.detail?.kind || 'unknown',
-            duration: entry.duration,
-            timestamp: entry.startTime
-          });
-
-          logger.debug('GC event', {
-            kind: entry.detail?.kind,
-            duration: `${entry.duration.toFixed(2)}ms`
-          });
-        }
-      });
-    });
-
-    this.gcObserver.observe({ entryTypes: ['gc'] });
-  }
-
-  forceGC(): void {
-    if (typeof global.gc === 'function') {
-      const before = process.memoryUsage();
-      global.gc();
-      const after = process.memoryUsage();
-      
-      logger.info('Manual GC executed', {
-        freedMemory: (before.heapUsed - after.heapUsed) / 1024 / 1024
-      });
-
-      this.emit('manual-gc', { before, after });
-    }
-  }
-
-  getMemoryMetrics(): NodeJS.MemoryUsage & { 
-    heapUtilization: number;
-    trend: 'increasing' | 'stable' | 'decreasing';
-  } {
-    const current = process.memoryUsage();
-    const utilization = (current.heapUsed / current.heapTotal) * 100;
-    
-    // Store snapshot for trend analysis
-    this.heapSnapshots.push({ timestamp: Date.now(), heap: current });
-    
-    // Keep only last 10 snapshots
-    if (this.heapSnapshots.length > 10) {
-      this.heapSnapshots = this.heapSnapshots.slice(-10);
-    }
-
-    // Calculate trend
-    let trend: 'increasing' | 'stable' | 'decreasing' = 'stable';
-    if (this.heapSnapshots.length >= 3) {
-      const recent = this.heapSnapshots.slice(-3).map(s => s.heap.heapUsed);
-      const increasing = recent[2] > recent[1] && recent[1] > recent[0];
-      const decreasing = recent[2] < recent[1] && recent[1] < recent[0];
-      
-      if (increasing) trend = 'increasing';
-      else if (decreasing) trend = 'decreasing';
-    }
-
-    return {
-      ...current,
-      heapUtilization: utilization,
-      trend
-    };
-  }
-
-  destroy(): void {
-    if (this.gcObserver) {
-      this.gcObserver.disconnect();
-    }
-    this.heapSnapshots = [];
-    this.removeAllListeners();
-  }
-}
-
-/**
- * Main Enterprise Performance System
- */
 export class EnterprisePerformanceSystem extends EventEmitter {
-  private config: PerformanceConfig;
-  private circuitBreaker: CircuitBreaker;
-  private batchProcessor: BatchProcessor;
-  private workerPool: WorkerPool;
-  private v8Manager: V8OptimizationManager;
-  private metrics: PerformanceMetrics;
-  private metricsInterval?: NodeJS.Timeout;
+  private config: EnterprisePerformanceConfig;
+  private performanceMonitor: PerformanceMonitor;
+  private auditLogger?: SecurityAuditLogger;
 
-  constructor(config: Partial<PerformanceConfig> = {}) {
+  private sloViolations: SLOViolation[] = [];
+  private capacityPredictions = new Map<string, CapacityPrediction>();
+  private businessMetrics = new Map<string, BusinessMetric[]>();
+  private anomalies: AnomalyAlert[] = [];
+  private optimizations: PerformanceOptimization[] = [];
+
+  private baselineData = new Map<string, number[]>();
+  private monitoringInterval?: NodeJS.Timeout;
+  private predictionInterval?: NodeJS.Timeout;
+
+  constructor(
+    performanceMonitor: PerformanceMonitor,
+    auditLogger?: SecurityAuditLogger,
+    config: Partial<EnterprisePerformanceConfig> = {}
+  ) {
     super();
+
+    this.performanceMonitor = performanceMonitor;
+    this.auditLogger = auditLogger;
 
     this.config = {
-      enableBatchProcessing: true,
-      enableWorkerThreads: true,
-      maxWorkerThreads: 4,
-      enableV8Optimization: true,
-      enableStreamProcessing: true,
-      enablePredictivePreloading: true,
-      performanceMode: 'balanced',
-      circuitBreakerThreshold: 5,
-      adaptiveThresholds: true,
-      cacheConfig: {
-        enableL1: true,
-        enableL2: true,
-        enableL3: false,
+      enableSLOMonitoring: true,
+      enableCapacityPlanning: true,
+      enableAnomalyDetection: true,
+      enablePredictiveScaling: true,
+      enableCostOptimization: true,
+      enableBusinessMetrics: true,
+      alerting: {
+        enabled: true,
+        channels: ['log', 'console'],
+        escalationRules: [
+          {
+            condition: 'slo_violation',
+            delay: 300000, // 5 minutes
+            channels: ['slack', 'email'],
+            severity: 'critical',
+          },
+        ],
       },
-      ...config
+      slo: {
+        availability: 99.9,
+        latencyP99: 1000,
+        errorRate: 0.1,
+        throughput: 1000,
+      },
+      ...config,
     };
 
-    this.initializeComponents();
-    this.startMetricsCollection();
+    this.initialize();
   }
 
-  private initializeComponents(): void {
-    // Initialize circuit breaker
-    this.circuitBreaker = new CircuitBreaker(
-      this.config.circuitBreakerThreshold,
-      60000, // 1 minute timeout
-      30000  // 30 second reset
-    );
+  /**
+   * Initialize enterprise performance monitoring
+   */
+  private initialize(): void {
+    // Listen to performance monitor events
+    this.performanceMonitor.on('metric-recorded', metric => {
+      this.processMetric(metric);
+    });
 
-    // Initialize batch processor if enabled
-    if (this.config.enableBatchProcessing) {
-      this.batchProcessor = new BatchProcessor(10, 100);
-      this.batchProcessor.on('batch-processed', (event) => {
-        this.emit('performance-event', { type: 'batch-processed', ...event });
-      });
+    this.performanceMonitor.on('performance-snapshot', snapshot => {
+      this.processSnapshot(snapshot);
+    });
+
+    this.performanceMonitor.on('threshold-critical', event => {
+      this.handleCriticalThreshold(event);
+    });
+
+    // Start enterprise monitoring
+    if (this.config.enableSLOMonitoring) {
+      this.startSLOMonitoring();
     }
 
-    // Initialize worker pool if enabled
-    if (this.config.enableWorkerThreads) {
-      this.workerPool = new WorkerPool(this.config.maxWorkerThreads);
-      this.workerPool.on('task-completed', (event) => {
-        this.emit('performance-event', { type: 'task-completed', ...event });
-      });
+    if (this.config.enableCapacityPlanning) {
+      this.startCapacityPlanning();
     }
 
-    // Initialize V8 optimization
-    if (this.config.enableV8Optimization) {
-      this.v8Manager = new V8OptimizationManager();
-      this.v8Manager.on('gc-event', (event) => {
-        this.emit('performance-event', { type: 'gc-event', ...event });
-      });
+    if (this.config.enableAnomalyDetection) {
+      this.startAnomalyDetection();
     }
 
-    this.initializeMetrics();
     logger.info('Enterprise Performance System initialized', {
-      mode: this.config.performanceMode,
-      features: {
-        batchProcessing: this.config.enableBatchProcessing,
-        workerThreads: this.config.enableWorkerThreads,
-        v8Optimization: this.config.enableV8Optimization
+      sloMonitoring: this.config.enableSLOMonitoring,
+      capacityPlanning: this.config.enableCapacityPlanning,
+      anomalyDetection: this.config.enableAnomalyDetection,
+      businessMetrics: this.config.enableBusinessMetrics,
+    });
+  }
+
+  /**
+   * Process individual metrics for enterprise analysis
+   */
+  private processMetric(metric: PerformanceMetric): void {
+    // Update baseline data
+    this.updateBaseline(metric.name, metric.value);
+
+    // Check SLO compliance
+    if (this.config.enableSLOMonitoring) {
+      this.checkSLOCompliance(metric);
+    }
+
+    // Detect anomalies
+    if (this.config.enableAnomalyDetection) {
+      this.detectAnomaly(metric);
+    }
+
+    // Update business metrics correlation
+    if (this.config.enableBusinessMetrics) {
+      this.updateBusinessMetricCorrelations(metric);
+    }
+  }
+
+  /**
+   * Process performance snapshots for trend analysis
+   */
+  private processSnapshot(snapshot: PerformanceSnapshot): void {
+    // Capacity planning analysis
+    if (this.config.enableCapacityPlanning) {
+      this.analyzeCapacity(snapshot);
+    }
+
+    // Performance optimization opportunities
+    this.identifyOptimizations(snapshot);
+
+    // Emit enterprise snapshot event
+    this.emit('enterprise-snapshot', {
+      snapshot,
+      sloCompliance: this.calculateSLOCompliance(),
+      capacityStatus: this.getCapacityStatus(),
+      anomalyCount: this.anomalies.length,
+      optimizationOpportunities: this.optimizations.length,
+    });
+  }
+
+  /**
+   * Start SLO monitoring
+   */
+  private startSLOMonitoring(): void {
+    this.monitoringInterval = setInterval(() => {
+      this.checkAllSLOs();
+    }, 60000); // Check every minute
+  }
+
+  /**
+   * Start capacity planning
+   */
+  private startCapacityPlanning(): void {
+    this.predictionInterval = setInterval(() => {
+      this.updateCapacityPredictions();
+    }, 300000); // Update every 5 minutes
+  }
+
+  /**
+   * Start anomaly detection
+   */
+  private startAnomalyDetection(): void {
+    setInterval(() => {
+      this.performAnomalyAnalysis();
+    }, 120000); // Analyze every 2 minutes
+  }
+
+  /**
+   * Check SLO compliance for a metric
+   */
+  private checkSLOCompliance(metric: PerformanceMetric): void {
+    const violations: SLOViolation[] = [];
+
+    // Availability SLO
+    if (metric.name === 'http_request_duration' && metric.tags.status?.startsWith('5')) {
+      const errorRate = this.calculateErrorRate();
+      if (errorRate > 100 - this.config.slo.availability) {
+        violations.push({
+          metric: 'availability',
+          target: this.config.slo.availability,
+          actual: 100 - errorRate,
+          duration: 0,
+          impact: this.determineSLOImpact(errorRate),
+          timestamp: Date.now(),
+        });
+      }
+    }
+
+    // Latency SLO
+    if (metric.name === 'http_request_duration') {
+      const latencyStats = this.performanceMonitor.getMetricStats('http_request_duration');
+      if (latencyStats && latencyStats.p99 > this.config.slo.latencyP99) {
+        violations.push({
+          metric: 'latency_p99',
+          target: this.config.slo.latencyP99,
+          actual: latencyStats.p99,
+          duration: 0,
+          impact: this.determineSLOImpact(latencyStats.p99 / this.config.slo.latencyP99),
+          timestamp: Date.now(),
+        });
+      }
+    }
+
+    // Process violations
+    violations.forEach(violation => {
+      this.sloViolations.push(violation);
+      this.handleSLOViolation(violation);
+    });
+  }
+
+  /**
+   * Calculate current error rate
+   */
+  private calculateErrorRate(): number {
+    const httpMetrics = this.performanceMonitor.getAllMetrics()['http_request_duration'] || [];
+    const recentMetrics = httpMetrics.filter(m => Date.now() - m.timestamp < 300000); // Last 5 minutes
+
+    if (recentMetrics.length === 0) return 0;
+
+    const errorCount = recentMetrics.filter(
+      m => m.tags.status?.startsWith('4') || m.tags.status?.startsWith('5')
+    ).length;
+
+    return (errorCount / recentMetrics.length) * 100;
+  }
+
+  /**
+   * Determine SLO impact level
+   */
+  private determineSLOImpact(ratio: number): 'low' | 'medium' | 'high' | 'critical' {
+    if (ratio > 2) return 'critical';
+    if (ratio > 1.5) return 'high';
+    if (ratio > 1.2) return 'medium';
+    return 'low';
+  }
+
+  /**
+   * Handle SLO violation
+   */
+  private handleSLOViolation(violation: SLOViolation): void {
+    logger.error('SLO violation detected', violation);
+
+    // Audit log
+    if (this.auditLogger) {
+      this.auditLogger.logEvent(
+        AuditEventType.SYSTEM_EVENT,
+        AuditSeverity.HIGH,
+        'ERROR',
+        'enterprise-performance-system',
+        'slo_violation',
+        violation.metric,
+        `SLO violation: ${violation.metric} target=${violation.target} actual=${violation.actual}`,
+        {},
+        {
+          violation,
+          impact: violation.impact,
+        }
+      );
+    }
+
+    // Emit violation event
+    this.emit('slo-violation', violation);
+
+    // Trigger alerting
+    if (this.config.alerting.enabled) {
+      this.triggerAlert('SLO Violation', violation);
+    }
+  }
+
+  /**
+   * Update baseline data for anomaly detection
+   */
+  private updateBaseline(metricName: string, value: number): void {
+    if (!this.baselineData.has(metricName)) {
+      this.baselineData.set(metricName, []);
+    }
+
+    const baseline = this.baselineData.get(metricName)!;
+    baseline.push(value);
+
+    // Keep only last 1000 data points
+    if (baseline.length > 1000) {
+      baseline.shift();
+    }
+  }
+
+  /**
+   * Detect anomalies in metrics
+   */
+  private detectAnomaly(metric: PerformanceMetric): void {
+    const baseline = this.baselineData.get(metric.name);
+    if (!baseline || baseline.length < 10) return;
+
+    const anomaly = this.calculateAnomalyScore(metric.value, baseline);
+
+    if (anomaly.severity > 0.8) {
+      const alert: AnomalyAlert = {
+        metric: metric.name,
+        anomalyType: anomaly.type,
+        severity: anomaly.severity,
+        confidence: anomaly.confidence,
+        description: `Anomaly detected in ${metric.name}: ${anomaly.description}`,
+        timestamp: Date.now(),
+        context: {
+          value: metric.value,
+          baseline: anomaly.baseline,
+          tags: metric.tags,
+        },
+      };
+
+      this.anomalies.push(alert);
+      this.emit('anomaly-detected', alert);
+
+      logger.warn('Performance anomaly detected', alert);
+    }
+  }
+
+  /**
+   * Calculate anomaly score using statistical methods
+   */
+  private calculateAnomalyScore(
+    value: number,
+    baseline: number[]
+  ): {
+    severity: number;
+    confidence: number;
+    type: 'spike' | 'drop' | 'trend' | 'outlier';
+    description: string;
+    baseline: { mean: number; std: number };
+  } {
+    const mean = baseline.reduce((sum, v) => sum + v, 0) / baseline.length;
+    const variance = baseline.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / baseline.length;
+    const std = Math.sqrt(variance);
+
+    const zScore = Math.abs((value - mean) / std);
+    const severity = Math.min(zScore / 3, 1); // Normalize to 0-1
+
+    let type: 'spike' | 'drop' | 'trend' | 'outlier' = 'outlier';
+    let description = '';
+
+    if (value > mean + 2 * std) {
+      type = 'spike';
+      description = `Value ${value.toFixed(2)} is ${zScore.toFixed(2)} standard deviations above baseline`;
+    } else if (value < mean - 2 * std) {
+      type = 'drop';
+      description = `Value ${value.toFixed(2)} is ${zScore.toFixed(2)} standard deviations below baseline`;
+    } else {
+      type = 'outlier';
+      description = `Unusual value detected: ${value.toFixed(2)}`;
+    }
+
+    return {
+      severity,
+      confidence: Math.min(baseline.length / 100, 1), // More data = higher confidence
+      type,
+      description,
+      baseline: { mean, std },
+    };
+  }
+
+  /**
+   * Analyze capacity trends and predictions
+   */
+  private analyzeCapacity(snapshot: PerformanceSnapshot): void {
+    const resources = ['memory', 'cpu', 'connections'];
+
+    resources.forEach(resource => {
+      const prediction = this.predictCapacity(resource, snapshot);
+      if (prediction) {
+        this.capacityPredictions.set(resource, prediction);
+
+        // Alert if capacity will be reached soon
+        if (prediction.timeToCapacity < 24) {
+          // Less than 24 hours
+          this.emit('capacity-warning', prediction);
+          logger.warn('Capacity warning', prediction);
+        }
       }
     });
   }
 
-  private initializeMetrics(): void {
-    this.metrics = {
-      responseTime: { p50: 0, p95: 0, p99: 0, avg: 0 },
-      throughput: { requestsPerMinute: 0, tokensPerSecond: 0, commandsPerMinute: 0 },
-      cacheMetrics: { hitRate: 0, l1HitRate: 0, l2HitRate: 0, l3HitRate: 0, evictionRate: 0 },
-      memoryMetrics: { heapUsed: 0, heapTotal: 0, external: 0, gcMetrics: [] },
-      workerMetrics: { activeWorkers: 0, queuedTasks: 0, completedTasks: 0, failedTasks: 0 }
-    };
-  }
-
-  private startMetricsCollection(): void {
-    this.metricsInterval = setInterval(() => {
-      this.updateMetrics();
-    }, 5000); // Update every 5 seconds
-  }
-
-  private updateMetrics(): void {
-    // Update memory metrics
-    if (this.v8Manager) {
-      const memoryMetrics = this.v8Manager.getMemoryMetrics();
-      this.metrics.memoryMetrics = {
-        heapUsed: memoryMetrics.heapUsed,
-        heapTotal: memoryMetrics.heapTotal,
-        external: memoryMetrics.external,
-        gcMetrics: [] // Would be populated by GC observer
-      };
-    }
-
-    // Update worker metrics
-    if (this.workerPool) {
-      const workerMetrics = this.workerPool.getMetrics();
-      this.metrics.workerMetrics = {
-        ...this.metrics.workerMetrics,
-        activeWorkers: workerMetrics.activeWorkers,
-        queuedTasks: workerMetrics.queuedTasks
-      };
-    }
-
-    this.emit('metrics-updated', this.metrics);
-  }
-
   /**
-   * Execute high-performance request with all optimizations
+   * Predict capacity requirements
    */
-  async executeOptimized<T>(
-    operation: () => Promise<T>,
-    options: {
-      enableBatch?: boolean;
-      enableWorker?: boolean;
-      priority?: 'low' | 'medium' | 'high';
-      timeout?: number;
-    } = {}
-  ): Promise<T> {
-    const startTime = performance.now();
-    
-    try {
-      // Use circuit breaker
-      const result = await this.circuitBreaker.execute(async () => {
-        if (options.enableBatch && this.batchProcessor) {
-          // Use batch processing
-          const batchRequest: BatchRequest = {
-            id: createHash('md5').update(JSON.stringify(operation)).digest('hex'),
-            prompt: 'batch-operation',
-            priority: options.priority || 'medium',
-            timeout: options.timeout || 30000
-          };
-          
-          const response = await this.batchProcessor.addRequest(batchRequest);
-          return response.result;
-        } else if (options.enableWorker && this.workerPool) {
-          // Use worker thread
-          return await this.workerPool.executeTask(operation);
-        } else {
-          // Direct execution
-          return await operation();
-        }
-      });
+  private predictCapacity(
+    resource: string,
+    snapshot: PerformanceSnapshot
+  ): CapacityPrediction | null {
+    // Simplified linear trend prediction
+    const metricName = `${resource}_usage_percent`;
+    const baseline = this.baselineData.get(metricName);
 
-      const duration = performance.now() - startTime;
-      this.recordRequestMetrics(duration, true);
-      
-      return result;
-    } catch (error) {
-      const duration = performance.now() - startTime;
-      this.recordRequestMetrics(duration, false);
-      throw error;
-    }
-  }
+    if (!baseline || baseline.length < 10) return null;
 
-  private recordRequestMetrics(duration: number, success: boolean): void {
-    // Update response time metrics (simplified implementation)
-    this.metrics.responseTime.avg = (this.metrics.responseTime.avg * 0.9) + (duration * 0.1);
-    
-    // Update throughput
-    this.metrics.throughput.requestsPerMinute++;
-    
-    this.emit('request-completed', { duration, success });
-  }
+    const recent = baseline.slice(-10);
+    const trend = this.calculateTrend(recent);
+    const currentUsage = recent[recent.length - 1];
 
-  /**
-   * Get current performance metrics
-   */
-  getMetrics(): PerformanceMetrics {
-    return { ...this.metrics };
-  }
+    if (trend <= 0) return null; // No growth trend
 
-  /**
-   * Check if system meets performance targets
-   */
-  checkPerformanceTargets(): {
-    responseTime: boolean;
-    throughput: boolean;
-    memory: boolean;
-    overall: boolean;
-  } {
-    const responseOk = this.metrics.responseTime.avg < PERFORMANCE_TARGETS.RESPONSE_LATENCY.STANDARD;
-    const throughputOk = this.metrics.throughput.commandsPerMinute >= PERFORMANCE_TARGETS.THROUGHPUT.MIN;
-    const memoryOk = (this.metrics.memoryMetrics.heapUsed / this.metrics.memoryMetrics.heapTotal) < 0.8;
-    
+    const timeToCapacity = (95 - currentUsage) / trend; // Hours to reach 95%
+    const predictedUsage = currentUsage + trend * 24; // 24 hours ahead
+
     return {
-      responseTime: responseOk,
-      throughput: throughputOk,
-      memory: memoryOk,
-      overall: responseOk && throughputOk && memoryOk
+      resource,
+      currentUsage,
+      predictedUsage,
+      timeToCapacity,
+      confidence: Math.min(recent.length / 20, 1),
+      recommendations: this.generateCapacityRecommendations(resource, timeToCapacity, trend),
     };
   }
 
   /**
-   * Force garbage collection if needed
+   * Calculate linear trend
    */
-  optimizeMemory(): void {
-    if (this.v8Manager) {
-      const metrics = this.v8Manager.getMemoryMetrics();
-      if (metrics.heapUtilization > PERFORMANCE_TARGETS.MEMORY.GC_THRESHOLD) {
-        this.v8Manager.forceGC();
-      }
-    }
+  private calculateTrend(values: number[]): number {
+    if (values.length < 2) return 0;
+
+    const n = values.length;
+    const sumX = (n * (n - 1)) / 2;
+    const sumY = values.reduce((sum, val) => sum + val, 0);
+    const sumXY = values.reduce((sum, val, idx) => sum + val * idx, 0);
+    const sumX2 = values.reduce((sum, _, idx) => sum + idx * idx, 0);
+
+    return (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
   }
 
   /**
-   * Get performance recommendations
+   * Generate capacity recommendations
    */
-  getPerformanceRecommendations(): string[] {
+  private generateCapacityRecommendations(
+    resource: string,
+    timeToCapacity: number,
+    trend: number
+  ): string[] {
     const recommendations: string[] = [];
-    const targets = this.checkPerformanceTargets();
-    
-    if (!targets.responseTime) {
-      recommendations.push('Consider enabling batch processing to reduce latency');
+
+    if (timeToCapacity < 24) {
+      recommendations.push(
+        `Immediate action required: ${resource} capacity will be reached in ${timeToCapacity.toFixed(1)} hours`
+      );
+      recommendations.push(`Consider scaling up ${resource} immediately`);
+    } else if (timeToCapacity < 168) {
+      // 1 week
+      recommendations.push(`Plan ${resource} scaling within the next week`);
+      recommendations.push(`Monitor ${resource} usage closely`);
     }
-    
-    if (!targets.throughput) {
-      recommendations.push('Enable worker threads for better throughput');
+
+    if (trend > 5) {
+      recommendations.push(`High growth rate detected for ${resource} (${trend.toFixed(2)}%/hour)`);
+      recommendations.push(`Investigate cause of rapid ${resource} growth`);
     }
-    
-    if (!targets.memory) {
-      recommendations.push('Optimize memory usage or increase heap size');
-    }
-    
-    if (this.metrics.cacheMetrics.hitRate < PERFORMANCE_TARGETS.CACHE_HIT_RATE.TARGET) {
-      recommendations.push('Improve cache configuration for better hit rates');
-    }
-    
+
     return recommendations;
   }
 
   /**
-   * Cleanup and destroy system
+   * Identify performance optimization opportunities
    */
-  async destroy(): Promise<void> {
-    if (this.metricsInterval) {
-      clearInterval(this.metricsInterval);
+  private identifyOptimizations(snapshot: PerformanceSnapshot): void {
+    const optimizations: PerformanceOptimization[] = [];
+
+    // Memory optimization
+    if (snapshot.metrics.memory.heapUsed / snapshot.metrics.memory.heapTotal > 0.8) {
+      optimizations.push({
+        area: 'memory',
+        currentValue: snapshot.metrics.memory.heapUsed,
+        optimizedValue: snapshot.metrics.memory.heapUsed * 0.7,
+        improvement: 30,
+        confidence: 0.8,
+        effort: 'medium',
+        risk: 'low',
+        recommendations: [
+          'Implement memory pooling',
+          'Review object retention',
+          'Optimize garbage collection',
+        ],
+      });
     }
 
-    if (this.batchProcessor) {
-      this.batchProcessor.destroy();
+    // Response time optimization
+    const latencyStats = this.performanceMonitor.getMetricStats('http_request_duration');
+    if (latencyStats && latencyStats.p95 > 500) {
+      optimizations.push({
+        area: 'response_time',
+        currentValue: latencyStats.p95,
+        optimizedValue: latencyStats.p95 * 0.6,
+        improvement: 40,
+        confidence: 0.7,
+        effort: 'high',
+        risk: 'medium',
+        recommendations: [
+          'Implement response caching',
+          'Optimize database queries',
+          'Add CDN for static assets',
+        ],
+      });
     }
 
-    if (this.workerPool) {
-      this.workerPool.destroy();
+    this.optimizations = optimizations;
+
+    optimizations.forEach(optimization => {
+      this.emit('optimization-opportunity', optimization);
+    });
+  }
+
+  /**
+   * Update business metric correlations
+   */
+  private updateBusinessMetricCorrelations(metric: PerformanceMetric): void {
+    // This would correlate technical metrics with business metrics
+    // For now, we'll track some basic correlations
+
+    if (metric.name === 'http_request_duration') {
+      this.recordBusinessMetric('user_experience_score', 100 - metric.value / 10, 'score');
     }
 
-    if (this.v8Manager) {
-      this.v8Manager.destroy();
+    if (metric.name === 'error_rate') {
+      this.recordBusinessMetric('system_reliability', 100 - metric.value, 'percent');
+    }
+  }
+
+  /**
+   * Record business metric
+   */
+  recordBusinessMetric(name: string, value: number, unit: string): void {
+    const metric: BusinessMetric = {
+      name,
+      value,
+      unit,
+      timestamp: Date.now(),
+      correlations: {},
+    };
+
+    if (!this.businessMetrics.has(name)) {
+      this.businessMetrics.set(name, []);
     }
 
-    this.removeAllListeners();
-    logger.info('Enterprise Performance System destroyed');
+    const metrics = this.businessMetrics.get(name)!;
+    metrics.push(metric);
+
+    // Keep only last 100 metrics
+    if (metrics.length > 100) {
+      metrics.shift();
+    }
+
+    this.emit('business-metric', metric);
+  }
+
+  /**
+   * Check all SLOs
+   */
+  private checkAllSLOs(): void {
+    const compliance = this.calculateSLOCompliance();
+
+    if (compliance.overall < this.config.slo.availability) {
+      logger.warn('Overall SLO compliance below target', compliance);
+      this.emit('slo-compliance-low', compliance);
+    }
+  }
+
+  /**
+   * Calculate SLO compliance
+   */
+  private calculateSLOCompliance(): {
+    overall: number;
+    availability: number;
+    latency: number;
+    errorRate: number;
+    throughput: number;
+  } {
+    const errorRate = this.calculateErrorRate();
+    const availability = 100 - errorRate;
+
+    const latencyStats = this.performanceMonitor.getMetricStats('http_request_duration');
+    const latencyCompliance = latencyStats
+      ? Math.max(
+          0,
+          100 - ((latencyStats.p99 - this.config.slo.latencyP99) / this.config.slo.latencyP99) * 100
+        )
+      : 100;
+
+    const throughputStats = this.performanceMonitor.getMetricStats('http_requests_total');
+    const throughputCompliance =
+      throughputStats && throughputStats.count > 0
+        ? Math.min(100, (throughputStats.count / this.config.slo.throughput) * 100)
+        : 0;
+
+    const overall = (availability + latencyCompliance + throughputCompliance) / 3;
+
+    return {
+      overall,
+      availability,
+      latency: latencyCompliance,
+      errorRate,
+      throughput: throughputCompliance,
+    };
+  }
+
+  /**
+   * Get capacity status
+   */
+  private getCapacityStatus(): Record<string, CapacityPrediction> {
+    return Object.fromEntries(this.capacityPredictions);
+  }
+
+  /**
+   * Update capacity predictions
+   */
+  private updateCapacityPredictions(): void {
+    // This would be called periodically to update predictions
+    const snapshot = this.performanceMonitor.getPerformanceSummary().lastSnapshot;
+    if (snapshot) {
+      this.analyzeCapacity(snapshot);
+    }
+  }
+
+  /**
+   * Perform comprehensive anomaly analysis
+   */
+  private performAnomalyAnalysis(): void {
+    // Clean old anomalies (older than 1 hour)
+    const cutoff = Date.now() - 3600000;
+    this.anomalies = this.anomalies.filter(a => a.timestamp > cutoff);
+
+    // Emit anomaly summary
+    if (this.anomalies.length > 0) {
+      this.emit('anomaly-summary', {
+        count: this.anomalies.length,
+        highSeverity: this.anomalies.filter(a => a.severity > 0.8).length,
+        recentTrends: this.analyzeAnomalyTrends(),
+      });
+    }
+  }
+
+  /**
+   * Analyze anomaly trends
+   */
+  private analyzeAnomalyTrends(): Record<string, number> {
+    const trends: Record<string, number> = {};
+
+    this.anomalies.forEach(anomaly => {
+      trends[anomaly.anomalyType] = (trends[anomaly.anomalyType] || 0) + 1;
+    });
+
+    return trends;
+  }
+
+  /**
+   * Trigger alert
+   */
+  private triggerAlert(type: string, data: any): void {
+    const alert = {
+      type,
+      timestamp: Date.now(),
+      data,
+      channels: this.config.alerting.channels,
+    };
+
+    this.emit('alert', alert);
+
+    // Log alert
+    logger.error(`Performance Alert: ${type}`, alert);
+
+    // In a real system, this would integrate with:
+    // - Slack/Teams webhooks
+    // - Email services
+    // - PagerDuty/OpsGenie
+    // - SMS services
+  }
+
+  /**
+   * Handle critical threshold events from base monitor
+   */
+  private handleCriticalThreshold(event: any): void {
+    logger.error('Critical performance threshold exceeded', event);
+
+    // Enhanced enterprise handling
+    this.triggerAlert('Critical Threshold', event);
+
+    // Auto-scaling trigger (if enabled)
+    if (this.config.enablePredictiveScaling) {
+      this.emit('scaling-trigger', {
+        metric: event.metric,
+        value: event.value,
+        threshold: event.threshold,
+        action: 'scale-up',
+      });
+    }
+  }
+
+  /**
+   * Get enterprise performance dashboard data
+   */
+  getEnterpriseMetrics(): {
+    slo: ReturnType<typeof this.calculateSLOCompliance>;
+    capacity: Record<string, CapacityPrediction>;
+    anomalies: AnomalyAlert[];
+    optimizations: PerformanceOptimization[];
+    businessMetrics: Record<string, BusinessMetric[]>;
+    alerts: {
+      violations: number;
+      anomalies: number;
+      capacity: number;
+    };
+  } {
+    return {
+      slo: this.calculateSLOCompliance(),
+      capacity: this.getCapacityStatus(),
+      anomalies: this.anomalies.slice(-10), // Last 10 anomalies
+      optimizations: this.optimizations,
+      businessMetrics: Object.fromEntries(this.businessMetrics),
+      alerts: {
+        violations: this.sloViolations.filter(v => Date.now() - v.timestamp < 3600000).length,
+        anomalies: this.anomalies.filter(a => Date.now() - a.timestamp < 3600000).length,
+        capacity: Array.from(this.capacityPredictions.values()).filter(p => p.timeToCapacity < 168)
+          .length,
+      },
+    };
+  }
+
+  /**
+   * Stop enterprise monitoring
+   */
+  stop(): void {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+    }
+
+    if (this.predictionInterval) {
+      clearInterval(this.predictionInterval);
+    }
+
+    logger.info('Enterprise Performance System stopped');
+    this.emit('enterprise-stop');
   }
 }
 
-// Export singleton instance
-export const enterprisePerformanceSystem = new EnterprisePerformanceSystem();
+// Export default instance
+export const enterprisePerformanceSystem = new EnterprisePerformanceSystem(
+  new PerformanceMonitor()
+);

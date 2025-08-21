@@ -15,7 +15,7 @@ export class SmitheryMCPServer {
 
   constructor(config: SmitheryMCPConfig) {
     this.config = config;
-    
+
     this.server = new Server(
       { name: 'smithery-ai-exa', version: '1.0.0' },
       { capabilities: { tools: {} } }
@@ -26,13 +26,13 @@ export class SmitheryMCPServer {
 
   private initializeServer(): void {
     // Register tool handlers
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
 
       switch (name) {
         case 'web_search_exa':
           return await this.handleWebSearchExa(args);
-        
+
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
@@ -48,12 +48,16 @@ export class SmitheryMCPServer {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              numResults: { type: 'number', description: 'Number of results to return', default: 10 }
+              numResults: {
+                type: 'number',
+                description: 'Number of results to return',
+                default: 10,
+              },
             },
-            required: ['query']
-          }
-        }
-      ]
+            required: ['query'],
+          },
+        },
+      ],
     }));
 
     logger.debug('Smithery MCP server initialized');
@@ -63,46 +67,52 @@ export class SmitheryMCPServer {
     // If no API key is configured, return an error
     if (!this.config.apiKey || !this.config.profile) {
       return {
-        content: [{
-          type: 'text',
-          text: 'Smithery API key and profile are not configured. Please set them in your configuration.'
-        }],
-        isError: true
+        content: [
+          {
+            type: 'text',
+            text: 'Smithery API key and profile are not configured. Please set them in your configuration.',
+          },
+        ],
+        isError: true,
       };
     }
 
     try {
       const { query, numResults = 10 } = args;
-      
+
       // Make request to Smithery AI Exa MCP API
       const response = await axios.get(`${this.config.baseUrl}/exa/mcp`, {
         params: {
           api_key: this.config.apiKey,
-          profile: this.config.profile
+          profile: this.config.profile,
         },
         headers: {
-          'Accept': 'application/json'
-        }
+          Accept: 'application/json',
+        },
       });
 
       return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            query,
-            results: response.data,
-            numResults
-          })
-        }]
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              query,
+              results: response.data,
+              numResults,
+            }),
+          },
+        ],
       };
     } catch (error: any) {
       logger.error('Smithery web search error:', error);
       return {
-        content: [{
-          type: 'text',
-          text: `Web search error: ${error.message || 'Unknown error'}`
-        }],
-        isError: true
+        content: [
+          {
+            type: 'text',
+            text: `Web search error: ${error.message || 'Unknown error'}`,
+          },
+        ],
+        isError: true,
       };
     }
   }

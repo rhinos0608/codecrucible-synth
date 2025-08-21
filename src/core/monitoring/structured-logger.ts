@@ -64,26 +64,22 @@ export class StructuredLogger {
     this.config = config;
     this.service = config.service;
     this.version = config.version;
-    
+
     this.logger = winston.createLogger({
       level: config.level,
       format: this.createFormat(),
       defaultMeta: {
         service: this.service,
         version: this.version,
-        environment: config.environment
+        environment: config.environment,
       },
-      transports: this.createTransports()
+      transports: this.createTransports(),
     });
 
     // Handle uncaught exceptions and unhandled rejections
-    this.logger.exceptions.handle(
-      new winston.transports.File({ filename: 'exceptions.log' })
-    );
+    this.logger.exceptions.handle(new winston.transports.File({ filename: 'exceptions.log' }));
 
-    this.logger.rejections.handle(
-      new winston.transports.File({ filename: 'rejections.log' })
-    );
+    this.logger.rejections.handle(new winston.transports.File({ filename: 'rejections.log' }));
   }
 
   /**
@@ -96,7 +92,7 @@ export class StructuredLogger {
       winston.format.json(),
       winston.format.printf(({ timestamp, level, message, service, version, ...meta }) => {
         const correlationId = this.getCorrelationId();
-        
+
         const logEntry: LogEntry = {
           timestamp: timestamp as string,
           level: level as string,
@@ -104,7 +100,7 @@ export class StructuredLogger {
           service: service as string,
           version: version as string,
           correlationId,
-          metadata: meta
+          metadata: meta,
         };
 
         // Add tracing information if available
@@ -122,7 +118,7 @@ export class StructuredLogger {
             name: meta.error.name,
             message: meta.error.message,
             stack: meta.error.stack || '',
-            code: (meta.error as any).code
+            code: (meta.error as any).code,
           };
         }
 
@@ -141,12 +137,10 @@ export class StructuredLogger {
     if (this.config.outputs.console) {
       transports.push(
         new winston.transports.Console({
-          format: this.config.format === 'text' 
-            ? winston.format.combine(
-                winston.format.colorize(),
-                winston.format.simple()
-              )
-            : winston.format.json()
+          format:
+            this.config.format === 'text'
+              ? winston.format.combine(winston.format.colorize(), winston.format.simple())
+              : winston.format.json(),
         })
       );
     }
@@ -158,7 +152,7 @@ export class StructuredLogger {
           filename: 'application.log',
           maxsize: this.parseSize(this.config.rotation.maxSize),
           maxFiles: this.config.rotation.maxFiles,
-          tailable: true
+          tailable: true,
         })
       );
 
@@ -169,7 +163,7 @@ export class StructuredLogger {
           level: 'error',
           maxsize: this.parseSize(this.config.rotation.maxSize),
           maxFiles: this.config.rotation.maxFiles,
-          tailable: true
+          tailable: true,
         })
       );
     }
@@ -184,9 +178,9 @@ export class StructuredLogger {
           path: new URL(this.config.outputs.remote.endpoint).pathname,
           ssl: this.config.outputs.remote.endpoint.startsWith('https'),
           headers: {
-            'Authorization': `Bearer ${this.config.outputs.remote.apiKey}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${this.config.outputs.remote.apiKey}`,
+            'Content-Type': 'application/json',
+          },
         })
       );
     }
@@ -201,7 +195,7 @@ export class StructuredLogger {
     const units = { k: 1024, m: 1024 * 1024, g: 1024 * 1024 * 1024 };
     const match = size.toLowerCase().match(/^(\d+)([kmg]?)b?$/);
     if (!match) return 10 * 1024 * 1024; // Default 10MB
-    
+
     const value = parseInt(match[1]);
     const unit = match[2] as keyof typeof units;
     return value * (units[unit] || 1);
@@ -266,36 +260,35 @@ export class StructuredLogger {
   ): Promise<T> {
     const startTime = Date.now();
     const operationId = crypto.randomUUID();
-    
+
     this.info(`Operation started: ${operation}`, {
       operation,
       operationId,
-      ...metadata
+      ...metadata,
     });
 
     try {
       const result = await fn();
       const duration = Date.now() - startTime;
-      
+
       this.info(`Operation completed: ${operation}`, {
         operation,
         operationId,
         duration,
         status: 'success',
-        ...metadata
+        ...metadata,
       });
 
       return result;
-
     } catch (error) {
       const duration = Date.now() - startTime;
-      
+
       this.error(`Operation failed: ${operation}`, error as Error, {
         operation,
         operationId,
         duration,
         status: 'error',
-        ...metadata
+        ...metadata,
       });
 
       throw error;
@@ -314,7 +307,7 @@ export class StructuredLogger {
       userAgent: req.get('User-Agent'),
       ip: req.ip,
       userId: req.user?.userId,
-      sessionId: req.sessionId
+      sessionId: req.sessionId,
     });
   }
 
@@ -325,20 +318,25 @@ export class StructuredLogger {
     this.warn(`Security event: ${event}`, {
       securityEvent: event,
       timestamp: new Date().toISOString(),
-      ...metadata
+      ...metadata,
     });
   }
 
   /**
    * Performance metrics logging
    */
-  logPerformanceMetric(metric: string, value: number, unit: string, metadata: Record<string, any> = {}): void {
+  logPerformanceMetric(
+    metric: string,
+    value: number,
+    unit: string,
+    metadata: Record<string, any> = {}
+  ): void {
     this.info(`Performance metric: ${metric}`, {
       metric,
       value,
       unit,
       timestamp: new Date().toISOString(),
-      ...metadata
+      ...metadata,
     });
   }
 
@@ -349,7 +347,7 @@ export class StructuredLogger {
     this.info(`Business event: ${event}`, {
       businessEvent: event,
       timestamp: new Date().toISOString(),
-      ...metadata
+      ...metadata,
     });
   }
 
@@ -371,17 +369,17 @@ export class StructuredLogger {
         url: req.originalUrl,
         userAgent: req.get('User-Agent'),
         ip: req.ip,
-        correlationId
+        correlationId,
       });
 
       // Override res.end to log response
       const originalEnd = res.end;
-      res.end = function(chunk: any, encoding: any) {
+      res.end = function (chunk: any, encoding: any) {
         const duration = Date.now() - startTime;
-        
+
         // Use the logger instance through closure
         (req as any).logger.logHttpRequest(req, res, duration);
-        
+
         originalEnd.call(this, chunk, encoding);
       };
 
@@ -405,7 +403,7 @@ export class StructuredLogger {
    * Flush logs (useful for graceful shutdown)
    */
   async flush(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       this.logger.on('finish', resolve);
       this.logger.end();
     });

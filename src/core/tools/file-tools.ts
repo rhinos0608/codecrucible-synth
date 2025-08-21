@@ -19,7 +19,7 @@ export class ReadFileTool extends BaseTool {
       description: 'Reads the contents of a file.',
       category: 'File System',
       parameters: ReadFileSchema,
-      examples: ['{"path": "package.json"}', '{"path": "src/index.ts"}', '{"path": "README.md"}']
+      examples: ['{"path": "package.json"}', '{"path": "src/index.ts"}', '{"path": "README.md"}'],
     });
   }
 
@@ -30,14 +30,14 @@ export class ReadFileTool extends BaseTool {
     }
 
     const fullPath = this.resolvePath(args.path);
-    
+
     // Check if file exists before trying to read
     try {
       await fs.access(fullPath);
     } catch (error) {
       return `Error: File not found at path '${args.path}' (resolved to '${fullPath}'). Please verify the file exists.`;
     }
-    
+
     try {
       return await fs.readFile(fullPath, 'utf-8');
     } catch (error) {
@@ -48,7 +48,7 @@ export class ReadFileTool extends BaseTool {
   private resolvePath(path: string): string {
     // Convert to relative path to comply with MCP workspace restrictions
     let resolvedPath = path;
-    
+
     // If path is absolute, convert to relative to working directory
     if (isAbsolute(path)) {
       try {
@@ -59,11 +59,13 @@ export class ReadFileTool extends BaseTool {
         }
       } catch (error) {
         // Fallback to using the path as-is but log the issue
-        console.warn(`⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.warn(
+          `⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
         resolvedPath = path;
       }
     }
-    
+
     // Join with working directory to ensure proper resolution
     return join(this.agentContext.workingDirectory, resolvedPath);
   }
@@ -81,7 +83,10 @@ export class WriteFileTool extends BaseTool {
       description: 'Writes content to a file.',
       category: 'File System',
       parameters: WriteFileSchema,
-      examples: ['{"path": "output.txt", "content": "Hello World"}', '{"path": "src/new-file.ts", "content": "export const test = true;"}']
+      examples: [
+        '{"path": "output.txt", "content": "Hello World"}',
+        '{"path": "src/new-file.ts", "content": "export const test = true;"}',
+      ],
     });
   }
 
@@ -93,7 +98,7 @@ export class WriteFileTool extends BaseTool {
   private resolvePath(path: string): string {
     // Convert to relative path to comply with MCP workspace restrictions
     let resolvedPath = path;
-    
+
     // If path is absolute, convert to relative to working directory
     if (isAbsolute(path)) {
       try {
@@ -104,18 +109,24 @@ export class WriteFileTool extends BaseTool {
         }
       } catch (error) {
         // Fallback to using the path as-is but log the issue
-        console.warn(`⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.warn(
+          `⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
         resolvedPath = path;
       }
     }
-    
+
     // Join with working directory to ensure proper resolution
     return join(this.agentContext.workingDirectory, resolvedPath);
   }
 }
 
 const ListFilesSchema = z.object({
-  path: z.string().optional().default('.').describe('The path to the directory to list. Defaults to current directory.'),
+  path: z
+    .string()
+    .optional()
+    .default('.')
+    .describe('The path to the directory to list. Defaults to current directory.'),
 });
 
 export class ListFilesTool extends BaseTool {
@@ -125,7 +136,7 @@ export class ListFilesTool extends BaseTool {
       description: 'Lists the files in a directory.',
       category: 'File System',
       parameters: ListFilesSchema,
-      examples: ['{"path": "."}', '{"path": "src"}', '{"path": "dist"}']
+      examples: ['{"path": "."}', '{"path": "src"}', '{"path": "dist"}'],
     });
   }
 
@@ -133,11 +144,11 @@ export class ListFilesTool extends BaseTool {
     try {
       const fullPath = this.resolvePath(args.path || '.');
       const files = await fs.readdir(fullPath);
-      
+
       if (files.length === 0) {
         return `Directory '${args.path || '.'}' is empty.`;
       }
-      
+
       return `Files in '${args.path || '.'}' (${files.length} items):\n${files.map(f => `- ${f}`).join('\n')}`;
     } catch (error) {
       return `Error listing files in '${args.path || '.'}': ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -147,7 +158,7 @@ export class ListFilesTool extends BaseTool {
   private resolvePath(path: string): string {
     // Convert to relative path to comply with MCP workspace restrictions
     let resolvedPath = path;
-    
+
     // If path is absolute, convert to relative to working directory
     if (isAbsolute(path)) {
       try {
@@ -158,11 +169,13 @@ export class ListFilesTool extends BaseTool {
         }
       } catch (error) {
         // Fallback to using the path as-is but log the issue
-        console.warn(`⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.warn(
+          `⚠️  Path conversion warning: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
         resolvedPath = path;
       }
     }
-    
+
     // Join with working directory to ensure proper resolution
     return join(this.agentContext.workingDirectory, resolvedPath);
   }

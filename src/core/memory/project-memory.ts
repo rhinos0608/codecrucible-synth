@@ -82,10 +82,10 @@ export class ProjectMemorySystem {
     this.globalContextPath = path.join(require('os').homedir(), '.codecrucible');
     this.cache = new Map();
     this.watchedPaths = new Set();
-    
+
     logger.info('Project memory system initialized', {
       contextPath: this.contextPath,
-      globalPath: this.globalContextPath
+      globalPath: this.globalContextPath,
     });
   }
 
@@ -95,7 +95,7 @@ export class ProjectMemorySystem {
   async loadProjectContext(currentPath?: string): Promise<ProjectContext> {
     const hierarchy = await this.loadContextHierarchy(currentPath);
     this.cache.set(currentPath || 'default', hierarchy);
-    
+
     return hierarchy.merged;
   }
 
@@ -108,7 +108,7 @@ export class ProjectMemorySystem {
     subfolderPath?: string
   ): Promise<void> {
     let targetPath: string;
-    
+
     switch (level) {
       case 'global':
         targetPath = this.globalContextPath;
@@ -125,17 +125,19 @@ export class ProjectMemorySystem {
     }
 
     await this.ensureDirectoryExists(targetPath);
-    
+
     // Load existing context to merge
-    const existing = await this.loadContextFromPath(targetPath).catch(() => this.createDefaultContext());
+    const existing = await this.loadContextFromPath(targetPath).catch(() =>
+      this.createDefaultContext()
+    );
     const merged = this.mergeContexts([existing, context]);
-    
+
     // Save individual files
     await this.saveContextFiles(targetPath, merged);
-    
+
     // Invalidate cache
     this.cache.clear();
-    
+
     logger.info(`Saved project context at ${level} level`, { targetPath });
   }
 
@@ -153,17 +155,18 @@ export class ProjectMemorySystem {
       prompt: prompt.substring(0, 200), // Truncate for storage
       response: response.synthesis.substring(0, 500), // Truncate for storage
       voicesUsed: response.voicesUsed,
-      outcome: response.confidence > 0.7 ? 'successful' : response.confidence > 0.4 ? 'partial' : 'failed',
+      outcome:
+        response.confidence > 0.7 ? 'successful' : response.confidence > 0.4 ? 'partial' : 'failed',
       userFeedback,
-      topics: this.extractTopics(prompt, response)
+      topics: this.extractTopics(prompt, response),
     };
 
     // Add to current context
     context.history.unshift(interaction);
-    
+
     // Keep only last 50 interactions
     context.history = context.history.slice(0, 50);
-    
+
     // Update metadata
     context.metadata.totalInteractions++;
     context.metadata.lastUpdated = Date.now();
@@ -171,11 +174,11 @@ export class ProjectMemorySystem {
 
     // Save updated context
     await this.saveProjectContext(context, 'repo');
-    
+
     logger.debug('Stored interaction in project memory', {
       outcome: interaction.outcome,
       voicesUsed: interaction.voicesUsed.length,
-      topics: interaction.topics.length
+      topics: interaction.topics.length,
     });
   }
 
@@ -193,14 +196,14 @@ export class ProjectMemorySystem {
   ): Promise<InteractionSummary[]> {
     const context = await this.loadProjectContext();
     const { limit = 10, timeRange, outcome, voices } = options;
-    
+
     let results = context.history;
 
     // Filter by time range
     if (timeRange) {
-      results = results.filter(interaction => 
-        interaction.timestamp >= timeRange.start && 
-        interaction.timestamp <= timeRange.end
+      results = results.filter(
+        interaction =>
+          interaction.timestamp >= timeRange.start && interaction.timestamp <= timeRange.end
       );
     }
 
@@ -211,7 +214,7 @@ export class ProjectMemorySystem {
 
     // Filter by voices
     if (voices && voices.length > 0) {
-      results = results.filter(interaction => 
+      results = results.filter(interaction =>
         voices.some(voice => interaction.voicesUsed.includes(voice))
       );
     }
@@ -220,7 +223,8 @@ export class ProjectMemorySystem {
     if (query.trim()) {
       const searchTerms = query.toLowerCase().split(' ');
       results = results.filter(interaction => {
-        const searchContent = `${interaction.prompt} ${interaction.response} ${interaction.topics.join(' ')}`.toLowerCase();
+        const searchContent =
+          `${interaction.prompt} ${interaction.response} ${interaction.topics.join(' ')}`.toLowerCase();
         return searchTerms.some(term => searchContent.includes(term));
       });
     }
@@ -252,7 +256,7 @@ export class ProjectMemorySystem {
     // Find similar interactions
     const similarInteractions = context.history
       .filter(interaction => {
-        const commonTopics = interaction.topics.filter(topic => 
+        const commonTopics = interaction.topics.filter(topic =>
           currentTopics.some(current => current.toLowerCase().includes(topic.toLowerCase()))
         );
         return commonTopics.length > 0;
@@ -278,7 +282,7 @@ export class ProjectMemorySystem {
       relevantPatterns,
       similarInteractions,
       suggestedVoices,
-      constraints: context.constraints
+      constraints: context.constraints,
     };
   }
 
@@ -295,7 +299,7 @@ export class ProjectMemorySystem {
         level: 'global',
         path: this.globalContextPath,
         content: globalContext,
-        priority: 1
+        priority: 1,
       });
     } catch (error) {
       logger.debug('No global context found, using defaults');
@@ -308,7 +312,7 @@ export class ProjectMemorySystem {
         level: 'repo',
         path: this.contextPath,
         content: repoContext,
-        priority: 2
+        priority: 2,
       });
     } catch (error) {
       logger.debug('No repository context found, using defaults');
@@ -323,7 +327,7 @@ export class ProjectMemorySystem {
           level: 'subfolder',
           path: subfolderContextPath,
           content: subfolderContext,
-          priority: 3
+          priority: 3,
         });
       } catch (error) {
         logger.debug('No subfolder context found');
@@ -337,7 +341,7 @@ export class ProjectMemorySystem {
         level: 'repo',
         path: this.contextPath,
         content: defaultContext,
-        priority: 2
+        priority: 2,
       });
     }
 
@@ -348,7 +352,7 @@ export class ProjectMemorySystem {
     return {
       layers,
       merged,
-      conflicts
+      conflicts,
     };
   }
 
@@ -362,7 +366,12 @@ export class ProjectMemorySystem {
     const patternsFile = path.join(contextPath, 'patterns.json');
 
     let guidance = '';
-    let preferences: VoicePreferences = { primary: [], secondary: [], disabled: [], customSettings: {} };
+    let preferences: VoicePreferences = {
+      primary: [],
+      secondary: [],
+      disabled: [],
+      customSettings: {},
+    };
     let history: InteractionSummary[] = [];
     let patterns: CodePattern[] = [];
 
@@ -411,8 +420,8 @@ export class ProjectMemorySystem {
         frameworks: [],
         lastUpdated: Date.now(),
         totalInteractions: history.length,
-        averageComplexity: this.calculateAverageComplexity(history)
-      }
+        averageComplexity: this.calculateAverageComplexity(history),
+      },
     };
   }
 
@@ -422,7 +431,10 @@ export class ProjectMemorySystem {
   private async saveContextFiles(contextPath: string, context: ProjectContext): Promise<void> {
     // Save guidance
     const contextFile = path.join(contextPath, 'context.md');
-    await fs.writeFile(contextFile, context.guidance || '# Project Context\n\nAdd project-specific guidance here.\n');
+    await fs.writeFile(
+      contextFile,
+      context.guidance || '# Project Context\n\nAdd project-specific guidance here.\n'
+    );
 
     // Save voice preferences
     const voicesFile = path.join(contextPath, 'voices.yaml');
@@ -465,7 +477,7 @@ export class ProjectMemorySystem {
 
       // Merge guidance (concatenate with separators)
       if (context.guidance) {
-        merged.guidance = merged.guidance 
+        merged.guidance = merged.guidance
           ? `${merged.guidance}\n\n---\n\n${context.guidance}`
           : context.guidance;
       }
@@ -476,7 +488,10 @@ export class ProjectMemorySystem {
           primary: context.preferences.primary || merged.preferences.primary,
           secondary: context.preferences.secondary || merged.preferences.secondary,
           disabled: [...merged.preferences.disabled, ...(context.preferences.disabled || [])],
-          customSettings: { ...merged.preferences.customSettings, ...context.preferences.customSettings }
+          customSettings: {
+            ...merged.preferences.customSettings,
+            ...context.preferences.customSettings,
+          },
         };
       }
 
@@ -526,11 +541,11 @@ export class ProjectMemorySystem {
    */
   private detectVoiceConflicts(layers: ContextLayer[]): ContextConflict[] {
     const conflicts: ContextConflict[] = [];
-    
+
     // Check if same voice is in both primary and disabled
     const allPrimary = new Set<string>();
     const allDisabled = new Set<string>();
-    
+
     layers.forEach(layer => {
       if (layer.content.preferences) {
         layer.content.preferences.primary?.forEach(voice => allPrimary.add(voice));
@@ -539,13 +554,13 @@ export class ProjectMemorySystem {
     });
 
     const conflictingVoices = [...allPrimary].filter(voice => allDisabled.has(voice));
-    
+
     if (conflictingVoices.length > 0) {
       conflicts.push({
         property: 'voice_preferences',
         layers: layers.map(l => l.level),
         resolution: 'override',
-        value: conflictingVoices
+        value: conflictingVoices,
       });
     }
 
@@ -562,7 +577,7 @@ export class ProjectMemorySystem {
         primary: ['explorer', 'maintainer'],
         secondary: ['analyzer', 'developer'],
         disabled: [],
-        customSettings: {}
+        customSettings: {},
       },
       constraints: [],
       patterns: [],
@@ -574,8 +589,8 @@ export class ProjectMemorySystem {
         frameworks: [],
         lastUpdated: Date.now(),
         totalInteractions: 0,
-        averageComplexity: 0
-      }
+        averageComplexity: 0,
+      },
     };
   }
 
@@ -595,25 +610,67 @@ export class ProjectMemorySystem {
     const lowercaseText = text.toLowerCase();
 
     // Programming languages
-    const languages = ['javascript', 'typescript', 'python', 'java', 'rust', 'go', 'cpp', 'c#', 'php', 'ruby'];
+    const languages = [
+      'javascript',
+      'typescript',
+      'python',
+      'java',
+      'rust',
+      'go',
+      'cpp',
+      'c#',
+      'php',
+      'ruby',
+    ];
     languages.forEach(lang => {
       if (lowercaseText.includes(lang)) topics.add(lang);
     });
 
     // Frameworks
-    const frameworks = ['react', 'vue', 'angular', 'express', 'fastapi', 'django', 'spring', 'flutter', 'nextjs'];
+    const frameworks = [
+      'react',
+      'vue',
+      'angular',
+      'express',
+      'fastapi',
+      'django',
+      'spring',
+      'flutter',
+      'nextjs',
+    ];
     frameworks.forEach(framework => {
       if (lowercaseText.includes(framework)) topics.add(framework);
     });
 
     // Technologies
-    const technologies = ['database', 'api', 'rest', 'graphql', 'docker', 'kubernetes', 'aws', 'git', 'test', 'security'];
+    const technologies = [
+      'database',
+      'api',
+      'rest',
+      'graphql',
+      'docker',
+      'kubernetes',
+      'aws',
+      'git',
+      'test',
+      'security',
+    ];
     technologies.forEach(tech => {
       if (lowercaseText.includes(tech)) topics.add(tech);
     });
 
     // Activity types
-    const activities = ['debug', 'refactor', 'optimize', 'implement', 'design', 'review', 'fix', 'create', 'update'];
+    const activities = [
+      'debug',
+      'refactor',
+      'optimize',
+      'implement',
+      'design',
+      'review',
+      'fix',
+      'create',
+      'update',
+    ];
     activities.forEach(activity => {
       if (lowercaseText.includes(activity)) topics.add(activity);
     });
@@ -630,19 +687,19 @@ export class ProjectMemorySystem {
     const complexitySum = history.reduce((sum, interaction) => {
       // Simple complexity scoring based on various factors
       let complexity = 0;
-      
+
       // Prompt length factor
       complexity += Math.min(interaction.prompt.length / 100, 5);
-      
-      // Response length factor  
+
+      // Response length factor
       complexity += Math.min(interaction.response.length / 200, 5);
-      
+
       // Number of voices used
       complexity += interaction.voicesUsed.length;
-      
+
       // Topic count
       complexity += interaction.topics.length;
-      
+
       return sum + Math.min(complexity, 10); // Cap at 10
     }, 0);
 
@@ -675,7 +732,7 @@ export class ProjectMemorySystem {
 
     this.cache.clear();
     this.watchedPaths.clear();
-    
+
     logger.info('Project memory system disposed');
   }
 }

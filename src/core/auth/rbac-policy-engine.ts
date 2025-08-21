@@ -29,7 +29,7 @@ export class RBACPolicyEngine {
       { id: 'generate:code', name: 'Generate Code', resource: 'generation:*', action: 'write' },
       { id: 'manage:voices', name: 'Manage Voice Systems', resource: 'voices:*', action: '*' },
       { id: 'view:metrics', name: 'View Metrics', resource: 'metrics:*', action: 'read' },
-      { id: 'manage:config', name: 'Manage Configuration', resource: 'config:*', action: '*' }
+      { id: 'manage:config', name: 'Manage Configuration', resource: 'config:*', action: '*' },
     ];
 
     permissions.forEach(perm => this.permissions.set(perm.id, perm));
@@ -40,32 +40,39 @@ export class RBACPolicyEngine {
         id: 'guest',
         name: 'Guest User',
         description: 'Limited read-only access',
-        permissions: [permissions[1]] // read:public only
+        permissions: [permissions[1]], // read:public only
       },
       {
         id: 'user',
         name: 'Regular User',
         description: 'Standard user with basic AI features',
-        permissions: [permissions[0], permissions[1], permissions[4], permissions[5]] // read own/public, analyze, generate
+        permissions: [permissions[0], permissions[1], permissions[4], permissions[5]], // read own/public, analyze, generate
       },
       {
         id: 'developer',
         name: 'Developer',
         description: 'Developer with enhanced code generation capabilities',
-        permissions: [permissions[0], permissions[1], permissions[2], permissions[4], permissions[5], permissions[6]]
+        permissions: [
+          permissions[0],
+          permissions[1],
+          permissions[2],
+          permissions[4],
+          permissions[5],
+          permissions[6],
+        ],
       },
       {
         id: 'admin',
         name: 'Administrator',
         description: 'Full system access',
-        permissions: [permissions[3]] // admin:all covers everything
+        permissions: [permissions[3]], // admin:all covers everything
       },
       {
         id: 'analyst',
         name: 'Data Analyst',
         description: 'Read access with metrics viewing',
-        permissions: [permissions[0], permissions[1], permissions[4], permissions[7]]
-      }
+        permissions: [permissions[0], permissions[1], permissions[4], permissions[7]],
+      },
     ];
 
     roles.forEach(role => this.roles.set(role.id, role));
@@ -77,44 +84,44 @@ export class RBACPolicyEngine {
         principal: ['user', 'developer', 'admin'],
         action: ['read'],
         resource: ['user:*'],
-        condition: { 'user.owns_resource': true }
+        condition: { 'user.owns_resource': true },
       },
       {
         effect: 'allow',
         principal: ['admin'],
         action: ['*'],
-        resource: ['*']
+        resource: ['*'],
       },
       {
         effect: 'deny',
         principal: ['*'],
         action: ['delete'],
-        resource: ['system:*']
+        resource: ['system:*'],
       },
       {
         effect: 'allow',
         principal: ['developer', 'admin'],
         action: ['write'],
-        resource: ['generation:*', 'analysis:*']
+        resource: ['generation:*', 'analysis:*'],
       },
       {
         effect: 'deny',
         principal: ['guest'],
         action: ['write'],
-        resource: ['*']
+        resource: ['*'],
       },
       {
         effect: 'allow',
         principal: ['analyst', 'admin'],
         action: ['read'],
-        resource: ['metrics:*', 'logs:*']
-      }
+        resource: ['metrics:*', 'logs:*'],
+      },
     ];
 
     logger.info('RBAC Policy Engine initialized', {
       policies: this.policies.length,
       roles: this.roles.size,
-      permissions: this.permissions.size
+      permissions: this.permissions.size,
     });
   }
 
@@ -124,18 +131,19 @@ export class RBACPolicyEngine {
   authorize(context: PolicyContext): boolean {
     try {
       const applicablePolicies = this.getApplicablePolicies(context);
-      
+
       // Log authorization attempt
       logger.debug('Authorization evaluation', {
         principal: context.principal,
         action: context.action,
         resource: context.resource,
-        applicablePolicies: applicablePolicies.length
+        applicablePolicies: applicablePolicies.length,
       });
 
       // Check for explicit deny first (deny overrides allow)
-      const hasDeny = applicablePolicies.some(policy => 
-        policy.effect === 'deny' && this.evaluateConditions(policy.condition, context.environment)
+      const hasDeny = applicablePolicies.some(
+        policy =>
+          policy.effect === 'deny' && this.evaluateConditions(policy.condition, context.environment)
       );
 
       if (hasDeny) {
@@ -144,24 +152,25 @@ export class RBACPolicyEngine {
       }
 
       // Check for explicit allow
-      const hasAllow = applicablePolicies.some(policy => 
-        policy.effect === 'allow' && this.evaluateConditions(policy.condition, context.environment)
+      const hasAllow = applicablePolicies.some(
+        policy =>
+          policy.effect === 'allow' &&
+          this.evaluateConditions(policy.condition, context.environment)
       );
 
       const authorized = hasAllow;
-      
+
       if (authorized) {
         logger.info('Authorization granted', {
           principal: context.principal,
           action: context.action,
-          resource: context.resource
+          resource: context.resource,
         });
       } else {
         logger.warn('Authorization denied - no matching allow policy', context);
       }
 
       return authorized;
-
     } catch (error) {
       logger.error('Authorization evaluation failed', error as Error, context);
       return false; // Fail secure
@@ -172,10 +181,11 @@ export class RBACPolicyEngine {
    * Get applicable policies for a context
    */
   private getApplicablePolicies(context: PolicyContext): Policy[] {
-    return this.policies.filter(policy =>
-      this.matchesPrincipal(policy.principal, context.principal) &&
-      this.matchesAction(policy.action, context.action) &&
-      this.matchesResource(policy.resource, context.resource)
+    return this.policies.filter(
+      policy =>
+        this.matchesPrincipal(policy.principal, context.principal) &&
+        this.matchesAction(policy.action, context.action) &&
+        this.matchesResource(policy.resource, context.resource)
     );
   }
 
@@ -209,41 +219,44 @@ export class RBACPolicyEngine {
   private matchesPattern(pattern: string, value: string): boolean {
     if (pattern === '*') return true;
     if (pattern === value) return true;
-    
+
     if (pattern.includes('*')) {
       const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
       return regex.test(value);
     }
-    
+
     return false;
   }
 
   /**
    * Evaluate policy conditions
    */
-  private evaluateConditions(conditions: Record<string, any> | undefined, environment: Record<string, any>): boolean {
+  private evaluateConditions(
+    conditions: Record<string, any> | undefined,
+    environment: Record<string, any>
+  ): boolean {
     if (!conditions) return true;
 
     return Object.entries(conditions).every(([key, value]) => {
       switch (key) {
         case 'user.owns_resource':
           return environment.userId === environment.resourceOwnerId;
-        
+
         case 'ip_address_in_range':
           return this.isIpInRange(environment.ipAddress, value);
-        
+
         case 'time_between':
           return this.isTimeBetween(environment.currentTime, value.start, value.end);
-        
+
         case 'user.has_role':
           return environment.userRoles?.includes(value);
-        
+
         case 'request.has_header':
           return environment.headers?.[value.name] === value.value;
-        
+
         case 'rate_limit.under_threshold':
           return environment.requestCount < value;
-        
+
         default:
           // Direct equality check
           return environment[key] === value;
@@ -258,13 +271,13 @@ export class RBACPolicyEngine {
     // Simplified IP range check - in production use proper CIDR library
     if (range === '*') return true;
     if (range === ip) return true;
-    
+
     // Basic subnet check (e.g., 192.168.1.*)
     if (range.endsWith('*')) {
       const prefix = range.slice(0, -1);
       return ip.startsWith(prefix);
     }
-    
+
     return false;
   }
 
@@ -275,7 +288,7 @@ export class RBACPolicyEngine {
     const currentTime = current.getHours() * 100 + current.getMinutes();
     const startTime = parseInt(start.replace(':', ''));
     const endTime = parseInt(end.replace(':', ''));
-    
+
     return currentTime >= startTime && currentTime <= endTime;
   }
 
@@ -302,7 +315,7 @@ export class RBACPolicyEngine {
    */
   getUserPermissions(user: User): Permission[] {
     const userPermissions: Permission[] = [];
-    
+
     // Get permissions from user's roles
     for (const roleId of user.roles) {
       const role = this.roles.get(roleId);
@@ -320,8 +333,8 @@ export class RBACPolicyEngine {
     }
 
     // Remove duplicates
-    const uniquePermissions = userPermissions.filter((perm, index, self) =>
-      index === self.findIndex(p => p.id === perm.id)
+    const uniquePermissions = userPermissions.filter(
+      (perm, index, self) => index === self.findIndex(p => p.id === perm.id)
     );
 
     return uniquePermissions;
@@ -346,7 +359,7 @@ export class RBACPolicyEngine {
         if (!user) {
           return res.status(401).json({
             error: 'Authentication required',
-            code: 'NO_USER_CONTEXT'
+            code: 'NO_USER_CONTEXT',
           });
         }
 
@@ -362,31 +375,30 @@ export class RBACPolicyEngine {
             currentTime: new Date(),
             headers: req.headers,
             method: req.method,
-            path: req.path
-          }
+            path: req.path,
+          },
         };
 
         // Check authorization
         const authorized = this.authorize(context);
-        
+
         if (!authorized) {
           return res.status(403).json({
             error: 'Insufficient permissions',
             code: 'INSUFFICIENT_PERMISSIONS',
             required: {
               action: requiredAction,
-              resource: requiredResource
-            }
+              resource: requiredResource,
+            },
           });
         }
 
         next();
-
       } catch (error) {
         logger.error('Authorization middleware error', error as Error);
         return res.status(500).json({
           error: 'Internal authorization error',
-          code: 'AUTHZ_INTERNAL_ERROR'
+          code: 'AUTHZ_INTERNAL_ERROR',
         });
       }
     };

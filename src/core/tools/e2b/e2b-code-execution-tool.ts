@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 /**
  * Secure E2B Code Execution Tool
- * 
+ *
  * Replaces the unsafe CodeExecutionTool with sandboxed execution
  * using E2B infrastructure for complete isolation and security.
  */
@@ -14,24 +14,25 @@ export class E2BCodeExecutionTool extends BaseTool {
   private e2bService: E2BService;
   private securityValidator: SecurityValidator;
 
-  constructor(
-    e2bService: E2BService,
-    agentContext: any,
-    securityValidator?: SecurityValidator
-  ) {
+  constructor(e2bService: E2BService, agentContext: any, securityValidator?: SecurityValidator) {
     super({
       name: 'executeCode',
       description: 'Execute code safely in an isolated E2B sandbox environment',
       category: 'Code Execution',
       parameters: z.object({
         code: z.string().min(1).describe('The code to execute'),
-        language: z.enum(['python', 'javascript', 'typescript', 'bash', 'shell']).describe('Programming language'),
+        language: z
+          .enum(['python', 'javascript', 'typescript', 'bash', 'shell'])
+          .describe('Programming language'),
         sessionId: z.string().optional().describe('Session ID for persistent execution context'),
         timeout: z.number().optional().default(30000).describe('Execution timeout in milliseconds'),
         description: z.string().optional().describe('Description of what the code does'),
         expectedOutput: z.string().optional().describe('Expected output for validation'),
-        variables: z.record(z.any()).optional().describe('Variables to make available in execution context')
-      })
+        variables: z
+          .record(z.any())
+          .optional()
+          .describe('Variables to make available in execution context'),
+      }),
     });
 
     this.e2bService = e2bService;
@@ -40,15 +41,15 @@ export class E2BCodeExecutionTool extends BaseTool {
 
   async execute(args: any): Promise<any> {
     const startTime = Date.now();
-    
+
     try {
       logger.info(`🔐 E2B Code Execution Request: ${args.language} (${args.code.length} chars)`);
-      
+
       // Security validation
       const validationResult = this.securityValidator.validateCode(args.code, args.language);
       if (!validationResult.isValid) {
         logger.warn(`🚨 Code execution blocked: ${validationResult.reason}`);
-        
+
         this.securityValidator.logSecurityViolation(
           args.sessionId || 'unknown',
           'code_execution',
@@ -61,7 +62,7 @@ export class E2BCodeExecutionTool extends BaseTool {
           error: `Security validation failed: ${validationResult.reason}`,
           executionTime: Date.now() - startTime,
           sessionId: args.sessionId || 'none',
-          securityWarnings: [validationResult.reason]
+          securityWarnings: [validationResult.reason],
         };
       }
 
@@ -81,7 +82,9 @@ export class E2BCodeExecutionTool extends BaseTool {
       // Process and validate results
       const processedResult = await this.processExecutionResult(executionResult, args);
 
-      logger.info(`✅ E2B Code execution completed - Success: ${processedResult.success}, Time: ${processedResult.executionTime}ms`);
+      logger.info(
+        `✅ E2B Code execution completed - Success: ${processedResult.success}, Time: ${processedResult.executionTime}ms`
+      );
 
       return {
         success: processedResult.success,
@@ -89,9 +92,9 @@ export class E2BCodeExecutionTool extends BaseTool {
         error: processedResult.error,
         executionTime: processedResult.executionTime,
         sessionId,
-        securityWarnings: validationResult.severity !== 'low' ? [validationResult.reason] : undefined
+        securityWarnings:
+          validationResult.severity !== 'low' ? [validationResult.reason] : undefined,
       };
-
     } catch (error) {
       const executionTime = Date.now() - startTime;
       logger.error('❌ E2B Code execution failed:', error);
@@ -100,7 +103,7 @@ export class E2BCodeExecutionTool extends BaseTool {
         success: false,
         error: `Execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         executionTime,
-        sessionId: args.sessionId || 'none'
+        sessionId: args.sessionId || 'none',
       };
     }
   }
@@ -144,19 +147,19 @@ export class E2BCodeExecutionTool extends BaseTool {
         return Object.entries(variables)
           .map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
           .join('\n');
-      
+
       case 'javascript':
       case 'typescript':
         return Object.entries(variables)
           .map(([key, value]) => `const ${key} = ${JSON.stringify(value)};`)
           .join('\n');
-      
+
       case 'bash':
       case 'shell':
         return Object.entries(variables)
           .map(([key, value]) => `${key}="${String(value)}"`)
           .join('\n');
-      
+
       default:
         return '';
     }
@@ -190,7 +193,10 @@ try:
         check_timeout()
         
         # User code execution
-${code.split('\n').map(line => '        ' + line).join('\n')}
+${code
+  .split('\n')
+  .map(line => '        ' + line)
+  .join('\n')}
         
         check_timeout()
         
@@ -229,7 +235,7 @@ except Exception as e:
    */
   private convertJSToPython(jsCode: string): string {
     let pythonCode = jsCode;
-    
+
     // Basic conversions
     pythonCode = pythonCode
       .replace(/console\.log\s*\(/g, 'print(')
@@ -323,7 +329,8 @@ except Exception as e:
 
     // Check for timeout errors
     if (executionResult.error?.includes('TIMEOUT_ERROR')) {
-      executionResult.error = 'Code execution timed out. Consider optimizing your code or reducing complexity.';
+      executionResult.error =
+        'Code execution timed out. Consider optimizing your code or reducing complexity.';
     }
 
     // Check for execution errors
@@ -355,7 +362,7 @@ except Exception as e:
     return {
       toolName: this.definition.name,
       securityPolicy: this.securityValidator.getPolicy(),
-      e2bServiceStats: this.e2bService.getStats()
+      e2bServiceStats: this.e2bService.getStats(),
     };
   }
 

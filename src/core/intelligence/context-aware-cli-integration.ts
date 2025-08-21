@@ -9,7 +9,11 @@ import { readFile, stat } from 'fs/promises';
 import chalk from 'chalk';
 import ora from 'ora';
 import { Logger } from '../logger.js';
-import { ProjectIntelligenceSystem, ProjectIntelligence, AnalysisOptions } from './project-intelligence-system.js';
+import {
+  ProjectIntelligenceSystem,
+  ProjectIntelligence,
+  AnalysisOptions,
+} from './project-intelligence-system.js';
 import { ExecutionRequest } from '../types.js';
 import { UnifiedModelClient } from '../client.js';
 
@@ -84,7 +88,10 @@ export class ContextAwareCLIIntegration extends EventEmitter {
   /**
    * Initialize context-aware CLI with project intelligence
    */
-  async initialize(workingDir: string = process.cwd(), options: ContextAwareOptions = {}): Promise<void> {
+  async initialize(
+    workingDir: string = process.cwd(),
+    options: ContextAwareOptions = {}
+  ): Promise<void> {
     this.currentWorkingDir = workingDir;
     this.logger.info(`Initializing context-aware CLI in ${workingDir}`);
 
@@ -103,28 +110,33 @@ export class ContextAwareCLIIntegration extends EventEmitter {
    * Load or update project intelligence
    */
   async loadProjectIntelligence(
-    projectPath: string, 
+    projectPath: string,
     options: ContextAwareOptions = {}
   ): Promise<ProjectIntelligence> {
     const spinner = ora('🧠 Analyzing project structure and generating intelligence...').start();
-    
+
     try {
       const analysisOptions: AnalysisOptions = {
         force: false,
         maxDepth: options.contextDepth || 5,
         includeTests: true,
         skipLargeFiles: true,
-        maxFileSize: 1024 * 1024 // 1MB
+        maxFileSize: 1024 * 1024, // 1MB
       };
 
-      const intelligence = await this.intelligenceSystem.analyzeProject(projectPath, analysisOptions);
+      const intelligence = await this.intelligenceSystem.analyzeProject(
+        projectPath,
+        analysisOptions
+      );
       this.projectCache.set(projectPath, intelligence);
-      
-      spinner.succeed(`🎯 Project intelligence loaded: ${intelligence.insights.projectType} project with ${intelligence.insights.primaryLanguage}`);
-      
+
+      spinner.succeed(
+        `🎯 Project intelligence loaded: ${intelligence.insights.projectType} project with ${intelligence.insights.primaryLanguage}`
+      );
+
       // Display quick project overview
       this.displayProjectOverview(intelligence);
-      
+
       return intelligence;
     } catch (error) {
       spinner.fail('❌ Failed to analyze project');
@@ -136,7 +148,7 @@ export class ContextAwareCLIIntegration extends EventEmitter {
    * Enhance user prompts with project context
    */
   async enhancePromptWithContext(
-    prompt: string, 
+    prompt: string,
     options: ContextAwareOptions = {}
   ): Promise<ContextualPromptEnhancement> {
     const intelligence = this.projectCache.get(this.currentWorkingDir);
@@ -146,7 +158,7 @@ export class ContextAwareCLIIntegration extends EventEmitter {
         enhancedPrompt: prompt,
         contextAdded: this.getEmptyContext(),
         confidence: 0,
-        suggestions: []
+        suggestions: [],
       };
     }
 
@@ -159,7 +171,7 @@ export class ContextAwareCLIIntegration extends EventEmitter {
       enhancedPrompt,
       contextAdded: contextInfo,
       confidence: this.calculateContextConfidence(contextInfo),
-      suggestions: suggestions.map(s => s.title)
+      suggestions: suggestions.map(s => s.title),
     };
   }
 
@@ -167,11 +179,15 @@ export class ContextAwareCLIIntegration extends EventEmitter {
    * Build contextual information for a given prompt
    */
   private async buildContextInformation(
-    prompt: string, 
-    intelligence: ProjectIntelligence, 
+    prompt: string,
+    intelligence: ProjectIntelligence,
     options: ContextAwareOptions
   ): Promise<ContextInformation> {
-    const relevantFiles = await this.findRelevantFiles(prompt, intelligence, options.maxContextFiles || 5);
+    const relevantFiles = await this.findRelevantFiles(
+      prompt,
+      intelligence,
+      options.maxContextFiles || 5
+    );
     const codePatterns = this.identifyRelevantPatterns(prompt, intelligence);
     const recommendations = this.generateContextualRecommendations(prompt, intelligence);
 
@@ -183,7 +199,7 @@ export class ContextAwareCLIIntegration extends EventEmitter {
       relevantFiles,
       codePatterns,
       dependencies: intelligence.dependencies.externalDependencies.slice(0, 10).map(d => d.name),
-      recommendations
+      recommendations,
     };
   }
 
@@ -191,8 +207,8 @@ export class ContextAwareCLIIntegration extends EventEmitter {
    * Find files relevant to the user's prompt
    */
   private async findRelevantFiles(
-    prompt: string, 
-    intelligence: ProjectIntelligence, 
+    prompt: string,
+    intelligence: ProjectIntelligence,
     maxFiles: number
   ): Promise<string[]> {
     const promptLower = prompt.toLowerCase();
@@ -204,25 +220,27 @@ export class ContextAwareCLIIntegration extends EventEmitter {
 
       // Check filename relevance
       if (file.name.toLowerCase().includes(promptLower)) score += 10;
-      
+
       // Check path relevance
       if (file.path.toLowerCase().includes(promptLower)) score += 5;
-      
+
       // Boost important files
       if (file.importance === 'critical') score += 8;
       else if (file.importance === 'high') score += 4;
-      
+
       // Language relevance
       if (promptLower.includes(file.language.toLowerCase())) score += 6;
-      
+
       // Purpose relevance
       if (promptLower.includes('test') && file.purpose === 'test') score += 7;
       if (promptLower.includes('config') && file.purpose === 'config') score += 7;
       if (promptLower.includes('util') && file.purpose === 'utility') score += 5;
 
       // File type relevance
-      if (promptLower.includes('component') && file.name.toLowerCase().includes('component')) score += 8;
-      if (promptLower.includes('service') && file.name.toLowerCase().includes('service')) score += 8;
+      if (promptLower.includes('component') && file.name.toLowerCase().includes('component'))
+        score += 8;
+      if (promptLower.includes('service') && file.name.toLowerCase().includes('service'))
+        score += 8;
       if (promptLower.includes('model') && file.name.toLowerCase().includes('model')) score += 8;
 
       if (score > 0) {
@@ -273,7 +291,10 @@ export class ContextAwareCLIIntegration extends EventEmitter {
   /**
    * Generate contextual recommendations
    */
-  private generateContextualRecommendations(prompt: string, intelligence: ProjectIntelligence): string[] {
+  private generateContextualRecommendations(
+    prompt: string,
+    intelligence: ProjectIntelligence
+  ): string[] {
     const recommendations: string[] = [];
     const promptLower = prompt.toLowerCase();
 
@@ -344,7 +365,7 @@ Please provide a response that takes into account the project context above and 
    * Generate smart suggestions based on prompt and project context
    */
   async generateSmartSuggestions(
-    prompt: string, 
+    prompt: string,
     intelligence: ProjectIntelligence
   ): Promise<SmartSuggestion[]> {
     const suggestions: SmartSuggestion[] = [];
@@ -358,7 +379,7 @@ Please provide a response that takes into account the project context above and 
         description: 'Execute the project test suite',
         action: 'npm test',
         confidence: 0.9,
-        rationale: 'User mentioned testing'
+        rationale: 'User mentioned testing',
       });
     }
 
@@ -369,7 +390,7 @@ Please provide a response that takes into account the project context above and 
         description: 'Build the project for production',
         action: 'npm run build',
         confidence: 0.85,
-        rationale: 'User mentioned building'
+        rationale: 'User mentioned building',
       });
     }
 
@@ -380,7 +401,7 @@ Please provide a response that takes into account the project context above and 
         title: 'Check Documentation',
         description: 'Review project README and documentation',
         confidence: 0.7,
-        rationale: 'Documentation exists for context'
+        rationale: 'Documentation exists for context',
       });
     }
 
@@ -391,7 +412,7 @@ Please provide a response that takes into account the project context above and 
         title: `Apply ${pattern} Pattern`,
         description: `Consider using ${pattern} pattern for this implementation`,
         confidence: 0.6,
-        rationale: `Pattern used elsewhere in codebase`
+        rationale: `Pattern used elsewhere in codebase`,
       });
     }
 
@@ -402,7 +423,7 @@ Please provide a response that takes into account the project context above and 
         title: 'Refactor for Maintainability',
         description: 'Consider refactoring to improve code maintainability',
         confidence: 0.75,
-        rationale: 'Current maintainability index is below optimal'
+        rationale: 'Current maintainability index is below optimal',
       });
     }
 
@@ -417,15 +438,29 @@ Please provide a response that takes into account the project context above and 
     console.log(chalk.gray(`   Type: ${intelligence.insights.projectType}`));
     console.log(chalk.gray(`   Language: ${intelligence.insights.primaryLanguage}`));
     console.log(chalk.gray(`   Architecture: ${intelligence.patterns.primaryPattern}`));
-    console.log(chalk.gray(`   Files: ${intelligence.structure.totalFiles} (${intelligence.structure.totalDirectories} directories)`));
-    
+    console.log(
+      chalk.gray(
+        `   Files: ${intelligence.structure.totalFiles} (${intelligence.structure.totalDirectories} directories)`
+      )
+    );
+
     if (intelligence.insights.frameworksDetected.length > 0) {
-      console.log(chalk.gray(`   Frameworks: ${intelligence.insights.frameworksDetected.map(f => f.name).join(', ')}`));
+      console.log(
+        chalk.gray(
+          `   Frameworks: ${intelligence.insights.frameworksDetected.map(f => f.name).join(', ')}`
+        )
+      );
     }
-    
-    const qualityColor = intelligence.insights.codeQuality.maintainabilityIndex >= 80 ? chalk.green : 
-                        intelligence.insights.codeQuality.maintainabilityIndex >= 60 ? chalk.yellow : chalk.red;
-    console.log(qualityColor(`   Code Quality: ${intelligence.insights.codeQuality.maintainabilityIndex}/100`));
+
+    const qualityColor =
+      intelligence.insights.codeQuality.maintainabilityIndex >= 80
+        ? chalk.green
+        : intelligence.insights.codeQuality.maintainabilityIndex >= 60
+          ? chalk.yellow
+          : chalk.red;
+    console.log(
+      qualityColor(`   Code Quality: ${intelligence.insights.codeQuality.maintainabilityIndex}/100`)
+    );
   }
 
   /**
@@ -439,7 +474,7 @@ Please provide a response that takes into account the project context above and 
         relatedFiles: [],
         suggestedFiles: [],
         keyDirectories: [],
-        navigationHistory: this.navigationHistory
+        navigationHistory: this.navigationHistory,
       };
     }
 
@@ -466,7 +501,7 @@ Please provide a response that takes into account the project context above and 
       relatedFiles,
       suggestedFiles,
       keyDirectories,
-      navigationHistory: this.navigationHistory
+      navigationHistory: this.navigationHistory,
     };
   }
 
@@ -490,7 +525,7 @@ Please provide a response that takes into account the project context above and 
             description: `Run ${script} script: ${command}`,
             examples: [`npm run ${script}`],
             contextRelevance: 0.9,
-            suggestedArgs: []
+            suggestedArgs: [],
           });
         }
       }
@@ -514,13 +549,13 @@ Please provide a response that takes into account the project context above and 
    */
   private calculateContextConfidence(context: ContextInformation): number {
     let confidence = 0;
-    
+
     if (context.projectType !== 'unknown') confidence += 0.2;
     if (context.primaryLanguage !== 'Unknown') confidence += 0.2;
     if (context.frameworks.length > 0) confidence += 0.2;
     if (context.relevantFiles.length > 0) confidence += 0.2;
     if (context.recommendations.length > 0) confidence += 0.2;
-    
+
     return Math.min(confidence, 1.0);
   }
 
@@ -534,15 +569,15 @@ Please provide a response that takes into account the project context above and 
         description: 'Analyze current project or file',
         examples: ['crucible analyze .', 'crucible analyze file.js'],
         contextRelevance: 0.8,
-        suggestedArgs: ['.', '*.js', '*.ts']
+        suggestedArgs: ['.', '*.js', '*.ts'],
       },
       {
         command: 'help',
         description: 'Show available commands and options',
         examples: ['crucible help', 'crucible --help'],
         contextRelevance: 0.6,
-        suggestedArgs: []
-      }
+        suggestedArgs: [],
+      },
     ];
   }
 
@@ -551,33 +586,33 @@ Please provide a response that takes into account the project context above and 
    */
   private getFrameworkCommands(framework: string): IntelligentCommand[] {
     const frameworkMap: Record<string, IntelligentCommand[]> = {
-      'React': [
+      React: [
         {
           command: 'create-react-app',
           description: 'Create a new React application',
           examples: ['npx create-react-app my-app'],
           contextRelevance: 0.8,
-          suggestedArgs: []
-        }
+          suggestedArgs: [],
+        },
       ],
-      'Vue': [
+      Vue: [
         {
           command: 'vue create',
           description: 'Create a new Vue.js project',
           examples: ['vue create my-project'],
           contextRelevance: 0.8,
-          suggestedArgs: []
-        }
+          suggestedArgs: [],
+        },
       ],
-      'Express': [
+      Express: [
         {
           command: 'express-generator',
           description: 'Generate Express application skeleton',
           examples: ['npx express-generator my-app'],
           contextRelevance: 0.8,
-          suggestedArgs: []
-        }
-      ]
+          suggestedArgs: [],
+        },
+      ],
     };
 
     return frameworkMap[framework] || [];
@@ -588,33 +623,33 @@ Please provide a response that takes into account the project context above and 
    */
   private getLanguageCommands(language: string): IntelligentCommand[] {
     const languageMap: Record<string, IntelligentCommand[]> = {
-      'JavaScript': [
+      JavaScript: [
         {
           command: 'node',
           description: 'Run JavaScript file with Node.js',
           examples: ['node app.js', 'node --version'],
           contextRelevance: 0.7,
-          suggestedArgs: []
-        }
+          suggestedArgs: [],
+        },
       ],
-      'TypeScript': [
+      TypeScript: [
         {
           command: 'tsc',
           description: 'TypeScript compiler',
           examples: ['tsc', 'tsc --watch'],
           contextRelevance: 0.8,
-          suggestedArgs: ['--watch', '--build']
-        }
+          suggestedArgs: ['--watch', '--build'],
+        },
       ],
-      'Python': [
+      Python: [
         {
           command: 'python',
           description: 'Run Python scripts',
           examples: ['python app.py', 'python -m pip install'],
           contextRelevance: 0.7,
-          suggestedArgs: ['-m', '--version']
-        }
-      ]
+          suggestedArgs: ['-m', '--version'],
+        },
+      ],
     };
 
     return languageMap[language] || [];
@@ -632,7 +667,7 @@ Please provide a response that takes into account the project context above and 
       relevantFiles: [],
       codePatterns: [],
       dependencies: [],
-      recommendations: []
+      recommendations: [],
     };
   }
 
@@ -673,7 +708,7 @@ Please provide a response that takes into account the project context above and 
       cachedProjects: this.projectCache.size,
       navigationHistoryLength: this.navigationHistory.length,
       currentWorkingDir: this.currentWorkingDir,
-      intelligenceSystem: this.intelligenceSystem.getSystemMetrics()
+      intelligenceSystem: this.intelligenceSystem.getSystemMetrics(),
     };
   }
 }

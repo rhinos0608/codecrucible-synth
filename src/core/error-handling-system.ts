@@ -33,18 +33,18 @@ export interface ErrorInfo {
   status: 'active' | 'acknowledged' | 'resolved' | 'ignored';
 }
 
-export type ErrorType = 
-  | 'validation' 
-  | 'authentication' 
-  | 'authorization' 
-  | 'network' 
-  | 'database' 
-  | 'file_system' 
-  | 'external_api' 
-  | 'configuration' 
-  | 'business_logic' 
-  | 'system' 
-  | 'performance' 
+export type ErrorType =
+  | 'validation'
+  | 'authentication'
+  | 'authorization'
+  | 'network'
+  | 'database'
+  | 'file_system'
+  | 'external_api'
+  | 'configuration'
+  | 'business_logic'
+  | 'system'
+  | 'performance'
   | 'security'
   | 'unknown';
 
@@ -103,7 +103,7 @@ export class ErrorHandlingSystem extends EventEmitter {
     await this.loadErrorPatterns();
     await this.setupDefaultAlertRules();
     this.setupDefaultCircuitBreakers();
-    
+
     this.isInitialized = true;
     logger.info('🚨 Error handling system initialized');
   }
@@ -111,10 +111,7 @@ export class ErrorHandlingSystem extends EventEmitter {
   /**
    * Handle an error with comprehensive context
    */
-  async handleError(
-    error: Error | string,
-    context: Partial<ErrorContext>
-  ): Promise<string> {
+  async handleError(error: Error | string, context: Partial<ErrorContext>): Promise<string> {
     const errorId = this.generateErrorId();
     const errorMessage = error instanceof Error ? error.message : error;
     const errorStack = error instanceof Error ? error.stack : undefined;
@@ -128,12 +125,12 @@ export class ErrorHandlingSystem extends EventEmitter {
       component: 'system',
       timestamp: Date.now(),
       requestId: this.generateRequestId(),
-      ...context
+      ...context,
     };
 
     // Check for existing error
     let errorInfo = this.findExistingError(errorMessage, fullContext);
-    
+
     if (errorInfo) {
       // Update existing error
       errorInfo.count++;
@@ -151,9 +148,9 @@ export class ErrorHandlingSystem extends EventEmitter {
         count: 1,
         firstOccurrence: Date.now(),
         lastOccurrence: Date.now(),
-        status: 'active'
+        status: 'active',
       };
-      
+
       this.errors.set(errorId, errorInfo);
       this.emit('error-created', errorInfo);
     }
@@ -172,7 +169,7 @@ export class ErrorHandlingSystem extends EventEmitter {
       this.correlationContext.set(fullContext.requestId, {
         ...fullContext.metadata,
         errorId: errorInfo.id,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -182,7 +179,10 @@ export class ErrorHandlingSystem extends EventEmitter {
   /**
    * Classify error type and severity
    */
-  private classifyError(message: string, stack?: string): { type: ErrorType; severity: ErrorSeverity } {
+  private classifyError(
+    message: string,
+    stack?: string
+  ): { type: ErrorType; severity: ErrorSeverity } {
     const text = (message + (stack || '')).toLowerCase();
 
     // Check against patterns
@@ -196,23 +196,23 @@ export class ErrorHandlingSystem extends EventEmitter {
     if (text.includes('unauthorized') || text.includes('forbidden')) {
       return { type: 'authorization', severity: 'high' };
     }
-    
+
     if (text.includes('not found') || text.includes('enoent')) {
       return { type: 'file_system', severity: 'medium' };
     }
-    
+
     if (text.includes('timeout') || text.includes('network')) {
       return { type: 'network', severity: 'medium' };
     }
-    
+
     if (text.includes('database') || text.includes('sql')) {
       return { type: 'database', severity: 'high' };
     }
-    
+
     if (text.includes('memory') || text.includes('heap')) {
       return { type: 'performance', severity: 'high' };
     }
-    
+
     if (text.includes('security') || text.includes('xss') || text.includes('injection')) {
       return { type: 'security', severity: 'critical' };
     }
@@ -246,7 +246,7 @@ export class ErrorHandlingSystem extends EventEmitter {
       component: errorInfo.context.component,
       operation: errorInfo.context.operation,
       count: errorInfo.count,
-      requestId: errorInfo.context.requestId
+      requestId: errorInfo.context.requestId,
     };
 
     switch (errorInfo.severity) {
@@ -277,8 +277,7 @@ export class ErrorHandlingSystem extends EventEmitter {
       if (!rule.enabled) continue;
 
       // Check cooldown
-      if (rule.lastTriggered && 
-          Date.now() - rule.lastTriggered < rule.cooldownMs) {
+      if (rule.lastTriggered && Date.now() - rule.lastTriggered < rule.cooldownMs) {
         continue;
       }
 
@@ -300,15 +299,15 @@ export class ErrorHandlingSystem extends EventEmitter {
           case 'log':
             logger.error(`🚨 ALERT: ${rule.name}`, { errorInfo, rule });
             break;
-            
+
           case 'webhook':
             await this.executeWebhookAction(action.config, rule, errorInfo);
             break;
-            
+
           case 'circuit_breaker':
             this.triggerCircuitBreaker(action.config.component);
             break;
-            
+
           case 'restart':
             logger.warn(`🔄 Restart triggered by alert: ${rule.name}`);
             // Implementation would depend on deployment method
@@ -338,12 +337,12 @@ export class ErrorHandlingSystem extends EventEmitter {
   private updateCircuitBreakers(errorInfo: ErrorInfo): void {
     const component = errorInfo.context.component;
     let breaker = this.circuitBreakers.get(component);
-    
+
     if (!breaker) {
       breaker = new CircuitBreaker(component);
       this.circuitBreakers.set(component, breaker);
     }
-    
+
     breaker.recordError(errorInfo);
   }
 
@@ -362,47 +361,55 @@ export class ErrorHandlingSystem extends EventEmitter {
    * Get comprehensive observability metrics
    */
   getMetrics(): ObservabilityMetrics {
-    const activeErrors = Array.from(this.errors.values())
-      .filter(e => e.status === 'active');
+    const activeErrors = Array.from(this.errors.values()).filter(e => e.status === 'active');
 
-    const errorsByType = activeErrors.reduce((acc, error) => {
-      acc[error.type] = (acc[error.type] || 0) + 1;
-      return acc;
-    }, {} as Record<ErrorType, number>);
+    const errorsByType = activeErrors.reduce(
+      (acc, error) => {
+        acc[error.type] = (acc[error.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<ErrorType, number>
+    );
 
-    const errorsBySeverity = activeErrors.reduce((acc, error) => {
-      acc[error.severity] = (acc[error.severity] || 0) + 1;
-      return acc;
-    }, {} as Record<ErrorSeverity, number>);
+    const errorsBySeverity = activeErrors.reduce(
+      (acc, error) => {
+        acc[error.severity] = (acc[error.severity] || 0) + 1;
+        return acc;
+      },
+      {} as Record<ErrorSeverity, number>
+    );
 
-    const errorsByComponent = activeErrors.reduce((acc, error) => {
-      const component = error.context.component;
-      acc[component] = (acc[component] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const errorsByComponent = activeErrors.reduce(
+      (acc, error) => {
+        const component = error.context.component;
+        acc[component] = (acc[component] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     // Calculate resolution time for resolved errors
-    const resolvedErrors = Array.from(this.errors.values())
-      .filter(e => e.status === 'resolved');
-    
-    const meanTimeToResolve = resolvedErrors.length > 0
-      ? resolvedErrors.reduce((sum, error) => {
-          return sum + (error.lastOccurrence - error.firstOccurrence);
-        }, 0) / resolvedErrors.length
-      : 0;
+    const resolvedErrors = Array.from(this.errors.values()).filter(e => e.status === 'resolved');
+
+    const meanTimeToResolve =
+      resolvedErrors.length > 0
+        ? resolvedErrors.reduce((sum, error) => {
+            return sum + (error.lastOccurrence - error.firstOccurrence);
+          }, 0) / resolvedErrors.length
+        : 0;
 
     // Circuit breaker status
     const circuitBreakerStatus = Object.fromEntries(
       Array.from(this.circuitBreakers.entries()).map(([name, breaker]) => [
         name,
-        breaker.getState()
+        breaker.getState(),
       ])
     );
 
     // Calculate health score (0-100)
     const criticalErrors = errorsBySeverity.critical || 0;
     const highErrors = errorsBySeverity.high || 0;
-    const healthScore = Math.max(0, 100 - (criticalErrors * 25) - (highErrors * 10));
+    const healthScore = Math.max(0, 100 - criticalErrors * 25 - highErrors * 10);
 
     return {
       errorRate: activeErrors.length,
@@ -411,7 +418,7 @@ export class ErrorHandlingSystem extends EventEmitter {
       errorsByComponent,
       meanTimeToResolve,
       circuitBreakerStatus,
-      healthScore
+      healthScore,
     };
   }
 
@@ -427,7 +434,7 @@ export class ErrorHandlingSystem extends EventEmitter {
         severity: 'critical',
         description: 'Potential SQL injection attempt',
         recommendation: 'Use parameterized queries and input validation',
-        autoFixable: false
+        autoFixable: false,
       },
       {
         id: 'xss-attack',
@@ -436,7 +443,7 @@ export class ErrorHandlingSystem extends EventEmitter {
         severity: 'critical',
         description: 'Potential XSS attack',
         recommendation: 'Sanitize user input and use CSP headers',
-        autoFixable: false
+        autoFixable: false,
       },
       {
         id: 'memory-leak',
@@ -445,7 +452,7 @@ export class ErrorHandlingSystem extends EventEmitter {
         severity: 'high',
         description: 'Memory-related performance issue',
         recommendation: 'Review memory management and disposal patterns',
-        autoFixable: false
+        autoFixable: false,
       },
       {
         id: 'authentication-failure',
@@ -454,7 +461,7 @@ export class ErrorHandlingSystem extends EventEmitter {
         severity: 'high',
         description: 'Authentication failure',
         recommendation: 'Verify credentials and token validity',
-        autoFixable: false
+        autoFixable: false,
       },
       {
         id: 'database-connection',
@@ -463,7 +470,7 @@ export class ErrorHandlingSystem extends EventEmitter {
         severity: 'high',
         description: 'Database connectivity issue',
         recommendation: 'Check database status and connection settings',
-        autoFixable: false
+        autoFixable: false,
       },
       {
         id: 'file-not-found',
@@ -472,8 +479,8 @@ export class ErrorHandlingSystem extends EventEmitter {
         severity: 'medium',
         description: 'File system access issue',
         recommendation: 'Verify file paths and permissions',
-        autoFixable: false
-      }
+        autoFixable: false,
+      },
     ];
   }
 
@@ -485,42 +492,41 @@ export class ErrorHandlingSystem extends EventEmitter {
       {
         id: 'critical-error-burst',
         name: 'Critical Error Burst',
-        condition: (error) => error.severity === 'critical' && error.count >= 3,
+        condition: error => error.severity === 'critical' && error.count >= 3,
         severity: 'critical',
         enabled: true,
         cooldownMs: 5 * 60 * 1000, // 5 minutes
         actions: [
           { type: 'log', config: {} },
-          { type: 'circuit_breaker', config: { component: 'system' } }
-        ]
+          { type: 'circuit_breaker', config: { component: 'system' } },
+        ],
       },
       {
         id: 'security-threat',
         name: 'Security Threat Detected',
-        condition: (error) => error.type === 'security',
+        condition: error => error.type === 'security',
         severity: 'critical',
         enabled: true,
         cooldownMs: 1 * 60 * 1000, // 1 minute
         actions: [
           { type: 'log', config: {} },
-          { type: 'webhook', config: { url: '${SECURITY_WEBHOOK_URL}' } }
-        ]
+          { type: 'webhook', config: { url: '${SECURITY_WEBHOOK_URL}' } },
+        ],
       },
       {
         id: 'high-error-rate',
         name: 'High Error Rate',
-        condition: (error) => {
-          const recentErrors = Array.from(this.errors.values())
-            .filter(e => Date.now() - e.lastOccurrence < 60000); // Last minute
+        condition: error => {
+          const recentErrors = Array.from(this.errors.values()).filter(
+            e => Date.now() - e.lastOccurrence < 60000
+          ); // Last minute
           return recentErrors.length >= 10;
         },
         severity: 'high',
         enabled: true,
         cooldownMs: 10 * 60 * 1000, // 10 minutes
-        actions: [
-          { type: 'log', config: {} }
-        ]
-      }
+        actions: [{ type: 'log', config: {} }],
+      },
     ];
   }
 
@@ -529,7 +535,7 @@ export class ErrorHandlingSystem extends EventEmitter {
    */
   private setupDefaultCircuitBreakers(): void {
     const components = ['database', 'external_api', 'file_system', 'cache'];
-    
+
     for (const component of components) {
       this.circuitBreakers.set(component, new CircuitBreaker(component));
     }
@@ -558,10 +564,10 @@ export class ErrorHandlingSystem extends EventEmitter {
 
     error.status = 'resolved';
     error.resolution = resolution;
-    
+
     this.emit('error-resolved', error);
     logger.info(`✅ Error resolved: ${errorId}`, { resolution });
-    
+
     return true;
   }
 
@@ -602,9 +608,14 @@ ERROR BREAKDOWN:
 
     // By severity
     for (const [severity, count] of Object.entries(metrics.errorsBySeverity)) {
-      const icon = severity === 'critical' ? '🚨' : 
-                  severity === 'high' ? '🔴' : 
-                  severity === 'medium' ? '🟡' : '🔵';
+      const icon =
+        severity === 'critical'
+          ? '🚨'
+          : severity === 'high'
+            ? '🔴'
+            : severity === 'medium'
+              ? '🟡'
+              : '🔵';
       report += `${icon} ${severity}: ${count}\n`;
     }
 
@@ -618,12 +629,17 @@ ERROR BREAKDOWN:
     if (activeErrors.length > 0) {
       report += '\n🔥 RECENT ACTIVE ERRORS:\n';
       report += '─'.repeat(50) + '\n';
-      
+
       for (const error of activeErrors.slice(0, 10)) {
-        const icon = error.severity === 'critical' ? '🚨' : 
-                    error.severity === 'high' ? '🔴' : 
-                    error.severity === 'medium' ? '🟡' : '🔵';
-        
+        const icon =
+          error.severity === 'critical'
+            ? '🚨'
+            : error.severity === 'high'
+              ? '🔴'
+              : error.severity === 'medium'
+                ? '🟡'
+                : '🔵';
+
         const timeSince = Math.round((Date.now() - error.lastOccurrence) / 1000 / 60);
         report += `${icon} [${error.count}x] ${error.message}\n`;
         report += `   📍 ${error.context.component}:${error.context.operation} (${timeSince}min ago)\n`;
@@ -638,7 +654,7 @@ ERROR BREAKDOWN:
     if (Object.keys(metrics.circuitBreakerStatus).length > 0) {
       report += '⚡ CIRCUIT BREAKER STATUS:\n';
       report += '─'.repeat(50) + '\n';
-      
+
       for (const [component, status] of Object.entries(metrics.circuitBreakerStatus)) {
         const icon = status === 'open' ? '🔴' : status === 'half_open' ? '🟡' : '🟢';
         report += `${icon} ${component}: ${status}\n`;
@@ -655,14 +671,14 @@ ERROR BREAKDOWN:
   cleanup(): void {
     const now = Date.now();
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-    
+
     // Clean up old errors
     for (const [id, error] of this.errors) {
       if (now - error.lastOccurrence > maxAge && error.status === 'resolved') {
         this.errors.delete(id);
       }
     }
-    
+
     // Clean up old correlation context
     for (const [id, context] of this.correlationContext) {
       if (now - context.timestamp > maxAge) {
@@ -716,7 +732,7 @@ class CircuitBreaker {
 
   isOpen(): boolean {
     if (this.state === 'closed') return false;
-    
+
     if (this.state === 'open') {
       if (Date.now() - this.lastFailureTime > this.timeoutMs) {
         this.state = 'half_open';
@@ -724,17 +740,16 @@ class CircuitBreaker {
       }
       return true;
     }
-    
+
     return false; // half_open
   }
 
   getState(): 'closed' | 'open' | 'half_open' {
     // Check if we should transition from open to half_open
-    if (this.state === 'open' && 
-        Date.now() - this.lastFailureTime > this.timeoutMs) {
+    if (this.state === 'open' && Date.now() - this.lastFailureTime > this.timeoutMs) {
       this.state = 'half_open';
     }
-    
+
     return this.state;
   }
 }
@@ -742,8 +757,9 @@ class CircuitBreaker {
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const errorSystem = new ErrorHandlingSystem();
-  
-  errorSystem.initialize()
+
+  errorSystem
+    .initialize()
     .then(() => {
       console.log('🚨 Error handling system initialized');
       console.log(errorSystem.generateReport());

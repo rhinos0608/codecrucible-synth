@@ -71,7 +71,7 @@ class MemoryStore implements RateLimitStore {
   async set(key: string, info: RateLimitInfo, ttl: number): Promise<void> {
     this.store.set(key, {
       info,
-      expiry: Date.now() + ttl
+      expiry: Date.now() + ttl,
     });
   }
 
@@ -89,7 +89,7 @@ class MemoryStore implements RateLimitStore {
       totalHitsLimit: 100, // Default, should be overridden
       remainingHits: 99,
       msBeforeNext: 0,
-      resetTime: new Date(Date.now() + 60000) // Default 1 minute
+      resetTime: new Date(Date.now() + 60000), // Default 1 minute
     };
 
     await this.set(key, newInfo, 60000);
@@ -134,12 +134,12 @@ class TokenBucket {
    */
   consume(tokens: number = 1): boolean {
     this.refill();
-    
+
     if (this.tokens >= tokens) {
       this.tokens -= tokens;
       return true;
     }
-    
+
     return false;
   }
 
@@ -158,7 +158,7 @@ class TokenBucket {
     const now = Date.now();
     const timePassed = now - this.lastRefill;
     const intervalsElapsed = Math.floor(timePassed / this.config.refillInterval);
-    
+
     if (intervalsElapsed > 0) {
       const tokensToAdd = intervalsElapsed * this.config.refillRate;
       this.tokens = Math.min(this.config.capacity, this.tokens + tokensToAdd);
@@ -184,20 +184,20 @@ class SlidingWindow {
   isAllowed(key: string, limit: number): boolean {
     const now = Date.now();
     const windowStart = now - this.config.windowSize;
-    
+
     // Get or create window for this key
     let timestamps = this.windows.get(key) || [];
-    
+
     // Remove old timestamps
     timestamps = timestamps.filter(timestamp => timestamp > windowStart);
-    
+
     // Check if under limit
     if (timestamps.length < limit) {
       timestamps.push(now);
       this.windows.set(key, timestamps);
       return true;
     }
-    
+
     return false;
   }
 
@@ -208,7 +208,7 @@ class SlidingWindow {
     const now = Date.now();
     const windowStart = now - this.config.windowSize;
     const timestamps = this.windows.get(key) || [];
-    
+
     return timestamps.filter(timestamp => timestamp > windowStart).length;
   }
 
@@ -218,10 +218,10 @@ class SlidingWindow {
   cleanup(): void {
     const now = Date.now();
     const cutoff = now - this.config.windowSize;
-    
+
     for (const [key, timestamps] of this.windows.entries()) {
       const filtered = timestamps.filter(timestamp => timestamp > cutoff);
-      
+
       if (filtered.length === 0) {
         this.windows.delete(key);
       } else {
@@ -243,7 +243,7 @@ export class RateLimiter extends EventEmitter {
 
   constructor(config: RateLimitConfig) {
     super();
-    
+
     this.config = {
       algorithm: 'sliding-window',
       windowMs: 60000, // 1 minute
@@ -254,7 +254,7 @@ export class RateLimiter extends EventEmitter {
       message: 'Too many requests, please try again later',
       standardHeaders: true,
       legacyHeaders: false,
-      ...config
+      ...config,
     };
 
     this.store = config.store || new MemoryStore();
@@ -298,7 +298,7 @@ export class RateLimiter extends EventEmitter {
           this.emit('limit-reached', {
             key,
             ip: req.ip,
-            info: allowed.info
+            info: allowed.info,
           });
 
           // Log rate limit hit
@@ -309,7 +309,7 @@ export class RateLimiter extends EventEmitter {
             path: req.path,
             method: req.method,
             limit: this.config.maxRequests,
-            window: this.config.windowMs
+            window: this.config.windowMs,
           });
 
           return res.status(429).json({
@@ -317,7 +317,7 @@ export class RateLimiter extends EventEmitter {
             retryAfter: Math.ceil(allowed.info.msBeforeNext / 1000),
             limit: this.config.maxRequests,
             remaining: allowed.info.remainingHits,
-            resetTime: allowed.info.resetTime.toISOString()
+            resetTime: allowed.info.resetTime.toISOString(),
           });
         }
 
@@ -332,7 +332,6 @@ export class RateLimiter extends EventEmitter {
         req.rateLimitInfo = allowed.info;
 
         next();
-
       } catch (error) {
         logger.error('Rate limiter error', error as Error);
         // Fail open - allow request if rate limiter fails
@@ -354,8 +353,8 @@ export class RateLimiter extends EventEmitter {
           totalHitsLimit: this.config.maxRequests,
           remainingHits: this.config.maxRequests,
           msBeforeNext: 0,
-          resetTime: new Date(Date.now() + this.config.windowMs)
-        }
+          resetTime: new Date(Date.now() + this.config.windowMs),
+        },
       };
     }
 
@@ -375,12 +374,12 @@ export class RateLimiter extends EventEmitter {
    */
   private async checkTokenBucket(key: string): Promise<{ allowed: boolean; info: RateLimitInfo }> {
     let bucket = this.tokenBuckets.get(key);
-    
+
     if (!bucket) {
       bucket = new TokenBucket({
         capacity: this.config.maxRequests,
         refillRate: Math.ceil(this.config.maxRequests / (this.config.windowMs / 1000)),
-        refillInterval: 1000 // Refill every second
+        refillInterval: 1000, // Refill every second
       });
       this.tokenBuckets.set(key, bucket);
     }
@@ -393,7 +392,7 @@ export class RateLimiter extends EventEmitter {
       totalHitsLimit: this.config.maxRequests,
       remainingHits: availableTokens,
       msBeforeNext: allowed ? 0 : 1000,
-      resetTime: new Date(Date.now() + this.config.windowMs)
+      resetTime: new Date(Date.now() + this.config.windowMs),
     };
 
     return { allowed, info };
@@ -402,13 +401,15 @@ export class RateLimiter extends EventEmitter {
   /**
    * Check sliding window rate limit
    */
-  private async checkSlidingWindow(key: string): Promise<{ allowed: boolean; info: RateLimitInfo }> {
+  private async checkSlidingWindow(
+    key: string
+  ): Promise<{ allowed: boolean; info: RateLimitInfo }> {
     let window = this.slidingWindows.get(key);
-    
+
     if (!window) {
       window = new SlidingWindow({
         windowSize: this.config.windowMs,
-        subWindows: 10
+        subWindows: 10,
       });
       this.slidingWindows.set(key, window);
     }
@@ -421,7 +422,7 @@ export class RateLimiter extends EventEmitter {
       totalHitsLimit: this.config.maxRequests,
       remainingHits: Math.max(0, this.config.maxRequests - currentCount),
       msBeforeNext: allowed ? 0 : this.config.windowMs,
-      resetTime: new Date(Date.now() + this.config.windowMs)
+      resetTime: new Date(Date.now() + this.config.windowMs),
     };
 
     return { allowed, info };
@@ -436,26 +437,26 @@ export class RateLimiter extends EventEmitter {
     const windowKey = `${key}:${windowStart}`;
 
     let info = await this.store.get(windowKey);
-    
+
     if (!info) {
       info = {
         totalHits: 0,
         totalHitsLimit: this.config.maxRequests,
         remainingHits: this.config.maxRequests,
         msBeforeNext: this.config.windowMs,
-        resetTime: new Date(windowStart + this.config.windowMs)
+        resetTime: new Date(windowStart + this.config.windowMs),
       };
     }
 
     const allowed = info.totalHits < this.config.maxRequests;
-    
+
     if (allowed) {
       info = await this.store.increment(windowKey);
       info.totalHitsLimit = this.config.maxRequests;
       info.remainingHits = Math.max(0, this.config.maxRequests - info.totalHits);
       info.resetTime = new Date(windowStart + this.config.windowMs);
-      info.msBeforeNext = (windowStart + this.config.windowMs) - now;
-      
+      info.msBeforeNext = windowStart + this.config.windowMs - now;
+
       await this.store.set(windowKey, info, this.config.windowMs);
     }
 
@@ -477,26 +478,26 @@ export class RateLimiter extends EventEmitter {
       case 'token-bucket':
         const bucket = this.tokenBuckets.get(key);
         if (!bucket) return null;
-        
+
         return {
           totalHits: this.config.maxRequests - bucket.getAvailableTokens(),
           totalHitsLimit: this.config.maxRequests,
           remainingHits: bucket.getAvailableTokens(),
           msBeforeNext: 0,
-          resetTime: new Date(Date.now() + this.config.windowMs)
+          resetTime: new Date(Date.now() + this.config.windowMs),
         };
 
       case 'sliding-window':
         const window = this.slidingWindows.get(key);
         if (!window) return null;
-        
+
         const currentCount = window.getCurrentCount(key);
         return {
           totalHits: currentCount,
           totalHitsLimit: this.config.maxRequests,
           remainingHits: Math.max(0, this.config.maxRequests - currentCount),
           msBeforeNext: 0,
-          resetTime: new Date(Date.now() + this.config.windowMs)
+          resetTime: new Date(Date.now() + this.config.windowMs),
         };
 
       case 'fixed-window':
@@ -557,7 +558,7 @@ export class RateLimiter extends EventEmitter {
         windowMs: 15 * 60 * 1000, // 15 minutes
         maxRequests: 5,
         keyGenerator: RateLimiter.createKeyGenerator('ip'),
-        message: 'Too many authentication attempts'
+        message: 'Too many authentication attempts',
       }),
 
       // Moderate limits for API endpoints
@@ -566,7 +567,7 @@ export class RateLimiter extends EventEmitter {
         windowMs: 60 * 1000, // 1 minute
         maxRequests: 100,
         keyGenerator: RateLimiter.createKeyGenerator('userId'),
-        message: 'API rate limit exceeded'
+        message: 'API rate limit exceeded',
       }),
 
       // Generous limits for general requests
@@ -575,7 +576,7 @@ export class RateLimiter extends EventEmitter {
         windowMs: 60 * 1000, // 1 minute
         maxRequests: 1000,
         keyGenerator: RateLimiter.createKeyGenerator('ip'),
-        message: 'Rate limit exceeded'
+        message: 'Rate limit exceeded',
       }),
 
       // Very strict for admin operations
@@ -584,8 +585,8 @@ export class RateLimiter extends EventEmitter {
         windowMs: 60 * 60 * 1000, // 1 hour
         maxRequests: 10,
         keyGenerator: RateLimiter.createKeyGenerator('userId'),
-        message: 'Admin operation rate limit exceeded'
-      })
+        message: 'Admin operation rate limit exceeded',
+      }),
     };
   }
 

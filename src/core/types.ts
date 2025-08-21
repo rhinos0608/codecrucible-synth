@@ -1,4 +1,3 @@
-
 // Core Type Definitions for CodeCrucible Synth
 export interface UnifiedClientConfig {
   endpoint?: string;
@@ -161,7 +160,7 @@ export interface SecurityError extends Error {
 export class SecurityError extends Error {
   public code: string;
   public risk: string;
-  
+
   constructor(message: string, code: string = 'SECURITY_ERROR', risk: string = 'medium') {
     super(message);
     this.name = 'SecurityError';
@@ -179,18 +178,22 @@ export interface CLIError extends Error {
 export class CLIError extends Error {
   public code: string;
   public exitCode: number;
-  
+
   constructor(message: string, exitCode: number, code: string = 'CLI_ERROR') {
     super(message);
     this.name = 'CLIError';
     this.code = code;
     this.exitCode = exitCode;
   }
-  
+
   static timeout(operation: string): CLIError {
-    return new CLIError(`Timeout occurred during ${operation}`, CLIExitCode.NETWORK_ERROR, 'TIMEOUT');
+    return new CLIError(
+      `Timeout occurred during ${operation}`,
+      CLIExitCode.NETWORK_ERROR,
+      'TIMEOUT'
+    );
   }
-  
+
   static networkError(message: string): CLIError {
     return new CLIError(`Network error: ${message}`, CLIExitCode.NETWORK_ERROR, 'NETWORK_ERROR');
   }
@@ -205,7 +208,11 @@ export enum CLIExitCode {
   INVALID_INPUT = 5,
   EXECUTION_FAILED = 6,
   INITIALIZATION_FAILED = 7,
-  UNEXPECTED_ERROR = 99
+  AUTHENTICATION_REQUIRED = 8,
+  AUTHENTICATION_FAILED = 9,
+  PERMISSION_DENIED = 10,
+  SECURITY_VIOLATION = 11,
+  UNEXPECTED_ERROR = 99,
 }
 
 // LLM Provider Interfaces (moved from hybrid-model-client.ts)
@@ -355,7 +362,7 @@ export interface PerformanceMetrics {
 
 // Response Validator (placeholder)
 export const ResponseValidator = {
-  validate: (response: Record<string, unknown>) => ({ isValid: true, errors: [] })
+  validate: (response: Record<string, unknown>) => ({ isValid: true, errors: [] }),
 };
 
 // Export classes for compatibility
@@ -368,7 +375,6 @@ export const AgentConfig = {} as Record<string, unknown>;
 export const ExecutionResult = {} as Record<string, unknown>;
 export const SynthesisResponse = {} as Record<string, unknown>;
 
-
 // Additional types for agent system
 export interface ExecutionMode {
   type: 'auto' | 'fast' | 'quality';
@@ -380,7 +386,7 @@ export interface WorkflowExtended extends Workflow {
   status?: 'pending' | 'running' | 'completed' | 'failed';
 }
 
-// Update ExecutionResponse interface  
+// Update ExecutionResponse interface
 export interface ExecutionResponseExtended extends ExecutionResponse {
   results?: Record<string, unknown>;
   error?: string;

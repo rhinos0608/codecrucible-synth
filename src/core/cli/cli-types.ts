@@ -12,7 +12,14 @@ import { AppConfig } from '../../config/config-manager.js';
 export interface CLIOptions {
   voices?: string | string[];
   depth?: string;
-  mode?: 'competitive' | 'collaborative' | 'consensus' | 'iterative' | 'agentic' | 'comprehensive' | 'analysis';
+  mode?:
+    | 'competitive'
+    | 'collaborative'
+    | 'consensus'
+    | 'iterative'
+    | 'agentic'
+    | 'comprehensive'
+    | 'analysis';
   file?: string;
   project?: boolean;
   interactive?: boolean;
@@ -37,18 +44,22 @@ export interface CLIOptions {
   iterative?: boolean;
   maxIterations?: string;
   qualityThreshold?: string;
-  
+
   // Real-time streaming options (streaming is now default)
   stream?: boolean;
   noStream?: boolean;
+
+  // Role-based model selection
+  role?: 'auditor' | 'writer' | 'auto';
+  forceProvider?: 'ollama' | 'lm-studio';
   batch?: boolean;
-  
+
   // Enhanced context awareness options
   enableIntelligence?: boolean;
   contextAware?: boolean;
   smartSuggestions?: boolean;
   projectAnalysis?: boolean;
-  
+
   // Dual Agent System options
   dualAgent?: boolean;
   realtimeAudit?: boolean;
@@ -56,7 +67,7 @@ export interface CLIOptions {
   streamGeneration?: boolean;
   writerModel?: string;
   auditorModel?: string;
-  
+
   // VRAM management options
   status?: boolean;
   optimize?: boolean;
@@ -65,7 +76,14 @@ export interface CLIOptions {
   configure?: boolean;
   server?: boolean;
   port?: string;
-  
+
+  // Authentication options
+  token?: string;
+  apiKey?: string;
+  login?: boolean;
+  logout?: boolean;
+  register?: boolean;
+
   // Additional CLI options
   [key: string]: unknown;
 }

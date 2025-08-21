@@ -10,8 +10,14 @@ const execAsync = promisify(exec);
 
 const GenerateTestSchema = z.object({
   filePath: z.string().describe('Path to the file to generate tests for'),
-  testType: z.enum(['unit', 'integration', 'e2e', 'component']).default('unit').describe('Type of test to generate'),
-  testFramework: z.enum(['jest', 'mocha', 'vitest', 'jasmine', 'cypress', 'playwright']).default('jest').describe('Testing framework to use'),
+  testType: z
+    .enum(['unit', 'integration', 'e2e', 'component'])
+    .default('unit')
+    .describe('Type of test to generate'),
+  testFramework: z
+    .enum(['jest', 'mocha', 'vitest', 'jasmine', 'cypress', 'playwright'])
+    .default('jest')
+    .describe('Testing framework to use'),
   outputPath: z.string().optional().describe('Optional output path for the test file'),
   includeEdgeCases: z.boolean().default(true).describe('Whether to include edge case testing'),
   includeMocking: z.boolean().default(true).describe('Whether to include mocking examples'),
@@ -35,38 +41,38 @@ export class TestGeneratorTool extends BaseTool {
 
   async execute(args: z.infer<typeof GenerateTestSchema>): Promise<string> {
     try {
-      const { filePath, testType, testFramework, outputPath, includeEdgeCases, includeMocking } = args;
-      
+      const { filePath, testType, testFramework, outputPath, includeEdgeCases, includeMocking } =
+        args;
+
       const fullPath = this.resolvePath(filePath);
-      
+
       // Read the source code
       const sourceCode = await fs.readFile(fullPath, 'utf-8');
-      
+
       // Determine output path
       const testFilePath = outputPath || this.generateTestFilePath(filePath, testFramework);
-      
+
       // Generate test prompt
       const testPrompt = this.buildTestGenerationPrompt(
-        sourceCode, 
-        filePath, 
-        testType, 
-        testFramework, 
-        includeEdgeCases, 
+        sourceCode,
+        filePath,
+        testType,
+        testFramework,
+        includeEdgeCases,
         includeMocking
       );
-      
+
       // Generate tests using AI
       const generatedTests = await this.modelClient.generateText(testPrompt);
       const cleanTestCode = this.extractCodeFromResponse(generatedTests);
-      
+
       // Ensure test directory exists
       await this.ensureDirectoryExists(testFilePath);
-      
+
       // Write test file
       await fs.writeFile(testFilePath, cleanTestCode, 'utf-8');
-      
+
       return `Generated ${testType} tests using ${testFramework} for ${filePath}\nTest file saved to: ${testFilePath}`;
-      
     } catch (error) {
       return `Error generating tests: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
@@ -81,7 +87,7 @@ export class TestGeneratorTool extends BaseTool {
     includeMocking: boolean
   ): string {
     const frameworkSetup = this.getFrameworkSetup(testFramework);
-    
+
     return `You are an expert test engineer. Generate comprehensive ${testType} tests for the following code using ${testFramework}.
 
 SOURCE CODE TO TEST:
@@ -130,7 +136,7 @@ Mocking examples:
 jest.mock('../src/dependency');
 const mockFunction = jest.fn();
 \`\`\``,
-      
+
       mocha: `
 Import examples:
 \`\`\`typescript
@@ -138,14 +144,14 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { functionToTest } from '../src/module';
 \`\`\``,
-      
+
       vitest: `
 Import examples:
 \`\`\`typescript
 import { describe, it, expect, vi } from 'vitest';
 import { functionToTest } from '../src/module';
 \`\`\``,
-      
+
       cypress: `
 Cypress E2E test structure:
 \`\`\`typescript
@@ -155,12 +161,12 @@ describe('Component E2E Tests', () => {
   });
 });
 \`\`\``,
-      
+
       playwright: `
 Playwright test structure:
 \`\`\`typescript
 import { test, expect } from '@playwright/test';
-\`\`\``
+\`\`\``,
     };
 
     return setups[framework as keyof typeof setups] || setups.jest;
@@ -169,7 +175,7 @@ import { test, expect } from '@playwright/test';
   private generateTestFilePath(sourceFilePath: string, framework: string): string {
     const ext = extname(sourceFilePath);
     const baseName = sourceFilePath.replace(ext, '');
-    
+
     // Different frameworks have different conventions
     const testExtensions = {
       jest: '.test.ts',
@@ -177,15 +183,15 @@ import { test, expect } from '@playwright/test';
       vitest: '.test.ts',
       jasmine: '.spec.ts',
       cypress: '.cy.ts',
-      playwright: '.spec.ts'
+      playwright: '.spec.ts',
     };
-    
+
     const testExt = testExtensions[framework as keyof typeof testExtensions] || '.test.ts';
-    
+
     // Place tests in __tests__ directory or alongside source
     const testDir = join(dirname(sourceFilePath), '__tests__');
     const fileName = `${baseName}${testExt}`;
-    
+
     return fileName.replace(/^src\//, 'src/__tests__/');
   }
 
@@ -193,15 +199,15 @@ import { test, expect } from '@playwright/test';
     const codeBlockRegex = /```[\w]*\n([\s\S]*?)\n```/g;
     const matches = [];
     let match;
-    
+
     while ((match = codeBlockRegex.exec(response)) !== null) {
       matches.push(match[1]);
     }
-    
+
     if (matches.length > 0) {
       return matches.join('\n\n');
     }
-    
+
     return response.trim();
   }
 
@@ -224,7 +230,10 @@ import { test, expect } from '@playwright/test';
 
 const RunTestsSchema = z.object({
   testPattern: z.string().optional().describe('Pattern to match test files (e.g., "*.test.ts")'),
-  testFramework: z.enum(['jest', 'mocha', 'vitest', 'npm', 'yarn']).default('npm').describe('Test runner to use'),
+  testFramework: z
+    .enum(['jest', 'mocha', 'vitest', 'npm', 'yarn'])
+    .default('npm')
+    .describe('Test runner to use'),
   coverage: z.boolean().default(false).describe('Whether to generate coverage report'),
   watch: z.boolean().default(false).describe('Whether to run tests in watch mode'),
   verbose: z.boolean().default(false).describe('Whether to run tests in verbose mode'),
@@ -244,28 +253,27 @@ export class TestRunnerTool extends BaseTool {
   async execute(args: z.infer<typeof RunTestsSchema>): Promise<string> {
     try {
       const { testPattern, testFramework, coverage, watch, verbose, timeout } = args;
-      
+
       const command = this.buildTestCommand(testFramework, testPattern, coverage, watch, verbose);
-      
+
       console.log(`Running tests with command: ${command}`);
-      
+
       const { stdout, stderr } = await execAsync(command, {
         cwd: this.agentContext.workingDirectory,
         timeout,
-        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
       });
-      
+
       let result = '';
       if (stdout) result += `STDOUT:\n${stdout}\n`;
       if (stderr) result += `STDERR:\n${stderr}\n`;
-      
+
       return result || 'Tests completed successfully with no output.';
-      
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       const stdout = error.stdout || '';
       const stderr = error.stderr || '';
-      
+
       return `Test execution failed:\nError: ${errorMessage}\n${stdout ? `STDOUT:\n${stdout}\n` : ''}${stderr ? `STDERR:\n${stderr}\n` : ''}`;
     }
   }
@@ -278,7 +286,7 @@ export class TestRunnerTool extends BaseTool {
     verbose?: boolean
   ): string {
     let command = '';
-    
+
     switch (framework) {
       case 'jest':
         command = 'npx jest';
@@ -287,40 +295,51 @@ export class TestRunnerTool extends BaseTool {
         if (watch) command += ' --watch';
         if (verbose) command += ' --verbose';
         break;
-        
+
       case 'mocha':
         command = 'npx mocha';
         if (pattern) command += ` "${pattern}"`;
         if (verbose) command += ' --reporter spec';
         break;
-        
+
       case 'vitest':
         command = 'npx vitest';
         if (pattern) command += ` "${pattern}"`;
         if (coverage) command += ' --coverage';
         if (watch) command += ' --watch';
         break;
-        
+
       case 'npm':
         command = 'npm test';
         break;
-        
+
       case 'yarn':
         command = 'yarn test';
         break;
-        
+
       default:
         command = 'npm test';
     }
-    
+
     return command;
   }
 }
 
 const AnalyzeCoverageSchema = z.object({
-  coverageFormat: z.enum(['lcov', 'html', 'text', 'json']).default('text').describe('Coverage report format'),
-  threshold: z.number().min(0).max(100).default(80).describe('Minimum coverage threshold percentage'),
-  includeUncovered: z.boolean().default(true).describe('Whether to include uncovered lines in the report'),
+  coverageFormat: z
+    .enum(['lcov', 'html', 'text', 'json'])
+    .default('text')
+    .describe('Coverage report format'),
+  threshold: z
+    .number()
+    .min(0)
+    .max(100)
+    .default(80)
+    .describe('Minimum coverage threshold percentage'),
+  includeUncovered: z
+    .boolean()
+    .default(true)
+    .describe('Whether to include uncovered lines in the report'),
 });
 
 export class CoverageAnalyzerTool extends BaseTool {
@@ -336,29 +355,29 @@ export class CoverageAnalyzerTool extends BaseTool {
   async execute(args: z.infer<typeof AnalyzeCoverageSchema>): Promise<string> {
     try {
       const { coverageFormat, threshold, includeUncovered } = args;
-      
+
       // Run tests with coverage
       const coverageCommand = this.buildCoverageCommand(coverageFormat);
-      
+
       console.log(`Analyzing coverage with command: ${coverageCommand}`);
-      
+
       const { stdout, stderr } = await execAsync(coverageCommand, {
         cwd: this.agentContext.workingDirectory,
         timeout: 60000, // 1 minute timeout for coverage analysis
-        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
       });
-      
+
       let result = `Coverage Analysis Complete\n\n`;
-      
+
       if (stdout) {
         result += `Coverage Report:\n${stdout}\n\n`;
-        
+
         // Extract coverage percentage if possible
         const coverageMatch = stdout.match(/All files\s+\|\s*([\d.]+)/);
         if (coverageMatch) {
           const coverage = parseFloat(coverageMatch[1]);
           result += `Overall Coverage: ${coverage}%\n`;
-          
+
           if (coverage < threshold) {
             result += `⚠️  Coverage (${coverage}%) is below threshold (${threshold}%)\n`;
           } else {
@@ -366,19 +385,18 @@ export class CoverageAnalyzerTool extends BaseTool {
           }
         }
       }
-      
+
       if (stderr) {
         result += `Warnings:\n${stderr}\n`;
       }
-      
+
       // Check for coverage files
       const coverageFiles = await this.findCoverageFiles();
       if (coverageFiles.length > 0) {
         result += `\nCoverage reports generated:\n${coverageFiles.join('\n')}`;
       }
-      
+
       return result;
-      
     } catch (error: any) {
       return `Coverage analysis failed: ${error.message}`;
     }
@@ -389,9 +407,9 @@ export class CoverageAnalyzerTool extends BaseTool {
     const commands = [
       `npx jest --coverage --coverageReporters=${format}`,
       `npx vitest --coverage --coverage.reporter=${format}`,
-      `npm test -- --coverage`
+      `npm test -- --coverage`,
     ];
-    
+
     return commands[0]; // Default to Jest
   }
 
@@ -400,11 +418,11 @@ export class CoverageAnalyzerTool extends BaseTool {
       'coverage/lcov-report/index.html',
       'coverage/index.html',
       'coverage/lcov.info',
-      'coverage/coverage-final.json'
+      'coverage/coverage-final.json',
     ];
-    
+
     const existingFiles = [];
-    
+
     for (const path of coveragePaths) {
       try {
         const fullPath = join(this.agentContext.workingDirectory, path);
@@ -414,7 +432,7 @@ export class CoverageAnalyzerTool extends BaseTool {
         // File doesn't exist, continue
       }
     }
-    
+
     return existingFiles;
   }
 }

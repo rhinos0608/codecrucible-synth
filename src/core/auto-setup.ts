@@ -30,18 +30,18 @@ export class AutoSetup {
     const ollama = await this.checkOllama();
     const models = await this.checkModels();
     const lmStudio = await this.checkLMStudio();
-    
+
     // Only require setup for commands that need AI models
     // Allow basic commands (help, version, status) to work without models
-    const isBasicCommand = process.argv.some(arg => 
+    const isBasicCommand = process.argv.some(arg =>
       ['--help', '-h', '--version', '-v', 'status', 'help'].includes(arg)
     );
-    
+
     return {
       required: !isBasicCommand && (!ollama || models.length === 0),
       ollama,
       models,
-      lmStudio
+      lmStudio,
     };
   }
 
@@ -52,14 +52,14 @@ export class AutoSetup {
       details: {
         ollama: false,
         models: [],
-        lmStudio: false
-      }
+        lmStudio: false,
+      },
     };
 
     try {
       // Check Ollama installation
       result.details.ollama = await this.checkOllama();
-      
+
       if (!result.details.ollama) {
         console.log('⚠️ Ollama not detected. Running in degraded mode.');
         result.message = 'Running without AI models';
@@ -69,7 +69,7 @@ export class AutoSetup {
 
       // Check models
       result.details.models = await this.checkModels();
-      
+
       if (result.details.models.length === 0) {
         console.log('⚠️ No models found. Continuing in degraded mode.');
         result.message = 'No models available';
@@ -80,7 +80,7 @@ export class AutoSetup {
 
       result.success = result.details.ollama;
       result.message = result.success ? 'Setup completed' : 'Partial setup';
-      
+
       return result;
     } catch (error) {
       result.message = `Setup failed: ${error.message}`;
@@ -116,7 +116,7 @@ export class AutoSetup {
       // Check if LM Studio is running by trying to connect to default port
       const response = await fetch('http://localhost:1234/v1/models', {
         method: 'GET',
-        signal: AbortSignal.timeout(2000)
+        signal: AbortSignal.timeout(2000),
       });
       return response.ok;
     } catch {

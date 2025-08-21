@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Logs
+*.log
+
+# Generated files
+*.d.ts
+
+# Package files
+package-lock.json
+yarn.lock
+
+# Environment files
+.env*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Archives
+*.tar.gz
+*.zip

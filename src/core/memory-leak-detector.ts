@@ -11,15 +11,21 @@ import { glob } from 'glob';
 import { logger } from './logger.js';
 
 interface MemoryUsage {
-  rss: number;        // Resident Set Size
-  heapTotal: number;  // Total heap size
-  heapUsed: number;   // Used heap size
-  external: number;   // External memory
+  rss: number; // Resident Set Size
+  heapTotal: number; // Total heap size
+  heapUsed: number; // Used heap size
+  external: number; // External memory
   arrayBuffers: number; // Array buffers
 }
 
 interface MemoryLeak {
-  type: 'event_listener' | 'interval' | 'timeout' | 'cache_growth' | 'closure' | 'circular_reference';
+  type:
+    | 'event_listener'
+    | 'interval'
+    | 'timeout'
+    | 'cache_growth'
+    | 'closure'
+    | 'circular_reference';
   file: string;
   line: number;
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -30,7 +36,12 @@ interface MemoryLeak {
 }
 
 interface PerformanceBottleneck {
-  type: 'cpu_intensive' | 'memory_intensive' | 'io_blocking' | 'inefficient_algorithm' | 'large_payload';
+  type:
+    | 'cpu_intensive'
+    | 'memory_intensive'
+    | 'io_blocking'
+    | 'inefficient_algorithm'
+    | 'large_payload';
   file: string;
   function: string;
   impact: 'low' | 'medium' | 'high' | 'critical';
@@ -82,7 +93,10 @@ export class MemoryLeakDetector extends EventEmitter {
     const growthRate = this.calculateMemoryGrowthRate();
 
     const current = process.memoryUsage();
-    const recommendations = this.generateRecommendations([...codebaseLeaks, ...runtimeLeaks], bottlenecks);
+    const recommendations = this.generateRecommendations(
+      [...codebaseLeaks, ...runtimeLeaks],
+      bottlenecks
+    );
 
     return {
       baseline,
@@ -90,7 +104,7 @@ export class MemoryLeakDetector extends EventEmitter {
       growthRate,
       leaks: [...codebaseLeaks, ...runtimeLeaks],
       bottlenecks,
-      recommendations
+      recommendations,
     };
   }
 
@@ -99,13 +113,13 @@ export class MemoryLeakDetector extends EventEmitter {
    */
   private startMemoryMonitoring(): void {
     if (this.isMonitoring) return;
-    
+
     this.isMonitoring = true;
-    
+
     const interval = setInterval(() => {
       const usage = process.memoryUsage();
       this.memoryHistory.push(usage);
-      
+
       // Keep only last 100 entries
       if (this.memoryHistory.length > 100) {
         this.memoryHistory.shift();
@@ -113,7 +127,6 @@ export class MemoryLeakDetector extends EventEmitter {
 
       // Check for memory spikes
       this.checkForMemorySpikes(usage);
-      
     }, 5000); // Every 5 seconds
 
     this.intervals.push(interval);
@@ -129,11 +142,11 @@ export class MemoryLeakDetector extends EventEmitter {
    */
   private stopMemoryMonitoring(): void {
     this.isMonitoring = false;
-    
+
     for (const interval of this.intervals) {
       clearInterval(interval);
     }
-    
+
     this.intervals = [];
   }
 
@@ -145,18 +158,19 @@ export class MemoryLeakDetector extends EventEmitter {
 
     const previous = this.memoryHistory[this.memoryHistory.length - 2];
     const heapGrowth = current.heapUsed - previous.heapUsed;
-    
+
     // Alert on rapid growth (>50MB in 5 seconds)
     if (heapGrowth > 50 * 1024 * 1024) {
       this.emit('memory-spike', {
         growth: heapGrowth,
         current: current.heapUsed,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      
+
       // Throttle memory spike warnings to prevent spam
       const now = Date.now();
-      if (now - this.lastMemorySpikeWarning > 30000) { // 30 seconds between warnings
+      if (now - this.lastMemorySpikeWarning > 30000) {
+        // 30 seconds between warnings
         logger.warn(`🚨 Memory spike detected: +${Math.round(heapGrowth / 1024 / 1024)}MB`);
         this.lastMemorySpikeWarning = now;
       }
@@ -204,7 +218,7 @@ export class MemoryLeakDetector extends EventEmitter {
           description: 'Event listener added without cleanup',
           recommendation: 'Add removeEventListener or AbortController cleanup',
           leakRate: 0.1, // Estimated KB/second
-          autoFixable: true
+          autoFixable: true,
         });
       }
 
@@ -218,7 +232,7 @@ export class MemoryLeakDetector extends EventEmitter {
           description: 'setInterval without clearInterval',
           recommendation: 'Store interval ID and clear in cleanup method',
           leakRate: 0.05,
-          autoFixable: true
+          autoFixable: true,
         });
       }
 
@@ -232,7 +246,7 @@ export class MemoryLeakDetector extends EventEmitter {
           description: 'Cache without size limit or TTL',
           recommendation: 'Implement LRU cache with size limits and TTL',
           leakRate: 1.0,
-          autoFixable: false
+          autoFixable: false,
         });
       }
 
@@ -246,7 +260,7 @@ export class MemoryLeakDetector extends EventEmitter {
           description: 'Potential circular reference',
           recommendation: 'Use WeakMap or WeakSet for object references',
           leakRate: 0.2,
-          autoFixable: false
+          autoFixable: false,
         });
       }
 
@@ -260,7 +274,7 @@ export class MemoryLeakDetector extends EventEmitter {
           description: 'Closure capturing large scope',
           recommendation: 'Minimize closure scope or use weak references',
           leakRate: 0.3,
-          autoFixable: false
+          autoFixable: false,
         });
       }
     }
@@ -306,9 +320,10 @@ export class MemoryLeakDetector extends EventEmitter {
    * Check for unbounded cache growth
    */
   private hasUnboundedCacheGrowth(line: string): boolean {
-    const isCacheOperation = /\.(set|put|store|cache)\s*\(/.test(line) || 
-                           /new\s+(Map|Set|WeakMap|WeakSet)\s*\(/.test(line);
-    
+    const isCacheOperation =
+      /\.(set|put|store|cache)\s*\(/.test(line) ||
+      /new\s+(Map|Set|WeakMap|WeakSet)\s*\(/.test(line);
+
     if (!isCacheOperation) return false;
 
     // Check if there's any size limiting logic nearby
@@ -343,8 +358,9 @@ export class MemoryLeakDetector extends EventEmitter {
 
     // Look for large captured scope
     const contextLines = lines.slice(Math.max(0, index - 20), index);
-    const hasLargeScope = contextLines.some(contextLine => 
-      contextLine.includes('const') || contextLine.includes('let') || contextLine.includes('var')
+    const hasLargeScope = contextLines.some(
+      contextLine =>
+        contextLine.includes('const') || contextLine.includes('let') || contextLine.includes('var')
     );
 
     return hasLargeScope && contextLines.length > 10;
@@ -358,7 +374,8 @@ export class MemoryLeakDetector extends EventEmitter {
 
     // Check for growing event listener counts
     for (const [event, count] of this.eventListeners) {
-      if (count > 50) { // Arbitrary threshold
+      if (count > 50) {
+        // Arbitrary threshold
         leaks.push({
           type: 'event_listener',
           file: 'runtime',
@@ -367,7 +384,7 @@ export class MemoryLeakDetector extends EventEmitter {
           description: `High number of ${event} listeners: ${count}`,
           recommendation: 'Review event listener cleanup logic',
           leakRate: count * 0.01,
-          autoFixable: false
+          autoFixable: false,
         });
       }
     }
@@ -375,7 +392,8 @@ export class MemoryLeakDetector extends EventEmitter {
     // Check for cache growth
     for (const [cacheName, data] of this.cacheGrowthTracking) {
       const growthRate = data.size / ((Date.now() - data.timestamp) / 1000);
-      if (growthRate > 100) { // 100 entries per second
+      if (growthRate > 100) {
+        // 100 entries per second
         leaks.push({
           type: 'cache_growth',
           file: 'runtime',
@@ -384,7 +402,7 @@ export class MemoryLeakDetector extends EventEmitter {
           description: `Rapid cache growth: ${cacheName} growing at ${growthRate} entries/sec`,
           recommendation: 'Implement cache size limits and cleanup',
           leakRate: growthRate * 0.1,
-          autoFixable: false
+          autoFixable: false,
         });
       }
     }
@@ -415,7 +433,10 @@ export class MemoryLeakDetector extends EventEmitter {
   /**
    * Analyze file for performance bottlenecks
    */
-  private async analyzeFileForBottlenecks(filePath: string, content: string): Promise<PerformanceBottleneck[]> {
+  private async analyzeFileForBottlenecks(
+    filePath: string,
+    content: string
+  ): Promise<PerformanceBottleneck[]> {
     const bottlenecks: PerformanceBottleneck[] = [];
 
     // Check for synchronous file operations
@@ -427,7 +448,7 @@ export class MemoryLeakDetector extends EventEmitter {
         impact: 'high',
         description: 'Synchronous file operations block event loop',
         suggestion: 'Use async file operations (fs.promises)',
-        estimatedImprovement: '50-90% faster I/O'
+        estimatedImprovement: '50-90% faster I/O',
       });
     }
 
@@ -441,7 +462,7 @@ export class MemoryLeakDetector extends EventEmitter {
         impact: 'medium',
         description: 'Loop with repeated .length calculation',
         suggestion: 'Cache array length outside loop',
-        estimatedImprovement: '10-30% faster iteration'
+        estimatedImprovement: '10-30% faster iteration',
       });
     }
 
@@ -454,7 +475,7 @@ export class MemoryLeakDetector extends EventEmitter {
         impact: 'medium',
         description: 'Potentially large JSON serialization/parsing',
         suggestion: 'Consider streaming JSON or data compression',
-        estimatedImprovement: '20-60% faster serialization'
+        estimatedImprovement: '20-60% faster serialization',
       });
     }
 
@@ -468,7 +489,7 @@ export class MemoryLeakDetector extends EventEmitter {
         impact: 'medium',
         description: 'Complex regex patterns',
         suggestion: 'Simplify regex or use string methods',
-        estimatedImprovement: '30-70% faster text processing'
+        estimatedImprovement: '30-70% faster text processing',
       });
     }
 
@@ -481,7 +502,7 @@ export class MemoryLeakDetector extends EventEmitter {
         impact: 'high',
         description: 'Large memory allocations',
         suggestion: 'Use streaming or pooled buffers',
-        estimatedImprovement: '40-80% memory reduction'
+        estimatedImprovement: '40-80% memory reduction',
       });
     }
 
@@ -497,7 +518,7 @@ export class MemoryLeakDetector extends EventEmitter {
     const first = this.memoryHistory[0];
     const last = this.memoryHistory[this.memoryHistory.length - 1];
     const timeDiff = this.memoryHistory.length * 5; // 5 seconds per sample
-    
+
     const heapGrowth = last.heapUsed - first.heapUsed;
     return heapGrowth / timeDiff; // Bytes per second
   }
@@ -505,7 +526,10 @@ export class MemoryLeakDetector extends EventEmitter {
   /**
    * Generate recommendations
    */
-  private generateRecommendations(leaks: MemoryLeak[], bottlenecks: PerformanceBottleneck[]): string[] {
+  private generateRecommendations(
+    leaks: MemoryLeak[],
+    bottlenecks: PerformanceBottleneck[]
+  ): string[] {
     const recommendations: string[] = [];
 
     const criticalLeaks = leaks.filter(l => l.severity === 'critical').length;
@@ -606,7 +630,11 @@ export class MemoryLeakDetector extends EventEmitter {
     // Simple fix: add comment about cleanup needed
     if (line.includes('addEventListener')) {
       const indent = line.match(/^\s*/)?.[0] || '';
-      lines.splice(lineNumber, 0, `${indent}// TODO: Add cleanup with removeEventListener or AbortController`);
+      lines.splice(
+        lineNumber,
+        0,
+        `${indent}// TODO: Add cleanup with removeEventListener or AbortController`
+      );
     }
 
     return lines.join('\n');
@@ -622,7 +650,11 @@ export class MemoryLeakDetector extends EventEmitter {
     // Simple fix: add comment about cleanup needed
     if (line.includes('setInterval')) {
       const indent = line.match(/^\s*/)?.[0] || '';
-      lines.splice(lineNumber, 0, `${indent}// TODO: Store interval ID and call clearInterval in cleanup`);
+      lines.splice(
+        lineNumber,
+        0,
+        `${indent}// TODO: Store interval ID and call clearInterval in cleanup`
+      );
     }
 
     return lines.join('\n');
@@ -663,22 +695,33 @@ MEMORY USAGE:
       }
 
       for (const [type, typeLeaks] of leakTypes) {
-        const icon = type === 'event_listener' ? '🎯' : 
-                    type === 'interval' ? '⏰' : 
-                    type === 'cache_growth' ? '💾' : 
-                    type === 'circular_reference' ? '🔄' : '⚠️';
-        
+        const icon =
+          type === 'event_listener'
+            ? '🎯'
+            : type === 'interval'
+              ? '⏰'
+              : type === 'cache_growth'
+                ? '💾'
+                : type === 'circular_reference'
+                  ? '🔄'
+                  : '⚠️';
+
         report += `${icon} ${type.replace('_', ' ').toUpperCase()} (${typeLeaks.length}):\n`;
-        
+
         for (const leak of typeLeaks.slice(0, 5)) {
-          const severity = leak.severity === 'critical' ? '🚨' : 
-                          leak.severity === 'high' ? '🔴' : 
-                          leak.severity === 'medium' ? '🟡' : '🔵';
-          
+          const severity =
+            leak.severity === 'critical'
+              ? '🚨'
+              : leak.severity === 'high'
+                ? '🔴'
+                : leak.severity === 'medium'
+                  ? '🟡'
+                  : '🔵';
+
           report += `  ${severity} ${leak.file}:${leak.line} - ${leak.description}\n`;
           report += `     💡 ${leak.recommendation}\n`;
         }
-        
+
         if (typeLeaks.length > 5) {
           report += `     ... and ${typeLeaks.length - 5} more\n`;
         }
@@ -700,22 +743,33 @@ MEMORY USAGE:
       }
 
       for (const [type, typeBottlenecks] of bottleneckTypes) {
-        const icon = type === 'cpu_intensive' ? '🔥' : 
-                    type === 'memory_intensive' ? '🧠' : 
-                    type === 'io_blocking' ? '📁' : 
-                    type === 'inefficient_algorithm' ? '🔄' : '⚠️';
-        
+        const icon =
+          type === 'cpu_intensive'
+            ? '🔥'
+            : type === 'memory_intensive'
+              ? '🧠'
+              : type === 'io_blocking'
+                ? '📁'
+                : type === 'inefficient_algorithm'
+                  ? '🔄'
+                  : '⚠️';
+
         report += `${icon} ${type.replace('_', ' ').toUpperCase()} (${typeBottlenecks.length}):\n`;
-        
+
         for (const bottleneck of typeBottlenecks.slice(0, 3)) {
-          const impact = bottleneck.impact === 'critical' ? '🚨' : 
-                        bottleneck.impact === 'high' ? '🔴' : 
-                        bottleneck.impact === 'medium' ? '🟡' : '🔵';
-          
+          const impact =
+            bottleneck.impact === 'critical'
+              ? '🚨'
+              : bottleneck.impact === 'high'
+                ? '🔴'
+                : bottleneck.impact === 'medium'
+                  ? '🟡'
+                  : '🔵';
+
           report += `  ${impact} ${bottleneck.file} - ${bottleneck.description}\n`;
           report += `     🚀 ${bottleneck.suggestion} (${bottleneck.estimatedImprovement})\n`;
         }
-        
+
         if (typeBottlenecks.length > 3) {
           report += `     ... and ${typeBottlenecks.length - 3} more\n`;
         }
@@ -727,7 +781,7 @@ MEMORY USAGE:
     if (recommendations.length > 0) {
       report += '📋 RECOMMENDATIONS:\n';
       report += '─'.repeat(50) + '\n';
-      
+
       for (const rec of recommendations) {
         report += `${rec}\n`;
       }
@@ -742,11 +796,11 @@ MEMORY USAGE:
    */
   private formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B';
-    
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
@@ -766,14 +820,17 @@ MEMORY USAGE:
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const detector = new MemoryLeakDetector();
-  
-  detector.detectMemoryLeaks()
+
+  detector
+    .detectMemoryLeaks()
     .then(analysis => {
       console.log(detector.generateReport(analysis));
-      
+
       if (analysis.leaks.length > 0) {
-        console.log(`\n🔧 Found ${analysis.leaks.length} memory leaks and ${analysis.bottlenecks.length} performance bottlenecks`);
-        
+        console.log(
+          `\n🔧 Found ${analysis.leaks.length} memory leaks and ${analysis.bottlenecks.length} performance bottlenecks`
+        );
+
         const fixableLeaks = analysis.leaks.filter(l => l.autoFixable);
         if (fixableLeaks.length > 0) {
           console.log(`💾 ${fixableLeaks.length} leaks can be automatically fixed`);

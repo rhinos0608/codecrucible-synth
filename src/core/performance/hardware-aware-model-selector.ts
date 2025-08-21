@@ -4,7 +4,11 @@
  */
 
 import { Logger } from '../logger.js';
-import { IntelligentModelDetector, ModelInfo, OptimalConfiguration } from '../model-management/intelligent-model-detector.js';
+import {
+  IntelligentModelDetector,
+  ModelInfo,
+  OptimalConfiguration,
+} from '../model-management/intelligent-model-detector.js';
 import { EventEmitter } from 'events';
 import * as os from 'os';
 
@@ -54,7 +58,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
     maxErrorRate: 0.3, // 30% error rate
     maxConsecutiveErrors: 3,
     minTokensPerSecond: 0.5,
-    memoryWarningThreshold: 0.75 // 75% memory usage warning
+    memoryWarningThreshold: 0.75, // 75% memory usage warning
   };
 
   constructor() {
@@ -71,7 +75,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
   private assessHardware(): HardwareProfile {
     const totalMemoryGB = os.totalmem() / (1024 * 1024 * 1024);
     const freeMemoryGB = os.freemem() / (1024 * 1024 * 1024);
-    
+
     return {
       totalMemoryGB,
       availableMemoryGB: freeMemoryGB,
@@ -79,7 +83,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
       hasGPU: this.detectGPU(),
       gpuMemoryGB: this.estimateGPUMemory(),
       platform: os.platform(),
-      arch: os.arch()
+      arch: os.arch(),
     };
   }
 
@@ -89,8 +93,10 @@ export class HardwareAwareModelSelector extends EventEmitter {
   private detectGPU(): boolean {
     // This is a simplified check - in real implementation,
     // you'd use nvidia-ml-py or similar
-    return process.env.CUDA_VISIBLE_DEVICES !== undefined || 
-           process.env.HIP_VISIBLE_DEVICES !== undefined;
+    return (
+      process.env.CUDA_VISIBLE_DEVICES !== undefined ||
+      process.env.HIP_VISIBLE_DEVICES !== undefined
+    );
   }
 
   /**
@@ -98,7 +104,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private estimateGPUMemory(): number | undefined {
     if (!this.detectGPU()) return undefined;
-    
+
     // Rough estimation based on common GPU configs
     // In real implementation, query actual GPU memory
     return 8; // Default estimate: 8GB
@@ -110,16 +116,16 @@ export class HardwareAwareModelSelector extends EventEmitter {
   async getOptimalModelForHardware(): Promise<OptimalConfiguration> {
     await this.modelDetector.scanAvailableModels();
     const availableModels = await this.modelDetector.scanAvailableModels();
-    
+
     this.logger.info('Selecting models based on hardware profile:', {
       memory: `${this.hardwareProfile.totalMemoryGB.toFixed(1)}GB total, ${this.hardwareProfile.availableMemoryGB.toFixed(1)}GB available`,
       cpu: `${this.hardwareProfile.cpuCores} cores`,
-      gpu: this.hardwareProfile.hasGPU ? `${this.hardwareProfile.gpuMemoryGB}GB` : 'none'
+      gpu: this.hardwareProfile.hasGPU ? `${this.hardwareProfile.gpuMemoryGB}GB` : 'none',
     });
 
     // Filter models based on hardware constraints
     const suitableModels = this.filterModelsByHardware(availableModels);
-    
+
     if (suitableModels.length === 0) {
       throw new Error('No models compatible with current hardware configuration');
     }
@@ -127,33 +133,34 @@ export class HardwareAwareModelSelector extends EventEmitter {
     // Prioritize qwen2.5-coder if available
     const qwenCoder = suitableModels.find(m => m.name.toLowerCase().includes('qwen2.5-coder'));
     let sortedModels = this.sortModelsByHardwareCompatibility(suitableModels);
-    
+
     if (qwenCoder) {
       // Move qwen2.5-coder to the front if it's available
       sortedModels = [qwenCoder, ...sortedModels.filter(m => m !== qwenCoder)];
     }
-    
+
     // Create fallback chain - only include models smaller or equal in size to primary
     const primaryModelSize = this.estimateModelMemoryUsage(sortedModels[0]);
-    this.fallbackModels = sortedModels.slice(1, 5)
+    this.fallbackModels = sortedModels
+      .slice(1, 5)
       .filter(m => this.estimateModelMemoryUsage(m) <= primaryModelSize)
       .slice(0, 3); // Keep top 3 smaller/equal fallbacks
-    
+
     const primaryModel = sortedModels[0];
     const secondaryModel = sortedModels[1] || primaryModel;
-    
+
     return {
       writer: {
         model: primaryModel.name,
         platform: primaryModel.platform,
-        reasoning: `Hardware-optimized: ${primaryModel.size} model fits ${this.hardwareProfile.availableMemoryGB.toFixed(1)}GB available memory`
+        reasoning: `Hardware-optimized: ${primaryModel.size} model fits ${this.hardwareProfile.availableMemoryGB.toFixed(1)}GB available memory`,
       },
       auditor: {
         model: secondaryModel.name,
         platform: secondaryModel.platform,
-        reasoning: `Secondary model for review tasks`
+        reasoning: `Secondary model for review tasks`,
       },
-      confidence: this.calculateHardwareConfidence(primaryModel)
+      confidence: this.calculateHardwareConfidence(primaryModel),
     };
   }
 
@@ -163,24 +170,28 @@ export class HardwareAwareModelSelector extends EventEmitter {
   private filterModelsByHardware(models: ModelInfo[]): ModelInfo[] {
     return models.filter(model => {
       const estimatedMemoryGB = this.estimateModelMemoryUsage(model);
-      
+
       // Adaptive safety margin based on current memory pressure
-      const currentMemoryUsage = 1 - (this.hardwareProfile.availableMemoryGB / this.hardwareProfile.totalMemoryGB);
+      const currentMemoryUsage =
+        1 - this.hardwareProfile.availableMemoryGB / this.hardwareProfile.totalMemoryGB;
       let safetyMargin = 0.7; // Default 70% safety margin
-      
+
       if (currentMemoryUsage > 0.8) {
         safetyMargin = 0.5; // More aggressive under high memory pressure
       } else if (currentMemoryUsage > 0.7) {
         safetyMargin = 0.6; // Moderate adjustment
       }
-      
-      const memoryFitsWithBuffer = estimatedMemoryGB <= (this.hardwareProfile.availableMemoryGB * safetyMargin);
-      
+
+      const memoryFitsWithBuffer =
+        estimatedMemoryGB <= this.hardwareProfile.availableMemoryGB * safetyMargin;
+
       // Additional hardware-specific filters
       const cpuSuitable = this.hardwareProfile.cpuCores >= this.getMinCoresForModel(model);
-      
-      this.logger.debug(`Model ${model.name}: memory=${estimatedMemoryGB.toFixed(1)}GB, fits=${memoryFitsWithBuffer}, cpu=${cpuSuitable}, margin=${(safetyMargin*100).toFixed(0)}%`);
-      
+
+      this.logger.debug(
+        `Model ${model.name}: memory=${estimatedMemoryGB.toFixed(1)}GB, fits=${memoryFitsWithBuffer}, cpu=${cpuSuitable}, margin=${(safetyMargin * 100).toFixed(0)}%`
+      );
+
       return memoryFitsWithBuffer && cpuSuitable;
     });
   }
@@ -193,10 +204,10 @@ export class HardwareAwareModelSelector extends EventEmitter {
       // Give priority to qwen2.5-coder
       const aIsQwenCoder = a.name.toLowerCase().includes('qwen2.5-coder');
       const bIsQwenCoder = b.name.toLowerCase().includes('qwen2.5-coder');
-      
+
       if (aIsQwenCoder && !bIsQwenCoder) return -1;
       if (!aIsQwenCoder && bIsQwenCoder) return 1;
-      
+
       const scoreA = this.calculateHardwareCompatibilityScore(a);
       const scoreB = this.calculateHardwareCompatibilityScore(b);
       return scoreB - scoreA;
@@ -208,27 +219,31 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private calculateHardwareCompatibilityScore(model: ModelInfo): number {
     let score = 0;
-    
+
     // Memory efficiency
     const memoryUsage = this.estimateModelMemoryUsage(model);
-    const memoryEfficiency = 1 - (memoryUsage / this.hardwareProfile.availableMemoryGB);
+    const memoryEfficiency = 1 - memoryUsage / this.hardwareProfile.availableMemoryGB;
     score += memoryEfficiency * 40; // 40% weight for memory efficiency
-    
+
     // Performance characteristics
-    const speedBonus = model.performance.speed === 'fast' ? 30 : 
-                      model.performance.speed === 'medium' ? 20 : 10;
+    const speedBonus =
+      model.performance.speed === 'fast' ? 30 : model.performance.speed === 'medium' ? 20 : 10;
     score += speedBonus; // 30% weight for speed
-    
+
     // Quality vs resource trade-off
-    const qualityBonus = model.performance.quality === 'excellent' ? 20 :
-                        model.performance.quality === 'good' ? 15 : 10;
+    const qualityBonus =
+      model.performance.quality === 'excellent'
+        ? 20
+        : model.performance.quality === 'good'
+          ? 15
+          : 10;
     score += qualityBonus; // 20% weight for quality
-    
+
     // Hardware-specific bonuses
     if (this.hardwareProfile.hasGPU && model.name.includes('gpu')) {
       score += 10; // GPU acceleration bonus
     }
-    
+
     return score;
   }
 
@@ -240,7 +255,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
       // Rule of thumb: model needs 1.2x its size in RAM for inference
       return (model.sizeBytes / (1024 * 1024 * 1024)) * 1.2;
     }
-    
+
     // Fallback estimation based on name
     const nameLower = model.name.toLowerCase();
     if (nameLower.includes('72b') || nameLower.includes('70b')) return 40;
@@ -248,7 +263,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
     if (nameLower.includes('13b') || nameLower.includes('14b')) return 8;
     if (nameLower.includes('7b') || nameLower.includes('8b')) return 4;
     if (nameLower.includes('3b') || nameLower.includes('2b')) return 2;
-    
+
     return 4; // Default estimate
   }
 
@@ -257,26 +272,27 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private getMinCoresForModel(model: ModelInfo): number {
     const memoryGB = this.estimateModelMemoryUsage(model);
-    
+
     if (memoryGB > 20) return 8; // Large models need more cores
     if (memoryGB > 10) return 4;
     return 2; // Minimum for any model
   }
-  
+
   /**
    * Estimate memory usage by model name string
    */
   private estimateModelMemoryUsageByName(modelName: string): number {
     const nameLower = modelName.toLowerCase();
     if (nameLower.includes('72b') || nameLower.includes('70b')) return 40;
-    if (nameLower.includes('34b') || nameLower.includes('32b') || nameLower.includes('30b')) return 20;
+    if (nameLower.includes('34b') || nameLower.includes('32b') || nameLower.includes('30b'))
+      return 20;
     if (nameLower.includes('13b') || nameLower.includes('14b')) return 8;
     if (nameLower.includes('7b') || nameLower.includes('8b')) return 4;
     if (nameLower.includes('3b') || nameLower.includes('2b')) return 2;
     if (nameLower.includes('gemma') && nameLower.includes('2b')) return 2;
     if (nameLower.includes('qwen2.5-coder')) return 4; // Qwen 2.5 Coder 7B
     if (nameLower.includes('llama3.2')) return 2; // Llama 3.2 is small
-    
+
     return 4; // Default estimate
   }
 
@@ -286,21 +302,21 @@ export class HardwareAwareModelSelector extends EventEmitter {
   private calculateHardwareConfidence(model: ModelInfo): number {
     const memoryUsage = this.estimateModelMemoryUsage(model);
     const memoryUtilization = memoryUsage / this.hardwareProfile.availableMemoryGB;
-    
+
     let confidence = 1.0;
-    
+
     // Reduce confidence based on memory pressure
     if (memoryUtilization > 0.8) confidence -= 0.4;
     else if (memoryUtilization > 0.6) confidence -= 0.2;
     else if (memoryUtilization > 0.4) confidence -= 0.1;
-    
+
     // CPU considerations
     const minCores = this.getMinCoresForModel(model);
     if (this.hardwareProfile.cpuCores < minCores) confidence -= 0.3;
-    
+
     // GPU bonus
     if (this.hardwareProfile.hasGPU) confidence += 0.1;
-    
+
     return Math.max(confidence, 0.1);
   }
 
@@ -315,11 +331,11 @@ export class HardwareAwareModelSelector extends EventEmitter {
       errorRate: 0,
       tokensPerSecond: 0,
       consecutiveErrors: 0,
-      lastSuccessTime: Date.now()
+      lastSuccessTime: Date.now(),
     };
 
     const updated = { ...existing, ...metrics };
-    
+
     // Update consecutive errors
     if (metrics.errorRate !== undefined) {
       if (metrics.errorRate > 0) {
@@ -331,7 +347,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
     }
 
     this.performanceMetrics.set(modelName, updated);
-    
+
     // Check if automatic switching is needed
     this.checkForAutomaticSwitch(modelName, updated);
   }
@@ -355,7 +371,10 @@ export class HardwareAwareModelSelector extends EventEmitter {
       switchReason = 'error_threshold';
     } else if (metrics.consecutiveErrors >= this.thresholds.maxConsecutiveErrors) {
       switchReason = 'error_threshold';
-    } else if (metrics.tokensPerSecond < this.thresholds.minTokensPerSecond && metrics.tokensPerSecond > 0) {
+    } else if (
+      metrics.tokensPerSecond < this.thresholds.minTokensPerSecond &&
+      metrics.tokensPerSecond > 0
+    ) {
       switchReason = 'performance_degradation';
     }
 
@@ -367,7 +386,10 @@ export class HardwareAwareModelSelector extends EventEmitter {
   /**
    * Perform automatic model switch
    */
-  private async performAutomaticSwitch(reason: ModelSwitchEvent['reason'], metrics: PerformanceMetrics): Promise<void> {
+  private async performAutomaticSwitch(
+    reason: ModelSwitchEvent['reason'],
+    metrics: PerformanceMetrics
+  ): Promise<void> {
     if (this.switchingInProgress || this.fallbackModels.length === 0) {
       return;
     }
@@ -382,13 +404,13 @@ export class HardwareAwareModelSelector extends EventEmitter {
           responseTime: metrics.responseTime,
           memoryUsage: (metrics.memoryUsage * 100).toFixed(1) + '%',
           errorRate: (metrics.errorRate * 100).toFixed(1) + '%',
-          consecutiveErrors: metrics.consecutiveErrors
-        }
+          consecutiveErrors: metrics.consecutiveErrors,
+        },
       });
 
       // Find next suitable model
       const nextModel = this.selectFallbackModel(reason, metrics);
-      
+
       if (!nextModel) {
         this.logger.error('No suitable fallback models available');
         return;
@@ -403,13 +425,12 @@ export class HardwareAwareModelSelector extends EventEmitter {
         toModel: nextModel.name,
         metrics,
         hardwareProfile: this.hardwareProfile,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       this.emit('modelSwitch', switchEvent);
-      
-      this.logger.info(`Successfully switched to ${nextModel.name} (${nextModel.size})`);
 
+      this.logger.info(`Successfully switched to ${nextModel.name} (${nextModel.size})`);
     } catch (error) {
       this.logger.error('Failed to switch model:', error);
     } finally {
@@ -420,18 +441,23 @@ export class HardwareAwareModelSelector extends EventEmitter {
   /**
    * Select appropriate fallback model based on failure reason
    */
-  private selectFallbackModel(reason: ModelSwitchEvent['reason'], metrics: PerformanceMetrics): ModelInfo | null {
+  private selectFallbackModel(
+    reason: ModelSwitchEvent['reason'],
+    metrics: PerformanceMetrics
+  ): ModelInfo | null {
     // Check if current model is already small/efficient
     if (this.currentModel) {
       const currentModelSize = this.estimateModelMemoryUsageByName(this.currentModel);
-      
+
       // If we're already using a small model (<=4GB) and facing memory issues, don't switch to larger
       if ((reason === 'oom' || reason === 'hardware_constraint') && currentModelSize <= 4) {
-        this.logger.info(`Keeping current efficient model ${this.currentModel} (${currentModelSize}GB) despite memory pressure`);
+        this.logger.info(
+          `Keeping current efficient model ${this.currentModel} (${currentModelSize}GB) despite memory pressure`
+        );
         return null; // Don't switch if already using efficient model
       }
     }
-    
+
     let sortedFallbacks = [...this.fallbackModels];
 
     // Sort fallbacks based on failure reason
@@ -453,10 +479,12 @@ export class HardwareAwareModelSelector extends EventEmitter {
     // Find first fallback that hasn't been problematic
     for (const model of sortedFallbacks) {
       const modelMetrics = this.performanceMetrics.get(model.name);
-      
-      if (!modelMetrics || 
-          (modelMetrics.consecutiveErrors < this.thresholds.maxConsecutiveErrors &&
-           modelMetrics.errorRate < this.thresholds.maxErrorRate)) {
+
+      if (
+        !modelMetrics ||
+        (modelMetrics.consecutiveErrors < this.thresholds.maxConsecutiveErrors &&
+          modelMetrics.errorRate < this.thresholds.maxErrorRate)
+      ) {
         return model;
       }
     }
@@ -484,7 +512,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
         console.error('Hardware monitoring error:', error);
       }
     }, 30000); // Update every 30 seconds
-    
+
     // Prevent the interval from keeping the process alive
     if (this.monitoringInterval.unref) {
       this.monitoringInterval.unref();
@@ -499,11 +527,11 @@ export class HardwareAwareModelSelector extends EventEmitter {
     this.hardwareProfile.availableMemoryGB = freeMemoryGB;
 
     // Check for memory pressure
-    const memoryUsage = 1 - (freeMemoryGB / this.hardwareProfile.totalMemoryGB);
-    
+    const memoryUsage = 1 - freeMemoryGB / this.hardwareProfile.totalMemoryGB;
+
     if (memoryUsage > this.thresholds.memoryWarningThreshold && this.currentModel) {
       // DISABLED: High memory usage warnings disabled for normal operation
-      
+
       const metrics: PerformanceMetrics = {
         responseTime: 0,
         memoryUsage,
@@ -511,7 +539,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
         errorRate: 0,
         tokensPerSecond: 0,
         consecutiveErrors: 0,
-        lastSuccessTime: Date.now()
+        lastSuccessTime: Date.now(),
       };
 
       if (memoryUsage > this.thresholds.maxMemoryUsage) {
@@ -536,7 +564,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
       currentModel: this.currentModel,
       fallbackModels: this.fallbackModels.map(m => ({ name: m.name, size: m.size })),
       thresholds: this.thresholds,
-      metrics: Object.fromEntries(this.performanceMetrics)
+      metrics: Object.fromEntries(this.performanceMetrics),
     };
   }
 
@@ -553,7 +581,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
       errorRate: 0,
       tokensPerSecond: 1,
       consecutiveErrors: 0,
-      lastSuccessTime: Date.now()
+      lastSuccessTime: Date.now(),
     };
 
     if (targetModel) {
@@ -566,7 +594,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
           toModel: targetModel,
           metrics,
           hardwareProfile: this.hardwareProfile,
-          timestamp: new Date()
+          timestamp: new Date(),
         });
         return true;
       }

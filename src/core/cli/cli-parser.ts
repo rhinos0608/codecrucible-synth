@@ -7,18 +7,46 @@ import { CLIOptions } from './cli-types.js';
 
 export class CLIParser {
   /**
+   * Parse slash commands for role switching
+   */
+  static parseSlashCommand(input: string): { command: string; role?: string; content: string } {
+    const slashCommandRegex = /^\/(\w+)(?:\s+(.*))?$/;
+    const match = input.match(slashCommandRegex);
+    
+    if (match) {
+      const command = match[1];
+      const content = match[2] || '';
+      
+      switch (command) {
+        case 'auditor':
+          return { command: 'role-switch', role: 'auditor', content };
+        case 'writer':
+          return { command: 'role-switch', role: 'writer', content };
+        case 'auto':
+          return { command: 'role-switch', role: 'auto', content };
+        case 'help':
+          return { command: 'slash-help', content };
+        default:
+          return { command: 'unknown-slash', content: input };
+      }
+    }
+    
+    return { command: 'none', content: input };
+  }
+
+  /**
    * Parse command line arguments into structured options
    */
   static parseOptions(args: string[]): CLIOptions {
     const options: CLIOptions = {};
-    
+
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
-      
+
       if (arg.startsWith('--')) {
         const key = arg.slice(2);
         const nextArg = args[i + 1];
-        
+
         switch (key) {
           case 'voices':
             if (nextArg && !nextArg.startsWith('--')) {
@@ -26,84 +54,84 @@ export class CLIParser {
               i++;
             }
             break;
-            
+
           case 'mode':
             if (nextArg && !nextArg.startsWith('--')) {
               options.mode = nextArg as any;
               i++;
             }
             break;
-            
+
           case 'depth':
             if (nextArg && !nextArg.startsWith('--')) {
               options.depth = nextArg;
               i++;
             }
             break;
-            
+
           case 'timeout':
             if (nextArg && !nextArg.startsWith('--')) {
               options.timeout = parseInt(nextArg, 10);
               i++;
             }
             break;
-            
+
           case 'spiral-iterations':
             if (nextArg && !nextArg.startsWith('--')) {
               options.spiralIterations = parseInt(nextArg, 10);
               i++;
             }
             break;
-            
+
           case 'spiral-quality':
             if (nextArg && !nextArg.startsWith('--')) {
               options.spiralQuality = parseFloat(nextArg);
               i++;
             }
             break;
-            
+
           case 'max-steps':
             if (nextArg && !nextArg.startsWith('--')) {
               options.maxSteps = parseInt(nextArg, 10);
               i++;
             }
             break;
-            
+
           case 'output':
             if (nextArg && !nextArg.startsWith('--')) {
               options.output = nextArg as 'text' | 'json' | 'table';
               i++;
             }
             break;
-            
+
           case 'backend':
             if (nextArg && !nextArg.startsWith('--')) {
               options.backend = nextArg as any;
               i++;
             }
             break;
-            
+
           case 'port':
             if (nextArg && !nextArg.startsWith('--')) {
               options.port = nextArg;
               i++;
             }
             break;
-            
+
           case 'writer-model':
             if (nextArg && !nextArg.startsWith('--')) {
               options.writerModel = nextArg;
               i++;
             }
             break;
-            
+
           case 'auditor-model':
             if (nextArg && !nextArg.startsWith('--')) {
               options.auditorModel = nextArg;
               i++;
             }
             break;
-            
+
           // Boolean flags
           case 'interactive':
             options.interactive = true;
@@ -218,7 +246,7 @@ export class CLIParser {
         }
       }
     }
-    
+
     return options;
   }
 
@@ -227,20 +255,20 @@ export class CLIParser {
    */
   static extractCommand(args: string[]): { command: string; remainingArgs: string[] } {
     const commands = ['analyze', 'generate', 'status', 'models', 'configure', 'help'];
-    
+
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
       if (commands.includes(arg)) {
         return {
           command: arg,
-          remainingArgs: args.slice(i + 1)
+          remainingArgs: args.slice(i + 1),
         };
       }
     }
-    
+
     return {
       command: '',
-      remainingArgs: args
+      remainingArgs: args,
     };
   }
 
@@ -256,10 +284,10 @@ export class CLIParser {
    */
   static getNonOptionArgs(args: string[]): string[] {
     const nonOptions: string[] = [];
-    
+
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
-      
+
       if (arg.startsWith('-')) {
         // Skip this option and its value if it has one
         const nextArg = args[i + 1];
@@ -270,7 +298,7 @@ export class CLIParser {
         nonOptions.push(arg);
       }
     }
-    
+
     return nonOptions;
   }
 
@@ -279,11 +307,20 @@ export class CLIParser {
    */
   private static isOptionWithValue(option: string): boolean {
     const optionsWithValues = [
-      '--voices', '--mode', '--depth', '--timeout', '--spiral-iterations',
-      '--spiral-quality', '--max-steps', '--output', '--backend', '--port',
-      '--writer-model', '--auditor-model'
+      '--voices',
+      '--mode',
+      '--depth',
+      '--timeout',
+      '--spiral-iterations',
+      '--spiral-quality',
+      '--max-steps',
+      '--output',
+      '--backend',
+      '--port',
+      '--writer-model',
+      '--auditor-model',
     ];
-    
+
     return optionsWithValues.includes(option);
   }
 }

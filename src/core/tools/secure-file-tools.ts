@@ -1,6 +1,6 @@
 /**
  * Secure File Tools with Enhanced Error Handling
- * 
+ *
  * Secure file operations with comprehensive error handling,
  * input validation, and security measures.
  */
@@ -9,18 +9,18 @@ import { z } from 'zod';
 import { promises as fs, existsSync, statSync } from 'fs';
 import { join, resolve, dirname, relative, isAbsolute } from 'path';
 import { glob } from 'glob';
-import { 
-  EnhancedBaseTool, 
-  EnhancedToolConfig, 
-  ToolExecutionContext 
+import {
+  EnhancedBaseTool,
+  EnhancedToolConfig,
+  ToolExecutionContext,
 } from './enhanced-base-tool.js';
-import { 
-  ErrorFactory, 
-  ErrorCategory, 
+import {
+  ErrorFactory,
+  ErrorCategory,
   ErrorSeverity,
   InputValidator,
   ServiceResponse,
-  ErrorResponse
+  ErrorResponse,
 } from '../error-handling/structured-error-system.js';
 import { logger } from '../logger.js';
 
@@ -41,7 +41,7 @@ export class SecureFileReadTool extends EnhancedBaseTool {
       securityLevel: 'high',
       timeoutMs: 15000,
       rateLimitPerMinute: 100,
-      retryable: false // File operations shouldn't be retried
+      retryable: false, // File operations shouldn't be retried
     };
 
     super(config);
@@ -70,15 +70,15 @@ export class SecureFileReadTool extends EnhancedBaseTool {
           suggestedActions: [
             'Check if the file path is correct',
             'Verify the file exists in the specified location',
-            'Use file listing to find available files'
-          ]
+            'Use file listing to find available files',
+          ],
         }
       );
     }
 
     // Check file permissions and size
     const stats = await this.getFileStats(resolvedPath);
-    
+
     if (stats.size > maxSize) {
       throw ErrorFactory.createError(
         `File too large: ${stats.size} bytes (max: ${maxSize})`,
@@ -90,8 +90,8 @@ export class SecureFileReadTool extends EnhancedBaseTool {
           suggestedActions: [
             'Increase maxSize parameter',
             'Read file in chunks',
-            'Use file streaming for large files'
-          ]
+            'Use file streaming for large files',
+          ],
         }
       );
     }
@@ -107,8 +107,8 @@ export class SecureFileReadTool extends EnhancedBaseTool {
           userMessage: 'Cannot read: path is not a file',
           suggestedActions: [
             'Provide a file path instead of directory',
-            'Use directory listing tool for directories'
-          ]
+            'Use directory listing tool for directories',
+          ],
         }
       );
     }
@@ -116,7 +116,7 @@ export class SecureFileReadTool extends EnhancedBaseTool {
     // Read file content
     try {
       const content = await fs.readFile(resolvedPath, encoding);
-      
+
       return {
         content,
         metadata: {
@@ -124,8 +124,8 @@ export class SecureFileReadTool extends EnhancedBaseTool {
           size: stats.size,
           modified: stats.mtime.toISOString(),
           encoding,
-          type: this.getFileType(resolvedPath)
-        }
+          type: this.getFileType(resolvedPath),
+        },
       };
     } catch (error) {
       throw ErrorFactory.createError(
@@ -138,9 +138,9 @@ export class SecureFileReadTool extends EnhancedBaseTool {
           suggestedActions: [
             'Check file permissions',
             'Verify file is not corrupted',
-            'Try with different encoding'
+            'Try with different encoding',
           ],
-          originalError: error as Error
+          originalError: error as Error,
         }
       );
     }
@@ -162,7 +162,7 @@ export class SecureFileReadTool extends EnhancedBaseTool {
           context: { requested_path: path, working_directory: basePath },
           userMessage: 'Cannot access files outside the project directory',
           suggestedActions: ['Use paths within the current project directory'],
-          recoverable: false
+          recoverable: false,
         }
       );
     }
@@ -181,11 +181,8 @@ export class SecureFileReadTool extends EnhancedBaseTool {
         {
           context: { path, error_message: (error as Error).message },
           userMessage: 'Cannot access file information',
-          suggestedActions: [
-            'Check file permissions',
-            'Verify file path is correct'
-          ],
-          originalError: error as Error
+          suggestedActions: ['Check file permissions', 'Verify file path is correct'],
+          originalError: error as Error,
         }
       );
     }
@@ -194,22 +191,22 @@ export class SecureFileReadTool extends EnhancedBaseTool {
   private getFileType(path: string): string {
     const ext = path.split('.').pop()?.toLowerCase() || '';
     const typeMap: Record<string, string> = {
-      'js': 'javascript',
-      'ts': 'typescript',
-      'py': 'python',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c': 'c',
-      'md': 'markdown',
-      'json': 'json',
-      'yaml': 'yaml',
-      'yml': 'yaml',
-      'xml': 'xml',
-      'html': 'html',
-      'css': 'css',
-      'txt': 'text'
+      js: 'javascript',
+      ts: 'typescript',
+      py: 'python',
+      java: 'java',
+      cpp: 'cpp',
+      c: 'c',
+      md: 'markdown',
+      json: 'json',
+      yaml: 'yaml',
+      yml: 'yaml',
+      xml: 'xml',
+      html: 'html',
+      css: 'css',
+      txt: 'text',
     };
-    
+
     return typeMap[ext] || 'unknown';
   }
 }
@@ -227,13 +224,21 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
         path: z.string().describe('File path to write'),
         content: z.string().describe('Content to write to file'),
         encoding: z.enum(['utf8', 'base64', 'binary']).optional().default('utf8'),
-        createBackup: z.boolean().optional().default(true).describe('Create backup of existing file'),
-        overwrite: z.boolean().optional().default(false).describe('Allow overwriting existing files'),
+        createBackup: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe('Create backup of existing file'),
+        overwrite: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe('Allow overwriting existing files'),
       }),
       securityLevel: 'high',
       timeoutMs: 30000,
       rateLimitPerMinute: 50,
-      retryable: false
+      retryable: false,
     };
 
     super(config);
@@ -249,7 +254,7 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
     }
 
     const contentValidation = InputValidator.validateString(content, 'content', {
-      maxLength: 10000000 // 10MB limit for content
+      maxLength: 10000000, // 10MB limit for content
     });
     if (!contentValidation.success) {
       throw (contentValidation as ErrorResponse).error;
@@ -270,8 +275,8 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
           suggestedActions: [
             'Set overwrite parameter to true',
             'Choose a different file name',
-            'Delete the existing file first'
-          ]
+            'Delete the existing file first',
+          ],
         }
       );
     }
@@ -297,12 +302,13 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
         success: true,
         path: relative(this.agentContext.workingDirectory, resolvedPath),
         size: stats.size,
-        backup_created: backupPath ? relative(this.agentContext.workingDirectory, backupPath) : null,
+        backup_created: backupPath
+          ? relative(this.agentContext.workingDirectory, backupPath)
+          : null,
         encoding,
         created: !fileExists,
-        overwritten: fileExists
+        overwritten: fileExists,
       };
-
     } catch (error) {
       // Restore backup if write failed
       if (backupPath && fileExists) {
@@ -324,9 +330,9 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
           suggestedActions: [
             'Check file permissions',
             'Verify directory exists',
-            'Check available disk space'
+            'Check available disk space',
           ],
-          originalError: error as Error
+          originalError: error as Error,
         }
       );
     }
@@ -347,7 +353,7 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
           context: { requested_path: path, working_directory: basePath },
           userMessage: 'Cannot write files outside the project directory',
           suggestedActions: ['Use paths within the current project directory'],
-          recoverable: false
+          recoverable: false,
         }
       );
     }
@@ -373,9 +379,9 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
           suggestedActions: [
             'Check file permissions',
             'Verify available disk space',
-            'Disable backup creation if not needed'
+            'Disable backup creation if not needed',
           ],
-          originalError: error as Error
+          originalError: error as Error,
         }
       );
     }
@@ -395,9 +401,9 @@ export class SecureFileWriteTool extends EnhancedBaseTool {
           suggestedActions: [
             'Check directory permissions',
             'Verify parent directory exists',
-            'Check available disk space'
+            'Check available disk space',
           ],
-          originalError: error as Error
+          originalError: error as Error,
         }
       );
     }
@@ -423,7 +429,7 @@ export class SecureFileListTool extends EnhancedBaseTool {
       }),
       securityLevel: 'medium',
       timeoutMs: 20000,
-      rateLimitPerMinute: 200
+      rateLimitPerMinute: 200,
     };
 
     super(config);
@@ -452,8 +458,8 @@ export class SecureFileListTool extends EnhancedBaseTool {
           suggestedActions: [
             'Check if the directory path is correct',
             'Create the directory first',
-            'Use parent directory path'
-          ]
+            'Use parent directory path',
+          ],
         }
       );
     }
@@ -468,10 +474,7 @@ export class SecureFileListTool extends EnhancedBaseTool {
         {
           context: { path, is_file: stats.isFile() },
           userMessage: 'Cannot list: path is not a directory',
-          suggestedActions: [
-            'Provide a directory path',
-            'Use file read tool for individual files'
-          ]
+          suggestedActions: ['Provide a directory path', 'Use file read tool for individual files'],
         }
       );
     }
@@ -485,7 +488,7 @@ export class SecureFileListTool extends EnhancedBaseTool {
         files = await glob(globPattern, {
           cwd: this.agentContext.workingDirectory,
           dot: includeHidden,
-          maxDepth: recursive ? maxDepth : 1
+          maxDepth: recursive ? maxDepth : 1,
         });
       } else {
         // List directory contents
@@ -499,11 +502,13 @@ export class SecureFileListTool extends EnhancedBaseTool {
 
       // Get file metadata
       const fileDetails = await Promise.all(
-        files.map(async (file) => {
+        files.map(async file => {
           try {
-            const fullPath = isAbsolute(file) ? file : join(this.agentContext.workingDirectory, file);
+            const fullPath = isAbsolute(file)
+              ? file
+              : join(this.agentContext.workingDirectory, file);
             const fileStat = await fs.stat(fullPath);
-            
+
             return {
               path: relative(this.agentContext.workingDirectory, fullPath),
               name: file.split('/').pop() || file.split('\\').pop(),
@@ -511,14 +516,14 @@ export class SecureFileListTool extends EnhancedBaseTool {
               type: fileStat.isDirectory() ? 'directory' : 'file',
               modified: fileStat.mtime.toISOString(),
               created: fileStat.birthtime.toISOString(),
-              permissions: fileStat.mode
+              permissions: fileStat.mode,
             };
           } catch (error) {
             logger.warn(`Failed to get stats for file: ${file}`, error);
             return {
               path: file,
               name: file.split('/').pop() || file.split('\\').pop(),
-              error: 'Unable to read file stats'
+              error: 'Unable to read file stats',
             };
           }
         })
@@ -533,10 +538,9 @@ export class SecureFileListTool extends EnhancedBaseTool {
           pattern,
           include_hidden: includeHidden,
           recursive,
-          max_depth: maxDepth
-        }
+          max_depth: maxDepth,
+        },
       };
-
     } catch (error) {
       throw ErrorFactory.createError(
         `Failed to list directory: ${(error as Error).message}`,
@@ -548,9 +552,9 @@ export class SecureFileListTool extends EnhancedBaseTool {
           suggestedActions: [
             'Check directory permissions',
             'Verify directory is accessible',
-            'Try with simpler filters'
+            'Try with simpler filters',
           ],
-          originalError: error as Error
+          originalError: error as Error,
         }
       );
     }
@@ -571,7 +575,7 @@ export class SecureFileListTool extends EnhancedBaseTool {
           context: { requested_path: path, working_directory: basePath },
           userMessage: 'Cannot access directories outside the project directory',
           suggestedActions: ['Use paths within the current project directory'],
-          recoverable: false
+          recoverable: false,
         }
       );
     }
@@ -600,7 +604,7 @@ export class SecureFileListTool extends EnhancedBaseTool {
 
       const fullPath = join(dirPath, entry);
       const relativePath = relative(this.agentContext.workingDirectory, fullPath);
-      
+
       files.push(relativePath);
 
       if (recursive) {

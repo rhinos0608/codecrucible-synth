@@ -11,7 +11,13 @@ import { glob } from 'glob';
 import { logger } from './logger.js';
 
 export interface ScalabilityIssue {
-  type: 'singleton' | 'global_state' | 'blocking_operation' | 'memory_intensive' | 'non_stateless' | 'hardcoded_limits';
+  type:
+    | 'singleton'
+    | 'global_state'
+    | 'blocking_operation'
+    | 'memory_intensive'
+    | 'non_stateless'
+    | 'hardcoded_limits';
   severity: 'low' | 'medium' | 'high' | 'critical';
   file: string;
   line: number;
@@ -80,7 +86,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
       issues: this.issues,
       recommendations: this.recommendations,
       metrics,
-      migrationPlan
+      migrationPlan,
     };
   }
 
@@ -89,7 +95,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
    */
   private async discoverSourceFiles(): Promise<void> {
     this.sourceFiles = await glob('src/**/*.{ts,js}', {
-      ignore: ['src/**/*.test.ts', 'src/**/*.spec.ts']
+      ignore: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
     });
 
     logger.info(`📁 Analyzing ${this.sourceFiles.length} source files for scalability`);
@@ -130,7 +136,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           impact: 'Prevents horizontal scaling and creates shared state across users',
           solution: 'Convert to dependency injection or stateless service',
           priority: 8,
-          estimatedEffort: 'medium'
+          estimatedEffort: 'medium',
         });
       }
 
@@ -145,7 +151,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           impact: 'Creates race conditions and prevents multi-tenancy',
           solution: 'Move state to user/session context or database',
           priority: 9,
-          estimatedEffort: 'high'
+          estimatedEffort: 'high',
         });
       }
 
@@ -160,7 +166,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           impact: 'Reduces throughput and can cause timeouts under load',
           solution: 'Convert to async/await or use worker threads',
           priority: 6,
-          estimatedEffort: 'low'
+          estimatedEffort: 'low',
         });
       }
 
@@ -175,7 +181,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           impact: 'Can cause OOM errors with multiple users',
           solution: 'Implement streaming or pagination',
           priority: 7,
-          estimatedEffort: 'medium'
+          estimatedEffort: 'medium',
         });
       }
 
@@ -190,7 +196,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           impact: 'Prevents load balancing and auto-scaling',
           solution: 'Refactor to stateless design with external state storage',
           priority: 8,
-          estimatedEffort: 'high'
+          estimatedEffort: 'high',
         });
       }
 
@@ -205,7 +211,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           impact: 'Cannot adapt to varying load conditions',
           solution: 'Make limits configurable and implement auto-scaling',
           priority: 5,
-          estimatedEffort: 'low'
+          estimatedEffort: 'low',
         });
       }
     }
@@ -220,7 +226,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
       /private\s+static\s+instance/,
       /getInstance\s*\(\s*\)/,
       /new\.target.*constructor/,
-      /export\s+const\s+\w+\s*=\s*new\s+/
+      /export\s+const\s+\w+\s*=\s*new\s+/,
     ];
 
     return singletonPatterns.some(pattern => pattern.test(line));
@@ -236,7 +242,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
       /window\.\w+\s*=/, // Browser global
       /globalThis\.\w+\s*=/,
       /export\s+let\s+\w+/, // Mutable exports
-      /var\s+\w+.*=.*(?!function)/ // Global vars (outside functions)
+      /var\s+\w+.*=.*(?!function)/, // Global vars (outside functions)
     ];
 
     return globalStatePatterns.some(pattern => pattern.test(line));
@@ -253,7 +259,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
       /require\s*\(\s*['"][^'"]+['"]\s*\)/, // Synchronous require
       /JSON\.parse\(.*readFileSync/,
       /crypto\.pbkdf2Sync/,
-      /crypto\.scryptSync/
+      /crypto\.scryptSync/,
     ];
 
     return blockingPatterns.some(pattern => pattern.test(line));
@@ -268,7 +274,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
       /Buffer\.alloc\s*\(\s*\d{6,}\s*\)/, // Large buffers
       /JSON\.stringify\s*\(\s*.*\)/, // Large object serialization
       /\.readFile\s*\(\s*.*\).*(?!stream)/, // Reading entire files
-      /new\s+Map\s*\(\s*\).*(?=.*for|.*while)/ // Large maps in loops
+      /new\s+Map\s*\(\s*\).*(?=.*for|.*while)/, // Large maps in loops
     ];
 
     return memoryIntensivePatterns.some(pattern => pattern.test(line));
@@ -285,7 +291,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
       const hasStatefulContext = contextLines.some(contextLine =>
         /cache|store|history|state|session/.test(contextLine.toLowerCase())
       );
-      
+
       return hasStatefulContext;
     }
 
@@ -302,7 +308,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
       /limit:\s*\d+/,
       /maxRetries:\s*\d+/,
       /poolSize:\s*\d+/,
-      /batchSize:\s*\d+/
+      /batchSize:\s*\d+/,
     ];
 
     return hardcodedLimitPatterns.some(pattern => pattern.test(line));
@@ -321,16 +327,16 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           'Independent scaling of components',
           'Better fault isolation',
           'Technology diversity',
-          'Easier deployment and updates'
+          'Easier deployment and updates',
         ],
         implementation: [
           'Identify service boundaries based on business capabilities',
           'Implement API Gateway for service orchestration',
           'Use message queues for async communication',
-          'Implement distributed tracing and logging'
+          'Implement distributed tracing and logging',
         ],
         priority: 'high',
-        timeframe: 'medium_term'
+        timeframe: 'medium_term',
       },
       {
         category: 'caching',
@@ -340,16 +346,16 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           'Shared cache across multiple instances',
           'Improved cache hit rates',
           'Reduced memory usage per instance',
-          'Better performance under load'
+          'Better performance under load',
         ],
         implementation: [
           'Deploy Redis or Memcached cluster',
           'Implement cache-aside pattern',
           'Add cache warming strategies',
-          'Monitor cache hit/miss ratios'
+          'Monitor cache hit/miss ratios',
         ],
         priority: 'high',
-        timeframe: 'short_term'
+        timeframe: 'short_term',
       },
       {
         category: 'database',
@@ -359,16 +365,16 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           'Improved query performance',
           'Better resource utilization',
           'Horizontal scalability',
-          'Reduced single points of failure'
+          'Reduced single points of failure',
         ],
         implementation: [
           'Analyze and optimize slow queries',
           'Implement read replicas',
           'Design sharding strategy',
-          'Use connection pooling'
+          'Use connection pooling',
         ],
         priority: 'high',
-        timeframe: 'medium_term'
+        timeframe: 'medium_term',
       },
       {
         category: 'api_design',
@@ -378,16 +384,16 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           'Protection against abuse',
           'Fair resource allocation',
           'Improved system stability',
-          'Better user experience'
+          'Better user experience',
         ],
         implementation: [
           'Implement token bucket algorithm',
           'Add request/response compression',
           'Use pagination for large datasets',
-          'Implement API versioning'
+          'Implement API versioning',
         ],
         priority: 'medium',
-        timeframe: 'short_term'
+        timeframe: 'short_term',
       },
       {
         category: 'deployment',
@@ -397,16 +403,16 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           'Automatic scaling based on load',
           'Zero-downtime deployments',
           'Better resource utilization',
-          'Improved fault tolerance'
+          'Improved fault tolerance',
         ],
         implementation: [
           'Containerize all services',
           'Configure horizontal pod autoscaler',
           'Implement health checks',
-          'Set up CI/CD pipelines'
+          'Set up CI/CD pipelines',
         ],
         priority: 'high',
-        timeframe: 'medium_term'
+        timeframe: 'medium_term',
       },
       {
         category: 'monitoring',
@@ -416,17 +422,17 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
           'Real-time performance monitoring',
           'Faster incident resolution',
           'Proactive issue detection',
-          'Data-driven scaling decisions'
+          'Data-driven scaling decisions',
         ],
         implementation: [
           'Deploy Prometheus and Grafana',
           'Implement distributed tracing',
           'Set up log aggregation',
-          'Create alerting rules'
+          'Create alerting rules',
         ],
         priority: 'medium',
-        timeframe: 'short_term'
-      }
+        timeframe: 'short_term',
+      },
     ];
   }
 
@@ -440,19 +446,23 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
     const statefulComponents = this.issues.filter(i => i.type === 'non_stateless').length;
 
     // Calculate code complexity (simplified metric)
-    const codeComplexity = this.sourceFiles.length > 0 
-      ? Math.min(100, (this.issues.length / this.sourceFiles.length) * 100)
-      : 0;
+    const codeComplexity =
+      this.sourceFiles.length > 0
+        ? Math.min(100, (this.issues.length / this.sourceFiles.length) * 100)
+        : 0;
 
     // Identify caching opportunities
-    const cachingOpportunities = this.issues.filter(i => 
-      i.description.includes('memory') || i.description.includes('blocking')
+    const cachingOpportunities = this.issues.filter(
+      i => i.description.includes('memory') || i.description.includes('blocking')
     ).length;
 
     // Calculate overall scalability score (0-100, higher is better)
     const maxPossibleIssues = this.sourceFiles.length * 2; // Assume 2 issues per file max
     const actualIssues = this.issues.length;
-    const scalabilityScore = Math.max(0, 100 - (actualIssues / Math.max(maxPossibleIssues, 1)) * 100);
+    const scalabilityScore = Math.max(
+      0,
+      100 - (actualIssues / Math.max(maxPossibleIssues, 1)) * 100
+    );
 
     return {
       codeComplexity,
@@ -461,7 +471,7 @@ export class ScalabilityArchitectureSystem extends EventEmitter {
       blockingOperations,
       cachingOpportunities,
       statefulComponents,
-      scalabilityScore: Math.round(scalabilityScore)
+      scalabilityScore: Math.round(scalabilityScore),
     };
   }
 
@@ -1044,7 +1054,7 @@ spec:
    */
   generateReport(): string {
     const metrics = this.calculateScalabilityMetrics();
-    
+
     let report = `
 🏗️ SCALABILITY ARCHITECTURE ANALYSIS REPORT
 ===========================================
@@ -1074,21 +1084,26 @@ SCALABILITY METRICS:
       report += '─'.repeat(50) + '\n';
 
       for (const [severity, issues] of issuesBySeverity) {
-        const icon = severity === 'critical' ? '🚨' : 
-                    severity === 'high' ? '🔴' : 
-                    severity === 'medium' ? '🟡' : '🔵';
-        
+        const icon =
+          severity === 'critical'
+            ? '🚨'
+            : severity === 'high'
+              ? '🔴'
+              : severity === 'medium'
+                ? '🟡'
+                : '🔵';
+
         report += `${icon} ${severity.toUpperCase()} (${issues.length}):\n`;
-        
+
         // Show top issues by priority
         const topIssues = issues.sort((a, b) => b.priority - a.priority).slice(0, 5);
-        
+
         for (const issue of topIssues) {
           report += `  • ${issue.file}:${issue.line} - ${issue.description}\n`;
           report += `    💡 ${issue.solution}\n`;
           report += `    📊 Impact: ${issue.impact}\n`;
         }
-        
+
         if (issues.length > 5) {
           report += `    ... and ${issues.length - 5} more\n`;
         }
@@ -1109,19 +1124,31 @@ SCALABILITY METRICS:
     report += '─'.repeat(50) + '\n';
 
     for (const [category, recs] of recsByCategory) {
-      const icon = category === 'architecture' ? '🏗️' : 
-                  category === 'caching' ? '💾' : 
-                  category === 'database' ? '🗄️' : 
-                  category === 'api_design' ? '🔌' : 
-                  category === 'deployment' ? '🚀' : '📊';
-      
+      const icon =
+        category === 'architecture'
+          ? '🏗️'
+          : category === 'caching'
+            ? '💾'
+            : category === 'database'
+              ? '🗄️'
+              : category === 'api_design'
+                ? '🔌'
+                : category === 'deployment'
+                  ? '🚀'
+                  : '📊';
+
       report += `${icon} ${category.replace('_', ' ').toUpperCase()}:\n`;
-      
+
       for (const rec of recs) {
-        const priority = rec.priority === 'critical' ? '🚨' : 
-                        rec.priority === 'high' ? '🔴' : 
-                        rec.priority === 'medium' ? '🟡' : '🔵';
-        
+        const priority =
+          rec.priority === 'critical'
+            ? '🚨'
+            : rec.priority === 'high'
+              ? '🔴'
+              : rec.priority === 'medium'
+                ? '🟡'
+                : '🔵';
+
         report += `  ${priority} ${rec.title} (${rec.timeframe})\n`;
         report += `     📝 ${rec.description}\n`;
         report += `     🎯 Benefits: ${rec.benefits[0]}\n`;
@@ -1132,13 +1159,13 @@ SCALABILITY METRICS:
     // Performance impact estimate
     const criticalIssues = this.issues.filter(i => i.severity === 'critical').length;
     const highIssues = this.issues.filter(i => i.severity === 'high').length;
-    
+
     if (criticalIssues > 0 || highIssues > 0) {
       report += '⚡ PERFORMANCE IMPACT:\n';
       report += '─'.repeat(50) + '\n';
       report += `• Current architecture can handle ~${this.estimateUserCapacity()} concurrent users\n`;
       report += `• After optimization: ~${this.estimateOptimizedCapacity()} concurrent users\n`;
-      report += `• Expected improvement: ${Math.round(((this.estimateOptimizedCapacity() / this.estimateUserCapacity()) - 1) * 100)}%\n\n`;
+      report += `• Expected improvement: ${Math.round((this.estimateOptimizedCapacity() / this.estimateUserCapacity() - 1) * 100)}%\n\n`;
     }
 
     return report;
@@ -1150,14 +1177,14 @@ SCALABILITY METRICS:
   private estimateUserCapacity(): number {
     // Base capacity of 100 users
     let capacity = 100;
-    
+
     // Reduce for each scalability issue
     const criticalIssues = this.issues.filter(i => i.severity === 'critical').length;
     const highIssues = this.issues.filter(i => i.severity === 'high').length;
-    
+
     capacity -= criticalIssues * 30; // Critical issues reduce by 30 users each
-    capacity -= highIssues * 15;     // High issues reduce by 15 users each
-    
+    capacity -= highIssues * 15; // High issues reduce by 15 users each
+
     return Math.max(10, capacity); // Minimum 10 users
   }
 
@@ -1177,8 +1204,8 @@ SCALABILITY METRICS:
     let failed = 0;
 
     // Focus on low-effort, high-impact fixes
-    const autoFixableIssues = this.issues.filter(i => 
-      i.estimatedEffort === 'low' && i.priority >= 6
+    const autoFixableIssues = this.issues.filter(
+      i => i.estimatedEffort === 'low' && i.priority >= 6
     );
 
     for (const issue of autoFixableIssues) {
@@ -1209,7 +1236,11 @@ SCALABILITY METRICS:
 
     // Add configuration comment
     const indent = line.match(/^\s*/)?.[0] || '';
-    lines.splice(issue.line - 1, 0, `${indent}// TODO: Make this limit configurable via environment variable`);
+    lines.splice(
+      issue.line - 1,
+      0,
+      `${indent}// TODO: Make this limit configurable via environment variable`
+    );
 
     await fs.writeFile(issue.file, lines.join('\n'));
     logger.info(`✅ Added configuration comment to ${issue.file}:${issue.line}`);
@@ -1223,7 +1254,11 @@ SCALABILITY METRICS:
     const lines = content.split('\n');
 
     const indent = lines[issue.line - 1].match(/^\s*/)?.[0] || '';
-    lines.splice(issue.line - 1, 0, `${indent}// TODO: Convert to async operation for better scalability`);
+    lines.splice(
+      issue.line - 1,
+      0,
+      `${indent}// TODO: Convert to async operation for better scalability`
+    );
 
     await fs.writeFile(issue.file, lines.join('\n'));
     logger.info(`✅ Added async comment to ${issue.file}:${issue.line}`);
@@ -1244,16 +1279,17 @@ SCALABILITY METRICS:
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const scalabilitySystem = new ScalabilityArchitectureSystem();
-  
-  scalabilitySystem.analyzeScalability()
+
+  scalabilitySystem
+    .analyzeScalability()
     .then(result => {
       console.log(scalabilitySystem.generateReport());
-      
+
       console.log('\n📋 MIGRATION PLAN:');
       for (const step of result.migrationPlan) {
         console.log(step);
       }
-      
+
       if (result.issues.length > 0) {
         console.log(`\n🔧 Found ${result.issues.length} scalability issues to address`);
         console.log(`📊 Current scalability score: ${result.metrics.scalabilityScore}/100`);

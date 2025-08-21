@@ -40,14 +40,14 @@ export class ResilientCLIWrapper extends EventEmitter {
     super();
     this.logger = new Logger('ResilientCLI');
     this.errorRecovery = new ErrorRecoverySystem();
-    
+
     this.defaultOptions = {
       enableGracefulDegradation: true,
       retryAttempts: 3,
       timeoutMs: 30000,
       fallbackMode: 'basic',
       errorNotification: true,
-      ...options
+      ...options,
     };
 
     this.setupErrorRecoveryListeners();
@@ -69,7 +69,7 @@ export class ResilientCLIWrapper extends EventEmitter {
     const mergedOptions = { ...this.defaultOptions, ...options };
     const operationId = `op_${++this.operationCount}_${Date.now()}`;
     const startTime = Date.now();
-    
+
     let attempts = 0;
     let warnings: string[] = [];
     let lastError: Error | null = null;
@@ -78,15 +78,16 @@ export class ResilientCLIWrapper extends EventEmitter {
 
     try {
       // Setup timeout if specified
-      const timeoutPromise = mergedOptions.timeoutMs > 0 
-        ? this.createTimeoutPromise(mergedOptions.timeoutMs, context.name)
-        : null;
+      const timeoutPromise =
+        mergedOptions.timeoutMs > 0
+          ? this.createTimeoutPromise(mergedOptions.timeoutMs, context.name)
+          : null;
 
       for (attempts = 1; attempts <= mergedOptions.retryAttempts; attempts++) {
         try {
           // Execute operation with optional timeout
           const operationPromise = operation();
-          const result = timeoutPromise 
+          const result = timeoutPromise
             ? await Promise.race([operationPromise, timeoutPromise])
             : await operationPromise;
 
@@ -97,10 +98,9 @@ export class ResilientCLIWrapper extends EventEmitter {
             metrics: {
               attempts,
               duration: Date.now() - startTime,
-              recoveryActions: 0
-            }
+              recoveryActions: 0,
+            },
           };
-
         } catch (error) {
           lastError = error as Error;
           attempts++;
@@ -112,13 +112,13 @@ export class ResilientCLIWrapper extends EventEmitter {
             severity: context.critical ? 'critical' : 'medium',
             recoverable: attempts < mergedOptions.retryAttempts,
             metadata: { operationId, attempt: attempts },
-            timestamp: Date.now()
+            timestamp: Date.now(),
           };
 
           // Attempt error recovery
           try {
             const recoveryResult = await this.errorRecovery.handleError(lastError, errorContext);
-            
+
             if (recoveryResult && !recoveryResult.error) {
               // Recovery successful
               warnings.push(`Recovered from error using fallback: ${lastError.message}`);
@@ -130,8 +130,8 @@ export class ResilientCLIWrapper extends EventEmitter {
                 metrics: {
                   attempts,
                   duration: Date.now() - startTime,
-                  recoveryActions: 1
-                }
+                  recoveryActions: 1,
+                },
               };
             }
           } catch (recoveryError) {
@@ -165,8 +165,8 @@ export class ResilientCLIWrapper extends EventEmitter {
             metrics: {
               attempts,
               duration: Date.now() - startTime,
-              recoveryActions: 1
-            }
+              recoveryActions: 1,
+            },
           };
         }
       }
@@ -179,10 +179,9 @@ export class ResilientCLIWrapper extends EventEmitter {
         metrics: {
           attempts,
           duration: Date.now() - startTime,
-          recoveryActions: 0
-        }
+          recoveryActions: 0,
+        },
       };
-
     } catch (error) {
       // Unexpected error in wrapper itself
       this.logger.error(`Unexpected error in resilient wrapper:`, error);
@@ -192,8 +191,8 @@ export class ResilientCLIWrapper extends EventEmitter {
         metrics: {
           attempts: attempts || 1,
           duration: Date.now() - startTime,
-          recoveryActions: 0
-        }
+          recoveryActions: 0,
+        },
       };
     }
   }
@@ -211,11 +210,11 @@ export class ResilientCLIWrapper extends EventEmitter {
         return await operation();
       } catch (error) {
         this.logger.warn(`${operationName} failed (attempt ${attempt}):`, error);
-        
+
         if (attempt === maxAttempts) {
           throw error;
         }
-        
+
         await this.sleep(Math.min(1000 * attempt, 5000));
       }
     }
@@ -234,11 +233,11 @@ export class ResilientCLIWrapper extends EventEmitter {
       return await operation();
     } catch (error) {
       this.logger.warn(`${operationName} failed, using fallback:`, error);
-      
+
       if (this.defaultOptions.errorNotification) {
         console.warn(chalk.yellow(`⚠️  ${operationName} unavailable, using defaults`));
       }
-      
+
       return fallback;
     }
   }
@@ -271,7 +270,7 @@ export class ResilientCLIWrapper extends EventEmitter {
       } catch (error) {
         const errorMsg = `Batch operation ${i + 1} failed: ${(error as Error).message}`;
         errors.push(errorMsg);
-        
+
         if (!context.tolerateFailures || errors.length > maxFailures) {
           return {
             success: false,
@@ -280,11 +279,11 @@ export class ResilientCLIWrapper extends EventEmitter {
             metrics: {
               attempts: 1,
               duration: Date.now() - startTime,
-              recoveryActions: 0
-            }
+              recoveryActions: 0,
+            },
           };
         }
-        
+
         warnings.push(errorMsg);
       }
     }
@@ -298,8 +297,8 @@ export class ResilientCLIWrapper extends EventEmitter {
       metrics: {
         attempts: 1,
         duration: Date.now() - startTime,
-        recoveryActions: 0
-      }
+        recoveryActions: 0,
+      },
     };
   }
 
@@ -336,7 +335,7 @@ export class ResilientCLIWrapper extends EventEmitter {
       mode: 'minimal',
       message: `${context.name} is running in minimal mode`,
       limitations: ['Limited functionality due to error'],
-      originalError: error.message
+      originalError: error.message,
     };
   }
 
@@ -351,7 +350,7 @@ export class ResilientCLIWrapper extends EventEmitter {
       mode: 'basic',
       message: `${context.name} is running with basic functionality`,
       availableFeatures: ['core operations only'],
-      originalError: error.message
+      originalError: error.message,
     };
   }
 
@@ -366,7 +365,7 @@ export class ResilientCLIWrapper extends EventEmitter {
       mode: 'safe',
       message: `${context.name} is running in safe mode`,
       status: 'degraded but functional',
-      originalError: error.message
+      originalError: error.message,
     };
   }
 
@@ -378,10 +377,10 @@ export class ResilientCLIWrapper extends EventEmitter {
       const timeoutId = setTimeout(() => {
         reject(new Error(`Operation '${operationName}' timed out after ${timeoutMs}ms`));
       }, timeoutMs);
-      
+
       // Prevent timeout from keeping process alive during tests
       timeoutId.unref();
-      
+
       // Store timeout ID for potential cleanup (though in this case it auto-cleans when Promise resolves)
       return timeoutId;
     });
@@ -401,19 +400,19 @@ export class ResilientCLIWrapper extends EventEmitter {
    * Setup error recovery event listeners
    */
   private setupErrorRecoveryListeners(): void {
-    this.errorRecovery.on('recovery:success', (event) => {
+    this.errorRecovery.on('recovery:success', event => {
       this.logger.info('Error recovery successful:', {
         operation: event.context.operation,
-        action: event.action.description
+        action: event.action.description,
       });
     });
 
-    this.errorRecovery.on('error:critical', (event) => {
+    this.errorRecovery.on('error:critical', event => {
       console.error(chalk.red(`🚨 Critical Error: ${event.error.message}`));
       this.emit('critical_error', event);
     });
 
-    this.errorRecovery.on('error:overload', (event) => {
+    this.errorRecovery.on('error:overload', event => {
       console.error(chalk.red(`🛑 System Overload: Too many errors (${event.errorCount})`));
       this.emit('system_overload', event);
     });
@@ -425,12 +424,12 @@ export class ResilientCLIWrapper extends EventEmitter {
   getSystemHealth(): any {
     const errorStats = this.errorRecovery.getErrorStats();
     const systemHealth = this.errorRecovery.getSystemHealth();
-    
+
     return {
       ...systemHealth,
       operationCount: this.operationCount,
       errorStats,
-      configuration: this.defaultOptions
+      configuration: this.defaultOptions,
     };
   }
 

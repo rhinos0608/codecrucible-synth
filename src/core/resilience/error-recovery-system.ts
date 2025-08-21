@@ -37,7 +37,7 @@ export class ErrorRecoverySystem extends EventEmitter {
   private recoveryPatterns: ErrorPattern[] = [];
   private globalErrorCount = 0;
   private maxGlobalErrors = 50;
-  
+
   constructor() {
     super();
     this.logger = new Logger('ErrorRecovery');
@@ -58,16 +58,18 @@ export class ErrorRecoverySystem extends EventEmitter {
         {
           type: 'retry',
           description: 'Retry network operation with backoff',
-          action: async () => { throw error; }, // Will be overridden by caller
+          action: async () => {
+            throw error;
+          }, // Will be overridden by caller
           maxAttempts: 3,
-          backoffMs: 1000
+          backoffMs: 1000,
         },
         {
           type: 'graceful_degradation',
           description: 'Continue with limited functionality',
-          action: async () => ({ degraded: true, reason: 'network_error' })
-        }
-      ]
+          action: async () => ({ degraded: true, reason: 'network_error' }),
+        },
+      ],
     });
 
     // File system errors
@@ -79,14 +81,14 @@ export class ErrorRecoverySystem extends EventEmitter {
         {
           type: 'fallback',
           description: 'Use alternative file access method',
-          action: async () => this.createFallbackFileHandler(error, context)
+          action: async () => this.createFallbackFileHandler(error, context),
         },
         {
           type: 'notify_user',
           description: 'Inform user about file access issue',
-          action: async () => this.notifyFileSystemError(error, context)
-        }
-      ]
+          action: async () => this.notifyFileSystemError(error, context),
+        },
+      ],
     });
 
     // Model/AI service errors
@@ -98,14 +100,14 @@ export class ErrorRecoverySystem extends EventEmitter {
         {
           type: 'fallback',
           description: 'Switch to fallback model/provider',
-          action: async () => ({ fallback_provider: true })
+          action: async () => ({ fallback_provider: true }),
         },
         {
           type: 'graceful_degradation',
           description: 'Continue with basic functionality',
-          action: async () => ({ basic_mode: true })
-        }
-      ]
+          action: async () => ({ basic_mode: true }),
+        },
+      ],
     });
 
     // Memory/Resource errors
@@ -117,14 +119,14 @@ export class ErrorRecoverySystem extends EventEmitter {
         {
           type: 'graceful_degradation',
           description: 'Clear caches and reduce memory usage',
-          action: async () => this.performMemoryCleanup()
+          action: async () => this.performMemoryCleanup(),
         },
         {
           type: 'notify_user',
           description: 'Warn user about resource constraints',
-          action: async () => this.notifyResourceError(error, context)
-        }
-      ]
+          action: async () => this.notifyResourceError(error, context),
+        },
+      ],
     });
 
     // JSON/Parsing errors
@@ -136,9 +138,9 @@ export class ErrorRecoverySystem extends EventEmitter {
         {
           type: 'fallback',
           description: 'Use alternative parser or safe defaults',
-          action: async () => this.createSafeParsingFallback(error, context)
-        }
-      ]
+          action: async () => this.createSafeParsingFallback(error, context),
+        },
+      ],
     });
 
     // TypeScript/Compilation errors
@@ -150,9 +152,9 @@ export class ErrorRecoverySystem extends EventEmitter {
         {
           type: 'fallback',
           description: 'Skip type checking or use JavaScript mode',
-          action: async () => ({ skip_types: true, mode: 'javascript' })
-        }
-      ]
+          action: async () => ({ skip_types: true, mode: 'javascript' }),
+        },
+      ],
     });
   }
 
@@ -170,7 +172,7 @@ export class ErrorRecoverySystem extends EventEmitter {
    */
   async handleError(error: Error, context: ErrorContext): Promise<any> {
     this.globalErrorCount++;
-    
+
     // Check if we've exceeded global error limit
     if (this.globalErrorCount > this.maxGlobalErrors) {
       return this.handleCriticalErrorOverload(error, context);
@@ -180,7 +182,7 @@ export class ErrorRecoverySystem extends EventEmitter {
     this.logger.error(`Error in ${context.component}:${context.operation}`, {
       error: error.message,
       severity: context.severity,
-      recoverable: context.recoverable
+      recoverable: context.recoverable,
     });
 
     // Record error history
@@ -188,7 +190,7 @@ export class ErrorRecoverySystem extends EventEmitter {
 
     // Find matching recovery pattern
     const recoveryActions = this.findRecoveryActions(error, context);
-    
+
     if (recoveryActions.length === 0) {
       return this.handleUnknownError(error, context);
     }
@@ -197,7 +199,7 @@ export class ErrorRecoverySystem extends EventEmitter {
     for (const action of recoveryActions) {
       try {
         const result = await this.executeRecoveryAction(action, error, context);
-        
+
         if (result !== null && result !== undefined) {
           this.logger.info(`Recovery successful: ${action.description}`);
           this.emit('recovery:success', { error, context, action, result });
@@ -205,7 +207,7 @@ export class ErrorRecoverySystem extends EventEmitter {
         }
       } catch (recoveryError) {
         this.logger.warn(`Recovery action failed: ${action.description}`, {
-          error: recoveryError.message
+          error: recoveryError.message,
         });
       }
     }
@@ -223,7 +225,7 @@ export class ErrorRecoverySystem extends EventEmitter {
 
     for (const pattern of this.recoveryPatterns) {
       let matches = false;
-      
+
       if (pattern.pattern instanceof RegExp) {
         matches = pattern.pattern.test(errorMessage);
       } else {
@@ -244,8 +246,8 @@ export class ErrorRecoverySystem extends EventEmitter {
    * Execute a recovery action with retry logic
    */
   private async executeRecoveryAction(
-    action: RecoveryAction, 
-    originalError: Error, 
+    action: RecoveryAction,
+    originalError: Error,
     context: ErrorContext
   ): Promise<any> {
     const maxAttempts = action.maxAttempts || 1;
@@ -256,19 +258,18 @@ export class ErrorRecoverySystem extends EventEmitter {
         if (attempt > 1 && backoffMs > 0) {
           await this.sleep(backoffMs * attempt);
         }
-        
+
         const result = await action.action();
         return result;
-        
       } catch (error) {
         if (attempt === maxAttempts) {
           throw error;
         }
-        
+
         this.logger.debug(`Recovery attempt ${attempt}/${maxAttempts} failed, retrying...`);
       }
     }
-    
+
     return null;
   }
 
@@ -277,14 +278,14 @@ export class ErrorRecoverySystem extends EventEmitter {
    */
   private recordError(context: ErrorContext): void {
     const key = `${context.component}:${context.operation}`;
-    
+
     if (!this.errorHistory.has(key)) {
       this.errorHistory.set(key, []);
     }
-    
+
     const history = this.errorHistory.get(key)!;
     history.push(context);
-    
+
     // Keep only last 10 errors per operation
     if (history.length > 10) {
       history.shift();
@@ -297,7 +298,7 @@ export class ErrorRecoverySystem extends EventEmitter {
   private async handleUnknownError(error: Error, context: ErrorContext): Promise<any> {
     this.logger.warn('Unknown error pattern, using default handling', {
       error: error.message,
-      context
+      context,
     });
 
     if (context.severity === 'critical') {
@@ -308,7 +309,7 @@ export class ErrorRecoverySystem extends EventEmitter {
     return {
       error: true,
       message: 'Operation failed, continuing with limited functionality',
-      originalError: error.message
+      originalError: error.message,
     };
   }
 
@@ -318,7 +319,7 @@ export class ErrorRecoverySystem extends EventEmitter {
   private async handleUnrecoverableError(error: Error, context: ErrorContext): Promise<any> {
     this.logger.error('All recovery attempts failed', {
       error: error.message,
-      context
+      context,
     });
 
     this.emit('error:unrecoverable', { error, context });
@@ -331,7 +332,7 @@ export class ErrorRecoverySystem extends EventEmitter {
       error: true,
       recovered: false,
       message: 'Operation failed after recovery attempts',
-      originalError: error.message
+      originalError: error.message,
     };
   }
 
@@ -341,7 +342,7 @@ export class ErrorRecoverySystem extends EventEmitter {
   private async handleCriticalErrorOverload(error: Error, context: ErrorContext): Promise<any> {
     this.logger.error(`Critical: Too many errors (${this.globalErrorCount}), entering safe mode`);
     this.emit('error:overload', { errorCount: this.globalErrorCount });
-    
+
     throw new Error('System entered safe mode due to excessive errors');
   }
 
@@ -353,7 +354,7 @@ export class ErrorRecoverySystem extends EventEmitter {
     return {
       fallback: true,
       method: 'safe_defaults',
-      reason: 'filesystem_error'
+      reason: 'filesystem_error',
     };
   }
 
@@ -365,7 +366,7 @@ export class ErrorRecoverySystem extends EventEmitter {
       parsed: true,
       data: {},
       warning: 'Used safe parsing fallback',
-      originalError: error.message
+      originalError: error.message,
     };
   }
 
@@ -377,12 +378,12 @@ export class ErrorRecoverySystem extends EventEmitter {
     if (global.gc) {
       global.gc();
     }
-    
+
     this.emit('memory:cleanup');
-    
+
     return {
       cleaned: true,
-      memoryAfter: process.memoryUsage().heapUsed
+      memoryAfter: process.memoryUsage().heapUsed,
     };
   }
 
@@ -410,8 +411,8 @@ export class ErrorRecoverySystem extends EventEmitter {
   private setupGlobalErrorHandling(): void {
     if (!ErrorRecoverySystem.globalErrorHandlersRegistered) {
       ErrorRecoverySystem.globalErrorHandlersRegistered = true;
-      
-      process.on('uncaughtException', (error) => {
+
+      process.on('uncaughtException', error => {
         this.logger.error('Uncaught exception:', error);
         this.emit('error:uncaught', error);
       });
@@ -431,14 +432,15 @@ export class ErrorRecoverySystem extends EventEmitter {
       totalErrors: this.globalErrorCount,
       errorsByComponent: {} as Record<string, number>,
       errorsByCategory: {} as Record<string, number>,
-      recentErrors: [] as ErrorContext[]
+      recentErrors: [] as ErrorContext[],
     };
 
     // Collect statistics from error history
     for (const [key, history] of this.errorHistory.entries()) {
       const component = key.split(':')[0];
-      stats.errorsByComponent[component] = (stats.errorsByComponent[component] || 0) + history.length;
-      
+      stats.errorsByComponent[component] =
+        (stats.errorsByComponent[component] || 0) + history.length;
+
       // Add recent errors
       stats.recentErrors.push(...history.slice(-3));
     }
@@ -469,7 +471,7 @@ export class ErrorRecoverySystem extends EventEmitter {
     const health = {
       status: 'healthy' as 'healthy' | 'degraded' | 'critical',
       errorRate: this.globalErrorCount,
-      issues: [] as string[]
+      issues: [] as string[],
     };
 
     if (this.globalErrorCount > 30) {

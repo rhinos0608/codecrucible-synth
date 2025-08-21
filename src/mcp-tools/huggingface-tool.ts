@@ -19,7 +19,13 @@ export interface ModelInfo {
   library_name?: string;
   language?: string[];
   license?: string;
-  modelType: 'text-generation' | 'text-classification' | 'translation' | 'summarization' | 'question-answering' | 'other';
+  modelType:
+    | 'text-generation'
+    | 'text-classification'
+    | 'translation'
+    | 'summarization'
+    | 'question-answering'
+    | 'other';
 }
 
 export interface DatasetInfo {
@@ -46,7 +52,7 @@ export interface SpaceInfo {
 
 /**
  * Hugging Face MCP Tool Integration
- * 
+ *
  * Provides access to Hugging Face Hub for model discovery,
  * dataset exploration, and space browsing.
  */
@@ -58,7 +64,7 @@ export class HuggingFaceTool {
     this.config = {
       ...config,
       baseUrl: config.baseUrl || 'https://huggingface.co/api',
-      timeout: config.timeout || 30000
+      timeout: config.timeout || 30000,
     };
   }
 
@@ -84,7 +90,7 @@ export class HuggingFaceTool {
 
     try {
       const params = new URLSearchParams();
-      
+
       if (query) params.append('search', query);
       if (options.task) params.append('pipeline_tag', options.task);
       if (options.library) params.append('library', options.library);
@@ -95,18 +101,14 @@ export class HuggingFaceTool {
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
       if (options.filter) params.append('filter', options.filter);
 
-      const response = await axios.get(
-        `${this.config.baseUrl}/models?${params.toString()}`,
-        {
-          headers: this.getHeaders(),
-          timeout: this.config.timeout
-        }
-      );
+      const response = await axios.get(`${this.config.baseUrl}/models?${params.toString()}`, {
+        headers: this.getHeaders(),
+        timeout: this.config.timeout,
+      });
 
       this.requestCount++;
-      
-      return response.data.map((model: any) => this.processModelInfo(model));
 
+      return response.data.map((model: any) => this.processModelInfo(model));
     } catch (error: any) {
       logger.error('Hugging Face model search failed:', error);
       this.handleError(error);
@@ -123,18 +125,14 @@ export class HuggingFaceTool {
     }
 
     try {
-      const response = await axios.get(
-        `${this.config.baseUrl}/models/${modelId}`,
-        {
-          headers: this.getHeaders(),
-          timeout: this.config.timeout
-        }
-      );
+      const response = await axios.get(`${this.config.baseUrl}/models/${modelId}`, {
+        headers: this.getHeaders(),
+        timeout: this.config.timeout,
+      });
 
       this.requestCount++;
-      
-      return this.processModelInfo(response.data);
 
+      return this.processModelInfo(response.data);
     } catch (error: any) {
       logger.error('Failed to get model info:', error);
       this.handleError(error);
@@ -163,7 +161,7 @@ export class HuggingFaceTool {
 
     try {
       const params = new URLSearchParams();
-      
+
       if (query) params.append('search', query);
       if (options.task) params.append('task_categories', options.task);
       if (options.language) params.append('language', options.language);
@@ -173,18 +171,14 @@ export class HuggingFaceTool {
       if (options.direction) params.append('direction', options.direction);
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
 
-      const response = await axios.get(
-        `${this.config.baseUrl}/datasets?${params.toString()}`,
-        {
-          headers: this.getHeaders(),
-          timeout: this.config.timeout
-        }
-      );
+      const response = await axios.get(`${this.config.baseUrl}/datasets?${params.toString()}`, {
+        headers: this.getHeaders(),
+        timeout: this.config.timeout,
+      });
 
       this.requestCount++;
-      
-      return response.data.map((dataset: any) => this.processDatasetInfo(dataset));
 
+      return response.data.map((dataset: any) => this.processDatasetInfo(dataset));
     } catch (error: any) {
       logger.error('Hugging Face dataset search failed:', error);
       this.handleError(error);
@@ -210,25 +204,21 @@ export class HuggingFaceTool {
 
     try {
       const params = new URLSearchParams();
-      
+
       if (query) params.append('search', query);
       if (options.sdk) params.append('sdk', options.sdk);
       if (options.sort) params.append('sort', options.sort);
       if (options.direction) params.append('direction', options.direction);
       if (options.limit) params.append('limit', Math.min(options.limit, 100).toString());
 
-      const response = await axios.get(
-        `${this.config.baseUrl}/spaces?${params.toString()}`,
-        {
-          headers: this.getHeaders(),
-          timeout: this.config.timeout
-        }
-      );
+      const response = await axios.get(`${this.config.baseUrl}/spaces?${params.toString()}`, {
+        headers: this.getHeaders(),
+        timeout: this.config.timeout,
+      });
 
       this.requestCount++;
-      
-      return response.data.map((space: any) => this.processSpaceInfo(space));
 
+      return response.data.map((space: any) => this.processSpaceInfo(space));
     } catch (error: any) {
       logger.error('Hugging Face spaces search failed:', error);
       this.handleError(error);
@@ -240,7 +230,12 @@ export class HuggingFaceTool {
    * Find models suitable for a specific coding task
    */
   async findCodeModels(
-    task: 'code-generation' | 'code-completion' | 'code-explanation' | 'bug-fixing' | 'code-translation',
+    task:
+      | 'code-generation'
+      | 'code-completion'
+      | 'code-explanation'
+      | 'bug-fixing'
+      | 'code-translation',
     language?: string
   ): Promise<ModelInfo[]> {
     const taskMappings = {
@@ -248,17 +243,17 @@ export class HuggingFaceTool {
       'code-completion': 'text-generation',
       'code-explanation': 'text-generation',
       'bug-fixing': 'text-generation',
-      'code-translation': 'translation'
+      'code-translation': 'translation',
     };
 
     const searchQuery = `${task} ${language || 'code'}`;
-    
+
     return this.searchModels(searchQuery, {
       task: taskMappings[task],
       sort: 'downloads',
       direction: 'desc',
       limit: 20,
-      filter: 'code'
+      filter: 'code',
     });
   }
 
@@ -273,7 +268,7 @@ export class HuggingFaceTool {
       task: category,
       sort: 'downloads',
       direction: 'desc',
-      limit: 15
+      limit: 15,
     });
   }
 
@@ -291,7 +286,7 @@ export class HuggingFaceTool {
     const options: any = {
       limit: 25,
       sort: 'downloads',
-      direction: 'desc'
+      direction: 'desc',
     };
 
     if (criteria.language) {
@@ -306,7 +301,7 @@ export class HuggingFaceTool {
       const sizeFilters = {
         small: '< 1B',
         medium: '1B - 10B',
-        large: '> 10B'
+        large: '> 10B',
       };
       query += ` ${sizeFilters[criteria.size]} parameters`;
     }
@@ -315,7 +310,7 @@ export class HuggingFaceTool {
       const licenseMap = {
         commercial: 'apache-2.0',
         research: 'cc-by-nc-4.0',
-        open: 'mit'
+        open: 'mit',
       };
       options.license = licenseMap[criteria.license];
     }
@@ -341,23 +336,23 @@ export class HuggingFaceTool {
   }> {
     // Analyze use case to determine task type
     const taskAnalysis = this.analyzeUseCase(useCase);
-    
+
     // Search for models
     const models = await this.searchModels(useCase, {
       task: taskAnalysis.primaryTask,
       library: constraints.preferredLibrary,
       license: constraints.requiresCommercialLicense ? 'apache-2.0' : undefined,
       sort: constraints.performanceRequirement === 'speed' ? 'downloads' : 'likes',
-      limit: 30
+      limit: 30,
     });
 
     // Filter and rank models
     const filtered = this.filterModelsByConstraints(models, constraints);
-    
+
     return {
       recommended: filtered.slice(0, 5),
       alternatives: filtered.slice(5, 10),
-      reasoning: this.generateRecommendationReasoning(taskAnalysis, constraints, filtered)
+      reasoning: this.generateRecommendationReasoning(taskAnalysis, constraints, filtered),
     };
   }
 
@@ -376,7 +371,7 @@ export class HuggingFaceTool {
       library_name: data.library_name,
       language: data.language,
       license: data.license,
-      modelType: this.categorizeModel(data.pipeline_tag, data.tags)
+      modelType: this.categorizeModel(data.pipeline_tag, data.tags),
     };
   }
 
@@ -390,7 +385,7 @@ export class HuggingFaceTool {
       tags: data.tags || [],
       size: data.size_categories?.[0],
       language: data.language,
-      license: data.license
+      license: data.license,
     };
   }
 
@@ -402,7 +397,7 @@ export class HuggingFaceTool {
       likes: data.likes || 0,
       sdk: data.sdk,
       tags: data.tags || [],
-      runtime: data.runtime
+      runtime: data.runtime,
     };
   }
 
@@ -429,33 +424,37 @@ export class HuggingFaceTool {
     if (tags.some(tag => tag.includes('generation'))) return 'text-generation';
     if (tags.some(tag => tag.includes('classification'))) return 'text-classification';
     if (tags.some(tag => tag.includes('translation'))) return 'translation';
-    
+
     return 'other';
   }
 
   private analyzeUseCase(useCase: string): { primaryTask: string; confidence: number } {
     const useCaseLower = useCase.toLowerCase();
-    
-    if (useCaseLower.includes('generat') || useCaseLower.includes('creat') || useCaseLower.includes('writ')) {
+
+    if (
+      useCaseLower.includes('generat') ||
+      useCaseLower.includes('creat') ||
+      useCaseLower.includes('writ')
+    ) {
       return { primaryTask: 'text-generation', confidence: 0.9 };
     }
-    
+
     if (useCaseLower.includes('classif') || useCaseLower.includes('categor')) {
       return { primaryTask: 'text-classification', confidence: 0.8 };
     }
-    
+
     if (useCaseLower.includes('translat')) {
       return { primaryTask: 'translation', confidence: 0.9 };
     }
-    
+
     if (useCaseLower.includes('summar')) {
       return { primaryTask: 'summarization', confidence: 0.8 };
     }
-    
+
     if (useCaseLower.includes('question') || useCaseLower.includes('answer')) {
       return { primaryTask: 'question-answering', confidence: 0.8 };
     }
-    
+
     return { primaryTask: 'text-generation', confidence: 0.5 };
   }
 
@@ -466,7 +465,7 @@ export class HuggingFaceTool {
         const hasSize = model.tags.some(tag => tag.includes('size') || tag.includes('param'));
         // This is a simplified check - in practice, you'd parse size information
       }
-      
+
       // Commercial license constraint
       if (constraints.requiresCommercialLicense) {
         const commercialLicenses = ['apache-2.0', 'mit', 'bsd-3-clause'];
@@ -474,39 +473,43 @@ export class HuggingFaceTool {
           return false;
         }
       }
-      
+
       return true;
     });
   }
 
-  private generateRecommendationReasoning(taskAnalysis: any, constraints: any, models: ModelInfo[]): string {
+  private generateRecommendationReasoning(
+    taskAnalysis: any,
+    constraints: any,
+    models: ModelInfo[]
+  ): string {
     let reasoning = `Based on your use case, I identified this as a ${taskAnalysis.primaryTask} task with ${taskAnalysis.confidence * 100}% confidence. `;
-    
+
     if (models.length > 0) {
       reasoning += `I found ${models.length} suitable models. `;
       reasoning += `The top recommendation is ${models[0].name} due to its ${models[0].downloads} downloads and popularity. `;
     }
-    
+
     if (constraints.requiresCommercialLicense) {
       reasoning += `Filtered for commercial-friendly licenses. `;
     }
-    
+
     if (constraints.preferredLibrary) {
       reasoning += `Prioritized ${constraints.preferredLibrary} library compatibility. `;
     }
-    
+
     return reasoning;
   }
 
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      'User-Agent': 'CodeCrucible-Synth/2.0.0'
+      'User-Agent': 'CodeCrucible-Synth/2.0.0',
     };
-    
+
     if (this.config.apiKey) {
       headers['Authorization'] = `Bearer ${this.config.apiKey}`;
     }
-    
+
     return headers;
   }
 
@@ -523,7 +526,7 @@ export class HuggingFaceTool {
   /**
    * Public utility methods
    */
-  
+
   /**
    * Test API connectivity
    */
@@ -548,7 +551,7 @@ export class HuggingFaceTool {
     return {
       requestCount: this.requestCount,
       isEnabled: this.config.enabled,
-      hasApiKey: !!this.config.apiKey
+      hasApiKey: !!this.config.apiKey,
     };
   }
 

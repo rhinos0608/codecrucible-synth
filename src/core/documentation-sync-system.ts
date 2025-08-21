@@ -78,7 +78,7 @@ export class DocumentationSyncSystem {
     return {
       metrics,
       issues: this.issues,
-      recommendations
+      recommendations,
     };
   }
 
@@ -94,7 +94,7 @@ export class DocumentationSyncSystem {
       'README*',
       'CHANGELOG*',
       'LICENSE*',
-      '*.txt'
+      '*.txt',
     ];
 
     const docFiles: string[] = [];
@@ -120,7 +120,7 @@ export class DocumentationSyncSystem {
           content,
           references: this.extractReferences(content),
           outdated: false,
-          missing: []
+          missing: [],
         };
 
         this.docs.set(file, doc);
@@ -129,7 +129,9 @@ export class DocumentationSyncSystem {
       }
     }
 
-    logger.info(`📄 Found ${this.docs.size} documentation files, ${this.codeFiles.length} code files`);
+    logger.info(
+      `📄 Found ${this.docs.size} documentation files, ${this.codeFiles.length} code files`
+    );
   }
 
   /**
@@ -137,13 +139,13 @@ export class DocumentationSyncSystem {
    */
   private classifyDocType(filePath: string): DocumentationFile['type'] {
     const fileName = basename(filePath).toLowerCase();
-    
+
     if (fileName.includes('readme')) return 'readme';
     if (fileName.includes('changelog') || fileName.includes('history')) return 'changelog';
     if (fileName.includes('api') || fileName.includes('reference')) return 'api';
     if (fileName.includes('guide') || fileName.includes('tutorial')) return 'guide';
     if (fileName.includes('config') || fileName.includes('setup')) return 'config';
-    
+
     return 'other';
   }
 
@@ -173,7 +175,9 @@ export class DocumentationSyncSystem {
       const codeContent = match[2];
       const importMatches = codeContent.match(/import.*from\s+['"]([^'"]+)['"]/g);
       if (importMatches) {
-        references.push(...importMatches.map(imp => imp.split('from')[1].trim().replace(/['"]/g, '')));
+        references.push(
+          ...importMatches.map(imp => imp.split('from')[1].trim().replace(/['"]/g, ''))
+        );
       }
     }
 
@@ -193,7 +197,7 @@ export class DocumentationSyncSystem {
           file: filePath,
           description: 'Documentation file is too short or empty',
           suggestion: 'Add comprehensive content explaining purpose and usage',
-          autoFixable: false
+          autoFixable: false,
         });
       }
 
@@ -207,7 +211,7 @@ export class DocumentationSyncSystem {
             file: filePath,
             description: `Contains placeholder: ${placeholder}`,
             suggestion: 'Replace placeholder with actual content',
-            autoFixable: false
+            autoFixable: false,
           });
         }
       }
@@ -219,7 +223,7 @@ export class DocumentationSyncSystem {
         const oldestDate = new Date(Math.min(...dates.map(d => new Date(d).getTime())));
         const oneYearAgo = new Date();
         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-        
+
         if (oldestDate < oneYearAgo) {
           doc.outdated = true;
           this.issues.push({
@@ -228,7 +232,7 @@ export class DocumentationSyncSystem {
             file: filePath,
             description: 'Contains dates older than one year',
             suggestion: 'Review and update dated information',
-            autoFixable: false
+            autoFixable: false,
           });
         }
       }
@@ -244,7 +248,7 @@ export class DocumentationSyncSystem {
       { file: 'README.md', description: 'Main project README' },
       { file: 'SETUP.md', description: 'Setup and installation guide' },
       { file: 'CHANGELOG.md', description: 'Change history' },
-      { file: 'docs/API.md', description: 'API documentation' }
+      { file: 'docs/API.md', description: 'API documentation' },
     ];
 
     for (const required of requiredDocs) {
@@ -255,18 +259,19 @@ export class DocumentationSyncSystem {
           file: required.file,
           description: `Missing ${required.description}`,
           suggestion: `Create ${required.file} with comprehensive ${required.description.toLowerCase()}`,
-          autoFixable: true
+          autoFixable: true,
         });
       }
     }
 
     // Check for code files without documentation
-    const criticalFiles = this.codeFiles.filter(file => 
-      file.includes('index.ts') || 
-      file.includes('main.ts') || 
-      file.includes('cli.ts') ||
-      file.includes('client.ts') ||
-      file.includes('agent.ts')
+    const criticalFiles = this.codeFiles.filter(
+      file =>
+        file.includes('index.ts') ||
+        file.includes('main.ts') ||
+        file.includes('cli.ts') ||
+        file.includes('client.ts') ||
+        file.includes('agent.ts')
     );
 
     for (const file of criticalFiles) {
@@ -280,7 +285,7 @@ export class DocumentationSyncSystem {
           file: file,
           description: 'Critical file lacks documentation',
           suggestion: 'Add JSDoc comments or create corresponding documentation file',
-          autoFixable: true
+          autoFixable: true,
         });
       }
     }
@@ -292,7 +297,7 @@ export class DocumentationSyncSystem {
   private hasInlineDocumentation(filePath: string): boolean {
     try {
       const content = readFileSync(filePath, 'utf-8');
-      return content.includes('/**') || content.includes('//') && content.split('//').length > 5;
+      return content.includes('/**') || (content.includes('//') && content.split('//').length > 5);
     } catch {
       return false;
     }
@@ -303,13 +308,13 @@ export class DocumentationSyncSystem {
    */
   private hasExternalDocumentation(filePath: string): boolean {
     const fileName = basename(filePath, '.ts').replace('.js', '');
-    
+
     for (const doc of this.docs.values()) {
       if (doc.content.toLowerCase().includes(fileName.toLowerCase())) {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -336,7 +341,7 @@ export class DocumentationSyncSystem {
               file: filePath,
               description: `Broken file reference: ${ref}`,
               suggestion: 'Update file path or remove broken reference',
-              autoFixable: false
+              autoFixable: false,
             });
           }
         }
@@ -351,7 +356,7 @@ export class DocumentationSyncSystem {
               file: filePath,
               description: `Broken documentation link: ${ref}`,
               suggestion: 'Create referenced documentation or fix link',
-              autoFixable: true
+              autoFixable: true,
             });
           }
         }
@@ -365,7 +370,7 @@ export class DocumentationSyncSystem {
   private checkOutdatedContent(): void {
     const packageJsonPath = 'package.json';
     let packageVersion = '1.0.0';
-    
+
     try {
       const packageContent = readFileSync(packageJsonPath, 'utf-8');
       const packageData = JSON.parse(packageContent);
@@ -378,7 +383,7 @@ export class DocumentationSyncSystem {
       // Check for version mismatches
       const versionRegex = /version\s*:?\s*['"]?([0-9]+\.[0-9]+\.[0-9]+)/gi;
       const versionMatches = doc.content.match(versionRegex);
-      
+
       if (versionMatches) {
         for (const versionMatch of versionMatches) {
           const extractedVersion = versionMatch.match(/([0-9]+\.[0-9]+\.[0-9]+)/)?.[1];
@@ -389,7 +394,7 @@ export class DocumentationSyncSystem {
               file: filePath,
               description: `Version mismatch: shows ${extractedVersion}, current is ${packageVersion}`,
               suggestion: `Update version references to ${packageVersion}`,
-              autoFixable: true
+              autoFixable: true,
             });
           }
         }
@@ -409,20 +414,21 @@ export class DocumentationSyncSystem {
 
     while ((match = codeBlockRegex.exec(doc.content)) !== null) {
       const codeContent = match[1];
-      
+
       // Check for imports that don't exist
       const importRegex = /import.*from\s+['"]([^'"]+)['"]/g;
       let importMatch;
-      
+
       while ((importMatch = importRegex.exec(codeContent)) !== null) {
         const importPath = importMatch[1];
-        
+
         // Check if import path exists in codebase
-        const pathExists = this.codeFiles.some(file => 
-          file.includes(importPath) || 
-          file.replace('src/', '').replace('.ts', '').includes(importPath)
+        const pathExists = this.codeFiles.some(
+          file =>
+            file.includes(importPath) ||
+            file.replace('src/', '').replace('.ts', '').includes(importPath)
         );
-        
+
         if (!pathExists && !importPath.startsWith('.') && !importPath.startsWith('node:')) {
           this.issues.push({
             type: 'outdated',
@@ -430,7 +436,7 @@ export class DocumentationSyncSystem {
             file: filePath,
             description: `Code example references non-existent import: ${importPath}`,
             suggestion: 'Update code example with correct import paths',
-            autoFixable: false
+            autoFixable: false,
           });
         }
       }
@@ -442,7 +448,7 @@ export class DocumentationSyncSystem {
    */
   private async generateMissingDocs(): Promise<void> {
     const autoFixableIssues = this.issues.filter(i => i.autoFixable);
-    
+
     for (const issue of autoFixableIssues) {
       try {
         if (issue.type === 'missing' && issue.file.endsWith('.md')) {
@@ -459,7 +465,7 @@ export class DocumentationSyncSystem {
    */
   private async generateDocFile(filePath: string): Promise<void> {
     let content = '';
-    
+
     if (filePath.includes('README')) {
       content = await this.generateReadme();
     } else if (filePath.includes('API')) {
@@ -483,7 +489,7 @@ export class DocumentationSyncSystem {
    */
   private async generateReadme(): Promise<string> {
     let packageData: Record<string, unknown> = {};
-    
+
     try {
       const packageContent = await fs.readFile('package.json', 'utf-8');
       packageData = JSON.parse(packageContent);
@@ -547,7 +553,7 @@ Last updated: ${new Date().toISOString()}
    */
   private async generateApiDocs(): Promise<string> {
     const exports = await this.extractExports();
-    
+
     let content = `# API Documentation
 
 ## Overview
@@ -560,17 +566,17 @@ This document provides a comprehensive reference for all public APIs.
 
     for (const [moduleName, moduleExports] of exports) {
       content += `### ${moduleName}\n\n`;
-      
+
       for (const exportItem of moduleExports) {
         content += `#### \`${exportItem.name}\`\n\n`;
         content += `${exportItem.description || 'No description available.'}\n\n`;
-        
+
         if (exportItem.type === 'class') {
           content += `**Type:** Class\n\n`;
         } else if (exportItem.type === 'function') {
           content += `**Type:** Function\n\n`;
         }
-        
+
         content += `**Usage:**\n\`\`\`typescript\n// TODO: Add usage example\n\`\`\`\n\n`;
       }
     }
@@ -583,28 +589,30 @@ This document provides a comprehensive reference for all public APIs.
   /**
    * Extract exports from code files
    */
-  private async extractExports(): Promise<Map<string, Array<{ name: string; type: string; description?: string }>>> {
+  private async extractExports(): Promise<
+    Map<string, Array<{ name: string; type: string; description?: string }>>
+  > {
     const exports = new Map();
-    
+
     for (const file of this.codeFiles) {
       try {
         const content = await fs.readFile(file, 'utf-8');
         const moduleName = relative('src', file).replace('.ts', '').replace('.js', '');
         const moduleExports = [];
-        
+
         // Extract class exports
         const classRegex = /export\s+class\s+(\w+)/g;
         let match;
         while ((match = classRegex.exec(content)) !== null) {
           moduleExports.push({ name: match[1], type: 'class' });
         }
-        
+
         // Extract function exports
         const functionRegex = /export\s+(?:async\s+)?function\s+(\w+)/g;
         while ((match = functionRegex.exec(content)) !== null) {
           moduleExports.push({ name: match[1], type: 'function' });
         }
-        
+
         if (moduleExports.length > 0) {
           exports.set(moduleName, moduleExports);
         }
@@ -612,7 +620,7 @@ This document provides a comprehensive reference for all public APIs.
         // Ignore files that can't be read
       }
     }
-    
+
     return exports;
   }
 
@@ -760,19 +768,20 @@ Last updated: ${new Date().toISOString()}
     const outdatedFiles = Array.from(this.docs.values()).filter(d => d.outdated).length;
     const missingDocumentation = this.issues.filter(i => i.type === 'missing').length;
     const brokenLinks = this.issues.filter(i => i.type === 'broken_link').length;
-    
+
     // Coverage score based on critical files having documentation
-    const criticalFiles = this.codeFiles.filter(f => 
-      f.includes('index.ts') || f.includes('main.ts') || f.includes('cli.ts')
+    const criticalFiles = this.codeFiles.filter(
+      f => f.includes('index.ts') || f.includes('main.ts') || f.includes('cli.ts')
     );
-    
-    const documentedCriticalFiles = criticalFiles.filter(f => 
-      this.hasInlineDocumentation(f) || this.hasExternalDocumentation(f)
+
+    const documentedCriticalFiles = criticalFiles.filter(
+      f => this.hasInlineDocumentation(f) || this.hasExternalDocumentation(f)
     );
-    
-    const coverageScore = criticalFiles.length > 0 
-      ? Math.round((documentedCriticalFiles.length / criticalFiles.length) * 100)
-      : 100;
+
+    const coverageScore =
+      criticalFiles.length > 0
+        ? Math.round((documentedCriticalFiles.length / criticalFiles.length) * 100)
+        : 100;
 
     const lastUpdated = Math.max(...Array.from(this.docs.values()).map(d => d.lastModified));
 
@@ -782,7 +791,7 @@ Last updated: ${new Date().toISOString()}
       missingDocumentation,
       brokenLinks,
       coverageScore,
-      lastUpdated
+      lastUpdated,
     };
   }
 
@@ -821,7 +830,7 @@ Last updated: ${new Date().toISOString()}
    */
   generateReport(): string {
     const metrics = this.calculateMetrics();
-    
+
     let report = `
 📚 DOCUMENTATION SYNCHRONIZATION REPORT
 ======================================
@@ -849,22 +858,33 @@ OVERVIEW:
       report += '─'.repeat(50) + '\n';
 
       for (const [type, issues] of issueTypes) {
-        const icon = type === 'missing' ? '📄' : 
-                    type === 'outdated' ? '📅' : 
-                    type === 'broken_link' ? '🔗' : 
-                    type === 'inconsistent' ? '⚠️' : '🔄';
-        
+        const icon =
+          type === 'missing'
+            ? '📄'
+            : type === 'outdated'
+              ? '📅'
+              : type === 'broken_link'
+                ? '🔗'
+                : type === 'inconsistent'
+                  ? '⚠️'
+                  : '🔄';
+
         report += `${icon} ${type.replace('_', ' ').toUpperCase()} (${issues.length}):\n`;
-        
+
         for (const issue of issues.slice(0, 5)) {
-          const severity = issue.severity === 'critical' ? '🚨' : 
-                          issue.severity === 'high' ? '🔴' : 
-                          issue.severity === 'medium' ? '🟡' : '🔵';
-          
+          const severity =
+            issue.severity === 'critical'
+              ? '🚨'
+              : issue.severity === 'high'
+                ? '🔴'
+                : issue.severity === 'medium'
+                  ? '🟡'
+                  : '🔵';
+
           report += `  ${severity} ${issue.file}: ${issue.description}\n`;
           report += `     💡 ${issue.suggestion}\n`;
         }
-        
+
         if (issues.length > 5) {
           report += `     ... and ${issues.length - 5} more\n`;
         }
@@ -881,10 +901,16 @@ OVERVIEW:
     report += 'DOCUMENTATION BREAKDOWN:\n';
     report += '─'.repeat(50) + '\n';
     for (const [type, count] of docsByType) {
-      const icon = type === 'readme' ? '📖' : 
-                  type === 'api' ? '🔧' : 
-                  type === 'guide' ? '📚' : 
-                  type === 'changelog' ? '📅' : '📄';
+      const icon =
+        type === 'readme'
+          ? '📖'
+          : type === 'api'
+            ? '🔧'
+            : type === 'guide'
+              ? '📚'
+              : type === 'changelog'
+                ? '📅'
+                : '📄';
       report += `${icon} ${type}: ${count}\n`;
     }
 
@@ -928,7 +954,7 @@ OVERVIEW:
       const currentVersion = packageData.version;
 
       let content = await fs.readFile(filePath, 'utf-8');
-      
+
       // Replace version references
       const versionRegex = /version\s*:?\s*['"]?[0-9]+\.[0-9]+\.[0-9]+['"]?/gi;
       content = content.replace(versionRegex, `version: "${currentVersion}"`);
@@ -954,18 +980,19 @@ OVERVIEW:
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const docSync = new DocumentationSyncSystem();
-  
-  docSync.syncDocumentation()
+
+  docSync
+    .syncDocumentation()
     .then(result => {
       console.log(docSync.generateReport());
-      
+
       if (result.issues.length > 0) {
         console.log(`\n🔧 Found ${result.issues.length} documentation issues`);
         console.log('📋 Recommendations:');
         for (const rec of result.recommendations) {
           console.log(`  • ${rec}`);
         }
-        
+
         const autoFixable = result.issues.filter(i => i.autoFixable).length;
         if (autoFixable > 0) {
           console.log(`\n💾 ${autoFixable} issues can be automatically fixed`);

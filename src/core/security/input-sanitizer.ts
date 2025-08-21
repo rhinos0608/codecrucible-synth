@@ -12,16 +12,26 @@ export interface SanitizationResult {
 
 export class InputSanitizer {
   private static readonly ALLOWED_SLASH_COMMANDS = new Set([
-    '/help', '/voices', '/voice', '/mode', '/todo', '/plan', 
-    '/dual', '/dualagent', '/stream', '/audit', '/autoconfig', '/config'
+    '/help',
+    '/voices',
+    '/voice',
+    '/mode',
+    '/todo',
+    '/plan',
+    '/dual',
+    '/dualagent',
+    '/stream',
+    '/audit',
+    '/autoconfig',
+    '/config',
   ]);
 
   private static readonly DANGEROUS_PATTERNS = [
-    /[;&|`$(){}[\]\\]/g,  // Shell metacharacters
-    /\.\./g,              // Directory traversal
+    /[;&|`$(){}[\]\\]/g, // Shell metacharacters
+    /\.\./g, // Directory traversal
     /(rm|del|format|shutdown|reboot|halt)/i, // Dangerous commands
-    /(exec|eval|system|spawn)/i,              // Code execution
-    /(<script|javascript:|data:)/i,           // Script injection
+    /(exec|eval|system|spawn)/i, // Code execution
+    /(<script|javascript:|data:)/i, // Script injection
     /(union|select|insert|update|delete|drop)/i, // SQL injection
     /(malicious|attack|exploit|hack|virus|trojan)/i, // Malicious keywords
   ];
@@ -47,7 +57,7 @@ export class InputSanitizer {
         sanitized: '',
         isValid: false,
         violations,
-        originalCommand: command
+        originalCommand: command,
       };
     }
 
@@ -66,7 +76,7 @@ export class InputSanitizer {
     // Sanitize arguments by removing dangerous characters
     const sanitizedArgs = args
       .replace(/[;&|`${}[\]\\]/g, '') // Remove shell metacharacters
-      .replace(/\.\./g, '')           // Remove directory traversal
+      .replace(/\.\./g, '') // Remove directory traversal
       .trim();
 
     // Reconstruct command
@@ -76,7 +86,7 @@ export class InputSanitizer {
       sanitized,
       isValid: violations.length === 0,
       violations,
-      originalCommand: command
+      originalCommand: command,
     };
   }
 
@@ -85,8 +95,15 @@ export class InputSanitizer {
    */
   static sanitizeVoiceNames(voiceNames: string[]): string[] {
     const allowedVoices = new Set([
-      'explorer', 'maintainer', 'analyzer', 'developer', 
-      'implementor', 'security', 'architect', 'designer', 'optimizer'
+      'explorer',
+      'maintainer',
+      'analyzer',
+      'developer',
+      'implementor',
+      'security',
+      'architect',
+      'designer',
+      'optimizer',
     ]);
 
     return voiceNames
@@ -109,11 +126,11 @@ export class InputSanitizer {
 
     // Enhanced dangerous pattern detection with more comprehensive coverage
     const enhancedDangerousPatterns = [
-      /[;&|`$(){}[\]\\]/g,  // Shell metacharacters
-      /\.\./g,              // Directory traversal
+      /[;&|`$(){}[\]\\]/g, // Shell metacharacters
+      /\.\./g, // Directory traversal
       /(rm|del|format|shutdown|reboot|halt)\s*(-[a-zA-Z]*\s*)*\s*[\/\\]*/gi, // Dangerous commands with flags
-      /(exec|eval|system|spawn|cmd|sh|bash|powershell)/gi,              // Code execution
-      /(<script|javascript:|data:)/gi,           // Script injection
+      /(exec|eval|system|spawn|cmd|sh|bash|powershell)/gi, // Code execution
+      /(<script|javascript:|data:)/gi, // Script injection
       /(union|select|insert|update|delete|drop)/gi, // SQL injection
       /(malicious|attack|exploit|hack|virus|trojan|backdoor|payload)/gi, // Malicious keywords
       /echo\s+["'].*malicious.*["']/gi, // Echo commands with malicious content
@@ -128,7 +145,7 @@ export class InputSanitizer {
         sanitized = sanitized.replace(pattern, '[FILTERED]');
       }
     }
-    
+
     // Additional comprehensive cleanup to remove any remaining traces of dangerous content
     sanitized = sanitized
       .replace(/rm\s+(-rf|--recursive|--force)\s*\/?.*/gi, '[REMOVED_COMMAND]')
@@ -145,7 +162,7 @@ export class InputSanitizer {
       sanitized,
       isValid: violations.length === 0,
       violations,
-      originalCommand: prompt
+      originalCommand: prompt,
     };
   }
 
@@ -180,7 +197,7 @@ export class InputSanitizer {
       sanitized,
       isValid: violations.length === 0,
       violations,
-      originalCommand: filePath
+      originalCommand: filePath,
     };
   }
 
@@ -188,17 +205,15 @@ export class InputSanitizer {
    * Create security error for audit logging
    */
   static createSecurityError(result: SanitizationResult, context: string): Error {
-    const error = new Error(
-      `Security violation in ${context}: ${result.violations.join(', ')}`
-    );
-    
+    const error = new Error(`Security violation in ${context}: ${result.violations.join(', ')}`);
+
     // Add metadata for security logging
     (error as any).securityContext = {
       originalInput: result.originalCommand,
       sanitizedInput: result.sanitized,
       violations: result.violations,
       timestamp: new Date().toISOString(),
-      context
+      context,
     };
 
     return error;

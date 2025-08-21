@@ -73,9 +73,11 @@ export class PerformanceValidator {
   async validateDocumentationClaims(): Promise<ValidationReport> {
     const startTime = Date.now();
     console.log('🔍 Validating performance claims against documented benchmarks...');
-    
+
     const environment = await this.getSystemEnvironment();
-    console.log(`📊 Test Environment: ${environment.platform}, Node ${environment.nodeVersion}, ${Math.round(environment.memory / 1024 / 1024 / 1024)}GB RAM`);
+    console.log(
+      `📊 Test Environment: ${environment.platform}, Node ${environment.nodeVersion}, ${Math.round(environment.memory / 1024 / 1024 / 1024)}GB RAM`
+    );
 
     try {
       const results = await Promise.all([
@@ -86,7 +88,7 @@ export class PerformanceValidator {
         this.benchmarkBoilerplateCode(),
         this.benchmarkComplexAnalysis(),
         this.benchmarkTaskRouting(),
-        this.benchmarkResourceUtilization()
+        this.benchmarkResourceUtilization(),
       ]);
 
       const validatedClaims = results.filter(r => r.meetsDocumentedMetric);
@@ -99,17 +101,18 @@ export class PerformanceValidator {
         recommendations: this.generateRecommendations(results),
         overallScore,
         timestamp: Date.now(),
-        environment
+        environment,
       };
 
       await this.saveReport(report);
-      
+
       const duration = Date.now() - startTime;
       console.log(`\n✅ Performance validation completed in ${(duration / 1000).toFixed(1)}s`);
-      console.log(`📈 Overall Score: ${overallScore.toFixed(1)}% (${validatedClaims.length}/${results.length} claims validated)`);
+      console.log(
+        `📈 Overall Score: ${overallScore.toFixed(1)}% (${validatedClaims.length}/${results.length} claims validated)`
+      );
 
       return report;
-
     } catch (error) {
       logger.error('Performance validation failed:', error);
       throw error;
@@ -127,7 +130,7 @@ export class PerformanceValidator {
       'Generate a Node.js Express API endpoint',
       'Create a Python class template',
       'Generate a SQL table creation script',
-      'Create a TypeScript interface definition'
+      'Create a TypeScript interface definition',
     ];
 
     const iterations = 5;
@@ -156,9 +159,9 @@ export class PerformanceValidator {
       for (let i = 0; i < iterations; i++) {
         const start = Date.now();
         try {
-          await this.hybridClient?.generateCode(task, [], { 
-            taskType: 'template', 
-            complexity: 'simple' 
+          await this.hybridClient?.generateCode(task, [], {
+            taskType: 'template',
+            complexity: 'simple',
           });
         } catch (error) {
           // Use estimated time if service unavailable
@@ -177,13 +180,15 @@ export class PerformanceValidator {
         ollamaTime: avgOllama,
         hybridTime: avgHybrid,
         improvement,
-        accuracy: 0.95 // Estimated accuracy
+        accuracy: 0.95, // Estimated accuracy
       });
 
       totalOllamaTime += avgOllama;
       totalHybridTime += avgHybrid;
 
-      console.log(`   📝 ${task.substring(0, 40)}... : ${(avgOllama / 1000).toFixed(1)}s → ${(avgHybrid / 1000).toFixed(1)}s (${improvement.toFixed(1)}x)`);
+      console.log(
+        `   📝 ${task.substring(0, 40)}... : ${(avgOllama / 1000).toFixed(1)}s → ${(avgHybrid / 1000).toFixed(1)}s (${improvement.toFixed(1)}x)`
+      );
     }
 
     const averageSpeedup = totalOllamaTime / totalHybridTime;
@@ -200,8 +205,8 @@ export class PerformanceValidator {
         times: taskResults.map(r => r.hybridTime),
         baseline: totalOllamaTime / tasks.length,
         target: 19,
-        tasks: taskResults
-      }
+        tasks: taskResults,
+      },
     };
   }
 
@@ -216,7 +221,7 @@ export class PerformanceValidator {
       'Clean up this Python function with proper spacing',
       'Format this CSS with consistent structure',
       'Organize this TypeScript interface properly',
-      'Format this SQL query with proper alignment'
+      'Format this SQL query with proper alignment',
     ];
 
     const iterations = 3;
@@ -224,13 +229,25 @@ export class PerformanceValidator {
     let totalHybridTime = 0;
 
     for (const task of formatTasks) {
-      const ollamaTime = await this.measureTaskTime(this.ollamaClient?.generateText.bind(this.ollamaClient), task) || 12700;
-      const hybridTime = await this.measureTaskTime(this.hybridClient?.generateCode.bind(this.hybridClient), task, [], { taskType: 'format' }) || 500;
-      
+      const ollamaTime =
+        (await this.measureTaskTime(
+          this.ollamaClient?.generateText.bind(this.ollamaClient),
+          task
+        )) || 12700;
+      const hybridTime =
+        (await this.measureTaskTime(
+          this.hybridClient?.generateCode.bind(this.hybridClient),
+          task,
+          [],
+          { taskType: 'format' }
+        )) || 500;
+
       totalOllamaTime += ollamaTime;
       totalHybridTime += hybridTime;
 
-      console.log(`   🎨 Format task: ${(ollamaTime / 1000).toFixed(1)}s → ${(hybridTime / 1000).toFixed(1)}s (${(ollamaTime / hybridTime).toFixed(1)}x)`);
+      console.log(
+        `   🎨 Format task: ${(ollamaTime / 1000).toFixed(1)}s → ${(hybridTime / 1000).toFixed(1)}s (${(ollamaTime / hybridTime).toFixed(1)}x)`
+      );
     }
 
     const averageSpeedup = totalOllamaTime / totalHybridTime;
@@ -246,8 +263,8 @@ export class PerformanceValidator {
         iterations,
         times: [totalHybridTime / formatTasks.length],
         baseline: totalOllamaTime / formatTasks.length,
-        target: 25
-      }
+        target: 25,
+      },
     };
   }
 
@@ -262,11 +279,13 @@ export class PerformanceValidator {
 
     for (let i = 0; i < iterations; i++) {
       const start = Date.now();
-      
+
       try {
         if (this.lmStudioClient) {
           // Measure time to first token from LM Studio
-          const stream = this.lmStudioClient.streamGenerateCode('Test prompt for first token measurement');
+          const stream = this.lmStudioClient.streamGenerateCode(
+            'Test prompt for first token measurement'
+          );
           const firstChunk = await stream.next();
           const firstTokenTime = Date.now() - start;
           latencies.push(firstTokenTime);
@@ -286,7 +305,9 @@ export class PerformanceValidator {
     const averageLatency = latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length;
     const meetsTarget = averageLatency < 200;
 
-    console.log(`   ⚡ Average first token latency: ${averageLatency.toFixed(0)}ms (target: <200ms)`);
+    console.log(
+      `   ⚡ Average first token latency: ${averageLatency.toFixed(0)}ms (target: <200ms)`
+    );
 
     return {
       metric: 'first_token_latency',
@@ -297,8 +318,8 @@ export class PerformanceValidator {
       details: {
         iterations,
         latencies,
-        target: 200
-      }
+        target: 200,
+      },
     };
   }
 
@@ -312,16 +333,26 @@ export class PerformanceValidator {
       'Add error handling to this function',
       'Rename variable names to be more descriptive',
       'Add TypeScript types to this function',
-      'Optimize this loop for better performance'
+      'Optimize this loop for better performance',
     ];
 
     let totalOllamaTime = 0;
     let totalHybridTime = 0;
 
     for (const task of editTasks) {
-      const ollamaTime = await this.measureTaskTime(this.ollamaClient?.generateText.bind(this.ollamaClient), task) || 8200;
-      const hybridTime = await this.measureTaskTime(this.hybridClient?.generateCode.bind(this.hybridClient), task, [], { taskType: 'edit' }) || 600;
-      
+      const ollamaTime =
+        (await this.measureTaskTime(
+          this.ollamaClient?.generateText.bind(this.ollamaClient),
+          task
+        )) || 8200;
+      const hybridTime =
+        (await this.measureTaskTime(
+          this.hybridClient?.generateCode.bind(this.hybridClient),
+          task,
+          [],
+          { taskType: 'edit' }
+        )) || 600;
+
       totalOllamaTime += ollamaTime;
       totalHybridTime += hybridTime;
     }
@@ -339,8 +370,8 @@ export class PerformanceValidator {
         iterations: editTasks.length,
         times: [totalHybridTime / editTasks.length],
         baseline: totalOllamaTime / editTasks.length,
-        target: 14
-      }
+        target: 14,
+      },
     };
   }
 
@@ -354,16 +385,26 @@ export class PerformanceValidator {
       'Create a complete REST API controller with CRUD operations',
       'Generate a React component with props interface',
       'Create a database model with validation',
-      'Generate test suite boilerplate'
+      'Generate test suite boilerplate',
     ];
 
     let totalOllamaTime = 0;
     let totalHybridTime = 0;
 
     for (const task of boilerplateTasks) {
-      const ollamaTime = await this.measureTaskTime(this.ollamaClient?.generateText.bind(this.ollamaClient), task) || 18900;
-      const hybridTime = await this.measureTaskTime(this.hybridClient?.generateCode.bind(this.hybridClient), task, [], { taskType: 'boilerplate' }) || 1200;
-      
+      const ollamaTime =
+        (await this.measureTaskTime(
+          this.ollamaClient?.generateText.bind(this.ollamaClient),
+          task
+        )) || 18900;
+      const hybridTime =
+        (await this.measureTaskTime(
+          this.hybridClient?.generateCode.bind(this.hybridClient),
+          task,
+          [],
+          { taskType: 'boilerplate' }
+        )) || 1200;
+
       totalOllamaTime += ollamaTime;
       totalHybridTime += hybridTime;
     }
@@ -381,8 +422,8 @@ export class PerformanceValidator {
         iterations: boilerplateTasks.length,
         times: [totalHybridTime / boilerplateTasks.length],
         baseline: totalOllamaTime / boilerplateTasks.length,
-        target: 16
-      }
+        target: 16,
+      },
     };
   }
 
@@ -396,16 +437,26 @@ export class PerformanceValidator {
       'Analyze this codebase architecture and suggest improvements',
       'Review this code for security vulnerabilities',
       'Analyze performance bottlenecks in this system',
-      'Suggest refactoring strategy for this legacy code'
+      'Suggest refactoring strategy for this legacy code',
     ];
 
     let totalOllamaTime = 0;
     let totalHybridTime = 0;
 
     for (const task of complexTasks) {
-      const ollamaTime = await this.measureTaskTime(this.ollamaClient?.generateText.bind(this.ollamaClient), task) || 45200;
-      const hybridTime = await this.measureTaskTime(this.hybridClient?.generateCode.bind(this.hybridClient), task, [], { taskType: 'analysis', complexity: 'complex' }) || 43100;
-      
+      const ollamaTime =
+        (await this.measureTaskTime(
+          this.ollamaClient?.generateText.bind(this.ollamaClient),
+          task
+        )) || 45200;
+      const hybridTime =
+        (await this.measureTaskTime(
+          this.hybridClient?.generateCode.bind(this.hybridClient),
+          task,
+          [],
+          { taskType: 'analysis', complexity: 'complex' }
+        )) || 43100;
+
       totalOllamaTime += ollamaTime;
       totalHybridTime += hybridTime;
     }
@@ -423,8 +474,8 @@ export class PerformanceValidator {
         iterations: complexTasks.length,
         times: [totalHybridTime / complexTasks.length],
         baseline: totalOllamaTime / complexTasks.length,
-        target: 0.985 // 98.5% quality preservation
-      }
+        target: 0.985, // 98.5% quality preservation
+      },
     };
   }
 
@@ -442,7 +493,7 @@ export class PerformanceValidator {
       { prompt: 'add error handling', expectedRoute: 'lmstudio', complexity: 'simple' },
       { prompt: 'refactor complex algorithm', expectedRoute: 'ollama', complexity: 'complex' },
       { prompt: 'generate boilerplate', expectedRoute: 'lmstudio', complexity: 'simple' },
-      { prompt: 'debug performance issue', expectedRoute: 'ollama', complexity: 'complex' }
+      { prompt: 'debug performance issue', expectedRoute: 'ollama', complexity: 'complex' },
     ];
 
     let correctRoutes = 0;
@@ -452,7 +503,7 @@ export class PerformanceValidator {
       try {
         const result = await this.hybridClient?.generateCode(testCase.prompt, [], {
           taskType: this.extractTaskType(testCase.prompt),
-          complexity: testCase.complexity as any
+          complexity: testCase.complexity as any,
         });
 
         if (result) {
@@ -492,9 +543,9 @@ export class PerformanceValidator {
           ollamaTime: 0,
           hybridTime: 0,
           improvement: 0,
-          accuracy: i < correctRoutes ? 1 : 0
-        }))
-      }
+          accuracy: i < correctRoutes ? 1 : 0,
+        })),
+      },
     };
   }
 
@@ -505,12 +556,12 @@ export class PerformanceValidator {
     console.log('⏱️  Benchmarking resource utilization...');
 
     const initialMemory = process.memoryUsage();
-    
+
     // Simulate typical usage pattern
     const testTasks = [
       'Create a simple component template',
       'Format this code snippet',
-      'Analyze this complex algorithm'
+      'Analyze this complex algorithm',
     ];
 
     let totalMemoryUsed = 0;
@@ -518,7 +569,7 @@ export class PerformanceValidator {
 
     for (const task of testTasks) {
       const beforeMemory = process.memoryUsage();
-      
+
       try {
         await this.hybridClient?.generateCode(task);
       } catch (error) {
@@ -537,7 +588,9 @@ export class PerformanceValidator {
     const averageMemoryUsage = totalMemoryUsed / measurements;
     const memoryEfficient = averageMemoryUsage < 100 * 1024 * 1024; // < 100MB per task
 
-    console.log(`   💾 Average memory per task: ${(averageMemoryUsage / 1024 / 1024).toFixed(1)}MB`);
+    console.log(
+      `   💾 Average memory per task: ${(averageMemoryUsage / 1024 / 1024).toFixed(1)}MB`
+    );
 
     return {
       metric: 'resource_utilization',
@@ -548,8 +601,8 @@ export class PerformanceValidator {
       details: {
         iterations: measurements,
         times: [averageMemoryUsage],
-        target: 100 * 1024 * 1024 // 100MB target
-      }
+        target: 100 * 1024 * 1024, // 100MB target
+      },
     };
   }
 
@@ -578,14 +631,14 @@ export class PerformanceValidator {
    */
   private extractTaskType(prompt: string): string {
     const promptLower = prompt.toLowerCase();
-    
+
     if (promptLower.includes('format')) return 'format';
     if (promptLower.includes('template') || promptLower.includes('create')) return 'template';
     if (promptLower.includes('analyze') || promptLower.includes('review')) return 'analysis';
     if (promptLower.includes('debug') || promptLower.includes('fix')) return 'debugging';
     if (promptLower.includes('boilerplate')) return 'boilerplate';
     if (promptLower.includes('edit') || promptLower.includes('add')) return 'edit';
-    
+
     return 'general';
   }
 
@@ -597,23 +650,27 @@ export class PerformanceValidator {
       this.hybridClient = new UnifiedModelClient({
         providers: [
           { type: 'ollama', endpoint: 'http://localhost:11434', model: 'auto', timeout: 30000 },
-          { type: 'lm-studio', endpoint: 'http://localhost:1234', model: 'auto', timeout: 30000 }
+          { type: 'lm-studio', endpoint: 'http://localhost:1234', model: 'auto', timeout: 30000 },
         ],
         executionMode: 'auto',
         fallbackChain: ['ollama', 'lm-studio'],
-        performanceThresholds: { fastModeMaxTokens: 2048, timeoutMs: 30000, maxConcurrentRequests: 3 }
+        performanceThresholds: {
+          fastModeMaxTokens: 2048,
+          timeoutMs: 30000,
+          maxConcurrentRequests: 3,
+        },
       });
 
       this.ollamaClient = new UnifiedModelClient({
         endpoint: 'http://localhost:11434',
         model: 'codellama:34b',
-        timeout: 60000
+        timeout: 60000,
       });
 
       this.lmStudioClient = new UnifiedModelClient({
         endpoint: 'http://localhost:1234',
         timeout: 30000,
-        streamingEnabled: true
+        streamingEnabled: true,
       });
 
       logger.debug('Performance validation clients initialized');
@@ -627,13 +684,13 @@ export class PerformanceValidator {
    */
   private async getSystemEnvironment(): Promise<SystemEnvironment> {
     const os = await import('os');
-    
+
     return {
       platform: `${os.platform()} ${os.release()}`,
       nodeVersion: process.version,
       memory: os.totalmem(),
       cpu: os.cpus()[0]?.model || 'Unknown',
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -647,28 +704,42 @@ export class PerformanceValidator {
       if (!result.meetsDocumentedMetric) {
         switch (result.metric) {
           case 'template_generation':
-            recommendations.push('Template generation below target. Ensure LM Studio is running and configured properly.');
+            recommendations.push(
+              'Template generation below target. Ensure LM Studio is running and configured properly.'
+            );
             break;
           case 'first_token_latency':
-            recommendations.push('First token latency too high. Check LM Studio streaming configuration and model size.');
+            recommendations.push(
+              'First token latency too high. Check LM Studio streaming configuration and model size.'
+            );
             break;
           case 'task_routing':
-            recommendations.push('Task routing accuracy below target. Review routing rules and model selection logic.');
+            recommendations.push(
+              'Task routing accuracy below target. Review routing rules and model selection logic.'
+            );
             break;
           case 'resource_utilization':
-            recommendations.push('Resource usage higher than expected. Consider model quantization or smaller models.');
+            recommendations.push(
+              'Resource usage higher than expected. Consider model quantization or smaller models.'
+            );
             break;
           default:
-            recommendations.push(`${result.metric}: Performance below documented claim. Review configuration and hardware.`);
+            recommendations.push(
+              `${result.metric}: Performance below documented claim. Review configuration and hardware.`
+            );
         }
       }
     });
 
     // General recommendations
     if (recommendations.length === 0) {
-      recommendations.push('All benchmarks passed! Consider enabling more aggressive optimization settings.');
+      recommendations.push(
+        'All benchmarks passed! Consider enabling more aggressive optimization settings.'
+      );
     } else if (recommendations.length > 3) {
-      recommendations.push('Multiple performance issues detected. Check that both LM Studio and Ollama are properly configured.');
+      recommendations.push(
+        'Multiple performance issues detected. Check that both LM Studio and Ollama are properly configured.'
+      );
     }
 
     return recommendations;

@@ -19,10 +19,10 @@ export class RefDocumentationTool extends BaseTool {
   async execute(params: { query: string }): Promise<any> {
     try {
       logger.info(`📚 MCP Ref Documentation Search: ${params.query}`);
-      
+
       // Simulate documentation search using web search as fallback
       const searchQuery = `${params.query} documentation API reference`;
-      
+
       return {
         success: true,
         query: params.query,
@@ -31,10 +31,10 @@ export class RefDocumentationTool extends BaseTool {
             title: `Documentation for ${params.query}`,
             url: `https://docs.example.com/${params.query.toLowerCase()}`,
             snippet: `API documentation and examples for ${params.query}`,
-            type: 'documentation'
-          }
+            type: 'documentation',
+          },
         ],
-        source: 'mcp-ref-fallback'
+        source: 'mcp-ref-fallback',
       };
     } catch (error) {
       logger.error('MCP Ref Documentation Search failed:', error);
@@ -63,20 +63,20 @@ export class ExaWebSearchTool extends BaseTool {
   async execute(params: { query: string; numResults?: number }): Promise<any> {
     try {
       logger.info(`🔍 MCP Exa Web Search: ${params.query}`);
-      
+
       // Use the actual Exa API if available, otherwise simulate
       try {
         // Try to use the real Exa search via global function
         if (typeof (global as any).web_search_exa !== 'undefined') {
-          return await (global as any).web_search_exa({ 
-            query: params.query, 
-            numResults: params.numResults 
+          return await (global as any).web_search_exa({
+            query: params.query,
+            numResults: params.numResults,
           });
         }
       } catch (e) {
         // Fall back to simulated search
       }
-      
+
       return {
         success: true,
         query: params.query,
@@ -85,10 +85,10 @@ export class ExaWebSearchTool extends BaseTool {
             title: `Web Results for ${params.query}`,
             url: `https://example.com/search?q=${encodeURIComponent(params.query)}`,
             snippet: `Search results and information about ${params.query}`,
-            type: 'web'
-          }
+            type: 'web',
+          },
         ],
-        source: 'mcp-exa-fallback'
+        source: 'mcp-exa-fallback',
       };
     } catch (error) {
       logger.error('MCP Exa Web Search failed:', error);
@@ -117,7 +117,7 @@ export class ExaDeepResearchTool extends BaseTool {
   async execute(params: { topic: string; depth?: string }): Promise<any> {
     try {
       logger.info(`🔬 MCP Exa Deep Research: ${params.topic}`);
-      
+
       // Try to use real deep research if available
       try {
         if (typeof (global as any).deep_researcher_start !== 'undefined') {
@@ -129,7 +129,7 @@ export class ExaDeepResearchTool extends BaseTool {
       } catch (e) {
         // Fall back to simulated research
       }
-      
+
       return {
         success: true,
         topic: params.topic,
@@ -137,13 +137,13 @@ export class ExaDeepResearchTool extends BaseTool {
         findings: [
           `Key information about ${params.topic}`,
           `Analysis and insights on ${params.topic}`,
-          `Recommendations and conclusions for ${params.topic}`
+          `Recommendations and conclusions for ${params.topic}`,
         ],
         sources: [
           `https://research.example.com/${params.topic.toLowerCase()}`,
-          `https://academic.example.com/${params.topic.toLowerCase()}`
+          `https://academic.example.com/${params.topic.toLowerCase()}`,
         ],
-        source: 'mcp-deep-research-fallback'
+        source: 'mcp-deep-research-fallback',
       };
     } catch (error) {
       logger.error('MCP Deep Research failed:', error);
@@ -172,7 +172,7 @@ export class ExaCompanyResearchTool extends BaseTool {
   async execute(params: { company: string; aspects?: string[] }): Promise<any> {
     try {
       logger.info(`🏢 MCP Company Research: ${params.company}`);
-      
+
       // Try to use real company research if available
       try {
         if (typeof (global as any).company_research_exa !== 'undefined') {
@@ -183,9 +183,9 @@ export class ExaCompanyResearchTool extends BaseTool {
       } catch (e) {
         // Fall back to simulated research
       }
-      
+
       const aspects = params.aspects || ['overview', 'financials', 'products', 'news'];
-      
+
       return {
         success: true,
         company: params.company,
@@ -194,14 +194,14 @@ export class ExaCompanyResearchTool extends BaseTool {
           financials: `Financial information for ${params.company}`,
           products: `Products and services offered by ${params.company}`,
           news: `Recent news and updates about ${params.company}`,
-          market_position: `Market analysis for ${params.company}`
+          market_position: `Market analysis for ${params.company}`,
         },
         aspects_researched: aspects,
         sources: [
           `https://company-info.example.com/${params.company.toLowerCase()}`,
-          `https://financial-data.example.com/${params.company.toLowerCase()}`
+          `https://financial-data.example.com/${params.company.toLowerCase()}`,
         ],
-        source: 'mcp-company-research-fallback'
+        source: 'mcp-company-research-fallback',
       };
     } catch (error) {
       logger.error('MCP Company Research failed:', error);
@@ -229,10 +229,15 @@ export class MCPServerTool extends BaseTool {
     });
   }
 
-  async execute(params: { action: string; server?: string; method?: string; params?: any }): Promise<any> {
+  async execute(params: {
+    action: string;
+    server?: string;
+    method?: string;
+    params?: any;
+  }): Promise<any> {
     try {
       logger.info(`🔧 MCP Server Action: ${params.action}`);
-      
+
       switch (params.action) {
         case 'list':
           return {
@@ -241,41 +246,41 @@ export class MCPServerTool extends BaseTool {
               { name: 'filesystem', status: 'running', description: 'File system operations' },
               { name: 'git', status: 'running', description: 'Git version control' },
               { name: 'terminal', status: 'running', description: 'Terminal command execution' },
-              { name: 'research', status: 'running', description: 'Research and web search' }
-            ]
+              { name: 'research', status: 'running', description: 'Research and web search' },
+            ],
           };
-          
+
         case 'status':
           return {
             success: true,
             server: params.server || 'all',
             status: 'running',
             uptime: '2h 15m',
-            connections: 3
+            connections: 3,
           };
-          
+
         case 'start':
         case 'stop':
           return {
             success: true,
             server: params.server,
             action: params.action,
-            message: `Server ${params.server} ${params.action}ed successfully`
+            message: `Server ${params.server} ${params.action}ed successfully`,
           };
-          
+
         case 'call':
           return {
             success: true,
             server: params.server,
             method: params.method,
             result: `Called ${params.method} on ${params.server} with result`,
-            params: params.params
+            params: params.params,
           };
-          
+
         default:
           return {
             error: `Unknown MCP action: ${params.action}`,
-            available_actions: ['list', 'status', 'start', 'stop', 'call']
+            available_actions: ['list', 'status', 'start', 'stop', 'call'],
           };
       }
     } catch (error) {

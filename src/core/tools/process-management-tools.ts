@@ -47,29 +47,28 @@ export class AdvancedProcessTool extends BaseTool {
       switch (args.action) {
         case 'start':
           return await this.startProcess(args);
-        
+
         case 'interact':
           return await this.interactWithProcess(args);
-        
+
         case 'read':
           return await this.readProcessOutput(args);
-        
+
         case 'list':
           return this.listSessions();
-        
+
         case 'kill':
           return this.killProcess(args);
-        
+
         case 'status':
           return this.getProcessStatus(args);
-        
+
         default:
           return { error: `Unknown action: ${args.action}` };
       }
-
     } catch (error) {
-      return { 
-        error: `Process management failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      return {
+        error: `Process management failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
@@ -78,14 +77,14 @@ export class AdvancedProcessTool extends BaseTool {
     try {
       const sessionId = `session_${++this.sessionCounter}_${Date.now()}`;
       const cwd = args.workingDirectory || this.agentContext.workingDirectory;
-      
+
       // Parse command and arguments
       const [command, ...cmdArgs] = args.command.split(' ');
-      
+
       const childProcess = spawn(command, cmdArgs, {
         cwd,
         env: { ...process.env, ...args.environment },
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
 
       const session: ProcessSession = {
@@ -95,7 +94,7 @@ export class AdvancedProcessTool extends BaseTool {
         startTime: Date.now(),
         lastActivity: Date.now(),
         outputBuffer: [],
-        isInteractive: args.interactive
+        isInteractive: args.interactive,
       };
 
       // Set up output handlers
@@ -105,7 +104,7 @@ export class AdvancedProcessTool extends BaseTool {
       this.sessions.set(sessionId, session);
 
       // Handle process exit
-      childProcess.on('exit', (code) => {
+      childProcess.on('exit', code => {
         session.outputBuffer.push(`Process exited with code: ${code}`);
         if (!args.interactive) {
           this.sessions.delete(sessionId);
@@ -122,13 +121,12 @@ export class AdvancedProcessTool extends BaseTool {
         pid: childProcess.pid,
         initialOutput: session.outputBuffer.slice(0, 10).join('\n'),
         isRunning: !childProcess.killed,
-        interactive: args.interactive
+        interactive: args.interactive,
       };
-
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -136,67 +134,73 @@ export class AdvancedProcessTool extends BaseTool {
   private setupOutputHandlers(session: ProcessSession): void {
     const maxBufferSize = 1000; // Keep last 1000 lines
 
-    session.process.stdout?.on('data', (data) => {
-      const lines = data.toString().split('\n').filter((line: string) => line.trim());
+    session.process.stdout?.on('data', data => {
+      const lines = data
+        .toString()
+        .split('\n')
+        .filter((line: string) => line.trim());
       session.outputBuffer.push(...lines);
       session.lastActivity = Date.now();
-      
+
       // Keep buffer size manageable
       if (session.outputBuffer.length > maxBufferSize) {
         session.outputBuffer = session.outputBuffer.slice(-maxBufferSize);
       }
     });
 
-    session.process.stderr?.on('data', (data) => {
-      const lines = data.toString().split('\n').filter((line: string) => line.trim());
+    session.process.stderr?.on('data', data => {
+      const lines = data
+        .toString()
+        .split('\n')
+        .filter((line: string) => line.trim());
       const errorLines = lines.map((line: string) => `[ERROR] ${line}`);
       session.outputBuffer.push(...errorLines);
       session.lastActivity = Date.now();
-      
+
       if (session.outputBuffer.length > maxBufferSize) {
         session.outputBuffer = session.outputBuffer.slice(-maxBufferSize);
       }
     });
 
-    session.process.on('error', (error) => {
+    session.process.on('error', error => {
       session.outputBuffer.push(`[PROCESS ERROR] ${error.message}`);
       session.lastActivity = Date.now();
     });
   }
 
   private async waitForProcessReady(session: ProcessSession, timeout: number): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const startTime = Date.now();
-      
+
       const checkReady = () => {
         const elapsed = Date.now() - startTime;
-        
+
         if (elapsed >= timeout) {
           resolve(); // Timeout reached
           return;
         }
-        
+
         if (session.outputBuffer.length > 0) {
           resolve(); // Got some output
           return;
         }
-        
+
         if (session.process.killed) {
           resolve(); // Process ended
           return;
         }
-        
+
         // Check again in 100ms
         setTimeout(checkReady, 100);
       };
-      
+
       checkReady();
     });
   }
 
   private async interactWithProcess(args: any): Promise<any> {
     const session = this.sessions.get(args.sessionId!);
-    
+
     if (!session) {
       return { error: `Session not found: ${args.sessionId}` };
     }
@@ -227,49 +231,52 @@ export class AdvancedProcessTool extends BaseTool {
         input: args.input,
         output: newOutput.join('\n'),
         newLines: newOutput.length,
-        totalLines: session.outputBuffer.length
+        totalLines: session.outputBuffer.length,
       };
-
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
-  private async waitForNewOutput(session: ProcessSession, timeout: number, initialLength: number): Promise<void> {
-    return new Promise((resolve) => {
+  private async waitForNewOutput(
+    session: ProcessSession,
+    timeout: number,
+    initialLength: number
+  ): Promise<void> {
+    return new Promise(resolve => {
       const startTime = Date.now();
-      
+
       const checkForOutput = () => {
         const elapsed = Date.now() - startTime;
-        
+
         if (elapsed >= timeout) {
           resolve(); // Timeout
           return;
         }
-        
+
         if (session.outputBuffer.length > initialLength) {
           resolve(); // Got new output
           return;
         }
-        
+
         if (session.process.killed) {
           resolve(); // Process ended
           return;
         }
-        
+
         setTimeout(checkForOutput, 100);
       };
-      
+
       checkForOutput();
     });
   }
 
   private async readProcessOutput(args: any): Promise<any> {
     const session = this.sessions.get(args.sessionId!);
-    
+
     if (!session) {
       return { error: `Session not found: ${args.sessionId}` };
     }
@@ -281,7 +288,7 @@ export class AdvancedProcessTool extends BaseTool {
       output: session.outputBuffer.join('\n'),
       totalLines: session.outputBuffer.length,
       lastActivity: new Date(session.lastActivity).toISOString(),
-      uptime: Date.now() - session.startTime
+      uptime: Date.now() - session.startTime,
     };
   }
 
@@ -294,19 +301,19 @@ export class AdvancedProcessTool extends BaseTool {
       uptime: Date.now() - session.startTime,
       lastActivity: new Date(session.lastActivity).toISOString(),
       outputLines: session.outputBuffer.length,
-      isInteractive: session.isInteractive
+      isInteractive: session.isInteractive,
     }));
 
     return {
       totalSessions: sessions.length,
       runningSessions: sessions.filter(s => s.isRunning).length,
-      sessions
+      sessions,
     };
   }
 
   private killProcess(args: any): any {
     const session = this.sessions.get(args.sessionId!);
-    
+
     if (!session) {
       return { error: `Session not found: ${args.sessionId}` };
     }
@@ -314,7 +321,7 @@ export class AdvancedProcessTool extends BaseTool {
     try {
       if (!session.process.killed) {
         session.process.kill('SIGTERM');
-        
+
         // Force kill after 5 seconds if still running
         setTimeout(() => {
           if (!session.process.killed) {
@@ -329,20 +336,19 @@ export class AdvancedProcessTool extends BaseTool {
       return {
         success: true,
         sessionId: args.sessionId,
-        message: 'Process terminated'
+        message: 'Process terminated',
       };
-
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
   private getProcessStatus(args: any): any {
     const session = this.sessions.get(args.sessionId!);
-    
+
     if (!session) {
       return { error: `Session not found: ${args.sessionId}` };
     }
@@ -357,7 +363,7 @@ export class AdvancedProcessTool extends BaseTool {
       uptime: Date.now() - session.startTime,
       outputLines: session.outputBuffer.length,
       recentOutput: session.outputBuffer.slice(-5).join('\n'),
-      isInteractive: session.isInteractive
+      isInteractive: session.isInteractive,
     };
   }
 }
@@ -388,24 +394,23 @@ export class CodeExecutionTool extends BaseTool {
       switch (args.language) {
         case 'python':
           return await this.executePython(args);
-        
+
         case 'javascript':
         case 'nodejs':
           return await this.executeNodeJS(args);
-        
+
         case 'bash':
           return await this.executeBash(args);
-        
+
         case 'powershell':
           return await this.executePowerShell(args);
-        
+
         default:
           return { error: `Unsupported language: ${args.language}` };
       }
-
     } catch (error) {
-      return { 
-        error: `Code execution failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      return {
+        error: `Code execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
@@ -415,7 +420,7 @@ export class CodeExecutionTool extends BaseTool {
       const result = await execAsync(`python -c "${args.code.replace(/"/g, '\\"')}"`, {
         cwd: this.agentContext.workingDirectory,
         timeout: args.timeout,
-        env: { ...process.env, ...args.environment }
+        env: { ...process.env, ...args.environment },
       });
 
       return {
@@ -424,9 +429,8 @@ export class CodeExecutionTool extends BaseTool {
         code: args.code,
         output: result.stdout,
         stderr: result.stderr,
-        executionTime: Date.now()
+        executionTime: Date.now(),
       };
-
     } catch (error: any) {
       return {
         success: false,
@@ -435,7 +439,7 @@ export class CodeExecutionTool extends BaseTool {
         error: error.message,
         output: error.stdout || '',
         stderr: error.stderr || '',
-        exitCode: error.code
+        exitCode: error.code,
       };
     }
   }
@@ -445,7 +449,7 @@ export class CodeExecutionTool extends BaseTool {
       const result = await execAsync(`node -e "${args.code.replace(/"/g, '\\"')}"`, {
         cwd: this.agentContext.workingDirectory,
         timeout: args.timeout,
-        env: { ...process.env, ...args.environment }
+        env: { ...process.env, ...args.environment },
       });
 
       return {
@@ -454,9 +458,8 @@ export class CodeExecutionTool extends BaseTool {
         code: args.code,
         output: result.stdout,
         stderr: result.stderr,
-        executionTime: Date.now()
+        executionTime: Date.now(),
       };
-
     } catch (error: any) {
       return {
         success: false,
@@ -465,7 +468,7 @@ export class CodeExecutionTool extends BaseTool {
         error: error.message,
         output: error.stdout || '',
         stderr: error.stderr || '',
-        exitCode: error.code
+        exitCode: error.code,
       };
     }
   }
@@ -476,7 +479,7 @@ export class CodeExecutionTool extends BaseTool {
         cwd: this.agentContext.workingDirectory,
         timeout: args.timeout,
         env: { ...process.env, ...args.environment },
-        shell: '/bin/bash'
+        shell: '/bin/bash',
       });
 
       return {
@@ -485,9 +488,8 @@ export class CodeExecutionTool extends BaseTool {
         code: args.code,
         output: result.stdout,
         stderr: result.stderr,
-        executionTime: Date.now()
+        executionTime: Date.now(),
       };
-
     } catch (error: any) {
       return {
         success: false,
@@ -496,7 +498,7 @@ export class CodeExecutionTool extends BaseTool {
         error: error.message,
         output: error.stdout || '',
         stderr: error.stderr || '',
-        exitCode: error.code
+        exitCode: error.code,
       };
     }
   }
@@ -506,7 +508,7 @@ export class CodeExecutionTool extends BaseTool {
       const result = await execAsync(`powershell -Command "${args.code.replace(/"/g, '\\"')}"`, {
         cwd: this.agentContext.workingDirectory,
         timeout: args.timeout,
-        env: { ...process.env, ...args.environment }
+        env: { ...process.env, ...args.environment },
       });
 
       return {
@@ -515,9 +517,8 @@ export class CodeExecutionTool extends BaseTool {
         code: args.code,
         output: result.stdout,
         stderr: result.stderr,
-        executionTime: Date.now()
+        executionTime: Date.now(),
       };
-
     } catch (error: any) {
       return {
         success: false,
@@ -526,7 +527,7 @@ export class CodeExecutionTool extends BaseTool {
         error: error.message,
         output: error.stdout || '',
         stderr: error.stderr || '',
-        exitCode: error.code
+        exitCode: error.code,
       };
     }
   }

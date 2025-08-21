@@ -1,6 +1,6 @@
 /**
  * Advanced Logging System with Structured Format and Levels
- * 
+ *
  * Provides comprehensive logging with structured data, multiple outputs,
  * log aggregation, security logging, and performance monitoring.
  */
@@ -18,7 +18,7 @@ export enum LogLevel {
   INFO = 2,
   WARN = 3,
   ERROR = 4,
-  FATAL = 5
+  FATAL = 5,
 }
 
 // Log categories for better organization
@@ -35,7 +35,7 @@ export enum LogCategory {
   NETWORK = 'network',
   API = 'api',
   ERROR = 'error',
-  AUDIT = 'audit'
+  AUDIT = 'audit',
 }
 
 // Structured log entry interface
@@ -141,39 +141,39 @@ export class AdvancedLogger {
           type: 'console',
           config: { colors: true },
           formatter: new ConsoleFormatter(),
-          filter: new LevelFilter(LogLevel.INFO)
+          filter: new LevelFilter(LogLevel.INFO),
         },
         {
           type: 'file',
-          config: { 
+          config: {
             path: join(homedir(), '.codecrucible', 'logs'),
-            filename: 'codecrucible-structured.log'
+            filename: 'codecrucible-structured.log',
           },
           formatter: new JSONFormatter(),
-          filter: new LevelFilter(LogLevel.DEBUG)
-        }
+          filter: new LevelFilter(LogLevel.DEBUG),
+        },
       ],
       retention: {
         maxFiles: 10,
         maxAge: 30,
-        maxSize: 100 * 1024 * 1024 // 100MB
+        maxSize: 100 * 1024 * 1024, // 100MB
       },
       security: {
         enableSecurityLogging: true,
         enableAuditLogging: true,
         maskSensitiveData: true,
-        sensitiveFields: ['password', 'token', 'key', 'secret', 'api_key', 'auth']
+        sensitiveFields: ['password', 'token', 'key', 'secret', 'api_key', 'auth'],
       },
       performance: {
         enablePerformanceLogging: true,
         slowOperationThreshold: 1000,
-        enableMemoryTracking: true
+        enableMemoryTracking: true,
       },
       correlation: {
         enableCorrelation: true,
-        correlationIdHeader: 'X-Correlation-ID'
+        correlationIdHeader: 'X-Correlation-ID',
       },
-      ...config
+      ...config,
     };
   }
 
@@ -199,11 +199,11 @@ export class AdvancedLogger {
       message,
       context: this.sanitizeContext(context),
       metadata: {
-        ...metadata
+        ...metadata,
       },
       correlationId: metadata?.requestId || this.generateCorrelationId(),
       error: error ? this.serializeError(error) : undefined,
-      sensitive: this.detectSensitiveData(message, context)
+      sensitive: this.detectSensitiveData(message, context),
     };
 
     this.enqueueLog(entry);
@@ -212,53 +212,89 @@ export class AdvancedLogger {
   /**
    * Trace level logging (most verbose)
    */
-  trace(category: LogCategory, message: string, context?: Record<string, any>, metadata?: StructuredLogEntry['metadata']): void {
+  trace(
+    category: LogCategory,
+    message: string,
+    context?: Record<string, any>,
+    metadata?: StructuredLogEntry['metadata']
+  ): void {
     this.log(LogLevel.TRACE, category, message, context, metadata);
   }
 
   /**
    * Debug level logging
    */
-  debug(category: LogCategory, message: string, context?: Record<string, any>, metadata?: StructuredLogEntry['metadata']): void {
+  debug(
+    category: LogCategory,
+    message: string,
+    context?: Record<string, any>,
+    metadata?: StructuredLogEntry['metadata']
+  ): void {
     this.log(LogLevel.DEBUG, category, message, context, metadata);
   }
 
   /**
    * Info level logging
    */
-  info(category: LogCategory, message: string, context?: Record<string, any>, metadata?: StructuredLogEntry['metadata']): void {
+  info(
+    category: LogCategory,
+    message: string,
+    context?: Record<string, any>,
+    metadata?: StructuredLogEntry['metadata']
+  ): void {
     this.log(LogLevel.INFO, category, message, context, metadata);
   }
 
   /**
    * Warning level logging
    */
-  warn(category: LogCategory, message: string, context?: Record<string, any>, metadata?: StructuredLogEntry['metadata']): void {
+  warn(
+    category: LogCategory,
+    message: string,
+    context?: Record<string, any>,
+    metadata?: StructuredLogEntry['metadata']
+  ): void {
     this.log(LogLevel.WARN, category, message, context, metadata);
   }
 
   /**
    * Error level logging
    */
-  error(category: LogCategory, message: string, error?: Error, context?: Record<string, any>, metadata?: StructuredLogEntry['metadata']): void {
+  error(
+    category: LogCategory,
+    message: string,
+    error?: Error,
+    context?: Record<string, any>,
+    metadata?: StructuredLogEntry['metadata']
+  ): void {
     this.log(LogLevel.ERROR, category, message, context, metadata, error);
   }
 
   /**
    * Fatal level logging (highest severity)
    */
-  fatal(category: LogCategory, message: string, error?: Error, context?: Record<string, any>, metadata?: StructuredLogEntry['metadata']): void {
+  fatal(
+    category: LogCategory,
+    message: string,
+    error?: Error,
+    context?: Record<string, any>,
+    metadata?: StructuredLogEntry['metadata']
+  ): void {
     this.log(LogLevel.FATAL, category, message, context, metadata, error);
   }
 
   /**
    * Security-specific logging
    */
-  security(message: string, context?: Record<string, any>, metadata?: StructuredLogEntry['metadata']): void {
+  security(
+    message: string,
+    context?: Record<string, any>,
+    metadata?: StructuredLogEntry['metadata']
+  ): void {
     if (this.config.security.enableSecurityLogging) {
       this.log(LogLevel.WARN, LogCategory.SECURITY, message, context, {
         ...metadata,
-        tags: [...(metadata?.tags || []), 'security']
+        tags: [...(metadata?.tags || []), 'security'],
       });
     }
   }
@@ -266,11 +302,15 @@ export class AdvancedLogger {
   /**
    * Audit logging for compliance
    */
-  audit(message: string, context?: Record<string, any>, metadata?: StructuredLogEntry['metadata']): void {
+  audit(
+    message: string,
+    context?: Record<string, any>,
+    metadata?: StructuredLogEntry['metadata']
+  ): void {
     if (this.config.security.enableAuditLogging) {
       this.log(LogLevel.INFO, LogCategory.AUDIT, message, context, {
         ...metadata,
-        tags: [...(metadata?.tags || []), 'audit']
+        tags: [...(metadata?.tags || []), 'audit'],
       });
     }
   }
@@ -285,18 +325,18 @@ export class AdvancedLogger {
         duration,
         memory: this.getMemoryUsage(),
         timestamp: new Date().toISOString(),
-        context
+        context,
       };
 
       this.performanceMetrics.push(metrics);
-      
+
       // Log slow operations
       if (duration > this.config.performance.slowOperationThreshold) {
         this.warn(LogCategory.PERFORMANCE, `Slow operation detected: ${operation}`, {
           duration,
           threshold: this.config.performance.slowOperationThreshold,
           memory: metrics.memory,
-          ...context
+          ...context,
         });
       }
 
@@ -313,7 +353,7 @@ export class AdvancedLogger {
   startOperation(operationId: string, context?: any): void {
     this.activeOperations.set(operationId, {
       start: Date.now(),
-      context
+      context,
     });
   }
 
@@ -326,7 +366,7 @@ export class AdvancedLogger {
       const duration = Date.now() - operation.start;
       this.performance(operationId, duration, {
         ...operation.context,
-        ...additionalContext
+        ...additionalContext,
       });
       this.activeOperations.delete(operationId);
     }
@@ -337,11 +377,18 @@ export class AdvancedLogger {
    */
   child(context: Record<string, any>): AdvancedLogger {
     const childLogger = new AdvancedLogger(this.config);
-    
+
     // Override log method to include context
     const originalLog = childLogger.log.bind(childLogger);
     childLogger.log = (level, category, message, childContext, metadata, error) => {
-      return originalLog(level, category, message, { ...context, ...childContext }, metadata, error);
+      return originalLog(
+        level,
+        category,
+        message,
+        { ...context, ...childContext },
+        metadata,
+        error
+      );
     };
 
     return childLogger;
@@ -358,9 +405,8 @@ export class AdvancedLogger {
     recentMetrics: PerformanceMetrics[];
   } {
     const total = this.performanceMetrics.length;
-    const avgDuration = total > 0 
-      ? this.performanceMetrics.reduce((sum, m) => sum + m.duration, 0) / total 
-      : 0;
+    const avgDuration =
+      total > 0 ? this.performanceMetrics.reduce((sum, m) => sum + m.duration, 0) / total : 0;
     const slowOps = this.performanceMetrics.filter(
       m => m.duration > this.config.performance.slowOperationThreshold
     ).length;
@@ -370,7 +416,7 @@ export class AdvancedLogger {
       averageDuration: avgDuration,
       slowOperations: slowOps,
       memoryUsage: this.getMemoryUsage(),
-      recentMetrics: this.performanceMetrics.slice(-10)
+      recentMetrics: this.performanceMetrics.slice(-10),
     };
   }
 
@@ -407,7 +453,7 @@ export class AdvancedLogger {
     }
 
     const sanitized = { ...context };
-    
+
     for (const field of this.config.security.sensitiveFields) {
       this.maskSensitiveField(sanitized, field);
     }
@@ -434,7 +480,7 @@ export class AdvancedLogger {
       /secret/i,
       /api[_-]?key/i,
       /auth/i,
-      /credential/i
+      /credential/i,
     ];
 
     const textToCheck = message + (context ? JSON.stringify(context) : '');
@@ -446,7 +492,7 @@ export class AdvancedLogger {
       name: error.name,
       message: error.message,
       stack: error.stack,
-      code: (error as any).code
+      code: (error as any).code,
     };
   }
 
@@ -478,11 +524,8 @@ export class AdvancedLogger {
 
     try {
       const entries = this.logQueue.splice(0, 50); // Process in batches
-      
-      await Promise.all(
-        this.config.outputs.map(output => this.processOutput(output, entries))
-      );
 
+      await Promise.all(this.config.outputs.map(output => this.processOutput(output, entries)));
     } catch (error) {
       console.error('Failed to process log queue:', error);
     } finally {
@@ -496,8 +539,8 @@ export class AdvancedLogger {
   }
 
   private async processOutput(output: LogOutput, entries: StructuredLogEntry[]): Promise<void> {
-    const filteredEntries = entries.filter(entry => 
-      !output.filter || output.filter.shouldLog(entry)
+    const filteredEntries = entries.filter(
+      entry => !output.filter || output.filter.shouldLog(entry)
     );
 
     if (filteredEntries.length === 0) {
@@ -532,15 +575,14 @@ export class AdvancedLogger {
       await mkdir(path, { recursive: true });
 
       const logFile = join(path, filename);
-      const content = entries
-        .map(entry => output.formatter?.format(entry) || JSON.stringify(entry))
-        .join('\n') + '\n';
+      const content =
+        entries.map(entry => output.formatter?.format(entry) || JSON.stringify(entry)).join('\n') +
+        '\n';
 
       await writeFile(logFile, content, { flag: 'a' });
 
       // Manage log retention
       await this.manageLogRetention(path);
-
     } catch (error) {
       console.error('Failed to write to log file:', error);
     }
@@ -556,7 +598,7 @@ export class AdvancedLogger {
     const timestamp = chalk.gray(entry.timestamp);
     const level = this.getColoredLevel(entry.level);
     const category = chalk.cyan(`[${entry.category}]`);
-    
+
     let message = `${timestamp} ${level} ${category} ${entry.message}`;
 
     if (entry.context) {
@@ -572,7 +614,7 @@ export class AdvancedLogger {
 
   private getColoredLevel(level: LogLevel): string {
     const levelName = LogLevel[level].padEnd(5);
-    
+
     switch (level) {
       case LogLevel.TRACE:
         return chalk.gray(levelName);
@@ -603,7 +645,7 @@ export class AdvancedLogger {
       for (const file of logFiles) {
         const filePath = join(logPath, file);
         const stats = await stat(filePath);
-        
+
         if (now - stats.mtime.getTime() > maxAge) {
           await unlink(filePath);
         }
@@ -614,12 +656,11 @@ export class AdvancedLogger {
         const filesToRemove = logFiles
           .sort()
           .slice(0, logFiles.length - this.config.retention.maxFiles);
-        
+
         for (const file of filesToRemove) {
           await unlink(join(logPath, file));
         }
       }
-
     } catch (error) {
       console.warn('Failed to manage log retention:', error);
     }
@@ -634,13 +675,13 @@ export class ConsoleFormatter implements LogFormatter {
     const timestamp = chalk.gray(entry.timestamp);
     const level = this.getColoredLevel(entry.level);
     const category = chalk.cyan(`[${entry.category}]`);
-    
+
     return `${timestamp} ${level} ${category} ${entry.message}`;
   }
 
   private getColoredLevel(level: LogLevel): string {
     const levelName = LogLevel[level].padEnd(5);
-    
+
     switch (level) {
       case LogLevel.TRACE:
         return chalk.gray(levelName);

@@ -98,7 +98,7 @@ export class GitMCPServer extends BaseMCPServer {
       git_tag: this.handleGitTag.bind(this),
       git_remote: this.handleGitRemote.bind(this),
       git_stash: this.handleGitStash.bind(this),
-      git_clean: this.handleGitClean.bind(this)
+      git_clean: this.handleGitClean.bind(this),
     };
 
     logger.info('Git MCP server initialized', { workspaceRoot });
@@ -113,22 +113,21 @@ export class GitMCPServer extends BaseMCPServer {
       if (!isRepo) {
         return {
           success: false,
-          error: 'Not a Git repository'
+          error: 'Not a Git repository',
         };
       }
 
       const status = await this.getGitStatus();
-      
+
       return {
         success: true,
-        data: status
+        data: status,
       };
-
     } catch (error) {
       logger.error('Git status failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git status failed'
+        error: error instanceof Error ? error.message : 'Git status failed',
       };
     }
   }
@@ -136,7 +135,11 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git diff
    */
-  async handleGitDiff(args: { files?: string[]; staged?: boolean; commit?: string }): Promise<ToolResult> {
+  async handleGitDiff(args: {
+    files?: string[];
+    staged?: boolean;
+    commit?: string;
+  }): Promise<ToolResult> {
     try {
       const { files = [], staged = false, commit } = args;
 
@@ -152,14 +155,13 @@ export class GitMCPServer extends BaseMCPServer {
 
       return {
         success: true,
-        data: diffs
+        data: diffs,
       };
-
     } catch (error) {
       logger.error('Git diff failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git diff failed'
+        error: error instanceof Error ? error.message : 'Git diff failed',
       };
     }
   }
@@ -167,7 +169,12 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git log
    */
-  async handleGitLog(args: { limit?: number; since?: string; author?: string; grep?: string }): Promise<ToolResult> {
+  async handleGitLog(args: {
+    limit?: number;
+    since?: string;
+    author?: string;
+    grep?: string;
+  }): Promise<ToolResult> {
     try {
       const { limit = 10, since, author, grep } = args;
 
@@ -183,14 +190,13 @@ export class GitMCPServer extends BaseMCPServer {
 
       return {
         success: true,
-        data: commits
+        data: commits,
       };
-
     } catch (error) {
       logger.error('Git log failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git log failed'
+        error: error instanceof Error ? error.message : 'Git log failed',
       };
     }
   }
@@ -205,14 +211,14 @@ export class GitMCPServer extends BaseMCPServer {
       const operation: Operation = {
         type: 'git-operation',
         target: all ? 'all files' : files.join(', '),
-        description: `Add ${all ? 'all files' : files.length + ' file(s)'} to staging area`
+        description: `Add ${all ? 'all files' : files.length + ' file(s)'} to staging area`,
       };
 
       const context: OperationContext = {
         sandboxMode: 'workspace-write', // Git operations are generally safe in workspace
         workspaceRoot: this.workspaceRoot,
         userIntent: 'Stage files for commit',
-        sessionId: this.generateSessionId()
+        sessionId: this.generateSessionId(),
       };
 
       const approval = await this.approvalManager.requestApproval(operation, context);
@@ -220,7 +226,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'Operation not approved',
-          suggestion: approval.suggestions?.[0]
+          suggestion: approval.suggestions?.[0],
         };
       }
 
@@ -235,14 +241,13 @@ export class GitMCPServer extends BaseMCPServer {
 
       return {
         success: true,
-        data: { staged: all ? 'all files' : files }
+        data: { staged: all ? 'all files' : files },
       };
-
     } catch (error) {
       logger.error('Git add failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git add failed'
+        error: error instanceof Error ? error.message : 'Git add failed',
       };
     }
   }
@@ -260,7 +265,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'No staged changes to commit',
-          suggestion: 'Use git_add to stage files first'
+          suggestion: 'Use git_add to stage files first',
         };
       }
 
@@ -268,14 +273,14 @@ export class GitMCPServer extends BaseMCPServer {
         type: 'git-operation',
         target: amend ? 'previous commit' : 'staged changes',
         description: `${amend ? 'Amend' : 'Create'} commit: "${message}"`,
-        metadata: { files, amend, signoff }
+        metadata: { files, amend, signoff },
       };
 
       const context: OperationContext = {
         sandboxMode: 'workspace-write',
         workspaceRoot: this.workspaceRoot,
         userIntent: 'Commit changes to repository',
-        sessionId: this.generateSessionId()
+        sessionId: this.generateSessionId(),
       };
 
       const approval = await this.approvalManager.requestApproval(operation, context);
@@ -283,7 +288,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'Commit not approved',
-          suggestion: approval.suggestions?.[0]
+          suggestion: approval.suggestions?.[0],
         };
       }
 
@@ -302,15 +307,14 @@ export class GitMCPServer extends BaseMCPServer {
           hash: commitHash,
           message,
           amend,
-          files: files || status.staged
-        }
+          files: files || status.staged,
+        },
       };
-
     } catch (error) {
       logger.error('Git commit failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git commit failed'
+        error: error instanceof Error ? error.message : 'Git commit failed',
       };
     }
   }
@@ -318,7 +322,12 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Push changes to remote
    */
-  async handleGitPush(args: { remote?: string; branch?: string; force?: boolean; setUpstream?: boolean }): Promise<ToolResult> {
+  async handleGitPush(args: {
+    remote?: string;
+    branch?: string;
+    force?: boolean;
+    setUpstream?: boolean;
+  }): Promise<ToolResult> {
     try {
       const { remote = 'origin', branch, force = false, setUpstream = false } = args;
 
@@ -326,14 +335,14 @@ export class GitMCPServer extends BaseMCPServer {
         type: 'git-operation',
         target: `${remote}/${branch || 'current branch'}`,
         description: `Push changes to remote repository${force ? ' (force push)' : ''}`,
-        metadata: { remote, branch, force, setUpstream }
+        metadata: { remote, branch, force, setUpstream },
       };
 
       const context: OperationContext = {
         sandboxMode: force ? 'full-access' : 'workspace-write', // Force push is more dangerous
         workspaceRoot: this.workspaceRoot,
         userIntent: 'Push commits to remote repository',
-        sessionId: this.generateSessionId()
+        sessionId: this.generateSessionId(),
       };
 
       const approval = await this.approvalManager.requestApproval(operation, context);
@@ -341,7 +350,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'Push not approved',
-          suggestion: approval.suggestions?.[0]
+          suggestion: approval.suggestions?.[0],
         };
       }
 
@@ -357,15 +366,14 @@ export class GitMCPServer extends BaseMCPServer {
         data: {
           remote,
           branch: branch || 'current',
-          output: stdout + stderr
-        }
+          output: stdout + stderr,
+        },
       };
-
     } catch (error) {
       logger.error('Git push failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git push failed'
+        error: error instanceof Error ? error.message : 'Git push failed',
       };
     }
   }
@@ -373,7 +381,11 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Pull changes from remote
    */
-  async handleGitPull(args: { remote?: string; branch?: string; rebase?: boolean }): Promise<ToolResult> {
+  async handleGitPull(args: {
+    remote?: string;
+    branch?: string;
+    rebase?: boolean;
+  }): Promise<ToolResult> {
     try {
       const { remote = 'origin', branch, rebase = false } = args;
 
@@ -381,14 +393,14 @@ export class GitMCPServer extends BaseMCPServer {
         type: 'git-operation',
         target: `${remote}/${branch || 'current branch'}`,
         description: `Pull changes from remote repository${rebase ? ' (with rebase)' : ''}`,
-        metadata: { remote, branch, rebase }
+        metadata: { remote, branch, rebase },
       };
 
       const context: OperationContext = {
         sandboxMode: 'workspace-write',
         workspaceRoot: this.workspaceRoot,
         userIntent: 'Pull latest changes from remote',
-        sessionId: this.generateSessionId()
+        sessionId: this.generateSessionId(),
       };
 
       const approval = await this.approvalManager.requestApproval(operation, context);
@@ -396,7 +408,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'Pull not approved',
-          suggestion: approval.suggestions?.[0]
+          suggestion: approval.suggestions?.[0],
         };
       }
 
@@ -412,15 +424,14 @@ export class GitMCPServer extends BaseMCPServer {
           remote,
           branch: branch || 'current',
           rebase,
-          output: stdout + stderr
-        }
+          output: stdout + stderr,
+        },
       };
-
     } catch (error) {
       logger.error('Git pull failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git pull failed'
+        error: error instanceof Error ? error.message : 'Git pull failed',
       };
     }
   }
@@ -437,14 +448,14 @@ export class GitMCPServer extends BaseMCPServer {
           type: 'git-operation',
           target: `branch: ${name}`,
           description: `Delete branch "${name}"`,
-          metadata: { name, delete: true, remote }
+          metadata: { name, delete: true, remote },
         };
 
         const context: OperationContext = {
           sandboxMode: 'workspace-write',
           workspaceRoot: this.workspaceRoot,
           userIntent: 'Delete Git branch',
-          sessionId: this.generateSessionId()
+          sessionId: this.generateSessionId(),
         };
 
         const approval = await this.approvalManager.requestApproval(operation, context);
@@ -452,7 +463,7 @@ export class GitMCPServer extends BaseMCPServer {
           return {
             success: false,
             error: 'Branch deletion not approved',
-            suggestion: approval.suggestions?.[0]
+            suggestion: approval.suggestions?.[0],
           };
         }
 
@@ -461,7 +472,7 @@ export class GitMCPServer extends BaseMCPServer {
 
         return {
           success: true,
-          data: { action: 'deleted', branch: name }
+          data: { action: 'deleted', branch: name },
         };
       }
 
@@ -480,15 +491,14 @@ export class GitMCPServer extends BaseMCPServer {
         data: {
           action: checkout ? 'created_and_checked_out' : 'created',
           branch: name,
-          remote
-        }
+          remote,
+        },
       };
-
     } catch (error) {
       logger.error('Git branch operation failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git branch operation failed'
+        error: error instanceof Error ? error.message : 'Git branch operation failed',
       };
     }
   }
@@ -496,7 +506,11 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Checkout branch or commit
    */
-  async handleGitCheckout(args: { target: string; createBranch?: boolean; force?: boolean }): Promise<ToolResult> {
+  async handleGitCheckout(args: {
+    target: string;
+    createBranch?: boolean;
+    force?: boolean;
+  }): Promise<ToolResult> {
     try {
       const { target, createBranch = false, force = false } = args;
 
@@ -506,7 +520,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'Uncommitted changes would be lost',
-          suggestion: 'Commit or stash changes before checkout, or use force option'
+          suggestion: 'Commit or stash changes before checkout, or use force option',
         };
       }
 
@@ -523,15 +537,14 @@ export class GitMCPServer extends BaseMCPServer {
           target,
           createBranch,
           force,
-          output: stdout
-        }
+          output: stdout,
+        },
       };
-
     } catch (error) {
       logger.error('Git checkout failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git checkout failed'
+        error: error instanceof Error ? error.message : 'Git checkout failed',
       };
     }
   }
@@ -539,7 +552,10 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Reset repository state
    */
-  async handleGitReset(args: { mode?: 'soft' | 'mixed' | 'hard'; target?: string }): Promise<ToolResult> {
+  async handleGitReset(args: {
+    mode?: 'soft' | 'mixed' | 'hard';
+    target?: string;
+  }): Promise<ToolResult> {
     try {
       const { mode = 'mixed', target = 'HEAD' } = args;
 
@@ -547,14 +563,14 @@ export class GitMCPServer extends BaseMCPServer {
         type: 'git-operation',
         target: `${target} (${mode} reset)`,
         description: `Reset repository to ${target} with ${mode} mode`,
-        metadata: { mode, target }
+        metadata: { mode, target },
       };
 
       const context: OperationContext = {
         sandboxMode: mode === 'hard' ? 'full-access' : 'workspace-write',
         workspaceRoot: this.workspaceRoot,
         userIntent: 'Reset repository state',
-        sessionId: this.generateSessionId()
+        sessionId: this.generateSessionId(),
       };
 
       const approval = await this.approvalManager.requestApproval(operation, context);
@@ -562,7 +578,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'Reset not approved',
-          suggestion: approval.suggestions?.[0]
+          suggestion: approval.suggestions?.[0],
         };
       }
 
@@ -574,15 +590,14 @@ export class GitMCPServer extends BaseMCPServer {
         data: {
           mode,
           target,
-          output: stdout
-        }
+          output: stdout,
+        },
       };
-
     } catch (error) {
       logger.error('Git reset failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git reset failed'
+        error: error instanceof Error ? error.message : 'Git reset failed',
       };
     }
   }
@@ -598,14 +613,14 @@ export class GitMCPServer extends BaseMCPServer {
         type: 'git-operation',
         target: `branch: ${branch}`,
         description: `Merge branch "${branch}" using ${strategy} strategy`,
-        metadata: { branch, strategy, noFastForward }
+        metadata: { branch, strategy, noFastForward },
       };
 
       const context: OperationContext = {
         sandboxMode: 'workspace-write',
         workspaceRoot: this.workspaceRoot,
         userIntent: 'Merge Git branch',
-        sessionId: this.generateSessionId()
+        sessionId: this.generateSessionId(),
       };
 
       const approval = await this.approvalManager.requestApproval(operation, context);
@@ -613,7 +628,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'Merge not approved',
-          suggestion: approval.suggestions?.[0]
+          suggestion: approval.suggestions?.[0],
         };
       }
 
@@ -629,16 +644,15 @@ export class GitMCPServer extends BaseMCPServer {
           branch,
           strategy,
           noFastForward,
-          output: stdout
-        }
+          output: stdout,
+        },
       };
-
     } catch (error) {
       logger.error('Git merge failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Git merge failed',
-        suggestion: 'Check for merge conflicts and resolve them manually'
+        suggestion: 'Check for merge conflicts and resolve them manually',
       };
     }
   }
@@ -646,7 +660,12 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git rebase
    */
-  async handleGitRebase(args: { target: string; interactive?: boolean; abort?: boolean; continue?: boolean }): Promise<ToolResult> {
+  async handleGitRebase(args: {
+    target: string;
+    interactive?: boolean;
+    abort?: boolean;
+    continue?: boolean;
+  }): Promise<ToolResult> {
     try {
       const { target, interactive = false, abort = false, continue: continueRebase = false } = args;
 
@@ -654,7 +673,7 @@ export class GitMCPServer extends BaseMCPServer {
         await execAsync('git rebase --abort', { cwd: this.workspaceRoot });
         return {
           success: true,
-          data: { action: 'aborted' }
+          data: { action: 'aborted' },
         };
       }
 
@@ -662,7 +681,7 @@ export class GitMCPServer extends BaseMCPServer {
         await execAsync('git rebase --continue', { cwd: this.workspaceRoot });
         return {
           success: true,
-          data: { action: 'continued' }
+          data: { action: 'continued' },
         };
       }
 
@@ -670,14 +689,14 @@ export class GitMCPServer extends BaseMCPServer {
         type: 'git-operation',
         target: `rebase onto ${target}`,
         description: `Rebase current branch onto "${target}"${interactive ? ' (interactive)' : ''}`,
-        metadata: { target, interactive }
+        metadata: { target, interactive },
       };
 
       const context: OperationContext = {
         sandboxMode: 'workspace-write',
         workspaceRoot: this.workspaceRoot,
         userIntent: 'Rebase Git branch',
-        sessionId: this.generateSessionId()
+        sessionId: this.generateSessionId(),
       };
 
       const approval = await this.approvalManager.requestApproval(operation, context);
@@ -685,7 +704,7 @@ export class GitMCPServer extends BaseMCPServer {
         return {
           success: false,
           error: 'Rebase not approved',
-          suggestion: approval.suggestions?.[0]
+          suggestion: approval.suggestions?.[0],
         };
       }
 
@@ -699,16 +718,15 @@ export class GitMCPServer extends BaseMCPServer {
         data: {
           target,
           interactive,
-          output: stdout
-        }
+          output: stdout,
+        },
       };
-
     } catch (error) {
       logger.error('Git rebase failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Git rebase failed',
-        suggestion: 'Check for conflicts and resolve them, then use git_rebase with continue=true'
+        suggestion: 'Check for conflicts and resolve them, then use git_rebase with continue=true',
       };
     }
   }
@@ -725,14 +743,14 @@ export class GitMCPServer extends BaseMCPServer {
           type: 'git-operation',
           target: `tag: ${name}`,
           description: `Delete tag "${name}"`,
-          metadata: { name, delete: true }
+          metadata: { name, delete: true },
         };
 
         const context: OperationContext = {
           sandboxMode: 'workspace-write',
           workspaceRoot: this.workspaceRoot,
           userIntent: 'Delete Git tag',
-          sessionId: this.generateSessionId()
+          sessionId: this.generateSessionId(),
         };
 
         const approval = await this.approvalManager.requestApproval(operation, context);
@@ -740,7 +758,7 @@ export class GitMCPServer extends BaseMCPServer {
           return {
             success: false,
             error: 'Tag deletion not approved',
-            suggestion: approval.suggestions?.[0]
+            suggestion: approval.suggestions?.[0],
           };
         }
 
@@ -748,7 +766,7 @@ export class GitMCPServer extends BaseMCPServer {
 
         return {
           success: true,
-          data: { action: 'deleted', tag: name }
+          data: { action: 'deleted', tag: name },
         };
       }
 
@@ -769,15 +787,14 @@ export class GitMCPServer extends BaseMCPServer {
           action: 'created',
           tag: name,
           message,
-          pushed: push
-        }
+          pushed: push,
+        },
       };
-
     } catch (error) {
       logger.error('Git tag operation failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git tag operation failed'
+        error: error instanceof Error ? error.message : 'Git tag operation failed',
       };
     }
   }
@@ -785,26 +802,34 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git remote operations
    */
-  async handleGitRemote(args: { action: 'add' | 'remove' | 'list' | 'show'; name?: string; url?: string }): Promise<ToolResult> {
+  async handleGitRemote(args: {
+    action: 'add' | 'remove' | 'list' | 'show';
+    name?: string;
+    url?: string;
+  }): Promise<ToolResult> {
     try {
       const { action, name, url } = args;
 
       switch (action) {
         case 'list':
-          const { stdout: listOutput } = await execAsync('git remote -v', { cwd: this.workspaceRoot });
+          const { stdout: listOutput } = await execAsync('git remote -v', {
+            cwd: this.workspaceRoot,
+          });
           return {
             success: true,
-            data: { remotes: listOutput.trim().split('\n') }
+            data: { remotes: listOutput.trim().split('\n') },
           };
 
         case 'show':
           if (!name) {
             return { success: false, error: 'Remote name required for show action' };
           }
-          const { stdout: showOutput } = await execAsync(`git remote show "${name}"`, { cwd: this.workspaceRoot });
+          const { stdout: showOutput } = await execAsync(`git remote show "${name}"`, {
+            cwd: this.workspaceRoot,
+          });
           return {
             success: true,
-            data: { remote: name, info: showOutput }
+            data: { remote: name, info: showOutput },
           };
 
         case 'add':
@@ -814,7 +839,7 @@ export class GitMCPServer extends BaseMCPServer {
           await execAsync(`git remote add "${name}" "${url}"`, { cwd: this.workspaceRoot });
           return {
             success: true,
-            data: { action: 'added', remote: name, url }
+            data: { action: 'added', remote: name, url },
           };
 
         case 'remove':
@@ -824,18 +849,17 @@ export class GitMCPServer extends BaseMCPServer {
           await execAsync(`git remote remove "${name}"`, { cwd: this.workspaceRoot });
           return {
             success: true,
-            data: { action: 'removed', remote: name }
+            data: { action: 'removed', remote: name },
           };
 
         default:
           return { success: false, error: `Unknown action: ${action}` };
       }
-
     } catch (error) {
       logger.error('Git remote operation failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git remote operation failed'
+        error: error instanceof Error ? error.message : 'Git remote operation failed',
       };
     }
   }
@@ -843,7 +867,11 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git stash operations
    */
-  async handleGitStash(args: { action: 'save' | 'pop' | 'list' | 'show' | 'drop'; message?: string; index?: number }): Promise<ToolResult> {
+  async handleGitStash(args: {
+    action: 'save' | 'pop' | 'list' | 'show' | 'drop';
+    message?: string;
+    index?: number;
+  }): Promise<ToolResult> {
     try {
       const { action, message, index } = args;
 
@@ -854,7 +882,7 @@ export class GitMCPServer extends BaseMCPServer {
           const { stdout: saveOutput } = await execAsync(saveCommand, { cwd: this.workspaceRoot });
           return {
             success: true,
-            data: { action: 'saved', message, output: saveOutput }
+            data: { action: 'saved', message, output: saveOutput },
           };
 
         case 'pop':
@@ -863,14 +891,21 @@ export class GitMCPServer extends BaseMCPServer {
           const { stdout: popOutput } = await execAsync(popCommand, { cwd: this.workspaceRoot });
           return {
             success: true,
-            data: { action: 'popped', index, output: popOutput }
+            data: { action: 'popped', index, output: popOutput },
           };
 
         case 'list':
-          const { stdout: listOutput } = await execAsync('git stash list', { cwd: this.workspaceRoot });
+          const { stdout: listOutput } = await execAsync('git stash list', {
+            cwd: this.workspaceRoot,
+          });
           return {
             success: true,
-            data: { stashes: listOutput.trim().split('\n').filter(line => line) }
+            data: {
+              stashes: listOutput
+                .trim()
+                .split('\n')
+                .filter(line => line),
+            },
           };
 
         case 'show':
@@ -879,7 +914,7 @@ export class GitMCPServer extends BaseMCPServer {
           const { stdout: showOutput } = await execAsync(showCommand, { cwd: this.workspaceRoot });
           return {
             success: true,
-            data: { index, diff: showOutput }
+            data: { index, diff: showOutput },
           };
 
         case 'drop':
@@ -889,18 +924,17 @@ export class GitMCPServer extends BaseMCPServer {
           await execAsync(`git stash drop stash@{${index}}`, { cwd: this.workspaceRoot });
           return {
             success: true,
-            data: { action: 'dropped', index }
+            data: { action: 'dropped', index },
           };
 
         default:
           return { success: false, error: `Unknown stash action: ${action}` };
       }
-
     } catch (error) {
       logger.error('Git stash operation failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git stash operation failed'
+        error: error instanceof Error ? error.message : 'Git stash operation failed',
       };
     }
   }
@@ -908,7 +942,12 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git clean operations
    */
-  async handleGitClean(args: { dryRun?: boolean; directories?: boolean; ignored?: boolean; force?: boolean }): Promise<ToolResult> {
+  async handleGitClean(args: {
+    dryRun?: boolean;
+    directories?: boolean;
+    ignored?: boolean;
+    force?: boolean;
+  }): Promise<ToolResult> {
     try {
       const { dryRun = true, directories = false, ignored = false, force = false } = args;
 
@@ -916,14 +955,14 @@ export class GitMCPServer extends BaseMCPServer {
         type: 'git-operation',
         target: 'untracked files',
         description: `Clean untracked files${dryRun ? ' (dry run)' : ''}`,
-        metadata: { dryRun, directories, ignored, force }
+        metadata: { dryRun, directories, ignored, force },
       };
 
       const context: OperationContext = {
         sandboxMode: force && !dryRun ? 'full-access' : 'workspace-write',
         workspaceRoot: this.workspaceRoot,
         userIntent: 'Clean untracked files',
-        sessionId: this.generateSessionId()
+        sessionId: this.generateSessionId(),
       };
 
       if (!dryRun) {
@@ -932,7 +971,7 @@ export class GitMCPServer extends BaseMCPServer {
           return {
             success: false,
             error: 'Clean operation not approved',
-            suggestion: approval.suggestions?.[0]
+            suggestion: approval.suggestions?.[0],
           };
         }
       }
@@ -952,15 +991,14 @@ export class GitMCPServer extends BaseMCPServer {
           directories,
           ignored,
           force,
-          output: stdout
-        }
+          output: stdout,
+        },
       };
-
     } catch (error) {
       logger.error('Git clean failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Git clean failed'
+        error: error instanceof Error ? error.message : 'Git clean failed',
       };
     }
   }
@@ -981,8 +1019,12 @@ export class GitMCPServer extends BaseMCPServer {
    * Get comprehensive Git status
    */
   private async getGitStatus(): Promise<GitStatus> {
-    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: this.workspaceRoot });
-    const { stdout: branchOutput } = await execAsync('git branch --show-current', { cwd: this.workspaceRoot });
+    const { stdout: statusOutput } = await execAsync('git status --porcelain', {
+      cwd: this.workspaceRoot,
+    });
+    const { stdout: branchOutput } = await execAsync('git branch --show-current', {
+      cwd: this.workspaceRoot,
+    });
 
     const staged: string[] = [];
     const modified: string[] = [];
@@ -1009,7 +1051,10 @@ export class GitMCPServer extends BaseMCPServer {
     let ahead = 0;
     let behind = 0;
     try {
-      const { stdout: aheadBehind } = await execAsync('git rev-list --left-right --count HEAD...@{upstream}', { cwd: this.workspaceRoot });
+      const { stdout: aheadBehind } = await execAsync(
+        'git rev-list --left-right --count HEAD...@{upstream}',
+        { cwd: this.workspaceRoot }
+      );
       const [aheadStr, behindStr] = aheadBehind.trim().split('\t');
       ahead = parseInt(aheadStr) || 0;
       behind = parseInt(behindStr) || 0;
@@ -1024,7 +1069,7 @@ export class GitMCPServer extends BaseMCPServer {
       untracked,
       ahead,
       behind,
-      clean: staged.length === 0 && modified.length === 0 && untracked.length === 0
+      clean: staged.length === 0 && modified.length === 0 && untracked.length === 0,
     };
   }
 
@@ -1034,7 +1079,7 @@ export class GitMCPServer extends BaseMCPServer {
   private parseDiffOutput(diffOutput: string): GitDiffResult[] {
     const diffs: GitDiffResult[] = [];
     const lines = diffOutput.split('\n');
-    
+
     let currentFile = '';
     let currentPatch = '';
     let additions = 0;
@@ -1048,7 +1093,7 @@ export class GitMCPServer extends BaseMCPServer {
             file: currentFile,
             additions,
             deletions,
-            patch: currentPatch.trim()
+            patch: currentPatch.trim(),
           });
         }
 
@@ -1058,7 +1103,7 @@ export class GitMCPServer extends BaseMCPServer {
         deletions = 0;
       } else {
         currentPatch += line + '\n';
-        
+
         if (line.startsWith('+') && !line.startsWith('+++')) {
           additions++;
         } else if (line.startsWith('-') && !line.startsWith('---')) {
@@ -1073,7 +1118,7 @@ export class GitMCPServer extends BaseMCPServer {
         file: currentFile,
         additions,
         deletions,
-        patch: currentPatch.trim()
+        patch: currentPatch.trim(),
       });
     }
 
@@ -1095,9 +1140,9 @@ export class GitMCPServer extends BaseMCPServer {
         commits.push({
           hash,
           author: 'unknown', // Would need different format to get author
-          date: 'unknown',   // Would need different format to get date
+          date: 'unknown', // Would need different format to get date
           message: message.trim(),
-          files: []          // Would need different format to get files
+          files: [], // Would need different format to get files
         });
       }
     }

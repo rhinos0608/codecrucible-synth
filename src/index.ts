@@ -7,76 +7,87 @@ import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 // Fix EventEmitter memory leak warning
 process.setMaxListeners(50);
 
-export async function initializeCLIContext(): Promise<{cli: CLI, context: CLIContext}> {
+export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLIContext }> {
   try {
     const configManager = new ConfigManager();
     const config = await configManager.loadConfiguration();
-    
-    // Create unified client configuration
+
+    // Create unified client configuration with dynamic model detection
     const clientConfig: UnifiedClientConfig = {
       providers: [
-        { 
-          type: 'ollama', 
+        {
+          type: 'ollama',
           endpoint: config.model?.endpoint || 'http://localhost:11434',
-          model: config.model?.name || 'llama2',
-          timeout: config.model?.timeout || 30000
+          model: null, // Autonomous model selection
+          timeout: config.model?.timeout || 30000,
         },
         {
           type: 'lm-studio',
           endpoint: 'http://localhost:1234',
-          model: 'auto',
-          timeout: 30000
-        }
+          model: null, // Autonomous model selection
+          timeout: 30000,
+        },
       ],
-      executionMode: 'auto',
-      fallbackChain: ['ollama', 'lm-studio'],
+      executionMode: 'auto', // Let the dynamic router handle the actual routing
+      fallbackChain: ['ollama', 'lm-studio'], // Keep fallback but let dynamic router decide primary
       performanceThresholds: {
-        fastModeMaxTokens: config.model?.maxTokens || 2048,
-        timeoutMs: config.model?.timeout || 30000,
-        maxConcurrentRequests: 3
+        fastModeMaxTokens: config.model?.maxTokens || 32768, // Increased for better context
+        timeoutMs: config.model?.timeout || 60000, // Increased for complex tasks
+        maxConcurrentRequests: 2, // Reduced for sequential execution
       },
       security: {
         enableSandbox: true,
-        maxInputLength: 50000,
-        allowedCommands: ['npm', 'node', 'git', 'code']
-      }
+        maxInputLength: 100000, // Increased for larger codebases
+        allowedCommands: ['npm', 'node', 'git', 'code', 'ollama'],
+      },
     };
 
     const client = new UnifiedModelClient(clientConfig);
-    
+
     // Initialize providers but don't fail if they're not available
     try {
       await client.initialize();
     } catch (error) {
-      console.warn('⚠️ Provider initialization failed, continuing in degraded mode:', error.message);
+      console.warn(
+        '⚠️ Provider initialization failed, continuing in degraded mode:',
+        error.message
+      );
     }
-    
+
     const voiceSystem = new VoiceArchetypeSystem(client);
-    
+
     // Make MCP manager optional to prevent hanging
     let mcpManager;
     try {
       mcpManager = new MCPServerManager({
-        filesystem: { 
+        filesystem: {
           enabled: true,
-          restrictedPaths: ['/etc', '/var', '/usr', '/sys', '/proc', 'C:\\Windows', 'C:\\Program Files'],
-          allowedPaths: [process.cwd(), 'src', 'tests', 'docs', 'config']
+          restrictedPaths: [
+            '/etc',
+            '/var',
+            '/usr',
+            '/sys',
+            '/proc',
+            'C:\\Windows',
+            'C:\\Program Files',
+          ],
+          allowedPaths: [process.cwd(), 'src', 'tests', 'docs', 'config'],
         },
-        git: { 
+        git: {
           enabled: true,
           autoCommitMessages: false,
-          safeModeEnabled: true
+          safeModeEnabled: true,
         },
-        terminal: { 
+        terminal: {
           enabled: true,
           allowedCommands: ['ls', 'dir', 'find', 'grep', 'cat', 'head', 'tail', 'wc', 'tree'],
-          blockedCommands: ['rm', 'del', 'format', 'fdisk', 'shutdown', 'reboot']
+          blockedCommands: ['rm', 'del', 'format', 'fdisk', 'shutdown', 'reboot'],
         },
         packageManager: {
           enabled: true,
           autoInstall: false,
-          securityScan: true
-        }
+          securityScan: true,
+        },
       });
     } catch (error) {
       console.warn('⚠️ MCP Manager initialization failed, using minimal setup:', error.message);
@@ -84,7 +95,7 @@ export async function initializeCLIContext(): Promise<{cli: CLI, context: CLICon
       mcpManager = {
         startServers: async () => {},
         stopServers: async () => {},
-        getServerStatus: () => ({ filesystem: { status: 'disabled' } })
+        getServerStatus: () => ({ filesystem: { status: 'disabled' } }),
       } as any;
     }
 
@@ -101,16 +112,16 @@ export async function initializeCLIContext(): Promise<{cli: CLI, context: CLICon
       modelClient: client,
       voiceSystem,
       mcpManager,
-      config
+      config,
     };
 
     const cli = new CLI(
       context.modelClient,
-      context.voiceSystem, 
+      context.voiceSystem,
       context.mcpManager,
       context.config
     );
-    return {cli, context};
+    return { cli, context };
   } catch (error) {
     console.error('Failed to initialize CLI context:', error);
     throw error;
@@ -125,38 +136,73 @@ export async function main() {
   try {
     // Handle basic commands immediately without full initialization
     const args = process.argv.slice(2);
-    
+
     // Fast commands that don't need AI models or full initialization
     if (args.includes('--help') || args.includes('-h')) {
       showBasicHelp();
       return;
     }
-    
+
     if (args.includes('--version') || args.includes('-v')) {
       console.log('CodeCrucible Synth v3.8.9');
       return;
     }
-    
+
     // Status command with minimal initialization
     if (args[0] === 'status') {
       await showQuickStatus();
       return;
     }
-    
-    // Models command with minimal initialization  
+
+    // Models command with minimal initialization
     if (args[0] === 'models') {
       await showAvailableModels();
       return;
     }
-    
+
     // For other commands, do full initialization
     console.log('🚀 Initializing CodeCrucible Synth...');
     const startTime = Date.now();
-    const { cli } = await initializeCLIContext();
+    const { cli, context } = await initializeCLIContext();
     const initTime = Date.now() - startTime;
     console.log(`✅ Initialized in ${initTime}ms`);
+
+    // Check if we have piped input
+    const isInteractive = process.stdin.isTTY;
+    console.log('🔧 DEBUG: isInteractive:', isInteractive, 'args.length:', args.length);
     
-    await cli.run(args);
+    // If we have arguments or piped input, process them
+    if (args.length > 0) {
+      console.log('🔧 DEBUG: Taking args.length > 0 branch with args:', args);
+      await cli.run(args);
+    } else if (!isInteractive) {
+      console.log('🔧 DEBUG: Processing piped input directly, bypassing CLI race condition');
+      // Handle piped input directly without CLI.run() to avoid race condition
+      let inputData = '';
+      process.stdin.setEncoding('utf8');
+      
+      for await (const chunk of process.stdin) {
+        inputData += chunk;
+      }
+      
+      if (inputData.trim()) {
+        console.log('🔧 DEBUG: Processing piped input:', inputData.trim().substring(0, 50) + '...');
+        // Process directly through the model client to avoid InteractiveREPL race condition
+        try {
+          const response = await context.modelClient.generateText(inputData.trim(), { timeout: 30000 });
+          console.log('\n🤖 Response:');
+          console.log(response);
+        } catch (error) {
+          console.error('❌ Error processing input:', error.message);
+        }
+      } else {
+        console.log('🔧 DEBUG: No piped input received');
+      }
+    } else {
+      console.log('🔧 DEBUG: Taking interactive mode branch with args:', args, 'isInteractive:', isInteractive);
+      // No args and interactive terminal - start interactive mode
+      await cli.run(args);
+    }
   } catch (error) {
     console.error('❌ Fatal error:', error);
     process.exit(1);
@@ -203,50 +249,50 @@ function showBasicHelp() {
 async function showQuickStatus() {
   console.log('📊 CodeCrucible Synth Status');
   console.log('━'.repeat(40));
-  
+
   console.log(`Version: 3.8.9`);
   console.log(`Node.js: ${process.version}`);
   console.log(`Platform: ${process.platform}`);
-  
+
   const healthChecks = [
     { name: 'Ollama', url: 'http://localhost:11434/api/tags' },
-    { name: 'LM Studio', url: 'http://localhost:1234/v1/models' }
+    { name: 'LM Studio', url: 'http://localhost:1234/v1/models' },
   ];
-  
+
   for (const check of healthChecks) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
-      
+
       const response = await fetch(check.url, {
         signal: controller.signal,
-        method: 'GET'
+        method: 'GET',
       });
-      
+
       clearTimeout(timeoutId);
       console.log(`✅ ${check.name}: Available`);
     } catch (error) {
       console.log(`❌ ${check.name}: Not available`);
     }
   }
-  
+
   console.log('━'.repeat(40));
 }
 
 async function showAvailableModels() {
   console.log('🤖 Available Models');
   console.log('━'.repeat(40));
-  
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
-    
+
     const response = await fetch('http://localhost:11434/api/tags', {
-      signal: controller.signal
+      signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
-    
+
     if (response.ok) {
       const data = await response.json();
       console.log('');
@@ -263,17 +309,17 @@ async function showAvailableModels() {
     console.log('');
     console.log('❌ Ollama: Not available');
   }
-  
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
-    
+
     const response = await fetch('http://localhost:1234/v1/models', {
-      signal: controller.signal
+      signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
-    
+
     if (response.ok) {
       const data = await response.json();
       console.log('');
@@ -290,7 +336,7 @@ async function showAvailableModels() {
     console.log('');
     console.log('❌ LM Studio: Not available');
   }
-  
+
   console.log('');
   console.log('━'.repeat(40));
   console.log('💡 Use "crucible status" for full system status');
@@ -300,8 +346,11 @@ export default initializeCLIContext;
 
 // Auto-run main when executed directly
 // Fix: More robust check for direct execution
-if (process.argv[1] && (process.argv[1].includes('index.js') || process.argv[1].endsWith('index.ts'))) {
-  main().catch((error) => {
+if (
+  process.argv[1] &&
+  (process.argv[1].includes('index.js') || process.argv[1].endsWith('index.ts'))
+) {
+  main().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
   });

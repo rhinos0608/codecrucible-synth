@@ -68,7 +68,7 @@ export class HealthChecker extends EventEmitter {
 
   constructor(config: Partial<HealthConfig> = {}) {
     super();
-    
+
     this.config = {
       checkInterval: 30000, // 30 seconds
       timeout: 5000, // 5 seconds
@@ -76,7 +76,7 @@ export class HealthChecker extends EventEmitter {
       retryDelay: 1000, // 1 second
       degradedThreshold: 2, // consecutive failures before degraded
       unhealthyThreshold: 5, // consecutive failures before unhealthy
-      ...config
+      ...config,
     };
 
     this.registerDefaultChecks();
@@ -100,25 +100,25 @@ export class HealthChecker extends EventEmitter {
           // For now, simulate a check
           const start = Date.now();
           await this.simulateAsyncOperation(100);
-          
+
           return {
             healthy: true,
             message: 'Database connection successful',
             duration: Date.now() - start,
             metadata: {
               connection_pool: 'active',
-              query_performance: 'optimal'
+              query_performance: 'optimal',
             },
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         } catch (error) {
           return {
             healthy: false,
             message: `Database connection failed: ${(error as Error).message}`,
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         }
-      }
+      },
     });
 
     // Ollama service check
@@ -131,12 +131,12 @@ export class HealthChecker extends EventEmitter {
       check: async () => {
         try {
           const start = Date.now();
-          
+
           // Try to connect to Ollama
           const response = await fetch('http://localhost:11434/api/tags', {
-            signal: AbortSignal.timeout(8000)
+            signal: AbortSignal.timeout(8000),
           });
-          
+
           if (response.ok) {
             const data = await response.json();
             return {
@@ -145,26 +145,26 @@ export class HealthChecker extends EventEmitter {
               duration: Date.now() - start,
               metadata: {
                 models_available: data.models?.length || 0,
-                api_version: response.headers.get('server') || 'unknown'
+                api_version: response.headers.get('server') || 'unknown',
               },
-              timestamp: new Date()
+              timestamp: new Date(),
             };
           } else {
             return {
               healthy: false,
               message: `Ollama service returned ${response.status}`,
               duration: Date.now() - start,
-              timestamp: new Date()
+              timestamp: new Date(),
             };
           }
         } catch (error) {
           return {
             healthy: false,
             message: `Ollama service unavailable: ${(error as Error).message}`,
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         }
-      }
+      },
     });
 
     // LM Studio service check
@@ -177,11 +177,11 @@ export class HealthChecker extends EventEmitter {
       check: async () => {
         try {
           const start = Date.now();
-          
+
           const response = await fetch('http://localhost:1234/v1/models', {
-            signal: AbortSignal.timeout(8000)
+            signal: AbortSignal.timeout(8000),
           });
-          
+
           if (response.ok) {
             const data = await response.json();
             return {
@@ -189,26 +189,26 @@ export class HealthChecker extends EventEmitter {
               message: 'LM Studio service is available',
               duration: Date.now() - start,
               metadata: {
-                models_available: data.data?.length || 0
+                models_available: data.data?.length || 0,
               },
-              timestamp: new Date()
+              timestamp: new Date(),
             };
           } else {
             return {
               healthy: false,
               message: `LM Studio service returned ${response.status}`,
               duration: Date.now() - start,
-              timestamp: new Date()
+              timestamp: new Date(),
             };
           }
         } catch (error) {
           return {
             healthy: false,
             message: `LM Studio service unavailable: ${(error as Error).message}`,
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         }
-      }
+      },
     });
 
     // Memory usage check
@@ -224,12 +224,12 @@ export class HealthChecker extends EventEmitter {
           const used = memUsage.heapUsed;
           const total = memUsage.heapTotal;
           const usagePercent = (used / total) * 100;
-          
+
           const isHealthy = usagePercent < 85; // Alert if over 85%
-          
+
           return {
             healthy: isHealthy,
-            message: isHealthy 
+            message: isHealthy
               ? `Memory usage is normal (${usagePercent.toFixed(1)}%)`
               : `High memory usage detected (${usagePercent.toFixed(1)}%)`,
             metadata: {
@@ -237,18 +237,18 @@ export class HealthChecker extends EventEmitter {
               heap_total: total,
               usage_percent: usagePercent,
               rss: memUsage.rss,
-              external: memUsage.external
+              external: memUsage.external,
             },
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         } catch (error) {
           return {
             healthy: false,
             message: `Memory check failed: ${(error as Error).message}`,
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         }
-      }
+      },
     });
 
     // Disk space check
@@ -264,26 +264,26 @@ export class HealthChecker extends EventEmitter {
           // For now, simulate a check
           const freeSpacePercent = 70; // Mock 70% free space
           const isHealthy = freeSpacePercent > 20; // Alert if less than 20% free
-          
+
           return {
             healthy: isHealthy,
-            message: isHealthy 
+            message: isHealthy
               ? `Disk space is adequate (${freeSpacePercent}% free)`
               : `Low disk space warning (${freeSpacePercent}% free)`,
             metadata: {
               free_space_percent: freeSpacePercent,
-              path: process.cwd()
+              path: process.cwd(),
             },
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         } catch (error) {
           return {
             healthy: false,
             message: `Disk check failed: ${(error as Error).message}`,
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         }
-      }
+      },
     });
 
     // External API dependency check
@@ -300,46 +300,47 @@ export class HealthChecker extends EventEmitter {
             { name: 'github', url: 'https://api.github.com/zen' },
             // Add other external services as needed
           ];
-          
+
           const results = await Promise.allSettled(
             checks.map(async ({ name, url }) => {
               const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
               return { name, healthy: response.ok, status: response.status };
             })
           );
-          
+
           const failedServices = results
-            .filter((result, index) => 
-              result.status === 'rejected' || 
-              (result.status === 'fulfilled' && !result.value.healthy)
+            .filter(
+              (result, index) =>
+                result.status === 'rejected' ||
+                (result.status === 'fulfilled' && !result.value.healthy)
             )
             .map((_, index) => checks[index].name);
-          
+
           const isHealthy = failedServices.length === 0;
-          
+
           return {
             healthy: isHealthy,
-            message: isHealthy 
+            message: isHealthy
               ? 'All external services are available'
               : `Some external services are unavailable: ${failedServices.join(', ')}`,
             metadata: {
               total_services: checks.length,
-              failed_services: failedServices
+              failed_services: failedServices,
             },
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         } catch (error) {
           return {
             healthy: false,
             message: `External API check failed: ${(error as Error).message}`,
-            timestamp: new Date()
+            timestamp: new Date(),
           };
         }
-      }
+      },
     });
 
     logger.info('Default health checks registered', {
-      total_checks: this.checks.size
+      total_checks: this.checks.size,
     });
   }
 
@@ -348,7 +349,7 @@ export class HealthChecker extends EventEmitter {
    */
   registerCheck(check: HealthCheck): void {
     this.checks.set(check.name, check);
-    
+
     // Initialize component health
     this.results.set(check.name, {
       name: check.name,
@@ -357,11 +358,11 @@ export class HealthChecker extends EventEmitter {
       result: {
         healthy: true,
         message: 'Not yet checked',
-        timestamp: new Date()
+        timestamp: new Date(),
       },
       uptime: 100,
       errorCount: 0,
-      consecutiveFailures: 0
+      consecutiveFailures: 0,
     });
 
     // Start interval if specified
@@ -369,14 +370,14 @@ export class HealthChecker extends EventEmitter {
       const intervalHandle = setInterval(async () => {
         await this.runSingleCheck(check.name);
       }, check.interval);
-      
+
       this.intervalHandles.set(check.name, intervalHandle);
     }
 
     logger.info('Health check registered', {
       name: check.name,
       critical: check.critical,
-      timeout: check.timeout
+      timeout: check.timeout,
     });
   }
 
@@ -386,7 +387,7 @@ export class HealthChecker extends EventEmitter {
   unregisterCheck(name: string): void {
     this.checks.delete(name);
     this.results.delete(name);
-    
+
     const intervalHandle = this.intervalHandles.get(name);
     if (intervalHandle) {
       clearInterval(intervalHandle);
@@ -400,9 +401,7 @@ export class HealthChecker extends EventEmitter {
    * Run all health checks
    */
   async runAllChecks(): Promise<SystemHealth> {
-    const checkPromises = Array.from(this.checks.keys()).map(name => 
-      this.runSingleCheck(name)
-    );
+    const checkPromises = Array.from(this.checks.keys()).map(name => this.runSingleCheck(name));
 
     await Promise.allSettled(checkPromises);
     return this.getSystemHealth();
@@ -416,21 +415,18 @@ export class HealthChecker extends EventEmitter {
     if (!check) return null;
 
     let lastError: Error | null = null;
-    
+
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
       try {
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error('Health check timeout')), check.timeout);
         });
 
-        const result = await Promise.race([
-          check.check(),
-          timeoutPromise
-        ]);
+        const result = await Promise.race([check.check(), timeoutPromise]);
 
         // Update component health
         const componentHealth = this.updateComponentHealth(name, result, true);
-        
+
         if (result.healthy) {
           this.emit('health_check_passed', { name, result, attempt });
           return componentHealth;
@@ -438,16 +434,15 @@ export class HealthChecker extends EventEmitter {
           logger.warn('Health check failed', {
             name,
             attempt,
-            message: result.message
+            message: result.message,
           });
         }
-
       } catch (error) {
         lastError = error as Error;
         logger.error('Health check error', error as Error, {
           name,
           attempt,
-          max_attempts: this.config.retryAttempts
+          max_attempts: this.config.retryAttempts,
         });
 
         if (attempt < this.config.retryAttempts) {
@@ -460,12 +455,12 @@ export class HealthChecker extends EventEmitter {
     const failureResult: HealthCheckResult = {
       healthy: false,
       message: `Health check failed after ${this.config.retryAttempts} attempts: ${lastError?.message}`,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     const componentHealth = this.updateComponentHealth(name, failureResult, false);
     this.emit('health_check_failed', { name, result: failureResult });
-    
+
     return componentHealth;
   }
 
@@ -473,19 +468,19 @@ export class HealthChecker extends EventEmitter {
    * Update component health based on check result
    */
   private updateComponentHealth(
-    name: string, 
-    result: HealthCheckResult, 
+    name: string,
+    result: HealthCheckResult,
     success: boolean
   ): ComponentHealth {
     const existing = this.results.get(name)!;
-    
+
     if (success) {
       existing.consecutiveFailures = 0;
       existing.status = 'healthy';
     } else {
       existing.consecutiveFailures++;
       existing.errorCount++;
-      
+
       if (existing.consecutiveFailures >= this.config.unhealthyThreshold) {
         existing.status = 'unhealthy';
       } else if (existing.consecutiveFailures >= this.config.degradedThreshold) {
@@ -495,10 +490,10 @@ export class HealthChecker extends EventEmitter {
 
     existing.lastCheck = new Date();
     existing.result = result;
-    
+
     // Calculate uptime percentage
     const totalTime = Date.now() - this.startTime;
-    const healthyTime = totalTime - (existing.errorCount * this.config.checkInterval);
+    const healthyTime = totalTime - existing.errorCount * this.config.checkInterval;
     existing.uptime = Math.max(0, (healthyTime / totalTime) * 100);
 
     this.results.set(name, existing);
@@ -511,13 +506,13 @@ export class HealthChecker extends EventEmitter {
   getSystemHealth(): SystemHealth {
     const components = Object.fromEntries(this.results);
     const componentList = Array.from(this.results.values());
-    
+
     const summary = {
       total: componentList.length,
       healthy: componentList.filter(c => c.status === 'healthy').length,
       degraded: componentList.filter(c => c.status === 'degraded').length,
       unhealthy: componentList.filter(c => c.status === 'unhealthy').length,
-      critical_failures: 0
+      critical_failures: 0,
     };
 
     // Count critical failures
@@ -528,7 +523,7 @@ export class HealthChecker extends EventEmitter {
 
     // Determine overall system status
     let systemStatus: 'healthy' | 'degraded' | 'unhealthy';
-    
+
     if (summary.critical_failures > 0) {
       systemStatus = 'unhealthy';
     } else if (summary.unhealthy > 0 || summary.degraded > 0) {
@@ -544,7 +539,7 @@ export class HealthChecker extends EventEmitter {
       version: process.env.npm_package_version || 'unknown',
       environment: process.env.NODE_ENV || 'development',
       components,
-      summary
+      summary,
     };
   }
 
@@ -554,7 +549,7 @@ export class HealthChecker extends EventEmitter {
   private startPeriodicChecks(): void {
     // Run initial check
     setTimeout(() => this.runAllChecks(), 1000);
-    
+
     // Set up periodic checks
     setInterval(async () => {
       await this.runAllChecks();
@@ -568,21 +563,20 @@ export class HealthChecker extends EventEmitter {
     return async (req: any, res: any) => {
       try {
         const health = this.getSystemHealth();
-        
-        const statusCode = health.status === 'healthy' ? 200 :
-                          health.status === 'degraded' ? 200 : 503;
-        
+
+        const statusCode =
+          health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
+
         res.status(statusCode).json({
           ...health,
-          timestamp: health.timestamp.toISOString()
+          timestamp: health.timestamp.toISOString(),
         });
-
       } catch (error) {
         logger.error('Health endpoint error', error as Error);
         res.status(500).json({
           status: 'unhealthy',
           timestamp: new Date().toISOString(),
-          error: 'Health check system failure'
+          error: 'Health check system failure',
         });
       }
     };
@@ -599,9 +593,7 @@ export class HealthChecker extends EventEmitter {
    * Get checks by tag
    */
   getChecksByTag(tag: string): HealthCheck[] {
-    return Array.from(this.checks.values()).filter(check => 
-      check.tags?.includes(tag)
-    );
+    return Array.from(this.checks.values()).filter(check => check.tags?.includes(tag));
   }
 
   /**
@@ -626,7 +618,7 @@ export class HealthChecker extends EventEmitter {
       clearInterval(intervalHandle);
     }
     this.intervalHandles.clear();
-    
+
     logger.info('Health checker stopped');
   }
 }

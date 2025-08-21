@@ -62,13 +62,13 @@ export class ConfigurationConsolidator {
     const summary = {
       filesProcessed: this.sources.length,
       conflictsFound: this.conflicts.length,
-      conflictsResolved: this.conflicts.filter(c => c.resolution !== 'manual_required').length
+      conflictsResolved: this.conflicts.filter(c => c.resolution !== 'manual_required').length,
     };
 
     return {
       config: this.consolidatedConfig,
       conflicts: this.conflicts,
-      summary
+      summary,
     };
   }
 
@@ -80,26 +80,29 @@ export class ConfigurationConsolidator {
       // Priority 1: Default configurations
       { file: 'config/default.yaml', type: 'yaml' as const, priority: 1 },
       { file: 'config/voices.yaml', type: 'yaml' as const, priority: 1 },
-      
+
       // Priority 2: Hybrid/specific configurations
       { file: 'config/hybrid.yaml', type: 'yaml' as const, priority: 2 },
       { file: 'config/hybrid-config.json', type: 'json' as const, priority: 2 },
       { file: 'config/optimized-model-config.json', type: 'json' as const, priority: 2 },
-      
+
       // Priority 3: Main configuration
       { file: 'codecrucible.config.json', type: 'json' as const, priority: 3 },
-      
+
       // Priority 4: Environment variables (highest priority)
       { file: '.env', type: 'env' as const, priority: 4 },
       { file: '.env.local', type: 'env' as const, priority: 4 },
-      { file: '.env.production', type: 'env' as const, priority: 4 }
+      { file: '.env.production', type: 'env' as const, priority: 4 },
     ];
 
     for (const configFile of configFiles) {
       try {
         const filePath = resolve(configFile.file);
-        const exists = await fs.access(filePath).then(() => true).catch(() => false);
-        
+        const exists = await fs
+          .access(filePath)
+          .then(() => true)
+          .catch(() => false);
+
         if (exists) {
           const content = await fs.readFile(filePath, 'utf-8');
           let data: unknown;
@@ -120,7 +123,7 @@ export class ConfigurationConsolidator {
             file: configFile.file,
             type: configFile.type,
             priority: configFile.priority,
-            data
+            data,
           });
 
           logger.info(`📄 Loaded config: ${configFile.file}`);
@@ -143,7 +146,10 @@ export class ConfigurationConsolidator {
       if (trimmed && !trimmed.startsWith('#')) {
         const [key, ...valueParts] = trimmed.split('=');
         if (key && valueParts.length > 0) {
-          env[key.trim()] = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+          env[key.trim()] = valueParts
+            .join('=')
+            .trim()
+            .replace(/^["']|["']$/g, '');
         }
       }
     }
@@ -166,31 +172,29 @@ export class ConfigurationConsolidator {
     for (const [key, entries] of keyMap) {
       if (entries.length > 1) {
         const uniqueValues = new Set(entries.map(e => JSON.stringify(e.value)));
-        
+
         if (uniqueValues.size > 1) {
           const conflict: ConfigConflict = {
             key,
             sources: entries.map(e => ({
               file: e.source.file,
               value: e.value,
-              priority: e.source.priority
+              priority: e.source.priority,
             })),
             resolution: 'highest_priority',
-            resolvedValue: null
+            resolvedValue: null,
           };
 
           // Determine resolution strategy
-          const hasComplexValues = entries.some(e => 
-            typeof e.value === 'object' && e.value !== null
+          const hasComplexValues = entries.some(
+            e => typeof e.value === 'object' && e.value !== null
           );
 
           if (hasComplexValues) {
-            const canMerge = entries.every(e => 
-              typeof e.value === 'object' && 
-              e.value !== null && 
-              !Array.isArray(e.value)
+            const canMerge = entries.every(
+              e => typeof e.value === 'object' && e.value !== null && !Array.isArray(e.value)
             );
-            
+
             if (canMerge) {
               conflict.resolution = 'merge';
             } else {
@@ -208,18 +212,18 @@ export class ConfigurationConsolidator {
    * Flatten nested configuration objects for conflict detection
    */
   private flattenConfig(
-    obj: Record<string, unknown>, 
-    prefix: string, 
+    obj: Record<string, unknown>,
+    prefix: string,
     source: ConfigSource,
     keyMap: Map<string, Array<{ source: ConfigSource; value: unknown; path: string }>>
   ): void {
     for (const [key, value] of Object.entries(obj)) {
       const fullKey = prefix ? `${prefix}.${key}` : key;
-      
+
       if (!keyMap.has(fullKey)) {
         keyMap.set(fullKey, []);
       }
-      
+
       keyMap.get(fullKey)!.push({ source, value, path: fullKey });
 
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
@@ -246,7 +250,10 @@ export class ConfigurationConsolidator {
           conflict.resolvedValue = {};
           for (const source of conflict.sources.sort((a, b) => a.priority - b.priority)) {
             if (typeof source.value === 'object' && source.value !== null) {
-              conflict.resolvedValue = { ...conflict.resolvedValue as Record<string, unknown>, ...source.value as Record<string, unknown> };
+              conflict.resolvedValue = {
+                ...(conflict.resolvedValue as Record<string, unknown>),
+                ...(source.value as Record<string, unknown>),
+              };
             }
           }
           break;
@@ -272,7 +279,7 @@ export class ConfigurationConsolidator {
 
     // Apply configurations in priority order (lowest to highest)
     const sortedSources = [...this.sources].sort((a, b) => a.priority - b.priority);
-    
+
     for (const source of sortedSources) {
       this.mergeDeep(this.consolidatedConfig, source.data);
     }
@@ -288,18 +295,24 @@ export class ConfigurationConsolidator {
     this.consolidatedConfig._metadata = {
       consolidatedAt: new Date().toISOString(),
       sources: this.sources.map(s => ({ file: s.file, priority: s.priority })),
-      conflictsResolved: this.conflicts.length
+      conflictsResolved: this.conflicts.length,
     };
   }
 
   /**
    * Deep merge two objects
    */
-  private mergeDeep(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  private mergeDeep(
+    target: Record<string, unknown>,
+    source: Record<string, unknown>
+  ): Record<string, unknown> {
     for (const key in source) {
       if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
         if (!target[key]) target[key] = {};
-        this.mergeDeep(target[key] as Record<string, unknown>, source[key] as Record<string, unknown>);
+        this.mergeDeep(
+          target[key] as Record<string, unknown>,
+          source[key] as Record<string, unknown>
+        );
       } else {
         target[key] = source[key];
       }
@@ -353,15 +366,19 @@ SOURCES PROCESSED:
       report += '─'.repeat(50) + '\n';
 
       for (const conflict of this.conflicts) {
-        const icon = conflict.resolution === 'manual_required' ? '🚨' : 
-                    conflict.resolution === 'merge' ? '🔀' : '⬆️';
+        const icon =
+          conflict.resolution === 'manual_required'
+            ? '🚨'
+            : conflict.resolution === 'merge'
+              ? '🔀'
+              : '⬆️';
         report += `${icon} ${conflict.key}\n`;
         report += `   Resolution: ${conflict.resolution}\n`;
-        
+
         for (const source of conflict.sources) {
           report += `   • ${source.file}: ${JSON.stringify(source.value)}\n`;
         }
-        
+
         if (conflict.resolvedValue !== null) {
           report += `   ✅ Resolved: ${JSON.stringify(conflict.resolvedValue)}\n`;
         }
@@ -401,7 +418,7 @@ SOURCES PROCESSED:
       'model.endpoint',
       'model.name',
       'security.enableSandbox',
-      'performance.responseCache.enabled'
+      'performance.responseCache.enabled',
     ];
 
     for (const field of requiredFields) {
@@ -422,7 +439,7 @@ SOURCES PROCESSED:
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -437,11 +454,12 @@ SOURCES PROCESSED:
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const consolidator = new ConfigurationConsolidator();
-  
-  consolidator.consolidateConfigurations()
+
+  consolidator
+    .consolidateConfigurations()
     .then(_result => {
       console.log(consolidator.generateReport());
-      
+
       const validation = consolidator.validateConfiguration();
       if (!validation.isValid) {
         console.log('\n❌ Configuration validation failed:');
@@ -451,7 +469,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       } else {
         console.log('\n✅ Configuration validation passed!');
       }
-      
+
       return consolidator.saveConsolidatedConfig();
     })
     .then(() => {

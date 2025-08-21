@@ -6,7 +6,11 @@ import { performance } from 'perf_hooks';
 import picocolors from 'picocolors';
 import ora from 'ora';
 import { EnhancedStartupIndexer, ProjectIndex } from './enhanced-startup-indexer.js';
-import { StructuredResponseFormatter, createStructuredResponse, AnalysisResponse } from './structured-response-formatter.js';
+import {
+  StructuredResponseFormatter,
+  createStructuredResponse,
+  AnalysisResponse,
+} from './structured-response-formatter.js';
 import { logger } from './logger.js';
 
 export interface EnhancedAgentConfig {
@@ -45,12 +49,12 @@ export class EnhancedCodeCrucibleAgent {
       maxCacheAge: 30, // 30 minutes
       outputFormat: 'structured',
       verboseLogging: false,
-      ...config
+      ...config,
     };
 
     this.formatter = new StructuredResponseFormatter({
       maxWidth: process.stdout.columns || 120,
-      useColors: process.stdout.isTTY
+      useColors: process.stdout.isTTY,
     });
 
     if (this.config.verboseLogging) {
@@ -84,13 +88,12 @@ export class EnhancedCodeCrucibleAgent {
       const initTime = Math.round(endTime - startTime);
 
       spinner.succeed(`Enhanced CodeCrucible Agent initialized in ${initTime}ms`);
-      
+
       if (this.projectIndex) {
         this.displayWelcomeMessage();
       }
 
       this.startupCompleted = true;
-
     } catch (error) {
       spinner.fail('Failed to initialize Enhanced CodeCrucible Agent');
       logger.error('Initialization error:', error);
@@ -102,12 +105,12 @@ export class EnhancedCodeCrucibleAgent {
     if (!this.startupCompleted) {
       await this.initialize();
     }
-    
+
     try {
       // If we have a project index, use it for enhanced analysis
       if (this.projectIndex) {
         const response = this.createProjectBasedResponse(query);
-        
+
         if (this.config.outputFormat === 'json') {
           return JSON.stringify(response, null, 2);
         } else if (this.config.outputFormat === 'structured') {
@@ -119,7 +122,6 @@ export class EnhancedCodeCrucibleAgent {
 
       // Fallback to simple analysis
       return await this.performSimpleAnalysis(query);
-
     } catch (error) {
       logger.error('Analysis error:', error);
       return this.formatError(error);
@@ -134,7 +136,7 @@ export class EnhancedCodeCrucibleAgent {
     try {
       const response = createStructuredResponse(undefined, code, language, {
         maxWidth: process.stdout.columns || 120,
-        useColors: process.stdout.isTTY
+        useColors: process.stdout.isTTY,
       });
 
       if (this.config.outputFormat === 'json') {
@@ -144,7 +146,6 @@ export class EnhancedCodeCrucibleAgent {
       } else {
         return response.summary;
       }
-
     } catch (error) {
       logger.error('Code analysis error:', error);
       return this.formatError(error);
@@ -153,7 +154,7 @@ export class EnhancedCodeCrucibleAgent {
 
   async refreshIndex(): Promise<void> {
     const spinner = ora('Refreshing project index...').start();
-    
+
     try {
       this.projectIndex = null;
       this.indexCache.clear();
@@ -172,7 +173,7 @@ export class EnhancedCodeCrucibleAgent {
 
     const response = createStructuredResponse(this.projectIndex, undefined, undefined, {
       maxWidth: process.stdout.columns || 120,
-      useColors: process.stdout.isTTY
+      useColors: process.stdout.isTTY,
     });
 
     return this.formatter.renderResponse(response);
@@ -207,7 +208,7 @@ export class EnhancedCodeCrucibleAgent {
 
   private async detectProjectType(): Promise<void> {
     const projectPath = this.config.projectPath;
-    
+
     // Check for common project files
     const projectFiles = [
       'package.json',
@@ -216,7 +217,7 @@ export class EnhancedCodeCrucibleAgent {
       'go.mod',
       'composer.json',
       'pom.xml',
-      'build.gradle'
+      'build.gradle',
     ];
 
     let projectType = 'generic';
@@ -233,7 +234,7 @@ export class EnhancedCodeCrucibleAgent {
   private async buildProjectIndex(): Promise<void> {
     const cacheKey = this.config.projectPath;
     const cached = this.indexCache.get(cacheKey);
-    
+
     // Check if we have a valid cached index
     if (cached && this.config.cacheResults) {
       const age = (Date.now() - cached.timestamp) / (1000 * 60); // age in minutes
@@ -253,7 +254,7 @@ export class EnhancedCodeCrucibleAgent {
       this.indexCache.set(cacheKey, {
         index: this.projectIndex,
         timestamp: Date.now(),
-        hash: this.calculateIndexHash(this.projectIndex)
+        hash: this.calculateIndexHash(this.projectIndex),
       });
     }
 
@@ -265,12 +266,12 @@ export class EnhancedCodeCrucibleAgent {
 
     // Log key findings
     const { metadata, analysis } = this.projectIndex;
-    
+
     logger.info(`Project "${metadata.name}" indexed:`, {
       files: metadata.totalFiles,
       languages: Object.keys(metadata.languages).length,
       frameworks: metadata.frameworks.length,
-      qualityScore: analysis.patterns.qualityScore
+      qualityScore: analysis.patterns.qualityScore,
     });
 
     // Check for common issues
@@ -295,7 +296,7 @@ export class EnhancedCodeCrucibleAgent {
     // Create enhanced response using project context
     const response = createStructuredResponse(this.projectIndex, undefined, undefined, {
       maxWidth: process.stdout.columns || 120,
-      useColors: process.stdout.isTTY
+      useColors: process.stdout.isTTY,
     });
 
     // Enhance with query-specific insights
@@ -316,22 +317,26 @@ export class EnhancedCodeCrucibleAgent {
 
   private async performSimpleAnalysis(query: string): Promise<string> {
     // Fallback analysis for when project index is not available
-    return `CodeCrucible Analysis for: "${query}"\n\n` +
-           `Unfortunately, detailed project analysis is not available because the project indexing failed or was disabled.\n` +
-           `Enable indexing for enhanced analysis capabilities.\n\n` +
-           `Query processed at: ${new Date().toISOString()}`;
+    return (
+      `CodeCrucible Analysis for: "${query}"\n\n` +
+      `Unfortunately, detailed project analysis is not available because the project indexing failed or was disabled.\n` +
+      `Enable indexing for enhanced analysis capabilities.\n\n` +
+      `Query processed at: ${new Date().toISOString()}`
+    );
   }
 
   private displayWelcomeMessage(): void {
     if (!this.projectIndex || !process.stdout.isTTY) return;
 
     const { metadata, analysis } = this.projectIndex;
-    
+
     console.log('');
     console.log(picocolors.cyan('🔍 Enhanced CodeCrucible Agent Ready!'));
     console.log('');
     console.log(picocolors.bold(`Project: ${metadata.name} v${metadata.version}`));
-    console.log(`Files: ${metadata.totalFiles} | Languages: ${Object.keys(metadata.languages).length} | Quality: ${analysis.patterns.qualityScore}/100`);
+    console.log(
+      `Files: ${metadata.totalFiles} | Languages: ${Object.keys(metadata.languages).length} | Quality: ${analysis.patterns.qualityScore}/100`
+    );
     console.log('');
     console.log(picocolors.green('✅ Project indexed and ready for intelligent analysis'));
     console.log(picocolors.gray('Use enhanced commands for detailed insights and recommendations'));
@@ -340,9 +345,11 @@ export class EnhancedCodeCrucibleAgent {
 
   private formatError(error: Error | unknown): string {
     const timestamp = new Date().toISOString();
-    return `❌ CodeCrucible Error [${timestamp}]\n\n` +
-           `${error instanceof Error ? error.message : 'Unknown error occurred'}\n\n` +
-           `Please check your configuration and try again.`;
+    return (
+      `❌ CodeCrucible Error [${timestamp}]\n\n` +
+      `${error instanceof Error ? error.message : 'Unknown error occurred'}\n\n` +
+      `Please check your configuration and try again.`
+    );
   }
 
   private calculateIndexHash(index: ProjectIndex): string {
@@ -350,17 +357,17 @@ export class EnhancedCodeCrucibleAgent {
     const hashString = JSON.stringify({
       totalFiles: index.metadata.totalFiles,
       totalSize: index.metadata.totalSize,
-      lastUpdate: index.metadata.indexedAt
+      lastUpdate: index.metadata.indexedAt,
     });
-    
+
     // Simple hash function
     let hash = 0;
     for (let i = 0; i < hashString.length; i++) {
       const char = hashString.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
-    
+
     return hash.toString(36);
   }
 
@@ -383,7 +390,9 @@ export class EnhancedCodeCrucibleAgent {
 }
 
 // Export convenience function
-export async function createEnhancedAgent(config?: Partial<EnhancedAgentConfig>): Promise<EnhancedCodeCrucibleAgent> {
+export async function createEnhancedAgent(
+  config?: Partial<EnhancedAgentConfig>
+): Promise<EnhancedCodeCrucibleAgent> {
   const agent = new EnhancedCodeCrucibleAgent(config);
   await agent.initialize();
   return agent;
@@ -397,7 +406,7 @@ export async function runEnhancedAnalysis(query: string, options: any = {}): Pro
     enableDocumentationReading: options.docs !== false,
     enableStructuredOutput: options.structured !== false,
     outputFormat: options.format || 'structured',
-    verboseLogging: options.verbose || false
+    verboseLogging: options.verbose || false,
   });
 
   await agent.initialize();

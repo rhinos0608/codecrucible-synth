@@ -51,7 +51,7 @@ export interface ExecutionStep {
 
 /**
  * Enhanced Agentic Planning Engine
- * 
+ *
  * Implements sophisticated task planning with dependency management,
  * auto-recovery, and context-aware execution strategies following
  * the patterns from the Agentic CLI guide.
@@ -76,7 +76,7 @@ export class EnhancedAgenticPlanner {
       history: [],
       projectContext: {},
       sessionId: this.generateId(),
-      startTime: new Date()
+      startTime: new Date(),
     };
   }
 
@@ -89,22 +89,24 @@ export class EnhancedAgenticPlanner {
 
     // THINK: Analyze the objective with multiple perspectives
     const analysis = await this.analyzeObjective(objective);
-    
+
     // PLAN: Generate detailed task breakdown
     const planData = await this.generateTaskBreakdown(objective, analysis);
-    
+
     // Validate and optimize the plan
     const optimizedPlan = await this.optimizePlan(planData);
-    
+
     // Add meta-information
     const plan: Plan = {
       id: this.generateId(),
       objective,
       ...optimizedPlan,
-      contextRequirements: await this.identifyContextRequirements(objective)
+      contextRequirements: await this.identifyContextRequirements(objective),
     };
 
-    logger.info(`Plan created with ${plan.tasks.length} tasks, estimated ${plan.estimatedTime} minutes`);
+    logger.info(
+      `Plan created with ${plan.tasks.length} tasks, estimated ${plan.estimatedTime} minutes`
+    );
     return plan;
   }
 
@@ -132,7 +134,7 @@ Consider security, performance, maintainability, and user experience aspects.`;
     );
 
     const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses);
-    
+
     try {
       return this.extractJsonFromText((synthesis as any).combinedCode || synthesis.content);
     } catch (error) {
@@ -146,7 +148,7 @@ Consider security, performance, maintainability, and user experience aspects.`;
    */
   private async generateTaskBreakdown(objective: string, analysis: any): Promise<any> {
     const availableTools = await this.getAvailableTools();
-    
+
     const planningPrompt = `Create a detailed execution plan for this objective:
 
 Objective: "${objective}"
@@ -189,7 +191,7 @@ IMPORTANT:
     );
 
     const synthesis = await this.voiceSystem.synthesizeVoiceResponses(responses);
-    
+
     return this.extractJsonFromText((synthesis as any).combinedCode || synthesis.content);
   }
 
@@ -198,55 +200,54 @@ IMPORTANT:
    */
   async executePlan(plan: Plan, onProgress?: (task: Task) => void): Promise<void> {
     logger.info(`Executing plan: ${plan.objective}`);
-    
+
     // Build dependency graph and calculate execution order
     const executionOrder = this.calculateExecutionOrder(plan.tasks);
-    
+
     // Set up execution context
     this.context.variables['plan_id'] = plan.id;
     this.context.variables['objective'] = plan.objective;
-    
+
     for (const taskId of executionOrder) {
       const task = plan.tasks.find(t => t.id === taskId);
       if (!task) continue;
-      
+
       // Check if dependencies are satisfied
       if (!this.areDependenciesSatisfied(task, plan.tasks)) {
         task.status = 'failed';
         task.error = 'Dependencies not satisfied';
         continue;
       }
-      
+
       try {
         task.status = 'running';
         onProgress?.(task);
-        
+
         // ACT: Execute the task
         const result = await this.executeTask(task);
-        
+
         // VERIFY: Validate the result
         const isValid = await this.validateTaskResult(task, result);
-        
+
         if (isValid) {
           task.result = result;
           task.status = 'completed';
-          
+
           // Update context with results
           this.context.variables[`task_${task.id}_result`] = result;
-          
+
           logger.info(`Task completed: ${task.description}`);
         } else {
           throw new Error('Task result validation failed');
         }
-        
+
         onProgress?.(task);
-        
       } catch (error) {
         await this.handleTaskFailure(task, plan, error);
         onProgress?.(task);
       }
     }
-    
+
     // Final validation
     await this.validatePlanCompletion(plan);
   }
@@ -256,19 +257,19 @@ IMPORTANT:
    */
   private async executeTask(task: Task): Promise<any> {
     const startTime = Date.now();
-    
+
     try {
       // Resolve variables in arguments
       const resolvedArgs = this.resolveVariables(task.args);
-      
+
       // Add execution context
       const contextualArgs = {
         ...resolvedArgs,
         workingDirectory: this.context.workingDirectory,
         sessionId: this.context.sessionId,
-        taskContext: this.buildTaskContext(task)
+        taskContext: this.buildTaskContext(task),
       };
-      
+
       // Execute based on tool type
       let result;
       switch (task.tool) {
@@ -293,12 +294,11 @@ IMPORTANT:
         default:
           throw new Error(`Unknown tool: ${task.tool}`);
       }
-      
+
       // Record successful execution
       this.recordExecutionStep(task, contextualArgs, result, Date.now() - startTime, true);
-      
+
       return result;
-      
     } catch (error) {
       // Record failed execution
       this.recordExecutionStep(task, task.args, null, Date.now() - startTime, false, error);
@@ -312,21 +312,21 @@ IMPORTANT:
   private async handleTaskFailure(task: Task, plan: Plan, error: any): Promise<void> {
     task.error = error instanceof Error ? error.message : 'Unknown error';
     task.retryCount = (task.retryCount || 0) + 1;
-    
+
     logger.warn(`Task failed: ${task.description} (attempt ${task.retryCount})`);
-    
+
     // Try recovery if retries available
     if (task.retryCount < (task.maxRetries || 3)) {
       const canRecover = await this.attemptRecovery(task, plan, error);
-      
+
       if (canRecover) {
         // Reset status for retry
         task.status = 'pending';
-        
+
         // Wait before retry (exponential backoff)
         const delay = Math.pow(2, task.retryCount) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
-        
+
         // Retry execution
         try {
           const result = await this.executeTask(task);
@@ -339,16 +339,16 @@ IMPORTANT:
         }
       }
     }
-    
+
     // Mark as failed
     task.status = 'failed';
-    
+
     // Check if this is a critical failure
     const isCritical = await this.assessCriticalFailure(task, plan);
     if (isCritical) {
       throw new Error(`Critical task failed: ${task.description}`);
     }
-    
+
     logger.info(`Non-critical task failed, continuing with plan execution`);
   }
 
@@ -357,7 +357,7 @@ IMPORTANT:
    */
   private async attemptRecovery(task: Task, plan: Plan, error: any): Promise<boolean> {
     logger.info(`Attempting recovery for task: ${task.description}`);
-    
+
     // Use analyzer voice to understand the failure and suggest recovery
     const recoveryPrompt = `Analyze this task failure and suggest a recovery strategy:
 
@@ -376,33 +376,35 @@ Provide a JSON response:
 }`;
 
     try {
-      const response = await this.modelClient.processRequest({
-        prompt: `You are an expert at analyzing failures and suggesting recovery strategies. Always respond with valid JSON.\n\n${recoveryPrompt}`,
-        temperature: 0.3
-      }, {
-        files: [],
-        structure: { directories: [], fileTypes: {} },
-        workingDirectory: process.cwd(),
-        config: {}
-      });
-      
+      const response = await this.modelClient.processRequest(
+        {
+          prompt: `You are an expert at analyzing failures and suggesting recovery strategies. Always respond with valid JSON.\n\n${recoveryPrompt}`,
+          temperature: 0.3,
+        },
+        {
+          files: [],
+          structure: { directories: [], fileTypes: {} },
+          workingDirectory: process.cwd(),
+          config: {},
+        }
+      );
+
       const recovery = this.extractJsonFromText(response.content);
-      
+
       if (recovery.canRecover) {
         logger.info(`Recovery strategy: ${recovery.strategy}`);
-        
+
         // Apply modified arguments if provided
         if (recovery.modifiedArgs) {
           task.args = { ...task.args, ...recovery.modifiedArgs };
         }
-        
+
         return true;
       }
-      
     } catch (error) {
       logger.error('Recovery analysis failed:', error);
     }
-    
+
     return false;
   }
 
@@ -411,7 +413,7 @@ Provide a JSON response:
    */
   private async executeFilesystemTask(args: any): Promise<any> {
     const { operation, path, content, options } = args;
-    
+
     switch (operation) {
       case 'read':
         return await this.mcpManager.readFileSecure(path);
@@ -427,7 +429,7 @@ Provide a JSON response:
 
   private async executeGitTask(args: any): Promise<any> {
     const { operation, files, message } = args;
-    
+
     switch (operation) {
       case 'status':
         return await this.mcpManager.gitStatus();
@@ -452,7 +454,7 @@ Provide a JSON response:
 
   private async executePackageManagerTask(args: any): Promise<any> {
     const { operation, packageName, dev } = args;
-    
+
     switch (operation) {
       case 'install':
         return await this.mcpManager.installPackage(packageName, dev);
@@ -465,13 +467,13 @@ Provide a JSON response:
 
   private async executeVoiceTask(args: any): Promise<any> {
     const { prompt, voices, mode, context } = args;
-    
+
     const responses = await this.voiceSystem.generateMultiVoiceSolutions(
       voices || ['developer'],
       prompt,
       context || { files: [], structure: {}, metadata: {} }
     );
-    
+
     return await this.voiceSystem.synthesizeVoiceResponses(responses);
   }
 
@@ -483,7 +485,7 @@ Provide a JSON response:
     if (result === null || result === undefined) {
       return false;
     }
-    
+
     // Tool-specific validation
     switch (task.tool) {
       case 'filesystem':
@@ -491,10 +493,10 @@ Provide a JSON response:
           return typeof result === 'string' && result.length > 0;
         }
         return result.success === true;
-        
+
       case 'voice_generation':
         return result.combinedCode && result.confidence > 0.3;
-        
+
       default:
         return true; // Basic validation passed
     }
@@ -503,13 +505,15 @@ Provide a JSON response:
   private async validatePlanCompletion(plan: Plan): Promise<void> {
     const completedTasks = plan.tasks.filter(t => t.status === 'completed');
     const failedTasks = plan.tasks.filter(t => t.status === 'failed');
-    
-    logger.info(`Plan completion: ${completedTasks.length}/${plan.tasks.length} tasks completed, ${failedTasks.length} failed`);
-    
+
+    logger.info(
+      `Plan completion: ${completedTasks.length}/${plan.tasks.length} tasks completed, ${failedTasks.length} failed`
+    );
+
     if (completedTasks.length === 0) {
       throw new Error('Plan execution failed: No tasks completed successfully');
     }
-    
+
     // Check if critical tasks failed
     const criticalFailures = failedTasks.filter(t => t.priority === 'high');
     if (criticalFailures.length > 0) {
@@ -522,14 +526,14 @@ Provide a JSON response:
     if (task.priority === 'high') {
       return true;
     }
-    
+
     // Check if other tasks depend on this one
     const dependentTasks = plan.tasks.filter(t => t.dependencies.includes(task.id));
     if (dependentTasks.length > 0) {
       logger.warn(`Task failure affects ${dependentTasks.length} dependent tasks`);
       return dependentTasks.some(t => t.priority === 'high');
     }
-    
+
     return false;
   }
 
@@ -545,31 +549,31 @@ Provide a JSON response:
     const visited = new Set<string>();
     const visiting = new Set<string>();
     const result: string[] = [];
-    
+
     const visit = (taskId: string) => {
       if (visiting.has(taskId)) {
         throw new Error(`Circular dependency detected: ${taskId}`);
       }
       if (visited.has(taskId)) return;
-      
+
       visiting.add(taskId);
-      
+
       const task = tasks.find(t => t.id === taskId);
       if (task) {
         for (const depId of task.dependencies) {
           visit(depId);
         }
       }
-      
+
       visiting.delete(taskId);
       visited.add(taskId);
       result.push(taskId);
     };
-    
+
     for (const task of tasks) {
       visit(task.id);
     }
-    
+
     return result;
   }
 
@@ -582,11 +586,11 @@ Provide a JSON response:
         return this.context.variables[varName] || match;
       });
     }
-    
+
     if (Array.isArray(args)) {
       return args.map(arg => this.resolveVariables(arg));
     }
-    
+
     if (typeof args === 'object' && args !== null) {
       const resolved: any = {};
       for (const [key, value] of Object.entries(args)) {
@@ -594,7 +598,7 @@ Provide a JSON response:
       }
       return resolved;
     }
-    
+
     return args;
   }
 
@@ -618,14 +622,14 @@ Provide a JSON response:
       result,
       duration,
       success,
-      errorDetails: error ? (error.message || error.toString()) : undefined
+      errorDetails: error ? error.message || error.toString() : undefined,
     });
   }
 
   /**
    * Utility methods
    */
-  private async getAvailableTools(): Promise<Array<{name: string, description: string}>> {
+  private async getAvailableTools(): Promise<Array<{ name: string; description: string }>> {
     // Get available MCP tools and built-in capabilities
     return [
       { name: 'filesystem', description: 'Read, write, and list files securely' },
@@ -633,14 +637,14 @@ Provide a JSON response:
       { name: 'terminal', description: 'Execute terminal commands safely' },
       { name: 'smithery', description: 'Web search using Smithery API' },
       { name: 'voice_generation', description: 'Generate code using multi-voice AI' },
-      { name: 'package_manager', description: 'NPM package management operations' }
+      { name: 'package_manager', description: 'NPM package management operations' },
     ];
   }
 
   private async optimizePlan(planData: any): Promise<any> {
     // Add default values and optimize task ordering
     const tasks = planData.tasks || [];
-    
+
     tasks.forEach((task: Task, index: number) => {
       task.id = task.id || `task_${index + 1}`;
       task.status = 'pending';
@@ -650,44 +654,45 @@ Provide a JSON response:
       task.priority = task.priority || 'medium';
       task.estimatedDuration = task.estimatedDuration || 5;
     });
-    
+
     return {
       tasks,
-      estimatedTime: planData.estimatedTime || tasks.reduce((sum: number, t: Task) => sum + (t.estimatedDuration || 5), 0),
+      estimatedTime:
+        planData.estimatedTime ||
+        tasks.reduce((sum: number, t: Task) => sum + (t.estimatedDuration || 5), 0),
       complexity: planData.complexity || 'medium',
       riskFactors: planData.riskFactors || [],
-      recoveryStrategies: planData.recoveryStrategies || []
+      recoveryStrategies: planData.recoveryStrategies || [],
     };
   }
 
   private async identifyContextRequirements(objective: string): Promise<string[]> {
     // Analyze what context is needed for this objective
     const requirements = [];
-    
+
     if (objective.toLowerCase().includes('file') || objective.toLowerCase().includes('code')) {
       requirements.push('project_structure', 'file_contents');
     }
-    
+
     if (objective.toLowerCase().includes('git') || objective.toLowerCase().includes('commit')) {
       requirements.push('git_status', 'git_history');
     }
-    
+
     if (objective.toLowerCase().includes('test') || objective.toLowerCase().includes('build')) {
       requirements.push('package_json', 'test_configuration');
     }
-    
+
     return requirements;
   }
 
   private extractJsonFromText(text: string): any {
     // Extract JSON from potentially markdown-formatted response
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || 
-                     text.match(/\{[\s\S]*\}/);
-    
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/\{[\s\S]*\}/);
+
     if (!jsonMatch) {
       throw new Error('No JSON found in response');
     }
-    
+
     try {
       return JSON.parse(jsonMatch[1] || jsonMatch[0]);
     } catch (error) {
@@ -702,7 +707,7 @@ Provide a JSON response:
   /**
    * Public API methods
    */
-  
+
   /**
    * Get execution context and history
    */
@@ -718,19 +723,22 @@ Provide a JSON response:
     const totalExecutions = history.length;
     const successfulExecutions = history.filter(h => h.success).length;
     const avgDuration = history.reduce((sum, h) => sum + h.duration, 0) / totalExecutions || 0;
-    
-    const toolUsage = history.reduce((acc, h) => {
-      acc[h.tool] = (acc[h.tool] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
+
+    const toolUsage = history.reduce(
+      (acc, h) => {
+        acc[h.tool] = (acc[h.tool] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
     return {
       totalExecutions,
       successfulExecutions,
       successRate: totalExecutions > 0 ? successfulExecutions / totalExecutions : 0,
       avgDuration: Math.round(avgDuration),
       toolUsage,
-      sessionDuration: Date.now() - this.context.startTime.getTime()
+      sessionDuration: Date.now() - this.context.startTime.getTime(),
     };
   }
 
@@ -744,9 +752,9 @@ Provide a JSON response:
       history: [],
       projectContext: {},
       sessionId: this.generateId(),
-      startTime: new Date()
+      startTime: new Date(),
     };
-    
+
     logger.info('Execution context reset');
   }
 }

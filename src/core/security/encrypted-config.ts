@@ -42,7 +42,7 @@ export class EncryptedConfig {
 
     this.secretsManager = new SecretsManager({
       storePath: options.secretsPath,
-      masterKeyPath: path.join(options.secretsPath, 'master.key')
+      masterKeyPath: path.join(options.secretsPath, 'master.key'),
     });
   }
 
@@ -60,9 +60,8 @@ export class EncryptedConfig {
 
       logger.info('Encrypted configuration initialized', {
         environment: this.environment,
-        configKeys: Object.keys(this.config).length
+        configKeys: Object.keys(this.config).length,
       });
-
     } catch (error) {
       logger.error('Failed to initialize encrypted configuration', error as Error);
       throw error;
@@ -105,7 +104,6 @@ export class EncryptedConfig {
       }
 
       return undefined as T;
-
     } catch (error) {
       logger.error('Failed to get configuration value', error as Error, { key });
       throw error;
@@ -130,7 +128,7 @@ export class EncryptedConfig {
         const stringValue = this.stringifyValue(value);
         await this.secretsManager.storeSecret(secretKey, stringValue, {
           description: this.schema[key].description,
-          tags: ['config', this.environment]
+          tags: ['config', this.environment],
         });
       } else {
         // Store non-sensitive values in memory
@@ -142,9 +140,8 @@ export class EncryptedConfig {
 
       logger.debug('Configuration value updated', {
         key,
-        sensitive: this.schema?.[key]?.sensitive || false
+        sensitive: this.schema?.[key]?.sensitive || false,
       });
-
     } catch (error) {
       logger.error('Failed to set configuration value', error as Error, { key });
       throw error;
@@ -169,7 +166,6 @@ export class EncryptedConfig {
       }
 
       return result;
-
     } catch (error) {
       logger.error('Failed to get all configuration values', error as Error);
       throw error;
@@ -182,15 +178,14 @@ export class EncryptedConfig {
   async setMany(values: Record<string, any>): Promise<void> {
     try {
       const updates = Object.entries(values);
-      
+
       for (const [key, value] of updates) {
         await this.set(key, value);
       }
 
       logger.info('Multiple configuration values updated', {
-        keysUpdated: updates.length
+        keysUpdated: updates.length,
       });
-
     } catch (error) {
       logger.error('Failed to set multiple configuration values', error as Error);
       throw error;
@@ -222,7 +217,6 @@ export class EncryptedConfig {
       }
 
       return removed;
-
     } catch (error) {
       logger.error('Failed to remove configuration value', error as Error, { key });
       throw error;
@@ -266,7 +260,6 @@ export class EncryptedConfig {
         if (this.config.hasOwnProperty(key)) {
           this.validateValue(key, this.config[key], definition);
         }
-
       } catch (error) {
         errors.push(`Validation failed for '${key}': ${(error as Error).message}`);
       }
@@ -300,7 +293,6 @@ export class EncryptedConfig {
       }
 
       return exported;
-
     } catch (error) {
       logger.error('Failed to export configuration', error as Error);
       throw error;
@@ -316,9 +308,8 @@ export class EncryptedConfig {
       await this.loadConfiguration();
 
       logger.info('Configuration reloaded', {
-        environment: this.environment
+        environment: this.environment,
       });
-
     } catch (error) {
       logger.error('Failed to reload configuration', error as Error);
       throw error;
@@ -337,13 +328,13 @@ export class EncryptedConfig {
    */
   updateSchema(schema: ConfigSchema): void {
     this.schema = schema;
-    
+
     if (this.options.validateOnLoad) {
       this.validateConfiguration();
     }
 
     logger.info('Configuration schema updated', {
-      keys: Object.keys(schema).length
+      keys: Object.keys(schema).length,
     });
   }
 
@@ -369,12 +360,12 @@ export class EncryptedConfig {
     secretKeys: number;
     environment: string;
   }> {
-    const sensitiveKeys = this.schema 
-      ? Object.values(this.schema).filter(def => def.sensitive).length 
+    const sensitiveKeys = this.schema
+      ? Object.values(this.schema).filter(def => def.sensitive).length
       : 0;
 
     const secrets = await this.secretsManager.listSecrets(['config', this.environment]);
-    const secretKeys = secrets.filter(secret => 
+    const secretKeys = secrets.filter(secret =>
       secret.name.startsWith(`config_${this.environment}_`)
     ).length;
 
@@ -383,7 +374,7 @@ export class EncryptedConfig {
       sensitiveKeys,
       memoryKeys: Object.keys(this.config).length,
       secretKeys,
-      environment: this.environment
+      environment: this.environment,
     };
   }
 
@@ -416,12 +407,12 @@ export class EncryptedConfig {
       if (envValue !== undefined) {
         try {
           const parsedValue = this.parseValue(envValue, definition.type);
-          
+
           if (definition.sensitive) {
             // Store sensitive env values in secrets
             await this.secretsManager.storeSecret(this.getSecretKey(key), envValue, {
               description: `Environment variable: ${envKey}`,
-              tags: ['config', 'env', this.environment]
+              tags: ['config', 'env', this.environment],
             });
           } else {
             this.config[key] = parsedValue;
@@ -429,7 +420,7 @@ export class EncryptedConfig {
         } catch (error) {
           logger.warn('Failed to parse environment variable', {
             key: envKey,
-            error: (error as Error).message
+            error: (error as Error).message,
           });
         }
       }
@@ -466,7 +457,7 @@ export class EncryptedConfig {
         } catch (error) {
           logger.debug('Failed to load sensitive configuration value', {
             key,
-            error: (error as Error).message
+            error: (error as Error).message,
           });
         }
       }
@@ -577,7 +568,7 @@ export class EncryptedConfig {
     await this.secretsManager.stop();
     this.watchers = [];
     this.config = {};
-    
+
     logger.info('Encrypted configuration stopped');
   }
 }

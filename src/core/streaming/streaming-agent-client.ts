@@ -81,7 +81,7 @@ export class StreamingAgentClient extends EventEmitter {
     super();
     // Increase max listeners to prevent memory leak warnings for legitimate use cases
     this.setMaxListeners(50);
-    
+
     this.modelClient = modelClient;
     this.logger = new Logger('StreamingAgentClient');
     this.config = this.initializeConfig(config);
@@ -101,7 +101,7 @@ export class StreamingAgentClient extends EventEmitter {
       tokenBatching: config?.tokenBatching !== false,
       batchSize: config?.batchSize || 5,
       compressionEnabled: config?.compressionEnabled || false,
-      adaptiveStreaming: config?.adaptiveStreaming !== false
+      adaptiveStreaming: config?.adaptiveStreaming !== false,
     };
   }
 
@@ -113,20 +113,19 @@ export class StreamingAgentClient extends EventEmitter {
   ): AsyncGenerator<StreamingResponse, void, unknown> {
     const sessionId = this.generateSessionId();
     const session = this.createSession(sessionId, request);
-    
+
     this.logger.info(`Starting streaming session`, { sessionId });
     this.emit('stream:start', { sessionId, request });
-    
+
     try {
       // Initialize streaming
       const stream = await this.initializeStream(request, sessionId);
-      
+
       // Process stream with adaptive control
       yield* this.processStream(stream, session);
-      
+
       // Complete session
       this.completeSession(session);
-      
     } catch (error) {
       this.handleStreamError(session, error);
       yield this.createErrorResponse(sessionId, error);
@@ -145,17 +144,17 @@ export class StreamingAgentClient extends EventEmitter {
     const buffer = this.getOrCreateBuffer(session.id);
     let chunkIndex = 0;
     let tokensProcessed = 0;
-    
+
     for await (const chunk of stream) {
       // Apply backpressure if needed
       if (this.config.enableBackpressure) {
         await this.backpressureController.checkPressure(buffer);
       }
-      
+
       // Process chunk
       const processed = await this.processChunk(chunk, session);
       tokensProcessed += processed.tokens || 1;
-      
+
       // Create streaming response
       const response: StreamingResponse = {
         id: session.id,
@@ -168,33 +167,33 @@ export class StreamingAgentClient extends EventEmitter {
           confidence: processed.confidence || 0.95,
           latency: Date.now() - session.startTime,
           chunkIndex: chunkIndex++,
-          bufferSize: buffer.currentSize
+          bufferSize: buffer.currentSize,
         },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
+
       // Apply adaptive streaming if enabled
       if (this.config.adaptiveStreaming) {
         await this.adaptiveController.adapt(response, session);
       }
-      
+
       // Buffer management
       this.addToBuffer(buffer, response);
-      
+
       // Update metrics
       this.updateMetrics(session, response);
-      
+
       // Emit progress event
       this.emit('stream:chunk', response);
-      
+
       yield response;
-      
+
       // Batch tokens if configured
       if (this.config.tokenBatching && chunkIndex % this.config.batchSize === 0) {
         yield* this.flushBatch(session.id);
       }
     }
-    
+
     // Final completion response
     yield this.createCompletionResponse(session, tokensProcessed);
   }
@@ -207,13 +206,13 @@ export class StreamingAgentClient extends EventEmitter {
     if (this.config.compressionEnabled) {
       chunk = await this.compressChunk(chunk);
     }
-    
+
     // Transform chunk based on session configuration
     return {
       content: chunk.text || chunk.content || chunk,
       tokens: chunk.tokens || 1,
       voice: chunk.voice,
-      confidence: chunk.confidence
+      confidence: chunk.confidence,
     };
   }
 
@@ -234,16 +233,16 @@ export class StreamingAgentClient extends EventEmitter {
         peakLatency: 0,
         bufferUtilization: 0,
         droppedChunks: 0,
-        reconnections: 0
+        reconnections: 0,
       },
       buffer: {
         chunks: [],
         maxSize: this.config.bufferSize,
         currentSize: 0,
-        overflow: 'backpressure'
-      }
+        overflow: 'backpressure',
+      },
     };
-    
+
     this.activeSessions.set(id, session);
     return session;
   }
@@ -260,15 +259,15 @@ export class StreamingAgentClient extends EventEmitter {
       prompt: request.input || '',
       ...request,
       streaming: true,
-      sessionId
+      sessionId,
     };
-    
+
     let fullResponse = '';
-    
+
     // Get stream from model client with token handler
     const response = await this.modelClient.streamRequest(
-      streamRequest, 
-      (token) => {
+      streamRequest,
+      token => {
         // Token will be handled by the session
         this.handleToken(sessionId, token);
         fullResponse += token.content || '';
@@ -276,11 +275,11 @@ export class StreamingAgentClient extends EventEmitter {
       },
       { workingDirectory: '.', config: {}, files: [] }
     );
-    
+
     // Yield the complete response at the end
     yield { content: fullResponse, isComplete: true };
   }
-  
+
   private handleToken(sessionId: string, token: any): any {
     const session = this.activeSessions.get(sessionId);
     if (session) {
@@ -308,7 +307,7 @@ export class StreamingAgentClient extends EventEmitter {
         chunks: [],
         maxSize: this.config.bufferSize,
         currentSize: 0,
-        overflow: 'backpressure'
+        overflow: 'backpressure',
       });
     }
     return this.streamBuffers.get(sessionId)!;
@@ -328,7 +327,7 @@ export class StreamingAgentClient extends EventEmitter {
           break;
       }
     }
-    
+
     buffer.chunks.push(response);
     buffer.currentSize++;
   }
@@ -339,16 +338,16 @@ export class StreamingAgentClient extends EventEmitter {
   private async *flushBatch(sessionId: string): AsyncGenerator<StreamingResponse> {
     const buffer = this.streamBuffers.get(sessionId);
     if (!buffer || buffer.chunks.length === 0) return;
-    
+
     const batch = buffer.chunks.splice(0, this.config.batchSize);
     const combinedChunk = batch.map(r => r.chunk).join('');
-    
+
     yield {
       id: sessionId,
       type: 'partial',
       chunk: combinedChunk,
       metadata: batch[batch.length - 1].metadata,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -358,13 +357,14 @@ export class StreamingAgentClient extends EventEmitter {
   private updateMetrics(session: StreamingSession, response: StreamingResponse): void {
     const metrics = session.metrics;
     const latency = response.metadata.latency;
-    
+
     metrics.totalTokens++;
     metrics.tokensPerSecond = metrics.totalTokens / ((Date.now() - session.startTime) / 1000);
-    metrics.averageLatency = (metrics.averageLatency * (metrics.totalTokens - 1) + latency) / metrics.totalTokens;
+    metrics.averageLatency =
+      (metrics.averageLatency * (metrics.totalTokens - 1) + latency) / metrics.totalTokens;
     metrics.peakLatency = Math.max(metrics.peakLatency, latency);
     metrics.bufferUtilization = response.metadata.bufferSize! / this.config.bufferSize;
-    
+
     this.metricsCollector.record(session.id, metrics);
   }
 
@@ -375,7 +375,7 @@ export class StreamingAgentClient extends EventEmitter {
     session.status = 'completed';
     this.logger.info(`Streaming session completed`, {
       sessionId: session.id,
-      metrics: session.metrics
+      metrics: session.metrics,
     });
     this.emit('stream:complete', { sessionId: session.id, metrics: session.metrics });
   }
@@ -402,9 +402,9 @@ export class StreamingAgentClient extends EventEmitter {
         estimatedCompletion: 0,
         activeVoice: 'error',
         confidence: 0,
-        latency: 0
+        latency: 0,
       },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -424,9 +424,9 @@ export class StreamingAgentClient extends EventEmitter {
         estimatedCompletion: 100,
         activeVoice: session.request.voice || 'default',
         confidence: 1,
-        latency: Date.now() - session.startTime
+        latency: Date.now() - session.startTime,
       },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -505,20 +505,20 @@ export class StreamingAgentClient extends EventEmitter {
 class BackpressureController {
   private config: StreamingConfig;
   private pressureThreshold: number = 0.8;
-  
+
   constructor(config: StreamingConfig) {
     this.config = config;
   }
-  
+
   async checkPressure(buffer: StreamBuffer): Promise<void> {
     const utilization = buffer.currentSize / buffer.maxSize;
-    
+
     if (utilization > this.pressureThreshold) {
       // Apply backpressure
       await this.applyBackpressure(utilization);
     }
   }
-  
+
   private async applyBackpressure(utilization: number): Promise<void> {
     // Calculate delay based on utilization
     const delay = Math.floor((utilization - this.pressureThreshold) * 1000);
@@ -530,36 +530,36 @@ class BackpressureController {
 class AdaptiveStreamingController {
   private history: Map<string, number[]> = new Map();
   private adaptationThreshold: number = 0.1;
-  
+
   async adapt(response: StreamingResponse, session: StreamingSession): Promise<void> {
     const sessionHistory = this.getOrCreateHistory(session.id);
     sessionHistory.push(response.metadata.latency);
-    
+
     if (sessionHistory.length >= 10) {
       const avgLatency = sessionHistory.reduce((a, b) => a + b, 0) / sessionHistory.length;
       const variance = this.calculateVariance(sessionHistory, avgLatency);
-      
+
       if (variance > this.adaptationThreshold) {
         await this.adjustStreamingParameters(session, avgLatency, variance);
       }
-      
+
       // Keep only recent history
       sessionHistory.splice(0, sessionHistory.length - 20);
     }
   }
-  
+
   private getOrCreateHistory(sessionId: string): number[] {
     if (!this.history.has(sessionId)) {
       this.history.set(sessionId, []);
     }
     return this.history.get(sessionId)!;
   }
-  
+
   private calculateVariance(values: number[], mean: number): number {
     const squareDiffs = values.map(value => Math.pow(value - mean, 2));
     return Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / values.length);
   }
-  
+
   private async adjustStreamingParameters(
     session: StreamingSession,
     avgLatency: number,
@@ -577,32 +577,32 @@ class AdaptiveStreamingController {
 // Streaming Metrics Collector
 class StreamingMetricsCollector {
   private metrics: Map<string, StreamingMetrics[]> = new Map();
-  
+
   record(sessionId: string, metrics: StreamingMetrics): void {
     if (!this.metrics.has(sessionId)) {
       this.metrics.set(sessionId, []);
     }
     this.metrics.get(sessionId)!.push({ ...metrics });
   }
-  
+
   getMetrics(sessionId: string): StreamingMetrics[] | undefined {
     return this.metrics.get(sessionId);
   }
-  
+
   cleanup(sessionId: string): void {
     this.metrics.delete(sessionId);
   }
-  
+
   getAggregatedMetrics(): Map<string, StreamingMetrics> {
     const aggregated = new Map<string, StreamingMetrics>();
-    
+
     this.metrics.forEach((sessionMetrics, sessionId) => {
       if (sessionMetrics.length > 0) {
         const latest = sessionMetrics[sessionMetrics.length - 1];
         aggregated.set(sessionId, latest);
       }
     });
-    
+
     return aggregated;
   }
 }

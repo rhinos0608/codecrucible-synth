@@ -71,10 +71,10 @@ export class BenchmarkRunner {
   constructor() {
     this.challenges = this.loadDefaultChallenges();
     this.initializeClients();
-    
+
     logger.info('Benchmark runner initialized with challenges', {
       totalChallenges: this.challenges.length,
-      categories: this.getCategoryDistribution()
+      categories: this.getCategoryDistribution(),
     });
   }
 
@@ -91,25 +91,23 @@ export class BenchmarkRunner {
     } = {}
   ): Promise<BenchmarkSummary> {
     const startTime = Date.now();
-    
+
     console.log('🧪 Starting benchmark suite...');
     console.log(`📊 Model: ${modelName || 'hybrid'}`);
-    
+
     // Filter challenges based on options
     let selectedChallenges = this.challenges;
-    
+
     if (options.categories?.length) {
-      selectedChallenges = selectedChallenges.filter(c => 
-        options.categories!.includes(c.category)
-      );
+      selectedChallenges = selectedChallenges.filter(c => options.categories!.includes(c.category));
     }
-    
+
     if (options.difficulties?.length) {
-      selectedChallenges = selectedChallenges.filter(c => 
+      selectedChallenges = selectedChallenges.filter(c =>
         options.difficulties!.includes(c.difficulty)
       );
     }
-    
+
     if (options.limit) {
       selectedChallenges = selectedChallenges.slice(0, options.limit);
     }
@@ -124,34 +122,33 @@ export class BenchmarkRunner {
     // Run each challenge
     for (let i = 0; i < selectedChallenges.length; i++) {
       const challenge = selectedChallenges[i];
-      
-      console.log(`\n[${i + 1}/${selectedChallenges.length}] ${challenge.title} (${challenge.difficulty})`);
-      
+
+      console.log(
+        `\n[${i + 1}/${selectedChallenges.length}] ${challenge.title} (${challenge.difficulty})`
+      );
+
       try {
-        const result = await this.runSingleChallenge(
-          challenge, 
-          modelName, 
-          options.timeoutMs
-        );
-        
+        const result = await this.runSingleChallenge(challenge, modelName, options.timeoutMs);
+
         results.push(result);
-        
+
         if (result.passed) {
           passed++;
-          console.log(`   ✅ PASSED (${result.executionTime}ms, confidence: ${(result.confidence * 100).toFixed(0)}%)`);
+          console.log(
+            `   ✅ PASSED (${result.executionTime}ms, confidence: ${(result.confidence * 100).toFixed(0)}%)`
+          );
         } else {
           console.log(`   ❌ FAILED (${result.errors.length} errors)`);
           if (result.errors.length > 0) {
             console.log(`      ${result.errors[0]}`);
           }
         }
-        
+
         totalTime += result.executionTime;
         totalConfidence += result.confidence;
-
       } catch (error) {
         console.log(`   💥 ERROR: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        
+
         // Add failed result
         results.push({
           challengeId: challenge.id,
@@ -161,7 +158,7 @@ export class BenchmarkRunner {
           errors: [error instanceof Error ? error.message : 'Benchmark execution error'],
           testResults: [],
           confidence: 0,
-          codeQuality: { readability: 0, efficiency: 0, correctness: 0 }
+          codeQuality: { readability: 0, efficiency: 0, correctness: 0 },
         });
       }
 
@@ -189,14 +186,14 @@ export class BenchmarkRunner {
       difficultyBreakdown,
       detailedResults: results,
       modelUsed: modelName || 'hybrid',
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     // Save results
     await this.saveBenchmarkResults(summary);
 
     const totalDuration = Date.now() - startTime;
-    
+
     console.log('\n📈 Benchmark Results:');
     console.log(`✅ Passed: ${passed}/${selectedChallenges.length} (${successRate.toFixed(1)}%)`);
     console.log(`⏱️  Average Time: ${averageTime.toFixed(0)}ms per challenge`);
@@ -210,7 +207,7 @@ export class BenchmarkRunner {
       console.log(`   ${category}: ${stats.passed}/${stats.total} (${rate}%)`);
     });
 
-    // Difficulty breakdown  
+    // Difficulty breakdown
     console.log('\n🎚️  Difficulty Breakdown:');
     Object.entries(difficultyBreakdown).forEach(([difficulty, stats]) => {
       const rate = ((stats.passed / stats.total) * 100).toFixed(1);
@@ -233,15 +230,15 @@ export class BenchmarkRunner {
     try {
       // Generate code using specified model
       const generation = await this.generateCodeForChallenge(challenge, modelName, timeoutMs);
-      
+
       const executionTime = Date.now() - startTime;
 
       // Execute tests
       const testResults = await this.executeTests(challenge, generation.code);
-      
+
       // Check if all tests passed
       const passed = testResults.every(result => result.passed);
-      
+
       // Calculate code quality metrics
       const codeQuality = this.assessCodeQuality(generation.code, challenge);
 
@@ -253,9 +250,8 @@ export class BenchmarkRunner {
         errors: generation.errors,
         testResults,
         confidence: generation.confidence,
-        codeQuality
+        codeQuality,
       };
-
     } catch (error) {
       return {
         challengeId: challenge.id,
@@ -265,7 +261,7 @@ export class BenchmarkRunner {
         errors: [error instanceof Error ? error.message : 'Unknown execution error'],
         testResults: [],
         confidence: 0,
-        codeQuality: { readability: 0, efficiency: 0, correctness: 0 }
+        codeQuality: { readability: 0, efficiency: 0, correctness: 0 },
       };
     }
   }
@@ -278,7 +274,6 @@ export class BenchmarkRunner {
     modelName?: string,
     timeoutMs: number = 30000
   ): Promise<{ code: string; confidence: number; errors: string[] }> {
-    
     const enhancedPrompt = `${challenge.prompt}
 
 Requirements:
@@ -294,17 +289,17 @@ Function signature and implementation:`;
       if (modelName && modelName !== 'hybrid') {
         // Use specific model (Ollama)
         if (this.ollamaClient) {
-          const result = await Promise.race([
+          const result = (await Promise.race([
             this.ollamaClient.generateText(enhancedPrompt, { includeContext: false }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
-          ]) as any;
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs)),
+          ])) as any;
 
           const extractedCode = this.extractCodeFromResponse(result.text, challenge.language);
-          
+
           return {
             code: extractedCode,
             confidence: 0.8, // Default confidence for Ollama
-            errors: []
+            errors: [],
           };
         } else {
           throw new Error('Ollama client not available');
@@ -312,19 +307,34 @@ Function signature and implementation:`;
       } else {
         // Use hybrid client
         if (this.hybridClient) {
+<<<<<<< HEAD
           const result = await Promise.race([
             this.hybridClient.generate({
               prompt: enhancedPrompt
+=======
+          const result = (await Promise.race([
+            this.hybridClient.generateCode(enhancedPrompt, [], {
+              taskType: 'algorithms',
+              complexity:
+                challenge.difficulty === 'easy'
+                  ? 'simple'
+                  : challenge.difficulty === 'medium'
+                    ? 'medium'
+                    : 'complex',
+>>>>>>> 44ae8383dd29cf64d817a2f2858150305ea5525d
             }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
-          ]) as any;
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs)),
+          ])) as any;
 
-          const extractedCode = this.extractCodeFromResponse(result.code || result.synthesis, challenge.language);
-          
+          const extractedCode = this.extractCodeFromResponse(
+            result.code || result.synthesis,
+            challenge.language
+          );
+
           return {
             code: extractedCode,
             confidence: result.confidence || 0.7,
-            errors: []
+            errors: [],
           };
         } else {
           throw new Error('Hybrid client not available');
@@ -334,7 +344,7 @@ Function signature and implementation:`;
       return {
         code: '',
         confidence: 0,
-        errors: [error instanceof Error ? error.message : 'Code generation failed']
+        errors: [error instanceof Error ? error.message : 'Code generation failed'],
       };
     }
   }
@@ -345,17 +355,19 @@ Function signature and implementation:`;
   private extractCodeFromResponse(response: string, language: string): string {
     // Remove markdown code blocks
     let code = response.replace(/```[\w]*\n?/g, '').replace(/```/g, '');
-    
+
     // Remove explanatory text (simple heuristic)
     const lines = code.split('\n');
     const codeLines = lines.filter(line => {
       const trimmed = line.trim();
-      return trimmed && 
-             !trimmed.startsWith('//') && 
-             !trimmed.startsWith('#') &&
-             !trimmed.startsWith('Here') &&
-             !trimmed.startsWith('This') &&
-             !trimmed.startsWith('The function');
+      return (
+        trimmed &&
+        !trimmed.startsWith('//') &&
+        !trimmed.startsWith('#') &&
+        !trimmed.startsWith('Here') &&
+        !trimmed.startsWith('This') &&
+        !trimmed.startsWith('The function')
+      );
     });
 
     code = codeLines.join('\n').trim();
@@ -374,8 +386,8 @@ Function signature and implementation:`;
       const pyLines = code.split('\n');
       if (pyLines.length > 1 && !pyLines[1].startsWith('    ')) {
         // Add indentation
-        const indentedLines = pyLines.map((line, i) => 
-          i === 0 ? line : (line.trim() ? '    ' + line : line)
+        const indentedLines = pyLines.map((line, i) =>
+          i === 0 ? line : line.trim() ? '    ' + line : line
         );
         code = indentedLines.join('\n');
       }
@@ -400,7 +412,7 @@ Function signature and implementation:`;
           expectedOutput: testCase.expectedOutput,
           actualOutput: null,
           passed: false,
-          error: error instanceof Error ? error.message : 'Test execution error'
+          error: error instanceof Error ? error.message : 'Test execution error',
         });
       }
     }
@@ -430,7 +442,7 @@ Function signature and implementation:`;
         expectedOutput: testCase.expectedOutput,
         actualOutput: null,
         passed: false,
-        error: error instanceof Error ? error.message : 'Execution error'
+        error: error instanceof Error ? error.message : 'Execution error',
       };
     }
   }
@@ -441,7 +453,7 @@ Function signature and implementation:`;
   private async executeJavaScriptTest(code: string, testCase: TestCase): Promise<TestResult> {
     const vm = new VM({
       timeout: 5000,
-      sandbox: {}
+      sandbox: {},
     });
 
     try {
@@ -462,16 +474,15 @@ Function signature and implementation:`;
         input: testCase.input,
         expectedOutput: testCase.expectedOutput,
         actualOutput,
-        passed
+        passed,
       };
-
     } catch (error) {
       return {
         input: testCase.input,
         expectedOutput: testCase.expectedOutput,
         actualOutput: null,
         passed: false,
-        error: error instanceof Error ? error.message : 'JavaScript execution error'
+        error: error instanceof Error ? error.message : 'JavaScript execution error',
       };
     }
   }
@@ -486,11 +497,11 @@ Function signature and implementation:`;
       const { writeFile, unlink } = await import('fs/promises');
       const { join } = await import('path');
       const { randomBytes } = await import('crypto');
-      
+
       // Create temporary Python file
       const tempId = randomBytes(8).toString('hex');
       const tempFile = join(process.cwd(), `temp_test_${tempId}.py`);
-      
+
       // Write test code to temporary file
       const testCode = `
 import sys
@@ -504,40 +515,40 @@ try:
 except Exception as e:
     print(json.dumps({"result": None, "error": str(e)}))
 `;
-      
+
       await writeFile(tempFile, testCode);
-      
+
       // Execute Python code
-      const result = await new Promise<TestResult>((resolve) => {
+      const result = await new Promise<TestResult>(resolve => {
         const python = spawn('python', [tempFile]);
         let stdout = '';
         let stderr = '';
-        
-        python.stdout.on('data', (data) => {
+
+        python.stdout.on('data', data => {
           stdout += data.toString();
         });
-        
-        python.stderr.on('data', (data) => {
+
+        python.stderr.on('data', data => {
           stderr += data.toString();
         });
-        
-        python.on('close', async (code) => {
+
+        python.on('close', async code => {
           // Clean up temporary file
           try {
             await unlink(tempFile);
           } catch {}
-          
+
           if (code !== 0) {
             resolve({
               input: testCase.input,
               expectedOutput: testCase.expectedOutput,
               actualOutput: null,
               passed: false,
-              error: stderr || `Python process exited with code ${code}`
+              error: stderr || `Python process exited with code ${code}`,
             });
             return;
           }
-          
+
           try {
             const output = JSON.parse(stdout.trim());
             if (output.error) {
@@ -546,16 +557,17 @@ except Exception as e:
                 expectedOutput: testCase.expectedOutput,
                 actualOutput: null,
                 passed: false,
-                error: output.error
+                error: output.error,
               });
             } else {
-              const passed = JSON.stringify(output.result) === JSON.stringify(testCase.expectedOutput);
+              const passed =
+                JSON.stringify(output.result) === JSON.stringify(testCase.expectedOutput);
               resolve({
                 input: testCase.input,
                 expectedOutput: testCase.expectedOutput,
                 actualOutput: output.result,
                 passed,
-                error: null
+                error: null,
               });
             }
           } catch (parseError) {
@@ -564,12 +576,12 @@ except Exception as e:
               expectedOutput: testCase.expectedOutput,
               actualOutput: stdout,
               passed: false,
-              error: `Failed to parse Python output: ${parseError}`
+              error: `Failed to parse Python output: ${parseError}`,
             });
           }
         });
       });
-      
+
       return result;
     } catch (error) {
       return {
@@ -577,7 +589,7 @@ except Exception as e:
         expectedOutput: testCase.expectedOutput,
         actualOutput: null,
         passed: false,
-        error: `Python execution failed: ${error instanceof Error ? error.message : String(error)}`
+        error: `Python execution failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
@@ -620,13 +632,13 @@ except Exception as e:
     if (typeof actual === 'object' && actual !== null && expected !== null) {
       const actualKeys = Object.keys(actual).sort();
       const expectedKeys = Object.keys(expected).sort();
-      
+
       if (actualKeys.length !== expectedKeys.length) {
         return false;
       }
-      
-      return actualKeys.every(key => 
-        expectedKeys.includes(key) && this.compareOutputs(actual[key], expected[key])
+
+      return actualKeys.every(
+        key => expectedKeys.includes(key) && this.compareOutputs(actual[key], expected[key])
       );
     }
 
@@ -636,7 +648,10 @@ except Exception as e:
   /**
    * Assess code quality metrics
    */
-  private assessCodeQuality(code: string, challenge: CodingChallenge): {
+  private assessCodeQuality(
+    code: string,
+    challenge: CodingChallenge
+  ): {
     readability: number;
     efficiency: number;
     correctness: number;
@@ -665,7 +680,7 @@ except Exception as e:
     return {
       readability: Math.min(1, readability),
       efficiency: Math.min(1, efficiency),
-      correctness: Math.min(1, correctness)
+      correctness: Math.min(1, correctness),
     };
   }
 
@@ -673,7 +688,7 @@ except Exception as e:
    * Calculate category breakdown
    */
   private calculateCategoryBreakdown(
-    challenges: CodingChallenge[], 
+    challenges: CodingChallenge[],
     results: BenchmarkResult[]
   ): Record<string, { passed: number; total: number }> {
     const breakdown: Record<string, { passed: number; total: number }> = {};
@@ -684,7 +699,7 @@ except Exception as e:
         breakdown[category] = { passed: 0, total: 0 };
       }
       breakdown[category].total++;
-      
+
       if (results[index]?.passed) {
         breakdown[category].passed++;
       }
@@ -697,7 +712,7 @@ except Exception as e:
    * Calculate difficulty breakdown
    */
   private calculateDifficultyBreakdown(
-    challenges: CodingChallenge[], 
+    challenges: CodingChallenge[],
     results: BenchmarkResult[]
   ): Record<string, { passed: number; total: number }> {
     const breakdown: Record<string, { passed: number; total: number }> = {};
@@ -708,7 +723,7 @@ except Exception as e:
         breakdown[difficulty] = { passed: 0, total: 0 };
       }
       breakdown[difficulty].total++;
-      
+
       if (results[index]?.passed) {
         breakdown[difficulty].passed++;
       }
@@ -736,17 +751,21 @@ except Exception as e:
       this.hybridClient = new UnifiedModelClient({
         providers: [
           { type: 'ollama', endpoint: 'http://localhost:11434', model: 'auto', timeout: 30000 },
-          { type: 'lm-studio', endpoint: 'http://localhost:1234', model: 'auto', timeout: 30000 }
+          { type: 'lm-studio', endpoint: 'http://localhost:1234', model: 'auto', timeout: 30000 },
         ],
         executionMode: 'auto',
         fallbackChain: ['ollama', 'lm-studio'],
-        performanceThresholds: { fastModeMaxTokens: 2048, timeoutMs: 30000, maxConcurrentRequests: 3 }
+        performanceThresholds: {
+          fastModeMaxTokens: 2048,
+          timeoutMs: 30000,
+          maxConcurrentRequests: 3,
+        },
       });
 
       this.ollamaClient = new UnifiedModelClient({
         endpoint: 'http://localhost:11434',
         model: 'codellama:34b',
-        timeout: 60000
+        timeout: 60000,
       });
 
       logger.debug('Benchmark clients initialized');
@@ -768,11 +787,11 @@ except Exception as e:
           { input: 'hello', expectedOutput: 'olleh' },
           { input: 'world', expectedOutput: 'dlrow' },
           { input: '', expectedOutput: '' },
-          { input: 'a', expectedOutput: 'a' }
+          { input: 'a', expectedOutput: 'a' },
         ],
         difficulty: 'easy',
         category: 'string-manipulation',
-        language: 'javascript'
+        language: 'javascript',
       },
       {
         id: 'fibonacci',
@@ -782,11 +801,11 @@ except Exception as e:
           { input: 0, expectedOutput: 0 },
           { input: 1, expectedOutput: 1 },
           { input: 5, expectedOutput: 5 },
-          { input: 10, expectedOutput: 55 }
+          { input: 10, expectedOutput: 55 },
         ],
         difficulty: 'medium',
         category: 'math',
-        language: 'javascript'
+        language: 'javascript',
       },
       {
         id: 'two-sum',
@@ -795,11 +814,11 @@ except Exception as e:
         testCases: [
           { input: { nums: [2, 7, 11, 15], target: 9 }, expectedOutput: [0, 1] },
           { input: { nums: [3, 2, 4], target: 6 }, expectedOutput: [1, 2] },
-          { input: { nums: [3, 3], target: 6 }, expectedOutput: [0, 1] }
+          { input: { nums: [3, 3], target: 6 }, expectedOutput: [0, 1] },
         ],
         difficulty: 'medium',
         category: 'algorithms',
-        language: 'javascript'
+        language: 'javascript',
       },
       {
         id: 'palindrome-check',
@@ -809,11 +828,11 @@ except Exception as e:
           { input: 'racecar', expectedOutput: true },
           { input: 'hello', expectedOutput: false },
           { input: 'A man a plan a canal Panama', expectedOutput: true },
-          { input: '', expectedOutput: true }
+          { input: '', expectedOutput: true },
         ],
         difficulty: 'easy',
         category: 'string-manipulation',
-        language: 'javascript'
+        language: 'javascript',
       },
       {
         id: 'binary-search',
@@ -822,12 +841,12 @@ except Exception as e:
         testCases: [
           { input: { arr: [1, 2, 3, 4, 5], target: 3 }, expectedOutput: 2 },
           { input: { arr: [1, 2, 3, 4, 5], target: 6 }, expectedOutput: -1 },
-          { input: { arr: [], target: 1 }, expectedOutput: -1 }
+          { input: { arr: [], target: 1 }, expectedOutput: -1 },
         ],
         difficulty: 'medium',
         category: 'algorithms',
-        language: 'javascript'
-      }
+        language: 'javascript',
+      },
     ];
   }
 

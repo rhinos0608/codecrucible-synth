@@ -1,6 +1,6 @@
 /**
  * Comprehensive Error Handling System
- * 
+ *
  * Provides structured error handling, logging, recovery mechanisms,
  * and user-friendly error reporting across the entire application.
  */
@@ -13,7 +13,7 @@ export enum ErrorSeverity {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 // Error categories
@@ -29,7 +29,7 @@ export enum ErrorCategory {
   SYSTEM = 'system',
   USER_INPUT = 'user_input',
   EXTERNAL_API = 'external_api',
-  MCP_SERVICE = 'mcp_service'
+  MCP_SERVICE = 'mcp_service',
 }
 
 // Structured error interface
@@ -90,7 +90,7 @@ export class ErrorFactory {
     } = {}
   ): StructuredError {
     const id = `ERR_${Date.now()}_${++this.errorCounter}`;
-    
+
     return {
       id,
       message,
@@ -103,7 +103,7 @@ export class ErrorFactory {
       suggestedActions: options.suggestedActions || this.generateSuggestedActions(category),
       recoverable: options.recoverable ?? this.isRecoverable(category, severity),
       retryable: options.retryable ?? this.isRetryable(category),
-      metadata: options.metadata
+      metadata: options.metadata,
     };
   }
 
@@ -120,7 +120,7 @@ export class ErrorFactory {
       [ErrorCategory.SYSTEM]: 'System error occurred',
       [ErrorCategory.USER_INPUT]: 'Invalid user input',
       [ErrorCategory.EXTERNAL_API]: 'External service unavailable',
-      [ErrorCategory.MCP_SERVICE]: 'MCP service error'
+      [ErrorCategory.MCP_SERVICE]: 'MCP service error',
     };
 
     return categoryMessages[category] || 'An error occurred';
@@ -130,61 +130,58 @@ export class ErrorFactory {
     const categoryActions: Record<ErrorCategory, string[]> = {
       [ErrorCategory.VALIDATION]: [
         'Check input format and required fields',
-        'Review parameter types and constraints'
+        'Review parameter types and constraints',
       ],
       [ErrorCategory.AUTHENTICATION]: [
         'Verify API keys and credentials',
-        'Check authentication configuration'
+        'Check authentication configuration',
       ],
-      [ErrorCategory.AUTHORIZATION]: [
-        'Verify user permissions',
-        'Check access rights and roles'
-      ],
+      [ErrorCategory.AUTHORIZATION]: ['Verify user permissions', 'Check access rights and roles'],
       [ErrorCategory.NETWORK]: [
         'Check internet connection',
         'Verify endpoint availability',
-        'Try again in a moment'
+        'Try again in a moment',
       ],
       [ErrorCategory.FILE_SYSTEM]: [
         'Check file permissions',
         'Verify file path exists',
-        'Ensure sufficient disk space'
+        'Ensure sufficient disk space',
       ],
       [ErrorCategory.MODEL]: [
         'Check if AI model is running',
         'Verify model configuration',
-        'Try with a different model'
+        'Try with a different model',
       ],
       [ErrorCategory.TOOL_EXECUTION]: [
         'Review tool parameters',
         'Check tool availability',
-        'Try alternative tools'
+        'Try alternative tools',
       ],
       [ErrorCategory.CONFIGURATION]: [
         'Review configuration settings',
         'Check environment variables',
-        'Reset to default configuration'
+        'Reset to default configuration',
       ],
       [ErrorCategory.SYSTEM]: [
         'Restart the application',
         'Check system resources',
-        'Contact support if issue persists'
+        'Contact support if issue persists',
       ],
       [ErrorCategory.USER_INPUT]: [
         'Review input format',
         'Check for special characters',
-        'Try simplified input'
+        'Try simplified input',
       ],
       [ErrorCategory.EXTERNAL_API]: [
         'Check service status',
         'Verify API credentials',
-        'Try again later'
+        'Try again later',
       ],
       [ErrorCategory.MCP_SERVICE]: [
         'Check MCP server status',
         'Verify service configuration',
-        'Try fallback options'
-      ]
+        'Try fallback options',
+      ],
     };
 
     return categoryActions[category] || ['Try again', 'Contact support if issue persists'];
@@ -192,15 +189,15 @@ export class ErrorFactory {
 
   private static isRecoverable(category: ErrorCategory, severity: ErrorSeverity): boolean {
     if (severity === ErrorSeverity.CRITICAL) return false;
-    
+
     const recoverableCategories = [
       ErrorCategory.NETWORK,
       ErrorCategory.EXTERNAL_API,
       ErrorCategory.MCP_SERVICE,
       ErrorCategory.TOOL_EXECUTION,
-      ErrorCategory.MODEL
+      ErrorCategory.MODEL,
     ];
-    
+
     return recoverableCategories.includes(category);
   }
 
@@ -209,9 +206,9 @@ export class ErrorFactory {
       ErrorCategory.NETWORK,
       ErrorCategory.EXTERNAL_API,
       ErrorCategory.MCP_SERVICE,
-      ErrorCategory.MODEL
+      ErrorCategory.MODEL,
     ];
-    
+
     return retryableCategories.includes(category);
   }
 }
@@ -231,7 +228,7 @@ export class ErrorHandler {
     context?: Record<string, any>
   ): Promise<StructuredError> {
     const structuredError = this.ensureStructuredError(error, context);
-    
+
     // Add to history
     this.errorHistory.push(structuredError);
     if (this.errorHistory.length > this.maxHistorySize) {
@@ -258,13 +255,13 @@ export class ErrorHandler {
     service?: string
   ): ErrorResponse {
     const structuredError = this.ensureStructuredError(error);
-    
+
     return {
       success: false,
       error: structuredError,
       request_id: requestId,
       service,
-      recovery_suggestions: structuredError.suggestedActions
+      recovery_suggestions: structuredError.suggestedActions,
     };
   }
 
@@ -282,7 +279,7 @@ export class ErrorHandler {
       data,
       request_id: requestId,
       service,
-      metadata
+      metadata,
     };
   }
 
@@ -323,7 +320,7 @@ export class ErrorHandler {
         lastError = await this.handleError(error as Error, {
           ...context,
           attempt,
-          maxRetries
+          maxRetries,
         });
 
         if (attempt < maxRetries && lastError.retryable) {
@@ -352,8 +349,8 @@ export class ErrorHandler {
     const bySeverityCount: Record<ErrorSeverity, number> = {} as any;
 
     // Initialize counts
-    Object.values(ErrorCategory).forEach(cat => byCategoryCount[cat] = 0);
-    Object.values(ErrorSeverity).forEach(sev => bySeverityCount[sev] = 0);
+    Object.values(ErrorCategory).forEach(cat => (byCategoryCount[cat] = 0));
+    Object.values(ErrorSeverity).forEach(sev => (bySeverityCount[sev] = 0));
 
     // Count errors
     this.errorHistory.forEach(error => {
@@ -365,7 +362,7 @@ export class ErrorHandler {
       total: this.errorHistory.length,
       by_category: byCategoryCount,
       by_severity: bySeverityCount,
-      recent_errors: this.errorHistory.slice(-10)
+      recent_errors: this.errorHistory.slice(-10),
     };
   }
 
@@ -394,8 +391,8 @@ export class ErrorHandler {
         originalError,
         metadata: {
           error_name: originalError.name,
-          error_type: typeof originalError
-        }
+          error_type: typeof originalError,
+        },
       }
     );
   }
@@ -405,23 +402,26 @@ export class ErrorHandler {
       [ErrorSeverity.LOW]: chalk.yellow,
       [ErrorSeverity.MEDIUM]: chalk.yellowBright,
       [ErrorSeverity.HIGH]: chalk.red,
-      [ErrorSeverity.CRITICAL]: chalk.redBright
+      [ErrorSeverity.CRITICAL]: chalk.redBright,
     };
 
     const color = colorMap[error.severity] || chalk.red;
-    
-    logger.error(`${color(`[${error.severity.toUpperCase()}]`)} ${error.category}: ${error.message}`, {
-      errorId: error.id,
-      category: error.category,
-      severity: error.severity,
-      context: error.context,
-      stackTrace: error.stackTrace,
-      timestamp: error.timestamp
-    });
+
+    logger.error(
+      `${color(`[${error.severity.toUpperCase()}]`)} ${error.category}: ${error.message}`,
+      {
+        errorId: error.id,
+        category: error.category,
+        severity: error.severity,
+        context: error.context,
+        stackTrace: error.stackTrace,
+        timestamp: error.timestamp,
+      }
+    );
 
     // Also log to console for immediate visibility
     console.error(color(`❌ ${error.userMessage || error.message}`));
-    
+
     if (error.suggestedActions && error.suggestedActions.length > 0) {
       console.error(chalk.cyan('💡 Suggested actions:'));
       error.suggestedActions.forEach(action => {
@@ -439,17 +439,17 @@ export class ErrorHandler {
           // Wait and retry network connections
           await new Promise(resolve => setTimeout(resolve, 2000));
           break;
-          
+
         case ErrorCategory.MODEL:
           // Try to reinitialize model connection
           logger.info('Attempting model recovery...');
           break;
-          
+
         case ErrorCategory.MCP_SERVICE:
           // Try to reconnect to MCP services
           logger.info('Attempting MCP service recovery...');
           break;
-          
+
         default:
           logger.debug(`No recovery mechanism for category: ${error.category}`);
       }
@@ -484,14 +484,14 @@ export class InputValidator {
           ErrorSeverity.MEDIUM,
           {
             userMessage: `Please provide ${fieldName}`,
-            suggestedActions: [`Provide a valid ${fieldName} value`]
+            suggestedActions: [`Provide a valid ${fieldName} value`],
           }
         )
       );
     }
 
     const stringValue = String(value);
-    
+
     if (!options.allowEmpty && stringValue.trim().length === 0) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
@@ -554,7 +554,7 @@ export class InputValidator {
           {
             context: { attempted_path: filePath },
             userMessage: 'File path contains invalid characters',
-            suggestedActions: ['Use relative paths within the project directory']
+            suggestedActions: ['Use relative paths within the project directory'],
           }
         )
       );
@@ -567,11 +567,92 @@ export class InputValidator {
    * Sanitize user input to prevent injection attacks
    */
   static sanitizeInput(input: string): string {
-    return input
-      .replace(/[<>'"&]/g, '') // Remove potentially dangerous characters
+    if (!input || typeof input !== 'string') {
+      return '';
+    }
+
+    let sanitized = input;
+
+    // SQL Injection protection - remove/escape SQL keywords and operators
+    const sqlKeywords = [
+      'drop',
+      'delete',
+      'insert',
+      'update',
+      'union',
+      'select',
+      'create',
+      'alter',
+      'truncate',
+      'exec',
+      'execute',
+      'sp_',
+      'xp_',
+      'cmd',
+      'shell',
+      'script',
+    ];
+
+    sqlKeywords.forEach(keyword => {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+      sanitized = sanitized.replace(regex, '');
+    });
+
+    // Remove SQL operators and comment markers
+    sanitized = sanitized
+      .replace(/--/g, '') // SQL comments
+      .replace(/\/\*/g, '') // SQL block comment start
+      .replace(/\*\//g, '') // SQL block comment end
+      .replace(/;/g, '') // SQL statement terminator
+      .replace(/'/g, '') // Single quotes
+      .replace(/"/g, '') // Double quotes
+      .replace(/`/g, '') // Backticks
+      .replace(/\|/g, '') // Pipe operators
+      .replace(/&/g, 'and'); // Ampersand
+
+    // XSS protection - remove script tags and event handlers
+    const xssPatterns = [
+      /<script[^>]*>.*?<\/script>/gi,
+      /<iframe[^>]*>.*?<\/iframe>/gi,
+      /<object[^>]*>.*?<\/object>/gi,
+      /<embed[^>]*>.*?<\/embed>/gi,
+      /<svg[^>]*>.*?<\/svg>/gi,
+      /javascript:/gi,
+      /vbscript:/gi,
+      /data:/gi,
+      /on\w+\s*=/gi, // Event handlers like onclick, onerror, etc.
+      /<[^>]*on\w+[^>]*>/gi, // Any tag with event handlers
+    ];
+
+    xssPatterns.forEach(pattern => {
+      sanitized = sanitized.replace(pattern, '');
+    });
+
+    // Remove HTML tags completely
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+
+    // Directory traversal protection
+    sanitized = sanitized
+      .replace(/\.\./g, '') // Remove .. sequences
+      .replace(/~/g, '') // Remove home directory references
+      .replace(/\\/g, '/') // Normalize path separators
+      .replace(/\/\//g, '/'); // Remove double slashes
+
+    // Encoding-based attack protection
+    sanitized = sanitized
+      .replace(/%2e/gi, '') // Encoded dots
+      .replace(/%2f/gi, '') // Encoded slashes
+      .replace(/%5c/gi, '') // Encoded backslashes
+      .replace(/\\u[0-9a-f]{4}/gi, '') // Unicode escape sequences
+      .replace(/\\x[0-9a-f]{2}/gi, ''); // Hex escape sequences
+
+    // Normalize and limit whitespace
+    sanitized = sanitized
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim()
-      .substring(0, 10000); // Limit length
+      .substring(0, 10000); // Limit length to prevent buffer overflow
+
+    return sanitized;
   }
 }
 

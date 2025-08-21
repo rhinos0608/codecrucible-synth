@@ -110,7 +110,11 @@ export interface EmbeddingCache {
   cacheEmbedding(text: string, embedding: number[], modelId: string): Promise<void>;
   getCachedEmbedding(text: string, modelId: string): Promise<number[] | null>;
   getCachedEmbeddings(texts: string[], modelId: string): Promise<(number[] | null)[]>;
-  getEmbeddingSimilarity(text: string, modelId: string, threshold: number): Promise<Array<{ text: string; embedding: number[]; similarity: number }>>;
+  getEmbeddingSimilarity(
+    text: string,
+    modelId: string,
+    threshold: number
+  ): Promise<Array<{ text: string; embedding: number[]; similarity: number }>>;
 }
 
 export interface CodeAnalysisCache {
@@ -127,12 +131,12 @@ export class MultiLayerCacheSystem extends EventEmitter {
   private layerPriorities: string[] = [];
   private smartEvictionConfig: SmartEvictionConfig;
   private performanceTracker: CachePerformanceTracker;
-  
+
   // Specialized caches
   private aiResponseCache!: AIResponseCache;
   private embeddingCache!: EmbeddingCache;
   private codeAnalysisCache!: CodeAnalysisCache;
-  
+
   private isInitialized: boolean = false;
   private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -141,7 +145,7 @@ export class MultiLayerCacheSystem extends EventEmitter {
     this.logger = new Logger({ level: 'info' });
     this.smartEvictionConfig = config.smartEviction;
     this.performanceTracker = new CachePerformanceTracker();
-    
+
     this.initializeLayers(config);
     this.initializeSpecializedCaches();
   }
@@ -166,7 +170,6 @@ export class MultiLayerCacheSystem extends EventEmitter {
       this.isInitialized = true;
       this.logger.info('Multi-Layer Cache System initialized successfully');
       this.emit('cache:initialized');
-
     } catch (error) {
       this.logger.error('Failed to initialize cache system:', error);
       throw error;
@@ -198,7 +201,7 @@ export class MultiLayerCacheSystem extends EventEmitter {
 
             this.performanceTracker.recordHit(layerName, performance.now() - startTime);
             this.emit('cache:hit', { key: keyString, layer: layerName, value: entry.value });
-            
+
             return entry.value;
           }
         } catch (error) {
@@ -210,7 +213,6 @@ export class MultiLayerCacheSystem extends EventEmitter {
       this.performanceTracker.recordMiss(keyString, performance.now() - startTime);
       this.emit('cache:miss', { key: keyString });
       return null;
-
     } catch (error) {
       this.logger.error('Cache get operation failed:', error);
       throw error;
@@ -220,11 +222,7 @@ export class MultiLayerCacheSystem extends EventEmitter {
   /**
    * Set value in cache with intelligent layer placement
    */
-  async set<T>(
-    key: CacheKey, 
-    value: T, 
-    options: CacheSetOptions = {}
-  ): Promise<void> {
+  async set<T>(key: CacheKey, value: T, options: CacheSetOptions = {}): Promise<void> {
     const keyString = this.serializeKey(key);
     const startTime = performance.now();
 
@@ -238,7 +236,7 @@ export class MultiLayerCacheSystem extends EventEmitter {
         dependencies: options.dependencies,
         computeCost: options.computeCost || 1,
         hitCount: 0,
-        missCount: 0
+        missCount: 0,
       };
 
       const size = this.calculateValueSize(value);
@@ -262,7 +260,6 @@ export class MultiLayerCacheSystem extends EventEmitter {
 
       this.performanceTracker.recordSet(keyString, performance.now() - startTime);
       this.emit('cache:set', { key: keyString, layers: targetLayers });
-
     } catch (error) {
       this.logger.error('Cache set operation failed:', error);
       throw error;
@@ -340,7 +337,7 @@ export class MultiLayerCacheSystem extends EventEmitter {
    */
   async getStats(): Promise<CacheSystemStats> {
     const layerStats: Record<string, CacheStats> = {};
-    
+
     for (const [name, layer] of this.layers.entries()) {
       if (layer.enabled) {
         try {
@@ -358,8 +355,8 @@ export class MultiLayerCacheSystem extends EventEmitter {
       specializedCaches: {
         aiResponses: await this.getAIResponseCacheStats(),
         embeddings: await this.getEmbeddingCacheStats(),
-        codeAnalysis: await this.getCodeAnalysisCacheStats()
-      }
+        codeAnalysis: await this.getCodeAnalysisCacheStats(),
+      },
     };
   }
 
@@ -369,13 +366,13 @@ export class MultiLayerCacheSystem extends EventEmitter {
   async warmup(warmupData: CacheWarmupData[]): Promise<void> {
     this.logger.info(`Warming up cache with ${warmupData.length} entries`);
 
-    const warmupPromises = warmupData.map(async (data) => {
+    const warmupPromises = warmupData.map(async data => {
       try {
         await this.set(data.key, data.value, {
           priority: 'high',
           category: 'warmup',
           source: 'warmup-process',
-          computeCost: data.computeCost || 1
+          computeCost: data.computeCost || 1,
         });
       } catch (error) {
         this.logger.warn(`Failed to warmup entry ${this.serializeKey(data.key)}:`, error);
@@ -417,33 +414,30 @@ export class MultiLayerCacheSystem extends EventEmitter {
   private initializeLayers(config: CacheSystemConfig): void {
     // Memory layer (L1 - fastest)
     if (config.layers.memory.enabled) {
-      this.layers.set('memory', new MemoryCacheLayer(
-        'memory',
-        1,
-        config.layers.memory.policy
-      ));
+      this.layers.set('memory', new MemoryCacheLayer('memory', 1, config.layers.memory.policy));
       this.layerPriorities.push('memory');
     }
 
     // Disk layer (L2 - persistent)
     if (config.layers.disk.enabled) {
-      this.layers.set('disk', new DiskCacheLayer(
+      this.layers.set(
         'disk',
-        2,
-        config.layers.disk.policy,
-        config.layers.disk.dataPath
-      ));
+        new DiskCacheLayer('disk', 2, config.layers.disk.policy, config.layers.disk.dataPath)
+      );
       this.layerPriorities.push('disk');
     }
 
     // Distributed layer (L3 - shared)
     if (config.layers.distributed.enabled) {
-      this.layers.set('distributed', new DistributedCacheLayer(
+      this.layers.set(
         'distributed',
-        3,
-        config.layers.distributed.policy,
-        config.layers.distributed.nodes
-      ));
+        new DistributedCacheLayer(
+          'distributed',
+          3,
+          config.layers.distributed.policy,
+          config.layers.distributed.nodes
+        )
+      );
       this.layerPriorities.push('distributed');
     }
 
@@ -474,7 +468,7 @@ export class MultiLayerCacheSystem extends EventEmitter {
 
   private serializeKey(key: CacheKey): string {
     const keyParts = [key.namespace, key.identifier];
-    
+
     if (key.parameters) {
       const paramHash = crypto
         .createHash('md5')
@@ -482,11 +476,11 @@ export class MultiLayerCacheSystem extends EventEmitter {
         .digest('hex');
       keyParts.push(paramHash);
     }
-    
+
     if (key.version) {
       keyParts.push(key.version);
     }
-    
+
     return keyParts.join(':');
   }
 
@@ -496,16 +490,16 @@ export class MultiLayerCacheSystem extends EventEmitter {
   }
 
   private async promoteToHigherLayers(
-    key: string, 
-    entry: CacheEntry, 
+    key: string,
+    entry: CacheEntry,
     currentLayer: string
   ): Promise<void> {
     const currentPriority = this.layers.get(currentLayer)?.priority || 999;
-    
+
     for (const layerName of this.layerPriorities) {
       const layer = this.layers.get(layerName);
       if (!layer || !layer.enabled) continue;
-      
+
       if (layer.priority < currentPriority) {
         try {
           await layer.set(key, entry.value, entry.metadata);
@@ -521,7 +515,8 @@ export class MultiLayerCacheSystem extends EventEmitter {
 
     // Always try to cache in memory if it fits
     const memoryLayer = this.layers.get('memory');
-    if (memoryLayer && memoryLayer.enabled && size < 1024 * 1024) { // < 1MB
+    if (memoryLayer && memoryLayer.enabled && size < 1024 * 1024) {
+      // < 1MB
       selectedLayers.push('memory');
     }
 
@@ -533,8 +528,11 @@ export class MultiLayerCacheSystem extends EventEmitter {
 
     // Cache to distributed layer for high-value items
     const distributedLayer = this.layers.get('distributed');
-    if (distributedLayer && distributedLayer.enabled && 
-        (metadata.priority === 'critical' || metadata.computeCost > 5)) {
+    if (
+      distributedLayer &&
+      distributedLayer.enabled &&
+      (metadata.priority === 'critical' || metadata.computeCost > 5)
+    ) {
       selectedLayers.push('distributed');
     }
 
@@ -551,13 +549,16 @@ export class MultiLayerCacheSystem extends EventEmitter {
 
   private startMaintenanceTasks(): void {
     // Run maintenance every 5 minutes
-    this.cleanupInterval = setInterval(async () => {
-      try {
-        await this.performMaintenance();
-      } catch (error) {
-        this.logger.error('Cache maintenance failed:', error);
-      }
-    }, 5 * 60 * 1000);
+    this.cleanupInterval = setInterval(
+      async () => {
+        try {
+          await this.performMaintenance();
+        } catch (error) {
+          this.logger.error('Cache maintenance failed:', error);
+        }
+      },
+      5 * 60 * 1000
+    );
   }
 
   private async performMaintenance(): Promise<void> {
@@ -584,7 +585,7 @@ export class MultiLayerCacheSystem extends EventEmitter {
       evictionsLast24h: 0, // Would track actual evictions
       avgEvictionScore: 0.75,
       protectedEntriesCount: 0,
-      evictionsByCategory: {}
+      evictionsByCategory: {},
     };
   }
 
@@ -628,17 +629,17 @@ class MemoryCacheLayer implements CacheLayer {
       sizeCalculation: (entry: CacheEntry) => entry.size,
       dispose: (value: CacheEntry, key: string) => {
         this.stats.recordEviction();
-      }
+      },
     });
   }
 
   async get<T>(key: string): Promise<CacheEntry<T> | null> {
     const startTime = performance.now();
-    
+
     try {
       const entry = this.cache.get(key) as CacheEntry<T> | undefined;
       const duration = performance.now() - startTime;
-      
+
       if (entry) {
         this.stats.recordHit(duration);
         return entry;
@@ -654,7 +655,7 @@ class MemoryCacheLayer implements CacheLayer {
 
   async set<T>(key: string, value: T, metadata: CacheMetadata, ttl?: number): Promise<void> {
     const startTime = performance.now();
-    
+
     try {
       const entry: CacheEntry<T> = {
         key,
@@ -664,11 +665,11 @@ class MemoryCacheLayer implements CacheLayer {
         createdAt: new Date(),
         lastAccessed: new Date(),
         accessCount: 0,
-        size: this.calculateSize(value)
+        size: this.calculateSize(value),
       };
 
       this.cache.set(key, entry as CacheEntry, {
-        ttl: ttl || this.policy.defaultTTL
+        ttl: ttl || this.policy.defaultTTL,
       });
 
       this.stats.recordSet(performance.now() - startTime);
@@ -688,13 +689,13 @@ class MemoryCacheLayer implements CacheLayer {
     if (pattern) {
       const regex = new RegExp(pattern);
       const keysToDelete: string[] = [];
-      
+
       for (const key of this.cache.keys()) {
         if (regex.test(key)) {
           keysToDelete.push(key);
         }
       }
-      
+
       for (const key of keysToDelete) {
         this.cache.delete(key);
       }
@@ -713,7 +714,7 @@ class MemoryCacheLayer implements CacheLayer {
       evictionCount: this.stats.getEvictionCount(),
       averageAccessTime: this.stats.getAverageAccessTime(),
       memoryUsage: this.cache.calculatedSize || 0,
-      performance: this.stats.getPerformanceStats()
+      performance: this.stats.getPerformanceStats(),
     };
   }
 
@@ -750,7 +751,7 @@ class DiskCacheLayer implements CacheLayer {
 
   async get<T>(key: string): Promise<CacheEntry<T> | null> {
     const startTime = performance.now();
-    
+
     try {
       const indexEntry = this.index.get(key);
       if (!indexEntry) {
@@ -764,7 +765,6 @@ class DiskCacheLayer implements CacheLayer {
 
       this.stats.recordHit(performance.now() - startTime);
       return entry;
-
     } catch (error) {
       this.stats.recordError();
       this.stats.recordMiss(performance.now() - startTime);
@@ -774,7 +774,7 @@ class DiskCacheLayer implements CacheLayer {
 
   async set<T>(key: string, value: T, metadata: CacheMetadata, ttl?: number): Promise<void> {
     const startTime = performance.now();
-    
+
     try {
       const entry: CacheEntry<T> = {
         key,
@@ -784,12 +784,12 @@ class DiskCacheLayer implements CacheLayer {
         createdAt: new Date(),
         lastAccessed: new Date(),
         accessCount: 0,
-        size: this.calculateSize(value)
+        size: this.calculateSize(value),
       };
 
       const fileName = this.generateFileName(key);
       const filePath = path.join(this.dataPath, fileName);
-      
+
       await fs.mkdir(this.dataPath, { recursive: true });
       await fs.writeFile(filePath, JSON.stringify(entry));
 
@@ -797,11 +797,10 @@ class DiskCacheLayer implements CacheLayer {
         fileName,
         size: entry.size,
         createdAt: entry.createdAt,
-        expiresAt: entry.expiresAt
+        expiresAt: entry.expiresAt,
       });
 
       this.stats.recordSet(performance.now() - startTime);
-
     } catch (error) {
       this.stats.recordError();
       throw error;
@@ -816,7 +815,7 @@ class DiskCacheLayer implements CacheLayer {
       const filePath = path.join(this.dataPath, indexEntry.fileName);
       await fs.unlink(filePath);
       this.index.delete(key);
-      
+
       return true;
     } catch {
       return false;
@@ -827,13 +826,13 @@ class DiskCacheLayer implements CacheLayer {
     if (pattern) {
       const regex = new RegExp(pattern);
       const keysToDelete: string[] = [];
-      
+
       for (const key of this.index.keys()) {
         if (regex.test(key)) {
           keysToDelete.push(key);
         }
       }
-      
+
       for (const key of keysToDelete) {
         await this.delete(key);
       }
@@ -845,8 +844,7 @@ class DiskCacheLayer implements CacheLayer {
   }
 
   async getStats(): Promise<CacheStats> {
-    const totalSize = Array.from(this.index.values())
-      .reduce((sum, entry) => sum + entry.size, 0);
+    const totalSize = Array.from(this.index.values()).reduce((sum, entry) => sum + entry.size, 0);
 
     return {
       layer: this.name,
@@ -857,7 +855,7 @@ class DiskCacheLayer implements CacheLayer {
       evictionCount: this.stats.getEvictionCount(),
       averageAccessTime: this.stats.getAverageAccessTime(),
       memoryUsage: 0, // Disk cache doesn't use memory
-      performance: this.stats.getPerformanceStats()
+      performance: this.stats.getPerformanceStats(),
     };
   }
 
@@ -899,7 +897,7 @@ class DistributedCacheLayer implements CacheLayer {
 
   async get<T>(key: string): Promise<CacheEntry<T> | null> {
     const startTime = performance.now();
-    
+
     try {
       // Distributed cache implementation would go here
       // For now, simulate with null response
@@ -913,7 +911,7 @@ class DistributedCacheLayer implements CacheLayer {
 
   async set<T>(key: string, value: T, metadata: CacheMetadata, ttl?: number): Promise<void> {
     const startTime = performance.now();
-    
+
     try {
       // Distributed cache set implementation would go here
       this.stats.recordSet(performance.now() - startTime);
@@ -942,7 +940,7 @@ class DistributedCacheLayer implements CacheLayer {
       evictionCount: this.stats.getEvictionCount(),
       averageAccessTime: this.stats.getAverageAccessTime(),
       memoryUsage: 0,
-      performance: this.stats.getPerformanceStats()
+      performance: this.stats.getPerformanceStats(),
     };
   }
 
@@ -956,11 +954,16 @@ class DistributedCacheLayer implements CacheLayer {
 class AIResponseCacheImpl implements AIResponseCache {
   constructor(private cacheSystem: MultiLayerCacheSystem) {}
 
-  async cacheResponse(prompt: string, response: string, modelId: string, metadata: any): Promise<void> {
+  async cacheResponse(
+    prompt: string,
+    response: string,
+    modelId: string,
+    metadata: any
+  ): Promise<void> {
     const key: CacheKey = {
       namespace: 'ai-responses',
       identifier: modelId,
-      parameters: { prompt: this.hashPrompt(prompt) }
+      parameters: { prompt: this.hashPrompt(prompt) },
     };
 
     await this.cacheSystem.set(key, response, {
@@ -968,7 +971,7 @@ class AIResponseCacheImpl implements AIResponseCache {
       category: 'ai-response',
       source: 'ai-model',
       computeCost: 10, // AI responses are expensive to compute
-      ...metadata
+      ...metadata,
     });
   }
 
@@ -976,7 +979,7 @@ class AIResponseCacheImpl implements AIResponseCache {
     const key: CacheKey = {
       namespace: 'ai-responses',
       identifier: modelId,
-      parameters: { prompt: this.hashPrompt(prompt) }
+      parameters: { prompt: this.hashPrompt(prompt) },
     };
 
     return await this.cacheSystem.get<string>(key);
@@ -999,14 +1002,14 @@ class EmbeddingCacheImpl implements EmbeddingCache {
     const key: CacheKey = {
       namespace: 'embeddings',
       identifier: modelId,
-      parameters: { text: this.hashText(text) }
+      parameters: { text: this.hashText(text) },
     };
 
     await this.cacheSystem.set(key, embedding, {
       priority: 'high',
       category: 'embedding',
       source: 'embedding-model',
-      computeCost: 5 // Embeddings are moderately expensive
+      computeCost: 5, // Embeddings are moderately expensive
     });
   }
 
@@ -1014,7 +1017,7 @@ class EmbeddingCacheImpl implements EmbeddingCache {
     const key: CacheKey = {
       namespace: 'embeddings',
       identifier: modelId,
-      parameters: { text: this.hashText(text) }
+      parameters: { text: this.hashText(text) },
     };
 
     return await this.cacheSystem.get<number[]>(key);
@@ -1026,8 +1029,8 @@ class EmbeddingCacheImpl implements EmbeddingCache {
   }
 
   async getEmbeddingSimilarity(
-    text: string, 
-    modelId: string, 
+    text: string,
+    modelId: string,
     threshold: number
   ): Promise<Array<{ text: string; embedding: number[]; similarity: number }>> {
     // Implementation would search for similar embeddings
@@ -1047,14 +1050,14 @@ class CodeAnalysisCacheImpl implements CodeAnalysisCache {
     const key: CacheKey = {
       namespace: 'code-analysis',
       identifier: filePath,
-      parameters: { hash }
+      parameters: { hash },
     };
 
     await this.cacheSystem.set(key, analysis, {
       priority: 'medium',
       category: 'code-analysis',
       source: 'analysis-engine',
-      computeCost: 3 // Code analysis is moderately expensive
+      computeCost: 3, // Code analysis is moderately expensive
     });
   }
 
@@ -1062,7 +1065,7 @@ class CodeAnalysisCacheImpl implements CodeAnalysisCache {
     const key: CacheKey = {
       namespace: 'code-analysis',
       identifier: filePath,
-      parameters: { hash }
+      parameters: { hash },
     };
 
     return await this.cacheSystem.get(key);
@@ -1109,14 +1112,14 @@ class CachePerformanceTracker {
   getStats(): CachePerformanceTrackerStats {
     const totalHits = Array.from(this.hits.values()).reduce((sum, arr) => sum + arr.length, 0);
     const totalMisses = Array.from(this.misses.values()).reduce((sum, arr) => sum + arr.length, 0);
-    
+
     return {
       totalOperations: totalHits + totalMisses,
       hitRate: totalHits / (totalHits + totalMisses) || 0,
       missRate: totalMisses / (totalHits + totalMisses) || 0,
       averageHitTime: this.calculateAverageTime(this.hits),
       averageMissTime: this.calculateAverageTime(this.misses),
-      averageSetTime: this.calculateAverageTime(this.sets)
+      averageSetTime: this.calculateAverageTime(this.sets),
     };
   }
 
@@ -1127,7 +1130,9 @@ class CachePerformanceTracker {
 
   private calculateAverageTime(timings: Map<string, number[]>): number {
     const allTimes = Array.from(timings.values()).flat();
-    return allTimes.length > 0 ? allTimes.reduce((sum, time) => sum + time, 0) / allTimes.length : 0;
+    return allTimes.length > 0
+      ? allTimes.reduce((sum, time) => sum + time, 0) / allTimes.length
+      : 0;
   }
 
   private cleanupOldMetrics(): void {
@@ -1186,8 +1191,8 @@ class CacheLayerStats {
   }
 
   getAverageAccessTime(): number {
-    return this.accessTimes.length > 0 
-      ? this.accessTimes.reduce((sum, time) => sum + time, 0) / this.accessTimes.length 
+    return this.accessTimes.length > 0
+      ? this.accessTimes.reduce((sum, time) => sum + time, 0) / this.accessTimes.length
       : 0;
   }
 
@@ -1197,7 +1202,7 @@ class CacheLayerStats {
       averageSetTime: 0, // Would track separately
       averageDeleteTime: 0, // Would track separately
       throughputPerSecond: 0, // Would calculate based on time windows
-      errorRate: this.errors / (this.hits + this.misses + this.sets) || 0
+      errorRate: this.errors / (this.hits + this.misses + this.sets) || 0,
     };
   }
 }

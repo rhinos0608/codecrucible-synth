@@ -40,22 +40,22 @@ export interface OptimizationConfig {
   // Cache settings
   maxCacheSize: number;
   cacheMaxAge: number;
-  
+
   // Tokenization settings
   maxTokensPerPrompt: number;
   contextWindowSize: number;
   chunkSize: number;
-  
+
   // Batch settings
   batchSize: number;
   batchTimeoutMs: number;
   maxConcurrentBatches: number;
-  
+
   // Model parameters
   temperature: number;
   topP: number;
   topK: number;
-  
+
   // Performance settings
   enableStreaming: boolean;
   enableBatching: boolean;

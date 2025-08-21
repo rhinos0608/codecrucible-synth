@@ -6,7 +6,10 @@
 
 import { EventEmitter } from 'events';
 import { Logger } from './logger.js';
-import { DualAgentRealtimeSystem, CodeGenerationResult } from './collaboration/dual-agent-realtime-system.js';
+import {
+  DualAgentRealtimeSystem,
+  CodeGenerationResult,
+} from './collaboration/dual-agent-realtime-system.js';
 import chalk from 'chalk';
 
 export interface CoordinatedResponse {
@@ -43,9 +46,9 @@ export class UnifiedResponseCoordinator extends EventEmitter {
    * Main coordination method - ensures single response
    */
   async coordinateResponse(
-    prompt: string, 
+    prompt: string,
     context?: any,
-    options?: { 
+    options?: {
       requireAudit?: boolean;
       streamResponse?: boolean;
       maxResponseTime?: number;
@@ -53,38 +56,38 @@ export class UnifiedResponseCoordinator extends EventEmitter {
   ): Promise<CoordinatedResponse> {
     const requestId = this.generateRequestId();
     this.currentRequestId = requestId;
-    
+
     const startTime = Date.now();
     const auditTrail: AuditStep[] = [];
-    
+
     try {
       // Step 1: Initial generation with primary model (Ollama)
       this.logger.info(`[${requestId}] Starting coordinated response for prompt`);
-      
+
       let result: CodeGenerationResult;
-      
+
       if (this.dualAgentSystem) {
         // Use dual-agent system for coordinated generation + audit
         this.logger.info(`[${requestId}] Using dual-agent system`);
-        
+
         auditTrail.push({
           timestamp: new Date(),
           agent: 'ollama',
           action: 'generate',
           content: 'Starting primary code generation',
-          confidence: 0.8
+          confidence: 0.8,
         });
-        
+
         result = await this.dualAgentSystem.generateWithAudit(prompt, context);
-        
+
         auditTrail.push({
           timestamp: new Date(),
           agent: 'ollama',
           action: 'generate',
           content: 'Primary generation complete',
-          confidence: 0.8
+          confidence: 0.8,
         });
-        
+
         // Step 2: LM Studio audit (if available)
         if (result.audit) {
           auditTrail.push({
@@ -93,9 +96,9 @@ export class UnifiedResponseCoordinator extends EventEmitter {
             action: 'audit',
             content: `Audit complete - Score: ${result.audit.score}/100`,
             confidence: result.audit.confidence,
-            issues: result.audit.issues.map(i => i.description)
+            issues: result.audit.issues.map(i => i.description),
           });
-          
+
           // Step 3: Apply refinements if needed
           if (result.refinedCode) {
             auditTrail.push({
@@ -103,42 +106,41 @@ export class UnifiedResponseCoordinator extends EventEmitter {
               agent: 'lmstudio',
               action: 'refine',
               content: 'Applied audit fixes',
-              confidence: result.audit.confidence
+              confidence: result.audit.confidence,
             });
           }
-          
+
           // Step 4: Final approval
           auditTrail.push({
             timestamp: new Date(),
             agent: 'lmstudio',
             action: 'approve',
             content: 'Response approved for delivery',
-            confidence: result.audit.confidence
+            confidence: result.audit.confidence,
           });
         }
-        
       } else {
         // Fallback to single model
         this.logger.warn(`[${requestId}] Dual-agent system not available, using fallback`);
-        
+
         auditTrail.push({
           timestamp: new Date(),
           agent: 'ollama',
           action: 'generate',
           content: 'Single-model fallback generation',
-          confidence: 0.6
+          confidence: 0.6,
         });
-        
+
         result = {
           code: 'Fallback response generation not implemented',
           language: 'text',
           performance: {
             generationTime: 100,
-            totalTime: 100
-          }
+            totalTime: 100,
+          },
         };
       }
-      
+
       // Step 5: Format final response
       const coordinatedResponse: CoordinatedResponse = {
         content: this.formatFinalResponse(result),
@@ -146,36 +148,39 @@ export class UnifiedResponseCoordinator extends EventEmitter {
         confidence: result.audit?.confidence || 0.6,
         modelUsed: this.dualAgentSystem ? 'dual-agent' : 'single-model',
         responseTime: Date.now() - startTime,
-        warnings: result.audit?.issues
-          .filter(i => i.severity === 'warning' || i.severity === 'critical')
-          .map(i => i.description) || []
+        warnings:
+          result.audit?.issues
+            .filter(i => i.severity === 'warning' || i.severity === 'critical')
+            .map(i => i.description) || [],
       };
-      
+
       this.logger.info(`[${requestId}] Response coordination complete`, {
         responseTime: coordinatedResponse.responseTime,
         confidence: coordinatedResponse.confidence,
-        auditSteps: auditTrail.length
+        auditSteps: auditTrail.length,
       });
-      
+
       return coordinatedResponse;
-      
     } catch (error) {
       this.logger.error(`[${requestId}] Response coordination failed:`, error);
-      
+
       // Return error response with audit trail
       return {
         content: `❌ Error: ${error.message}`,
-        auditTrail: [...auditTrail, {
-          timestamp: new Date(),
-          agent: 'ollama',
-          action: 'generate',
-          content: `Error occurred: ${error.message}`,
-          confidence: 0.0
-        }],
+        auditTrail: [
+          ...auditTrail,
+          {
+            timestamp: new Date(),
+            agent: 'ollama',
+            action: 'generate',
+            content: `Error occurred: ${error.message}`,
+            confidence: 0.0,
+          },
+        ],
         confidence: 0.0,
         modelUsed: 'error',
         responseTime: Date.now() - startTime,
-        warnings: [`System error: ${error.message}`]
+        warnings: [`System error: ${error.message}`],
       };
     } finally {
       this.currentRequestId = null;
@@ -186,75 +191,78 @@ export class UnifiedResponseCoordinator extends EventEmitter {
    * Stream coordinated response with audit trail
    */
   async *streamCoordinatedResponse(
-    prompt: string, 
+    prompt: string,
     context?: any
-  ): AsyncGenerator<{ type: 'chunk' | 'audit' | 'complete', content: string, auditStep?: AuditStep }> {
+  ): AsyncGenerator<{
+    type: 'chunk' | 'audit' | 'complete';
+    content: string;
+    auditStep?: AuditStep;
+  }> {
     const requestId = this.generateRequestId();
     this.currentRequestId = requestId;
-    
+
     this.logger.info(`[${requestId}] Starting streaming coordinated response`);
-    
+
     try {
       if (!this.dualAgentSystem) {
-        yield { 
-          type: 'complete', 
-          content: '❌ Dual-agent system not available for streaming' 
+        yield {
+          type: 'complete',
+          content: '❌ Dual-agent system not available for streaming',
         };
         return;
       }
-      
+
       // Start streaming generation + audit
       for await (const chunk of this.dualAgentSystem.streamGenerateWithAudit(prompt)) {
         switch (chunk.type) {
           case 'code_chunk':
-            yield { 
-              type: 'chunk', 
-              content: chunk.content 
+            yield {
+              type: 'chunk',
+              content: chunk.content,
             };
             break;
-            
+
           case 'audit_start':
-            yield { 
-              type: 'audit', 
+            yield {
+              type: 'audit',
               content: '🔍 Starting audit...',
               auditStep: {
                 timestamp: new Date(),
                 agent: 'lmstudio',
                 action: 'audit',
                 content: 'Audit initiated',
-                confidence: 0.5
-              }
+                confidence: 0.5,
+              },
             };
             break;
-            
+
           case 'audit_complete':
-            yield { 
-              type: 'audit', 
+            yield {
+              type: 'audit',
               content: `✅ Audit complete - Score: ${chunk.audit?.score}/100`,
               auditStep: {
                 timestamp: new Date(),
                 agent: 'lmstudio',
                 action: 'approve',
                 content: `Audit complete with score ${chunk.audit?.score}/100`,
-                confidence: chunk.audit?.confidence || 0.7
-              }
+                confidence: chunk.audit?.confidence || 0.7,
+              },
             };
             break;
-            
+
           case 'complete':
-            yield { 
-              type: 'complete', 
-              content: '\n✅ Generation and audit complete' 
+            yield {
+              type: 'complete',
+              content: '\n✅ Generation and audit complete',
             };
             break;
         }
       }
-      
     } catch (error) {
       this.logger.error(`[${requestId}] Streaming failed:`, error);
-      yield { 
-        type: 'complete', 
-        content: `❌ Streaming failed: ${error.message}` 
+      yield {
+        type: 'complete',
+        content: `❌ Streaming failed: ${error.message}`,
       };
     } finally {
       this.currentRequestId = null;
@@ -268,21 +276,23 @@ export class UnifiedResponseCoordinator extends EventEmitter {
     console.log(chalk.green('\n✨ CodeCrucible Response:'));
     console.log(chalk.gray('─'.repeat(60)));
     console.log(response.content);
-    
+
     if (response.warnings && response.warnings.length > 0) {
       console.log(chalk.yellow('\n⚠️  Warnings:'));
       response.warnings.forEach(warning => {
         console.log(chalk.yellow(`   • ${warning}`));
       });
     }
-    
+
     if (showAuditTrail && response.auditTrail.length > 0) {
       console.log(chalk.cyan('\n🔍 Audit Trail:'));
       response.auditTrail.forEach((step, index) => {
         const emoji = step.agent === 'ollama' ? '🤖' : '🔬';
         const confidence = `${Math.round(step.confidence * 100)}%`;
-        console.log(chalk.gray(`   ${index + 1}. ${emoji} ${step.agent}: ${step.action} (${confidence})`));
-        
+        console.log(
+          chalk.gray(`   ${index + 1}. ${emoji} ${step.agent}: ${step.action} (${confidence})`)
+        );
+
         if (step.issues && step.issues.length > 0) {
           step.issues.forEach(issue => {
             console.log(chalk.red(`      ⚠ ${issue}`));
@@ -290,8 +300,12 @@ export class UnifiedResponseCoordinator extends EventEmitter {
         }
       });
     }
-    
-    console.log(chalk.gray(`\n💾 Response Time: ${response.responseTime}ms | Confidence: ${Math.round(response.confidence * 100)}%`));
+
+    console.log(
+      chalk.gray(
+        `\n💾 Response Time: ${response.responseTime}ms | Confidence: ${Math.round(response.confidence * 100)}%`
+      )
+    );
     console.log(chalk.gray('─'.repeat(60)));
   }
 
@@ -312,12 +326,12 @@ export class UnifiedResponseCoordinator extends EventEmitter {
 
   private formatFinalResponse(result: CodeGenerationResult): string {
     let response = result.refinedCode || result.code;
-    
+
     // Add audit summary if available
     if (result.audit) {
       const score = result.audit.score;
       const issues = result.audit.issues.length;
-      
+
       if (score >= 80) {
         response += `\n\n✅ Code Quality: Excellent (${score}/100)`;
       } else if (score >= 60) {
@@ -325,12 +339,12 @@ export class UnifiedResponseCoordinator extends EventEmitter {
       } else {
         response += `\n\n❌ Code Quality: Needs improvement (${score}/100, ${issues} issues found)`;
       }
-      
+
       if (result.audit.securityWarnings.length > 0) {
         response += `\n🔒 Security: ${result.audit.securityWarnings.length} warnings`;
       }
     }
-    
+
     return response;
   }
 

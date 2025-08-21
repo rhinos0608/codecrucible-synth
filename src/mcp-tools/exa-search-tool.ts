@@ -27,7 +27,7 @@ export interface ExaSearchResponse {
 
 /**
  * Exa Search MCP Tool Integration
- * 
+ *
  * Provides advanced web search capabilities with high-quality,
  * developer-focused search results using Exa's neural search API.
  */
@@ -41,7 +41,7 @@ export class ExaSearchTool {
       ...config,
       baseUrl: config.baseUrl || 'https://api.exa.ai',
       timeout: config.timeout || 30000,
-      maxResults: config.maxResults || 10
+      maxResults: config.maxResults || 10,
     };
   }
 
@@ -75,7 +75,7 @@ export class ExaSearchTool {
     await this.enforceRateLimit();
 
     const startTime = Date.now();
-    
+
     try {
       const searchParams = {
         query,
@@ -89,39 +89,35 @@ export class ExaSearchTool {
         useAutoprompt: options.useAutoprompt ?? true,
         type: options.type || 'neural',
         category: options.category,
-        includeText: options.includeText ?? true
+        includeText: options.includeText ?? true,
       };
 
       // Remove undefined values
-      Object.keys(searchParams).forEach(key => 
-        searchParams[key as keyof typeof searchParams] === undefined && 
-        delete searchParams[key as keyof typeof searchParams]
+      Object.keys(searchParams).forEach(
+        key =>
+          searchParams[key as keyof typeof searchParams] === undefined &&
+          delete searchParams[key as keyof typeof searchParams]
       );
 
-      const response = await axios.post(
-        `${this.config.baseUrl}/search`,
-        searchParams,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: this.config.timeout
-        }
-      );
+      const response = await axios.post(`${this.config.baseUrl}/search`, searchParams, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: this.config.timeout,
+      });
 
       const searchTime = Date.now() - startTime;
-      
+
       return {
         query,
         results: this.processSearchResults(response.data.results || []),
         totalResults: response.data.results?.length || 0,
-        searchTime
+        searchTime,
       };
-
     } catch (error: any) {
       logger.error('Exa search failed:', error);
-      
+
       if (error.response?.status === 401) {
         throw new Error('Exa Search API authentication failed. Check your API key.');
       } else if (error.response?.status === 429) {
@@ -148,7 +144,7 @@ export class ExaSearchTool {
     } = {}
   ): Promise<ExaSearchResponse> {
     let enhancedQuery = query;
-    
+
     if (language) {
       enhancedQuery += ` ${language} programming`;
     }
@@ -157,7 +153,7 @@ export class ExaSearchTool {
       numResults: 15,
       useAutoprompt: true,
       type: 'neural',
-      includeText: true
+      includeText: true,
     };
 
     // Configure domains based on options
@@ -204,11 +200,11 @@ export class ExaSearchTool {
     await this.enforceRateLimit();
 
     const startTime = Date.now();
-    
+
     try {
       const requestBody: any = {
         numResults: options.numResults || 10,
-        category: options.category
+        category: options.category,
       };
 
       if (options.isUrl) {
@@ -217,27 +213,22 @@ export class ExaSearchTool {
         requestBody.text = input;
       }
 
-      const response = await axios.post(
-        `${this.config.baseUrl}/findSimilar`,
-        requestBody,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: this.config.timeout
-        }
-      );
+      const response = await axios.post(`${this.config.baseUrl}/findSimilar`, requestBody, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: this.config.timeout,
+      });
 
       const searchTime = Date.now() - startTime;
-      
+
       return {
         query: `Similar to: ${input}`,
         results: this.processSearchResults(response.data.results || []),
         totalResults: response.data.results?.length || 0,
-        searchTime
+        searchTime,
       };
-
     } catch (error: any) {
       logger.error('Exa findSimilar failed:', error);
       throw new Error(`Exa findSimilar failed: ${error.message || 'Unknown error'}`);
@@ -260,31 +251,26 @@ export class ExaSearchTool {
     }
 
     await this.enforceRateLimit();
-    
+
     try {
       const requestBody = {
         ids: Array.isArray(urls) ? urls : [urls],
         contents: {
           text: options.text ?? true,
           highlights: options.highlights ?? false,
-          summary: options.summary ?? false
-        }
+          summary: options.summary ?? false,
+        },
       };
 
-      const response = await axios.post(
-        `${this.config.baseUrl}/contents`,
-        requestBody,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: this.config.timeout
-        }
-      );
+      const response = await axios.post(`${this.config.baseUrl}/contents`, requestBody, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: this.config.timeout,
+      });
 
       return response.data;
-
     } catch (error: any) {
       logger.error('Exa getContent failed:', error);
       throw new Error(`Exa getContent failed: ${error.message || 'Unknown error'}`);
@@ -303,26 +289,26 @@ export class ExaSearchTool {
         includeDomains: ['github.com', 'stackoverflow.com', 'developer.mozilla.org'],
         useAutoprompt: true,
         type: 'neural' as const,
-        numResults: 12
+        numResults: 12,
       },
       research: {
         useAutoprompt: true,
         type: 'neural' as const,
         numResults: 20,
-        includeText: true
+        includeText: true,
       },
       troubleshooting: {
         includeDomains: ['stackoverflow.com', 'github.com', 'reddit.com'],
         useAutoprompt: false,
         type: 'keyword' as const,
-        numResults: 15
+        numResults: 15,
       },
       learning: {
         includeDomains: ['developer.mozilla.org', 'docs.python.org', 'reactjs.org', 'nodejs.org'],
         useAutoprompt: true,
         type: 'neural' as const,
-        numResults: 10
-      }
+        numResults: 10,
+      },
     };
 
     const config = contextConfigs[context];
@@ -339,7 +325,7 @@ export class ExaSearchTool {
       content: this.cleanContent(result.text || result.content || ''),
       score: result.score || 0,
       publishedDate: result.publishedDate,
-      author: result.author
+      author: result.author,
     }));
   }
 
@@ -348,15 +334,15 @@ export class ExaSearchTool {
    */
   private cleanContent(content: string): string {
     if (!content) return '';
-    
+
     // Remove excessive whitespace
     let cleaned = content.replace(/\s+/g, ' ').trim();
-    
+
     // Truncate if too long
     if (cleaned.length > 1000) {
       cleaned = cleaned.substring(0, 1000) + '...';
     }
-    
+
     return cleaned;
   }
 
@@ -367,11 +353,11 @@ export class ExaSearchTool {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
     const minInterval = 100; // 100ms between requests
-    
+
     if (timeSinceLastRequest < minInterval) {
       await new Promise(resolve => setTimeout(resolve, minInterval - timeSinceLastRequest));
     }
-    
+
     this.lastRequestTime = Date.now();
     this.requestCount++;
   }
@@ -384,7 +370,7 @@ export class ExaSearchTool {
       requestCount: this.requestCount,
       isEnabled: this.config.enabled,
       hasApiKey: !!this.config.apiKey,
-      lastRequestTime: this.lastRequestTime
+      lastRequestTime: this.lastRequestTime,
     };
   }
 

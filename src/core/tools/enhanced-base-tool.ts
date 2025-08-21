@@ -1,20 +1,20 @@
 /**
  * Enhanced Base Tool with Comprehensive Error Handling
- * 
+ *
  * Extends the basic BaseTool with structured error handling,
  * input validation, logging, and security measures.
  */
 
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
-import { 
-  ErrorHandler, 
-  ErrorFactory, 
+import {
+  ErrorHandler,
+  ErrorFactory,
   InputValidator,
-  ErrorCategory, 
+  ErrorCategory,
   ErrorSeverity,
   ServiceResponse,
-  ErrorResponse
+  ErrorResponse,
 } from '../error-handling/structured-error-system.js';
 import { logger } from '../logger.js';
 
@@ -62,9 +62,9 @@ export abstract class EnhancedBaseTool extends BaseTool {
       name: config.name,
       description: config.description,
       category: config.category,
-      parameters: config.parameters as z.ZodObject<any>
+      parameters: config.parameters as z.ZodObject<any>,
     });
-    
+
     this.config = {
       requiresAuth: false,
       rateLimitPerMinute: 60,
@@ -72,20 +72,23 @@ export abstract class EnhancedBaseTool extends BaseTool {
       securityLevel: 'medium',
       retryable: true,
       maxRetries: 3,
-      ...config
+      ...config,
     };
   }
 
   /**
    * Enhanced execute method with error handling and security
    */
-  async execute(params: any, context?: Partial<ToolExecutionContext>): Promise<ToolExecutionResult> {
+  async execute(
+    params: any,
+    context?: Partial<ToolExecutionContext>
+  ): Promise<ToolExecutionResult> {
     const executionContext: ToolExecutionContext = {
       requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       workingDirectory: process.cwd(),
       timestamp: Date.now(),
       environment: {},
-      ...context
+      ...context,
     };
 
     const startTime = Date.now();
@@ -97,20 +100,21 @@ export abstract class EnhancedBaseTool extends BaseTool {
       // Validate and sanitize input
       const validationResult = await this.validateAndSanitizeInput(params);
       if (!validationResult.success) {
-        return this.createErrorResult((validationResult as ErrorResponse).error, executionContext, startTime);
+        return this.createErrorResult(
+          (validationResult as ErrorResponse).error,
+          executionContext,
+          startTime
+        );
       }
 
       // Execute with timeout and retry logic
-      const result = await this.executeWithTimeoutAndRetry(
-        validationResult.data,
-        executionContext
-      );
+      const result = await this.executeWithTimeoutAndRetry(validationResult.data, executionContext);
 
       // Post-execution processing
       const finalResult = await this.postExecutionProcessing(result, executionContext);
 
       this.recordExecution(Date.now() - startTime);
-      
+
       return {
         success: true,
         data: finalResult,
@@ -119,15 +123,14 @@ export abstract class EnhancedBaseTool extends BaseTool {
         metadata: {
           tool: this.config.name,
           category: this.config.category,
-          execution_count: this.executionCount
-        }
+          execution_count: this.executionCount,
+        },
       };
-
     } catch (error) {
       const structuredError = await ErrorHandler.handleError(error as Error, {
         tool: this.config.name,
         requestId: executionContext.requestId,
-        params: this.sanitizeParamsForLogging(params)
+        params: this.sanitizeParamsForLogging(params),
       });
 
       return this.createErrorResult(structuredError, executionContext, startTime);
@@ -153,7 +156,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
           userMessage: 'Too many requests, please wait before trying again',
           suggestedActions: ['Wait a moment and try again'],
           retryable: true,
-          metadata: { rate_limit: this.config.rateLimitPerMinute }
+          metadata: { rate_limit: this.config.rateLimitPerMinute },
         }
       );
     }
@@ -167,7 +170,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
         {
           userMessage: 'This operation requires authentication',
           suggestedActions: ['Please authenticate and try again'],
-          recoverable: false
+          recoverable: false,
         }
       );
     }
@@ -190,11 +193,10 @@ export abstract class EnhancedBaseTool extends BaseTool {
       const sanitizedParams = this.sanitizeInput(validatedParams);
 
       return ErrorHandler.createSuccessResponse(sanitizedParams);
-
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errorMessage = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
-        
+
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
             `Validation failed: ${errorMessage}`,
@@ -203,7 +205,10 @@ export abstract class EnhancedBaseTool extends BaseTool {
             {
               context: { validation_errors: error.errors },
               userMessage: 'Invalid input provided',
-              suggestedActions: ['Check parameter types and required fields', 'Review input format']
+              suggestedActions: [
+                'Check parameter types and required fields',
+                'Review input format',
+              ],
             }
           )
         );
@@ -246,31 +251,36 @@ export abstract class EnhancedBaseTool extends BaseTool {
       this.executeCore(params, context),
       new Promise((_, reject) => {
         setTimeout(() => {
-          reject(ErrorFactory.createError(
-            `Tool execution timeout after ${this.config.timeoutMs}ms`,
-            ErrorCategory.SYSTEM,
-            ErrorSeverity.HIGH,
-            {
-              context: { timeout: this.config.timeoutMs, tool: this.config.name },
-              userMessage: 'Operation timed out',
-              suggestedActions: ['Try again with simpler input', 'Check system performance'],
-              retryable: true
-            }
-          ));
+          reject(
+            ErrorFactory.createError(
+              `Tool execution timeout after ${this.config.timeoutMs}ms`,
+              ErrorCategory.SYSTEM,
+              ErrorSeverity.HIGH,
+              {
+                context: { timeout: this.config.timeoutMs, tool: this.config.name },
+                userMessage: 'Operation timed out',
+                suggestedActions: ['Try again with simpler input', 'Check system performance'],
+                retryable: true,
+              }
+            )
+          );
         }, this.config.timeoutMs!);
-      })
+      }),
     ]);
   }
 
   /**
    * Post-execution processing and cleanup
    */
-  protected async postExecutionProcessing(result: any, context: ToolExecutionContext): Promise<any> {
+  protected async postExecutionProcessing(
+    result: any,
+    context: ToolExecutionContext
+  ): Promise<any> {
     // Log successful execution
     logger.info(`Tool executed successfully: ${this.config.name}`, {
       requestId: context.requestId,
       tool: this.config.name,
-      executionTime: Date.now() - context.timestamp
+      executionTime: Date.now() - context.timestamp,
     });
 
     // Override in subclasses for custom post-processing
@@ -303,7 +313,10 @@ export abstract class EnhancedBaseTool extends BaseTool {
   /**
    * High security checks for sensitive operations
    */
-  protected async performHighSecurityChecks(params: any, context: ToolExecutionContext): Promise<void> {
+  protected async performHighSecurityChecks(
+    params: any,
+    context: ToolExecutionContext
+  ): Promise<void> {
     // Check for suspicious patterns
     const paramString = JSON.stringify(params);
     const suspiciousPatterns = [
@@ -315,7 +328,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
       /system\s*\(/,
       /require\s*\(/,
       /import\s+os/,
-      /__import__/
+      /__import__/,
     ];
 
     for (const pattern of suspiciousPatterns) {
@@ -328,7 +341,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
             context: { suspicious_pattern: pattern.source },
             userMessage: 'Input contains potentially dangerous commands',
             suggestedActions: ['Review input for security concerns', 'Use safer alternatives'],
-            recoverable: false
+            recoverable: false,
           }
         );
       }
@@ -341,10 +354,10 @@ export abstract class EnhancedBaseTool extends BaseTool {
   protected isRateLimited(): boolean {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
-    
+
     // Clean old executions
     this.lastExecutionTimes = this.lastExecutionTimes.filter(time => time > oneMinuteAgo);
-    
+
     if (this.lastExecutionTimes.length >= this.config.rateLimitPerMinute!) {
       return true;
     }
@@ -358,7 +371,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
    */
   protected recordExecution(executionTime: number): void {
     this.executionCount++;
-    
+
     // Keep track of recent execution times for performance analysis
     if (this.lastExecutionTimes.length >= this.maxExecutionHistory) {
       this.lastExecutionTimes.shift();
@@ -381,8 +394,8 @@ export abstract class EnhancedBaseTool extends BaseTool {
       metadata: {
         tool: this.config.name,
         category: this.config.category,
-        error_category: error.category || 'unknown'
-      }
+        error_category: error.category || 'unknown',
+      },
     };
   }
 
@@ -391,7 +404,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
    */
   protected sanitizeParamsForLogging(params: any): any {
     const sensitiveKeys = ['password', 'token', 'key', 'secret', 'api_key', 'auth'];
-    
+
     if (typeof params === 'object' && params !== null) {
       const sanitized = { ...params };
       for (const key of Object.keys(sanitized)) {
@@ -401,7 +414,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
       }
       return sanitized;
     }
-    
+
     return params;
   }
 
@@ -415,16 +428,18 @@ export abstract class EnhancedBaseTool extends BaseTool {
     rate_limit: number;
     security_level: string;
   } {
-    const avgTime = this.lastExecutionTimes.length > 0
-      ? this.lastExecutionTimes.reduce((sum, time) => sum + time, 0) / this.lastExecutionTimes.length
-      : 0;
+    const avgTime =
+      this.lastExecutionTimes.length > 0
+        ? this.lastExecutionTimes.reduce((sum, time) => sum + time, 0) /
+          this.lastExecutionTimes.length
+        : 0;
 
     return {
       total_executions: this.executionCount,
       average_execution_time: avgTime,
       last_execution_times: [...this.lastExecutionTimes],
       rate_limit: this.config.rateLimitPerMinute!,
-      security_level: this.config.securityLevel!
+      security_level: this.config.securityLevel!,
     };
   }
 }

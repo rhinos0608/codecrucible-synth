@@ -28,7 +28,7 @@ export class StubCompletionEngine {
     logger.info('🔍 Scanning for stubbed implementations...');
 
     const patterns = ['src/**/*.ts', 'src/**/*.js'];
-    
+
     for (const pattern of patterns) {
       const files = await glob(pattern, { cwd: process.cwd() });
       for (const file of files) {
@@ -48,7 +48,7 @@ export class StubCompletionEngine {
       const lines = content.split('\n');
 
       let currentClass = '';
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const lineNum = i + 1;
@@ -71,9 +71,9 @@ export class StubCompletionEngine {
    * Check a line for stub implementations
    */
   private async checkForStubImplementations(
-    filePath: string, 
-    line: string, 
-    lineNum: number, 
+    filePath: string,
+    line: string,
+    lineNum: number,
     className: string,
     lines: string[],
     index: number
@@ -88,7 +88,7 @@ export class StubCompletionEngine {
           className,
           methodName: methodMatch[1],
           stubType: 'empty',
-          implementation: this.generateImplementation(className, methodMatch[1], 'empty')
+          implementation: this.generateImplementation(className, methodMatch[1], 'empty'),
         });
       }
     }
@@ -103,7 +103,7 @@ export class StubCompletionEngine {
           className,
           methodName: methodMatch,
           stubType: 'placeholder',
-          implementation: this.generateImplementation(className, methodMatch, 'placeholder')
+          implementation: this.generateImplementation(className, methodMatch, 'placeholder'),
         });
       }
     }
@@ -119,13 +119,16 @@ export class StubCompletionEngine {
           className,
           methodName: methodMatch[1],
           stubType: 'todo',
-          implementation: this.generateImplementation(className, methodMatch[1], 'todo')
+          implementation: this.generateImplementation(className, methodMatch[1], 'todo'),
         });
       }
     }
 
     // Throw NotImplemented errors
-    if (line.includes('throw') && (line.includes('not implemented') || line.includes('NotImplemented'))) {
+    if (
+      line.includes('throw') &&
+      (line.includes('not implemented') || line.includes('NotImplemented'))
+    ) {
       const methodMatch = this.findMethodName(lines, index);
       if (methodMatch) {
         this.stubs.push({
@@ -134,7 +137,7 @@ export class StubCompletionEngine {
           className,
           methodName: methodMatch,
           stubType: 'not_implemented',
-          implementation: this.generateImplementation(className, methodMatch, 'not_implemented')
+          implementation: this.generateImplementation(className, methodMatch, 'not_implemented'),
         });
       }
     }
@@ -159,26 +162,29 @@ export class StubCompletionEngine {
    */
   private generateImplementation(className: string, methodName: string, stubType: string): string {
     const implementations: Record<string, Record<string, string>> = {
-      'OptimizerAgent': {
-        'optimizePerformance': this.getOptimizerImplementation(),
-        'analyzePerformance': this.getPerformanceAnalysisImplementation(),
-        'generateOptimizationActions': this.getOptimizationActionsImplementation()
+      OptimizerAgent: {
+        optimizePerformance: this.getOptimizerImplementation(),
+        analyzePerformance: this.getPerformanceAnalysisImplementation(),
+        generateOptimizationActions: this.getOptimizationActionsImplementation(),
       },
-      'SecurityAgent': {
-        'scanForVulnerabilities': this.getSecurityScanImplementation(),
-        'generateSecurityReport': this.getSecurityReportImplementation()
+      SecurityAgent: {
+        scanForVulnerabilities: this.getSecurityScanImplementation(),
+        generateSecurityReport: this.getSecurityReportImplementation(),
       },
-      'TesterAgent': {
-        'generateTests': this.getTestGenerationImplementation(),
-        'runTests': this.getTestRunnerImplementation()
+      TesterAgent: {
+        generateTests: this.getTestGenerationImplementation(),
+        runTests: this.getTestRunnerImplementation(),
       },
-      'ArchitectAgent': {
-        'designArchitecture': this.getArchitectureDesignImplementation(),
-        'validateArchitecture': this.getArchitectureValidationImplementation()
-      }
+      ArchitectAgent: {
+        designArchitecture: this.getArchitectureDesignImplementation(),
+        validateArchitecture: this.getArchitectureValidationImplementation(),
+      },
     };
 
-    return implementations[className]?.[methodName] || this.getGenericImplementation(methodName, stubType);
+    return (
+      implementations[className]?.[methodName] ||
+      this.getGenericImplementation(methodName, stubType)
+    );
   }
 
   private getOptimizerImplementation(): string {
@@ -412,7 +418,7 @@ export class StubCompletionEngine {
 
   private getGenericImplementation(methodName: string, stubType: string): string {
     const templates = {
-      'empty': `
+      empty: `
     try {
       logger.info('Executing ${methodName}...');
       // TODO: Implement ${methodName} logic
@@ -421,7 +427,7 @@ export class StubCompletionEngine {
       logger.error('${methodName} failed:', error);
       throw error;
     }`,
-      'placeholder': `
+      placeholder: `
     try {
       logger.info('Processing ${methodName} request...');
       // Implement actual ${methodName} logic here
@@ -429,7 +435,7 @@ export class StubCompletionEngine {
     } catch (error) {
       return \`\${methodName} failed: \${error instanceof Error ? error.message : 'Unknown error'}\`;
     }`,
-      'todo': `
+      todo: `
     try {
       // TODO: Complete implementation of ${methodName}
       logger.info('${methodName} called');
@@ -438,7 +444,7 @@ export class StubCompletionEngine {
       logger.error('${methodName} error:', error);
       throw error;
     }`,
-      'not_implemented': `
+      not_implemented: `
     try {
       logger.info('Implementing ${methodName}...');
       // Replace NotImplemented error with actual implementation
@@ -446,7 +452,7 @@ export class StubCompletionEngine {
     } catch (error) {
       logger.error('${methodName} implementation failed:', error);
       throw error;
-    }`
+    }`,
     };
 
     return templates[stubType] || templates['empty'];
@@ -481,7 +487,7 @@ export class StubCompletionEngine {
       class: stub.className,
       method: stub.methodName,
       type: stub.stubType,
-      implementation: stub.implementation
+      implementation: stub.implementation,
     });
   }
 
@@ -513,9 +519,14 @@ BREAKDOWN BY CLASS:
       report += '─'.repeat(50) + '\n';
 
       for (const stub of classStubs) {
-        const icon = stub.stubType === 'not_implemented' ? '🚨' : 
-                    stub.stubType === 'todo' ? '📝' : 
-                    stub.stubType === 'empty' ? '🔴' : '🟡';
+        const icon =
+          stub.stubType === 'not_implemented'
+            ? '🚨'
+            : stub.stubType === 'todo'
+              ? '📝'
+              : stub.stubType === 'empty'
+                ? '🔴'
+                : '🟡';
         report += `${icon} ${stub.methodName} (${stub.stubType}) - ${stub.file}:${stub.line}\n`;
       }
     }
@@ -527,11 +538,12 @@ BREAKDOWN BY CLASS:
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const engine = new StubCompletionEngine();
-  
-  engine.findAllStubs()
+
+  engine
+    .findAllStubs()
     .then(stubs => {
       console.log(engine.generateReport());
-      
+
       if (stubs.length > 0) {
         console.log('\n🔧 Applying stub completions...');
         return engine.applyStubCompletions();

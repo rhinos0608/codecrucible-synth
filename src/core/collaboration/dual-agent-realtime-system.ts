@@ -87,7 +87,7 @@ export interface DocCompliance {
 export class DualAgentRealtimeSystem extends EventEmitter {
   private logger: Logger;
   private config: DualAgentConfig;
-  private ollamaClient: any;  // Ollama client for writer
+  private ollamaClient: any; // Ollama client for writer
   private lmStudioClient: any; // LM Studio client for auditor
   private documentationIndex: Map<string, string> = new Map();
   private projectStandards: any = {};
@@ -98,7 +98,7 @@ export class DualAgentRealtimeSystem extends EventEmitter {
   constructor(config: Partial<DualAgentConfig> = {}) {
     super();
     this.logger = new Logger('DualAgentSystem');
-    
+
     this.config = {
       writer: {
         platform: 'ollama',
@@ -107,7 +107,7 @@ export class DualAgentRealtimeSystem extends EventEmitter {
         temperature: 0.7,
         maxTokens: 2048,
         keepAlive: '24h',
-        ...config.writer
+        ...config.writer,
       },
       auditor: {
         platform: 'lmstudio',
@@ -116,12 +116,12 @@ export class DualAgentRealtimeSystem extends EventEmitter {
         temperature: 0.2,
         maxTokens: 1024,
         contextLength: 8192,
-        ...config.auditor
+        ...config.auditor,
       },
       enableRealTimeAudit: true,
       auditInBackground: true,
       autoApplyFixes: false,
-      ...config
+      ...config,
     };
 
     this.initializeClients();
@@ -135,17 +135,16 @@ export class DualAgentRealtimeSystem extends EventEmitter {
       // Initialize Ollama client for fast writing
       this.logger.info('Initializing Ollama writer client...');
       await this.initializeOllamaWriter();
-      
+
       // Initialize LM Studio client for thorough auditing
       this.logger.info('Initializing LM Studio auditor client...');
       await this.initializeLMStudioAuditor();
-      
+
       // Check platform health
       await this.checkPlatformHealth();
-      
+
       this.logger.info('Dual-agent system initialized successfully');
       this.emit('ready');
-      
     } catch (error) {
       this.logger.error('Failed to initialize dual-agent system:', error);
       throw error;
@@ -159,20 +158,19 @@ export class DualAgentRealtimeSystem extends EventEmitter {
     try {
       const response = await fetch(`${this.config.writer.endpoint}/api/tags`);
       if (!response.ok) throw new Error('Ollama not available');
-      
+
       const data = await response.json();
-      const hasModel = data.models?.some((m: any) => 
-        m.name.includes('deepseek') || m.name.includes(this.config.writer.model)
+      const hasModel = data.models?.some(
+        (m: any) => m.name.includes('deepseek') || m.name.includes(this.config.writer.model)
       );
-      
+
       if (!hasModel) {
         this.logger.warn(`Model ${this.config.writer.model} not found in Ollama, pulling...`);
         await this.pullOllamaModel(this.config.writer.model);
       }
-      
+
       this.isWriterReady = true;
       this.logger.info('Ollama writer ready');
-      
     } catch (error) {
       this.logger.error('Failed to initialize Ollama writer:', error);
       throw error;
@@ -190,10 +188,9 @@ export class DualAgentRealtimeSystem extends EventEmitter {
         this.isAuditorReady = false;
         return;
       }
-      
+
       this.isAuditorReady = true;
       this.logger.info('LM Studio auditor ready');
-      
     } catch (error) {
       this.logger.warn('LM Studio not available:', error);
       this.isAuditorReady = false;
@@ -210,34 +207,34 @@ export class DualAgentRealtimeSystem extends EventEmitter {
       language: 'typescript',
       performance: {
         generationTime: 0,
-        totalTime: 0
-      }
+        totalTime: 0,
+      },
     };
 
     try {
       // Phase 1: Fast code generation with Ollama
       this.logger.info('Starting code generation with DeepSeek...');
       const generationStart = Date.now();
-      
+
       result.code = await this.generateCodeWithOllama(prompt, context);
       result.performance.generationTime = Date.now() - generationStart;
-      
+
       this.emit('code:generated', {
         code: result.code,
-        time: result.performance.generationTime
+        time: result.performance.generationTime,
       });
 
       // Phase 2: Background audit with LM Studio (if available)
       if (this.isAuditorReady && this.config.enableRealTimeAudit) {
         const auditStart = Date.now();
-        
+
         if (this.config.auditInBackground) {
           // Start audit in background
           this.auditInBackground(result.code, prompt, context).then(auditResult => {
             result.audit = auditResult;
             result.performance.auditTime = Date.now() - auditStart;
             this.emit('audit:complete', auditResult);
-            
+
             // Apply fixes if configured
             if (this.config.autoApplyFixes && auditResult.issues.some(i => i.fix)) {
               this.applyAuditFixes(result.code, auditResult).then(refinedCode => {
@@ -250,7 +247,7 @@ export class DualAgentRealtimeSystem extends EventEmitter {
           // Wait for audit to complete
           result.audit = await this.auditCodeWithLMStudio(result.code, prompt, context);
           result.performance.auditTime = Date.now() - auditStart;
-          
+
           // Apply fixes if needed
           if (this.config.autoApplyFixes && result.audit.issues.some(i => i.fix)) {
             const refinementStart = Date.now();
@@ -262,7 +259,6 @@ export class DualAgentRealtimeSystem extends EventEmitter {
 
       result.performance.totalTime = Date.now() - startTime;
       return result;
-
     } catch (error) {
       this.logger.error('Code generation failed:', error);
       throw error;
@@ -274,7 +270,7 @@ export class DualAgentRealtimeSystem extends EventEmitter {
    */
   private async generateCodeWithOllama(prompt: string, context?: any): Promise<string> {
     const enhancedPrompt = this.buildWriterPrompt(prompt, context);
-    
+
     const response = await fetch(`${this.config.writer.endpoint}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -286,9 +282,9 @@ export class DualAgentRealtimeSystem extends EventEmitter {
           temperature: this.config.writer.temperature,
           num_predict: this.config.writer.maxTokens,
           top_p: 0.9,
-          repeat_penalty: 1.1
-        }
-      })
+          repeat_penalty: 1.1,
+        },
+      }),
     });
 
     if (!response.ok) {
@@ -303,12 +299,12 @@ export class DualAgentRealtimeSystem extends EventEmitter {
    * Audit code using LM Studio (20B model)
    */
   private async auditCodeWithLMStudio(
-    code: string, 
-    originalPrompt: string, 
+    code: string,
+    originalPrompt: string,
     context?: any
   ): Promise<AuditResult> {
     const auditPrompt = this.buildAuditorPrompt(code, originalPrompt, context);
-    
+
     const response = await fetch(`${this.config.auditor.endpoint}/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -320,8 +316,8 @@ export class DualAgentRealtimeSystem extends EventEmitter {
         top_p: 0.8,
         frequency_penalty: 0.1,
         presence_penalty: 0.1,
-        stop: ["###", "END_AUDIT"]
-      })
+        stop: ['###', 'END_AUDIT'],
+      }),
     });
 
     if (!response.ok) {
@@ -337,11 +333,11 @@ export class DualAgentRealtimeSystem extends EventEmitter {
    * Audit code in background
    */
   private async auditInBackground(
-    code: string, 
-    originalPrompt: string, 
+    code: string,
+    originalPrompt: string,
     context?: any
   ): Promise<AuditResult> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       setImmediate(async () => {
         try {
           const audit = await this.auditCodeWithLMStudio(code, originalPrompt, context);
@@ -364,7 +360,7 @@ export class DualAgentRealtimeSystem extends EventEmitter {
     }
 
     const fixPrompt = this.buildFixPrompt(code, audit);
-    
+
     // Use Ollama for quick fixes
     const response = await fetch(`${this.config.writer.endpoint}/api/generate`, {
       method: 'POST',
@@ -375,9 +371,9 @@ export class DualAgentRealtimeSystem extends EventEmitter {
         stream: false,
         options: {
           temperature: 0.3, // Lower temp for fixes
-          num_predict: this.config.writer.maxTokens
-        }
-      })
+          num_predict: this.config.writer.maxTokens,
+        },
+      }),
     });
 
     const data = await response.json();
@@ -403,7 +399,7 @@ User Request: ${userPrompt}`;
     }
 
     prompt += `\n\nProvide complete, production-ready code with proper error handling and documentation.`;
-    
+
     return prompt;
   }
 
@@ -473,7 +469,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
     if (codeBlockMatch) {
       return codeBlockMatch[1].trim();
     }
-    
+
     // Return full response if no code blocks found
     return response.trim();
   }
@@ -511,9 +507,9 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
         follows_standards: true,
         missing_documentation: [],
         inconsistencies: [],
-        score: 80
+        score: 80,
       },
-      confidence: 0.7
+      confidence: 0.7,
     };
 
     // Extract score if mentioned
@@ -528,7 +524,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
       result.issues.push({
         severity: 'warning',
         type: 'logic',
-        description: match[1].trim()
+        description: match[1].trim(),
       });
     }
 
@@ -538,7 +534,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
       result.securityWarnings.push({
         vulnerability: match[1].trim(),
         severity: 'medium',
-        mitigation: 'Review and fix security issue'
+        mitigation: 'Review and fix security issue',
       });
     }
 
@@ -559,9 +555,9 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
         follows_standards: true,
         missing_documentation: [],
         inconsistencies: [],
-        score: 80
+        score: 80,
       },
-      confidence: parsed.confidence ?? 0.7
+      confidence: parsed.confidence ?? 0.7,
     };
   }
 
@@ -573,19 +569,21 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
       passed: true,
       score: 0,
       issues: [],
-      suggestions: [{
-        priority: 'low',
-        category: 'info',
-        description: 'Audit service unavailable - manual review recommended'
-      }],
+      suggestions: [
+        {
+          priority: 'low',
+          category: 'info',
+          description: 'Audit service unavailable - manual review recommended',
+        },
+      ],
       securityWarnings: [],
       documentationCompliance: {
         follows_standards: false,
         missing_documentation: ['Unable to verify'],
         inconsistencies: [],
-        score: 0
+        score: 0,
       },
-      confidence: 0
+      confidence: 0,
     };
   }
 
@@ -594,11 +592,11 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
    */
   private async pullOllamaModel(model: string): Promise<void> {
     this.logger.info(`Pulling model ${model}...`);
-    
+
     const response = await fetch(`${this.config.writer.endpoint}/api/pull`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: model })
+      body: JSON.stringify({ name: model }),
     });
 
     if (!response.ok) {
@@ -623,7 +621,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
   private async checkPlatformHealth(): Promise<void> {
     const health = {
       ollama: this.isWriterReady,
-      lmStudio: this.isAuditorReady
+      lmStudio: this.isAuditorReady,
     };
 
     if (!health.ollama) {
@@ -645,7 +643,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
    */
   async *streamGenerateWithAudit(prompt: string, context?: any): AsyncGenerator<any> {
     const startTime = Date.now();
-    
+
     // Stream generation from Ollama
     const response = await fetch(`${this.config.writer.endpoint}/api/generate`, {
       method: 'POST',
@@ -656,9 +654,9 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
         stream: true,
         options: {
           temperature: this.config.writer.temperature,
-          num_predict: this.config.writer.maxTokens
-        }
-      })
+          num_predict: this.config.writer.maxTokens,
+        },
+      }),
     });
 
     const reader = response.body?.getReader();
@@ -669,10 +667,10 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
-        
+
         for (const line of lines) {
           if (line.trim()) {
             try {
@@ -682,7 +680,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
                 yield {
                   type: 'code_chunk',
                   content: data.response,
-                  accumulated: fullCode
+                  accumulated: fullCode,
                 };
               }
             } catch (e) {
@@ -703,7 +701,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
     yield {
       type: 'complete',
       code: fullCode,
-      time: Date.now() - startTime
+      time: Date.now() - startTime,
     };
   }
 
@@ -713,7 +711,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
   getMetrics(): any {
     const recentAudits = this.auditHistory.slice(-10);
     const avgScore = recentAudits.reduce((sum, a) => sum + a.score, 0) / (recentAudits.length || 1);
-    
+
     return {
       writerStatus: this.isWriterReady ? 'ready' : 'offline',
       auditorStatus: this.isAuditorReady ? 'ready' : 'offline',
@@ -723,14 +721,14 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
         ollama: {
           endpoint: this.config.writer.endpoint,
           model: this.config.writer.model,
-          status: this.isWriterReady ? 'connected' : 'disconnected'
+          status: this.isWriterReady ? 'connected' : 'disconnected',
         },
         lmStudio: {
           endpoint: this.config.auditor.endpoint,
           model: this.config.auditor.model,
-          status: this.isAuditorReady ? 'connected' : 'disconnected'
-        }
-      }
+          status: this.isAuditorReady ? 'connected' : 'disconnected',
+        },
+      },
     };
   }
 

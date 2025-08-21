@@ -14,19 +14,19 @@ import { logger } from '../logger.js';
 
 // Agent isolation levels
 export enum IsolationLevel {
-  NONE = 'none',           // No isolation, shared memory
-  MEMORY = 'memory',       // Separate memory context
-  PROCESS = 'process',     // Separate worker process
-  SANDBOX = 'sandbox',     // Full sandboxed execution
-  SECURE = 'secure'        // Encrypted and validated execution
+  NONE = 'none', // No isolation, shared memory
+  MEMORY = 'memory', // Separate memory context
+  PROCESS = 'process', // Separate worker process
+  SANDBOX = 'sandbox', // Full sandboxed execution
+  SECURE = 'secure', // Encrypted and validated execution
 }
 
 // Agent permission scopes
 export interface AgentPermissions {
   fileAccess: {
-    read: string[];         // Allowed read paths
-    write: string[];        // Allowed write paths
-    execute: string[];      // Allowed execution paths
+    read: string[]; // Allowed read paths
+    write: string[]; // Allowed write paths
+    execute: string[]; // Allowed execution paths
   };
   networkAccess: {
     allowedHosts: string[];
@@ -34,15 +34,15 @@ export interface AgentPermissions {
     maxRequests: number;
   };
   systemAccess: {
-    environment: boolean;   // Can access env vars
-    processes: boolean;     // Can spawn processes
-    memory: number;         // Memory limit in MB
-    cpu: number;            // CPU time limit in ms
+    environment: boolean; // Can access env vars
+    processes: boolean; // Can spawn processes
+    memory: number; // Memory limit in MB
+    cpu: number; // CPU time limit in ms
   };
   apiAccess: {
-    models: string[];       // Allowed model IDs
-    rateLimit: number;      // Requests per minute
-    features: string[];     // Allowed API features
+    models: string[]; // Allowed model IDs
+    rateLimit: number; // Requests per minute
+    features: string[]; // Allowed API features
   };
 }
 
@@ -108,18 +108,21 @@ export interface IsolatedTaskResult {
  * Permission Validator - Enforces agent permissions
  */
 class PermissionValidator {
-  static validateFileAccess(permissions: AgentPermissions, operation: 'read' | 'write' | 'execute', path: string): boolean {
+  static validateFileAccess(
+    permissions: AgentPermissions,
+    operation: 'read' | 'write' | 'execute',
+    path: string
+  ): boolean {
     const allowedPaths = permissions.fileAccess[operation];
-    return allowedPaths.some(allowed => 
-      path.startsWith(allowed) || 
-      path.match(new RegExp(allowed.replace('*', '.*')))
+    return allowedPaths.some(
+      allowed => path.startsWith(allowed) || path.match(new RegExp(allowed.replace('*', '.*')))
     );
   }
 
   static validateNetworkAccess(permissions: AgentPermissions, host: string, port: number): boolean {
     const { allowedHosts, allowedPorts } = permissions.networkAccess;
-    const hostAllowed = allowedHosts.some(allowed => 
-      host === allowed || host.endsWith(allowed) || allowed === '*'
+    const hostAllowed = allowedHosts.some(
+      allowed => host === allowed || host.endsWith(allowed) || allowed === '*'
     );
     const portAllowed = allowedPorts.includes(port) || allowedPorts.includes(0); // 0 = any port
     return hostAllowed && portAllowed;
@@ -137,8 +140,11 @@ class PermissionValidator {
   }
 
   static validateApiAccess(permissions: AgentPermissions, model: string, feature: string): boolean {
-    const modelAllowed = permissions.apiAccess.models.includes(model) || permissions.apiAccess.models.includes('*');
-    const featureAllowed = permissions.apiAccess.features.includes(feature) || permissions.apiAccess.features.includes('*');
+    const modelAllowed =
+      permissions.apiAccess.models.includes(model) || permissions.apiAccess.models.includes('*');
+    const featureAllowed =
+      permissions.apiAccess.features.includes(feature) ||
+      permissions.apiAccess.features.includes('*');
     return modelAllowed && featureAllowed;
   }
 }
@@ -160,7 +166,7 @@ export class IsolatedAgent extends EventEmitter {
     isolationLevel: IsolationLevel = IsolationLevel.MEMORY
   ) {
     super();
-    
+
     this.context = {
       id,
       name,
@@ -170,7 +176,7 @@ export class IsolatedAgent extends EventEmitter {
         heap: new Map(),
         cache: new Map(),
         history: [],
-        maxSize: permissions.systemAccess.memory * 1024 * 1024 // Convert MB to bytes
+        maxSize: permissions.systemAccess.memory * 1024 * 1024, // Convert MB to bytes
       },
       metrics: {
         requests: 0,
@@ -178,13 +184,13 @@ export class IsolatedAgent extends EventEmitter {
         executionTime: 0,
         memoryUsed: 0,
         createdAt: new Date(),
-        lastAccessed: new Date()
+        lastAccessed: new Date(),
       },
       hooks: {
         preExecution: [],
         postExecution: [],
-        onError: []
-      }
+        onError: [],
+      },
     };
 
     if (isolationLevel === IsolationLevel.PROCESS || isolationLevel === IsolationLevel.SANDBOX) {
@@ -196,8 +202,8 @@ export class IsolatedAgent extends EventEmitter {
       permissions: {
         fileAccess: Object.keys(permissions.fileAccess).length,
         networkAccess: permissions.networkAccess.allowedHosts.length,
-        apiAccess: permissions.apiAccess.models.length
-      }
+        apiAccess: permissions.apiAccess.models.length,
+      },
     });
   }
 
@@ -207,26 +213,25 @@ export class IsolatedAgent extends EventEmitter {
         workerData: {
           agentId: this.context.id,
           permissions: this.context.permissions,
-          isolationLevel: this.context.isolationLevel
-        }
+          isolationLevel: this.context.isolationLevel,
+        },
       });
 
-      this.worker.on('message', (message) => {
+      this.worker.on('message', message => {
         this.handleWorkerMessage(message);
       });
 
-      this.worker.on('error', (error) => {
+      this.worker.on('error', error => {
         logger.error(`Worker error for agent ${this.context.id}:`, error);
         this.emit('error', error);
       });
 
-      this.worker.on('exit', (code) => {
+      this.worker.on('exit', code => {
         if (code !== 0) {
           logger.warn(`Worker exited with code ${code} for agent ${this.context.id}`);
         }
         this.worker = undefined;
       });
-
     } catch (error) {
       logger.error(`Failed to initialize worker for agent ${this.context.id}:`, error);
       throw error;
@@ -260,8 +265,8 @@ export class IsolatedAgent extends EventEmitter {
         isolation: {
           level: this.context.isolationLevel,
           secure: true,
-          violations: data.violations || []
-        }
+          violations: data.violations || [],
+        },
       };
 
       this.emit('task-completed', result);
@@ -281,8 +286,8 @@ export class IsolatedAgent extends EventEmitter {
         isolation: {
           level: this.context.isolationLevel,
           secure: true,
-          violations: data.violations || []
-        }
+          violations: data.violations || [],
+        },
       };
 
       this.context.metrics.errors++;
@@ -311,7 +316,7 @@ export class IsolatedAgent extends EventEmitter {
 
       // Add to queue
       this.taskQueue.push(request);
-      
+
       // Set up completion handlers
       const taskCompleteHandler = (result: IsolatedTaskResult) => {
         if (result.id === request.id) {
@@ -353,7 +358,7 @@ export class IsolatedAgent extends EventEmitter {
     if (request.type === 'execution') {
       return this.context.permissions.systemAccess.processes;
     }
-    
+
     // Check if agent can access required models
     if (request.payload?.model) {
       return PermissionValidator.validateApiAccess(
@@ -383,7 +388,7 @@ export class IsolatedAgent extends EventEmitter {
       this.handleTaskError({
         error: (error as Error).message,
         metrics: { executionTime: 0, memoryUsed: 0, cpuTime: 0 },
-        violations: []
+        violations: [],
       });
     }
   }
@@ -400,8 +405,10 @@ export class IsolatedAgent extends EventEmitter {
 
       let result: any;
 
-      if (this.context.isolationLevel === IsolationLevel.PROCESS || 
-          this.context.isolationLevel === IsolationLevel.SANDBOX) {
+      if (
+        this.context.isolationLevel === IsolationLevel.PROCESS ||
+        this.context.isolationLevel === IsolationLevel.SANDBOX
+      ) {
         // Execute in worker process
         result = await this.executeInWorker(task);
       } else {
@@ -422,11 +429,10 @@ export class IsolatedAgent extends EventEmitter {
         metrics: {
           executionTime,
           memoryUsed,
-          cpuTime: executionTime // Simplified for now
+          cpuTime: executionTime, // Simplified for now
         },
-        violations: []
+        violations: [],
       });
-
     } catch (error) {
       // Execute error hooks
       for (const hook of this.context.hooks.onError) {
@@ -458,7 +464,7 @@ export class IsolatedAgent extends EventEmitter {
       this.worker.postMessage({
         type: 'execute-task',
         taskId: task.id,
-        task
+        task,
       });
 
       // Cleanup on timeout
@@ -531,11 +537,11 @@ export class IsolatedAgent extends EventEmitter {
     const now = Date.now();
     const lastAccessed = this.context.metrics.lastAccessed.getTime();
     const timeSinceLastAccess = now - lastAccessed;
-    
+
     // Consider unhealthy if not accessed in 5 minutes and has errors
     const stale = timeSinceLastAccess > 5 * 60 * 1000;
     const hasErrors = this.context.metrics.errors > this.context.metrics.requests * 0.1; // >10% error rate
-    
+
     return !stale && !hasErrors;
   }
 
@@ -545,16 +551,16 @@ export class IsolatedAgent extends EventEmitter {
   async destroy(): Promise<void> {
     // this.isActive = false;
     this.taskQueue = [];
-    
+
     if (this.worker) {
       await this.worker.terminate();
       this.worker = undefined;
     }
-    
+
     this.context.memory.heap.clear();
     this.context.memory.cache.clear();
     this.removeAllListeners();
-    
+
     logger.info(`Isolated agent destroyed: ${this.context.name} (${this.context.id})`);
   }
 }
@@ -569,10 +575,12 @@ export class SubAgentIsolationSystem extends EventEmitter {
   private maxAgents = 10;
   private healthCheckInterval?: NodeJS.Timeout;
 
-  constructor(config: {
-    maxAgents?: number;
-    defaultPermissions?: Partial<AgentPermissions>;
-  } = {}) {
+  constructor(
+    config: {
+      maxAgents?: number;
+      defaultPermissions?: Partial<AgentPermissions>;
+    } = {}
+  ) {
     super();
 
     this.maxAgents = config.maxAgents || 10;
@@ -580,25 +588,25 @@ export class SubAgentIsolationSystem extends EventEmitter {
       fileAccess: {
         read: [process.cwd() + '/src', process.cwd() + '/tests', process.cwd() + '/docs'],
         write: [process.cwd() + '/dist', process.cwd() + '/tmp'],
-        execute: []
+        execute: [],
       },
       networkAccess: {
         allowedHosts: ['localhost', '127.0.0.1'],
         allowedPorts: [11434, 1234], // Ollama and LM Studio
-        maxRequests: 100
+        maxRequests: 100,
       },
       systemAccess: {
         environment: false,
         processes: false,
         memory: 512, // MB
-        cpu: 30000   // 30 seconds
+        cpu: 30000, // 30 seconds
       },
       apiAccess: {
         models: ['*'],
         rateLimit: 60,
-        features: ['generation', 'analysis']
+        features: ['generation', 'analysis'],
       },
-      ...config.defaultPermissions
+      ...config.defaultPermissions,
     };
 
     this.startHealthChecking();
@@ -626,17 +634,17 @@ export class SubAgentIsolationSystem extends EventEmitter {
     const isolationLevel = options.isolationLevel || IsolationLevel.MEMORY;
 
     const agent = new IsolatedAgent(agentId, name, permissions, isolationLevel);
-    
+
     // Add event forwarding
-    agent.on('task-completed', (result) => {
+    agent.on('task-completed', result => {
       this.emit('agent-task-completed', { agentId, result });
     });
-    
-    agent.on('task-error', (result) => {
+
+    agent.on('task-error', result => {
       this.emit('agent-task-error', { agentId, result });
     });
-    
-    agent.on('error', (error) => {
+
+    agent.on('error', error => {
       this.emit('agent-error', { agentId, error });
     });
 
@@ -654,7 +662,7 @@ export class SubAgentIsolationSystem extends EventEmitter {
     logger.info(`Created isolated agent: ${name} (${agentId})`, {
       type,
       isolationLevel,
-      pooled: options.pooled
+      pooled: options.pooled,
     });
 
     return agent;
@@ -663,7 +671,9 @@ export class SubAgentIsolationSystem extends EventEmitter {
   /**
    * Get or create an agent from pool
    */
-  getPooledAgent(type: 'analysis' | 'generation' | 'review' | 'execution' | 'planning'): IsolatedAgent {
+  getPooledAgent(
+    type: 'analysis' | 'generation' | 'review' | 'execution' | 'planning'
+  ): IsolatedAgent {
     const pool = this.agentPool.get(type);
     if (pool && pool.length > 0) {
       const agent = pool.find(a => a.isHealthy() && a.getMetrics().requests < 100);
@@ -690,7 +700,7 @@ export class SubAgentIsolationSystem extends EventEmitter {
     } = {}
   ): Promise<IsolatedTaskResult> {
     const agent = this.getPooledAgent(taskType);
-    
+
     const request: IsolatedTaskRequest = {
       id: createHash('md5').update(`${taskType}-${Date.now()}-${Math.random()}`).digest('hex'),
       agentId: agent.getContext().id,
@@ -699,7 +709,7 @@ export class SubAgentIsolationSystem extends EventEmitter {
       priority: options.priority || 'medium',
       timeout: options.timeout || 30000,
       requiresIsolation: options.isolationLevel !== IsolationLevel.NONE,
-      permissions: options.permissions
+      permissions: options.permissions,
     };
 
     return agent.executeTask(request);
@@ -717,17 +727,17 @@ export class SubAgentIsolationSystem extends EventEmitter {
    */
   listAgents(): Array<{ id: string; name: string; metrics: any }> {
     const result: Array<{ id: string; name: string; metrics: any }> = [];
-    
+
     // Active agents
     for (const [id, agent] of this.agents.entries()) {
       const context = agent.getContext();
       result.push({
         id,
         name: context.name,
-        metrics: agent.getMetrics()
+        metrics: agent.getMetrics(),
       });
     }
-    
+
     // Pooled agents
     for (const [type, pool] of this.agentPool.entries()) {
       for (const agent of pool) {
@@ -735,11 +745,11 @@ export class SubAgentIsolationSystem extends EventEmitter {
         result.push({
           id: context.id,
           name: `${context.name} (pooled-${type})`,
-          metrics: agent.getMetrics()
+          metrics: agent.getMetrics(),
         });
       }
     }
-    
+
     return result;
   }
 
@@ -790,7 +800,7 @@ export class SubAgentIsolationSystem extends EventEmitter {
       totalRequests,
       totalErrors,
       averageExecutionTime: agentCount > 0 ? totalExecutionTime / agentCount : 0,
-      healthyAgents
+      healthyAgents,
     };
   }
 
@@ -832,7 +842,7 @@ export class SubAgentIsolationSystem extends EventEmitter {
     if (unhealthyAgents.length > 0) {
       this.emit('health-check-completed', {
         unhealthyAgents,
-        removedCount: unhealthyAgents.length
+        removedCount: unhealthyAgents.length,
       });
     }
   }
@@ -859,11 +869,11 @@ export class SubAgentIsolationSystem extends EventEmitter {
     }
 
     await Promise.allSettled(destroyPromises);
-    
+
     this.agents.clear();
     this.agentPool.clear();
     this.removeAllListeners();
-    
+
     logger.info('Sub-Agent Isolation System destroyed');
   }
 }
@@ -871,22 +881,22 @@ export class SubAgentIsolationSystem extends EventEmitter {
 // Worker thread implementation (for process isolation)
 if (!isMainThread && parentPort) {
   // const { agentId, permissions, isolationLevel } = workerData;
-  
-  parentPort.on('message', async (message) => {
+
+  parentPort.on('message', async message => {
     if (message.type === 'execute-task') {
       const startTime = performance.now();
       const startMemory = process.memoryUsage().heapUsed;
-      
+
       try {
         // Validate permissions in worker context
         // ... permission validation logic ...
-        
+
         // Execute task with isolation
         const result = await executeTaskInWorker(message.task);
-        
+
         const executionTime = performance.now() - startTime;
         const memoryUsed = process.memoryUsage().heapUsed - startMemory;
-        
+
         parentPort!.postMessage({
           type: 'task-completed',
           taskId: message.taskId,
@@ -895,10 +905,10 @@ if (!isMainThread && parentPort) {
             metrics: {
               executionTime,
               memoryUsed,
-              cpuTime: executionTime
+              cpuTime: executionTime,
             },
-            violations: []
-          }
+            violations: [],
+          },
         });
       } catch (error) {
         parentPort!.postMessage({
@@ -909,15 +919,15 @@ if (!isMainThread && parentPort) {
             metrics: {
               executionTime: performance.now() - startTime,
               memoryUsed: process.memoryUsage().heapUsed - startMemory,
-              cpuTime: 0
+              cpuTime: 0,
             },
-            violations: []
-          }
+            violations: [],
+          },
         });
       }
     }
   });
-  
+
   async function executeTaskInWorker(task: IsolatedTaskRequest): Promise<any> {
     // Isolated execution logic
     switch (task.type) {
@@ -941,7 +951,7 @@ export const subAgentIsolationSystem = {
     }
     return _subAgentIsolationSystemInstance;
   },
-  
+
   async destroyInstance(): Promise<void> {
     if (_subAgentIsolationSystemInstance) {
       await _subAgentIsolationSystemInstance.destroy();
@@ -964,5 +974,5 @@ export const subAgentIsolationSystem = {
 
   listAgents() {
     return this.getInstance().listAgents();
-  }
+  },
 };

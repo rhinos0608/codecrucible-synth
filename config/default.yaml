@@ -5,7 +5,7 @@ model:
   endpoint: "http://localhost:11434"  # Ollama default endpoint
   name: "llama3.2:latest"             # Use llama3.2 as default
   timeout: 60000                      # 60 seconds for large model
-  maxTokens: 20000                    # Increased to 20k for better context
+  maxTokens: 128000                   # Industry standard 128K context window
   temperature: 0.7
 
 voices:
@@ -72,8 +72,8 @@ performance:
     batchSize: 2
   
   contextManagement:
-    maxContextLength: 100000          # tokens
-    compressionThreshold: 80000       # tokens
+    maxContextLength: 200000          # tokens (industry standard)
+    compressionThreshold: 150000      # tokens
     retentionStrategy: "sliding"      # sliding, summary, hierarchical
 
 # E2B Code Interpreter Configuration - SECURITY CRITICAL

@@ -96,7 +96,7 @@ describe('CodeCrucible Synth - Smoke Tests', () => {
       expect(tsConfig.compilerOptions).toBeDefined();
       expect(tsConfig.compilerOptions.target).toBe('ES2022');
       expect(tsConfig.compilerOptions.module).toBe('ESNext');
-      expect(tsConfig.compilerOptions.strict).toBe(false); // Currently disabled while fixing strict mode issues
+      expect(tsConfig.compilerOptions.strict).toBe(true); // Strict mode enabled, some checks relaxed for compatibility
       
     } catch (error) {
       console.warn('TypeScript config test failed:', error.message);

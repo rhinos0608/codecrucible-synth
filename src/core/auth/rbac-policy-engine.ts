@@ -40,13 +40,13 @@ export class RBACPolicyEngine {
         id: 'guest',
         name: 'Guest User',
         description: 'Limited read-only access',
-        permissions: [permissions[1]], // read:public only
+        permissions: permissions[1] ? [permissions[1]] : [], // read:public only
       },
       {
         id: 'user',
         name: 'Regular User',
         description: 'Standard user with basic AI features',
-        permissions: [permissions[0], permissions[1], permissions[4], permissions[5]], // read own/public, analyze, generate
+        permissions: [permissions[0], permissions[1], permissions[4], permissions[5]].filter(Boolean), // read own/public, analyze, generate
       },
       {
         id: 'developer',
@@ -59,13 +59,13 @@ export class RBACPolicyEngine {
           permissions[4],
           permissions[5],
           permissions[6],
-        ],
+        ].filter(Boolean),
       },
       {
         id: 'admin',
         name: 'Administrator',
         description: 'Full system access',
-        permissions: [permissions[3]], // admin:all covers everything
+        permissions: permissions[3] ? [permissions[3]] : [], // admin:all covers everything
       },
       {
         id: 'analyst',

@@ -24,8 +24,8 @@ export class JWTAuthenticator {
 
   constructor(config: AuthConfig) {
     this.config = {
-      algorithms: ['HS256'],
-      clockTolerance: 30,
+      algorithms: config.algorithms || ['HS256'],
+      clockTolerance: config.clockTolerance || 30,
       ...config,
     };
 

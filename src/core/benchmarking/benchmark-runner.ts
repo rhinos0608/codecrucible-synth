@@ -307,24 +307,12 @@ Function signature and implementation:`;
       } else {
         // Use hybrid client
         if (this.hybridClient) {
-<<<<<<< HEAD
           const result = await Promise.race([
             this.hybridClient.generate({
               prompt: enhancedPrompt
-=======
-          const result = (await Promise.race([
-            this.hybridClient.generateCode(enhancedPrompt, [], {
-              taskType: 'algorithms',
-              complexity:
-                challenge.difficulty === 'easy'
-                  ? 'simple'
-                  : challenge.difficulty === 'medium'
-                    ? 'medium'
-                    : 'complex',
->>>>>>> 44ae8383dd29cf64d817a2f2858150305ea5525d
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs)),
-          ])) as any;
+          ]) as any;
 
           const extractedCode = this.extractCodeFromResponse(
             result.code || result.synthesis,

@@ -2,7 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false
   },
   "include": [
     "src/**/*.ts"
@@ -13,19 +16,14 @@
     "tests",
     "**/*.test.ts",
     "**/*.spec.ts",
-    // Temporarily exclude enterprise files with missing dependencies
-    "src/core/collaboration/**/*",
+    // Only exclude files with missing external dependencies
     "src/core/error-handling/enterprise-error-handler.ts", 
     "src/core/mcp/enterprise-mcp-orchestrator.ts",
     "src/infrastructure/**/*",
     "src/testing/**/*",
     "src/core/security/security-audit-logger.ts",
-    "src/core/security/secure-tool-factory.ts",
     "src/core/security/enterprise-security-framework.ts",
-    "src/core/tools/**/*",
-    "src/core/performance/**/*",
-    "src/core/benchmarking/**/*",
-    "src/core/memory/**/*",
+    "src/core/performance/performance-benchmark.ts",
     "src/mcp-servers/git-mcp-server.ts"
   ]
 }

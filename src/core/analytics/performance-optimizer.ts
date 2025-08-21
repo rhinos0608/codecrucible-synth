@@ -527,6 +527,15 @@ export class PerformanceOptimizer {
     const recommended = models[0];
     const alternatives = models.slice(1, 3);
 
+    if (!recommended) {
+      return {
+        recommendedModel: 'default',
+        alternativeModels: [],
+        reasoning: `No performance data available for ${taskType}`,
+        confidence: 0,
+      };
+    }
+
     return {
       recommendedModel: recommended[0],
       alternativeModels: alternatives.map((m: any) => m[0]),

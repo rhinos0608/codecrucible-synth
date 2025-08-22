@@ -132,6 +132,50 @@ export class CLIParser {
             }
             break;
 
+          // Sequential Review options
+          case 'writer-provider':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.writerProvider = nextArg as 'ollama' | 'lm-studio';
+              i++;
+            }
+            break;
+          case 'auditor-provider':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.auditorProvider = nextArg as 'ollama' | 'lm-studio';
+              i++;
+            }
+            break;
+          case 'writer-temp':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.writerTemp = parseFloat(nextArg);
+              i++;
+            }
+            break;
+          case 'auditor-temp':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.auditorTemp = parseFloat(nextArg);
+              i++;
+            }
+            break;
+          case 'writer-tokens':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.writerTokens = parseInt(nextArg, 10);
+              i++;
+            }
+            break;
+          case 'auditor-tokens':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.auditorTokens = parseInt(nextArg, 10);
+              i++;
+            }
+            break;
+          case 'confidence-threshold':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.confidenceThreshold = parseFloat(nextArg);
+              i++;
+            }
+            break;
+
           // Boolean flags
           case 'interactive':
             options.interactive = true;
@@ -198,6 +242,23 @@ export class CLIParser {
             break;
           case 'stream-generation':
             options.streamGeneration = true;
+            break;
+          
+          // Sequential Review boolean flags
+          case 'sequential-review':
+            options.sequentialReview = true;
+            break;
+          case 'auto-audit':
+            options.autoAudit = true;
+            break;
+          case 'apply-fixes':
+            options.applyFixes = true;
+            break;
+          case 'save-result':
+            options.saveResult = true;
+            break;
+          case 'show-code':
+            options.showCode = true;
             break;
           case 'status':
             options.status = true;

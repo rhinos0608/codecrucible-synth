@@ -629,7 +629,7 @@ export class SubAgentIsolationSystem extends EventEmitter {
       throw new Error(`Maximum number of agents (${this.maxAgents}) reached`);
     }
 
-    const agentId = createHash('md5').update(`${name}-${type}-${Date.now()}`).digest('hex');
+    const agentId = createHash('sha256').update(`${name}-${type}-${Date.now()}`).digest('hex');
     const permissions = { ...this.defaultPermissions, ...options.permissions };
     const isolationLevel = options.isolationLevel || IsolationLevel.MEMORY;
 
@@ -702,7 +702,7 @@ export class SubAgentIsolationSystem extends EventEmitter {
     const agent = this.getPooledAgent(taskType);
 
     const request: IsolatedTaskRequest = {
-      id: createHash('md5').update(`${taskType}-${Date.now()}-${Math.random()}`).digest('hex'),
+      id: createHash('sha256').update(`${taskType}-${Date.now()}-${Math.random()}`).digest('hex'),
       agentId: agent.getContext().id,
       type: taskType,
       payload,

@@ -3,7 +3,7 @@ import { MCPServer } from '../core/mcp-server-manager.js';
 // Simple base class for MCP servers to maintain compatibility
 class BaseMCPServer {
   protected tools: Record<string, Function> = {};
-  
+
   constructor(
     public id: string,
     public description: string

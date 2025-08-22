@@ -941,19 +941,20 @@ abstract class BaseAgent implements Agent {
     }
 
     switch (method) {
-      case 'best':
+      case 'best': {
         // Return the response with highest confidence
         const bestResponse = responses.reduce((best, current) =>
           current.confidence > best.confidence ? current : best
         );
         return bestResponse.content;
+      }
 
       case 'merge':
         // Merge all responses with separators
         return responses.map(r => `**${r.agentId}**: ${r.content}`).join('\n\n---\n\n');
 
       case 'consensus':
-      default:
+      default: {
         // Simple consensus: use majority approach or highest confidence
         if (responses.length === 1) {
           return responses[0]?.content || '';
@@ -969,6 +970,7 @@ abstract class BaseAgent implements Agent {
         return responses.reduce((best, current) =>
           current.confidence > best.confidence ? current : best
         ).content;
+      }
     }
   }
 

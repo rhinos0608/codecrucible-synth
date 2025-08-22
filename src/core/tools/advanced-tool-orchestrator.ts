@@ -57,6 +57,7 @@ export interface ToolContext {
   previousResults: ToolResult[];
   constraints: ToolConstraints;
   security: SecurityContext;
+  systemPrompt?: string; // Enhanced: System prompt for better tool decision making
 }
 
 export interface ToolConstraints {
@@ -248,19 +249,23 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   /**
    * Process a prompt using appropriate tools
    */
-  async processWithTools(prompt: string): Promise<string> {
+  async processWithTools(prompt: string, systemPrompt?: string, runtimeContext?: any): Promise<string> {
     try {
       this.logger.info('Processing prompt with tools:', prompt.slice(0, 100) + '...');
       
-      // Create basic context
+      // Create enhanced context with system prompt and runtime information
       const context: ToolContext = {
         sessionId: Date.now().toString(),
         userId: 'cli-user',
         environment: {
           mode: 'development',
-          workingDirectory: process.cwd(),
+          workingDirectory: runtimeContext?.workingDirectory || process.cwd(),
           timestamp: new Date().toISOString(),
-          permissions: ['read', 'write', 'execute']
+          permissions: ['read', 'write', 'execute'],
+          platform: runtimeContext?.platform || process.platform,
+          isGitRepo: runtimeContext?.isGitRepo || false,
+          currentBranch: runtimeContext?.currentBranch || 'main',
+          modelId: runtimeContext?.modelId || 'unknown'
         },
         previousResults: [],
         constraints: {
@@ -275,15 +280,22 @@ export class AdvancedToolOrchestrator extends EventEmitter {
           restrictions: ['no-network', 'sandboxed'],
           auditLog: true,
           encryptionRequired: false
-        }
+        },
+        systemPrompt: systemPrompt // Enhanced: Include system prompt for better tool decision making
       };
 
       // Select appropriate tools for the objective
       const toolCalls = await this.selectTools(prompt, context);
       
       if (toolCalls.length === 0) {
-        this.logger.info('No tools selected, falling back to AI model');
-        return await this.modelClient.generateText(prompt);
+        this.logger.info('No tools selected, falling back to AI model with system prompt');
+        // Enhanced: Use system prompt in fallback for consistent behavior  
+        if (systemPrompt) {
+          const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}`;
+          return await this.modelClient.generateText(fullPrompt);
+        } else {
+          return await this.modelClient.generateText(prompt);
+        }
       }
 
       // Execute the tools

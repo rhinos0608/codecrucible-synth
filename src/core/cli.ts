@@ -11,7 +11,6 @@ import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
 import { logger } from './logger.js';
 import { getErrorMessage, toError } from '../utils/error-utils.js';
-import { StreamingAgentClient } from './streaming/streaming-agent-client.js';
 import { ContextAwareCLIIntegration } from './intelligence/context-aware-cli-integration.js';
 import { AutoConfigurator } from './model-management/auto-configurator.js';
 import { InteractiveREPL } from './interactive-repl.js';
@@ -31,7 +30,14 @@ import {
 } from './security/security-audit-logger.js';
 import { DynamicModelRouter } from './dynamic-model-router.js';
 import { AdvancedToolOrchestrator } from './tools/advanced-tool-orchestrator.js';
-import { EnterpriseSystemPromptBuilder, RuntimeContext } from './enterprise-system-prompt-builder.js';
+import {
+  EnterpriseSystemPromptBuilder,
+  RuntimeContext,
+} from './enterprise-system-prompt-builder.js';
+import {
+  SequentialDualAgentSystem,
+  SequentialAgentConfig,
+} from './collaboration/sequential-dual-agent-system.js';
 
 export type { CLIContext, CLIOptions };
 
@@ -44,7 +50,6 @@ export class CLI {
   private context: CLIContext;
   private initialized = false;
   private workingDirectory = process.cwd();
-  private streamingClient: StreamingAgentClient;
   private contextAwareCLI: ContextAwareCLIIntegration;
   private autoConfigurator: AutoConfigurator;
   private repl?: InteractiveREPL;
@@ -91,7 +96,6 @@ export class CLI {
     this.toolOrchestrator = new AdvancedToolOrchestrator(modelClient);
 
     // Initialize subsystems with simplified constructors
-    this.streamingClient = new StreamingAgentClient(modelClient);
     this.contextAwareCLI = new ContextAwareCLIIntegration();
     this.autoConfigurator = new AutoConfigurator();
     // Defer InteractiveREPL creation until actually needed to avoid race conditions with piped input
@@ -106,25 +110,27 @@ export class CLI {
   private async buildRuntimeContext(): Promise<RuntimeContext> {
     let isGitRepo = false;
     let currentBranch = 'unknown';
-    
+
     try {
       const { execSync } = await import('child_process');
       execSync('git status', { cwd: this.workingDirectory, stdio: 'ignore' });
       isGitRepo = true;
-      currentBranch = execSync('git branch --show-current', { 
-        cwd: this.workingDirectory 
-      }).toString().trim();
+      currentBranch = execSync('git branch --show-current', {
+        cwd: this.workingDirectory,
+      })
+        .toString()
+        .trim();
     } catch {
       // Not a git repo or git not available
     }
-    
+
     return {
       workingDirectory: this.workingDirectory,
       isGitRepo,
       platform: process.platform,
       currentBranch,
-      modelId: 'CodeCrucible Synth v4.0.4',
-      knowledgeCutoff: 'January 2025'
+      modelId: 'CodeCrucible Synth v4.0.5',
+      knowledgeCutoff: 'January 2025',
     };
   }
 
@@ -136,7 +142,7 @@ export class CLI {
       const context = await this.buildRuntimeContext();
       return EnterpriseSystemPromptBuilder.buildSystemPrompt(context, {
         conciseness: 'ultra',
-        securityLevel: 'enterprise'
+        securityLevel: 'enterprise',
       });
     } catch (error) {
       console.warn('⚠️ Failed to build system prompt, using fallback:', getErrorMessage(error));
@@ -222,12 +228,6 @@ export class CLI {
     try {
       // Only perform synchronous cleanup operations here
       if (
-        this.streamingClient &&
-        typeof (this.streamingClient as any).removeAllListeners === 'function'
-      ) {
-        (this.streamingClient as any).removeAllListeners();
-      }
-      if (
         this.contextAwareCLI &&
         typeof (this.contextAwareCLI as any).removeAllListeners === 'function'
       ) {
@@ -298,6 +298,13 @@ export class CLI {
       args,
       commandLength: command.length,
     });
+
+    // Handle sequential review
+    if (options.sequentialReview) {
+      const promptText = args.join(' ') || command || 'Generate code';
+      await this.handleSequentialReview(promptText, options);
+      return;
+    }
 
     // Audit log command execution for enterprise security compliance
     if (this.initialized && this.auditLogger) {
@@ -537,15 +544,20 @@ export class CLI {
   async executePromptProcessing(prompt: string, options: CLIOptions): Promise<string> {
     try {
       console.log('DEBUG: Starting executePromptProcessing');
-      
+
       // Step 1: Check if this prompt should use autonomous tool execution
       if (this.toolOrchestrator.shouldUseTools(prompt)) {
         console.log(chalk.cyan('🔧 Using autonomous tool orchestration...'));
         try {
-          // Note: Tool orchestrator needs system prompt integration
-          // For now, adding TODO to modify processWithTools to accept system prompt
-          const toolResponse = await this.toolOrchestrator.processWithTools(prompt);
-          console.log('✅ Tool orchestration completed');
+          // Enhanced: Pass system prompt and runtime context for full integration
+          const systemPrompt = await this.buildSystemPrompt();
+          const runtimeContext = await this.buildRuntimeContext();
+          const toolResponse = await this.toolOrchestrator.processWithTools(
+            prompt,
+            systemPrompt,
+            runtimeContext
+          );
+          console.log('✅ Tool orchestration completed with full context integration');
           return toolResponse;
         } catch (error) {
           console.error(chalk.red('❌ Tool orchestration failed:'), error);
@@ -580,7 +592,9 @@ export class CLI {
         const systemPrompt = await this.buildSystemPrompt();
         const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}`;
         console.log('🔧 DEBUG: System prompt injected, calling model...');
-        const response = await this.context.modelClient.generateText(fullPrompt, { timeout: 30000 });
+        const response = await this.context.modelClient.generateText(fullPrompt, {
+          timeout: 30000,
+        });
         console.log('✅ Model response received');
         return response;
       } catch (error) {
@@ -1701,9 +1715,6 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    */
   async destroy(): Promise<void> {
     try {
-      if (this.streamingClient) {
-        await (this.streamingClient as any).destroy?.();
-      }
       if (this.contextAwareCLI) {
         await (this.contextAwareCLI as any).destroy?.();
       }
@@ -1994,6 +2005,96 @@ ${chalk.bold.cyan('Current Mode:')} ${this.dynamicModelRouter.getCurrentRole()}
 
     console.log(help);
     return help;
+  }
+
+  /**
+   * Handle Sequential Dual Agent Review
+   */
+  private async handleSequentialReview(prompt: string, options: CLIOptions): Promise<void> {
+    try {
+      console.log(chalk.blue('\n🔄 Initializing Sequential Dual-Agent Review System'));
+
+      // Build configuration from CLI options
+      const config: SequentialAgentConfig = {
+        writer: {
+          provider: options.writerProvider || 'lm-studio',
+          temperature: options.writerTemp || 0.7,
+          maxTokens: options.writerTokens || 4096,
+        },
+        auditor: {
+          provider: options.auditorProvider || 'ollama',
+          temperature: options.auditorTemp || 0.2,
+          maxTokens: options.auditorTokens || 2048,
+        },
+        workflow: {
+          autoAudit: options.autoAudit !== false, // Default true
+          applyFixes: options.applyFixes || false,
+          maxIterations: 3,
+          confidenceThreshold: options.confidenceThreshold || 0.8,
+        },
+      };
+
+      // Initialize sequential system
+      const sequentialSystem = new SequentialDualAgentSystem(config);
+
+      // Get runtime context for better integration
+      const runtimeContext = await this.buildRuntimeContext();
+
+      console.log(
+        chalk.cyan(`📝 Writer: ${config.writer.provider} (temp: ${config.writer.temperature})`)
+      );
+      console.log(
+        chalk.cyan(`🔍 Auditor: ${config.auditor.provider} (temp: ${config.auditor.temperature})`)
+      );
+      console.log(chalk.cyan(`🎯 Confidence Threshold: ${config.workflow.confidenceThreshold}`));
+
+      // Execute sequential review
+      const spinner = ora('Executing sequential review...').start();
+      const result = await sequentialSystem.executeSequentialReview(prompt, runtimeContext);
+      spinner.stop();
+
+      // Display results
+      console.log(chalk.green('\n✅ Sequential Review Completed!\n'));
+      console.log(chalk.bold('📝 Generated Code:'));
+      if (options.showCode !== false) {
+        console.log(chalk.gray('─'.repeat(60)));
+        console.log(result.writerOutput.code);
+        console.log(chalk.gray('─'.repeat(60)));
+      }
+
+      console.log(chalk.bold('\n🔍 Audit Results:'));
+      console.log(chalk.cyan(`Overall Score: ${result.auditorOutput.review.overallScore}/100`));
+      console.log(
+        chalk.cyan(`Status: ${result.auditorOutput.review.passed ? 'PASSED' : 'FAILED'}`)
+      );
+      console.log(
+        chalk.cyan(`Recommendation: ${result.auditorOutput.review.recommendation.toUpperCase()}`)
+      );
+
+      if (result.auditorOutput.review.issues && result.auditorOutput.review.issues.length > 0) {
+        console.log(chalk.yellow('\n⚠️ Issues Found:'));
+        result.auditorOutput.review.issues.forEach((issue, index) => {
+          console.log(chalk.yellow(`${index + 1}. [${issue.severity}] ${issue.description}`));
+        });
+      }
+
+      // Save result if requested
+      if (options.saveResult) {
+        const filename = `sequential-review-${Date.now()}.json`;
+        await writeFile(filename, JSON.stringify(result, null, 2));
+        console.log(chalk.green(`\n💾 Results saved to ${filename}`));
+      }
+
+      console.log(chalk.blue(`\n⏱️ Total Duration: ${result.totalDuration}ms`));
+      console.log(
+        chalk.blue(
+          `📊 Writer: ${result.writerOutput.duration}ms | Auditor: ${result.auditorOutput.duration}ms`
+        )
+      );
+    } catch (error) {
+      console.error(chalk.red('❌ Sequential review failed:'), error);
+      throw error;
+    }
   }
 }
 

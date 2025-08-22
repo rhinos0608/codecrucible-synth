@@ -28,12 +28,70 @@ import { ActiveProcessManager, ActiveProcess } from './performance/active-proces
 import { unifiedCache } from './cache/unified-cache-system.js';
 import { HybridLLMRouter, HybridConfig } from './hybrid/hybrid-llm-router.js';
 import { intelligentBatchProcessor } from './performance/intelligent-batch-processor.js';
-import { enhancedStreamingClient, StreamToken } from './streaming/enhanced-streaming-client.js';
 import { getErrorMessage, isError, toError } from '../utils/error-utils.js';
 import { createHash } from 'crypto';
 
+// Streaming interfaces (consolidated from enhanced-streaming-client.ts)
+export interface StreamToken {
+  content: string;
+  timestamp: number;
+  index: number;
+  finished?: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface StreamConfig {
+  chunkSize?: number;
+  bufferSize?: number;
+  enableBackpressure?: boolean;
+  timeout?: number;
+  encoding?: BufferEncoding;
+}
+
+export interface StreamMetrics {
+  tokensStreamed: number;
+  streamDuration: number;
+  averageLatency: number;
+  throughput: number;
+  backpressureEvents: number;
+}
+
 export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
 export type ExecutionMode = 'fast' | 'auto' | 'quality';
+
+/**
+ * Helper function to create default UnifiedClientConfig with streaming
+ */
+export function createDefaultUnifiedClientConfig(
+  overrides: Partial<UnifiedClientConfig> = {}
+): UnifiedClientConfig {
+  return {
+    providers: [
+      { type: 'ollama', endpoint: 'http://localhost:11434' },
+      { type: 'lm-studio', endpoint: 'http://localhost:1234' },
+    ],
+    executionMode: 'auto',
+    fallbackChain: ['ollama', 'lm-studio', 'huggingface'],
+    performanceThresholds: {
+      fastModeMaxTokens: 1000,
+      timeoutMs: 180000,
+      maxConcurrentRequests: 3,
+    },
+    security: {
+      enableSandbox: true,
+      maxInputLength: 50000,
+      allowedCommands: ['npm', 'node', 'git'],
+    },
+    streaming: {
+      chunkSize: 50,
+      bufferSize: 1024,
+      enableBackpressure: true,
+      timeout: 30000,
+      encoding: 'utf8',
+    },
+    ...overrides,
+  };
+}
 
 export interface ProviderConfig {
   type: ProviderType;
@@ -58,6 +116,7 @@ export interface UnifiedClientConfig extends BaseUnifiedClientConfig {
     maxInputLength: number;
     allowedCommands: string[];
   };
+  streaming?: StreamConfig;
 }
 
 export interface RequestMetrics {
@@ -97,6 +156,10 @@ export class UnifiedModelClient extends EventEmitter {
   private processManager: ActiveProcessManager;
   private currentModel: string | null = null;
   private readonly HEALTH_CACHE_TTL = 30000; // 30 seconds
+
+  // Streaming management (consolidated from enhanced-streaming-client.ts)
+  private streamingSessions: Map<string, any> = new Map();
+  private streamMetrics: Map<string, StreamMetrics> = new Map();
 
   // Integrated system for advanced features
   private integratedSystem: IntegratedCodeCrucibleSystem | null = null;
@@ -270,6 +333,13 @@ export class UnifiedModelClient extends EventEmitter {
         enableSandbox: true,
         maxInputLength: 50000,
         allowedCommands: ['npm', 'node', 'git'],
+      },
+      streaming: {
+        chunkSize: 50,
+        bufferSize: 1024,
+        enableBackpressure: true,
+        timeout: 30000,
+        encoding: 'utf8',
       },
     };
   }
@@ -639,11 +709,11 @@ export class UnifiedModelClient extends EventEmitter {
       request.prompt = validation.sanitizedInput;
     }
 
-    // Check semantic cache first  
-    const promptKey = `ai:prompt:${createHash('md5').update(request.prompt).digest('hex')}`;
+    // Check semantic cache first
+    const promptKey = `ai:prompt:${createHash('sha256').update(request.prompt).digest('hex')}`;
     const cachedResponse = await this.cache.get(promptKey, {
       prompt: request.prompt,
-      context: context?.files?.map(f => f.path) || []
+      context: context?.files?.map(f => f.path) || [],
     });
 
     if (cachedResponse?.hit) {
@@ -652,20 +722,16 @@ export class UnifiedModelClient extends EventEmitter {
         similarity: cachedResponse.similarity,
       });
 
-      // Stream cached response progressively
-      await enhancedStreamingClient.streamResponse(
-        request.prompt,
-        onToken,
-        async function* (prompt: string) {
-          const content = cachedResponse.value;
-          const chunks = content.match(/.{1,50}/g) || [content]; // 50 char chunks
+      // Stream cached response progressively (consolidated streaming logic)
+      await this.streamResponseInternal(request.prompt, onToken, async function* (prompt: string) {
+        const content = cachedResponse.value;
+        const chunks = content.match(/.{1,50}/g) || [content]; // 50 char chunks
 
-          for (const chunk of chunks) {
-            await new Promise(resolve => setTimeout(resolve, 20)); // 20ms delay per chunk
-            yield chunk;
-          }
+        for (const chunk of chunks) {
+          await new Promise(resolve => setTimeout(resolve, 20)); // 20ms delay per chunk
+          yield chunk;
         }
-      );
+      });
 
       return {
         content: cachedResponse.value,
@@ -708,8 +774,8 @@ export class UnifiedModelClient extends EventEmitter {
         }
       };
 
-      // Stream the response
-      await enhancedStreamingClient.streamResponse(
+      // Stream the response (consolidated streaming logic)
+      await this.streamResponseInternal(
         request.prompt,
         (token: StreamToken) => {
           fullResponse += token.content;
@@ -997,15 +1063,15 @@ export class UnifiedModelClient extends EventEmitter {
         logger.info(`✅ Request ${requestId} completed successfully with ${providerType}`);
 
         // PERFORMANCE: Cache successful response
-        const responseKey = `ai:response:${createHash('md5').update(request.prompt).digest('hex')}`;
+        const responseKey = `ai:response:${createHash('sha256').update(request.prompt).digest('hex')}`;
         await this.cache.set(responseKey, response.content || response.text || '', {
           ttl: 3600,
-          metadata: { 
+          metadata: {
             prompt: request.prompt,
             context: context?.files?.map(f => f.path) || [],
-            model: providerType, 
-            processingTime: metrics.endTime! - metrics.startTime 
-          }
+            model: providerType,
+            processingTime: metrics.endTime! - metrics.startTime,
+          },
         });
 
         return response;
@@ -1149,13 +1215,13 @@ export class UnifiedModelClient extends EventEmitter {
       const intelligentTTL = ttl || this.getIntelligentTTL(request);
 
       // Store with metadata in unified cache system
-      this.cache.set(key, value, { 
+      this.cache.set(key, value, {
         ttl: intelligentTTL,
         metadata: {
           cachedAt: Date.now(),
           requestType: this.classifyRequestType(request),
           hitCount: 0,
-        }
+        },
       });
       this.cacheStats.sets++;
 
@@ -1369,6 +1435,101 @@ export class UnifiedModelClient extends EventEmitter {
     this.healthCheckCache.clear();
 
     logger.info('✅ UnifiedModelClient shutdown complete with memory cleanup');
+  }
+
+  /**
+   * Internal streaming method (consolidated from enhanced-streaming-client.ts)
+   */
+  private async streamResponseInternal(
+    prompt: string,
+    onToken: (token: StreamToken) => void,
+    generateFn: (prompt: string) => AsyncGenerator<string>
+  ): Promise<void> {
+    const streamId = this.generateStreamId();
+
+    try {
+      this.emit('stream-start', streamId);
+
+      let tokenIndex = 0;
+      const startTime = Date.now();
+
+      // Initialize metrics for this stream
+      this.streamMetrics.set(streamId, {
+        tokensStreamed: 0,
+        streamDuration: 0,
+        averageLatency: 0,
+        throughput: 0,
+        backpressureEvents: 0,
+      });
+
+      // Stream tokens progressively
+      for await (const chunk of generateFn(prompt)) {
+        const token: StreamToken = {
+          content: chunk,
+          timestamp: Date.now(),
+          index: tokenIndex++,
+          finished: false,
+        };
+
+        // Call token handler
+        onToken(token);
+
+        // Emit token event
+        this.emit('token', token);
+
+        // Update metrics
+        this.updateStreamMetrics(streamId, token);
+
+        // Basic backpressure handling (simplified from enhanced-streaming-client)
+        if (this.config.streaming?.enableBackpressure && tokenIndex % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1)); // Small delay for backpressure
+        }
+      }
+
+      // Send final token
+      const finalToken: StreamToken = {
+        content: '',
+        timestamp: Date.now(),
+        index: tokenIndex,
+        finished: true,
+        metadata: {
+          totalTokens: tokenIndex,
+          duration: Date.now() - startTime,
+        },
+      };
+
+      onToken(finalToken);
+      this.emit('stream-end', streamId, finalToken);
+    } catch (error) {
+      logger.error(`Streaming error for ${streamId}:`, error);
+      this.emit('stream-error', streamId, error);
+      throw error;
+    } finally {
+      // Cleanup
+      this.streamingSessions.delete(streamId);
+      // Keep metrics for a short time for debugging
+      setTimeout(() => this.streamMetrics.delete(streamId), 60000);
+    }
+  }
+
+  /**
+   * Generate unique stream ID
+   */
+  private generateStreamId(): string {
+    return `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Update streaming metrics
+   */
+  private updateStreamMetrics(streamId: string, token: StreamToken): void {
+    const metrics = this.streamMetrics.get(streamId);
+    if (metrics) {
+      metrics.tokensStreamed++;
+      metrics.streamDuration = Date.now() - (token.timestamp - token.index * 50); // Approximate
+      metrics.averageLatency = metrics.streamDuration / metrics.tokensStreamed;
+      metrics.throughput = metrics.tokensStreamed / (metrics.streamDuration / 1000);
+    }
   }
 
   // Legacy compatibility methods

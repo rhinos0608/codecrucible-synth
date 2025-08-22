@@ -6,7 +6,6 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { SynthesisResult, ExecutionRequest } from '../types.js';
-import { StreamingAgentClient } from '../streaming/streaming-agent-client.js';
 
 export class CLIDisplay {
   /**
@@ -33,56 +32,8 @@ export class CLIDisplay {
     }
   }
 
-  /**
-   * Display streaming responses in real-time
-   */
-  static async displayStreamingResponse(
-    request: ExecutionRequest,
-    streamingClient: StreamingAgentClient
-  ): Promise<void> {
-    let buffer = '';
-    let lastUpdate = Date.now();
-    const spinner = ora('🤖 Generating response...').start();
-
-    try {
-      for await (const chunk of streamingClient.executeStreaming(request)) {
-        const now = Date.now();
-
-        switch (chunk.type) {
-          case 'progress':
-            spinner.text = `🤖 ${chunk.chunk} (${Math.round(chunk.metadata.estimatedCompletion * 100)}%)`;
-            break;
-
-          case 'partial':
-            buffer += chunk.chunk;
-
-            // Update display every 100ms to prevent flickering
-            if (now - lastUpdate > 100) {
-              spinner.stop();
-              process.stdout.write('\r\x1b[K'); // Clear current line
-              process.stdout.write(chalk.cyan('🤖 ') + buffer + chalk.gray('▋')); // Show cursor
-              lastUpdate = now;
-            }
-            break;
-
-          case 'complete':
-            spinner.stop();
-            process.stdout.write('\r\x1b[K'); // Clear current line
-            console.log(chalk.green('\n📝 Response:'));
-            console.log(buffer);
-            break;
-
-          case 'error':
-            spinner.stop();
-            console.error(chalk.red('\n❌ Error:'), chunk.chunk);
-            break;
-        }
-      }
-    } catch (error) {
-      spinner.stop();
-      console.error(chalk.red('\n❌ Streaming Error:'), error);
-    }
-  }
+  // Note: Streaming display methods were consolidated into CLI class
+  // displayStreamingResponse method removed as it was unused
 
   /**
    * Show CLI help information

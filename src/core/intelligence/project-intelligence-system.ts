@@ -7,6 +7,7 @@ import { EventEmitter } from 'events';
 import { readdir, readFile, stat, access } from 'fs/promises';
 import { join, relative, extname, dirname, basename } from 'path';
 import { Logger } from '../logger.js';
+import { unifiedCache } from '../cache/unified-cache-system.js';
 import { ProjectContext } from '../types.js';
 
 export interface ProjectIntelligence {
@@ -405,7 +406,6 @@ export interface ProjectStats {
 
 export class ProjectIntelligenceSystem extends EventEmitter {
   private logger: Logger;
-  private cache: Map<string, ProjectIntelligence> = new Map();
   private analysisInProgress: Set<string> = new Set();
 
   constructor() {
@@ -428,10 +428,13 @@ export class ProjectIntelligenceSystem extends EventEmitter {
     }
 
     // Check cache first
-    if (!options.force && this.cache.has(normalizedPath)) {
-      const cached = this.cache.get(normalizedPath)!;
-      this.logger.info(`Using cached analysis for ${normalizedPath}`);
-      return cached;
+    const cacheKey = `project-intel:${normalizedPath}`;
+    if (!options.force) {
+      const cacheResult = await unifiedCache.get<ProjectIntelligence>(cacheKey);
+      if (cacheResult?.hit) {
+        this.logger.info(`Using cached analysis for ${normalizedPath}`);
+        return cacheResult.value;
+      }
     }
 
     this.analysisInProgress.add(normalizedPath);
@@ -479,8 +482,12 @@ export class ProjectIntelligenceSystem extends EventEmitter {
         recommendations,
       };
 
-      // Cache the results
-      this.cache.set(normalizedPath, intelligence);
+      // Cache the results with 1 hour TTL and project intelligence tags
+      await unifiedCache.set(cacheKey, intelligence, { 
+        ttl: 3600000, // 1 hour
+        tags: ['project-intelligence', 'analysis'],
+        metadata: { path: normalizedPath, analysisTime: Date.now() - startTime }
+      });
 
       const analysisTime = Date.now() - startTime;
       this.logger.info(`Project analysis completed in ${analysisTime}ms`);
@@ -1191,27 +1198,31 @@ export class ProjectIntelligenceSystem extends EventEmitter {
   /**
    * Get cached analysis if available
    */
-  getCachedAnalysis(path: string): ProjectIntelligence | null {
-    return this.cache.get(join(path)) || null;
+  async getCachedAnalysis(path: string): Promise<ProjectIntelligence | null> {
+    const cacheKey = `project-intel:${join(path)}`;
+    const cacheResult = await unifiedCache.get<ProjectIntelligence>(cacheKey);
+    return cacheResult?.value || null;
   }
 
   /**
    * Clear analysis cache
    */
-  clearCache(path?: string): void {
+  async clearCache(path?: string): Promise<void> {
     if (path) {
-      this.cache.delete(join(path));
+      const cacheKey = `project-intel:${join(path)}`;
+      await unifiedCache.delete(cacheKey);
     } else {
-      this.cache.clear();
+      await unifiedCache.clearByTags(['project-intelligence']);
     }
   }
 
   /**
    * Get system metrics
    */
-  getSystemMetrics(): any {
+  async getSystemMetrics(): Promise<any> {
+    const cacheStats = await unifiedCache.getStats();
     return {
-      cachedAnalyses: this.cache.size,
+      cachedAnalyses: cacheStats.size || 0,
       activeAnalyses: this.analysisInProgress.size,
       memoryUsage: process.memoryUsage(),
     };

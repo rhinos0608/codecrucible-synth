@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { homedir } from 'os';
 import { logger } from '../logger.js';
 import { SynthesisResult } from '../types.js';
 
@@ -79,7 +80,7 @@ export class ProjectMemorySystem {
 
   constructor(workspaceRoot: string) {
     this.contextPath = path.join(workspaceRoot, '.codecrucible');
-    this.globalContextPath = path.join(require('os').homedir(), '.codecrucible');
+    this.globalContextPath = path.join(homedir(), '.codecrucible');
     this.cache = new Map();
     this.watchedPaths = new Set();
 

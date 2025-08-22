@@ -6,8 +6,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { UnifiedModelClient } from './client.js';
-import { configManager, AgentConfig } from './config.js';
+import { UnifiedModelClient, createDefaultUnifiedClientConfig } from './client.js';
+import { configManager, AgentConfig } from '../config/config-manager.js';
 export type { AgentConfig };
 import { PerformanceMonitor } from '../utils/performance.js';
 import {
@@ -1142,13 +1142,10 @@ export const clearManagedInterval = (id: NodeJS.Timeout) => {
 export const initializeEditConfirmation = (_path: string, _options?: unknown) =>
   globalEditConfirmation;
 export const createUnifiedModelClient = (config: Record<string, unknown>) => {
-  // Create a basic config structure for compatibility
-  const unifiedConfig = {
+  // Use the helper function to create a complete config with streaming
+  const unifiedConfig = createDefaultUnifiedClientConfig({
     providers: [],
-    executionMode: 'auto' as const,
-    fallbackChain: ['ollama', 'lm-studio'] as Array<
-      'ollama' | 'lm-studio' | 'huggingface' | 'auto'
-    >,
+    fallbackChain: ['ollama', 'lm-studio', 'huggingface', 'auto'],
     performanceThresholds: {
       fastModeMaxTokens: 1000,
       timeoutMs: 30000,
@@ -1160,7 +1157,7 @@ export const createUnifiedModelClient = (config: Record<string, unknown>) => {
       allowedCommands: [],
     },
     ...config,
-  };
+  });
   return new UnifiedModelClient(unifiedConfig);
 };
 

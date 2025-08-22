@@ -68,6 +68,20 @@ export interface CLIOptions {
   writerModel?: string;
   auditorModel?: string;
 
+  // Sequential Dual Agent System options
+  sequentialReview?: boolean;
+  writerProvider?: 'ollama' | 'lm-studio';
+  auditorProvider?: 'ollama' | 'lm-studio';
+  writerTemp?: number;
+  auditorTemp?: number;
+  writerTokens?: number;
+  auditorTokens?: number;
+  autoAudit?: boolean;
+  applyFixes?: boolean;
+  confidenceThreshold?: number;
+  saveResult?: boolean;
+  showCode?: boolean;
+
   // VRAM management options
   status?: boolean;
   optimize?: boolean;

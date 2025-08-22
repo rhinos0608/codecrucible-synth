@@ -334,7 +334,7 @@ export class UnifiedCacheSystem extends EventEmitter {
    * TODO: Replace with actual embedding service (OpenAI, HuggingFace, etc.)
    */
   private async getEmbedding(text: string): Promise<number[]> {
-    const hash = createHash('md5').update(text).digest('hex');
+    const hash = createHash('sha256').update(text).digest('hex');
     
     if (this.embeddingCache.has(hash)) {
       return this.embeddingCache.get(hash)!;
@@ -423,6 +423,30 @@ export class UnifiedCacheSystem extends EventEmitter {
         adapters: this.legacyAdapters.size
       }
     };
+  }
+
+  /**
+   * Delete a specific cache entry
+   */
+  async delete(key: string): Promise<boolean> {
+    const result = await this.cacheManager.delete(key);
+    // Also remove from vector index if present
+    this.vectorIndex.delete(key);
+    this.embeddingCache.delete(key);
+    return result;
+  }
+
+  /**
+   * Clear cache entries by tags
+   */
+  async clearByTags(tags: string[]): Promise<void> {
+    // Since cache-manager doesn't have tag-based clearing, we'll implement basic clearing
+    // This is a simplified implementation - in production would need proper tag tracking
+    await this.cacheManager.clear();
+    this.vectorIndex.clear();
+    this.embeddingCache.clear();
+    logger.info(`Cleared cache entries with tags: ${tags.join(', ')}`);
+    this.emit('cache-cleared-by-tags', tags);
   }
 
   /**

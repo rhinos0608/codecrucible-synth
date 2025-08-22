@@ -16,6 +16,16 @@ export interface LLMProviderConfig {
   enabled: boolean;
 }
 
+// Consolidated from core/config.ts - Agent configuration
+export interface AgentConfig {
+  enabled: boolean;
+  mode: 'fast' | 'balanced' | 'thorough' | 'auto';
+  maxConcurrency: number;
+  enableCaching: boolean;
+  enableMetrics: boolean;
+  enableSecurity: boolean;
+}
+
 export interface AppConfig {
   model: {
     endpoint: string;
@@ -28,6 +38,7 @@ export interface AppConfig {
     default: string;
     providers: Record<string, LLMProviderConfig>;
   };
+  agent: AgentConfig;
   voices: {
     default: string[];
     available: string[];
@@ -274,6 +285,14 @@ export class ConfigManager {
           },
         },
       },
+      agent: {
+        enabled: true,
+        mode: 'balanced',
+        maxConcurrency: 3,
+        enableCaching: true,
+        enableMetrics: true,
+        enableSecurity: true,
+      },
       voices: {
         default: ['explorer', 'maintainer'],
         available: [
@@ -441,4 +460,42 @@ export class ConfigManager {
     }, obj);
     target[lastKey] = value;
   }
+
+  /**
+   * Get agent configuration (consolidated from core/config.ts)
+   */
+  async getAgentConfig(): Promise<AgentConfig> {
+    const config = await this.loadConfiguration();
+    return config.agent;
+  }
+
+  /**
+   * Update agent configuration (consolidated from core/config.ts)
+   */
+  async updateAgentConfig(newConfig: AgentConfig): Promise<void> {
+    const config = await this.loadConfiguration();
+    config.agent = newConfig;
+    await this.saveUserConfig();
+  }
 }
+
+// Export singleton instance (consolidated from core/config.ts)
+// Note: Since getInstance is async, this needs to be awaited where used
+let configManagerInstance: ConfigManager | null = null;
+
+export const configManager = {
+  async getInstance(): Promise<ConfigManager> {
+    if (!configManagerInstance) {
+      configManagerInstance = await ConfigManager.getInstance();
+    }
+    return configManagerInstance;
+  },
+  async getAgentConfig(): Promise<AgentConfig> {
+    const instance = await this.getInstance();
+    return instance.getAgentConfig();
+  },
+  async updateAgentConfig(config: AgentConfig): Promise<void> {
+    const instance = await this.getInstance();
+    return instance.updateAgentConfig(config);
+  },
+};

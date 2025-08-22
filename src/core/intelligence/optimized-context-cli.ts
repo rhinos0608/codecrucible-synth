@@ -109,7 +109,7 @@ export class OptimizedContextAwareCLI extends EventEmitter {
     prompt: string,
     options: OptimizedContextOptions = {}
   ): Promise<ContextualPromptEnhancement> {
-    const basic = this.lazyIntelligence.getBasicInfo(this.currentWorkingDir);
+    const basic = await this.lazyIntelligence.getBasicInfo(this.currentWorkingDir);
 
     if (!basic) {
       return this.getEmptyEnhancement(prompt);
@@ -449,10 +449,10 @@ Please provide a response considering the project context above.`;
   /**
    * Get quick context status
    */
-  getContextStatus(): QuickContextInfo {
-    const basic = this.lazyIntelligence.getBasicInfo(this.currentWorkingDir);
-    const fullLoaded = this.lazyIntelligence.isFullyLoaded(this.currentWorkingDir);
-    const loading = this.lazyIntelligence.isLoading(this.currentWorkingDir);
+  async getContextStatus(): Promise<QuickContextInfo> {
+    const basic = await this.lazyIntelligence.getBasicInfo(this.currentWorkingDir);
+    const fullLoaded = await this.lazyIntelligence.isFullyLoaded(this.currentWorkingDir);
+    const loading = await this.lazyIntelligence.isLoading(this.currentWorkingDir);
 
     return {
       available: basic !== null,
@@ -474,7 +474,7 @@ Please provide a response considering the project context above.`;
    * Get intelligent commands (optimized)
    */
   async getIntelligentCommands(context?: string): Promise<IntelligentCommand[]> {
-    const basic = this.lazyIntelligence.getBasicInfo(this.currentWorkingDir);
+    const basic = await this.lazyIntelligence.getBasicInfo(this.currentWorkingDir);
     if (!basic) return [];
 
     const commands: IntelligentCommand[] = [];

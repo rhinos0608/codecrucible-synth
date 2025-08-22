@@ -7,6 +7,7 @@ import { DatabaseManager } from './database-manager.js';
 import { logger } from '../core/logger.js';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { createHash } from 'crypto';
 
 export interface Migration {
   version: string;
@@ -418,8 +419,7 @@ export class MigrationManager {
    * Calculate checksum for migration content
    */
   private calculateChecksum(content: string): string {
-    const crypto = require('crypto');
-    return crypto.createHash('sha256').update(content).digest('hex');
+    return createHash('sha256').update(content).digest('hex');
   }
 
   /**

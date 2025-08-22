@@ -4,7 +4,9 @@
  */
 
 import { EventEmitter } from 'events';
+import { basename } from 'path';
 import { Logger } from '../logger.js';
+import { unifiedCache } from '../cache/unified-cache-system.js';
 import {
   ProjectIntelligenceSystem,
   ProjectIntelligence,
@@ -39,7 +41,6 @@ export interface PerformanceMetrics {
 export class LazyProjectIntelligenceSystem extends EventEmitter {
   private logger: Logger;
   private fullSystem: ProjectIntelligenceSystem;
-  private cache: Map<string, LazyProjectIntelligence> = new Map();
   private loadingPromises: Map<string, Promise<ProjectIntelligence>> = new Map();
   private cleanupInterval?: NodeJS.Timeout;
   private metrics: PerformanceMetrics = {
@@ -69,11 +70,12 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
       const basic = await this.extractBasicInfo(rootPath);
 
       // Cache the basic info
-      this.cache.set(rootPath, {
+      const cacheKey = `lazy-intel-basic:${rootPath}`;
+      await unifiedCache.set(cacheKey, {
         basic,
         loaded: false,
         loading: false,
-      });
+      }, { ttl: 3600000, tags: ['lazy-project-intelligence', 'basic-info'] });
 
       this.metrics.initTime = Date.now() - startTime;
       this.logger.info(`Quick analysis completed in ${this.metrics.initTime}ms`);
@@ -89,12 +91,13 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
    * Get full project intelligence (lazy loaded)
    */
   async getFullIntelligence(rootPath: string, force = false): Promise<ProjectIntelligence | null> {
-    const cached = this.cache.get(rootPath);
+    const cacheKey = `lazy-intel-basic:${rootPath}`;
+    const cached = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
 
     // Return cached full intelligence if available
-    if (cached?.full && !force) {
+    if (cached?.value?.full && !force) {
       this.metrics.cacheHits++;
-      return cached.full;
+      return cached.value.full;
     }
 
     // Check if already loading
@@ -112,11 +115,15 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
       const intelligence = await loadingPromise;
 
       // Update cache
-      const existing = this.cache.get(rootPath);
-      if (existing) {
-        existing.full = intelligence;
-        existing.loaded = true;
-        existing.loading = false;
+      const existingCached = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
+      if (existingCached?.value) {
+        const updated = {
+          ...existingCached.value,
+          full: intelligence,
+          loaded: true,
+          loading: false,
+        };
+        await unifiedCache.set(cacheKey, updated, { ttl: 3600000, tags: ['lazy-project-intelligence', 'full-intel'] });
       }
 
       this.emit('intelligence:loaded', { rootPath, intelligence });
@@ -129,17 +136,20 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   /**
    * Load full intelligence in background without blocking
    */
-  preloadIntelligence(rootPath: string): void {
-    if (!this.cache.has(rootPath) || this.loadingPromises.has(rootPath)) {
+  async preloadIntelligence(rootPath: string): Promise<void> {
+    const cacheKey = `lazy-intel-basic:${rootPath}`;
+    const cached = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
+    
+    if (!cached?.value || this.loadingPromises.has(rootPath)) {
       return;
     }
 
-    const cached = this.cache.get(rootPath)!;
-    if (cached.loaded || cached.loading) {
+    if (cached.value.loaded || cached.value.loading) {
       return;
     }
 
-    cached.loading = true;
+    const updated = { ...cached.value, loading: true };
+    await unifiedCache.set(cacheKey, updated, { ttl: 3600000, tags: ['lazy-project-intelligence'] });
 
     // Load in background
     setImmediate(async () => {
@@ -147,7 +157,11 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
         await this.getFullIntelligence(rootPath);
       } catch (error) {
         this.logger.warn(`Background preload failed: ${error}`);
-        cached.loading = false;
+        const cachedData = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
+        if (cachedData?.value) {
+          const updated = { ...cachedData.value, loading: false };
+          await unifiedCache.set(cacheKey, updated, { ttl: 3600000, tags: ['lazy-project-intelligence'] });
+        }
       }
     });
   }
@@ -271,7 +285,6 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
    * Get default basic info when analysis fails
    */
   private getDefaultBasicInfo(rootPath: string): BasicProjectInfo {
-    const { basename } = require('path');
     return {
       name: basename(rootPath),
       type: 'unknown',
@@ -284,43 +297,38 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   }
 
   /**
-   * Cleanup old cache entries to prevent memory leaks
+   * Cleanup old cache entries - now handled by unified cache TTL
    */
   private cleanupCache(): void {
-    const maxAge = 30 * 60 * 1000; // 30 minutes
-    const now = Date.now();
-
-    // This is a simple cleanup - in production, we'd track timestamps
-    if (this.cache.size > 10) {
-      const entries = Array.from(this.cache.entries());
-      const toRemove = entries.slice(0, Math.floor(entries.length / 2));
-
-      for (const [path] of toRemove) {
-        this.cache.delete(path);
-        this.logger.debug(`Cleaned up cache entry for ${path}`);
-      }
-    }
+    // Cache cleanup is now handled automatically by unified cache TTL
+    // This method is kept for compatibility but no longer needed
   }
 
   /**
    * Get cached basic info
    */
-  getBasicInfo(rootPath: string): BasicProjectInfo | null {
-    return this.cache.get(rootPath)?.basic || null;
+  async getBasicInfo(rootPath: string): Promise<BasicProjectInfo | null> {
+    const cacheKey = `lazy-intel-basic:${rootPath}`;
+    const cached = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
+    return cached?.value?.basic || null;
   }
 
   /**
    * Check if full intelligence is loaded
    */
-  isFullyLoaded(rootPath: string): boolean {
-    return this.cache.get(rootPath)?.loaded || false;
+  async isFullyLoaded(rootPath: string): Promise<boolean> {
+    const cacheKey = `lazy-intel-basic:${rootPath}`;
+    const cached = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
+    return cached?.value?.loaded || false;
   }
 
   /**
    * Check if currently loading
    */
-  isLoading(rootPath: string): boolean {
-    return this.cache.get(rootPath)?.loading || this.loadingPromises.has(rootPath);
+  async isLoading(rootPath: string): Promise<boolean> {
+    const cacheKey = `lazy-intel-basic:${rootPath}`;
+    const cached = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
+    return cached?.value?.loading || this.loadingPromises.has(rootPath);
   }
 
   /**
@@ -333,10 +341,10 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   /**
    * Clear all caches
    */
-  clearCache(): void {
-    this.cache.clear();
+  async clearCache(): Promise<void> {
+    await unifiedCache.clearByTags(['lazy-project-intelligence']);
     this.loadingPromises.clear();
-    this.fullSystem.clearCache();
+    await this.fullSystem.clearCache();
     this.metrics = {
       initTime: 0,
       analysisTime: 0,
@@ -349,12 +357,12 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   /**
    * Shutdown and cleanup
    */
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = undefined;
     }
-    this.clearCache();
+    await this.clearCache();
     this.removeAllListeners();
   }
 }

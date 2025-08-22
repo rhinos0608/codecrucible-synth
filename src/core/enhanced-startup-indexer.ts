@@ -260,7 +260,7 @@ export class EnhancedStartupIndexer {
     const relativePath = relative(this.rootPath, filePath);
     const content = readFileSync(filePath, 'utf-8');
     const lines = content.split('\n').length;
-    const hash = createHash('md5').update(content).digest('hex');
+    const hash = createHash('sha256').update(content).digest('hex');
 
     return {
       path: filePath,
@@ -848,8 +848,7 @@ export class EnhancedStartupIndexer {
   ): string | null {
     // Handle relative imports
     if (importPath.startsWith('./') || importPath.startsWith('../')) {
-      const path = require('path');
-      const resolved = path.resolve(path.dirname(currentFile), importPath);
+      const resolved = join(dirname(currentFile), importPath);
 
       // Try common extensions
       const extensions = ['.ts', '.tsx', '.js', '.jsx'];
@@ -860,7 +859,7 @@ export class EnhancedStartupIndexer {
 
       // Try index files
       for (const ext of extensions) {
-        const indexFile = path.join(resolved, 'index' + ext);
+        const indexFile = join(resolved, 'index' + ext);
         if (files[indexFile]) return indexFile;
       }
     }

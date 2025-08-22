@@ -6,6 +6,8 @@ import {
 } from '../core/collaboration/council-decision-engine.js';
 import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice-prompts.js';
 import { getErrorMessage } from '../utils/error-utils.js';
+import { accessSync } from 'fs';
+import { execSync } from 'child_process';
 
 interface Voice {
   id: string;
@@ -174,7 +176,7 @@ export class VoiceArchetypeSystem {
 
   private isGitRepository(): boolean {
     try {
-      require('fs').accessSync('.git');
+      accessSync('.git');
       return true;
     } catch {
       return false;
@@ -183,7 +185,6 @@ export class VoiceArchetypeSystem {
 
   private getCurrentBranch(): string {
     try {
-      const { execSync } = require('child_process');
       return execSync('git branch --show-current', { encoding: 'utf8' }).trim();
     } catch {
       return 'unknown';

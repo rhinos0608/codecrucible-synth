@@ -13,8 +13,6 @@
     "tests",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "src/testing/**/*",
-    "src/core/mcp/enterprise-mcp-orchestrator.ts",
-    "src/mcp-servers/git-mcp-server.ts"
+    "src/testing/**/*"
   ]
 }

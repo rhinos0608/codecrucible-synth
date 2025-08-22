@@ -625,7 +625,8 @@ export class CacheManager extends EventEmitter {
     if (!this.encryptionKey) return value;
 
     const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey);
+    // Use secure AES-256-CBC with proper IV instead of deprecated createCipher
+    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(this.encryptionKey).subarray(0, 32), iv);
 
     let encrypted = cipher.update(value, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -645,7 +646,8 @@ export class CacheManager extends EventEmitter {
     const iv = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
 
-    const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
+    // Use secure AES-256-CBC with proper IV instead of deprecated createDecipher
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(this.encryptionKey).subarray(0, 32), iv);
 
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');

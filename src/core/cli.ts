@@ -30,6 +30,7 @@ import {
   AuditOutcome,
 } from './security/security-audit-logger.js';
 import { DynamicModelRouter } from './dynamic-model-router.js';
+import { AdvancedToolOrchestrator } from './tools/advanced-tool-orchestrator.js';
 
 export type { CLIContext, CLIOptions };
 
@@ -52,6 +53,7 @@ export class CLI {
   private secretsManager: SecretsManager;
   private auditLogger: SecurityAuditLogger;
   private dynamicModelRouter: DynamicModelRouter;
+  private toolOrchestrator: AdvancedToolOrchestrator;
   private static globalListenersRegistered = false;
 
   // PERFORMANCE FIX: AbortController pattern for cleanup
@@ -83,6 +85,9 @@ export class CLI {
 
     // Initialize dynamic model router
     this.dynamicModelRouter = new DynamicModelRouter();
+
+    // Initialize tool orchestrator for autonomous operations
+    this.toolOrchestrator = new AdvancedToolOrchestrator(modelClient);
 
     // Initialize subsystems with simplified constructors
     this.streamingClient = new StreamingAgentClient(modelClient);
@@ -487,14 +492,29 @@ export class CLI {
   async executePromptProcessing(prompt: string, options: CLIOptions): Promise<string> {
     try {
       console.log('DEBUG: Starting executePromptProcessing');
-      // Step 1: Determine current role and task type
+      
+      // Step 1: Check if this prompt should use autonomous tool execution
+      if (this.toolOrchestrator.shouldUseTools(prompt)) {
+        console.log(chalk.cyan('🔧 Using autonomous tool orchestration...'));
+        try {
+          const toolResponse = await this.toolOrchestrator.processWithTools(prompt);
+          console.log('✅ Tool orchestration completed');
+          return toolResponse;
+        } catch (error) {
+          console.error(chalk.red('❌ Tool orchestration failed:'), error);
+          // Fall back to standard processing
+          console.log(chalk.yellow('⚠️ Falling back to standard AI processing'));
+        }
+      }
+
+      // Step 2: Determine current role and task type for standard processing
       const currentRole = options.role || this.dynamicModelRouter.getCurrentRole();
       const taskType = this.analyzeTaskType(prompt);
 
       console.log(chalk.blue(`🎯 Processing in ${currentRole} mode for ${taskType} task`));
       console.log('DEBUG: About to select model for role');
 
-      // Step 2: Skip dynamic model router for now and use the unified client directly
+      // Step 3: Skip dynamic model router for now and use the unified client directly
       console.log(chalk.cyan('🤖 Using unified model client directly'));
 
       // Check if we have analysis requests
@@ -611,7 +631,7 @@ export class CLI {
 
     // Generate dynamic analysis report
     const analysis = `
-# CodeCrucible Synth - Real-Time Codebase Analysis
+# ${projectAnalysis.name} - Real-Time Codebase Analysis
 
 ## Project Overview
 **Project:** ${projectAnalysis.name}

@@ -24,7 +24,7 @@ export class CodebaseAnalyzer {
 
     // Generate dynamic analysis report
     const analysis = `
-# CodeCrucible Synth - Real-Time Codebase Analysis
+# ${projectAnalysis.name} - Real-Time Codebase Analysis
 
 ## Project Overview
 **Project:** ${projectAnalysis.name}
@@ -430,7 +430,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     if (fs.existsSync(tsconfigPath)) {
       try {
         const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
-        if (!tsconfig.compilerOptions?.strict) {
+        if (tsconfig.compilerOptions?.strict !== true) {
           issues.push('🟡 **Warning**: TypeScript strict mode disabled - may hide type errors');
         }
       } catch (error) {
@@ -534,10 +534,27 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
       );
     }
 
+    // Only recommend enabling TypeScript strict mode if it's actually disabled
     if (codeMetrics.typescriptFiles > 0) {
-      recommendations.push(
-        '3. **Medium Priority**: Enable TypeScript strict mode for better type safety'
-      );
+      const fs = await import('fs');
+      const path = await import('path');
+      const tsconfigPath = path.join(this.workingDirectory, 'tsconfig.json');
+      
+      if (fs.existsSync(tsconfigPath)) {
+        try {
+          const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
+          if (tsconfig.compilerOptions?.strict !== true) {
+            recommendations.push(
+              '3. **Medium Priority**: Enable TypeScript strict mode for better type safety'
+            );
+          }
+        } catch (error) {
+          // If we can't parse tsconfig, suggest enabling strict mode as a precaution
+          recommendations.push(
+            '3. **Medium Priority**: Verify TypeScript strict mode configuration'
+          );
+        }
+      }
     }
 
     if (dependencyAnalysis.devDeps > dependencyAnalysis.prodDeps * 2) {

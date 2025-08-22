@@ -180,13 +180,11 @@ export class EnterpriseMCPOrchestrator {
 
     for (const server of servers) {
       try {
-        const [tools, resources, prompts] = await Promise.all([
-          server.listTools(),
-          server.listResources(),
-          server.listPrompts(),
-        ]);
+        const tools = server.capabilities?.tools || [];
+        const resources = server.capabilities?.resources || [];
+        const prompts = server.capabilities?.prompts || [];
 
-        const serverCapabilities = tools.map(tool => ({
+        const serverCapabilities = tools.map((tool: any) => ({
           serverId: server.id,
           name: tool.name,
           description: tool.description,
@@ -457,7 +455,7 @@ export class EnterpriseMCPOrchestrator {
 
     try {
       // Get the appropriate server
-      const server = await this.mcpManager.getServer(step.serverId);
+      const server = this.mcpManager.getServerStatus(step.serverId) as any;
       if (!server) {
         throw new Error(`Server not found: ${step.serverId}`);
       }

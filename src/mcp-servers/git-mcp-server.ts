@@ -1,4 +1,14 @@
-import { BaseMCPServer } from '../core/mcp-server-manager.js';
+import { MCPServer } from '../core/mcp-server-manager.js';
+
+// Simple base class for MCP servers to maintain compatibility
+class BaseMCPServer {
+  protected tools: Record<string, Function> = {};
+  
+  constructor(
+    public id: string,
+    public description: string
+  ) {}
+}
 import { ApprovalManager, Operation, OperationContext } from '../core/approval/approval-manager.js';
 import { logger } from '../core/logger.js';
 import { exec } from 'child_process';

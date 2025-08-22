@@ -232,6 +232,97 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   }
 
   /**
+   * Determine if a prompt requires tool usage
+   */
+  shouldUseTools(prompt: string): boolean {
+    const toolKeywords = [
+      'analyze', 'read', 'file', 'directory', 'project', 'code', 'structure',
+      'write', 'create', 'generate', 'build', 'compile', 'test', 'run',
+      'search', 'find', 'list', 'show', 'display', 'check', 'scan'
+    ];
+    
+    const promptLower = prompt.toLowerCase();
+    return toolKeywords.some(keyword => promptLower.includes(keyword));
+  }
+
+  /**
+   * Process a prompt using appropriate tools
+   */
+  async processWithTools(prompt: string): Promise<string> {
+    try {
+      this.logger.info('Processing prompt with tools:', prompt.slice(0, 100) + '...');
+      
+      // Create basic context
+      const context: ToolContext = {
+        sessionId: Date.now().toString(),
+        userId: 'cli-user',
+        environment: {
+          mode: 'development',
+          workingDirectory: process.cwd(),
+          timestamp: new Date().toISOString(),
+          permissions: ['read', 'write', 'execute']
+        },
+        previousResults: [],
+        constraints: {
+          maxExecutionTime: 30000,
+          maxMemoryUsage: 1024 * 1024 * 100, // 100MB
+          allowedNetworkAccess: false,
+          sandboxed: true,
+          costLimit: 1000
+        },
+        security: {
+          permissions: ['read', 'write', 'execute'],
+          restrictions: ['no-network', 'sandboxed'],
+          auditLog: true,
+          encryptionRequired: false
+        }
+      };
+
+      // Select appropriate tools for the objective
+      const toolCalls = await this.selectTools(prompt, context);
+      
+      if (toolCalls.length === 0) {
+        this.logger.info('No tools selected, falling back to AI model');
+        return await this.modelClient.generateText(prompt);
+      }
+
+      // Execute the tools
+      const results = await this.executePlan(toolCalls, context);
+      
+      // Synthesize results into a coherent response
+      return await this.synthesizeToolResults(prompt, results);
+      
+    } catch (error) {
+      this.logger.error('Tool processing failed:', error);
+      // Fallback to direct AI model
+      return await this.modelClient.generateText(prompt);
+    }
+  }
+
+  /**
+   * Synthesize tool results into a coherent response
+   */
+  private async synthesizeToolResults(originalPrompt: string, results: Map<string, ToolResult>): Promise<string> {
+    const resultsArray = Array.from(results.entries()).map(([toolId, result]) => ({
+      tool: toolId,
+      success: result.success,
+      output: result.output,
+      error: result.error
+    }));
+
+    const synthesisPrompt = `
+Original request: ${originalPrompt}
+
+Tool execution results:
+${JSON.stringify(resultsArray, null, 2)}
+
+Please provide a clear, helpful response based on these tool results. If there were errors, acknowledge them and provide what information is available.
+`;
+
+    return await this.modelClient.generateText(synthesisPrompt);
+  }
+
+  /**
    * Intelligent tool selection based on context and requirements
    */
   async selectTools(

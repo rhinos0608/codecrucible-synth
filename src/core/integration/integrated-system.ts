@@ -12,7 +12,7 @@ import { AdvancedToolOrchestrator } from '../tools/advanced-tool-orchestrator.js
 import { VectorRAGSystem, RAGConfig } from '../rag/vector-rag-system.js';
 import { IntelligentModelRouter, RouterConfig } from '../routing/intelligent-model-router.js';
 import { ObservabilitySystem, ObservabilityConfig } from '../observability/observability-system.js';
-import { MultiLayerCacheSystem, CacheSystemConfig } from '../caching/multi-layer-cache-system.js';
+import { UnifiedCacheSystem, UnifiedCacheConfig } from '../cache/unified-cache-system.js';
 import {
   AgentEcosystem,
   Agent,
@@ -49,7 +49,7 @@ export interface ComponentConfigs {
   modelClient: any;
   router: RouterConfig;
   rag: RAGConfig;
-  cache: CacheSystemConfig;
+  cache: UnifiedCacheConfig;
   observability: ObservabilityConfig;
   workflow: any;
 }
@@ -247,7 +247,7 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
   private workflowOrchestrator!: WorkflowOrchestrator;
   private toolOrchestrator!: AdvancedToolOrchestrator;
   private ragSystem!: VectorRAGSystem;
-  private cacheSystem!: MultiLayerCacheSystem;
+  private cacheSystem!: UnifiedCacheSystem;
   private observabilitySystem!: ObservabilitySystem;
   private agentEcosystem!: AgentEcosystem;
 
@@ -518,8 +518,8 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
 
     // Initialize cache system
     if (this.config.features.enableCaching) {
-      this.cacheSystem = new MultiLayerCacheSystem(this.config.components.cache);
-      await this.cacheSystem.initialize();
+      this.cacheSystem = new UnifiedCacheSystem(this.config.components.cache);
+      // UnifiedCacheSystem initializes automatically
     }
 
     // Initialize observability system
@@ -741,17 +741,17 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
     request: SynthesisRequest,
     response: SynthesisResponse
   ): Promise<void> {
-    const cacheKey = {
-      namespace: 'synthesis',
-      identifier: this.hashRequest(request),
-      version: this.config.version,
-    };
+    const cacheKey = `synthesis:${this.hashRequest(request)}:${this.config.version}`;
 
     await this.cacheSystem.set(cacheKey, response, {
-      priority: 'medium',
-      category: 'synthesis',
-      source: 'integrated-system',
-      computeCost: response.metadata.totalTokens / 1000,
+      ttl: 3600,
+      tags: ['synthesis', 'integrated-system'],
+      metadata: {
+        priority: 'medium',
+        category: 'synthesis',
+        source: 'integrated-system',
+        computeCost: response.metadata.totalTokens / 1000
+      }
     });
   }
 

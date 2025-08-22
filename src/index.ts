@@ -16,7 +16,7 @@ const eventManager = {
       emitter.removeAllListeners();
     }
     this.emitters.clear();
-  }
+  },
 };
 
 // Cleanup on exit
@@ -69,7 +69,7 @@ export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLICo
 
     // Lazy client initialization - don't block startup
     const client = new UnifiedModelClient(clientConfig);
-    
+
     // Don't await initialization to prevent hanging
     client.initialize().catch(() => {
       console.log('ℹ️ AI models will be initialized when needed');

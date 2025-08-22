@@ -821,7 +821,7 @@ export class GitMCPServer extends BaseMCPServer {
       const { action, name, url } = args;
 
       switch (action) {
-        case 'list':
+        case 'list': {
           const { stdout: listOutput } = await execAsync('git remote -v', {
             cwd: this.workspaceRoot,
           });
@@ -829,8 +829,9 @@ export class GitMCPServer extends BaseMCPServer {
             success: true,
             data: { remotes: listOutput.trim().split('\n') },
           };
+        }
 
-        case 'show':
+        case 'show': {
           if (!name) {
             return { success: false, error: 'Remote name required for show action' };
           }
@@ -841,6 +842,7 @@ export class GitMCPServer extends BaseMCPServer {
             success: true,
             data: { remote: name, info: showOutput },
           };
+        }
 
         case 'add':
           if (!name || !url) {
@@ -886,7 +888,7 @@ export class GitMCPServer extends BaseMCPServer {
       const { action, message, index } = args;
 
       switch (action) {
-        case 'save':
+        case 'save': {
           let saveCommand = 'git stash';
           if (message) saveCommand += ` -m "${message}"`;
           const { stdout: saveOutput } = await execAsync(saveCommand, { cwd: this.workspaceRoot });
@@ -894,8 +896,9 @@ export class GitMCPServer extends BaseMCPServer {
             success: true,
             data: { action: 'saved', message, output: saveOutput },
           };
+        }
 
-        case 'pop':
+        case 'pop': {
           let popCommand = 'git stash pop';
           if (index !== undefined) popCommand += ` stash@{${index}}`;
           const { stdout: popOutput } = await execAsync(popCommand, { cwd: this.workspaceRoot });
@@ -903,6 +906,7 @@ export class GitMCPServer extends BaseMCPServer {
             success: true,
             data: { action: 'popped', index, output: popOutput },
           };
+        }
 
         case 'list':
           const { stdout: listOutput } = await execAsync('git stash list', {

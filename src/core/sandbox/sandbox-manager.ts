@@ -346,7 +346,9 @@ class MacOSSandbox extends BaseSandbox {
       });
 
       // Cleanup profile file
-      await fs.unlink(profilePath).catch(() => {}); // Ignore errors
+      await fs.unlink(profilePath).catch(() => {
+        // Ignore errors
+      });
 
       return {
         success: true,

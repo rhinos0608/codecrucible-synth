@@ -30,31 +30,15 @@ import { HybridLLMRouter, HybridConfig } from './hybrid/hybrid-llm-router.js';
 import { intelligentBatchProcessor } from './performance/intelligent-batch-processor.js';
 import { getErrorMessage, isError, toError } from '../utils/error-utils.js';
 import { createHash } from 'crypto';
+import { StreamingManager, IStreamingManager } from './streaming/streaming-manager.js';
 
-// Streaming interfaces (consolidated from enhanced-streaming-client.ts)
-export interface StreamToken {
-  content: string;
-  timestamp: number;
-  index: number;
-  finished?: boolean;
-  metadata?: Record<string, any>;
-}
-
-export interface StreamConfig {
-  chunkSize?: number;
-  bufferSize?: number;
-  enableBackpressure?: boolean;
-  timeout?: number;
-  encoding?: BufferEncoding;
-}
-
-export interface StreamMetrics {
-  tokensStreamed: number;
-  streamDuration: number;
-  averageLatency: number;
-  throughput: number;
-  backpressureEvents: number;
-}
+// Import streaming interfaces from extracted module
+export {
+  StreamToken,
+  StreamConfig,
+  StreamMetrics,
+  IStreamingManager,
+} from './streaming/streaming-manager.js';
 
 export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
 export type ExecutionMode = 'fast' | 'auto' | 'quality';
@@ -157,9 +141,8 @@ export class UnifiedModelClient extends EventEmitter {
   private currentModel: string | null = null;
   private readonly HEALTH_CACHE_TTL = 30000; // 30 seconds
 
-  // Streaming management (consolidated from enhanced-streaming-client.ts)
-  private streamingSessions: Map<string, any> = new Map();
-  private streamMetrics: Map<string, StreamMetrics> = new Map();
+  // Streaming management (extracted to StreamingManager)
+  private streamingManager: IStreamingManager;
 
   // Integrated system for advanced features
   private integratedSystem: IntegratedCodeCrucibleSystem | null = null;
@@ -196,6 +179,9 @@ export class UnifiedModelClient extends EventEmitter {
     // Initialize hardware-aware components
     this.hardwareSelector = new HardwareAwareModelSelector();
     this.processManager = new ActiveProcessManager(this.hardwareSelector);
+
+    // Initialize streaming manager with configuration
+    this.streamingManager = new StreamingManager(config.streaming);
 
     // Using unified cache system singleton (no initialization needed)
 

@@ -523,7 +523,9 @@ except Exception as e:
           // Clean up temporary file
           try {
             await unlink(tempFile);
-          } catch {}
+          } catch {
+            // Ignore cleanup errors
+          }
 
           if (code !== 0) {
             resolve({

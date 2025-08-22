@@ -85,7 +85,6 @@ export class PerformanceMonitor extends EventEmitter {
         await this.updateSystemMetrics();
       } catch (error) {
         // Silent error handling to prevent crashes
-        console.warn('Performance monitoring error:', error);
       }
     }, 30000);
 

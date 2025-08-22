@@ -535,21 +535,21 @@ export class MCPServerManager {
       throw new Error('Path traversal attempt detected');
     }
 
-    // Enhanced Guardian-level security patterns from OWASP Top 10 
+    // Enhanced Guardian-level security patterns from OWASP Top 10
     const suspiciousPatterns = [
       // File system attacks
       /rm\s+-rf/i,
       /rmdir\s+/i,
       /del\s+/i,
       /format\s+/i,
-      
+
       // Privilege escalation
       /sudo/i,
       /su\s+/i,
       /runas/i,
       /chmod\s+\+[sx]/i,
       /chown/i,
-      
+
       // Remote code execution
       /curl.*\|.*sh/i,
       /wget.*\|.*sh/i,
@@ -560,22 +560,22 @@ export class MCPServerManager {
       /eval/i,
       /exec/i,
       /system/i,
-      
+
       // Network attacks
       /nmap/i,
       /telnet/i,
       /ssh.*@/i,
-      
+
       // Data exfiltration
       /scp\s+/i,
       /ftp/i,
       /sftp/i,
-      
+
       // Encoding/obfuscation attempts
       /base64\s+-d/i,
       /xxd\s+-r/i,
       /uuencode/i,
-      
+
       // Shell metacharacters in dangerous contexts
       /;\s*rm/i,
       /&&\s*rm/i,
@@ -589,7 +589,7 @@ export class MCPServerManager {
       if (pattern.test(fullCommand)) {
         logger.error('SECURITY VIOLATION: Dangerous command blocked', {
           command: command,
-          args: args.map(arg => arg.length > 50 ? arg.substring(0, 50) + '...' : arg),
+          args: args.map(arg => (arg.length > 50 ? arg.substring(0, 50) + '...' : arg)),
           pattern: pattern.source,
           timestamp: new Date().toISOString(),
         });
@@ -601,14 +601,14 @@ export class MCPServerManager {
     if (args.length > 20) {
       throw new Error('Too many command arguments');
     }
-    
+
     // Check for argument length limits to prevent buffer overflow attacks
     for (const arg of args) {
       if (arg.length > 4096) {
         throw new Error('Argument too long - possible buffer overflow attempt');
       }
     }
-    
+
     // Check for null bytes (common in injection attacks)
     if (fullCommand.includes('\0')) {
       throw new Error('Null byte detected - possible injection attempt');
@@ -810,15 +810,41 @@ export class MCPServerManager {
   private isCommandAllowed(command: string): boolean {
     // Default deny list for critical system commands
     const defaultBlockedCommands = [
-      'rm', 'rmdir', 'del', 'format', 'fdisk',
-      'sudo', 'su', 'runas', 'passwd',
-      'mount', 'umount', 'systemctl', 'service',
-      'reboot', 'shutdown', 'halt', 'poweroff',
-      'iptables', 'netsh', 'route',
-      'crontab', 'at', 'schtasks',
-      'nc', 'netcat', 'ncat', 'socat',
-      'curl', 'wget', 'fetch', // if not explicitly allowed
-      'python', 'python3', 'node', 'ruby', 'perl', // interpreters without whitelist
+      'rm',
+      'rmdir',
+      'del',
+      'format',
+      'fdisk',
+      'sudo',
+      'su',
+      'runas',
+      'passwd',
+      'mount',
+      'umount',
+      'systemctl',
+      'service',
+      'reboot',
+      'shutdown',
+      'halt',
+      'poweroff',
+      'iptables',
+      'netsh',
+      'route',
+      'crontab',
+      'at',
+      'schtasks',
+      'nc',
+      'netcat',
+      'ncat',
+      'socat',
+      'curl',
+      'wget',
+      'fetch', // if not explicitly allowed
+      'python',
+      'python3',
+      'node',
+      'ruby',
+      'perl', // interpreters without whitelist
     ];
 
     // Check blocked commands (config + defaults)
@@ -831,20 +857,36 @@ export class MCPServerManager {
 
     // Check allowed commands - use whitelist approach for security
     if (this.config.terminal.allowedCommands.length > 0) {
-      return this.config.terminal.allowedCommands.some(allowedCommand =>
-        command === allowedCommand || command.startsWith(allowedCommand + ' ')
+      return this.config.terminal.allowedCommands.some(
+        allowedCommand => command === allowedCommand || command.startsWith(allowedCommand + ' ')
       );
     }
 
     // Default safe commands if no explicit allow list
     const defaultSafeCommands = [
-      'ls', 'dir', 'pwd', 'cd', 'echo', 'cat', 'head', 'tail',
-      'grep', 'find', 'which', 'whoami', 'id', 'uname',
-      'git', 'npm', 'yarn', 'node', 'python', // only basic usage
+      'ls',
+      'dir',
+      'pwd',
+      'cd',
+      'echo',
+      'cat',
+      'head',
+      'tail',
+      'grep',
+      'find',
+      'which',
+      'whoami',
+      'id',
+      'uname',
+      'git',
+      'npm',
+      'yarn',
+      'node',
+      'python', // only basic usage
     ];
-    
-    return defaultSafeCommands.some(safeCommand => 
-      command === safeCommand || command.startsWith(safeCommand + ' ')
+
+    return defaultSafeCommands.some(
+      safeCommand => command === safeCommand || command.startsWith(safeCommand + ' ')
     );
   }
 

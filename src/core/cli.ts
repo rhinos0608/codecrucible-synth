@@ -341,16 +341,18 @@ export class CLI {
         await this.commands.handleAnalyze(args, options);
         break;
 
-      case 'analyze-dir':
+      case 'analyze-dir': {
         // Handle analyze-dir command properly
         const targetDir = args[0] || '.';
         await this.commands.handleAnalyze([targetDir], options);
         break;
+      }
 
-      case 'generate':
+      case 'generate': {
         const prompt = args.join(' ');
         await this.commands.handleGeneration(prompt, options);
         break;
+      }
 
       case 'configure':
         await this.handleConfiguration(options);
@@ -483,7 +485,8 @@ export class CLI {
     }
 
     // Sanitize input for security (relaxed validation in test environment)
-    const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
+    const isTestEnvironment =
+      process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
     const sanitizationResult = InputSanitizer.sanitizePrompt(prompt);
 
     if (!sanitizationResult.isValid && !isTestEnvironment) {
@@ -497,12 +500,12 @@ export class CLI {
         CLIExitCode.INVALID_INPUT
       );
     }
-    
+
     // In test environment, log but don't block for development
     if (!sanitizationResult.isValid && isTestEnvironment) {
       logger.warn('Test environment: Security validation bypassed for development', {
         violations: sanitizationResult.violations,
-        prompt: prompt.substring(0, 100) + '...'
+        prompt: prompt.substring(0, 100) + '...',
       });
     }
 
@@ -524,18 +527,11 @@ export class CLI {
       }
 
       // For non-analysis requests, use standard processing
-      // TEMPORARY FIX: Force non-streaming mode to fix display issues
-      if (true || options.noStream || options.batch) {
-        console.log('🔧 DEBUG: About to call executePromptProcessing');
+      // Use non-streaming mode for better compatibility
+      if (options.noStream || options.batch) {
         const response = await this.executePromptProcessing(sanitizedPrompt, options);
-        console.log(
-          '🔧 DEBUG: executePromptProcessing returned:',
-          typeof response,
-          response?.length || 'no length'
-        );
         console.log('\n' + chalk.cyan('🤖 Response:'));
         console.log(response);
-        console.log('🔧 DEBUG: Response displayed, returning');
         return response;
       } else {
         await this.displayStreamingResponse(sanitizedPrompt, options);
@@ -1541,6 +1537,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     console.log(chalk.cyan('\n🎯 Starting Interactive Mode'));
     console.log(chalk.gray('Type "exit" to quit, "/help" for commands\n'));
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       try {
         const prompt = await inquirer.prompt({

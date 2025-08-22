@@ -417,7 +417,9 @@ export class AuthMiddleware {
         const path = await import('path');
 
         const tokenFile = path.join(tokenPath, '.codecrucible-session');
-        await fs.unlink(tokenFile).catch(() => {}); // Ignore if file doesn't exist
+        await fs.unlink(tokenFile).catch(() => {
+          // Ignore if file doesn't exist
+        });
       }
 
       logger.info('User logged out');

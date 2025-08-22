@@ -194,13 +194,11 @@ export class VoiceArchetypeSystem {
   getVoice(name: string): Voice | undefined {
     // Enhanced voice lookup with better error handling
     if (!name || typeof name !== 'string') {
-      console.warn(`Invalid voice identifier: ${name}`);
       return undefined;
     }
 
     const normalizedName = name.toString().trim().toLowerCase();
     if (!normalizedName) {
-      console.warn(`Empty voice identifier after normalization: ${name}`);
       return undefined;
     }
 
@@ -219,15 +217,11 @@ export class VoiceArchetypeSystem {
     if (normalizedName.length === 1) {
       for (const [key, voiceObj] of this.voices.entries()) {
         if (key.startsWith(normalizedName) || voiceObj.id.startsWith(normalizedName)) {
-          console.warn(`Partial voice match for '${name}': using '${voiceObj.name}'`);
           return voiceObj;
         }
       }
     }
 
-    console.warn(
-      `Voice not found: '${name}'. Available voices: ${Array.from(this.voices.keys()).join(', ')}`
-    );
     return undefined;
   }
 
@@ -405,13 +399,11 @@ export class VoiceArchetypeSystem {
 
         return responses;
       } catch (error) {
-        console.warn('Multi-voice API failed, falling back to sequential processing:', error);
         // Fall through to legacy implementation
       }
     }
 
     // Enhanced parallel implementation with batching and concurrency control
-    console.log(`🎭 Processing ${voices.length} voices in parallel with smart batching`);
     const startTime = Date.now();
 
     // Configuration for parallel processing
@@ -419,18 +411,12 @@ export class VoiceArchetypeSystem {
     const batchSize = Math.min(voices.length, context?.batchSize || 2);
     const timeout = context?.timeout || 30000; // 30 second timeout per voice
 
-    console.log(
-      `🎭 Parallel config: maxConcurrent=${maxConcurrent}, batchSize=${batchSize}, timeout=${timeout}ms`
-    );
 
     // Process voices in batches to prevent overwhelming the system
     const responses = [];
 
     for (let i = 0; i < voices.length; i += batchSize) {
       const batch = voices.slice(i, i + batchSize);
-      console.log(
-        `🎭 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(voices.length / batchSize)}: [${batch.join(', ')}]`
-      );
 
       // Create parallel promises for this batch
       const batchPromises = batch.map(voiceId =>
@@ -447,7 +433,6 @@ export class VoiceArchetypeSystem {
         } else {
           const voiceId = batch[index];
           const voice = this.getVoice(voiceId);
-          console.error(`🎭 Voice ${voiceId} failed:`, result.reason);
 
           // Add error response to maintain consistency
           responses.push({
@@ -471,9 +456,6 @@ export class VoiceArchetypeSystem {
 
     const totalTime = Date.now() - startTime;
     const avgTimePerVoice = totalTime / voices.length;
-    console.log(
-      `🎭 Parallel processing completed: ${totalTime}ms total, ${avgTimePerVoice.toFixed(0)}ms per voice`
-    );
 
     return responses;
   }
@@ -492,7 +474,6 @@ export class VoiceArchetypeSystem {
       throw new Error(`Voice not found: ${voiceId}`);
     }
 
-    console.log(`🎭 Starting voice ${voiceId} (${voice.name})`);
     const startTime = Date.now();
 
     // Create timeout promise for this specific voice
@@ -510,12 +491,10 @@ export class VoiceArchetypeSystem {
       const response = await Promise.race([generatePromise, timeoutPromise]);
 
       const duration = Date.now() - startTime;
-      console.log(`🎭 Voice ${voiceId} completed in ${duration}ms`);
 
       return response;
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`🎭 Voice ${voiceId} failed after ${duration}ms:`, getErrorMessage(error));
       throw error;
     }
   }
@@ -847,7 +826,7 @@ YOUR ARGUMENT:
             argument: response.content,
           });
         } catch (error) {
-          console.error(`Debate error for ${voiceId}:`, error);
+          // Continue with debate even if one voice fails
         }
       }
     }
@@ -896,7 +875,6 @@ SYNTHESIS:
 
       return response.content;
     } catch (error) {
-      console.error('Debate synthesis failed:', error);
       return 'Unable to synthesize debate conclusion due to technical error.';
     }
   }

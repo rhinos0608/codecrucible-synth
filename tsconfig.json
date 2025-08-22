@@ -45,15 +45,16 @@
     }
   },
   "include": [
-    "src/**/*",
-    "config/**/*"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "build",
     "archive",
+    "tests",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "src/testing/**/*"
   ]
 }

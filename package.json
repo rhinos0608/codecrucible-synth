@@ -10,7 +10,7 @@
     "codecrucible": "./dist/bin/crucible.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && npm run copy-assets",
+    "build": "tsc && npm run copy-assets",
     "build:all": "tsc && npm run copy-assets",
     "copy-assets": "node scripts/copy-assets.js",
     "dev": "tsx src/index.ts",
@@ -20,7 +20,7 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,js,json}\"",
-    "typecheck": "npx tsc --project tsconfig.build.json --noEmit",
+    "typecheck": "npx tsc --noEmit",
     "fix-code": "npm run lint:fix && npm run format && npm run typecheck",
     "start": "node dist/index.js",
     "cli": "npm run build && node dist/index.js",

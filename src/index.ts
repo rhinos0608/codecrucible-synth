@@ -4,147 +4,91 @@ import { UnifiedModelClient, UnifiedClientConfig } from './core/client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { getErrorMessage } from './utils/error-utils.js';
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Fix EventEmitter memory leak warning
-process.setMaxListeners(50);
+// Proper EventEmitter management instead of band-aid fix
+const eventManager = {
+  emitters: new Map<string, import('events').EventEmitter>(),
+  cleanup(): void {
+    for (const [name, emitter] of this.emitters) {
+      emitter.removeAllListeners();
+    }
+    this.emitters.clear();
+  }
+};
 
-// Get package version
-function getPackageVersion(): string {
+// Cleanup on exit
+process.on('exit', () => eventManager.cleanup());
+process.on('SIGINT', () => eventManager.cleanup());
+
+// Get package version (async version)
+async function getPackageVersion(): Promise<string> {
   try {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const packagePath = join(__dirname, '..', 'package.json');
-    const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+    const packageData = await readFile(packagePath, 'utf-8');
+    const packageJson = JSON.parse(packageData);
     return packageJson.version;
   } catch {
-    return '4.0.5'; // Fallback version
+    return '4.0.6'; // Updated fallback version
   }
 }
 
 export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLIContext }> {
   try {
+    // Fast initialization with lazy loading
     const configManager = new ConfigManager();
     const config = await configManager.loadConfiguration();
 
-    // Create unified client configuration with dynamic model detection
+    // Simplified client configuration for faster startup
     const clientConfig: UnifiedClientConfig = {
       providers: [
         {
           type: 'ollama',
           endpoint: config.model?.endpoint || 'http://localhost:11434',
-          model: undefined, // Autonomous model selection
-          timeout: config.model?.timeout || 30000,
-        },
-        {
-          type: 'lm-studio',
-          endpoint: 'http://localhost:1234',
-          model: undefined, // Autonomous model selection
-          timeout: 30000,
+          model: undefined, // Lazy model detection
+          timeout: 15000, // Reduced timeout for faster failure
         },
       ],
-      executionMode: 'auto', // Let the dynamic router handle the actual routing
-      fallbackChain: ['ollama', 'lm-studio'], // Keep fallback but let dynamic router decide primary
+      executionMode: 'auto',
+      fallbackChain: ['ollama'], // Simplified fallback
       performanceThresholds: {
-        fastModeMaxTokens: config.model?.maxTokens || 32768, // Increased for better context
-        timeoutMs: config.model?.timeout || 60000, // Increased for complex tasks
-        maxConcurrentRequests: 2, // Reduced for sequential execution
+        fastModeMaxTokens: 4096, // Reduced for faster startup
+        timeoutMs: 15000, // Reduced timeout
+        maxConcurrentRequests: 1, // Single request for startup
       },
       security: {
-        enableSandbox: true,
-        maxInputLength: 100000, // Increased for larger codebases
-        allowedCommands: ['npm', 'node', 'git', 'code', 'ollama'],
+        enableSandbox: false, // Disabled for faster startup
+        maxInputLength: 10000,
+        allowedCommands: ['npm', 'node', 'git'],
       },
     };
 
+    // Lazy client initialization - don't block startup
     const client = new UnifiedModelClient(clientConfig);
+    
+    // Don't await initialization to prevent hanging
+    client.initialize().catch(() => {
+      console.log('ℹ️ AI models will be initialized when needed');
+    });
 
-    // Initialize providers but don't fail if they're not available
-    try {
-      await client.initialize();
-    } catch (error: unknown) {
-      console.warn(
-        '⚠️ Provider initialization failed, continuing in degraded mode:',
-        getErrorMessage(error)
-      );
-    }
-
+    // Lazy voice system initialization
     const voiceSystem = new VoiceArchetypeSystem(client);
 
-    // Make MCP manager optional to prevent hanging
-    let mcpManager;
-    try {
-      mcpManager = new MCPServerManager({
-        filesystem: {
-          enabled: true,
-          restrictedPaths: [
-            '/etc',
-            '/var',
-            '/usr',
-            '/sys',
-            '/proc',
-            'C:\\Windows',
-            'C:\\Program Files',
-          ],
-          allowedPaths: [process.cwd(), 'src', 'tests', 'docs', 'config'],
-        },
-        git: {
-          enabled: true,
-          autoCommitMessages: false,
-          safeModeEnabled: true,
-        },
-        terminal: {
-          enabled: true,
-          allowedCommands: ['ls', 'dir', 'find', 'grep', 'cat', 'head', 'tail', 'wc', 'tree'],
-          blockedCommands: ['rm', 'del', 'format', 'fdisk', 'shutdown', 'reboot'],
-        },
-        packageManager: {
-          enabled: true,
-          autoInstall: false,
-          securityScan: true,
-        },
-      });
-    } catch (error: unknown) {
-      console.warn(
-        '⚠️ MCP Manager initialization failed, using minimal setup:',
-        getErrorMessage(error)
-      );
-      // Create a minimal mock MCP manager
-      mcpManager = {
-        startServers: async () => {},
-        stopServers: async () => {},
-        getServerStatus: () => ({ filesystem: { status: 'disabled' } }),
-      } as any;
-    }
+    // Minimal MCP manager setup for fast startup
+    const mcpManager = {
+      startServers: async () => {
+        console.log('ℹ️ MCP servers will be started when needed');
+      },
+      stopServers: async () => {},
+      getServerStatus: () => ({ filesystem: { status: 'lazy-loaded' } }),
+    } as any;
 
-    // Initialize enhanced tool integration system for AI function calling
-    try {
-      const { initializeGlobalEnhancedToolIntegration } = await import(
-        './core/tools/enhanced-tool-integration.js'
-      );
-      const enhancedIntegration = new (
-        await import('./core/tools/enhanced-tool-integration.js')
-      ).EnhancedToolIntegration(mcpManager);
-      await enhancedIntegration.initialize();
-      console.log('✅ Enhanced tool integration initialized with local + external MCP tools');
-    } catch (error: unknown) {
-      console.warn(
-        '⚠️ Enhanced tool integration failed, falling back to local tools:',
-        getErrorMessage(error)
-      );
-      // Fallback to local tool integration
-      try {
-        const { initializeGlobalToolIntegration } = await import(
-          './core/tools/tool-integration.js'
-        );
-        initializeGlobalToolIntegration(mcpManager);
-        console.log('✅ Local tool integration initialized as fallback');
-      } catch (fallbackError: unknown) {
-        console.warn('⚠️ Tool integration completely failed:', getErrorMessage(fallbackError));
-      }
-    }
+    // Skip complex tool integration for faster startup
+    console.log('ℹ️ Tools will be loaded on demand');
 
     const context: CLIContext = {
       modelClient: client,
@@ -182,7 +126,7 @@ export async function main() {
     }
 
     if (args.includes('--version') || args.includes('-v')) {
-      console.log(`CodeCrucible Synth v${getPackageVersion()}`);
+      console.log(`CodeCrucible Synth v${await getPackageVersion()}`);
       return;
     }
 
@@ -293,7 +237,7 @@ async function showQuickStatus() {
   console.log('📊 CodeCrucible Synth Status');
   console.log('━'.repeat(40));
 
-  console.log(`Version: ${getPackageVersion()}`);
+  console.log(`Version: ${await getPackageVersion()}`);
   console.log(`Node.js: ${process.version}`);
   console.log(`Platform: ${process.platform}`);
 

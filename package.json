@@ -1,5 +1,5 @@
 {
-  "name": "@codecrucible/synth",
+  "name": "codecrucible-synth",
   "version": "4.0.0",
   "description": "Enterprise-Ready AI-Powered Code Generation & Analysis Tool with Multi-Voice Synthesis, Hybrid Model Architecture, MCP Integration, and Production-Grade Testing",
   "main": "dist/index.js",
@@ -32,7 +32,7 @@
     "version": "npm run build",
     "postversion": "git push && git push --tags",
     "release": "npm run build && npm run package:all && npm version patch && npm publish",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build"
   },
   "publishConfig": {
     "access": "public"

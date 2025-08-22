@@ -1,4 +1,4 @@
-# CodeCrucible Synth v4.0.1 🚀
+# CodeCrucible Synth v4.0.1alpha 🚀
 
 > This application is still in production
 >  local AI assistance with multi-voice synthesis, MCP integration, and accurate self-analysis*
@@ -184,7 +184,7 @@ crucible --server --port 3002
 - Secrets stored in plain text files for now due to no financial services being used in the secrets
  - we however have encryption capability
 
-### **Performance Metrics (Enterprise Grade)**
+### **Performance Metrics 
 - **Response Time**: <30s completion with 0% hang rate (85%+ improvement from 30-45s hangs)
 - **Initialization**: timeout issues
 - **Seqeuntial voice processing: writer-auditor sequential work flow

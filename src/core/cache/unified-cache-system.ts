@@ -472,7 +472,7 @@ export class UnifiedCacheSystem extends EventEmitter {
    * Cleanup and destroy
    */
   async destroy(): Promise<void> {
-    await this.cacheManager.clear();
+    await this.cacheManager.stop(); // Properly stop the cache manager and clear intervals
     this.vectorIndex.clear();
     this.embeddingCache.clear();
     this.removeAllListeners();

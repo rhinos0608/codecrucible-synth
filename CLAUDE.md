@@ -225,7 +225,7 @@ crucible models
 git clone <repository-url>
 cd codecrucible-synth
 npm install
-npm run build
+npm run dev
 
 # Verify installation
 npm test
@@ -235,7 +235,7 @@ crucible --version
 ## Troubleshooting
 
 ### Common Issues
-1. **Build Failures**: Ensure TypeScript is installed globally and run `npm run build`
+1. **Build Failures**: Ensure TypeScript is installed globally and run `npm run dev`
 2. **Test Failures**: Many tests require AI models; check model availability
 3. **Permission Issues**: Run with appropriate permissions for file operations
 4. **Memory Issues**: Configure performance monitoring thresholds
@@ -262,45 +262,3 @@ crucible analyze src/core/cli.ts
 
 The codebase follows a modular, event-driven architecture with strong security principles and comprehensive error handling. The Living Spiral methodology provides a structured approach to iterative development with AI assistance.
 
-## ✅ Current Implementation Status (v4.0.1)
-
-**Build System**: ✅ FULLY OPERATIONAL 
-- Zero TypeScript compilation errors - stable production builds
-- All enterprise components included in production builds
-- Performance monitoring, security frameworks, infrastructure systems operational
-- Asset copying and production deployment ready
-
-**Analysis System**: ✅ VERIFIED ACCURACY
-- CodebaseAnalyzer bug fixed - accurate TypeScript configuration detection
-- Self-analysis capability verified with 401 files, 168K+ lines analyzed
-- Architecture discovery working - 8 major components identified correctly
-- Real-time codebase analysis operational with accurate results
-
-**Core Integration**: ✅ COMPLETE
-- AdvancedToolOrchestrator connected to CLI for autonomous operation
-- Unified cache system implemented with semantic routing (5→1 consolidation)
-- Tool integration functional across MCP servers
-- Enterprise security framework active with 14 modules
-
-**Authentication**: ✅ FULLY IMPLEMENTED
-- JWT Authenticator implemented and functional
-- EnterpriseAuthManager comprehensive enterprise implementation with:
-  - Multi-factor authentication, API key management, session handling
-  - Rate limiting, IP binding, password policies, RBAC integration
-  - JWT token generation/validation, refresh tokens, concurrent session management
-
-**End-to-End Verification**: ✅ CONFIRMED
-- CLI functionality: help, status, analysis commands working
-- System status reporting: Ollama/LM Studio detection functional
-- Self-analysis working with accurate configuration detection
-- GitHub integration: Repository synced with latest fixes
-
-**Testing Status**: ⚡ SIGNIFICANTLY IMPROVED
-- Base coverage: Enhanced with comprehensive enterprise test suites
-- ✅ Enterprise Security Framework tests (no mocks)
-- ✅ Enterprise Error Handler tests with circuit breakers  
-- ✅ Performance Benchmark System tests
-- ✅ Infrastructure deployment and scaling tests
-- ✅ CodebaseAnalyzer accuracy verified through end-to-end testing
-
-See `Docs/SESSION_SUMMARY_2025-08-22_DIAGNOSTIC_FIXES.md` for latest session details.

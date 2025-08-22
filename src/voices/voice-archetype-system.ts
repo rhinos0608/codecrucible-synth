@@ -411,7 +411,6 @@ export class VoiceArchetypeSystem {
     const batchSize = Math.min(voices.length, context?.batchSize || 2);
     const timeout = context?.timeout || 30000; // 30 second timeout per voice
 
-
     // Process voices in batches to prevent overwhelming the system
     const responses = [];
 

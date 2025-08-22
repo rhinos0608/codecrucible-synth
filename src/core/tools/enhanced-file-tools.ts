@@ -287,10 +287,11 @@ export class EnhancedWriteFileTool extends BaseTool {
         case 'append':
           await fs.appendFile(fullPath, operation.content, 'utf-8');
           break;
-        case 'prepend':
+        case 'prepend': {
           const existingContent = existsSync(fullPath) ? await fs.readFile(fullPath, 'utf-8') : '';
           await fs.writeFile(fullPath, operation.content + existingContent, 'utf-8');
           break;
+        }
       }
 
       return {

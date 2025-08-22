@@ -441,7 +441,6 @@ export class UnifiedAgent extends EventEmitter {
         inputLower.includes('thorough audit') ||
         inputLower.includes('comprehensive');
 
-
       if (typeof taskInput === 'string' && isProjectAnalysis) {
         // Read project structure
         try {
@@ -512,14 +511,12 @@ export class UnifiedAgent extends EventEmitter {
         analysisPrompt = `Analyze the following code for quality, patterns, and improvements:\n\n${codeContent}`;
       }
 
-
       const response = await this.modelClient.synthesize({
         prompt: analysisPrompt,
         model: 'default',
         temperature: 0.3,
         maxTokens: 2000,
       });
-
 
       return {
         success: true,

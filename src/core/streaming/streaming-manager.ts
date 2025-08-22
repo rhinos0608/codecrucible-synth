@@ -1,7 +1,7 @@
 /**
  * StreamingManager - Extracted from UnifiedModelClient
  * Handles all streaming-related functionality following Living Spiral methodology
- * 
+ *
  * Council Perspectives Applied:
  * - Maintainer: Clean interfaces and clear separation of concerns
  * - Performance Engineer: Optimized streaming with backpressure handling
@@ -52,20 +52,20 @@ export interface IStreamingManager {
     onToken: (token: StreamToken) => void,
     config?: StreamConfig
   ): Promise<string>;
-  
+
   // Session management
   createSession(sessionId?: string): StreamSession;
   getSession(sessionId: string): StreamSession | undefined;
   destroySession(sessionId: string): void;
-  
+
   // Metrics and monitoring
   getStreamMetrics(sessionId: string): StreamMetrics | undefined;
   getAllMetrics(): Map<string, StreamMetrics>;
-  
+
   // Configuration
   updateConfig(config: Partial<StreamConfig>): void;
   getConfig(): StreamConfig;
-  
+
   // Cleanup
   cleanup(): Promise<void>;
 }
@@ -120,7 +120,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   ): Promise<string> {
     const sessionConfig = { ...this.config, ...config };
     const sessionId = this.generateSessionId();
-    
+
     try {
       // Create and initialize session
       const session = this.createSession(sessionId);
@@ -176,7 +176,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       // Finalize session
       session.isActive = false;
       this.activeStreams.delete(sessionId);
-      
+
       logger.info('Stream session completed', {
         sessionId,
         tokensStreamed: session.metrics.tokensStreamed,
@@ -184,17 +184,16 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       });
 
       return streamedContent;
-
     } catch (error) {
       // Cleanup on error
       this.activeStreams.delete(sessionId);
       this.destroySession(sessionId);
-      
+
       logger.error('Stream session failed', {
         sessionId,
         error: error instanceof Error ? error.message : String(error),
       });
-      
+
       throw error;
     }
   }
@@ -204,7 +203,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
    */
   createSession(sessionId?: string): StreamSession {
     const id = sessionId || this.generateSessionId();
-    
+
     if (this.sessions.has(id)) {
       throw new Error(`Session ${id} already exists`);
     }
@@ -225,7 +224,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
 
     this.sessions.set(id, session);
     this.emit('session-created', id);
-    
+
     return session;
   }
 
@@ -299,7 +298,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     // Clear all data structures
     this.sessions.clear();
     this.activeStreams.clear();
-    
+
     // Remove all listeners
     this.removeAllListeners();
   }
@@ -314,7 +313,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     const metrics = session.metrics;
     metrics.tokensStreamed++;
     metrics.streamDuration = Date.now() - session.startTime;
-    
+
     if (metrics.tokensStreamed > 0) {
       metrics.averageLatency = metrics.streamDuration / metrics.tokensStreamed;
       metrics.throughput = (metrics.tokensStreamed / metrics.streamDuration) * 1000; // tokens per second
@@ -330,10 +329,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
 
     // Increment backpressure events counter
     session.metrics.backpressureEvents++;
-    
+
     // Emit backpressure event
     this.emit('backpressure', sessionId);
-    
+
     // Small delay to prevent overwhelming downstream consumers
     await new Promise(resolve => setTimeout(resolve, 5));
   }
@@ -345,7 +344,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     const tokens: string[] = [];
     const words = content.split(' ');
     let currentChunk = '';
-    
+
     for (const word of words) {
       if (currentChunk.length + word.length + 1 > chunkSize && currentChunk.length > 0) {
         tokens.push(currentChunk);
@@ -354,11 +353,11 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
         currentChunk += (currentChunk.length > 0 ? ' ' : '') + word;
       }
     }
-    
+
     if (currentChunk.length > 0) {
       tokens.push(currentChunk);
     }
-    
+
     // Ensure we always have at least 2 tokens for testing
     if (tokens.length === 1 && tokens[0].length > 10) {
       const midpoint = Math.floor(tokens[0].length / 2);
@@ -366,7 +365,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       const secondHalf = tokens[0].substring(midpoint);
       return [firstHalf, secondHalf];
     }
-    
+
     return tokens;
   }
 

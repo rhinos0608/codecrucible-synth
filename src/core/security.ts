@@ -228,9 +228,9 @@ export class SecurityUtils {
 
       // Check for directory traversal and dangerous patterns
       const dangerousPatterns = [
-        /\.\.[\/\\]/, // Directory traversal
-        /~[\/\\]/, // Home directory access
-        /[\/\\][.]+[\/\\]/, // Hidden directory access
+        /\.\.[/\\]/, // Directory traversal
+        /~[/\\]/, // Home directory access
+        /[/\\][.]+[/\\]/, // Hidden directory access
         /\$\{/, // Variable substitution
         /%[0-9A-Fa-f]{2}/, // URL encoded characters
         /\\x[0-9A-Fa-f]{2}/, // Hex encoded characters

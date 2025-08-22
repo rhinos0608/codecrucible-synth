@@ -616,12 +616,14 @@ export class CrossPlatformTerminalCodeExecutor extends BaseTool {
         return `python ${quotedPath} ${additionalArgs}`.trim();
       case 'java':
         return `javac ${quotedPath} && java ${basename(filePath, '.java')} ${additionalArgs}`.trim();
-      case 'cpp':
+      case 'cpp': {
         const outputName = platform() === 'win32' ? 'output.exe' : 'output';
         return `g++ ${quotedPath} -o ${outputName} && ./${outputName} ${additionalArgs}`.trim();
-      case 'c':
+      }
+      case 'c': {
         const cOutputName = platform() === 'win32' ? 'output.exe' : 'output';
         return `gcc ${quotedPath} -o ${cOutputName} && ./${cOutputName} ${additionalArgs}`.trim();
+      }
       case 'go':
         return `go run ${quotedPath} ${additionalArgs}`.trim();
       case 'rust':

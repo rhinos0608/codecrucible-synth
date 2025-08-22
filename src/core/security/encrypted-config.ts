@@ -74,7 +74,7 @@ export class EncryptedConfig {
   async get<T = any>(key: string, defaultValue?: T): Promise<T> {
     try {
       // Check if value exists in memory cache
-      if (this.config.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(this.config, key)) {
         return this.config[key] as T;
       }
 
@@ -206,7 +206,7 @@ export class EncryptedConfig {
       }
 
       // Remove from memory
-      if (this.config.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(this.config, key)) {
         delete this.config[key];
         removed = true;
       }
@@ -250,14 +250,14 @@ export class EncryptedConfig {
 
     for (const [key, definition] of Object.entries(this.schema)) {
       try {
-        if (definition.required && !this.config.hasOwnProperty(key)) {
+        if (definition.required && !Object.prototype.hasOwnProperty.call(this.config, key)) {
           // Check if it's available as a secret
           if (!definition.sensitive) {
             errors.push(`Required configuration key '${key}' is missing`);
           }
         }
 
-        if (this.config.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(this.config, key)) {
           this.validateValue(key, this.config[key], definition);
         }
       } catch (error) {

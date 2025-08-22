@@ -139,7 +139,7 @@ export class BuildAutomatorTool extends BaseTool {
         if (scripts.compile) return 'yarn compile';
         return 'yarn build';
 
-      case 'webpack':
+      case 'webpack': {
         let webpackCmd = 'npx webpack';
         if (environment === 'production') webpackCmd += ' --mode=production';
         if (environment === 'development') webpackCmd += ' --mode=development';
@@ -147,29 +147,33 @@ export class BuildAutomatorTool extends BaseTool {
         if (optimize) webpackCmd += ' --optimize-minimize';
         if (sourceMaps) webpackCmd += ' --devtool source-map';
         return webpackCmd;
+      }
 
       case 'vite':
         if (watch) return 'npx vite';
         return 'npx vite build';
 
-      case 'rollup':
+      case 'rollup': {
         let rollupCmd = 'npx rollup -c';
         if (watch) rollupCmd += ' --watch';
         if (environment === 'production') rollupCmd += ' --environment NODE_ENV:production';
         return rollupCmd;
+      }
 
-      case 'tsc':
+      case 'tsc': {
         let tscCmd = 'npx tsc';
         if (watch) tscCmd += ' --watch';
         if (sourceMaps) tscCmd += ' --sourceMap';
         return tscCmd;
+      }
 
-      case 'esbuild':
+      case 'esbuild': {
         let esbuildCmd = 'npx esbuild src/index.ts --bundle --outdir=dist';
         if (environment === 'production') esbuildCmd += ' --minify';
         if (sourceMaps) esbuildCmd += ' --sourcemap';
         if (watch) esbuildCmd += ' --watch';
         return esbuildCmd;
+      }
 
       default:
         return 'npm run build';

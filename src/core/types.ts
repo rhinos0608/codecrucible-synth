@@ -158,6 +158,7 @@ export interface SecurityError extends Error {
   risk: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SecurityError extends Error {
   public code: string;
   public risk: string;
@@ -176,6 +177,7 @@ export interface CLIError extends Error {
   exitCode: number;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CLIError extends Error {
   public code: string;
   public exitCode: number;

@@ -2,7 +2,7 @@ import { MCPServer } from '../core/mcp-server-manager.js';
 
 // Simple base class for MCP servers to maintain compatibility
 class BaseMCPServer {
-  protected tools: Record<string, Function> = {};
+  protected tools: Record<string, (...args: any[]) => any> = {};
 
   constructor(
     public id: string,
@@ -908,7 +908,7 @@ export class GitMCPServer extends BaseMCPServer {
           };
         }
 
-        case 'list':
+        case 'list': {
           const { stdout: listOutput } = await execAsync('git stash list', {
             cwd: this.workspaceRoot,
           });
@@ -921,8 +921,9 @@ export class GitMCPServer extends BaseMCPServer {
                 .filter(line => line),
             },
           };
+        }
 
-        case 'show':
+        case 'show': {
           let showCommand = 'git stash show';
           if (index !== undefined) showCommand += ` stash@{${index}}`;
           const { stdout: showOutput } = await execAsync(showCommand, { cwd: this.workspaceRoot });
@@ -930,6 +931,7 @@ export class GitMCPServer extends BaseMCPServer {
             success: true,
             data: { index, diff: showOutput },
           };
+        }
 
         case 'drop':
           if (index === undefined) {

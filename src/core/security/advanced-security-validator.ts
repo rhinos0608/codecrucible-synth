@@ -206,7 +206,7 @@ export class AdvancedSecurityValidator {
         desc: 'Environment variable access',
       },
       {
-        pattern: /\/home\/[^\/]+\/\.ssh/gi,
+        pattern: /\/home\/[^/]+\/\.ssh/gi,
         severity: 'high' as const,
         desc: 'SSH key directory access',
       },

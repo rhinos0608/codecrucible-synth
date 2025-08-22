@@ -128,7 +128,7 @@ export class InputSanitizer {
     const enhancedDangerousPatterns = [
       /[;&|`$(){}[\]\\]/g, // Shell metacharacters
       /\.\./g, // Directory traversal
-      /(rm|del|format|shutdown|reboot|halt)\s*(-[a-zA-Z]*\s*)*\s*[\/\\]*/gi, // Dangerous commands with flags
+      /(rm|del|format|shutdown|reboot|halt)\s*(-[a-zA-Z]*\s*)*\s*[/\\]*/gi, // Dangerous commands with flags
       /(exec\(|eval\(|system\(|spawn\(|require\(['"]child_process)/gi, // Code execution functions with parentheses
       /(<script|javascript:|data:)/gi, // Script injection
       /(union|select|insert|update|delete|drop)/gi, // SQL injection
@@ -156,6 +156,7 @@ export class InputSanitizer {
       .replace(/\s*&&\s*echo\s+[^;|&]*/gi, '[FILTERED]');
 
     // Remove null bytes and control characters (except newlines and tabs)
+    // eslint-disable-next-line no-control-regex
     sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
     return {

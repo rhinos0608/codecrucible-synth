@@ -81,8 +81,8 @@ export class InputValidator {
       ],
       sqlInjectionPatterns: [
         /(\b(select|insert|update|delete|drop|create|alter|exec|execute|union|declare)\b)/gi,
-        /(\b(or|and)\b\s*[\'\"]?\s*[\'\"]?\s*=\s*[\'\"]?\s*[\'\"]?)/gi,
-        /(;|\-\-|\#|\/\*|\*\/)/gi,
+        /(\b(or|and)\b\s*['"]?\s*['"]?\s*=\s*['"]?\s*['"]?)/gi,
+        /(;|--|#|\/\*|\*\/)/gi,
         /(\b(sleep|benchmark|waitfor)\b\s*\()/gi,
       ],
       xssPatterns: [
@@ -98,8 +98,8 @@ export class InputValidator {
         /\.\.\\\\]/gi,
         /%2e%2e%2f/gi,
         /%2e%2e%5c/gi,
-        /\.\.\%2f/gi,
-        /\.\.\%5c/gi,
+        /\\.\\.%2f/gi,
+        /\\.\\.%5c/gi,
       ],
       ...securityConfig,
     };

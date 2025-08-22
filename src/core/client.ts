@@ -28,19 +28,27 @@ import { ActiveProcessManager, ActiveProcess } from './performance/active-proces
 import { unifiedCache } from './cache/unified-cache-system.js';
 import { HybridLLMRouter, HybridConfig } from './hybrid/hybrid-llm-router.js';
 import { intelligentBatchProcessor } from './performance/intelligent-batch-processor.js';
+import { ProviderRepository, ProviderType, IProviderRepository } from './providers/provider-repository.js';
 import { getErrorMessage, isError, toError } from '../utils/error-utils.js';
 import { createHash } from 'crypto';
 import { StreamingManager, IStreamingManager } from './streaming/streaming-manager.js';
+import {
+  ProviderRepository,
+  IProviderRepository,
+  ProviderConfig,
+} from './providers/provider-repository.js';
 
 // Import streaming interfaces from extracted module
-export {
+import type { StreamToken, StreamConfig, StreamMetrics } from './streaming/streaming-manager.js';
+export type {
   StreamToken,
   StreamConfig,
   StreamMetrics,
   IStreamingManager,
 } from './streaming/streaming-manager.js';
 
-export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
+// Re-export provider types from ProviderRepository
+export type { ProviderType, ProviderConfig } from './providers/provider-repository.js';
 export type ExecutionMode = 'fast' | 'auto' | 'quality';
 
 /**
@@ -77,14 +85,7 @@ export function createDefaultUnifiedClientConfig(
   };
 }
 
-export interface ProviderConfig {
-  type: ProviderType;
-  endpoint?: string;
-  apiKey?: string;
-  model?: string;
-  timeout?: number;
-  maxRetries?: number;
-}
+// ProviderConfig moved to ProviderRepository
 
 export interface UnifiedClientConfig extends BaseUnifiedClientConfig {
   providers: ProviderConfig[];
@@ -115,15 +116,16 @@ export interface RequestMetrics {
 
 export class UnifiedModelClient extends EventEmitter {
   private config: UnifiedClientConfig;
-  private providers: Map<ProviderType, any> = new Map();
+  // Provider management extracted to ProviderRepository
+  private providerRepository: IProviderRepository;
   private performanceMonitor: PerformanceMonitor;
   private securityUtils: SecurityUtils;
   private activeRequests: Map<string, RequestMetrics> = new Map();
   private requestQueue: Array<{
     id: string;
     request: ModelRequest;
-    resolve: Function;
-    reject: Function;
+    resolve: (value: any) => void;
+    reject: (reason?: any) => void;
   }> = [];
   private isProcessingQueue = false;
 
@@ -182,6 +184,9 @@ export class UnifiedModelClient extends EventEmitter {
 
     // Initialize streaming manager with configuration
     this.streamingManager = new StreamingManager(config.streaming);
+
+    // Initialize provider repository for extracted provider management
+    this.providerRepository = new ProviderRepository();
 
     // Using unified cache system singleton (no initialization needed)
 
@@ -708,16 +713,8 @@ export class UnifiedModelClient extends EventEmitter {
         similarity: cachedResponse.similarity,
       });
 
-      // Stream cached response progressively (consolidated streaming logic)
-      await this.streamResponseInternal(request.prompt, onToken, async function* (prompt: string) {
-        const content = cachedResponse.value;
-        const chunks = content.match(/.{1,50}/g) || [content]; // 50 char chunks
-
-        for (const chunk of chunks) {
-          await new Promise(resolve => setTimeout(resolve, 20)); // 20ms delay per chunk
-          yield chunk;
-        }
-      });
+      // Stream cached response progressively using StreamingManager
+      await this.streamingManager.startStream(cachedResponse.value, onToken, this.config.streaming);
 
       return {
         content: cachedResponse.value,
@@ -746,28 +743,50 @@ export class UnifiedModelClient extends EventEmitter {
       let fullResponse = '';
       const startTime = Date.now();
 
-      // Create async generator for streaming
-      const generateFn = async function* (prompt: string) {
-        // This would integrate with actual provider streaming
-        // For now, simulating streaming by chunking a generated response
-        const response =
-          'Generated streaming response content that would come from the actual AI model...';
-        const chunks = response.match(/.{1,10}/g) || [response];
-
-        for (const chunk of chunks) {
-          await new Promise(resolve => setTimeout(resolve, 50)); // Simulate streaming delay
-          yield chunk;
+      // Real provider integration for streaming
+      let responseContent: string;
+      
+      try {
+        // Use hybrid routing to get real response from available providers
+        const routingDecision = await this.hybridRouter.routeTask(request.prompt, {
+          taskType: 'general',
+          userIntent: 'code_generation',
+          expectedLength: 'medium',
+          context: context
+        });
+        const providerResponse = await this.processRequestWithHybrid(request, routingDecision);
+        responseContent = providerResponse.content || '';
+        
+        if (!responseContent) {
+          throw new Error('Provider returned empty content');
         }
-      };
+      } catch (error) {
+        // Graceful fallback to available providers
+        logger.warn('Primary provider failed, attempting fallback', error);
+        const availableProviders = this.providerRepository.getAvailableProviders();
+        const fallbackProviderType = availableProviders.keys().next().value;
+        
+        if (fallbackProviderType) {
+          const fallbackProvider = this.providerRepository.getProvider(fallbackProviderType);
+          if (fallbackProvider) {
+            const fallbackResponse = await fallbackProvider.processRequest(request, context);
+            responseContent = fallbackResponse.content || 'Unable to generate response - all providers unavailable';
+          } else {
+            responseContent = 'No AI providers are currently available. Please check your configuration.';
+          }
+        } else {
+          responseContent = 'No AI providers are currently available. Please check your configuration.';
+        }
+      }
 
-      // Stream the response (consolidated streaming logic)
-      await this.streamResponseInternal(
-        request.prompt,
+      // Stream the real response using StreamingManager
+      const streamedContent = await this.streamingManager.startStream(
+        responseContent,
         (token: StreamToken) => {
           fullResponse += token.content;
           onToken(token);
         },
-        generateFn
+        this.config.streaming
       );
 
       const finalResponse: ModelResponse = {
@@ -1423,100 +1442,11 @@ export class UnifiedModelClient extends EventEmitter {
     logger.info('✅ UnifiedModelClient shutdown complete with memory cleanup');
   }
 
-  /**
-   * Internal streaming method (consolidated from enhanced-streaming-client.ts)
-   */
-  private async streamResponseInternal(
-    prompt: string,
-    onToken: (token: StreamToken) => void,
-    generateFn: (prompt: string) => AsyncGenerator<string>
-  ): Promise<void> {
-    const streamId = this.generateStreamId();
+  // Streaming methods removed - now handled by StreamingManager
 
-    try {
-      this.emit('stream-start', streamId);
+  // Stream ID generation moved to StreamingManager
 
-      let tokenIndex = 0;
-      const startTime = Date.now();
-
-      // Initialize metrics for this stream
-      this.streamMetrics.set(streamId, {
-        tokensStreamed: 0,
-        streamDuration: 0,
-        averageLatency: 0,
-        throughput: 0,
-        backpressureEvents: 0,
-      });
-
-      // Stream tokens progressively
-      for await (const chunk of generateFn(prompt)) {
-        const token: StreamToken = {
-          content: chunk,
-          timestamp: Date.now(),
-          index: tokenIndex++,
-          finished: false,
-        };
-
-        // Call token handler
-        onToken(token);
-
-        // Emit token event
-        this.emit('token', token);
-
-        // Update metrics
-        this.updateStreamMetrics(streamId, token);
-
-        // Basic backpressure handling (simplified from enhanced-streaming-client)
-        if (this.config.streaming?.enableBackpressure && tokenIndex % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 1)); // Small delay for backpressure
-        }
-      }
-
-      // Send final token
-      const finalToken: StreamToken = {
-        content: '',
-        timestamp: Date.now(),
-        index: tokenIndex,
-        finished: true,
-        metadata: {
-          totalTokens: tokenIndex,
-          duration: Date.now() - startTime,
-        },
-      };
-
-      onToken(finalToken);
-      this.emit('stream-end', streamId, finalToken);
-    } catch (error) {
-      logger.error(`Streaming error for ${streamId}:`, error);
-      this.emit('stream-error', streamId, error);
-      throw error;
-    } finally {
-      // Cleanup
-      this.streamingSessions.delete(streamId);
-      // Keep metrics for a short time for debugging
-      setTimeout(() => this.streamMetrics.delete(streamId), 60000);
-    }
-  }
-
-  /**
-   * Generate unique stream ID
-   */
-  private generateStreamId(): string {
-    return `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  /**
-   * Update streaming metrics
-   */
-  private updateStreamMetrics(streamId: string, token: StreamToken): void {
-    const metrics = this.streamMetrics.get(streamId);
-    if (metrics) {
-      metrics.tokensStreamed++;
-      metrics.streamDuration = Date.now() - (token.timestamp - token.index * 50); // Approximate
-      metrics.averageLatency = metrics.streamDuration / metrics.tokensStreamed;
-      metrics.throughput = metrics.tokensStreamed / (metrics.streamDuration / 1000);
-    }
-  }
+  // Streaming metrics moved to StreamingManager
 
   // Legacy compatibility methods
   async checkOllamaStatus(): Promise<boolean> {
@@ -2230,11 +2160,12 @@ export class UnifiedModelClient extends EventEmitter {
           synthesizedContent = this.synthesizeDemocratic(voicePerspectives);
           break;
 
-        case 'council':
+        case 'council': {
           const councilResult = this.synthesizeCouncil(voicePerspectives, prompt);
           synthesizedContent = councilResult.content;
           councilDecision = councilResult.decision;
           break;
+        }
 
         default:
           synthesizedContent = this.synthesizeConsensus(voicePerspectives, agreements);
@@ -2460,6 +2391,11 @@ export class UnifiedModelClient extends EventEmitter {
       // Clean up process manager
       if (this.processManager) {
         await this.processManager.destroy();
+      }
+
+      // Clean up streaming manager
+      if (this.streamingManager) {
+        await this.streamingManager.cleanup();
       }
 
       // Clean up integrated system

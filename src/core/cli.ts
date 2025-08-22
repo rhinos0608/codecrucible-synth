@@ -144,7 +144,7 @@ export class CLI {
         securityLevel: 'enterprise',
       });
     } catch (error) {
-      console.warn('⚠️ Failed to build system prompt, using fallback:', getErrorMessage(error));
+      logger.warn('Failed to build system prompt, using fallback', error);
       return `You are CodeCrucible Synth v4.0.4, an AI-powered code generation and analysis tool. Use available tools to assist with software engineering tasks.`;
     }
   }
@@ -154,7 +154,7 @@ export class CLI {
    */
   private getREPL(): InteractiveREPL {
     if (!this.repl) {
-      console.log('🔧 DEBUG: Creating InteractiveREPL on demand');
+      logger.debug('Creating InteractiveREPL on demand');
       this.repl = new InteractiveREPL(this, this.context);
     }
     return this.repl;
@@ -248,7 +248,7 @@ export class CLI {
    * Main CLI entry point
    */
   async run(args: string[]): Promise<void> {
-    console.log('🔧 DEBUG: CLI.run() called with args:', args);
+    logger.debug('CLI.run() called', { args });
     try {
       // Handle help requests
       if (CLIParser.isHelpRequest(args)) {
@@ -270,15 +270,15 @@ export class CLI {
 
       // Initialize if needed
       if (!this.initialized && !options.skipInit) {
-        console.log('🔧 DEBUG: About to initialize CLI');
+        logger.debug('About to initialize CLI');
         await this.initialize();
-        console.log('🔧 DEBUG: CLI initialized');
+        logger.debug('CLI initialized');
       }
 
       // Handle commands
-      console.log('🔧 DEBUG: About to call executeCommand');
+      logger.debug('About to call executeCommand');
       await this.executeCommand(command, remainingArgs, options);
-      console.log('🔧 DEBUG: executeCommand completed');
+      logger.debug('executeCommand completed');
     } catch (error) {
       await this.handleError(error);
     }
@@ -292,7 +292,7 @@ export class CLI {
     args: string[],
     options: CLIOptions
   ): Promise<void> {
-    console.log('🔧 DEBUG: executeCommand called with:', {
+    logger.debug('executeCommand called', {
       command: `"${command}"`,
       args,
       commandLength: command.length,
@@ -362,11 +362,11 @@ export class CLI {
         break;
 
       default:
-        console.log('🔧 DEBUG: In default case with command:', `"${command}"`, 'args:', args);
+        logger.debug('In default case', { command, args });
         // Handle as prompt if no specific command
         if (args.length > 0 || command) {
           const fullPrompt = [command, ...args].filter(Boolean).join(' ');
-          console.log('🔧 DEBUG: About to call processPrompt with:', fullPrompt);
+          logger.debug('About to call processPrompt', { fullPrompt });
           const result = await this.processPrompt(fullPrompt, options);
           console.log(
             '🔧 DEBUG: processPrompt returned:',
@@ -375,14 +375,14 @@ export class CLI {
             !!result
           );
           if (result && typeof result === 'string') {
-            console.log('🔧 DEBUG: About to display result');
+            logger.debug('About to display result');
             console.log(result);
-            console.log('🔧 DEBUG: Result displayed');
+            logger.debug('Result displayed');
           } else {
-            console.log('🔧 DEBUG: Result not displayed - failed condition check');
+            logger.debug('Result not displayed - failed condition check');
           }
         } else {
-          console.log('🔧 DEBUG: No args or command, starting interactive mode');
+          logger.debug('No args or command, starting interactive mode');
           // Interactive mode
           await this.startInteractiveMode(options);
         }
@@ -547,7 +547,7 @@ export class CLI {
    */
   async executePromptProcessing(prompt: string, options: CLIOptions): Promise<string> {
     try {
-      console.log('DEBUG: Starting executePromptProcessing');
+      logger.debug('Starting executePromptProcessing');
 
       // Step 1: Check if this prompt should use autonomous tool execution
       if (this.toolOrchestrator.shouldUseTools(prompt)) {
@@ -575,7 +575,7 @@ export class CLI {
       const taskType = this.analyzeTaskType(prompt);
 
       console.log(chalk.blue(`🎯 Processing in ${currentRole} mode for ${taskType} task`));
-      console.log('DEBUG: About to select model for role');
+      logger.debug('About to select model for role');
 
       // Step 3: Skip dynamic model router for now and use the unified client directly
       console.log(chalk.cyan('🤖 Using unified model client directly'));
@@ -595,7 +595,7 @@ export class CLI {
         console.log('🎯 Building system prompt and calling model client...');
         const systemPrompt = await this.buildSystemPrompt();
         const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}`;
-        console.log('🔧 DEBUG: System prompt injected, calling model...');
+        logger.debug('System prompt injected, calling model');
         const response = await this.context.modelClient.generateText(fullPrompt, {
           timeout: 30000,
         });
@@ -675,7 +675,7 @@ export class CLI {
       const analyzer = new CodebaseAnalyzer(this.workingDirectory);
       return await analyzer.performAnalysis();
     } catch (error) {
-      console.log('DEBUG: Shared analyzer failed, using direct implementation');
+      logger.debug('Shared analyzer failed, using direct implementation');
       // Fallback to direct implementation
       return await this.performDirectCodebaseAnalysisLegacy();
     }
@@ -1773,7 +1773,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         );
       } catch (auditError) {
         // Don't fail on audit logging errors
-        console.warn('Failed to log error to audit system:', auditError);
+        logger.warn('Failed to log error to audit system', auditError);
       }
     }
 

@@ -7,7 +7,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { join } from 'path';
+// import { join } from 'path';
 import { logger } from './logger.js';
 import {
   ProjectContext,
@@ -22,25 +22,25 @@ import {
   IntegratedSystemConfig,
 } from './integration/integrated-system.js';
 import { HardwareAwareModelSelector } from './performance/hardware-aware-model-selector.js';
-import { ToolIntegration, getGlobalToolIntegration } from './tools/tool-integration.js';
+import { getGlobalToolIntegration } from './tools/tool-integration.js';
 import { getGlobalEnhancedToolIntegration } from './tools/enhanced-tool-integration.js';
 import { ActiveProcessManager, ActiveProcess } from './performance/active-process-manager.js';
-import { unifiedCache } from './cache/unified-cache-system.js';
+// import { unifiedCache } from './cache/unified-cache-system.js';
 import { HybridLLMRouter, HybridConfig } from './hybrid/hybrid-llm-router.js';
-import { intelligentBatchProcessor } from './performance/intelligent-batch-processor.js';
+// import { intelligentBatchProcessor } from './performance/intelligent-batch-processor.js';
 import {
   ProviderRepository,
   ProviderType,
   IProviderRepository,
   ProviderConfig,
 } from './providers/provider-repository.js';
-import { getErrorMessage, isError, toError } from '../utils/error-utils.js';
+import { getErrorMessage, toError } from '../utils/error-utils.js';
 import { createHash } from 'crypto';
 import { StreamingManager, IStreamingManager } from './streaming/streaming-manager.js';
 import { CacheCoordinator, ICacheCoordinator } from './caching/cache-coordinator.js';
 
 // Import streaming interfaces from extracted module
-import type { StreamToken, StreamConfig, StreamMetrics } from './streaming/streaming-manager.js';
+import type { StreamToken, StreamConfig } from './streaming/streaming-manager.js';
 export type {
   StreamToken,
   StreamConfig,
@@ -269,7 +269,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
    * Initialize providers - must be called after constructor
    */
   async initialize(): Promise<void> {
-    console.log('🚀 Starting async initialization...');
+    logger.info('Starting async initialization');
 
     // Mark as initialized immediately for basic functionality
     this.initialized = true;
@@ -277,11 +277,11 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     // Start provider initialization in background (non-blocking)
     this.initializeProvidersAsync()
       .then(() => {
-        console.log('✅ Background provider initialization completed');
+        logger.info('Background provider initialization completed');
         this.emit('providers-ready');
       })
       .catch(error => {
-        console.warn('⚠️ Background provider initialization had issues:', error);
+        logger.warn('Background provider initialization had issues', error);
         this.emit('providers-partial', { error });
       });
 
@@ -290,11 +290,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       const optimalConfig = await this.hardwareSelector.getOptimalModelForHardware();
       this.currentModel = optimalConfig.writer.model;
       this.hardwareSelector.setCurrentModel(this.currentModel);
-      console.log(`✅ Immediate initialization completed with model: ${this.currentModel}`);
+      logger.info('Immediate initialization completed', { model: this.currentModel });
     } catch (error) {
-      console.warn(
-        '⚠️ Could not determine optimal model immediately, will retry when providers are ready'
-      );
+      logger.warn('Could not determine optimal model immediately, will retry when providers are ready');
       this.currentModel = 'auto'; // Fallback
     }
   }
@@ -357,7 +355,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
    * Async provider initialization - runs in background without blocking CLI startup
    */
   private async initializeProvidersAsync(): Promise<void> {
-    console.log('🔧 Starting background provider initialization...');
+    logger.info('Starting background provider initialization');
     const startTime = Date.now();
 
     // Track initialization state
@@ -367,7 +365,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     const initPromises = this.config.providers.map(async providerConfig => {
       const providerStartTime = Date.now();
       try {
-        console.log(`🔧 Initializing provider: ${providerConfig.type}`);
+        logger.debug('Initializing provider', { type: providerConfig.type });
 
         // Add timeout for individual provider initialization
         const initTimeout = 10000; // 10 second timeout per provider
@@ -385,7 +383,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         const duration = Date.now() - providerStartTime;
 
         initResults.set(providerConfig.type, { success: true, duration });
-        console.log(`✅ Provider ${providerConfig.type} initialized in ${duration}ms`);
+        logger.info('Provider initialized', { type: providerConfig.type, duration });
 
         // Emit individual provider ready event
         this.emit('provider-ready', { type: providerConfig.type, provider, duration });
@@ -396,10 +394,11 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         const errorObj = error instanceof Error ? error : new Error(String(error));
 
         initResults.set(providerConfig.type, { success: false, error: errorObj, duration });
-        console.warn(
-          `⚠️ Provider ${providerConfig.type} failed in ${duration}ms:`,
-          errorObj.message
-        );
+        logger.warn('Provider failed', { 
+          type: providerConfig.type, 
+          duration, 
+          error: errorObj.message 
+        });
 
         // Emit provider failure event
         this.emit('provider-failed', { type: providerConfig.type, error: errorObj, duration });
@@ -409,15 +408,17 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     });
 
     // Wait for all providers to complete (success or failure)
-    const results = await Promise.allSettled(initPromises);
+    await Promise.allSettled(initPromises);
 
     const totalDuration = Date.now() - startTime;
     const successCount = this.providerRepository.getAvailableProviders().size;
     const totalCount = this.config.providers.length;
 
-    console.log(
-      `🔧 Provider initialization completed: ${successCount}/${totalCount} providers in ${totalDuration}ms`
-    );
+    logger.info('Provider initialization completed', {
+      successful: successCount,
+      total: totalCount,
+      duration: totalDuration
+    });
 
     // Log detailed results
     for (const [providerType, result] of initResults) {
@@ -446,10 +447,10 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       if (this.currentModel === 'auto' || !this.currentModel) {
         this.currentModel = optimalConfig.writer.model;
         this.hardwareSelector.setCurrentModel(this.currentModel);
-        console.log(`🔧 Updated to optimal model: ${this.currentModel}`);
+        logger.info('Updated to optimal model', { model: this.currentModel });
       }
     } catch (error) {
-      console.warn('⚠️ Could not update optimal model configuration:', error);
+      logger.warn('Could not update optimal model configuration', error);
     }
   }
 
@@ -474,7 +475,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
       case 'huggingface': {
         // HuggingFace provider is not yet implemented - fallback to Ollama
-        console.warn('HuggingFace provider not implemented, falling back to Ollama');
+        logger.warn('HuggingFace provider not implemented, falling back to Ollama');
         const { OllamaProvider: HFOllamaProvider } = await import('../providers/ollama.js');
         return new (HFOllamaProvider as any)({ ...config, type: 'ollama' });
       }
@@ -492,7 +493,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     const cacheKey = this.cacheCoordinator.generateIntelligentCacheKey(request);
     const cached = await this.cacheCoordinator.get(cacheKey);
     if (cached && this.cacheCoordinator.shouldUseIntelligentCache(request)) {
-      console.log('🧠 Returning cached response');
+      logger.debug('Returning cached response');
       return { ...cached, fromCache: true };
     }
 
@@ -529,12 +530,14 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     const tools = supportsTools && toolIntegration ? toolIntegration.getLLMFunctions() : [];
 
     // DEBUG: Log tool integration status
-    console.log(
-      `🔧 TOOL DEBUG: Provider=${selectedProvider}, Model=${request.model}, SupportsTools=${supportsTools}`
-    );
-    console.log(`🔧 TOOL DEBUG: ToolIntegration=${!!toolIntegration}, ToolCount=${tools.length}`);
+    logger.debug('Tool debug info', {
+      provider: selectedProvider,
+      model: request.model,
+      supportsTools
+    });
+    logger.debug('Tool integration status', { hasIntegration: !!toolIntegration, toolCount: tools.length });
     if (tools.length > 0) {
-      console.log(`🔧 TOOL DEBUG: Available tools: ${tools.map(t => t.function.name).join(', ')}`);
+      logger.debug('Available tools', { tools: tools.map(t => t.function.name) });
     }
 
     const modelRequest: ModelRequest = {
@@ -578,7 +581,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     // INTELLIGENT CACHING: Cache with content-aware TTL
     if (this.cacheCoordinator.shouldUseIntelligentCache(request)) {
       this.cacheCoordinator.set(cacheKey, result);
-      console.log('🧠 Response cached with intelligent TTL');
+      logger.debug('Response cached with intelligent TTL');
     }
 
     return result;
@@ -595,7 +598,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private selectProvider(model?: string): any {
     // Select provider based on model or availability
     if (model) {
-      for (const [type, provider] of this.providerRepository.getAvailableProviders()) {
+      for (const [, provider] of this.providerRepository.getAvailableProviders()) {
         if (provider.supportsModel && provider.supportsModel(model)) {
           return provider;
         }
@@ -607,25 +610,25 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
 
   async processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
-    console.log('🔄 processRequest started');
+    logger.debug('processRequest started');
 
     // PERFORMANCE: Temporarily bypass semantic cache to fix hanging
-    console.log('🔄 Bypassing semantic cache (disabled for debugging)...');
+    logger.debug('Bypassing semantic cache (disabled for debugging)');
     // const cacheKey = `${request.prompt}::${request.model || 'default'}`;
     // const cachedResponse = await semanticCache.getCachedResponse(
     //   request.prompt,
     //   context?.files?.map(f => f.path) || []
     // );
-    console.log('✅ Cache bypass complete');
+    logger.debug('Cache bypass complete');
     const requestId = this.generateRequestId();
     logger.info(`📨 Processing request ${requestId}`, {
       prompt: request.prompt.substring(0, 100) + '...',
     });
 
     // CRITICAL SECURITY: ALWAYS validate input - cannot be bypassed
-    console.log('🔄 Starting security validation...');
+    logger.debug('Starting security validation');
     const validation = await this.securityValidator.validateRequest(request);
-    console.log('✅ Security validation complete');
+    logger.debug('Security validation complete');
     if (!validation.isValid) {
       throw new Error(`Security validation failed: ${validation.reason}`);
     }
@@ -793,7 +796,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       }
 
       // Stream the real response using StreamingManager
-      const streamedContent = await this.streamingManager.startStream(
+      await this.streamingManager.startStream(
         responseContent,
         (token: StreamToken) => {
           fullResponse += token.content;
@@ -883,6 +886,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   /**
    * Determine request priority
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private getRequestPriority(request: ModelRequest): ActiveProcess['priority'] {
     // Default to medium priority
     // Could be enhanced with explicit priority in request
@@ -1002,9 +1006,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     if (provider === 'ollama') {
       // If no specific model provided, assume auto-selection will pick a supported model
       if (!model) {
-        console.log(
-          '🔧 TOOL DEBUG: No specific model provided, assuming auto-selection will pick supported model'
-        );
+        logger.debug('No specific model provided, assuming auto-selection will pick supported model');
         return true; // Trust that auto-selection picks qwen2.5-coder which supports tools
       }
 
@@ -1024,7 +1026,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       const isSupported = supportedModels.some(supportedModel =>
         model_name.includes(supportedModel)
       );
-      console.log(`🔧 TOOL DEBUG: Model ${model_name} support check: ${isSupported}`);
+      logger.debug('Model tool support check', { model: model_name, isSupported });
       return isSupported;
     }
 
@@ -1036,6 +1038,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     request: ModelRequest,
     context: ProjectContext | undefined,
     strategy: { mode: ExecutionMode; provider: ProviderType; timeout: number; complexity: string },
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     abortSignal?: AbortSignal
   ): Promise<ModelResponse> {
     const fallbackChain =
@@ -1343,6 +1346,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async addApiModel(config: any): Promise<boolean> {
     // Implementation for API model management
     return true;
@@ -1352,11 +1356,13 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return this.testModel(modelName);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   removeApiModel(modelName: string): boolean {
     // Implementation for API model removal
     return true;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async autoSetup(force: boolean = false): Promise<any> {
     return { success: true, message: 'Auto setup complete' };
   }
@@ -1364,13 +1370,13 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   async generateText(prompt: string, options?: any): Promise<string> {
     const timeout = options?.timeout || 30000; // Increased to 30s for complex operations
 
-    console.log(`🔄 generateText called with timeout: ${timeout}ms`);
+    logger.debug('generateText called', { timeout });
 
     // Use AbortController for proper request cancellation
     const abortController = new AbortController();
 
     const timeoutId = setTimeout(() => {
-      console.log('⏰ Timeout triggered - aborting request');
+      logger.warn('Timeout triggered - aborting request');
       abortController.abort();
     }, timeout);
 
@@ -1382,7 +1388,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       });
 
       clearTimeout(timeoutId);
-      console.log('✅ generateText completed successfully');
+      logger.debug('generateText completed successfully');
       return response.text || response.content || response.response || '';
     } catch (error: unknown) {
       clearTimeout(timeoutId);
@@ -1394,7 +1400,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       }
 
       const errorMessage = getErrorMessage(error);
-      console.error('❌ generateText error:', errorMessage);
+      logger.error('generateText error', error);
 
       // Graceful error handling with helpful messages
       if (errorMessage.includes('ECONNREFUSED')) {
@@ -2107,6 +2113,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private synthesizeDebate(
     perspectives: any[],
     agreements: string[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     disagreements: any[]
   ): string {
     let synthesis = 'After considering multiple perspectives through debate:\n\n';
@@ -2127,6 +2134,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   /**
    * Helper: Synthesize hierarchical view
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private synthesizeHierarchical(perspectives: any[], voices: string[]): string {
     // Priority order for voices
     const priority = ['security', 'architect', 'maintainer', 'developer', 'explorer'];
@@ -2161,6 +2169,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   /**
    * Helper: Synthesize council decision
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private synthesizeCouncil(perspectives: any[], prompt: string): any {
     const votes: Record<string, string> = {};
     const conditions: string[] = [];

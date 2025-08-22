@@ -508,7 +508,7 @@ export class PerformanceOptimizer {
 
   private analyzeModelPerformance(taskType: string, patterns: LearningPattern[]): any {
     // Analyze which models perform best for this task type
-    const modelStats = new Map<
+    const _modelStats = new Map<
       string,
       { count: number; avgPerformance: number; successRate: number }
     >();
@@ -541,7 +541,7 @@ export class PerformanceOptimizer {
 
   private analyzeToolPerformance(objective: string, patterns: LearningPattern[]): any {
     // Analyze which tools work best for this objective
-    const toolStats = new Map<
+    const _toolStats = new Map<
       string,
       { count: number; avgPerformance: number; successRate: number }
     >();

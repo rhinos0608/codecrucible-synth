@@ -256,7 +256,7 @@ export class JWTAuthenticator {
    */
   async revokeAllUserTokens(userId: string): Promise<void> {
     // Deactivate all user sessions
-    for (const [sessionId, session] of this.activeSessions.entries()) {
+    for (const [_sessionId, session] of this.activeSessions.entries()) {
       if (session.userId === userId) {
         session.isActive = false;
       }

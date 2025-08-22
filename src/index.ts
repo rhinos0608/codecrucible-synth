@@ -5,6 +5,7 @@ import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { getErrorMessage } from './utils/error-utils.js';
 import { createSystem } from './core/di/system-bootstrap.js';
+import { logger } from './core/logger.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -222,14 +223,14 @@ export async function main() {
 
     // Check if we have piped input
     const isInteractive = process.stdin.isTTY;
-    console.log('🔧 DEBUG: isInteractive:', isInteractive, 'args.length:', args.length);
+    logger.debug('CLI invocation details', { isInteractive, argsLength: args.length });
 
     // If we have arguments or piped input, process them
     if (args.length > 0) {
-      console.log('🔧 DEBUG: Taking args.length > 0 branch with args:', args);
+      logger.debug('Taking args.length > 0 branch', { args });
       await cli.run(args);
     } else if (!isInteractive) {
-      console.log('🔧 DEBUG: Processing piped input directly, bypassing CLI race condition');
+      logger.debug('Processing piped input directly, bypassing CLI race condition');
       // Handle piped input directly without CLI.run() to avoid race condition
       let inputData = '';
       process.stdin.setEncoding('utf8');
@@ -239,7 +240,7 @@ export async function main() {
       }
 
       if (inputData.trim()) {
-        console.log('🔧 DEBUG: Processing piped input:', inputData.trim().substring(0, 50) + '...');
+        logger.debug('Processing piped input', { inputPreview: inputData.trim().substring(0, 50) + '...' });
         // Process through CLI to get system prompt injection and tool orchestration
         try {
           const response = await cli.processPrompt(inputData.trim(), {});
@@ -249,7 +250,7 @@ export async function main() {
           console.error('❌ Error processing input:', getErrorMessage(error));
         }
       } else {
-        console.log('🔧 DEBUG: No piped input received');
+        logger.debug('No piped input received');
       }
     } else {
       console.log(

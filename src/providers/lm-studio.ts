@@ -53,7 +53,7 @@ export class LMStudioProvider {
       },
     });
 
-    console.log('🔗 LM Studio: HTTP connection pooling configured (maxSockets: 5, keepAlive: 30s)');
+    logger.debug('LM Studio HTTP connection pooling configured', { maxSockets: 5, keepAlive: '30s' });
   }
 
   async processRequest(request: any, _context?: any): Promise<any> {
@@ -77,7 +77,7 @@ export class LMStudioProvider {
     let timeoutId: NodeJS.Timeout | undefined;
     if (!externalAbortSignal && abortController) {
       timeoutId = setTimeout(() => {
-        console.log('🤖 DEBUG: LM Studio request timeout, aborting...');
+        logger.debug('LM Studio request timeout, aborting');
         abortController.abort();
       }, this.config.timeout || 30000);
     }

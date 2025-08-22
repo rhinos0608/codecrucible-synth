@@ -20,7 +20,7 @@ export class OllamaProvider {
   private isAvailable: boolean = false;
 
   constructor(config: OllamaConfig) {
-    console.log('🤖 DEBUG: OllamaProvider constructor called with config:', config);
+    logger.debug('OllamaProvider constructor called', { config });
 
     this.config = {
       endpoint: config.endpoint || 'http://localhost:11434',
@@ -29,7 +29,7 @@ export class OllamaProvider {
     };
 
     this.model = this.config.model || 'auto-detect'; // Mark for autonomous detection
-    console.log('🤖 DEBUG: OllamaProvider model state:', this.model);
+    logger.debug('OllamaProvider model state', { model: this.model });
 
     // Create HTTP agents with connection pooling for performance optimization
     const httpAgent = new http.Agent({
@@ -57,12 +57,12 @@ export class OllamaProvider {
       },
     });
 
-    console.log('🔗 Ollama: HTTP connection pooling configured (maxSockets: 10, keepAlive: 30s)');
+    logger.debug('Ollama HTTP connection pooling configured', { maxSockets: 10, keepAlive: '30s' });
   }
 
   async processRequest(request: any, _context?: any): Promise<any> {
-    console.log('🤖 DEBUG: OllamaProvider.processRequest called');
-    console.log('🤖 DEBUG: Request object:', {
+    logger.debug('OllamaProvider.processRequest called');
+    logger.debug('OllamaProvider request object', {
       prompt: (request.prompt || '').substring(0, 200) + '...',
       model: request.model,
       temperature: request.temperature,
@@ -72,26 +72,26 @@ export class OllamaProvider {
 
     try {
       // Check status and perform autonomous model detection
-      console.log('🤖 DEBUG: Checking Ollama availability and detecting models...');
+      logger.debug('Checking Ollama availability and detecting models');
 
       // Check status and perform autonomous model detection
       if (!this.isAvailable || this.model === 'auto-detect') {
-        console.log('🤖 DEBUG: Performing model detection and status check...');
+        logger.debug('Performing model detection and status check');
         await this.checkStatus();
       }
-      console.log('🤖 DEBUG: Ollama is available, using model:', this.model);
+      logger.debug('Ollama is available', { model: this.model });
 
       const result = await this.generate(request);
-      console.log('🤖 DEBUG: OllamaProvider response received, length:', result?.content?.length);
+      logger.debug('OllamaProvider response received', { contentLength: result?.content?.length });
       return result;
     } catch (error: unknown) {
-      console.error('🤖 ERROR: OllamaProvider error:', getErrorMessage(error));
+      logger.error('OllamaProvider error', error);
       throw error;
     }
   }
 
   async generate(request: any): Promise<any> {
-    console.log('🤖 DEBUG: generate method started');
+    logger.debug('OllamaProvider generate method started');
 
     // Use external AbortSignal if provided, otherwise create our own
     const externalAbortSignal = request.abortSignal;
@@ -101,7 +101,7 @@ export class OllamaProvider {
     let timeoutId: NodeJS.Timeout | undefined;
     if (!externalAbortSignal && abortController) {
       timeoutId = setTimeout(() => {
-        console.log('🤖 DEBUG: Ollama request timeout, aborting...');
+        logger.debug('Ollama request timeout, aborting');
         abortController.abort();
       }, this.config.timeout || 30000);
     }
@@ -120,7 +120,7 @@ export class OllamaProvider {
         },
       };
 
-      console.log('🤖 DEBUG: Sending request to Ollama API...', {
+      logger.debug('Sending request to Ollama API', {
         url: `${this.config.endpoint}/api/generate`,
         model: this.model,
         promptLength: request.prompt?.length || 0,
@@ -132,7 +132,7 @@ export class OllamaProvider {
       });
 
       if (timeoutId) clearTimeout(timeoutId);
-      console.log('🤖 DEBUG: Received response from Ollama API');
+      logger.debug('Received response from Ollama API');
 
       return {
         content: response.data.response || '',
@@ -147,7 +147,7 @@ export class OllamaProvider {
       };
     } catch (error: unknown) {
       if (timeoutId) clearTimeout(timeoutId);
-      console.error('🤖 ERROR: Ollama API error:', getErrorMessage(error));
+      logger.error('Ollama API error', error);
 
       if ((error as any)?.name === 'AbortError') {
         throw new Error('Ollama API request timed out');
@@ -155,7 +155,7 @@ export class OllamaProvider {
 
       // Fallback response for debugging
       if ((error as any)?.code === 'ECONNREFUSED') {
-        console.log('🤖 WARNING: Ollama not available, using fallback response');
+        logger.warn('Ollama not available, using fallback response');
         return {
           content: `I understand you want to work with this code, but I'm unable to connect to Ollama right now. The request was: "${request.prompt?.substring(0, 100)}..."`,
           usage: { totalTokens: 20, promptTokens: 10, completionTokens: 10 },
@@ -170,11 +170,11 @@ export class OllamaProvider {
   }
 
   async checkStatus(): Promise<boolean> {
-    console.log('🤖 DEBUG: Checking Ollama status...');
+    logger.debug('Checking Ollama status');
 
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('🤖 DEBUG: Status check timeout, aborting...');
+      logger.debug('Status check timeout, aborting');
       abortController.abort();
     }, 5000); // Shorter timeout for status checks
 
@@ -188,7 +188,7 @@ export class OllamaProvider {
 
       if (response.data && response.data.models) {
         const availableModels = response.data.models.map((m: any) => m.name);
-        console.log('🤖 DEBUG: Available Ollama models:', availableModels);
+        logger.debug('Available Ollama models', { availableModels });
 
         // Set model based on configuration or default to first available
         if (!this.model || this.model === 'auto-detect') {
@@ -197,7 +197,7 @@ export class OllamaProvider {
             availableModels.find((m: string) => preferredModels.includes(m)) ||
             availableModels[0] ||
             'qwen2.5-coder:3b';
-          console.log('🤖 DEBUG: Selected model:', this.model);
+          logger.debug('Selected model', { model: this.model });
         }
 
         this.isAvailable = true;
@@ -207,7 +207,7 @@ export class OllamaProvider {
       return false;
     } catch (error: unknown) {
       clearTimeout(timeoutId);
-      console.log('🤖 WARNING: Ollama not available:', getErrorMessage(error));
+      logger.warn('Ollama not available', error);
       this.isAvailable = false;
       // Set fallback model for offline scenarios
       if (!this.model || this.model === 'auto-detect') {
@@ -218,7 +218,7 @@ export class OllamaProvider {
   }
 
   async listModels(): Promise<string[]> {
-    console.log('🤖 DEBUG: Listing Ollama models...');
+    logger.debug('Listing Ollama models');
 
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => {
@@ -235,20 +235,20 @@ export class OllamaProvider {
 
       if (response.data && response.data.models) {
         const models = response.data.models.map((m: any) => m.name);
-        console.log('🤖 DEBUG: Found models:', models);
+        logger.debug('Found models', { models });
         return models;
       }
 
       return [];
     } catch (error: unknown) {
       clearTimeout(timeoutId);
-      console.log('🤖 WARNING: Could not list models:', getErrorMessage(error));
+      logger.warn('Could not list models', error);
       return ['qwen2.5-coder:3b', 'deepseek-coder:8b']; // Fallback list
     }
   }
 
   async warmModel(): Promise<void> {
-    console.log(`🤖 ✅ Model ${this.model} is ready (simplified)`);
+    logger.info('Model is ready', { model: this.model });
   }
 
   private getGPUConfig(): any {

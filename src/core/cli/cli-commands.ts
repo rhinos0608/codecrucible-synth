@@ -8,10 +8,11 @@ import ora from 'ora';
 import { readFile, stat } from 'fs/promises';
 import { join, extname, isAbsolute } from 'path';
 import { glob } from 'glob';
+import { logger } from '../logger.js';
 
 import { CLIOptions, CLIContext } from './cli-types.js';
-import { CLIDisplay } from './cli-display.js';
-import { ProjectContext } from '../client.js';
+// import { CLIDisplay } from './cli-display.js';
+// import { ProjectContext } from '../client.js';
 import { startServerMode, ServerOptions } from '../../server/server-mode.js';
 import { analysisWorkerPool, AnalysisTask } from '../workers/analysis-worker.js';
 import { randomUUID } from 'crypto';
@@ -35,9 +36,9 @@ export class CLICommands {
     console.log(chalk.cyan('🤖 Model Client:'));
     try {
       if (this.context.modelClient) {
-        console.log('DEBUG: About to call healthCheck...');
+        logger.debug('About to call healthCheck');
         const healthCheck = await this.context.modelClient.healthCheck();
-        console.log('DEBUG: HealthCheck completed:', healthCheck);
+        logger.debug('HealthCheck completed', { healthCheck });
         console.log(chalk.green(`  ✅ Status: ${healthCheck ? 'Connected' : 'Disconnected'}`));
 
         if (typeof (this.context.modelClient as any).getCurrentModel === 'function') {
@@ -223,17 +224,17 @@ export class CLICommands {
       console.log(chalk.cyan('🔍 Performing comprehensive codebase analysis...'));
 
       try {
-        console.log('DEBUG: About to import CodebaseAnalyzer');
+        logger.debug('About to import CodebaseAnalyzer');
         const { CodebaseAnalyzer } = await import('../analysis/codebase-analyzer.js');
-        console.log('DEBUG: CodebaseAnalyzer imported successfully');
+        logger.debug('CodebaseAnalyzer imported successfully');
         const analyzer = new CodebaseAnalyzer(this.workingDirectory);
-        console.log('DEBUG: Analyzer created, starting analysis');
+        logger.debug('Analyzer created, starting analysis');
         const analysis = await analyzer.performAnalysis();
-        console.log('DEBUG: Analysis completed');
+        logger.debug('Analysis completed');
         console.log(analysis);
       } catch (error) {
         console.error(chalk.red('❌ Analysis failed:'), error);
-        console.log('DEBUG: Falling back to original analysis');
+        logger.debug('Falling back to original analysis');
         // For now, just show a message instead of hanging
         console.log(
           chalk.yellow('🔧 Real-time analysis temporarily unavailable. Using fallback method.')

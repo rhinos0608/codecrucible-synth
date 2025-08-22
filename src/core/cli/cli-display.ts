@@ -4,8 +4,8 @@
  */
 
 import chalk from 'chalk';
-import ora from 'ora';
-import { SynthesisResult, ExecutionRequest } from '../types.js';
+// import ora from 'ora';
+import { SynthesisResult } from '../types.js';
 
 export class CLIDisplay {
   /**

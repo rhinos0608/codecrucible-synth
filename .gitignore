@@ -124,8 +124,7 @@ archive/
 master.key
 *.key
 .secrets/
-secrets/test*.json
-secrets/key-test*.json
+secrets/
 audit-logs/
 custom-test-logs/
 test-logs/

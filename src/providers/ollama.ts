@@ -5,7 +5,10 @@ import { logger } from '../core/logger.js';
 import { readFileSync, existsSync } from 'fs';
 import { load as loadYaml } from 'js-yaml';
 import { join } from 'path';
+<<<<<<< HEAD
 import { modelCoordinator } from '../core/model-selection-coordinator.js';
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
 
 export interface OllamaConfig {
   endpoint?: string;
@@ -33,6 +36,7 @@ export class OllamaProvider {
 
     this.httpClient = axios.create({
       baseURL: this.config.endpoint,
+<<<<<<< HEAD
       timeout: 0, // Disable default timeout, use AbortController
       headers: {
         'Content-Type': 'application/json',
@@ -40,6 +44,12 @@ export class OllamaProvider {
       // Add connection keepalive for better performance
       httpAgent: new http.Agent({ keepAlive: true }),
       httpsAgent: new https.Agent({ keepAlive: true }),
+=======
+      timeout: this.config.timeout,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
     });
   }
 
@@ -77,6 +87,7 @@ export class OllamaProvider {
     console.log('🤖 DEBUG: generate method started');
     
     const abortController = new AbortController();
+<<<<<<< HEAD
     
     // Separate connection and response timeouts (2025 best practice with adaptive scaling)
     const connectionTimeout = setTimeout(() => {
@@ -213,11 +224,54 @@ export class OllamaProvider {
         content,
         toolCalls,
         usage,
+=======
+    const timeoutId = setTimeout(() => {
+      console.log('🤖 DEBUG: HTTP request timeout, aborting...');
+      abortController.abort();
+    }, this.config.timeout || 30000);
+
+    try {
+      const requestBody = {
+        model: this.model,
+        prompt: request.prompt,
+        stream: false,
+        options: {
+          temperature: request.temperature || 0.1,
+          num_predict: request.maxTokens || 2048,
+          top_p: 0.9,
+          top_k: 40,
+          ...this.getGPUConfig()
+        }
+      };
+
+      console.log('🤖 DEBUG: Sending request to Ollama API...', {
+        url: `${this.config.endpoint}/api/generate`,
+        model: this.model,
+        promptLength: request.prompt?.length || 0
+      });
+
+      const response = await this.httpClient.post('/api/generate', requestBody, {
+        signal: abortController.signal,
+        timeout: this.config.timeout
+      });
+
+      clearTimeout(timeoutId);
+      console.log('🤖 DEBUG: Received response from Ollama API');
+
+      return {
+        content: response.data.response || '',
+        usage: {
+          totalTokens: (response.data.prompt_eval_count || 0) + (response.data.eval_count || 0),
+          promptTokens: response.data.prompt_eval_count || 0,
+          completionTokens: response.data.eval_count || 0
+        },
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
         done: response.data.done || true,
         model: this.model,
         provider: 'ollama'
       };
     } catch (error) {
+<<<<<<< HEAD
       clearTimeout(connectionTimeout);
       clearTimeout(responseTimeout);
       console.error('🤖 ERROR: Ollama API error:', error.message);
@@ -225,6 +279,13 @@ export class OllamaProvider {
       if (abortController.signal.aborted) {
         const reason = abortController.signal.reason || 'timeout';
         throw new Error(`Ollama API request ${reason}`);
+=======
+      clearTimeout(timeoutId);
+      console.error('🤖 ERROR: Ollama API error:', error.message);
+      
+      if (error.name === 'AbortError') {
+        throw new Error('Ollama API request timed out');
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       }
       
       // Fallback response for debugging
@@ -249,12 +310,21 @@ export class OllamaProvider {
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => {
       console.log('🤖 DEBUG: Status check timeout, aborting...');
+<<<<<<< HEAD
       abortController.abort('status_check_timeout');
+=======
+      abortController.abort();
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
     }, 5000); // Shorter timeout for status checks
 
     try {
       const response = await this.httpClient.get('/api/tags', {
+<<<<<<< HEAD
         signal: abortController.signal
+=======
+        signal: abortController.signal,
+        timeout: 5000
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       });
       
       clearTimeout(timeoutId);
@@ -263,6 +333,7 @@ export class OllamaProvider {
         const availableModels = response.data.models.map((m: any) => m.name);
         console.log('🤖 DEBUG: Available Ollama models:', availableModels);
         
+<<<<<<< HEAD
         // Use ModelSelectionCoordinator for consistent model selection
         if (!this.model || this.model === 'auto-detect') {
           const selection = await modelCoordinator.selectModel('ollama', 'general', availableModels);
@@ -279,6 +350,15 @@ export class OllamaProvider {
           responseTime: '<30s'
         });
         
+=======
+        // Set model based on configuration or default to first available
+        if (!this.model || this.model === 'auto-detect') {
+          const preferredModels = ['qwen2.5-coder:7b', 'qwen2.5-coder:3b', 'deepseek-coder:8b'];
+          this.model = availableModels.find((m: string) => preferredModels.includes(m)) || availableModels[0] || 'qwen2.5-coder:3b';
+          console.log('🤖 DEBUG: Selected model:', this.model);
+        }
+        
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
         this.isAvailable = true;
         return true;
       }
@@ -288,11 +368,17 @@ export class OllamaProvider {
       clearTimeout(timeoutId);
       console.log('🤖 WARNING: Ollama not available:', error.message);
       this.isAvailable = false;
+<<<<<<< HEAD
       // Use coordinator for fallback model selection
       if (!this.model || this.model === 'auto-detect') {
         const selection = await modelCoordinator.selectModel('ollama', 'general', []);
         this.model = selection.model;
         console.log('🤖 DEBUG: Using fallback model:', this.model);
+=======
+      // Set fallback model for offline scenarios
+      if (!this.model || this.model === 'auto-detect') {
+        this.model = 'qwen2.5-coder:3b';
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       }
       return false;
     }
@@ -332,6 +418,7 @@ export class OllamaProvider {
     console.log(`🤖 ✅ Model ${this.model} is ready (simplified)`);
   }
 
+<<<<<<< HEAD
   /**
    * Calculate adaptive connection timeout based on model initialization requirements
    * Connection timeout is for model loading/warmup, not processing
@@ -435,6 +522,8 @@ export class OllamaProvider {
     return boundedTimeout;
   }
 
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
   private getGPUConfig(): any {
     return {
       num_gpu: 0,

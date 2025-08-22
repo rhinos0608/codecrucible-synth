@@ -68,6 +68,7 @@ export interface CLIOptions {
   writerModel?: string;
   auditorModel?: string;
 
+<<<<<<< HEAD
   // Sequential Review System options
   sequentialReview?: boolean;
   writerProvider?: 'ollama' | 'lm-studio';
@@ -82,6 +83,8 @@ export interface CLIOptions {
   saveResult?: boolean;
   showCode?: boolean;
 
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
   // VRAM management options
   status?: boolean;
   optimize?: boolean;

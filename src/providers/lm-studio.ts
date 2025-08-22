@@ -25,7 +25,11 @@ export class LMStudioProvider {
 
     this.httpClient = axios.create({
       baseURL: this.config.endpoint,
+<<<<<<< HEAD
       timeout: 0, // Disable default timeout, use AbortController for context-aware timeouts
+=======
+      timeout: this.config.timeout,
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       headers: {
         'Content-Type': 'application/json',
         ...(config.apiKey && { Authorization: `Bearer ${config.apiKey}` }),
@@ -52,6 +56,7 @@ export class LMStudioProvider {
         await this.selectOptimalModel();
       }
 
+<<<<<<< HEAD
       // Context-aware timeout calculation
       const abortController = new AbortController();
       const contextTimeout = this.getContextAwareTimeout(request);
@@ -63,6 +68,8 @@ export class LMStudioProvider {
 
       console.log(`🏛️ DEBUG: LM Studio context-aware timeout: ${Math.round(contextTimeout/1000)}s for ${this.estimateTokens(request)} tokens`);
 
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       const response = await this.httpClient.post('/v1/chat/completions', {
         model: this.model,
         messages: [
@@ -101,11 +108,16 @@ Your audit should be thorough but concise, focusing on actionable feedback to en
         temperature: request.temperature || 0.7,
         max_tokens: request.maxTokens || request.max_tokens || 16384,
         stream: false,
+<<<<<<< HEAD
         signal: abortController.signal,
       });
 
       clearTimeout(timeoutId);
 
+=======
+      });
+
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       const choice = response.data.choices?.[0];
       if (!choice) {
         throw new Error('No response choices returned from LM Studio');
@@ -217,6 +229,7 @@ Your audit should be thorough but concise, focusing on actionable feedback to en
   getModelName(): string {
     return this.model;
   }
+<<<<<<< HEAD
 
   /**
    * Estimate total tokens for context-aware timeout calculation
@@ -307,4 +320,6 @@ Your audit should be thorough but concise, focusing on actionable feedback to en
     
     return boundedTimeout;
   }
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
 }

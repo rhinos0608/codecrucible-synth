@@ -5,7 +5,11 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
+<<<<<<< HEAD
 import { readFile, stat, writeFile } from 'fs/promises';
+=======
+import { readFile, stat } from 'fs/promises';
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
 import { join, extname, isAbsolute } from 'path';
 import { glob } from 'glob';
 
@@ -15,7 +19,10 @@ import { ProjectContext } from '../client.js';
 import { startServerMode, ServerOptions } from '../../server/server-mode.js';
 import { analysisWorkerPool, AnalysisTask } from '../workers/analysis-worker.js';
 import { randomUUID } from 'crypto';
+<<<<<<< HEAD
 import { SequentialDualAgentSystem } from '../collaboration/sequential-dual-agent-system.js';
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
 
 export class CLICommands {
   private context: CLIContext;
@@ -434,6 +441,7 @@ export class CLICommands {
   }
 
   /**
+<<<<<<< HEAD
    * Execute sequential dual-agent review workflow
    */
   async handleSequentialReview(prompt: string, options: CLIOptions = {}): Promise<void> {
@@ -546,6 +554,8 @@ export class CLICommands {
   }
 
   /**
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
    * Get file type summary
    */
   private getFileTypes(files: string[]): string {

@@ -132,6 +132,7 @@ export class CLIParser {
             }
             break;
 
+<<<<<<< HEAD
           // Sequential Review System options
           case 'writer-provider':
             if (nextArg && !nextArg.startsWith('--')) {
@@ -182,6 +183,8 @@ export class CLIParser {
             }
             break;
 
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
           // Boolean flags
           case 'interactive':
             options.interactive = true;
@@ -249,6 +252,7 @@ export class CLIParser {
           case 'stream-generation':
             options.streamGeneration = true;
             break;
+<<<<<<< HEAD
           case 'sequential-review':
             options.sequentialReview = true;
             break;
@@ -264,6 +268,8 @@ export class CLIParser {
           case 'show-code':
             options.showCode = true;
             break;
+=======
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
           case 'status':
             options.status = true;
             break;
@@ -319,7 +325,11 @@ export class CLIParser {
    * Extract the main command from arguments
    */
   static extractCommand(args: string[]): { command: string; remainingArgs: string[] } {
+<<<<<<< HEAD
     const commands = ['analyze', 'generate', 'status', 'models', 'configure', 'help', 'sequential-review'];
+=======
+    const commands = ['analyze', 'generate', 'status', 'models', 'configure', 'help'];
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];

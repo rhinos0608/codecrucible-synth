@@ -189,9 +189,14 @@ export class CLI {
   /**
    * Main CLI entry point
    */
+<<<<<<< HEAD
   async run(args: string[], pipedInput?: string): Promise<void> {
     console.log('🔧 DEBUG: CLI.run() called with args:', args, 'pipedInput length:', pipedInput?.length || 0);
     
+=======
+  async run(args: string[]): Promise<void> {
+    console.log('🔧 DEBUG: CLI.run() called with args:', args);
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
     try {
       // Handle help requests
       if (CLIParser.isHelpRequest(args)) {
@@ -213,7 +218,11 @@ export class CLI {
 
       // Handle commands
       console.log('🔧 DEBUG: About to call executeCommand');
+<<<<<<< HEAD
       await this.executeCommand(command, remainingArgs, options, pipedInput);
+=======
+      await this.executeCommand(command, remainingArgs, options);
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       console.log('🔧 DEBUG: executeCommand completed');
     } catch (error) {
       await this.handleError(error);
@@ -226,8 +235,12 @@ export class CLI {
   private async executeCommand(
     command: string,
     args: string[],
+<<<<<<< HEAD
     options: CLIOptions,
     pipedInput?: string
+=======
+    options: CLIOptions
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
   ): Promise<void> {
     console.log('🔧 DEBUG: executeCommand called with:', { command: `"${command}"`, args, commandLength: command.length });
     switch (command) {
@@ -250,8 +263,13 @@ export class CLI {
         break;
 
       case 'generate':
+<<<<<<< HEAD
         const generatePrompt = args.join(' ');
         await this.commands.handleGeneration(generatePrompt, options);
+=======
+        const prompt = args.join(' ');
+        await this.commands.handleGeneration(prompt, options);
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
         break;
 
       case 'configure':
@@ -262,6 +280,7 @@ export class CLI {
         CLIDisplay.showHelp();
         break;
 
+<<<<<<< HEAD
       case 'sequential-review':
         const reviewPrompt = args.join(' ');
         await this.commands.handleSequentialReview(reviewPrompt, options);
@@ -279,6 +298,10 @@ export class CLI {
           break;
         }
         
+=======
+      default:
+        console.log('🔧 DEBUG: In default case with command:', `"${command}"`, 'args:', args);
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
         // Handle as prompt if no specific command
         if (args.length > 0 || command) {
           const fullPrompt = [command, ...args].filter(Boolean).join(' ');

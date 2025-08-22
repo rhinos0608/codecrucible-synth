@@ -16,6 +16,7 @@ describe('Enterprise Security Test Suite', () => {
   describe('Cryptographic Security', () => {
     let secretsManager: SecretsManager;
 
+<<<<<<< HEAD
     beforeEach(async () => {
       secretsManager = new SecretsManager();
       await secretsManager.initialize(); // No password for tests
@@ -30,6 +31,10 @@ describe('Enterprise Security Test Suite', () => {
       } catch (error) {
         // Ignore cleanup errors
       }
+=======
+    beforeEach(() => {
+      secretsManager = new SecretsManager();
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
     });
 
     test('should properly encrypt and decrypt secrets with AES-256-GCM', async () => {
@@ -96,12 +101,18 @@ describe('Enterprise Security Test Suite', () => {
 
   describe('Role-Based Access Control (RBAC)', () => {
     let rbac: RBACSystem;
+<<<<<<< HEAD
     let secretsManager: SecretsManager;
 
     beforeEach(async () => {
       secretsManager = new SecretsManager();
       await secretsManager.initialize(); // No password for tests
       rbac = new RBACSystem(secretsManager);
+=======
+
+    beforeEach(() => {
+      rbac = new RBACSystem();
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
     });
 
     test('should enforce permission-based access control', () => {
@@ -610,10 +621,15 @@ describe('Enterprise Security Test Suite', () => {
       expect(timeDifference).toBeLessThan(100); // Allow 100ms variance
     });
 
+<<<<<<< HEAD
     test('should resist session fixation attacks', async () => {
       const secretsManager = new SecretsManager();
       await secretsManager.initialize(); // No password for tests
       const rbac = new RBACSystem(secretsManager);
+=======
+    test('should resist session fixation attacks', () => {
+      const rbac = new RBACSystem();
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       const user = rbac.createUser('test-user', 'user@example.com', 'Test User');
       
       // Create initial session
@@ -669,6 +685,7 @@ describe('Enterprise Security Test Suite', () => {
       auditLogger.stop();
     });
 
+<<<<<<< HEAD
     test('should meet ISO 27001 information security controls', async () => {
       const securityFramework = new EnterpriseSecurityFramework();
       
@@ -679,6 +696,17 @@ describe('Enterprise Security Test Suite', () => {
       expect(rbac).toBeDefined();
       
       // A.10 Cryptography
+=======
+    test('should meet ISO 27001 information security controls', () => {
+      const securityFramework = new EnterpriseSecurityFramework();
+      
+      // A.9 Access Control
+      const rbac = new RBACSystem();
+      expect(rbac).toBeDefined();
+      
+      // A.10 Cryptography
+      const secretsManager = new SecretsManager();
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
       expect(secretsManager).toBeDefined();
       
       // A.12 Operations Security

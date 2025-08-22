@@ -113,9 +113,13 @@
       "Bash(NODE_ENV=test npm test)",
       "Bash(NODE_ENV=test npm test -- --testNamePattern=\"Voice Archetype System\")",
       "Bash(NODE_ENV=test npm test -- --testNamePattern=\"Voice Archetype System|Response System\")",
+<<<<<<< HEAD
       "Bash(rg:*)",
       "WebFetch(domain:smithery.ai)",
       "mcp__shreyaskarnik-huggingface-mcp-server__search-models"
+=======
+      "Bash(rg:*)"
+>>>>>>> 312cb1b60a67735101a751485e0debd903886729
     ],
     "deny": [],
     "ask": [],

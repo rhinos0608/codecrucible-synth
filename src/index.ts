@@ -20,7 +20,7 @@ function getPackageVersion(): string {
     const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
     return packageJson.version;
   } catch {
-    return '4.0.3'; // Fallback version
+    return '4.0.4'; // Fallback version
   }
 }
 
@@ -225,11 +225,9 @@ export async function main() {
 
       if (inputData.trim()) {
         console.log('🔧 DEBUG: Processing piped input:', inputData.trim().substring(0, 50) + '...');
-        // Process directly through the model client to avoid InteractiveREPL race condition
+        // Process through CLI to get system prompt injection and tool orchestration
         try {
-          const response = await context.modelClient.generateText(inputData.trim(), {
-            timeout: 30000,
-          });
+          const response = await cli.processPrompt(inputData.trim(), {});
           console.log('\n🤖 Response:');
           console.log(response);
         } catch (error: unknown) {

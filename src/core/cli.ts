@@ -31,6 +31,7 @@ import {
 } from './security/security-audit-logger.js';
 import { DynamicModelRouter } from './dynamic-model-router.js';
 import { AdvancedToolOrchestrator } from './tools/advanced-tool-orchestrator.js';
+import { EnterpriseSystemPromptBuilder, RuntimeContext } from './enterprise-system-prompt-builder.js';
 
 export type { CLIContext, CLIOptions };
 
@@ -97,6 +98,50 @@ export class CLI {
     this.commands = new CLICommands(this.context, this.workingDirectory);
 
     this.registerCleanupHandlers();
+  }
+
+  /**
+   * Build runtime context for system prompt generation
+   */
+  private async buildRuntimeContext(): Promise<RuntimeContext> {
+    let isGitRepo = false;
+    let currentBranch = 'unknown';
+    
+    try {
+      const { execSync } = await import('child_process');
+      execSync('git status', { cwd: this.workingDirectory, stdio: 'ignore' });
+      isGitRepo = true;
+      currentBranch = execSync('git branch --show-current', { 
+        cwd: this.workingDirectory 
+      }).toString().trim();
+    } catch {
+      // Not a git repo or git not available
+    }
+    
+    return {
+      workingDirectory: this.workingDirectory,
+      isGitRepo,
+      platform: process.platform,
+      currentBranch,
+      modelId: 'CodeCrucible Synth v4.0.4',
+      knowledgeCutoff: 'January 2025'
+    };
+  }
+
+  /**
+   * Build system prompt with enterprise configuration
+   */
+  private async buildSystemPrompt(): Promise<string> {
+    try {
+      const context = await this.buildRuntimeContext();
+      return EnterpriseSystemPromptBuilder.buildSystemPrompt(context, {
+        conciseness: 'ultra',
+        securityLevel: 'enterprise'
+      });
+    } catch (error) {
+      console.warn('⚠️ Failed to build system prompt, using fallback:', getErrorMessage(error));
+      return `You are CodeCrucible Synth v4.0.4, an AI-powered code generation and analysis tool. Use available tools to assist with software engineering tasks.`;
+    }
   }
 
   /**
@@ -497,6 +542,8 @@ export class CLI {
       if (this.toolOrchestrator.shouldUseTools(prompt)) {
         console.log(chalk.cyan('🔧 Using autonomous tool orchestration...'));
         try {
+          // Note: Tool orchestrator needs system prompt integration
+          // For now, adding TODO to modify processWithTools to accept system prompt
           const toolResponse = await this.toolOrchestrator.processWithTools(prompt);
           console.log('✅ Tool orchestration completed');
           return toolResponse;
@@ -527,10 +574,13 @@ export class CLI {
         return analysis;
       }
 
-      // For non-analysis prompts, use the model client directly
+      // For non-analysis prompts, use the model client directly with system prompt
       try {
-        console.log('🎯 Calling model client with prompt...');
-        const response = await this.context.modelClient.generateText(prompt, { timeout: 30000 });
+        console.log('🎯 Building system prompt and calling model client...');
+        const systemPrompt = await this.buildSystemPrompt();
+        const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}`;
+        console.log('🔧 DEBUG: System prompt injected, calling model...');
+        const response = await this.context.modelClient.generateText(fullPrompt, { timeout: 30000 });
         console.log('✅ Model response received');
         return response;
       } catch (error) {

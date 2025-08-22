@@ -132,59 +132,6 @@ export class CLIParser {
             }
             break;
 
-<<<<<<< HEAD
-          // Sequential Review System options
-          case 'writer-provider':
-            if (nextArg && !nextArg.startsWith('--')) {
-              options.writerProvider = nextArg as 'ollama' | 'lm-studio';
-              i++;
-            }
-            break;
-
-          case 'auditor-provider':
-            if (nextArg && !nextArg.startsWith('--')) {
-              options.auditorProvider = nextArg as 'ollama' | 'lm-studio';
-              i++;
-            }
-            break;
-
-          case 'writer-temp':
-            if (nextArg && !nextArg.startsWith('--')) {
-              options.writerTemp = parseFloat(nextArg);
-              i++;
-            }
-            break;
-
-          case 'auditor-temp':
-            if (nextArg && !nextArg.startsWith('--')) {
-              options.auditorTemp = parseFloat(nextArg);
-              i++;
-            }
-            break;
-
-          case 'writer-tokens':
-            if (nextArg && !nextArg.startsWith('--')) {
-              options.writerTokens = parseInt(nextArg, 10);
-              i++;
-            }
-            break;
-
-          case 'auditor-tokens':
-            if (nextArg && !nextArg.startsWith('--')) {
-              options.auditorTokens = parseInt(nextArg, 10);
-              i++;
-            }
-            break;
-
-          case 'confidence-threshold':
-            if (nextArg && !nextArg.startsWith('--')) {
-              options.confidenceThreshold = parseFloat(nextArg);
-              i++;
-            }
-            break;
-
-=======
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
           // Boolean flags
           case 'interactive':
             options.interactive = true;
@@ -252,24 +199,6 @@ export class CLIParser {
           case 'stream-generation':
             options.streamGeneration = true;
             break;
-<<<<<<< HEAD
-          case 'sequential-review':
-            options.sequentialReview = true;
-            break;
-          case 'auto-audit':
-            options.autoAudit = true;
-            break;
-          case 'apply-fixes':
-            options.applyFixes = true;
-            break;
-          case 'save-result':
-            options.saveResult = true;
-            break;
-          case 'show-code':
-            options.showCode = true;
-            break;
-=======
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
           case 'status':
             options.status = true;
             break;
@@ -325,11 +254,7 @@ export class CLIParser {
    * Extract the main command from arguments
    */
   static extractCommand(args: string[]): { command: string; remainingArgs: string[] } {
-<<<<<<< HEAD
-    const commands = ['analyze', 'generate', 'status', 'models', 'configure', 'help', 'sequential-review'];
-=======
     const commands = ['analyze', 'generate', 'status', 'models', 'configure', 'help'];
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];

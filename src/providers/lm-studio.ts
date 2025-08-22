@@ -25,11 +25,7 @@ export class LMStudioProvider {
 
     this.httpClient = axios.create({
       baseURL: this.config.endpoint,
-<<<<<<< HEAD
-      timeout: 0, // Disable default timeout, use AbortController for context-aware timeouts
-=======
       timeout: this.config.timeout,
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
       headers: {
         'Content-Type': 'application/json',
         ...(config.apiKey && { Authorization: `Bearer ${config.apiKey}` }),
@@ -56,20 +52,6 @@ export class LMStudioProvider {
         await this.selectOptimalModel();
       }
 
-<<<<<<< HEAD
-      // Context-aware timeout calculation
-      const abortController = new AbortController();
-      const contextTimeout = this.getContextAwareTimeout(request);
-      
-      const timeoutId = setTimeout(() => {
-        console.log(`🏛️ DEBUG: LM Studio context timeout (${Math.round(contextTimeout/1000)}s), aborting...`);
-        abortController.abort('context_timeout');
-      }, contextTimeout);
-
-      console.log(`🏛️ DEBUG: LM Studio context-aware timeout: ${Math.round(contextTimeout/1000)}s for ${this.estimateTokens(request)} tokens`);
-
-=======
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
       const response = await this.httpClient.post('/v1/chat/completions', {
         model: this.model,
         messages: [
@@ -108,16 +90,8 @@ Your audit should be thorough but concise, focusing on actionable feedback to en
         temperature: request.temperature || 0.7,
         max_tokens: request.maxTokens || request.max_tokens || 16384,
         stream: false,
-<<<<<<< HEAD
-        signal: abortController.signal,
       });
 
-      clearTimeout(timeoutId);
-
-=======
-      });
-
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
       const choice = response.data.choices?.[0];
       if (!choice) {
         throw new Error('No response choices returned from LM Studio');
@@ -229,97 +203,4 @@ Your audit should be thorough but concise, focusing on actionable feedback to en
   getModelName(): string {
     return this.model;
   }
-<<<<<<< HEAD
-
-  /**
-   * Estimate total tokens for context-aware timeout calculation
-   */
-  private estimateTokens(request: any): number {
-    const promptText = request.prompt || '';
-    const maxTokens = request.maxTokens || request.max_tokens || 16384;
-    
-    // Estimate input tokens (rough approximation: 1 token ≈ 4 characters)
-    const estimatedInputTokens = Math.ceil(promptText.length / 4);
-    
-    // Add system prompt tokens (approximately 200 tokens for LM Studio)
-    const systemPromptTokens = 200;
-    
-    return estimatedInputTokens + systemPromptTokens + maxTokens;
-  }
-
-  /**
-   * Context-aware timeout based on token consumption and LM Studio performance
-   * LM Studio typically runs optimized models and is faster than Ollama
-   */
-  private getContextAwareTimeout(request: any): number {
-    const totalTokens = this.estimateTokens(request);
-    
-    // LM Studio processing speeds (tokens per second) - generally faster than Ollama
-    const modelSpeeds = {
-      // Small models (very fast)
-      '1b': 120,   // ~120 tokens/sec
-      '3b': 80,    // ~80 tokens/sec
-      '7b': 40,    // ~40 tokens/sec
-      // Medium models  
-      '13b': 20,   // ~20 tokens/sec
-      '14b': 18,   // ~18 tokens/sec
-      // Large models
-      '20b': 12,   // ~12 tokens/sec
-      '30b': 8,    // ~8 tokens/sec
-    };
-    
-    // Determine model speed based on model name
-    let tokensPerSecond = 30; // Default fallback (faster than Ollama)
-    for (const [size, speed] of Object.entries(modelSpeeds)) {
-      if (this.model?.includes(size)) {
-        tokensPerSecond = speed;
-        break;
-      }
-    }
-    
-    // Calculate base processing time
-    const baseProcessingTime = Math.ceil(totalTokens / tokensPerSecond) * 1000;
-    
-    // Add complexity factors (same as Ollama but LM Studio handles them better)
-    let complexityMultiplier = 1;
-    
-    const promptText = request.prompt || '';
-    
-    // Tool usage increases complexity but LM Studio handles it well
-    if (request.tools && request.tools.length > 0) {
-      complexityMultiplier += 0.3; // Less impact than Ollama
-    }
-    
-    // Complex reasoning tasks
-    if (promptText.includes('audit') || promptText.includes('review') || 
-        promptText.includes('analyze') || promptText.includes('debug')) {
-      complexityMultiplier += 0.2; // Less impact due to optimization
-    }
-    
-    // Code generation tasks are LM Studio's strength
-    if (promptText.includes('generate') || promptText.includes('create') || 
-        promptText.includes('write')) {
-      complexityMultiplier -= 0.1; // Actually faster for code gen
-    }
-    
-    // Ensure minimum multiplier
-    complexityMultiplier = Math.max(complexityMultiplier, 0.7);
-    
-    // Add safety buffer (30% overhead - less than Ollama due to optimization)
-    const finalTimeout = baseProcessingTime * complexityMultiplier * 1.3;
-    
-    // Reasonable bounds: minimum 5s, maximum 10 minutes (600s)
-    const boundedTimeout = Math.max(5000, Math.min(finalTimeout, 600000));
-    
-    console.log(`🏛️ DEBUG: LM Studio context-aware timeout calculation:
-      Total tokens: ${totalTokens}
-      Model speed: ${tokensPerSecond} tokens/sec
-      Base processing time: ${Math.round(baseProcessingTime/1000)}s
-      Complexity multiplier: ${complexityMultiplier.toFixed(2)}
-      Final timeout: ${Math.round(boundedTimeout/1000)}s`);
-    
-    return boundedTimeout;
-  }
-=======
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
 }

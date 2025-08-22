@@ -180,12 +180,6 @@ export async function main() {
     const isInteractive = process.stdin.isTTY;
     console.log('🔧 DEBUG: isInteractive:', isInteractive, 'args.length:', args.length);
     
-<<<<<<< HEAD
-    // Check if we have piped input
-    let inputData = '';
-    if (!isInteractive) {
-      console.log('🔧 DEBUG: Reading piped input...');
-=======
     // If we have arguments or piped input, process them
     if (args.length > 0) {
       console.log('🔧 DEBUG: Taking args.length > 0 branch with args:', args);
@@ -194,40 +188,11 @@ export async function main() {
       console.log('🔧 DEBUG: Processing piped input directly, bypassing CLI race condition');
       // Handle piped input directly without CLI.run() to avoid race condition
       let inputData = '';
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
       process.stdin.setEncoding('utf8');
       
       for await (const chunk of process.stdin) {
         inputData += chunk;
       }
-<<<<<<< HEAD
-      inputData = inputData.trim();
-      console.log('🔧 DEBUG: Piped input received:', inputData.substring(0, 50) + '...');
-    }
-
-    // If we have arguments, process them with any piped input
-    if (args.length > 0) {
-      console.log('🔧 DEBUG: Taking args.length > 0 branch with args:', args);
-      // Pass piped input to CLI if available
-      if (inputData) {
-        await cli.run(args, inputData);
-      } else {
-        await cli.run(args);
-      }
-    } else if (inputData) {
-      console.log('🔧 DEBUG: Processing piped input directly');
-      // Process piped input directly through the model client
-      try {
-        const response = await context.modelClient.generateText(inputData, { timeout: 30000 });
-        console.log('\n🤖 Response:');
-        console.log(response);
-      } catch (error) {
-        console.error('❌ Error processing input:', error.message);
-      }
-    } else {
-      console.log('🔧 DEBUG: Taking interactive mode branch with args:', args, 'isInteractive:', isInteractive);
-      // No args and no piped input - start interactive mode
-=======
       
       if (inputData.trim()) {
         console.log('🔧 DEBUG: Processing piped input:', inputData.trim().substring(0, 50) + '...');
@@ -245,7 +210,6 @@ export async function main() {
     } else {
       console.log('🔧 DEBUG: Taking interactive mode branch with args:', args, 'isInteractive:', isInteractive);
       // No args and interactive terminal - start interactive mode
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
       await cli.run(args);
     }
   } catch (error) {

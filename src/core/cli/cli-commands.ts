@@ -5,11 +5,7 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
-<<<<<<< HEAD
-import { readFile, stat, writeFile } from 'fs/promises';
-=======
 import { readFile, stat } from 'fs/promises';
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
 import { join, extname, isAbsolute } from 'path';
 import { glob } from 'glob';
 
@@ -19,10 +15,6 @@ import { ProjectContext } from '../client.js';
 import { startServerMode, ServerOptions } from '../../server/server-mode.js';
 import { analysisWorkerPool, AnalysisTask } from '../workers/analysis-worker.js';
 import { randomUUID } from 'crypto';
-<<<<<<< HEAD
-import { SequentialDualAgentSystem } from '../collaboration/sequential-dual-agent-system.js';
-=======
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
 
 export class CLICommands {
   private context: CLIContext;
@@ -441,121 +433,6 @@ export class CLICommands {
   }
 
   /**
-<<<<<<< HEAD
-   * Execute sequential dual-agent review workflow
-   */
-  async handleSequentialReview(prompt: string, options: CLIOptions = {}): Promise<void> {
-    console.log(chalk.bold('\n🚀 Sequential Dual-Agent Review System\n'));
-
-    try {
-      const spinner = ora('Initializing dual-agent system...').start();
-
-      // Configure system based on options
-      const config = {
-        writer: {
-          provider: options.writerProvider || 'lm-studio',
-          temperature: options.writerTemp || 0.7,
-          maxTokens: options.writerTokens || 4096,
-        },
-        auditor: {
-          provider: options.auditorProvider || 'ollama',
-          temperature: options.auditorTemp || 0.2,
-          maxTokens: options.auditorTokens || 2048,
-        },
-        workflow: {
-          autoAudit: options.autoAudit !== false, // Default true
-          applyFixes: options.applyFixes || false,
-          maxIterations: Number(options.maxIterations) || 3,
-          confidenceThreshold: Number(options.confidenceThreshold) || 0.8,
-        },
-      };
-
-      // Update config if specified
-      if (Object.keys(config.writer).some(k => k in options) || 
-          Object.keys(config.auditor).some(k => k in options) ||
-          Object.keys(config.workflow).some(k => k in options)) {
-        console.log(chalk.cyan('📝 Using custom configuration'));
-      }
-
-      spinner.text = 'Starting sequential review...';
-
-      // Create properly configured sequential review system
-      const reviewSystem = new SequentialDualAgentSystem(config);
-      await reviewSystem.initialize();
-      
-      // Execute the sequential review
-      const result = await reviewSystem.executeSequentialReview(prompt);
-
-      spinner.succeed('Sequential review completed');
-
-      // Display results summary
-      console.log(chalk.green('\n✅ Review Process Complete!'));
-      
-      if (options.saveResult || options.output) {
-        const outputPath = options.output || `review-result-${Date.now()}.json`;
-        await this.saveReviewResult(result, outputPath);
-        console.log(chalk.cyan(`📄 Results saved to: ${outputPath}`));
-      }
-
-      if (options.showCode !== false) {
-        console.log(chalk.blue('\n📋 Generated Code:'));
-        console.log(chalk.gray('─'.repeat(60)));
-        console.log(result.writerOutput.code);
-        console.log(chalk.gray('─'.repeat(60)));
-        
-        if (result.refinedOutput?.code && result.refinedOutput.code !== result.writerOutput.code) {
-          console.log(chalk.blue('\n🔧 Refined Code:'));
-          console.log(chalk.gray('─'.repeat(60)));
-          console.log(result.refinedOutput.code);
-          console.log(chalk.gray('─'.repeat(60)));
-        }
-      }
-
-    } catch (error) {
-      console.error(chalk.red('\n❌ Sequential review failed:'));
-      console.error(chalk.red(`   ${error instanceof Error ? error.message : 'Unknown error'}`));
-      
-      // Provide helpful suggestions
-      console.log(chalk.yellow('\n💡 Troubleshooting suggestions:'));
-      console.log(chalk.yellow('   • Ensure Ollama is running: `ollama list`'));
-      console.log(chalk.yellow('   • Ensure LM Studio is running and server is started'));
-      console.log(chalk.yellow('   • Check network connectivity to localhost:11434 and localhost:1234'));
-      console.log(chalk.yellow('   • Try running with --verbose for detailed logs'));
-    }
-  }
-
-  /**
-   * Save review result to file
-   */
-  private async saveReviewResult(result: any, outputPath: string): Promise<void> {
-    const saveData = {
-      timestamp: new Date().toISOString(),
-      prompt: result.originalPrompt,
-      writer: {
-        provider: result.writerOutput.provider,
-        model: result.writerOutput.model,
-        duration: result.writerOutput.duration,
-        code: result.writerOutput.code,
-      },
-      auditor: {
-        provider: result.auditorOutput.provider,
-        model: result.auditorOutput.model,
-        duration: result.auditorOutput.duration,
-        review: result.auditorOutput.review,
-      },
-      refined: result.refinedOutput,
-      summary: {
-        totalDuration: result.totalDuration,
-        accepted: result.accepted,
-      },
-    };
-
-    await writeFile(outputPath, JSON.stringify(saveData, null, 2), 'utf-8');
-  }
-
-  /**
-=======
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
    * Get file type summary
    */
   private getFileTypes(files: string[]): string {

@@ -1,7 +1,7 @@
 {
-  "name": "codecrucible-synth",
-  "version": "3.9.1",
-  "description": "AI-Powered Code Generation & Analysis Tool with Dual-Agent Real-Time Code Review, Hybrid Model Architecture (Ollama + LM Studio), and Automated Quality Assurance",
+  "name": "@codecrucible/synth",
+  "version": "4.0.0",
+  "description": "Enterprise-Ready AI-Powered Code Generation & Analysis Tool with Multi-Voice Synthesis, Hybrid Model Architecture, MCP Integration, and Production-Grade Testing",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
@@ -31,7 +31,36 @@
     "package:all": "npm run package:win && npm run package:mac && npm run package:linux",
     "version": "npm run build",
     "postversion": "git push && git push --tags",
-    "release": "npm run build && npm run package:all && npm version patch && npm publish"
+    "release": "npm run build && npm run package:all && npm version patch && npm publish",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rhinos0608/codecrucible-synth.git"
+  },
+  "homepage": "https://github.com/rhinos0608/codecrucible-synth#readme",
+  "bugs": {
+    "url": "https://github.com/rhinos0608/codecrucible-synth/issues"
+  },
+  "author": "CodeCrucible Team",
+  "license": "MIT",
+  "keywords": [
+    "ai",
+    "code-generation",
+    "cli",
+    "typescript",
+    "ollama",
+    "lm-studio",
+    "mcp",
+    "voice-synthesis",
+    "enterprise",
+    "development-tools"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@ast-grep/cli": "^0.18.0",

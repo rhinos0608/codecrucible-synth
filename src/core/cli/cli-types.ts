@@ -68,23 +68,6 @@ export interface CLIOptions {
   writerModel?: string;
   auditorModel?: string;
 
-<<<<<<< HEAD
-  // Sequential Review System options
-  sequentialReview?: boolean;
-  writerProvider?: 'ollama' | 'lm-studio';
-  auditorProvider?: 'ollama' | 'lm-studio';
-  writerTemp?: number;
-  auditorTemp?: number;
-  writerTokens?: number;
-  auditorTokens?: number;
-  autoAudit?: boolean;
-  applyFixes?: boolean;
-  confidenceThreshold?: number;
-  saveResult?: boolean;
-  showCode?: boolean;
-
-=======
->>>>>>> 312cb1b60a67735101a751485e0debd903886729
   // VRAM management options
   status?: boolean;
   optimize?: boolean;

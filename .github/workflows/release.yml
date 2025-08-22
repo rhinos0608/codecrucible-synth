@@ -1,0 +1,377 @@
+name: 🚀 CodeCrucible Synth - Autonomous Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 2.0.1)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: false
+        default: 'stable'
+        type: choice
+        options:
+        - stable
+        - beta
+        - alpha
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      tag: ${{ steps.get-version.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Get version from tag or input
+        id: get-version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION}"
+          else
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION}"
+          echo "Release tag: ${TAG}"
+          
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.get-version.outputs.version }}"
+          if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format: $VERSION"
+            echo "Expected format: X.Y.Z (e.g., 2.0.1)"
+            exit 1
+          fi
+
+  test-before-release:
+    name: Test Before Release
+    runs-on: ubuntu-latest
+    needs: validate-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run all tests
+        run: |
+          npm run lint
+          npm test
+          npm run build
+
+  build-packages:
+    name: Build Release Packages
+    runs-on: ${{ matrix.os }}
+    needs: [validate-release, test-before-release]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build application
+        run: npm run build
+        
+      - name: Build standalone package
+        run: npm run package:${{ matrix.platform }}
+        
+      - name: Build desktop package (non-Windows)
+        if: matrix.os != 'windows-latest'
+        run: npm run desktop:package
+        
+      - name: Build desktop package (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          npm run desktop:package
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          
+      - name: Upload standalone artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: standalone-${{ matrix.platform }}
+          path: |
+            build/standalone/*
+          retention-days: 30
+          
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: |
+            build/desktop/*
+          retention-days: 30
+
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-packages]
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Update package version
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          npm version $VERSION --no-git-tag-version
+          
+      - name: Build for production
+        run: npm run build
+        
+      - name: Run final tests
+        run: npm test
+        
+      - name: Publish to NPM
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-packages, publish-npm]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          TAG="${{ needs.validate-release.outputs.tag }}"
+          
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 $TAG^ 2>/dev/null || echo "")
+          
+          cat > release-notes.md << 'EOF'
+          # CodeCrucible Synth v${VERSION}
+          
+          🤖 **Autonomous AI Coding Assistant for Local Models**
+          
+          ## 🚀 One-Liner Installation (NEW!)
+          
+          ### npm (Recommended - Works Everywhere)
+          ```bash
+          npm install -g codecrucible-synth
+          crucible
+          ```
+          
+          ### npx (No Installation Required)
+          ```bash
+          npx codecrucible-synth
+          ```
+          
+          ### curl + bash (Unix/macOS)
+          ```bash
+          curl -sSL https://raw.githubusercontent.com/rhinos0608/codecrucibe-synth/main/install.sh | bash
+          ```
+          
+          ### PowerShell (Windows)
+          ```powershell
+          iwr -useb https://raw.githubusercontent.com/rhinos0608/codecrucibe-synth/main/install.ps1 | iex
+          ```
+          
+          ### Direct Binary Download
+          Download the appropriate binary below and run directly.
+          
+          ## 🔥 Key Features
+          
+          - **Progressive Model Pulling** - Intelligent timeout handling with fallback models
+          - **Multi-Voice AI System** - 9 specialized AI voices with synthesis engine
+          - **Real-time File Watching** - Automatic contextual assistance as you code
+          - **Autonomous Setup** - Zero-configuration installation with auto-detection
+          - **Multiple Interfaces** - CLI, Agentic Mode (like Claude Code), Desktop GUI, Server Mode
+          - **Local & Offline** - Uses Ollama with complete privacy
+          - **Cross-Platform Binaries** - Windows, macOS, Linux standalone executables
+          - **MCP Integration** - Advanced tool calling and file operations
+          
+          ## 📋 What's New in v${VERSION}
+          
+          EOF
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "### 🆕 Changes since $PREV_TAG" >> release-notes.md
+            git log --pretty=format:"- %s (%h)" $PREV_TAG..$TAG >> release-notes.md
+          else
+            echo "### 🎉 Initial Release" >> release-notes.md
+            echo "- Complete autonomous AI coding assistant" >> release-notes.md
+            echo "- Progressive model management with timeout handling" >> release-notes.md
+            echo "- Real-time file watching and contextual assistance" >> release-notes.md
+            echo "- Multi-interface support (CLI/Desktop/Server)" >> release-notes.md
+            echo "- Cross-platform binaries and one-liner installation" >> release-notes.md
+          fi
+          
+          cat >> release-notes.md << 'EOF'
+          
+          ## 🛠️ Quick Start
+          
+          After installation:
+          ```bash
+          crucible                    # Start interactive mode
+          crucible agent              # Start agentic mode (like Claude Code)
+          crucible desktop            # Launch GUI application
+          crucible --help             # Show all commands
+          ```
+          
+          ## 🔧 Advanced Features
+          
+          - **Autonomous Error Recovery** - Automatically handles model timeouts and failures
+          - **GPU Acceleration** - Intelligent hardware detection and optimization
+          - **Voice Synthesis** - Competitive multi-voice conversations
+          - **Project Context** - Full codebase understanding and analysis
+          - **Tool Integration** - Git, filesystem, terminal, and package management
+          
+          ## 🐛 Troubleshooting
+          
+          If you encounter issues:
+          1. Ensure Node.js 18+ is installed: `node --version`
+          2. Check Ollama status: `ollama --version`
+          3. View logs in `.codecrucible/` directory
+          4. Report issues: [GitHub Issues](https://github.com/rhinos0608/codecrucibe-synth/issues)
+          
+          ## 📦 Installation Methods Summary
+          
+          | Method | Command | Best For |
+          |--------|---------|----------|
+          | npm global | `npm install -g codecrucible-synth` | Regular use |
+          | npx | `npx codecrucible-synth` | One-time testing |
+          | curl+bash | `curl -sSL https://...install.sh | bash` | Unix systems |
+          | PowerShell | `iwr -useb https://...install.ps1 | iex` | Windows |
+          | Binary | Download and run directly | No Node.js |
+          
+          EOF
+          
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          
+          # Copy and rename artifacts
+          if [ -d "release-artifacts/standalone-linux" ]; then
+            cp release-artifacts/standalone-linux/* release-assets/ 2>/dev/null || true
+          fi
+          if [ -d "release-artifacts/standalone-win" ]; then
+            cp release-artifacts/standalone-win/* release-assets/ 2>/dev/null || true
+          fi
+          if [ -d "release-artifacts/standalone-mac" ]; then
+            cp release-artifacts/standalone-mac/* release-assets/ 2>/dev/null || true
+          fi
+          if [ -d "release-artifacts/desktop-linux" ]; then
+            cp release-artifacts/desktop-linux/* release-assets/ 2>/dev/null || true
+          fi
+          if [ -d "release-artifacts/desktop-win" ]; then
+            cp release-artifacts/desktop-win/* release-assets/ 2>/dev/null || true
+          fi
+          if [ -d "release-artifacts/desktop-mac" ]; then
+            cp release-artifacts/desktop-mac/* release-assets/ 2>/dev/null || true
+          fi
+          
+          ls -la release-assets/ || echo "No assets found"
+          
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        id: create-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.validate-release.outputs.tag }}
+          release_name: CodeCrucible Synth v${{ needs.validate-release.outputs.version }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          
+      - name: Upload Release Assets
+        if: hashFiles('release-assets/*') != ''
+        run: |
+          for file in release-assets/*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file"
+              curl \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary @"$file" \
+                "${{ steps.create-release.outputs.upload_url }}?name=$(basename $file)"
+            fi
+          done
+
+  notify-release:
+    name: Notify Release Complete
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-github-release]
+    if: always()
+    steps:
+      - name: Release Success Notification
+        if: needs.create-github-release.result == 'success'
+        run: |
+          echo "🎉 Release v${{ needs.validate-release.outputs.version }} completed successfully!"
+          echo "📦 NPM: https://www.npmjs.com/package/codecrucible-synth"
+          echo "🏷️ GitHub: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate-release.outputs.tag }}"
+          
+      - name: Release Failure Notification
+        if: needs.create-github-release.result == 'failure'
+        run: |
+          echo "❌ Release v${{ needs.validate-release.outputs.version }} failed!"
+          echo "Please check the workflow logs for details."
+          exit 1

@@ -1,0 +1,59 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "allowJs": false,
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "sourceMap": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": false,
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "@types/node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/config/*": ["config/*"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "config/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "archive",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}

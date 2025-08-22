@@ -1,0 +1,143 @@
+# Unified Model Configuration - Single Source of Truth
+# Created: August 21, 2025
+# Purpose: Resolves configuration conflicts identified in audit report
+
+llm:
+  # Default provider selection
+  default_provider: "ollama"
+  fallback_chain: ["ollama", "lm-studio", "mock"]
+  
+  providers:
+    ollama:
+      endpoint: "http://localhost:11434"
+      timeout:
+        connection: 5000     # 5s for connection establishment
+        response: 30000      # 30s for response generation
+        status_check: 3000   # 3s for health checks
+      models:
+        # Preferred models in priority order
+        preferred: 
+          - "qwen2.5-coder:7b"
+          - "qwen2.5-coder:3b"
+          - "deepseek-coder:8b"
+        # Fallback models if preferred not available
+        fallback:
+          - "llama3.2:latest"
+          - "gemma:latest"
+        # Model-specific settings
+        settings:
+          "qwen2.5-coder:7b":
+            temperature: 0.1
+            max_tokens: 4096
+            context_window: 8192
+          "deepseek-coder:8b":
+            temperature: 0.2
+            max_tokens: 2048
+            context_window: 8192
+      # Task routing preferences
+      optimal_for:
+        - "analysis"
+        - "planning"
+        - "complex"
+        - "multi-file"
+        - "architecture"
+        - "debugging"
+    
+    lm-studio:
+      endpoint: "http://localhost:1234"
+      timeout:
+        connection: 3000     # 3s for connection
+        response: 15000      # 15s for response
+        status_check: 2000   # 2s for health checks
+      models:
+        preferred:
+          - "codellama-7b-instruct"
+          - "gemma-2b-it"
+          - "qwen/qwen2.5-coder-14b"
+        fallback:
+          - "gpt-3.5-turbo"  # OpenAI compatible fallback
+        settings:
+          "codellama-7b-instruct":
+            temperature: 0.7
+            max_tokens: 2048
+            context_window: 4096
+      optimal_for:
+        - "template"
+        - "edit"
+        - "format"
+        - "boilerplate"
+        - "quick-fix"
+        - "streaming"
+
+  # Routing strategy configuration
+  routing:
+    strategy: "hybrid"  # Options: hybrid, simple, complex
+    
+    # Task complexity mapping
+    task_complexity:
+      simple:
+        - "format"
+        - "template"
+        - "boilerplate"
+        - "edit"
+        - "rename"
+      complex:
+        - "analysis"
+        - "architecture"
+        - "planning"
+        - "debug"
+        - "security"
+        - "multi-file"
+    
+    # Confidence thresholds for routing decisions
+    confidence_thresholds:
+      high: 0.9       # Use fast path
+      medium: 0.7     # Standard routing
+      low: 0.5        # Require validation
+      escalation: 0.3 # Escalate to human
+    
+    # Performance targets
+    performance_targets:
+      simple_task_response: 1000    # 1s for simple tasks
+      complex_task_response: 30000  # 30s for complex tasks
+      streaming_latency: 100        # 100ms for first token
+
+  # Monitoring and metrics
+  monitoring:
+    enabled: true
+    metrics_port: 3001
+    collect_performance: true
+    collect_errors: true
+    
+    # Alert thresholds
+    alerts:
+      error_rate: 0.05         # Alert if >5% errors
+      response_time_p99: 5000  # Alert if p99 > 5s
+      availability: 0.95       # Alert if <95% available
+
+  # Security settings
+  security:
+    validate_inputs: true
+    sanitize_outputs: true
+    max_prompt_length: 10000
+    max_response_length: 50000
+    blocked_patterns:
+      - "password"
+      - "secret"
+      - "api_key"
+      - "private_key"
+
+  # Caching configuration
+  caching:
+    enabled: true
+    ttl: 3600               # 1 hour cache TTL
+    max_cache_size: 1000    # Max cached responses
+    cache_strategy: "lru"   # Least recently used
+
+  # Experimental features
+  experimental:
+    dual_agent_review: true     # Enable sequential review system
+    auto_retry_on_timeout: true # Automatic retry with backoff
+    adaptive_timeouts: true     # Adjust timeouts based on task
+    connection_pooling: true    # HTTP connection pooling
+    circuit_breaker: false      # Not yet implemented

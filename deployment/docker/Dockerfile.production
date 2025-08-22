@@ -1,0 +1,118 @@
+# CodeCrucible Synth Production Dockerfile
+# Multi-stage build for optimized production deployment
+
+# Stage 1: Base image with security hardening
+FROM node:18-alpine AS base
+
+# Add security packages and non-root user
+RUN apk add --no-cache \
+    dumb-init \
+    su-exec \
+    shadow \
+    ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN groupadd -r codecrucible && useradd -r -g codecrucible codecrucible
+
+# Stage 2: Dependencies installation
+FROM base AS dependencies
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies with exact versions
+RUN npm ci --only=production --no-audit --no-fund
+
+# Install development dependencies for building
+RUN npm ci --no-audit --no-fund
+
+# Stage 3: Build stage
+FROM dependencies AS builder
+
+# Copy source code
+COPY src/ ./src/
+COPY config/ ./config/
+COPY scripts/ ./scripts/
+
+# Build the application
+RUN npm run build
+
+# Remove development dependencies
+RUN npm prune --production
+
+# Stage 4: Production image
+FROM base AS production
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3002
+ENV LOG_LEVEL=info
+ENV METRICS_ENABLED=true
+ENV HEALTH_CHECK_PORT=3003
+
+# Set security headers and limits
+ENV NODE_OPTIONS="--max-old-space-size=2048 --max-http-header-size=65536"
+
+# Create app directory with proper permissions
+RUN mkdir -p /app /app/logs /app/cache /app/secrets && \
+    chown -R codecrucible:codecrucible /app
+
+WORKDIR /app
+
+# Copy built application and dependencies
+COPY --from=builder --chown=codecrucible:codecrucible /app/dist ./dist
+COPY --from=builder --chown=codecrucible:codecrucible /app/node_modules ./node_modules
+COPY --from=builder --chown=codecrucible:codecrucible /app/package.json ./
+COPY --from=builder --chown=codecrucible:codecrucible /app/config ./config
+
+# Copy startup script
+COPY --chown=codecrucible:codecrucible deployment/scripts/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
+# Create volume mount points
+VOLUME ["/app/logs", "/app/cache", "/app/secrets"]
+
+# Expose ports
+EXPOSE 3002 3003
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3003/health || exit 1
+
+# Security: Remove unnecessary packages and set file permissions
+RUN apk del shadow && \
+    rm -rf /var/cache/apk/* /tmp/* /var/tmp/* && \
+    find /app -type f -exec chmod 644 {} \; && \
+    find /app -type d -exec chmod 755 {} \; && \
+    chmod +x /app/docker-entrypoint.sh
+
+# Switch to non-root user
+USER codecrucible
+
+# Set entrypoint
+ENTRYPOINT ["dumb-init", "--", "./docker-entrypoint.sh"]
+CMD ["node", "dist/index.js", "--server"]
+
+# Build arguments for metadata
+ARG BUILD_DATE
+ARG BUILD_VERSION
+ARG BUILD_COMMIT
+
+# Labels for container metadata
+LABEL maintainer="CodeCrucible Team" \
+      version="${BUILD_VERSION}" \
+      build-date="${BUILD_DATE}" \
+      commit="${BUILD_COMMIT}" \
+      description="CodeCrucible Synth - Enterprise AI Code Generation Platform" \
+      org.opencontainers.image.title="CodeCrucible Synth" \
+      org.opencontainers.image.description="Enterprise AI Code Generation Platform" \
+      org.opencontainers.image.version="${BUILD_VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${BUILD_COMMIT}" \
+      org.opencontainers.image.vendor="CodeCrucible" \
+      org.opencontainers.image.source="https://github.com/codecrucible/synth"

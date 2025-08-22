@@ -1,0 +1,62 @@
+# Development and test files
+*.test.ts
+*.test.js
+test*.js
+test*.ts
+tests/
+test-*
+fix-*.js
+fix-*.cjs
+
+# Local development files
+.local/
+.claude/
+.codecrucible-history.json
+.config/.semgrep/
+.github/
+extensions/
+scripts/
+webhook_test.js
+test_*.js
+simple-electron-main.ts
+jest.setup.js
+jest.config.cjs
+.eslintrc.cjs
+tsconfig.json
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Install scripts
+install*.ps1
+install*.sh
+install-from-*.ps1
+install-from-*.sh
+
+# Documentation source files
+docs/
+*.md
+!README.md
+
+# Build artifacts
+build/
+coverage/
+
+# Git files
+.git/
+.gitignore
+
+# Misc
+huggingface-api-key.txt
+hello.txt
+shared/

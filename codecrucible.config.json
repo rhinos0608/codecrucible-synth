@@ -1,0 +1,71 @@
+{
+  "models": {
+    "gpt-4": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.7,
+      "maxTokens": 4000,
+      "timeout": 30000,
+      "retries": 3
+    },
+    "claude-3-sonnet": {
+      "provider": "anthropic",
+      "model": "claude-3-sonnet-20240229",
+      "temperature": 0.7,
+      "maxTokens": 4000,
+      "timeout": 30000,
+      "retries": 3
+    },
+    "local-llama": {
+      "provider": "ollama",
+      "model": "llama2",
+      "endpoint": "http://localhost:11434",
+      "temperature": 0.7,
+      "maxTokens": 4000,
+      "timeout": 60000,
+      "retries": 2
+    }
+  },
+  "agent": {
+    "enabled": true,
+    "mode": "thorough",
+    "maxConcurrency": 1,
+    "enableCaching": false,
+    "enableMetrics": true,
+    "enableSecurity": true
+  },
+  "performance": {
+    "enableMonitoring": true,
+    "alertThreshold": 5000,
+    "metricsRetention": 86400000,
+    "enableTracing": true,
+    "metricsPort": 9090
+  },
+  "security": {
+    "enableValidation": true,
+    "sandboxMode": true,
+    "allowUnsafeCommands": false,
+    "enableRateLimit": true,
+    "maxRequestsPerMinute": 60,
+    "enableCors": true,
+    "corsOrigins": [
+      "http://localhost:3000"
+    ],
+    "auditLogging": true
+  },
+  "debug": {
+    "enabled": false,
+    "verbose": false,
+    "logLevel": "info"
+  },
+  "environment": "development",
+  "features": {
+    "enableVoiceSystem": true,
+    "enableCouncilEngine": true,
+    "enableMcpIntegration": true,
+    "enableHybridModels": true,
+    "enableCaching": true,
+    "maxConcurrentVoices": 5,
+    "cacheExpiry": 3600
+  }
+}

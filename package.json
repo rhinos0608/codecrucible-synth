@@ -1,6 +1,6 @@
 {
   "name": "codecrucible-synth",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Production-Ready AI-Powered Code Generation & Analysis Tool with Multi-Voice Synthesis, Optimized Performance, Cross-Session Caching, and Zero-Timeout Reliability",
   "main": "dist/index.js",
   "type": "module",
@@ -41,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rhinos0608/codecrucible-synth.git"
+    "url": "git+https://github.com/rhinos0608/codecrucible-synth.git"
   },
   "homepage": "https://github.com/rhinos0608/codecrucible-synth#readme",
   "bugs": {
@@ -50,16 +50,25 @@
   "author": "CodeCrucible Team",
   "license": "MIT",
   "keywords": [
-    "ai",
-    "code-generation",
     "cli",
-    "typescript",
-    "ollama",
-    "lm-studio",
+    "ai",
+    "coding",
+    "assistant",
     "mcp",
-    "voice-synthesis",
-    "enterprise",
-    "development-tools"
+    "terminal",
+    "multi-voice",
+    "consciousness",
+    "local-ai",
+    "ollama",
+    "offline",
+    "agentic",
+    "react-pattern",
+    "tool-calling",
+    "planning",
+    "autonomous",
+    "ast-analysis",
+    "git-integration",
+    "code-understanding"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -166,40 +175,6 @@
     "typescript": "^5.6.0"
   },
   "preferGlobal": true,
-  "keywords": [
-    "cli",
-    "ai",
-    "coding",
-    "assistant",
-    "mcp",
-    "terminal",
-    "multi-voice",
-    "consciousness",
-    "local-ai",
-    "ollama",
-    "offline",
-    "agentic",
-    "react-pattern",
-    "tool-calling",
-    "planning",
-    "autonomous",
-    "ast-analysis",
-    "git-integration",
-    "code-understanding"
-  ],
-  "author": "CodeCrucible Team",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rhinos0608/codecrucible-synth.git"
-  },
-  "bugs": {
-    "url": "https://github.com/rhinos0608/codecrucible-synth/issues"
-  },
-  "homepage": "https://github.com/rhinos0608/codecrucible-synth#readme",
   "build": {
     "appId": "com.codecrucible.synth",
     "productName": "CodeCrucible Synth",

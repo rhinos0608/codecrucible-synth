@@ -243,7 +243,7 @@ export class CLIParser {
           case 'stream-generation':
             options.streamGeneration = true;
             break;
-          
+
           // Sequential Review boolean flags
           case 'sequential-review':
             options.sequentialReview = true;

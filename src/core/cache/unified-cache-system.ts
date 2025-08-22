@@ -1,12 +1,12 @@
 /**
  * Unified Cache System - Consolidates all cache implementations
- * 
+ *
  * Architecture:
  * - Uses cache-manager.ts as the foundation (multi-layer: memory/redis/disk)
  * - Adds semantic search capabilities for AI responses
  * - Provides type-based routing for different data types
  * - Supports migration from legacy cache systems
- * 
+ *
  * Based on audit findings: Consolidates 8 different cache systems into unified implementation
  */
 
@@ -58,7 +58,7 @@ export class UnifiedCacheSystem extends EventEmitter {
   private config: UnifiedCacheConfig;
   private vectorIndex: Map<string, number[]> = new Map();
   private embeddingCache: Map<string, number[]> = new Map();
-  
+
   // Migration support - adapters for legacy cache systems
   private legacyAdapters: Map<string, LegacyCacheAdapter> = new Map();
 
@@ -66,15 +66,15 @@ export class UnifiedCacheSystem extends EventEmitter {
     super();
     this.config = config;
     this.cacheManager = new CacheManager(config);
-    
+
     // Set up event forwarding
-    this.cacheManager.on('hit', (data) => this.emit('hit', data));
-    this.cacheManager.on('miss', (data) => this.emit('miss', data));
-    this.cacheManager.on('error', (error) => this.emit('error', error));
-    
+    this.cacheManager.on('hit', data => this.emit('hit', data));
+    this.cacheManager.on('miss', data => this.emit('miss', data));
+    this.cacheManager.on('error', error => this.emit('error', error));
+
     logger.info('Unified Cache System initialized', {
       semanticEnabled: config.semantic.enabled,
-      strategies: config.routing.strategies.length
+      strategies: config.routing.strategies.length,
     });
   }
 
@@ -83,7 +83,7 @@ export class UnifiedCacheSystem extends EventEmitter {
    */
   async get<T = any>(key: string, context?: Record<string, any>): Promise<CacheResult<T> | null> {
     const strategy = this.determineStrategy(key);
-    
+
     try {
       switch (strategy.strategy) {
         case 'semantic':
@@ -105,17 +105,17 @@ export class UnifiedCacheSystem extends EventEmitter {
    * Main cache set interface - routes to appropriate strategy
    */
   async set<T = any>(
-    key: string, 
-    value: T, 
-    options?: { 
-      ttl?: number; 
-      tags?: string[]; 
+    key: string,
+    value: T,
+    options?: {
+      ttl?: number;
+      tags?: string[];
       metadata?: Record<string, any>;
       embedding?: number[];
     }
   ): Promise<boolean> {
     const strategy = this.determineStrategy(key);
-    
+
     try {
       switch (strategy.strategy) {
         case 'semantic':
@@ -137,7 +137,7 @@ export class UnifiedCacheSystem extends EventEmitter {
    * Semantic search implementation - extends standard caching with vector similarity
    */
   private async getWithSemanticSearch<T>(
-    key: string, 
+    key: string,
     context?: Record<string, any>
   ): Promise<CacheResult<T> | null> {
     // Try exact match first (fastest)
@@ -148,7 +148,10 @@ export class UnifiedCacheSystem extends EventEmitter {
 
     // If semantic search is enabled and we have context for embedding generation
     if (this.config.semantic.enabled && context?.prompt) {
-      const semanticResult = await this.searchSemantically<T>(context.prompt, context.context || []);
+      const semanticResult = await this.searchSemantically<T>(
+        context.prompt,
+        context.context || []
+      );
       if (semanticResult) {
         return { ...semanticResult, source: 'semantic' };
       }
@@ -161,7 +164,7 @@ export class UnifiedCacheSystem extends EventEmitter {
    * Semantic similarity search using vector embeddings
    */
   private async searchSemantically<T>(
-    prompt: string, 
+    prompt: string,
     context: string[]
   ): Promise<CacheResult<T> | null> {
     const queryEmbedding = await this.getEmbedding(prompt + ' ' + context.join(' '));
@@ -179,18 +182,18 @@ export class UnifiedCacheSystem extends EventEmitter {
     if (similarResults.length > 0) {
       const bestMatch = similarResults.sort((a, b) => b.similarity - a.similarity)[0];
       const cached = await this.cacheManager.get<T>(bestMatch.key);
-      
+
       if (cached) {
-        logger.debug('Semantic cache hit', { 
-          similarity: bestMatch.similarity, 
-          threshold: this.config.semantic.similarityThreshold 
+        logger.debug('Semantic cache hit', {
+          similarity: bestMatch.similarity,
+          threshold: this.config.semantic.similarityThreshold,
         });
-        
+
         return {
           value: cached,
           hit: true,
           source: 'semantic',
-          similarity: bestMatch.similarity
+          similarity: bestMatch.similarity,
         };
       }
     }
@@ -204,11 +207,16 @@ export class UnifiedCacheSystem extends EventEmitter {
   private async setWithSemanticIndex<T>(
     key: string,
     value: T,
-    options?: { ttl?: number; tags?: string[]; metadata?: Record<string, any>; embedding?: number[] }
+    options?: {
+      ttl?: number;
+      tags?: string[];
+      metadata?: Record<string, any>;
+      embedding?: number[];
+    }
   ): Promise<boolean> {
     // Store in standard cache first
     const success = await this.setStandard(key, value, options);
-    
+
     if (success && this.config.semantic.enabled) {
       // Index for semantic search if embedding provided or can be generated
       let embedding = options?.embedding;
@@ -217,13 +225,13 @@ export class UnifiedCacheSystem extends EventEmitter {
           options.metadata.prompt + ' ' + (options.metadata.context || []).join(' ')
         );
       }
-      
+
       if (embedding) {
         this.vectorIndex.set(key, embedding);
         logger.debug('Semantic index updated', { key });
       }
     }
-    
+
     return success;
   }
 
@@ -236,12 +244,12 @@ export class UnifiedCacheSystem extends EventEmitter {
         return strategy;
       }
     }
-    
+
     // Default strategy
     return {
       name: 'default',
       pattern: /.*/,
-      strategy: 'standard'
+      strategy: 'standard',
     };
   }
 
@@ -254,15 +262,15 @@ export class UnifiedCacheSystem extends EventEmitter {
   }
 
   private async setStandard<T>(
-    key: string, 
-    value: T, 
+    key: string,
+    value: T,
     options?: { ttl?: number; tags?: string[]; metadata?: Record<string, any> }
   ): Promise<boolean> {
     try {
-      await this.cacheManager.set(key, value, { 
+      await this.cacheManager.set(key, value, {
         ttl: options?.ttl,
         tags: options?.tags,
-        metadata: options?.metadata
+        metadata: options?.metadata,
       });
       return true;
     } catch (error) {
@@ -281,8 +289,8 @@ export class UnifiedCacheSystem extends EventEmitter {
   }
 
   private async setSecure<T>(
-    key: string, 
-    value: T, 
+    key: string,
+    value: T,
     options?: { ttl?: number; tags?: string[]; metadata?: Record<string, any> }
   ): Promise<boolean> {
     try {
@@ -291,7 +299,7 @@ export class UnifiedCacheSystem extends EventEmitter {
       await this.cacheManager.set(key, value, {
         ttl: securityTTL,
         tags: [...(options?.tags || []), 'security'],
-        metadata: options?.metadata
+        metadata: options?.metadata,
       });
       return true;
     } catch (error) {
@@ -310,8 +318,8 @@ export class UnifiedCacheSystem extends EventEmitter {
   }
 
   private async setPerformant<T>(
-    key: string, 
-    value: T, 
+    key: string,
+    value: T,
     options?: { ttl?: number; tags?: string[]; metadata?: Record<string, any> }
   ): Promise<boolean> {
     try {
@@ -320,7 +328,7 @@ export class UnifiedCacheSystem extends EventEmitter {
       await this.cacheManager.set(key, value, {
         ttl: performanceTTL,
         tags: [...(options?.tags || []), 'performance'],
-        metadata: options?.metadata
+        metadata: options?.metadata,
       });
       return true;
     } catch (error) {
@@ -335,7 +343,7 @@ export class UnifiedCacheSystem extends EventEmitter {
    */
   private async getEmbedding(text: string): Promise<number[]> {
     const hash = createHash('sha256').update(text).digest('hex');
-    
+
     if (this.embeddingCache.has(hash)) {
       return this.embeddingCache.get(hash)!;
     }
@@ -349,7 +357,7 @@ export class UnifiedCacheSystem extends EventEmitter {
     }
 
     this.embeddingCache.set(hash, embedding);
-    
+
     // Limit embedding cache size
     if (this.embeddingCache.size > 1000) {
       const firstKey = this.embeddingCache.keys().next().value;
@@ -386,21 +394,21 @@ export class UnifiedCacheSystem extends EventEmitter {
    */
   async migrateLegacyCache(legacySystemName: string, adapter: LegacyCacheAdapter): Promise<void> {
     this.legacyAdapters.set(legacySystemName, adapter);
-    
+
     // Migrate existing data
     const legacyData = await adapter.exportData();
     let migratedCount = 0;
-    
+
     for (const item of legacyData) {
       const success = await this.set(item.key, item.value, {
         ttl: item.ttl,
         tags: item.tags,
-        metadata: item.metadata
+        metadata: item.metadata,
       });
-      
+
       if (success) migratedCount++;
     }
-    
+
     logger.info(`Migrated ${migratedCount}/${legacyData.length} entries from ${legacySystemName}`);
     this.emit('migration-complete', { system: legacySystemName, migrated: migratedCount });
   }
@@ -410,18 +418,18 @@ export class UnifiedCacheSystem extends EventEmitter {
    */
   async getStats(): Promise<any> {
     const baseStats = await this.cacheManager.getStats();
-    
+
     return {
       ...baseStats,
       semantic: {
         vectorIndexSize: this.vectorIndex.size,
         embeddingCacheSize: this.embeddingCache.size,
-        enabled: this.config.semantic.enabled
+        enabled: this.config.semantic.enabled,
       },
       routing: {
         strategies: this.config.routing.strategies.length,
-        adapters: this.legacyAdapters.size
-      }
+        adapters: this.legacyAdapters.size,
+      },
     };
   }
 
@@ -476,14 +484,16 @@ export class UnifiedCacheSystem extends EventEmitter {
  * Interface for migrating legacy cache systems
  */
 export interface LegacyCacheAdapter {
-  exportData(): Promise<Array<{
-    key: string;
-    value: any;
-    ttl?: number;
-    tags?: string[];
-    metadata?: Record<string, any>;
-  }>>;
-  
+  exportData(): Promise<
+    Array<{
+      key: string;
+      value: any;
+      ttl?: number;
+      tags?: string[];
+      metadata?: Record<string, any>;
+    }>
+  >;
+
   clear(): Promise<void>;
 }
 
@@ -500,26 +510,26 @@ export const defaultUnifiedCacheConfig: UnifiedCacheConfig = {
     memory: {
       enabled: true,
       maxSize: 1000,
-      algorithm: 'lru'
+      algorithm: 'lru',
     },
     redis: {
       enabled: false,
       host: 'localhost',
       port: 6379,
       db: 0,
-      keyPrefix: 'codecrucible:'
+      keyPrefix: 'codecrucible:',
     },
     disk: {
       enabled: true,
       path: './cache',
-      maxSize: '100MB'
-    }
+      maxSize: '100MB',
+    },
   },
   semantic: {
     enabled: true,
     similarityThreshold: 0.85,
     embeddingDimension: 1536,
-    maxVectorResults: 5
+    maxVectorResults: 5,
   },
   routing: {
     strategies: [
@@ -527,28 +537,28 @@ export const defaultUnifiedCacheConfig: UnifiedCacheConfig = {
         name: 'ai-responses',
         pattern: /^ai:(prompt|response|analysis):/,
         strategy: 'semantic',
-        ttl: 3600
+        ttl: 3600,
       },
       {
         name: 'security-tokens',
         pattern: /^(auth|token|session):/,
         strategy: 'security',
-        ttl: 300
+        ttl: 300,
       },
       {
         name: 'performance-data',
         pattern: /^(perf|metrics|stats):/,
-        strategy: 'performance', 
-        ttl: 1800
+        strategy: 'performance',
+        ttl: 1800,
       },
       {
         name: 'default',
         pattern: /.*/,
         strategy: 'standard',
-        ttl: 3600
-      }
-    ]
-  }
+        ttl: 3600,
+      },
+    ],
+  },
 };
 
 // Export singleton instance

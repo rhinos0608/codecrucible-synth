@@ -483,10 +483,10 @@ export class ProjectIntelligenceSystem extends EventEmitter {
       };
 
       // Cache the results with 1 hour TTL and project intelligence tags
-      await unifiedCache.set(cacheKey, intelligence, { 
+      await unifiedCache.set(cacheKey, intelligence, {
         ttl: 3600000, // 1 hour
         tags: ['project-intelligence', 'analysis'],
-        metadata: { path: normalizedPath, analysisTime: Date.now() - startTime }
+        metadata: { path: normalizedPath, analysisTime: Date.now() - startTime },
       });
 
       const analysisTime = Date.now() - startTime;

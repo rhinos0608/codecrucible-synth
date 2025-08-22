@@ -237,11 +237,29 @@ export class AdvancedToolOrchestrator extends EventEmitter {
    */
   shouldUseTools(prompt: string): boolean {
     const toolKeywords = [
-      'analyze', 'read', 'file', 'directory', 'project', 'code', 'structure',
-      'write', 'create', 'generate', 'build', 'compile', 'test', 'run',
-      'search', 'find', 'list', 'show', 'display', 'check', 'scan'
+      'analyze',
+      'read',
+      'file',
+      'directory',
+      'project',
+      'code',
+      'structure',
+      'write',
+      'create',
+      'generate',
+      'build',
+      'compile',
+      'test',
+      'run',
+      'search',
+      'find',
+      'list',
+      'show',
+      'display',
+      'check',
+      'scan',
     ];
-    
+
     const promptLower = prompt.toLowerCase();
     return toolKeywords.some(keyword => promptLower.includes(keyword));
   }
@@ -249,10 +267,14 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   /**
    * Process a prompt using appropriate tools
    */
-  async processWithTools(prompt: string, systemPrompt?: string, runtimeContext?: any): Promise<string> {
+  async processWithTools(
+    prompt: string,
+    systemPrompt?: string,
+    runtimeContext?: any
+  ): Promise<string> {
     try {
       this.logger.info('Processing prompt with tools:', prompt.slice(0, 100) + '...');
-      
+
       // Create enhanced context with system prompt and runtime information
       const context: ToolContext = {
         sessionId: Date.now().toString(),
@@ -265,7 +287,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
           platform: runtimeContext?.platform || process.platform,
           isGitRepo: runtimeContext?.isGitRepo || false,
           currentBranch: runtimeContext?.currentBranch || 'main',
-          modelId: runtimeContext?.modelId || 'unknown'
+          modelId: runtimeContext?.modelId || 'unknown',
         },
         previousResults: [],
         constraints: {
@@ -273,23 +295,23 @@ export class AdvancedToolOrchestrator extends EventEmitter {
           maxMemoryUsage: 1024 * 1024 * 100, // 100MB
           allowedNetworkAccess: false,
           sandboxed: true,
-          costLimit: 1000
+          costLimit: 1000,
         },
         security: {
           permissions: ['read', 'write', 'execute'],
           restrictions: ['no-network', 'sandboxed'],
           auditLog: true,
-          encryptionRequired: false
+          encryptionRequired: false,
         },
-        systemPrompt: systemPrompt // Enhanced: Include system prompt for better tool decision making
+        systemPrompt: systemPrompt, // Enhanced: Include system prompt for better tool decision making
       };
 
       // Select appropriate tools for the objective
       const toolCalls = await this.selectTools(prompt, context);
-      
+
       if (toolCalls.length === 0) {
         this.logger.info('No tools selected, falling back to AI model with system prompt');
-        // Enhanced: Use system prompt in fallback for consistent behavior  
+        // Enhanced: Use system prompt in fallback for consistent behavior
         if (systemPrompt) {
           const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}`;
           return await this.modelClient.generateText(fullPrompt);
@@ -300,10 +322,9 @@ export class AdvancedToolOrchestrator extends EventEmitter {
 
       // Execute the tools
       const results = await this.executePlan(toolCalls, context);
-      
+
       // Synthesize results into a coherent response
       return await this.synthesizeToolResults(prompt, results);
-      
     } catch (error) {
       this.logger.error('Tool processing failed:', error);
       // Fallback to direct AI model
@@ -314,12 +335,15 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   /**
    * Synthesize tool results into a coherent response
    */
-  private async synthesizeToolResults(originalPrompt: string, results: Map<string, ToolResult>): Promise<string> {
+  private async synthesizeToolResults(
+    originalPrompt: string,
+    results: Map<string, ToolResult>
+  ): Promise<string> {
     const resultsArray = Array.from(results.entries()).map(([toolId, result]) => ({
       tool: toolId,
       success: result.success,
       output: result.output,
-      error: result.error
+      error: result.error,
     }));
 
     const synthesisPrompt = `

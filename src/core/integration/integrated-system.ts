@@ -750,8 +750,8 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
         priority: 'medium',
         category: 'synthesis',
         source: 'integrated-system',
-        computeCost: response.metadata.totalTokens / 1000
-      }
+        computeCost: response.metadata.totalTokens / 1000,
+      },
     });
   }
 

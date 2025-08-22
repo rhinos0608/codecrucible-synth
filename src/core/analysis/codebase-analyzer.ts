@@ -539,7 +539,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
       const fs = await import('fs');
       const path = await import('path');
       const tsconfigPath = path.join(this.workingDirectory, 'tsconfig.json');
-      
+
       if (fs.existsSync(tsconfigPath)) {
         try {
           const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));

@@ -71,11 +71,15 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
 
       // Cache the basic info
       const cacheKey = `lazy-intel-basic:${rootPath}`;
-      await unifiedCache.set(cacheKey, {
-        basic,
-        loaded: false,
-        loading: false,
-      }, { ttl: 3600000, tags: ['lazy-project-intelligence', 'basic-info'] });
+      await unifiedCache.set(
+        cacheKey,
+        {
+          basic,
+          loaded: false,
+          loading: false,
+        },
+        { ttl: 3600000, tags: ['lazy-project-intelligence', 'basic-info'] }
+      );
 
       this.metrics.initTime = Date.now() - startTime;
       this.logger.info(`Quick analysis completed in ${this.metrics.initTime}ms`);
@@ -123,7 +127,10 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
           loaded: true,
           loading: false,
         };
-        await unifiedCache.set(cacheKey, updated, { ttl: 3600000, tags: ['lazy-project-intelligence', 'full-intel'] });
+        await unifiedCache.set(cacheKey, updated, {
+          ttl: 3600000,
+          tags: ['lazy-project-intelligence', 'full-intel'],
+        });
       }
 
       this.emit('intelligence:loaded', { rootPath, intelligence });
@@ -139,7 +146,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   async preloadIntelligence(rootPath: string): Promise<void> {
     const cacheKey = `lazy-intel-basic:${rootPath}`;
     const cached = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
-    
+
     if (!cached?.value || this.loadingPromises.has(rootPath)) {
       return;
     }
@@ -149,7 +156,10 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
     }
 
     const updated = { ...cached.value, loading: true };
-    await unifiedCache.set(cacheKey, updated, { ttl: 3600000, tags: ['lazy-project-intelligence'] });
+    await unifiedCache.set(cacheKey, updated, {
+      ttl: 3600000,
+      tags: ['lazy-project-intelligence'],
+    });
 
     // Load in background
     setImmediate(async () => {
@@ -160,7 +170,10 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
         const cachedData = await unifiedCache.get<LazyProjectIntelligence>(cacheKey);
         if (cachedData?.value) {
           const updated = { ...cachedData.value, loading: false };
-          await unifiedCache.set(cacheKey, updated, { ttl: 3600000, tags: ['lazy-project-intelligence'] });
+          await unifiedCache.set(cacheKey, updated, {
+            ttl: 3600000,
+            tags: ['lazy-project-intelligence'],
+          });
         }
       }
     });

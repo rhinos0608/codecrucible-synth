@@ -18,14 +18,14 @@ export class EnhancedToolIntegration extends ToolIntegration {
     try {
       // Initialize existing local tools
       logger.info('Initializing local MCP tools...');
-      
+
       // Initialize external MCP servers
       logger.info('Initializing external MCP servers...');
       await this.externalMcpManager.initializeServers();
-      
+
       // Register external MCP tools as LLM functions
       this.registerExternalMCPTools();
-      
+
       logger.info('Enhanced tool integration initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize enhanced tool integration:', error);
@@ -40,14 +40,15 @@ export class EnhancedToolIntegration extends ToolIntegration {
       id: 'mcp_execute_command',
       name: 'Execute Terminal Command',
       description: 'Execute a terminal command using external MCP Terminal Controller',
-      execute: async (args: any) => this.externalMcpTools.executeCommand(args.command, args.timeout),
+      execute: async (args: any) =>
+        this.externalMcpTools.executeCommand(args.command, args.timeout),
       inputSchema: {
         properties: {
           command: { type: 'string', description: 'Command to execute' },
-          timeout: { type: 'number', description: 'Timeout in milliseconds' }
+          timeout: { type: 'number', description: 'Timeout in milliseconds' },
         },
-        required: ['command']
-      }
+        required: ['command'],
+      },
     });
 
     this.availableTools.set('mcp_read_file', {
@@ -57,10 +58,10 @@ export class EnhancedToolIntegration extends ToolIntegration {
       execute: async (args: any) => this.externalMcpTools.readFile(args.filePath),
       inputSchema: {
         properties: {
-          filePath: { type: 'string', description: 'Path to file to read' }
+          filePath: { type: 'string', description: 'Path to file to read' },
         },
-        required: ['filePath']
-      }
+        required: ['filePath'],
+      },
     });
 
     this.availableTools.set('mcp_write_file', {
@@ -71,10 +72,10 @@ export class EnhancedToolIntegration extends ToolIntegration {
       inputSchema: {
         properties: {
           filePath: { type: 'string', description: 'Path to file to write' },
-          content: { type: 'string', description: 'Content to write to file' }
+          content: { type: 'string', description: 'Content to write to file' },
         },
-        required: ['filePath', 'content']
-      }
+        required: ['filePath', 'content'],
+      },
     });
 
     this.availableTools.set('mcp_list_directory', {
@@ -84,10 +85,10 @@ export class EnhancedToolIntegration extends ToolIntegration {
       execute: async (args: any) => this.externalMcpTools.listDirectory(args.path),
       inputSchema: {
         properties: {
-          path: { type: 'string', description: 'Directory path to list' }
+          path: { type: 'string', description: 'Directory path to list' },
         },
-        required: []
-      }
+        required: [],
+      },
     });
 
     // Register Task Manager tools
@@ -99,10 +100,10 @@ export class EnhancedToolIntegration extends ToolIntegration {
       inputSchema: {
         properties: {
           request: { type: 'string', description: 'Request description to plan' },
-          tasks: { type: 'array', description: 'Optional initial task list' }
+          tasks: { type: 'array', description: 'Optional initial task list' },
         },
-        required: ['request']
-      }
+        required: ['request'],
+      },
     });
 
     this.availableTools.set('mcp_get_next_task', {
@@ -112,8 +113,8 @@ export class EnhancedToolIntegration extends ToolIntegration {
       execute: async () => this.externalMcpTools.getNextTask(),
       inputSchema: {
         properties: {},
-        required: []
-      }
+        required: [],
+      },
     });
 
     this.availableTools.set('mcp_mark_task_done', {
@@ -123,10 +124,10 @@ export class EnhancedToolIntegration extends ToolIntegration {
       execute: async (args: any) => this.externalMcpTools.markTaskDone(args.taskId),
       inputSchema: {
         properties: {
-          taskId: { type: 'string', description: 'ID of task to mark as done' }
+          taskId: { type: 'string', description: 'ID of task to mark as done' },
         },
-        required: ['taskId']
-      }
+        required: ['taskId'],
+      },
     });
 
     // Register Remote Shell tools (disabled by default for security)
@@ -134,19 +135,16 @@ export class EnhancedToolIntegration extends ToolIntegration {
       id: 'mcp_remote_execute',
       name: 'Execute Remote Command',
       description: 'Execute command on remote system using external MCP Remote Shell (RESTRICTED)',
-      execute: async (args: any) => this.externalMcpTools.executeRemoteCommand(
-        args.command, 
-        args.workingDir, 
-        args.timeout
-      ),
+      execute: async (args: any) =>
+        this.externalMcpTools.executeRemoteCommand(args.command, args.workingDir, args.timeout),
       inputSchema: {
         properties: {
           command: { type: 'string', description: 'Command to execute remotely' },
           workingDir: { type: 'string', description: 'Working directory for command' },
-          timeout: { type: 'number', description: 'Timeout in milliseconds' }
+          timeout: { type: 'number', description: 'Timeout in milliseconds' },
         },
-        required: ['command']
-      }
+        required: ['command'],
+      },
     });
   }
 
@@ -165,13 +163,15 @@ export class EnhancedToolIntegration extends ToolIntegration {
           parameters: {
             type: 'object',
             properties: tool.inputSchema.properties || {},
-            required: tool.inputSchema.required || []
-          }
-        }
+            required: tool.inputSchema.required || [],
+          },
+        },
       }));
 
-    logger.info(`Enhanced tool integration providing ${baseFunctions.length} local + ${externalMcpFunctions.length} external MCP tools`);
-    
+    logger.info(
+      `Enhanced tool integration providing ${baseFunctions.length} local + ${externalMcpFunctions.length} external MCP tools`
+    );
+
     return [...baseFunctions, ...externalMcpFunctions];
   }
 
@@ -180,19 +180,22 @@ export class EnhancedToolIntegration extends ToolIntegration {
    */
   async healthCheck(): Promise<any> {
     const baseHealth = { local: { status: 'running', tools: this.getAvailableToolNames().length } };
-    
+
     try {
       const externalMcpHealth = await this.externalMcpTools.healthCheck();
-      
+
       return {
         ...baseHealth,
-        external_mcp: externalMcpHealth
+        external_mcp: externalMcpHealth,
       };
     } catch (error) {
       logger.warn('External MCP health check failed:', error);
       return {
         ...baseHealth,
-        external_mcp: { status: 'error', error: error instanceof Error ? error.message : 'Unknown error' }
+        external_mcp: {
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
       };
     }
   }

@@ -12,11 +12,11 @@ export class CLIParser {
   static parseSlashCommand(input: string): { command: string; role?: string; content: string } {
     const slashCommandRegex = /^\/(\w+)(?:\s+(.*))?$/;
     const match = input.match(slashCommandRegex);
-    
+
     if (match) {
       const command = match[1];
       const content = match[2] || '';
-      
+
       switch (command) {
         case 'auditor':
           return { command: 'role-switch', role: 'auditor', content };
@@ -30,7 +30,7 @@ export class CLIParser {
           return { command: 'unknown-slash', content: input };
       }
     }
-    
+
     return { command: 'none', content: input };
   }
 

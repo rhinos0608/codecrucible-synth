@@ -688,7 +688,7 @@ export class EnhancedStartupIndexer {
     documentation: Record<string, DocumentationFile>
   ): Promise<ProjectIndex['analysis']> {
     const fileArray = Object.values(files);
-    
+
     // Load package data for framework detection
     const packageJsonPath = join(this.rootPath, 'package.json');
     let packageData: PackageData = {};
@@ -785,7 +785,6 @@ export class EnhancedStartupIndexer {
     return 'Custom/Unknown';
   }
 
-
   private detectCircularDependencies(files: Record<string, ProjectFile>): string[] {
     const circular: string[] = [];
     const graph = new Map<string, Set<string>>();
@@ -795,7 +794,7 @@ export class EnhancedStartupIndexer {
     // Build dependency graph
     for (const [filePath, file] of Object.entries(files)) {
       if (!file.imports) continue;
-      
+
       graph.set(filePath, new Set());
       for (const importPath of file.imports) {
         // Convert relative imports to absolute paths
@@ -842,26 +841,30 @@ export class EnhancedStartupIndexer {
     return [...new Set(circular)]; // Remove duplicates
   }
 
-  private resolveImportPath(currentFile: string, importPath: string, files: Record<string, ProjectFile>): string | null {
+  private resolveImportPath(
+    currentFile: string,
+    importPath: string,
+    files: Record<string, ProjectFile>
+  ): string | null {
     // Handle relative imports
     if (importPath.startsWith('./') || importPath.startsWith('../')) {
       const path = require('path');
       const resolved = path.resolve(path.dirname(currentFile), importPath);
-      
+
       // Try common extensions
       const extensions = ['.ts', '.tsx', '.js', '.jsx'];
       for (const ext of extensions) {
         const withExt = resolved + ext;
         if (files[withExt]) return withExt;
       }
-      
+
       // Try index files
       for (const ext of extensions) {
         const indexFile = path.join(resolved, 'index' + ext);
         if (files[indexFile]) return indexFile;
       }
     }
-    
+
     return null;
   }
 

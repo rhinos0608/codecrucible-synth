@@ -245,9 +245,6 @@ export class RateLimiter extends EventEmitter {
     super();
 
     this.config = {
-      algorithm: 'sliding-window',
-      windowMs: 60000, // 1 minute
-      maxRequests: 100,
       keyGenerator: this.defaultKeyGenerator,
       skipSuccessfulRequests: false,
       skipFailedRequests: false,

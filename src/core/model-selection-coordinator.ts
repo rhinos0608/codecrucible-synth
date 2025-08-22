@@ -33,19 +33,19 @@ export class ModelSelectionCoordinator extends EventEmitter {
   private selectedModels: Map<string, ModelSelectionConfig> = new Map();
   private providerCapabilities: Map<string, ProviderCapabilities> = new Map();
   private routingHistory: ModelSelectionConfig[] = [];
-  
+
   // Unified configuration (single source of truth)
   private readonly modelPriority = {
     ollama: {
       preferred: ['qwen2.5-coder:7b', 'qwen2.5-coder:3b', 'deepseek-coder:8b'],
       fallback: ['llama3.2:latest', 'gemma:latest'],
-      taskTypes: ['analysis', 'planning', 'complex', 'multi-file']
+      taskTypes: ['analysis', 'planning', 'complex', 'multi-file'],
     },
     'lm-studio': {
       preferred: ['codellama-7b-instruct', 'gemma-2b-it'],
       fallback: ['qwen/qwen2.5-coder-14b'],
-      taskTypes: ['template', 'edit', 'format', 'boilerplate']
-    }
+      taskTypes: ['template', 'edit', 'format', 'boilerplate'],
+    },
   };
 
   constructor() {
@@ -58,12 +58,12 @@ export class ModelSelectionCoordinator extends EventEmitter {
    * This is the ONLY method that should be used for model selection
    */
   async selectModel(
-    provider: string, 
+    provider: string,
     taskType: string,
     availableModels: string[] = []
   ): Promise<ModelSelectionConfig> {
     this.logger.info(`Selecting model for ${provider} - task: ${taskType}`);
-    
+
     // Check if we already have a selection for this provider
     const existing = this.selectedModels.get(provider);
     if (existing && existing.confidence > 0.8) {
@@ -110,16 +110,16 @@ export class ModelSelectionCoordinator extends EventEmitter {
       model: selectedModel,
       reason,
       confidence,
-      taskType
+      taskType,
     };
 
     // Cache the selection
     this.selectedModels.set(provider, selection);
     this.routingHistory.push(selection);
-    
+
     // Emit event for monitoring
     this.emit('model-selected', selection);
-    
+
     this.logger.info(`Selected ${selectedModel} with confidence ${confidence}: ${reason}`);
     return selection;
   }
@@ -132,7 +132,9 @@ export class ModelSelectionCoordinator extends EventEmitter {
     const selection = this.selectedModels.get(provider);
     if (!selection) {
       this.logger.warn(`No model selected for ${provider}, using default`);
-      return this.modelPriority[provider as keyof typeof this.modelPriority]?.preferred[0] || 'unknown';
+      return (
+        this.modelPriority[provider as keyof typeof this.modelPriority]?.preferred[0] || 'unknown'
+      );
     }
     return selection.model;
   }
@@ -147,12 +149,12 @@ export class ModelSelectionCoordinator extends EventEmitter {
       models: [],
       preferredModels: [],
       strengths: [],
-      responseTime: 'unknown'
+      responseTime: 'unknown',
     };
 
     this.providerCapabilities.set(provider, {
       ...existing,
-      ...capabilities
+      ...capabilities,
     });
 
     this.logger.info(`Updated capabilities for ${provider}:`, capabilities);
@@ -163,7 +165,10 @@ export class ModelSelectionCoordinator extends EventEmitter {
    * Determine which provider to use based on task complexity
    * This replaces the conflicting routing logic in multiple places
    */
-  async routeToProvider(taskType: string, complexity: 'simple' | 'complex' | 'auto'): Promise<string> {
+  async routeToProvider(
+    taskType: string,
+    complexity: 'simple' | 'complex' | 'auto'
+  ): Promise<string> {
     // Simple routing based on task complexity
     if (complexity === 'simple' || ['template', 'edit', 'format'].includes(taskType)) {
       // Check if LM Studio is available
@@ -185,18 +190,17 @@ export class ModelSelectionCoordinator extends EventEmitter {
       totalRoutings: this.routingHistory.length,
       providerDistribution: {} as Record<string, number>,
       averageConfidence: 0,
-      modelUsage: {} as Record<string, number>
+      modelUsage: {} as Record<string, number>,
     };
 
     for (const routing of this.routingHistory) {
       // Provider distribution
-      stats.providerDistribution[routing.provider] = 
+      stats.providerDistribution[routing.provider] =
         (stats.providerDistribution[routing.provider] || 0) + 1;
-      
+
       // Model usage
-      stats.modelUsage[routing.model] = 
-        (stats.modelUsage[routing.model] || 0) + 1;
-      
+      stats.modelUsage[routing.model] = (stats.modelUsage[routing.model] || 0) + 1;
+
       // Confidence sum
       stats.averageConfidence += routing.confidence;
     }
@@ -223,7 +227,7 @@ export class ModelSelectionCoordinator extends EventEmitter {
     return {
       selectedModels: Array.from(this.selectedModels.entries()),
       providerCapabilities: Array.from(this.providerCapabilities.entries()),
-      routingHistory: this.routingHistory.slice(-100) // Keep last 100 for analysis
+      routingHistory: this.routingHistory.slice(-100), // Keep last 100 for analysis
     };
   }
 

@@ -455,7 +455,7 @@ export class StubCompletionEngine {
     }`,
     };
 
-    return templates[stubType] || templates['empty'];
+    return (templates as any)[stubType] || templates['empty'];
   }
 
   /**

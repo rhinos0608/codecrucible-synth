@@ -1,7 +1,7 @@
 {
   "name": "codecrucible-synth",
   "version": "4.0.0",
-  "description": "Enterprise-Ready AI-Powered Code Generation & Analysis Tool with Multi-Voice Synthesis, Hybrid Model Architecture, MCP Integration, and Production-Grade Testing",
+  "description": "Production-Ready AI-Powered Code Generation & Analysis Tool with Multi-Voice Synthesis, Optimized Performance, Cross-Session Caching, and Zero-Timeout Reliability",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
@@ -20,6 +20,8 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,js,json}\"",
+    "typecheck": "npx tsc --project tsconfig.build.json --noEmit",
+    "fix-code": "npm run lint:fix && npm run format && npm run typecheck",
     "start": "node dist/index.js",
     "cli": "npm run build && node dist/index.js",
     "install-global": "npm run build && npm link",

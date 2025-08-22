@@ -3,6 +3,7 @@ import { ConfigManager } from './config/config-manager.js';
 import { UnifiedModelClient, UnifiedClientConfig } from './core/client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
+import { getErrorMessage } from './utils/error-utils.js';
 
 // Fix EventEmitter memory leak warning
 process.setMaxListeners(50);
@@ -18,13 +19,13 @@ export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLICo
         {
           type: 'ollama',
           endpoint: config.model?.endpoint || 'http://localhost:11434',
-          model: null, // Autonomous model selection
+          model: undefined, // Autonomous model selection
           timeout: config.model?.timeout || 30000,
         },
         {
           type: 'lm-studio',
           endpoint: 'http://localhost:1234',
-          model: null, // Autonomous model selection
+          model: undefined, // Autonomous model selection
           timeout: 30000,
         },
       ],
@@ -47,10 +48,10 @@ export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLICo
     // Initialize providers but don't fail if they're not available
     try {
       await client.initialize();
-    } catch (error) {
+    } catch (error: unknown) {
       console.warn(
         '⚠️ Provider initialization failed, continuing in degraded mode:',
-        error.message
+        getErrorMessage(error)
       );
     }
 
@@ -89,8 +90,11 @@ export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLICo
           securityScan: true,
         },
       });
-    } catch (error) {
-      console.warn('⚠️ MCP Manager initialization failed, using minimal setup:', error.message);
+    } catch (error: unknown) {
+      console.warn(
+        '⚠️ MCP Manager initialization failed, using minimal setup:',
+        getErrorMessage(error)
+      );
       // Create a minimal mock MCP manager
       mcpManager = {
         startServers: async () => {},
@@ -101,19 +105,28 @@ export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLICo
 
     // Initialize enhanced tool integration system for AI function calling
     try {
-      const { initializeGlobalEnhancedToolIntegration } = await import('./core/tools/enhanced-tool-integration.js');
-      const enhancedIntegration = new (await import('./core/tools/enhanced-tool-integration.js')).EnhancedToolIntegration(mcpManager);
+      const { initializeGlobalEnhancedToolIntegration } = await import(
+        './core/tools/enhanced-tool-integration.js'
+      );
+      const enhancedIntegration = new (
+        await import('./core/tools/enhanced-tool-integration.js')
+      ).EnhancedToolIntegration(mcpManager);
       await enhancedIntegration.initialize();
       console.log('✅ Enhanced tool integration initialized with local + external MCP tools');
-    } catch (error) {
-      console.warn('⚠️ Enhanced tool integration failed, falling back to local tools:', error.message);
+    } catch (error: unknown) {
+      console.warn(
+        '⚠️ Enhanced tool integration failed, falling back to local tools:',
+        getErrorMessage(error)
+      );
       // Fallback to local tool integration
       try {
-        const { initializeGlobalToolIntegration } = await import('./core/tools/tool-integration.js');
+        const { initializeGlobalToolIntegration } = await import(
+          './core/tools/tool-integration.js'
+        );
         initializeGlobalToolIntegration(mcpManager);
         console.log('✅ Local tool integration initialized as fallback');
-      } catch (fallbackError) {
-        console.warn('⚠️ Tool integration completely failed:', fallbackError.message);
+      } catch (fallbackError: unknown) {
+        console.warn('⚠️ Tool integration completely failed:', getErrorMessage(fallbackError));
       }
     }
 
@@ -179,7 +192,7 @@ export async function main() {
     // Check if we have piped input
     const isInteractive = process.stdin.isTTY;
     console.log('🔧 DEBUG: isInteractive:', isInteractive, 'args.length:', args.length);
-    
+
     // If we have arguments or piped input, process them
     if (args.length > 0) {
       console.log('🔧 DEBUG: Taking args.length > 0 branch with args:', args);
@@ -189,26 +202,33 @@ export async function main() {
       // Handle piped input directly without CLI.run() to avoid race condition
       let inputData = '';
       process.stdin.setEncoding('utf8');
-      
+
       for await (const chunk of process.stdin) {
         inputData += chunk;
       }
-      
+
       if (inputData.trim()) {
         console.log('🔧 DEBUG: Processing piped input:', inputData.trim().substring(0, 50) + '...');
         // Process directly through the model client to avoid InteractiveREPL race condition
         try {
-          const response = await context.modelClient.generateText(inputData.trim(), { timeout: 30000 });
+          const response = await context.modelClient.generateText(inputData.trim(), {
+            timeout: 30000,
+          });
           console.log('\n🤖 Response:');
           console.log(response);
-        } catch (error) {
-          console.error('❌ Error processing input:', error.message);
+        } catch (error: unknown) {
+          console.error('❌ Error processing input:', getErrorMessage(error));
         }
       } else {
         console.log('🔧 DEBUG: No piped input received');
       }
     } else {
-      console.log('🔧 DEBUG: Taking interactive mode branch with args:', args, 'isInteractive:', isInteractive);
+      console.log(
+        '🔧 DEBUG: Taking interactive mode branch with args:',
+        args,
+        'isInteractive:',
+        isInteractive
+      );
       // No args and interactive terminal - start interactive mode
       await cli.run(args);
     }

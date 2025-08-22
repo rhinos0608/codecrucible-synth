@@ -7,6 +7,7 @@ import * as readline from 'readline';
 import chalk from 'chalk';
 import { CLI, CLIContext } from './cli.js';
 import { Logger } from './logger.js';
+import { getErrorMessage } from '../utils/error-utils.js';
 
 export class InteractiveREPL {
   private rl: readline.Interface;
@@ -210,8 +211,9 @@ export class InteractiveREPL {
           contextAware: true,
         });
       }
-    } catch (error) {
-      console.error(chalk.red('❌ Error:'), error.message);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      console.error(chalk.red('❌ Error:'), errorMessage);
     } finally {
       this.isProcessing = false;
       this.rl.prompt();
@@ -267,8 +269,9 @@ export class InteractiveREPL {
           chalk.yellow('🔄 You can try rephrasing your request or use a simpler prompt.')
         );
       }
-    } catch (error) {
-      console.error(chalk.red('Failed to load direct analyzer:'), error);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      console.error(chalk.red('Failed to load direct analyzer:'), errorMessage);
     }
   }
 

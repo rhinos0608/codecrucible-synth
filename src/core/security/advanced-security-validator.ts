@@ -40,8 +40,8 @@ export interface SecurityViolation {
 export class AdvancedSecurityValidator {
   private logger: Logger;
   private policy: SecurityPolicy;
-  private knownMaliciousPatterns: RegExp[];
-  private suspiciousKeywords: string[];
+  private knownMaliciousPatterns!: RegExp[];
+  private suspiciousKeywords!: string[];
 
   constructor(policy?: Partial<SecurityPolicy>) {
     this.logger = new Logger('AdvancedSecurityValidator');

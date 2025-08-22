@@ -157,7 +157,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
       console.log(chalk.green('✅ Sequential review system initialized'));
       console.log(chalk.cyan(`   Writer: ${this.config.writer.provider}`));
       console.log(chalk.cyan(`   Auditor: ${this.config.auditor.provider}`));
-      
+
       this.emit('system:ready');
     } catch (error) {
       this.logger.error('Failed to initialize system:', error);
@@ -189,7 +189,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
       'code_generation',
       []
     );
-    
+
     this.config.writer.model = selection.model;
     this.logger.info(`Writer model selected: ${selection.model}`);
   }
@@ -218,7 +218,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
       'code_review',
       []
     );
-    
+
     this.config.auditor.model = selection.model;
     this.logger.info(`Auditor model selected: ${selection.model}`);
   }
@@ -260,7 +260,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
       // PHASE 1: Writer generates code
       console.log(chalk.yellow('\n📝 Phase 1: Writer Agent Generating Code...'));
       this.emit('phase:writer_start', { prompt });
-      
+
       const writerStart = Date.now();
       result.writerOutput.code = await this.generateCode(prompt, context);
       result.writerOutput.duration = Date.now() - writerStart;
@@ -271,7 +271,9 @@ export class SequentialDualAgentSystem extends EventEmitter {
         duration: result.writerOutput.duration,
       });
 
-      console.log(chalk.green(`✅ Writer completed in ${(result.writerOutput.duration / 1000).toFixed(2)}s`));
+      console.log(
+        chalk.green(`✅ Writer completed in ${(result.writerOutput.duration / 1000).toFixed(2)}s`)
+      );
 
       // PHASE 2: Auditor automatically reviews code
       if (this.config.workflow.autoAudit) {
@@ -292,12 +294,18 @@ export class SequentialDualAgentSystem extends EventEmitter {
           duration: result.auditorOutput.duration,
         });
 
-        console.log(chalk.green(`✅ Auditor completed in ${(result.auditorOutput.duration / 1000).toFixed(2)}s`));
+        console.log(
+          chalk.green(
+            `✅ Auditor completed in ${(result.auditorOutput.duration / 1000).toFixed(2)}s`
+          )
+        );
         this.displayAuditResults(result.auditorOutput.review);
 
         // PHASE 3: Optional refinement based on audit
-        if (this.config.workflow.applyFixes && 
-            result.auditorOutput.review.recommendation === 'refine') {
+        if (
+          this.config.workflow.applyFixes &&
+          result.auditorOutput.review.recommendation === 'refine'
+        ) {
           console.log(chalk.yellow('\n🔧 Phase 3: Applying Refinements...'));
           result.refinedOutput = await this.refineCode(
             result.writerOutput.code,
@@ -308,21 +316,21 @@ export class SequentialDualAgentSystem extends EventEmitter {
         }
 
         // Determine acceptance
-        result.accepted = result.auditorOutput.review.overallScore >= 
-                         (this.config.workflow.confidenceThreshold * 100);
+        result.accepted =
+          result.auditorOutput.review.overallScore >=
+          this.config.workflow.confidenceThreshold * 100;
       }
 
       result.totalDuration = Date.now() - startTime;
-      
+
       // Store in history
       this.executionHistory.push(result);
-      
+
       // Final summary
       this.displayFinalSummary(result);
-      
+
       this.emit('workflow:complete', result);
       return result;
-
     } catch (error) {
       this.logger.error('Sequential review failed:', error);
       this.emit('workflow:error', error);
@@ -339,7 +347,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
     }
 
     const enhancedPrompt = this.buildWriterPrompt(prompt, context);
-    
+
     const response = await this.writerProvider.processRequest({
       prompt: enhancedPrompt,
       temperature: this.config.writer.temperature,
@@ -353,8 +361,8 @@ export class SequentialDualAgentSystem extends EventEmitter {
    * Audit code using the auditor agent
    */
   private async auditCode(
-    code: string, 
-    originalPrompt: string, 
+    code: string,
+    originalPrompt: string,
     context?: any
   ): Promise<AuditReview> {
     if (!this.auditorProvider) {
@@ -362,7 +370,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
     }
 
     const auditPrompt = this.buildAuditorPrompt(code, originalPrompt, context);
-    
+
     const response = await this.auditorProvider.processRequest({
       prompt: auditPrompt,
       temperature: this.config.auditor.temperature,
@@ -380,8 +388,8 @@ export class SequentialDualAgentSystem extends EventEmitter {
     review: AuditReview,
     originalPrompt: string
   ): Promise<any> {
-    const criticalIssues = review.issues.filter(i => 
-      i.severity === 'error' || i.severity === 'critical'
+    const criticalIssues = review.issues.filter(
+      i => i.severity === 'error' || i.severity === 'critical'
     );
 
     if (criticalIssues.length === 0) {
@@ -512,13 +520,15 @@ Generate the improved code with all issues resolved:`;
    */
   private extractCode(response: string | any): string {
     // Handle object responses from providers
-    const responseText = typeof response === 'string' ? response : 
-                        response?.content || response?.text || String(response);
-    
+    const responseText =
+      typeof response === 'string'
+        ? response
+        : response?.content || response?.text || String(response);
+
     if (!responseText || typeof responseText !== 'string') {
       throw new Error('Invalid response format: expected string content');
     }
-    
+
     const codeMatch = responseText.match(/```[\w]*\n?([\s\S]*?)```/);
     return codeMatch ? codeMatch[1].trim() : responseText.trim();
   }
@@ -528,9 +538,11 @@ Generate the improved code with all issues resolved:`;
    */
   private parseAuditResponse(response: string | any): AuditReview {
     // Handle object responses from providers
-    const responseText = typeof response === 'string' ? response : 
-                        response?.content || response?.text || String(response);
-    
+    const responseText =
+      typeof response === 'string'
+        ? response
+        : response?.content || response?.text || String(response);
+
     try {
       // Try to parse JSON from response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -572,16 +584,22 @@ Generate the improved code with all issues resolved:`;
   private displayAuditResults(review: AuditReview): void {
     console.log(chalk.cyan('\n📊 Audit Results:'));
     console.log(chalk.white(`   Overall Score: ${review.overallScore}/100`));
-    console.log(chalk.white(`   Status: ${review.passed ? chalk.green('PASSED') : chalk.red('FAILED')}`));
+    console.log(
+      chalk.white(`   Status: ${review.passed ? chalk.green('PASSED') : chalk.red('FAILED')}`)
+    );
     console.log(chalk.white(`   Recommendation: ${review.recommendation.toUpperCase()}`));
-    
+
     if (review.issues.length > 0) {
       console.log(chalk.yellow('\n   Issues Found:'));
       review.issues.forEach(issue => {
-        const color = issue.severity === 'critical' ? chalk.red :
-                      issue.severity === 'error' ? chalk.magenta :
-                      issue.severity === 'warning' ? chalk.yellow :
-                      chalk.gray;
+        const color =
+          issue.severity === 'critical'
+            ? chalk.red
+            : issue.severity === 'error'
+              ? chalk.magenta
+              : issue.severity === 'warning'
+                ? chalk.yellow
+                : chalk.gray;
         console.log(color(`     - [${issue.severity}] ${issue.description}`));
       });
     }
@@ -601,16 +619,18 @@ Generate the improved code with all issues resolved:`;
     console.log(chalk.blue('\n' + '='.repeat(60)));
     console.log(chalk.blue('📋 Sequential Review Summary'));
     console.log(chalk.blue('='.repeat(60)));
-    
+
     console.log(chalk.white(`\n⏱️  Total Duration: ${(result.totalDuration / 1000).toFixed(2)}s`));
     console.log(chalk.white(`   - Writer: ${(result.writerOutput.duration / 1000).toFixed(2)}s`));
     console.log(chalk.white(`   - Auditor: ${(result.auditorOutput.duration / 1000).toFixed(2)}s`));
-    
+
     const statusColor = result.accepted ? chalk.green : chalk.yellow;
     console.log(statusColor(`\n✅ Final Status: ${result.accepted ? 'ACCEPTED' : 'NEEDS REVIEW'}`));
-    
+
     if (result.refinedOutput) {
-      console.log(chalk.cyan(`\n🔧 Refinements Applied: ${result.refinedOutput.iterations} iteration(s)`));
+      console.log(
+        chalk.cyan(`\n🔧 Refinements Applied: ${result.refinedOutput.iterations} iteration(s)`)
+      );
       console.log(chalk.cyan(`   Final Score: ${result.refinedOutput.finalScore}/100`));
     }
   }
@@ -620,9 +640,14 @@ Generate the improved code with all issues resolved:`;
    */
   getMetrics(): any {
     const recentResults = this.executionHistory.slice(-10);
-    const avgWriterTime = recentResults.reduce((sum, r) => sum + r.writerOutput.duration, 0) / (recentResults.length || 1);
-    const avgAuditorTime = recentResults.reduce((sum, r) => sum + r.auditorOutput.duration, 0) / (recentResults.length || 1);
-    const acceptanceRate = recentResults.filter(r => r.accepted).length / (recentResults.length || 1);
+    const avgWriterTime =
+      recentResults.reduce((sum, r) => sum + r.writerOutput.duration, 0) /
+      (recentResults.length || 1);
+    const avgAuditorTime =
+      recentResults.reduce((sum, r) => sum + r.auditorOutput.duration, 0) /
+      (recentResults.length || 1);
+    const acceptanceRate =
+      recentResults.filter(r => r.accepted).length / (recentResults.length || 1);
 
     return {
       totalExecutions: this.executionHistory.length,

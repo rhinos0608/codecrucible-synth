@@ -188,7 +188,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
           quality_score: synthesis.qualityScore,
           voices_used: synthesis.voicesUsed,
         },
-        individual_responses: (synthesis.responses || []).map(r => ({
+        individual_responses: (synthesis.responses || []).map((r: any) => ({
           voice: r.voice,
           content: r.content,
           confidence: r.confidence,

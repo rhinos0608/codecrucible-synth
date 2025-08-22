@@ -17,8 +17,8 @@ export interface LRUCacheOptions {
 }
 
 export class LRUCache<T> {
-  private cache = new Map<string, CacheEntry<T>>();
-  private accessOrder: string[] = [];
+  protected cache = new Map<string, CacheEntry<T>>();
+  protected accessOrder: string[] = [];
   private maxSize: number;
   private readonly ttl: number;
   private cleanupInterval: NodeJS.Timeout | null = null;

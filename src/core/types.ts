@@ -31,6 +31,7 @@ export interface ModelRequest {
   maxTokens?: number;
   stream?: boolean;
   provider?: string;
+  abortSignal?: AbortSignal; // Add abort signal for request cancellation
   tools?: Array<{
     type: 'function';
     function: {

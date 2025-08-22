@@ -251,13 +251,15 @@ export class PerformanceMonitor extends EventEmitter {
     }
 
     // Check error rate alert
-    if (providerStats.errorRate > this.ALERT_THRESHOLDS.errorRate) {
+    if ((providerStats.errorRate ?? 0) > this.ALERT_THRESHOLDS.errorRate) {
       this.createAlert({
         type: 'error_rate',
         severity:
-          providerStats.errorRate > this.ALERT_THRESHOLDS.errorRate * 2 ? 'critical' : 'warning',
+          (providerStats.errorRate ?? 0) > this.ALERT_THRESHOLDS.errorRate * 2
+            ? 'critical'
+            : 'warning',
         message: `High error rate detected for provider ${provider}`,
-        value: providerStats.errorRate,
+        value: providerStats.errorRate ?? 0,
         threshold: this.ALERT_THRESHOLDS.errorRate,
         provider,
         timestamp: new Date(),
@@ -410,7 +412,7 @@ export class PerformanceMonitor extends EventEmitter {
     const summary = this.getSummary();
 
     // Check overall latency
-    if (summary.overall.averageLatency > 5000) {
+    if ((summary.overall?.averageLatency ?? 0) > 5000) {
       recommendations.push({
         type: 'performance' as const,
         priority: 'high' as const,
@@ -420,7 +422,7 @@ export class PerformanceMonitor extends EventEmitter {
     }
 
     // Check success rate
-    if (summary.overall.successRate < 0.9) {
+    if ((summary.overall?.successRate ?? 0) < 0.9) {
       recommendations.push({
         type: 'reliability' as const,
         priority: 'high' as const,
@@ -440,7 +442,7 @@ export class PerformanceMonitor extends EventEmitter {
     }
 
     // Check provider balance
-    const providerCounts = Object.values(summary.providers).map(p => p.totalRequests);
+    const providerCounts = Object.values(summary.providers || {}).map(p => p.totalRequests);
     const maxRequests = Math.max(...providerCounts);
     const minRequests = Math.min(...providerCounts);
 

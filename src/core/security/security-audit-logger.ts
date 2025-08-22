@@ -1008,7 +1008,7 @@ export class SecurityAuditLogger {
 
       // Write to disk if needed
       await this.writeEventsToFile(this.events);
-      
+
       logger.debug('Event buffer flushed', { eventCount: this.events.length });
     } catch (error) {
       logger.error('Failed to flush event buffer', error as Error);

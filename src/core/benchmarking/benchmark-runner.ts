@@ -307,12 +307,12 @@ Function signature and implementation:`;
       } else {
         // Use hybrid client
         if (this.hybridClient) {
-          const result = await Promise.race([
+          const result = (await Promise.race([
             this.hybridClient.generate({
-              prompt: enhancedPrompt
+              prompt: enhancedPrompt,
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs)),
-          ]) as any;
+          ])) as any;
 
           const extractedCode = this.extractCodeFromResponse(
             result.code || result.synthesis,
@@ -756,7 +756,12 @@ except Exception as e:
 
       this.ollamaClient = new UnifiedModelClient({
         providers: [
-          { type: 'ollama', endpoint: 'http://localhost:11434', model: 'codellama:34b', timeout: 60000 },
+          {
+            type: 'ollama',
+            endpoint: 'http://localhost:11434',
+            model: 'codellama:34b',
+            timeout: 60000,
+          },
         ],
         executionMode: 'quality',
         fallbackChain: ['ollama'],

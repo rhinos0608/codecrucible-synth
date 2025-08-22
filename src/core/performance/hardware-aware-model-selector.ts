@@ -458,7 +458,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
       }
     }
 
-    let sortedFallbacks = [...this.fallbackModels];
+    const sortedFallbacks = [...this.fallbackModels];
 
     // Sort fallbacks based on failure reason
     if (reason === 'oom' || reason === 'hardware_constraint') {

@@ -14,8 +14,8 @@ export class EnhancedExternalMCPTools {
    */
   async executeCommand(command: string, timeout?: number): Promise<any> {
     const isValid = await MCPSecurityValidator.validateToolCall(
-      'terminal-controller', 
-      'execute_command', 
+      'terminal-controller',
+      'execute_command',
       { command }
     );
 
@@ -25,7 +25,7 @@ export class EnhancedExternalMCPTools {
 
     return await this.mcpManager.executeToolCall('terminal-controller', 'execute_command', {
       command,
-      timeout: timeout || 30000
+      timeout: timeout || 30000,
     });
   }
 
@@ -41,7 +41,7 @@ export class EnhancedExternalMCPTools {
     }
 
     return await this.mcpManager.executeToolCall('terminal-controller', 'read_file', {
-      file_path: filePath
+      file_path: filePath,
     });
   }
 
@@ -58,12 +58,16 @@ export class EnhancedExternalMCPTools {
 
     return await this.mcpManager.executeToolCall('terminal-controller', 'write_file', {
       file_path: filePath,
-      content
+      content,
     });
   }
 
   async getCurrentDirectory(): Promise<any> {
-    return await this.mcpManager.executeToolCall('terminal-controller', 'get_current_directory', {});
+    return await this.mcpManager.executeToolCall(
+      'terminal-controller',
+      'get_current_directory',
+      {}
+    );
   }
 
   async listDirectory(path?: string): Promise<any> {
@@ -81,7 +85,7 @@ export class EnhancedExternalMCPTools {
   async planRequest(request: string, tasks?: string[]): Promise<any> {
     return await this.mcpManager.executeToolCall('task-manager', 'request_planning', {
       request,
-      tasks: tasks || []
+      tasks: tasks || [],
     });
   }
 
@@ -91,19 +95,19 @@ export class EnhancedExternalMCPTools {
 
   async markTaskDone(taskId: string): Promise<any> {
     return await this.mcpManager.executeToolCall('task-manager', 'mark_task_done', {
-      task_id: taskId
+      task_id: taskId,
     });
   }
 
   async approveTaskCompletion(taskId: string): Promise<any> {
     return await this.mcpManager.executeToolCall('task-manager', 'approve_task_completion', {
-      task_id: taskId
+      task_id: taskId,
     });
   }
 
   async approveRequestCompletion(requestId: string): Promise<any> {
     return await this.mcpManager.executeToolCall('task-manager', 'approve_request_completion', {
-      request_id: requestId
+      request_id: requestId,
     });
   }
 
@@ -111,11 +115,9 @@ export class EnhancedExternalMCPTools {
    * Remote Shell Tools
    */
   async executeRemoteCommand(command: string, workingDir?: string, timeout?: number): Promise<any> {
-    const isValid = await MCPSecurityValidator.validateToolCall(
-      'remote-shell',
-      'shell-exec',
-      { command }
-    );
+    const isValid = await MCPSecurityValidator.validateToolCall('remote-shell', 'shell-exec', {
+      command,
+    });
 
     if (!isValid) {
       throw new Error('Remote command blocked by security validation');
@@ -126,7 +128,7 @@ export class EnhancedExternalMCPTools {
     return await this.mcpManager.executeToolCall('remote-shell', 'shell-exec', {
       command,
       working_directory: workingDir,
-      timeout: timeout || 30000
+      timeout: timeout || 30000,
     });
   }
 

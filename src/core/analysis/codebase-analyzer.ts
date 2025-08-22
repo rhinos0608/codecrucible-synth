@@ -14,14 +14,14 @@ export class CodebaseAnalyzer {
    */
   async performAnalysis(): Promise<string> {
     console.log('📊 Analyzing project structure...');
-    
+
     // Real project analysis
     const projectAnalysis = await this.analyzeProjectStructure();
     const codeMetrics = await this.analyzeCodeMetrics();
     const dependencyAnalysis = await this.analyzeDependencies();
     const configAnalysis = await this.analyzeConfiguration();
     const testAnalysis = await this.analyzeTestCoverage();
-    
+
     // Generate dynamic analysis report
     const analysis = `
 # CodeCrucible Synth - Real-Time Codebase Analysis
@@ -46,7 +46,7 @@ ${await this.discoverArchitectureComponents()}
 
 ## File Distribution
 ${Object.entries(projectAnalysis.fileCounts)
-  .sort(([,a], [,b]) => (b as number) - (a as number))
+  .sort(([, a], [, b]) => (b as number) - (a as number))
   .map(([ext, count]) => `- ${ext}: ${count} files`)
   .join('\n')}
 
@@ -92,10 +92,10 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeProjectStructure(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     let projectInfo = { name: 'Unknown', version: 'Unknown' };
     const packageJsonPath = path.join(this.workingDirectory, 'package.json');
-    
+
     if (fs.existsSync(packageJsonPath)) {
       try {
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
@@ -104,17 +104,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         // Continue with defaults
       }
     }
-    
+
     const fileCounts = await this.countFilesByType();
     const totalFiles = Object.values(fileCounts).reduce((sum, count) => sum + count, 0);
     const discoveredComponents = await this.discoverProjectComponents();
-    
+
     return {
       name: projectInfo.name,
       version: projectInfo.version,
       totalFiles,
       fileCounts,
-      discoveredComponents
+      discoveredComponents,
     };
   }
 
@@ -124,19 +124,19 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeCodeMetrics(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     let totalLines = 0;
     let typescriptFiles = 0;
     let typescriptLines = 0;
     let javascriptFiles = 0;
     let javascriptLines = 0;
     let docFiles = 0;
-    
+
     const analyzeFile = (filePath: string, ext: string): number => {
       try {
         const content = fs.readFileSync(filePath, 'utf-8');
         const lines = content.split('\n').length;
-        
+
         if (ext === '.ts' || ext === '.tsx') {
           typescriptFiles++;
           typescriptLines += lines;
@@ -146,24 +146,25 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         } else if (ext === '.md' || ext === '.txt') {
           docFiles++;
         }
-        
+
         return lines;
       } catch (error) {
         return 0;
       }
     };
-    
+
     const scanDirectory = (dir: string, depth: number = 0): void => {
       if (depth > 3) return; // Limit recursion depth
-      
+
       try {
         const items = fs.readdirSync(dir, { withFileTypes: true });
-        
+
         for (const item of items) {
-          if (item.name.startsWith('.') || item.name === 'node_modules' || item.name === 'dist') continue;
-          
+          if (item.name.startsWith('.') || item.name === 'node_modules' || item.name === 'dist')
+            continue;
+
           const fullPath = path.join(dir, item.name);
-          
+
           if (item.isDirectory()) {
             scanDirectory(fullPath, depth + 1);
           } else if (item.isFile()) {
@@ -175,16 +176,16 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         // Ignore permission errors
       }
     };
-    
+
     scanDirectory(this.workingDirectory);
-    
+
     return {
       totalLines,
       typescriptFiles,
       typescriptLines,
       javascriptFiles,
       javascriptLines,
-      docFiles
+      docFiles,
     };
   }
 
@@ -194,27 +195,40 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeDependencies(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const packageJsonPath = path.join(this.workingDirectory, 'package.json');
     let prodDeps = 0;
     let devDeps = 0;
     let keyFrameworks: string[] = [];
-    
+
     if (fs.existsSync(packageJsonPath)) {
       try {
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
         prodDeps = Object.keys(packageJson.dependencies || {}).length;
         devDeps = Object.keys(packageJson.devDependencies || {}).length;
-        
+
         // Identify key frameworks
         const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-        const frameworks = ['express', 'react', 'vue', 'angular', 'next', 'typescript', 'jest', 'vitest', 'chalk', 'commander'];
-        keyFrameworks = frameworks.filter(fw => allDeps[fw] || Object.keys(allDeps).some(dep => dep.includes(fw)));
+        const frameworks = [
+          'express',
+          'react',
+          'vue',
+          'angular',
+          'next',
+          'typescript',
+          'jest',
+          'vitest',
+          'chalk',
+          'commander',
+        ];
+        keyFrameworks = frameworks.filter(
+          fw => allDeps[fw] || Object.keys(allDeps).some(dep => dep.includes(fw))
+        );
       } catch (error) {
         // Continue with defaults
       }
     }
-    
+
     return { prodDeps, devDeps, keyFrameworks };
   }
 
@@ -224,20 +238,20 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeConfiguration(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const configs = [
       { name: 'TypeScript Config', file: 'tsconfig.json', status: '' },
       { name: 'ESLint Config', file: '.eslintrc.cjs', status: '' },
       { name: 'Jest Config', file: 'jest.config.cjs', status: '' },
       { name: 'Package Config', file: 'package.json', status: '' },
-      { name: 'App Config', file: 'config/default.yaml', status: '' }
+      { name: 'App Config', file: 'config/default.yaml', status: '' },
     ];
-    
+
     for (const config of configs) {
       const configPath = path.join(this.workingDirectory, config.file);
       config.status = fs.existsSync(configPath) ? '✅ Present' : '❌ Missing';
     }
-    
+
     return { configs, configFiles: configs.filter(c => c.status.includes('✅')).length };
   }
 
@@ -247,32 +261,39 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeTestCoverage(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     let testFiles = 0;
     let testLines = 0;
     const frameworks: string[] = [];
-    
+
     const scanForTests = (dir: string, depth: number = 0): void => {
       if (depth > 2) return;
-      
+
       try {
         const items = fs.readdirSync(dir, { withFileTypes: true });
-        
+
         for (const item of items) {
           if (item.name.startsWith('.') || item.name === 'node_modules') continue;
-          
+
           const fullPath = path.join(dir, item.name);
-          
-          if (item.isDirectory() && (item.name === 'tests' || item.name === 'test' || item.name === '__tests__')) {
+
+          if (
+            item.isDirectory() &&
+            (item.name === 'tests' || item.name === 'test' || item.name === '__tests__')
+          ) {
             scanForTests(fullPath, depth + 1);
-          } else if (item.isFile() && (item.name.includes('.test.') || item.name.includes('.spec.'))) {
+          } else if (
+            item.isFile() &&
+            (item.name.includes('.test.') || item.name.includes('.spec.'))
+          ) {
             testFiles++;
             try {
               const content = fs.readFileSync(fullPath, 'utf-8');
               testLines += content.split('\n').length;
-              
+
               // Detect test frameworks
-              if (content.includes('describe(') || content.includes('it(')) frameworks.push('Jest/Mocha');
+              if (content.includes('describe(') || content.includes('it('))
+                frameworks.push('Jest/Mocha');
               if (content.includes('test(')) frameworks.push('Jest');
             } catch (error) {
               // Continue
@@ -283,16 +304,16 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         // Continue
       }
     };
-    
+
     scanForTests(this.workingDirectory);
-    
+
     const estimatedCoverage = testFiles > 0 ? Math.min(Math.round((testFiles / 50) * 100), 100) : 0;
-    
+
     return {
       testFiles,
       testLines,
       frameworks: [...new Set(frameworks)],
-      estimatedCoverage
+      estimatedCoverage,
     };
   }
 
@@ -302,9 +323,9 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async discoverProjectComponents(): Promise<any[]> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const components: any[] = [];
-    
+
     const checkComponent = (name: string, dirPath: string, description: string) => {
       const fullPath = path.join(this.workingDirectory, dirPath);
       if (fs.existsSync(fullPath)) {
@@ -316,18 +337,22 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         }
       }
     };
-    
+
     checkComponent('Core System', 'src/core', 'Main application logic and architecture');
     checkComponent('Voice System', 'src/voices', 'AI voice archetype system');
     checkComponent('MCP Servers', 'src/mcp-servers', 'Model Context Protocol servers');
     checkComponent('Security Framework', 'src/core/security', 'Enterprise security components');
-    checkComponent('Performance System', 'src/core/performance', 'Performance optimization modules');
+    checkComponent(
+      'Performance System',
+      'src/core/performance',
+      'Performance optimization modules'
+    );
     checkComponent('CLI Interface', 'src/core/cli', 'Command-line interface components');
     checkComponent('Tool Integration', 'src/core/tools', 'Integrated development tools');
     checkComponent('Configuration', 'config', 'Application configuration files');
     checkComponent('Documentation', 'Docs', 'Project documentation');
     checkComponent('Testing Suite', 'tests', 'Test files and utilities');
-    
+
     return components.filter(comp => comp.files > 0);
   }
 
@@ -337,28 +362,52 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async discoverArchitectureComponents(): Promise<string> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const architectureComponents: string[] = [];
-    
+
     // Check for key architecture files
     const keyFiles = [
-      { file: 'src/core/client.ts', component: '**Unified Model Client** - Consolidated LLM provider management' },
-      { file: 'src/voices/voice-archetype-system.ts', component: '**Voice Archetype System** - Multi-AI personality framework' },
-      { file: 'src/core/living-spiral-coordinator.ts', component: '**Living Spiral Coordinator** - Iterative development methodology' },
-      { file: 'src/core/security', component: '**Enterprise Security Framework** - Comprehensive security layer' },
-      { file: 'src/mcp-servers', component: '**MCP Server Integration** - Model Context Protocol implementation' },
-      { file: 'src/core/hybrid/hybrid-llm-router.ts', component: '**Hybrid LLM Router** - Intelligent model routing system' },
-      { file: 'src/core/performance', component: '**Performance Optimization Suite** - Caching, batching, monitoring' },
-      { file: 'src/core/tools', component: '**Tool Integration System** - Development tool orchestration' }
+      {
+        file: 'src/core/client.ts',
+        component: '**Unified Model Client** - Consolidated LLM provider management',
+      },
+      {
+        file: 'src/voices/voice-archetype-system.ts',
+        component: '**Voice Archetype System** - Multi-AI personality framework',
+      },
+      {
+        file: 'src/core/living-spiral-coordinator.ts',
+        component: '**Living Spiral Coordinator** - Iterative development methodology',
+      },
+      {
+        file: 'src/core/security',
+        component: '**Enterprise Security Framework** - Comprehensive security layer',
+      },
+      {
+        file: 'src/mcp-servers',
+        component: '**MCP Server Integration** - Model Context Protocol implementation',
+      },
+      {
+        file: 'src/core/hybrid/hybrid-llm-router.ts',
+        component: '**Hybrid LLM Router** - Intelligent model routing system',
+      },
+      {
+        file: 'src/core/performance',
+        component: '**Performance Optimization Suite** - Caching, batching, monitoring',
+      },
+      {
+        file: 'src/core/tools',
+        component: '**Tool Integration System** - Development tool orchestration',
+      },
     ];
-    
+
     for (const { file, component } of keyFiles) {
       const fullPath = path.join(this.workingDirectory, file);
       if (fs.existsSync(fullPath)) {
         architectureComponents.push(component);
       }
     }
-    
+
     return architectureComponents.map((comp, i) => `${i + 1}. ${comp}`).join('\n');
   }
 
@@ -367,15 +416,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    */
   private async detectRealIssues(): Promise<string> {
     const issues: string[] = [];
-    
+
     // Check for the hanging generateText issue we discovered
-    issues.push('🔴 **Critical**: UnifiedModelClient.generateText() method hanging - blocks CLI execution');
-    
+    issues.push(
+      '🔴 **Critical**: UnifiedModelClient.generateText() method hanging - blocks CLI execution'
+    );
+
     // Check for TypeScript strict mode
     const fs = await import('fs');
     const path = await import('path');
     const tsconfigPath = path.join(this.workingDirectory, 'tsconfig.json');
-    
+
     if (fs.existsSync(tsconfigPath)) {
       try {
         const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
@@ -386,13 +437,15 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         issues.push('🟡 **Warning**: Unable to parse tsconfig.json');
       }
     }
-    
+
     // Check for test coverage
     const testDir = path.join(this.workingDirectory, 'tests');
     if (!fs.existsSync(testDir)) {
-      issues.push('🟡 **Warning**: Limited test coverage - tests directory structure needs expansion');
+      issues.push(
+        '🟡 **Warning**: Limited test coverage - tests directory structure needs expansion'
+      );
     }
-    
+
     return issues.join('\n');
   }
 
@@ -402,15 +455,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async assessSecurity(): Promise<string> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const securityFeatures: string[] = [];
-    
+
     // Check for security components
     const securityDir = path.join(this.workingDirectory, 'src/core/security');
     if (fs.existsSync(securityDir)) {
       const securityFiles = fs.readdirSync(securityDir);
-      securityFeatures.push(`✅ **Security Framework**: ${securityFiles.length} security modules implemented`);
-      
+      securityFeatures.push(
+        `✅ **Security Framework**: ${securityFiles.length} security modules implemented`
+      );
+
       if (securityFiles.includes('input-validator.ts')) {
         securityFeatures.push('✅ **Input Validation**: Comprehensive input sanitization system');
       }
@@ -421,7 +476,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         securityFeatures.push('✅ **Secrets Management**: Encrypted secrets storage');
       }
     }
-    
+
     return securityFeatures.join('\n');
   }
 
@@ -431,15 +486,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzePerformance(): Promise<string> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const performanceFeatures: string[] = [];
-    
+
     // Check for performance components
     const perfDir = path.join(this.workingDirectory, 'src/core/performance');
     if (fs.existsSync(perfDir)) {
       const perfFiles = fs.readdirSync(perfDir);
-      performanceFeatures.push(`✅ **Performance Suite**: ${perfFiles.length} optimization modules`);
-      
+      performanceFeatures.push(
+        `✅ **Performance Suite**: ${perfFiles.length} optimization modules`
+      );
+
       if (perfFiles.some(f => f.includes('cache'))) {
         performanceFeatures.push('✅ **Caching System**: Multi-layer caching implementation');
       }
@@ -450,33 +507,49 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         performanceFeatures.push('✅ **Performance Monitoring**: Real-time performance tracking');
       }
     }
-    
+
     return performanceFeatures.join('\n');
   }
 
   /**
    * Generate recommendations based on analysis
    */
-  private async generateRecommendations(codeMetrics: any, testAnalysis: any, dependencyAnalysis: any): Promise<string> {
+  private async generateRecommendations(
+    codeMetrics: any,
+    testAnalysis: any,
+    dependencyAnalysis: any
+  ): Promise<string> {
     const recommendations: string[] = [];
-    
+
     // Critical recommendations based on real analysis
-    recommendations.push('1. **URGENT**: Fix UnifiedModelClient.generateText() hanging issue to restore full functionality');
-    
+    recommendations.push(
+      '1. **URGENT**: Fix UnifiedModelClient.generateText() hanging issue to restore full functionality'
+    );
+
     if (testAnalysis.estimatedCoverage < 50) {
-      recommendations.push('2. **High Priority**: Expand test coverage to 70%+ (currently ~' + testAnalysis.estimatedCoverage + '%)');
+      recommendations.push(
+        '2. **High Priority**: Expand test coverage to 70%+ (currently ~' +
+          testAnalysis.estimatedCoverage +
+          '%)'
+      );
     }
-    
+
     if (codeMetrics.typescriptFiles > 0) {
-      recommendations.push('3. **Medium Priority**: Enable TypeScript strict mode for better type safety');
+      recommendations.push(
+        '3. **Medium Priority**: Enable TypeScript strict mode for better type safety'
+      );
     }
-    
+
     if (dependencyAnalysis.devDeps > dependencyAnalysis.prodDeps * 2) {
-      recommendations.push('4. **Low Priority**: Review development dependencies - high dev/prod ratio');
+      recommendations.push(
+        '4. **Low Priority**: Review development dependencies - high dev/prod ratio'
+      );
     }
-    
-    recommendations.push('5. **Enhancement**: Implement automated code quality gates in CI/CD pipeline');
-    
+
+    recommendations.push(
+      '5. **Enhancement**: Implement automated code quality gates in CI/CD pipeline'
+    );
+
     return recommendations.join('\n');
   }
 
@@ -486,20 +559,20 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async countFilesByType(): Promise<Record<string, number>> {
     const path = await import('path');
     const fs = await import('fs');
-    
+
     const counts: Record<string, number> = {};
-    
+
     const countInDirectory = (dir: string, maxDepth: number = 2): void => {
       if (maxDepth <= 0) return;
-      
+
       try {
         const items = fs.readdirSync(dir, { withFileTypes: true });
-        
+
         for (const item of items) {
           if (item.name.startsWith('.') || item.name === 'node_modules') continue;
-          
+
           const fullPath = path.join(dir, item.name);
-          
+
           if (item.isDirectory()) {
             countInDirectory(fullPath, maxDepth - 1);
           } else if (item.isFile()) {
@@ -511,7 +584,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         // Ignore permission errors
       }
     };
-    
+
     countInDirectory(this.workingDirectory);
     return counts;
   }

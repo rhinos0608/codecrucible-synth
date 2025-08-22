@@ -46,7 +46,9 @@ export class RBACPolicyEngine {
         id: 'user',
         name: 'Regular User',
         description: 'Standard user with basic AI features',
-        permissions: [permissions[0], permissions[1], permissions[4], permissions[5]].filter(Boolean), // read own/public, analyze, generate
+        permissions: [permissions[0], permissions[1], permissions[4], permissions[5]].filter(
+          Boolean
+        ), // read own/public, analyze, generate
       },
       {
         id: 'developer',

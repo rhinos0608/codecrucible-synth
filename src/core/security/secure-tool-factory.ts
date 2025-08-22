@@ -595,11 +595,7 @@ class SecureE2BTerminalTool implements BaseTool {
       // Execute in E2B sandbox
       logger.info('Executing command in E2B sandbox', { executionId, command: args.command });
 
-      const result = await this.e2bService.executeCode(
-        executionId,
-        commandValidation.data,
-        'bash'
-      );
+      const result = await this.e2bService.executeCode(executionId, commandValidation.data, 'bash');
 
       // Log successful execution
       await this.auditLogger.logEvent(

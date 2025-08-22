@@ -6,6 +6,7 @@
 import { EventEmitter } from 'events';
 import { UnifiedModelClient } from '../client.js';
 import { Logger } from '../logger.js';
+import { getErrorMessage } from '../../utils/error-utils.js';
 
 // Core Types
 export interface ExecutionRequest {
@@ -312,13 +313,13 @@ export class WorkflowOrchestrator extends EventEmitter {
       this.emit('workflow:complete', { executionId, response });
 
       return response;
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(`Workflow execution failed`, { executionId, error });
       this.emit('workflow:error', { executionId, error });
 
       return {
         success: false,
-        error: error.message,
+        error: getErrorMessage(error),
         executionTime: Date.now() - startTime,
         metadata: { pattern, executionId },
       };
@@ -527,8 +528,8 @@ class ParallelHandler extends PatternHandler {
       try {
         const result = await this.modelClient.synthesize(task.request);
         results[taskIndex] = result;
-      } catch (error) {
-        results[taskIndex] = { error: error.message };
+      } catch (error: unknown) {
+        results[taskIndex] = { error: getErrorMessage(error) };
       }
       completed++;
       onTaskComplete(completed);
@@ -634,8 +635,8 @@ class HierarchicalHandler extends PatternHandler {
         if (protocol === 'broadcast') {
           messageQueue.broadcast(agent.id, agentResult);
         }
-      } catch (error) {
-        results.set(agent.id, { error: error.message });
+      } catch (error: unknown) {
+        results.set(agent.id, { error: getErrorMessage(error) });
       }
 
       progress += 60 / delegationPlan.length;
@@ -765,7 +766,7 @@ class AdaptiveHandler extends PatternHandler {
       // Execute current node
       const nodeResult = await this.executeNode(node, request, context);
       results.push(nodeResult);
-      context.history.push(nodeResult);
+      (context.history as any[]).push(nodeResult);
 
       // Check adaptation rules
       for (const rule of adaptationRules) {
@@ -879,7 +880,7 @@ class AdaptiveHandler extends PatternHandler {
     let score = 0;
 
     // Prefer unexplored nodes
-    const timesExecuted = context.history.filter(h => h.nodeId === node.id).length;
+    const timesExecuted = context.history.filter((h: any) => h.nodeId === node.id).length;
     score -= timesExecuted * 0.5;
 
     // Consider success rate of similar nodes
@@ -947,8 +948,8 @@ class FeedbackHandler extends PatternHandler {
 
     let result = await this.modelClient.synthesize(request);
     let finalResult = result;
-    let checkpointsPassed = [];
-    let feedbackCollected = [];
+    const checkpointsPassed = [];
+    const feedbackCollected = [];
     let retryCount = 0;
 
     onProgress(20);
@@ -1187,7 +1188,7 @@ class IterativeHandler extends PatternHandler {
     let currentResult = await this.modelClient.synthesize(request);
     let bestResult = currentResult;
     let bestQuality = this.evaluateQuality(currentResult, criteria);
-    let iterations = [];
+    const iterations = [];
 
     onProgress(20);
 
@@ -1499,11 +1500,11 @@ class BranchingHandler extends PatternHandler {
         matches,
         evaluation: matches ? 'Condition met' : 'Condition not met',
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return {
         branchId: branch.id,
         matches: false,
-        evaluation: `Error: ${error.message}`,
+        evaluation: `Error: ${getErrorMessage(error)}`,
       };
     }
   }
@@ -1616,13 +1617,13 @@ class StreamingHandler extends PatternHandler {
           bufferStats: buffer.getStats(),
         },
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return {
         success: false,
-        content: `Streaming error: ${error.message}`,
+        content: `Streaming error: ${getErrorMessage(error)}`,
         metadata: {
           pattern: 'streaming',
-          error: error.message,
+          error: getErrorMessage(error),
           chunksProcessed: this.processedChunks.length,
         },
       };
@@ -1859,7 +1860,7 @@ class MemoryHandler extends PatternHandler {
     policy: RetentionPolicy
   ): Promise<Memory[]> {
     // Get memories based on type
-    let memories = [];
+    let memories: any[] = [];
 
     switch (memoryType) {
       case 'short':
@@ -2003,7 +2004,7 @@ class MemoryHandler extends PatternHandler {
     // Importance trends
     const avgImportance =
       memories.reduce((sum, m) => sum + (m.importance || 0), 0) / memories.length;
-    if (newMemory.importance > avgImportance * 1.5) {
+    if ((newMemory.importance ?? 0) > avgImportance * 1.5) {
       insights.push('This appears to be particularly important');
     }
 
@@ -2110,7 +2111,8 @@ class MemoryStore {
       .map(m => ({
         memory: m,
         relevance:
-          keywords.filter(k => m.content.toLowerCase().includes(k)).length / keywords.length,
+          keywords.filter((k: string) => m.content.toLowerCase().includes(k)).length /
+          keywords.length,
       }))
       .sort((a, b) => b.relevance - a.relevance)
       .slice(0, count)

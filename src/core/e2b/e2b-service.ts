@@ -298,7 +298,7 @@ except Exception as e:
    */
   private convertJSToPython(jsCode: string): string {
     // Basic JS to Python conversion for simple operations
-    let pythonCode = jsCode
+    const pythonCode = jsCode
       .replace(/console\.log\(/g, 'print(')
       .replace(/let\s+/g, '')
       .replace(/const\s+/g, '')

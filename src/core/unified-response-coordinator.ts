@@ -11,6 +11,7 @@ import {
   CodeGenerationResult,
 } from './collaboration/dual-agent-realtime-system.js';
 import chalk from 'chalk';
+import { getErrorMessage } from '../utils/error-utils.js';
 
 export interface CoordinatedResponse {
   content: string;
@@ -161,26 +162,26 @@ export class UnifiedResponseCoordinator extends EventEmitter {
       });
 
       return coordinatedResponse;
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(`[${requestId}] Response coordination failed:`, error);
 
       // Return error response with audit trail
       return {
-        content: `❌ Error: ${error.message}`,
+        content: `❌ Error: ${getErrorMessage(error)}`,
         auditTrail: [
           ...auditTrail,
           {
             timestamp: new Date(),
             agent: 'ollama',
             action: 'generate',
-            content: `Error occurred: ${error.message}`,
+            content: `Error occurred: ${getErrorMessage(error)}`,
             confidence: 0.0,
           },
         ],
         confidence: 0.0,
         modelUsed: 'error',
         responseTime: Date.now() - startTime,
-        warnings: [`System error: ${error.message}`],
+        warnings: [`System error: ${getErrorMessage(error)}`],
       };
     } finally {
       this.currentRequestId = null;
@@ -258,11 +259,11 @@ export class UnifiedResponseCoordinator extends EventEmitter {
             break;
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(`[${requestId}] Streaming failed:`, error);
       yield {
         type: 'complete',
-        content: `❌ Streaming failed: ${error.message}`,
+        content: `❌ Streaming failed: ${getErrorMessage(error)}`,
       };
     } finally {
       this.currentRequestId = null;

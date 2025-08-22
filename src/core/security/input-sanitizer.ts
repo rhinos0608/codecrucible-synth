@@ -30,7 +30,7 @@ export class InputSanitizer {
     /[;&|`$(){}[\]\\]/g, // Shell metacharacters
     /\.\./g, // Directory traversal
     /(rm|del|format|shutdown|reboot|halt)/i, // Dangerous commands
-    /(exec|eval|system|spawn)/i, // Code execution
+    /(exec\(|eval\(|system\(|spawn\(|require\(['"]child_process)/i, // Code execution functions with parentheses
     /(<script|javascript:|data:)/i, // Script injection
     /(union|select|insert|update|delete|drop)/i, // SQL injection
     /(malicious|attack|exploit|hack|virus|trojan)/i, // Malicious keywords
@@ -129,7 +129,7 @@ export class InputSanitizer {
       /[;&|`$(){}[\]\\]/g, // Shell metacharacters
       /\.\./g, // Directory traversal
       /(rm|del|format|shutdown|reboot|halt)\s*(-[a-zA-Z]*\s*)*\s*[\/\\]*/gi, // Dangerous commands with flags
-      /(exec|eval|system|spawn|cmd|sh|bash|powershell)/gi, // Code execution
+      /(exec\(|eval\(|system\(|spawn\(|require\(['"]child_process)/gi, // Code execution functions with parentheses
       /(<script|javascript:|data:)/gi, // Script injection
       /(union|select|insert|update|delete|drop)/gi, // SQL injection
       /(malicious|attack|exploit|hack|virus|trojan|backdoor|payload)/gi, // Malicious keywords

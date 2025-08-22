@@ -30,6 +30,14 @@ export enum ErrorCategory {
   USER_INPUT = 'user_input',
   EXTERNAL_API = 'external_api',
   MCP_SERVICE = 'mcp_service',
+  DATABASE = 'database',
+  TIMEOUT = 'timeout',
+  RATE_LIMIT = 'rate_limit',
+  NOT_FOUND = 'not_found',
+  CONFLICT = 'conflict',
+  SECURITY = 'security',
+  INFRASTRUCTURE = 'infrastructure',
+  APPLICATION = 'application',
 }
 
 // Structured error interface
@@ -121,6 +129,14 @@ export class ErrorFactory {
       [ErrorCategory.USER_INPUT]: 'Invalid user input',
       [ErrorCategory.EXTERNAL_API]: 'External service unavailable',
       [ErrorCategory.MCP_SERVICE]: 'MCP service error',
+      [ErrorCategory.DATABASE]: 'Database operation failed',
+      [ErrorCategory.TIMEOUT]: 'Operation timed out',
+      [ErrorCategory.RATE_LIMIT]: 'Rate limit exceeded',
+      [ErrorCategory.NOT_FOUND]: 'Resource not found',
+      [ErrorCategory.CONFLICT]: 'Resource conflict detected',
+      [ErrorCategory.SECURITY]: 'Security violation detected',
+      [ErrorCategory.INFRASTRUCTURE]: 'Infrastructure error',
+      [ErrorCategory.APPLICATION]: 'Application error',
     };
 
     return categoryMessages[category] || 'An error occurred';
@@ -181,6 +197,46 @@ export class ErrorFactory {
         'Check MCP server status',
         'Verify service configuration',
         'Try fallback options',
+      ],
+      [ErrorCategory.DATABASE]: [
+        'Check database connection',
+        'Verify database credentials',
+        'Try reconnecting to database',
+      ],
+      [ErrorCategory.TIMEOUT]: [
+        'Increase timeout limit',
+        'Check network connectivity',
+        'Try again later',
+      ],
+      [ErrorCategory.RATE_LIMIT]: [
+        'Wait before retrying',
+        'Reduce request frequency',
+        'Check rate limit settings',
+      ],
+      [ErrorCategory.NOT_FOUND]: [
+        'Check resource path',
+        'Verify resource exists',
+        'Update resource references',
+      ],
+      [ErrorCategory.CONFLICT]: [
+        'Resolve resource conflicts',
+        'Check for duplicate entries',
+        'Update resource state',
+      ],
+      [ErrorCategory.SECURITY]: [
+        'Review security permissions',
+        'Check authentication status',
+        'Contact security administrator',
+      ],
+      [ErrorCategory.INFRASTRUCTURE]: [
+        'Check system health',
+        'Verify infrastructure status',
+        'Contact system administrator',
+      ],
+      [ErrorCategory.APPLICATION]: [
+        'Restart application',
+        'Check application logs',
+        'Update application configuration',
       ],
     };
 

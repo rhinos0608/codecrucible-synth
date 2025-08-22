@@ -153,10 +153,14 @@ export class ProjectMemorySystem {
     const interaction: InteractionSummary = {
       timestamp: Date.now(),
       prompt: prompt.substring(0, 200), // Truncate for storage
-      response: response.synthesis.substring(0, 500), // Truncate for storage
+      response: (response.synthesis || '').substring(0, 500), // Truncate for storage
       voicesUsed: response.voicesUsed,
       outcome:
-        response.confidence > 0.7 ? 'successful' : response.confidence > 0.4 ? 'partial' : 'failed',
+        (response.confidence || 0) > 0.7
+          ? 'successful'
+          : (response.confidence || 0) > 0.4
+            ? 'partial'
+            : 'failed',
       userFeedback,
       topics: this.extractTopics(prompt, response),
     };

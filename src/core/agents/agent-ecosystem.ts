@@ -703,7 +703,7 @@ export class AgentEcosystem extends EventEmitter {
       coordinator: 'system',
       phases: [],
       dependencies: [],
-      deadline: originalRequest.deadline || new Date()
+      deadline: originalRequest.deadline || new Date(),
     };
 
     return await this.executeCollaborativeTask(task);
@@ -898,7 +898,7 @@ abstract class BaseAgent implements Agent {
           result: response,
           quality: response.confidence,
           confidence: response.confidence,
-          issues: response.confidence < 0.5 ? ['Low confidence response'] : []
+          issues: response.confidence < 0.5 ? ['Low confidence response'] : [],
         })),
         synthesis: {
           approach: 'consensus' as const,
@@ -1069,7 +1069,7 @@ abstract class BaseAgent implements Agent {
           apiCalls: 0,
         },
       },
-      actions: actions || []
+      actions: actions || [],
     };
 
     return response;
@@ -1377,12 +1377,14 @@ class ImplementorAgent extends BaseAgent {
   }
 
   private async generateImplementationActions(_request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'file_create',
-      target: 'implementation.ts',
-      parameters: { content: 'generated code' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'file_create',
+        target: 'implementation.ts',
+        parameters: { content: 'generated code' },
+        reversible: true,
+      },
+    ];
   }
 }
 
@@ -1460,12 +1462,14 @@ class MaintainerAgent extends BaseAgent {
   }
 
   private async generateMaintenanceActions(_request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'file_modify',
-      target: 'legacy_file.ts',
-      parameters: { refactor: true },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'file_modify',
+        target: 'legacy_file.ts',
+        parameters: { refactor: true },
+        reversible: true,
+      },
+    ];
   }
 }
 
@@ -1548,12 +1552,14 @@ class SecurityAgent extends BaseAgent {
   }
 
   private async generateSecurityActions(_request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'analysis_run',
-      target: 'security_scan',
-      parameters: { type: 'vulnerability_scan' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'analysis_run',
+        target: 'security_scan',
+        parameters: { type: 'vulnerability_scan' },
+        reversible: true,
+      },
+    ];
   }
 }
 
@@ -1880,12 +1886,14 @@ class TesterAgent extends BaseAgent {
   }
 
   private async generateTestingActions(_request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'test_run',
-      target: 'test_suite',
-      parameters: { type: 'full_suite' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'test_run',
+        target: 'test_suite',
+        parameters: { type: 'full_suite' },
+        reversible: true,
+      },
+    ];
   }
 }
 
@@ -1968,12 +1976,14 @@ class ArchitectAgent extends BaseAgent {
   }
 
   private async generateArchitectureActions(_request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'file_create',
-      target: 'architecture_design.md',
-      parameters: { content: 'architecture_documentation' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'file_create',
+        target: 'architecture_design.md',
+        parameters: { content: 'architecture_documentation' },
+        reversible: true,
+      },
+    ];
   }
 }
 
@@ -2056,12 +2066,14 @@ class ReviewerAgent extends BaseAgent {
   }
 
   private async generateReviewActions(_request: AgentRequest): Promise<AgentAction[]> {
-    return [{
-      type: 'analysis_run',
-      target: 'code_review',
-      parameters: { type: 'comprehensive_review' },
-      reversible: true
-    }];
+    return [
+      {
+        type: 'analysis_run',
+        target: 'code_review',
+        parameters: { type: 'comprehensive_review' },
+        reversible: true,
+      },
+    ];
   }
 }
 

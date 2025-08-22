@@ -127,7 +127,7 @@ export class TestAutomationSystem {
         };
 
         if (testCoverage.hasTest) {
-          testCoverage.testFile = this.findCorrespondingTest(filePath);
+          testCoverage.testFile = this.findCorrespondingTest(filePath) || undefined;
         }
 
         this.coverage.push(testCoverage);
@@ -153,7 +153,7 @@ export class TestAutomationSystem {
         statements: hasTest ? 45 : 0,
         uncoveredLines: [],
         hasTest,
-        testFile: hasTest ? this.findCorrespondingTest(filePath) : undefined,
+        testFile: hasTest ? this.findCorrespondingTest(filePath) || undefined : undefined,
       });
     }
   }

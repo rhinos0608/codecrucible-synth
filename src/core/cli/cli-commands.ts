@@ -195,7 +195,7 @@ export class CLICommands {
       if (results && results.length > 0) {
         console.log(chalk.green('\n✨ Generated Solutions:\n'));
 
-        results.forEach((result, index) => {
+        results.forEach((result: any, index: number) => {
           console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Solution:`));
           console.log(chalk.white(result.content || 'No content generated'));
 
@@ -221,7 +221,7 @@ export class CLICommands {
     if (files.length === 0) {
       // Use our real codebase analysis for directory analysis
       console.log(chalk.cyan('🔍 Performing comprehensive codebase analysis...'));
-      
+
       try {
         console.log('DEBUG: About to import CodebaseAnalyzer');
         const { CodebaseAnalyzer } = await import('../analysis/codebase-analyzer.js');
@@ -235,7 +235,9 @@ export class CLICommands {
         console.error(chalk.red('❌ Analysis failed:'), error);
         console.log('DEBUG: Falling back to original analysis');
         // For now, just show a message instead of hanging
-        console.log(chalk.yellow('🔧 Real-time analysis temporarily unavailable. Using fallback method.'));
+        console.log(
+          chalk.yellow('🔧 Real-time analysis temporarily unavailable. Using fallback method.')
+        );
         console.log(chalk.cyan('ℹ️  The comprehensive analysis feature is being refined.'));
       }
     } else {
@@ -416,7 +418,7 @@ export class CLICommands {
         spinner.succeed('File analysis complete');
 
         if (analysis && analysis.length > 0) {
-          analysis.forEach((result, index) => {
+          analysis.forEach((result: any, index: number) => {
             console.log(chalk.cyan(`\n${index + 1}. ${result.voice || 'Voice'} Analysis:`));
             console.log(result.content || 'No analysis available');
           });

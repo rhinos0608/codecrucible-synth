@@ -236,12 +236,9 @@ export class PerformanceValidator {
           task
         )) || 12700;
       const hybridTime =
-        (await this.measureTaskTime(
-          this.hybridClient?.generate.bind(this.hybridClient),
-          task,
-          [],
-          { taskType: 'format' }
-        )) || 500;
+        (await this.measureTaskTime(this.hybridClient?.generate.bind(this.hybridClient), task, [], {
+          taskType: 'format',
+        })) || 500;
 
       totalOllamaTime += ollamaTime;
       totalHybridTime += hybridTime;
@@ -346,12 +343,9 @@ export class PerformanceValidator {
           task
         )) || 8200;
       const hybridTime =
-        (await this.measureTaskTime(
-          this.hybridClient?.generate.bind(this.hybridClient),
-          task,
-          [],
-          { taskType: 'edit' }
-        )) || 600;
+        (await this.measureTaskTime(this.hybridClient?.generate.bind(this.hybridClient), task, [], {
+          taskType: 'edit',
+        })) || 600;
 
       totalOllamaTime += ollamaTime;
       totalHybridTime += hybridTime;
@@ -398,12 +392,9 @@ export class PerformanceValidator {
           task
         )) || 18900;
       const hybridTime =
-        (await this.measureTaskTime(
-          this.hybridClient?.generate.bind(this.hybridClient),
-          task,
-          [],
-          { taskType: 'boilerplate' }
-        )) || 1200;
+        (await this.measureTaskTime(this.hybridClient?.generate.bind(this.hybridClient), task, [], {
+          taskType: 'boilerplate',
+        })) || 1200;
 
       totalOllamaTime += ollamaTime;
       totalHybridTime += hybridTime;
@@ -450,12 +441,10 @@ export class PerformanceValidator {
           task
         )) || 45200;
       const hybridTime =
-        (await this.measureTaskTime(
-          this.hybridClient?.generate.bind(this.hybridClient),
-          task,
-          [],
-          { taskType: 'analysis', complexity: 'complex' }
-        )) || 43100;
+        (await this.measureTaskTime(this.hybridClient?.generate.bind(this.hybridClient), task, [], {
+          taskType: 'analysis',
+          complexity: 'complex',
+        })) || 43100;
 
       totalOllamaTime += ollamaTime;
       totalHybridTime += hybridTime;
@@ -669,7 +658,12 @@ export class PerformanceValidator {
 
       this.ollamaClient = new UnifiedModelClient({
         providers: [
-          { type: 'ollama', endpoint: 'http://localhost:11434', model: 'codellama:34b', timeout: 60000 },
+          {
+            type: 'ollama',
+            endpoint: 'http://localhost:11434',
+            model: 'codellama:34b',
+            timeout: 60000,
+          },
         ],
         executionMode: 'quality',
         fallbackChain: ['ollama'],
@@ -686,9 +680,7 @@ export class PerformanceValidator {
       });
 
       this.lmStudioClient = new UnifiedModelClient({
-        providers: [
-          { type: 'lm-studio', endpoint: 'http://localhost:1234', timeout: 30000 },
-        ],
+        providers: [{ type: 'lm-studio', endpoint: 'http://localhost:1234', timeout: 30000 }],
         executionMode: 'fast',
         fallbackChain: ['lm-studio'],
         performanceThresholds: {

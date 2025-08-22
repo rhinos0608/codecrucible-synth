@@ -466,7 +466,7 @@ export class IntelligentModelRouter extends EventEmitter {
     let qualityScore = this.calculateQualityScore(model, request.taskType);
     let performanceScore = this.calculatePerformanceScore(provider, request);
     let costScore = this.calculateCostScore(model, request);
-    let reliabilityScore = provider.performanceProfile.reliability;
+    const reliabilityScore = provider.performanceProfile.reliability;
 
     // Apply user preferences
     if (request.userPreferences) {

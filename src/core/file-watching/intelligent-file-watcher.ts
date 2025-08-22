@@ -391,7 +391,7 @@ export class IntelligentFileWatcher extends EventEmitter {
 
       let changeType: FileChangeType;
       let currentStats: Stats | null = null;
-      let metadata: FileChangeEvent['metadata'] = {};
+      const metadata: FileChangeEvent['metadata'] = {};
 
       try {
         currentStats = await stat(filePath);

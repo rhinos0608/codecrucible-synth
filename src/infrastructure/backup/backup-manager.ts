@@ -66,9 +66,10 @@ export class BackupManager {
   private backupHistory: BackupMetadata[] = [];
   private scheduleTimer?: NodeJS.Timeout;
 
-  constructor(dbManager: DatabaseManager, config: BackupConfig) {
+  constructor(dbManager: DatabaseManager, config: Partial<BackupConfig> = {}) {
     this.dbManager = dbManager;
-    this.config = {
+
+    const defaultConfig: BackupConfig = {
       enabled: true,
       schedule: '0 2 * * *', // Daily at 2 AM
       retentionDays: 30,
@@ -85,8 +86,9 @@ export class BackupManager {
         onSuccess: true,
         onFailure: true,
       },
-      ...config,
     };
+
+    this.config = { ...defaultConfig, ...config };
   }
 
   /**
@@ -449,9 +451,18 @@ export class BackupManager {
     if (this.config.compressionEnabled) {
       const gzip = createGzip();
       const input = Buffer.from(content);
-      const compressed = await pipeline(async function* () {
-        yield input;
-      }, gzip);
+      const chunks: Buffer[] = [];
+
+      gzip.on('data', (chunk: Buffer) => chunks.push(chunk));
+      gzip.write(input);
+      gzip.end();
+
+      await new Promise((resolve, reject) => {
+        gzip.on('end', resolve);
+        gzip.on('error', reject);
+      });
+
+      const compressed = Buffer.concat(chunks);
       content = compressed.toString('base64');
     }
 

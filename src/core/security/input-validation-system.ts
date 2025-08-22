@@ -526,19 +526,19 @@ export class AdvancedInputValidator {
       groups.code_execution = SECURITY_PATTERNS.CODE_EXECUTION;
       groups.file_system_attacks = SECURITY_PATTERNS.FILE_SYSTEM_ATTACKS;
     }
-    
+
     if (options.level === ValidationLevel.PARANOID || options.level === ValidationLevel.STRICT) {
       groups.sql_injection = SECURITY_PATTERNS.SQL_INJECTION;
     }
-    
+
     // All levels include these patterns
     groups.command_injection = SECURITY_PATTERNS.COMMAND_INJECTION;
     groups.path_traversal = SECURITY_PATTERNS.PATH_TRAVERSAL;
-    
+
     if (!options.allowScripts) {
       groups.script_injection = SECURITY_PATTERNS.SCRIPT_INJECTION;
     }
-    
+
     switch (options.level) {
       case ValidationLevel.BASIC:
         // Basic patterns always checked

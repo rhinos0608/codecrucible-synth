@@ -142,25 +142,20 @@ export class EnterpriseErrorHandler {
       [key: string]: any;
     } = {}
   ): StructuredError {
-    return ErrorFactory.createError(
-      message,
-      category,
-      severity,
-      {
-        context,
-        userMessage: this.generateEnterpriseUserMessage(category, severity),
-        suggestedActions: this.generateEnterpriseSuggestedActions(category, severity),
-        retryable: this.isEnterpriseRetryable(category, severity),
-        recoverable: this.isEnterpriseRecoverable(category, severity),
-        metadata: {
-          estimatedResolutionTime: this.estimateResolutionTime(category, severity),
-          impactLevel: this.determineImpactLevel(severity),
-          affectedComponents: this.identifyAffectedComponents(category, context),
-          mitigations: this.generateMitigations(category, severity),
-          httpStatusCode: this.getHttpStatusCode(category, severity),
-        },
-      }
-    );
+    return ErrorFactory.createError(message, category, severity, {
+      context,
+      userMessage: this.generateEnterpriseUserMessage(category, severity),
+      suggestedActions: this.generateEnterpriseSuggestedActions(category, severity),
+      retryable: this.isEnterpriseRetryable(category, severity),
+      recoverable: this.isEnterpriseRecoverable(category, severity),
+      metadata: {
+        estimatedResolutionTime: this.estimateResolutionTime(category, severity),
+        impactLevel: this.determineImpactLevel(severity),
+        affectedComponents: this.identifyAffectedComponents(category, context),
+        mitigations: this.generateMitigations(category, severity),
+        httpStatusCode: this.getHttpStatusCode(category, severity),
+      },
+    });
   }
 
   /**

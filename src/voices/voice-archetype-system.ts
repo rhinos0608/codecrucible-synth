@@ -5,6 +5,7 @@ import {
   CouncilConfig,
 } from '../core/collaboration/council-decision-engine.js';
 import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice-prompts.js';
+import { getErrorMessage } from '../utils/error-utils.js';
 
 interface Voice {
   id: string;
@@ -203,7 +204,7 @@ export class VoiceArchetypeSystem {
     }
 
     // Try direct lookup first
-    let voice = this.voices.get(normalizedName);
+    const voice = this.voices.get(normalizedName);
     if (voice) return voice;
 
     // Try by voice ID if no direct match
@@ -378,60 +379,187 @@ export class VoiceArchetypeSystem {
   }
 
   async generateMultiVoiceSolutions(voices: string[], prompt: string, context?: any) {
-    const responses = [];
-
-    for (const voiceId of voices) {
-      const voice = this.getVoice(voiceId);
-      if (!voice) {
-        console.warn(`Voice not found: ${voiceId}. Skipping this voice.`);
-        continue; // Skip invalid voices instead of throwing
-      }
-
+    // Check if the model client supports the new multi-voice API
+    if (this.modelClient && this.modelClient.generateMultiVoiceResponses) {
       try {
-        const enhancedPrompt = voice.systemPrompt + '\n\n' + prompt;
-
-        // Use different client methods based on what's available
-        let response;
-        if (this.modelClient && this.modelClient.generateVoiceResponse) {
-          response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
-            temperature: voice.temperature,
-          });
-        } else if (this.modelClient && this.modelClient.processRequest) {
-          response = await this.modelClient.processRequest({
-            prompt: enhancedPrompt,
-            temperature: voice.temperature,
-          });
-        } else {
-          throw new Error('Model client not available or does not support voice generation');
-        }
-
-        // Normalize response format
-        const normalizedResponse = {
-          content: response.content || response.text || response.response || '',
-          voice: voice.name,
-          voiceId: voice.id,
-          confidence: response.confidence || 0.8,
-          tokens_used: response.tokens_used || response.tokensUsed || 0,
-          temperature: voice.temperature,
-        };
-
-        responses.push(normalizedResponse);
-      } catch (error) {
-        console.error(`Error generating response for voice ${voiceId}:`, error);
-        // Add error response to maintain consistency
-        responses.push({
-          content: `Error generating response for ${voice.name}: ${error.message}`,
-          voice: voice.name,
-          voiceId: voice.id,
-          confidence: 0,
-          tokens_used: 0,
-          temperature: voice.temperature,
-          error: true,
+        // Use the new optimized multi-voice API
+        const result = await this.modelClient.generateMultiVoiceResponses(voices, prompt, {
+          parallel: true,
+          maxConcurrent: 3,
+          ...context,
         });
+
+        // Transform the response format to match the expected structure
+        const responses = result.responses.map((r: any) => {
+          const voice = this.getVoice(r.voiceId);
+          return {
+            content: r.content,
+            voice: voice?.name || r.voiceId,
+            voiceId: r.voiceId,
+            confidence: r.confidence || 0.8,
+            tokens_used: r.tokens_used || 0,
+            temperature: voice?.temperature || 0.7,
+          };
+        });
+
+        return responses;
+      } catch (error) {
+        console.warn('Multi-voice API failed, falling back to sequential processing:', error);
+        // Fall through to legacy implementation
       }
     }
 
+    // Enhanced parallel implementation with batching and concurrency control
+    console.log(`🎭 Processing ${voices.length} voices in parallel with smart batching`);
+    const startTime = Date.now();
+
+    // Configuration for parallel processing
+    const maxConcurrent = Math.min(voices.length, context?.maxConcurrent || 3);
+    const batchSize = Math.min(voices.length, context?.batchSize || 2);
+    const timeout = context?.timeout || 30000; // 30 second timeout per voice
+
+    console.log(
+      `🎭 Parallel config: maxConcurrent=${maxConcurrent}, batchSize=${batchSize}, timeout=${timeout}ms`
+    );
+
+    // Process voices in batches to prevent overwhelming the system
+    const responses = [];
+
+    for (let i = 0; i < voices.length; i += batchSize) {
+      const batch = voices.slice(i, i + batchSize);
+      console.log(
+        `🎭 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(voices.length / batchSize)}: [${batch.join(', ')}]`
+      );
+
+      // Create parallel promises for this batch
+      const batchPromises = batch.map(voiceId =>
+        this.generateSingleVoiceResponseSafe(voiceId, prompt, timeout)
+      );
+
+      // Use Promise.allSettled for graceful error handling
+      const batchResults = await Promise.allSettled(batchPromises);
+
+      // Process results and maintain order
+      for (const [index, result] of batchResults.entries()) {
+        if (result.status === 'fulfilled') {
+          responses.push(result.value);
+        } else {
+          const voiceId = batch[index];
+          const voice = this.getVoice(voiceId);
+          console.error(`🎭 Voice ${voiceId} failed:`, result.reason);
+
+          // Add error response to maintain consistency
+          responses.push({
+            content: `Error generating response for ${voice?.name || voiceId}: ${getErrorMessage(result.reason)}`,
+            voice: voice?.name || voiceId,
+            voiceId: voiceId,
+            confidence: 0,
+            tokens_used: 0,
+            temperature: voice?.temperature || 0.7,
+            error: true,
+            errorMessage: getErrorMessage(result.reason),
+          });
+        }
+      }
+
+      // Small delay between batches to prevent overwhelming the system
+      if (i + batchSize < voices.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    const totalTime = Date.now() - startTime;
+    const avgTimePerVoice = totalTime / voices.length;
+    console.log(
+      `🎭 Parallel processing completed: ${totalTime}ms total, ${avgTimePerVoice.toFixed(0)}ms per voice`
+    );
+
     return responses;
+  }
+
+  /**
+   * Safely generate a response for a single voice with timeout and error handling
+   * Used by parallel processing to ensure robust voice generation
+   */
+  private async generateSingleVoiceResponseSafe(
+    voiceId: string,
+    prompt: string,
+    timeout: number = 30000
+  ) {
+    const voice = this.getVoice(voiceId);
+    if (!voice) {
+      throw new Error(`Voice not found: ${voiceId}`);
+    }
+
+    console.log(`🎭 Starting voice ${voiceId} (${voice.name})`);
+    const startTime = Date.now();
+
+    // Create timeout promise for this specific voice
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Voice ${voiceId} timed out after ${timeout}ms`));
+      }, timeout);
+    });
+
+    // Create the actual voice generation promise
+    const generatePromise = this.generateSingleVoiceResponseInternal(voiceId, prompt, voice);
+
+    try {
+      // Race between generation and timeout
+      const response = await Promise.race([generatePromise, timeoutPromise]);
+
+      const duration = Date.now() - startTime;
+      console.log(`🎭 Voice ${voiceId} completed in ${duration}ms`);
+
+      return response;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`🎭 Voice ${voiceId} failed after ${duration}ms:`, getErrorMessage(error));
+      throw error;
+    }
+  }
+
+  /**
+   * Generate response for a single voice (core implementation)
+   */
+  private async generateSingleVoiceResponseInternal(voiceId: string, prompt: string, voice: any) {
+    const enhancedPrompt = voice.systemPrompt + '\n\n' + prompt;
+
+    // Use different client methods based on what's available
+    let response;
+    if (this.modelClient && this.modelClient.generateVoiceResponse) {
+      response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
+        temperature: voice.temperature,
+      });
+    } else if (this.modelClient && this.modelClient.processRequest) {
+      response = await this.modelClient.processRequest({
+        prompt: enhancedPrompt,
+        temperature: voice.temperature,
+      });
+    } else if (this.modelClient && this.modelClient.generateText) {
+      // Fallback to basic generateText method
+      const textResponse = await this.modelClient.generateText(enhancedPrompt, {
+        temperature: voice.temperature,
+      });
+      response = { content: textResponse };
+    } else {
+      throw new Error('Model client not available or does not support voice generation');
+    }
+
+    // Normalize response format
+    return {
+      content: response.content || response.text || response.response || '',
+      voice: voice.name,
+      voiceId: voice.id,
+      confidence: response.confidence || 0.8,
+      tokens_used: response.tokens_used || response.tokensUsed || 0,
+      temperature: voice.temperature,
+      metadata: {
+        processingTime: Date.now(),
+        model: response.model || 'unknown',
+        provider: response.provider || 'unknown',
+      },
+    };
   }
 
   async synthesize(
@@ -459,20 +587,20 @@ export class VoiceArchetypeSystem {
 
       if (mode === 'competitive') {
         // Choose the best response
-        const best = responses.reduce((prev, curr) =>
+        const best = responses.reduce((prev: any, curr: any) =>
           (curr.confidence || 0) > (prev.confidence || 0) ? curr : prev
         );
         synthesizedContent = best.content || best.text || best.response || '';
       } else if (mode === 'consensus') {
         // Combine all responses with consensus
         const allResponses = responses
-          .map(r => r.content || r.text || r.response || '')
+          .map((r: any) => r.content || r.text || r.response || '')
           .filter(Boolean);
         synthesizedContent = allResponses.join('\n\n---\n\n');
       } else {
         // Collaborative mode - merge responses
         const allResponses = responses
-          .map(r => r.content || r.text || r.response || '')
+          .map((r: any) => r.content || r.text || r.response || '')
           .filter(Boolean);
         if (allResponses.length > 0) {
           synthesizedContent = allResponses[0]; // Use first valid response for now
@@ -486,9 +614,9 @@ export class VoiceArchetypeSystem {
         mode,
         responses,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       return {
-        content: `Error during synthesis: ${error.message}`,
+        content: `Error during synthesis: ${getErrorMessage(error)}`,
         voicesUsed: voices,
         qualityScore: 0,
         mode,

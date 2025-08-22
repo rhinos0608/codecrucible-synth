@@ -140,7 +140,7 @@ export class AutonomousCodebaseAnalyzer {
   private async analyzeCodeQuality() {
     let complexity = 1;
     let maintainability = 'good';
-    let codeSmells: string[] = [];
+    const codeSmells: string[] = [];
 
     // Basic heuristic analysis
     const files = await this.findAllFiles(['.ts', '.js', '.jsx', '.tsx']);

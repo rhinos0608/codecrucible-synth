@@ -241,24 +241,24 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
   private isInitialized: boolean = false;
   private activeRequestCount: number = 0;
 
-  // Core Components
-  private modelClient: UnifiedModelClient;
-  private modelRouter: IntelligentModelRouter;
-  private workflowOrchestrator: WorkflowOrchestrator;
-  private toolOrchestrator: AdvancedToolOrchestrator;
-  private ragSystem: VectorRAGSystem;
-  private cacheSystem: MultiLayerCacheSystem;
-  private observabilitySystem: ObservabilitySystem;
-  private agentEcosystem: AgentEcosystem;
+  // Core Components (initialized in init())
+  private modelClient!: UnifiedModelClient;
+  private modelRouter!: IntelligentModelRouter;
+  private workflowOrchestrator!: WorkflowOrchestrator;
+  private toolOrchestrator!: AdvancedToolOrchestrator;
+  private ragSystem!: VectorRAGSystem;
+  private cacheSystem!: MultiLayerCacheSystem;
+  private observabilitySystem!: ObservabilitySystem;
+  private agentEcosystem!: AgentEcosystem;
 
-  // Multi-Voice System
-  private voiceManager: VoiceManager;
-  private synthesisEngine: SynthesisEngine;
+  // Multi-Voice System (initialized in init())
+  private voiceManager!: VoiceManager;
+  private synthesisEngine!: SynthesisEngine;
 
-  // Performance and Management
-  private performanceMonitor: IntegratedPerformanceMonitor;
-  private healthMonitor: IntegratedHealthMonitor;
-  private requestQueue: RequestQueue;
+  // Performance and Management (initialized in init())
+  private performanceMonitor!: IntegratedPerformanceMonitor;
+  private healthMonitor!: IntegratedHealthMonitor;
+  private requestQueue!: RequestQueue;
 
   constructor(config: IntegratedSystemConfig) {
     super();

@@ -71,7 +71,7 @@ export class ResilientCLIWrapper extends EventEmitter {
     const startTime = Date.now();
 
     let attempts = 0;
-    let warnings: string[] = [];
+    const warnings: string[] = [];
     let lastError: Error | null = null;
 
     this.logger.info(`Starting operation: ${context.name}`, { operationId });

@@ -213,7 +213,7 @@ Provide a clear, structured breakdown that eliminates unnecessary complexity.
         councilVoices,
         collapsed.output
       );
-      perspectives.push(...responses.map(r => r.content));
+      perspectives.push(...responses.map((r: any) => r.content));
     } else {
       // Sequential council - voices build on each other
       for (const voice of councilVoices) {

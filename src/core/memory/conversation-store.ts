@@ -121,7 +121,7 @@ export class ConversationStore {
     const id = this.generateId();
     const timestamp = Date.now();
     const contextHash = this.hashContext(context);
-    const topics = this.extractTopics(prompt, response.synthesis);
+    const topics = this.extractTopics(prompt, response.synthesis || '');
 
     // Generate embedding for semantic search (simplified for now)
     const embedding = await this.generateEmbedding(prompt + ' ' + response.synthesis);
@@ -131,19 +131,25 @@ export class ConversationStore {
       sessionId,
       timestamp,
       prompt,
-      response: response.synthesis,
+      response: response.synthesis || '',
       voicesUsed: response.voicesUsed,
-      confidence: response.confidence,
-      latency: response.latency,
+      confidence: response.confidence || 0,
+      latency: response.latency || 0,
       userFeedback,
       topics,
       contextHash,
       embedding,
       metadata: {
         modelUsed: response.modelUsed,
-        reasoning: (typeof response.reasoning === 'object' && response.reasoning && 'steps' in response.reasoning && Array.isArray((response.reasoning as any).steps) ? (response.reasoning as any).steps.length : 0),
+        reasoning:
+          typeof response.reasoning === 'object' &&
+          response.reasoning &&
+          'steps' in response.reasoning &&
+          Array.isArray((response.reasoning as any).steps)
+            ? (response.reasoning as any).steps.length
+            : 0,
         promptTokens: prompt.length, // Simplified token count
-        responseTokens: response.synthesis.length,
+        responseTokens: (response.synthesis || '').length,
       },
     };
 

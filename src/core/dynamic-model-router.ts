@@ -32,7 +32,7 @@ export class DynamicModelRouter extends EventEmitter {
   private currentRole: 'auditor' | 'writer' | 'auto' = 'auto';
   private lastScan: number = 0;
   private readonly SCAN_CACHE_TTL = 30000; // 30 seconds
-  
+
   constructor() {
     super();
     this.setMaxListeners(20);
@@ -54,7 +54,10 @@ export class DynamicModelRouter extends EventEmitter {
       models.push(...ollamaModels);
       logger.info(`Found ${ollamaModels.length} Ollama models`);
     } catch (error) {
-      logger.warn('Failed to scan Ollama models:', error instanceof Error ? error.message : String(error));
+      logger.warn(
+        'Failed to scan Ollama models:',
+        error instanceof Error ? error.message : String(error)
+      );
     }
 
     // Scan LM Studio models
@@ -63,12 +66,15 @@ export class DynamicModelRouter extends EventEmitter {
       models.push(...lmStudioModels);
       logger.info(`Found ${lmStudioModels.length} LM Studio models`);
     } catch (error) {
-      logger.warn('Failed to scan LM Studio models:', error instanceof Error ? error.message : String(error));
+      logger.warn(
+        'Failed to scan LM Studio models:',
+        error instanceof Error ? error.message : String(error)
+      );
     }
 
     this.availableModels = models;
     this.lastScan = Date.now();
-    
+
     logger.info(`Found ${models.length} total models`);
     return models;
   }
@@ -123,7 +129,10 @@ export class DynamicModelRouter extends EventEmitter {
 
       return models;
     } catch (error) {
-      logger.debug('LM Studio API not available:', error instanceof Error ? error.message : String(error));
+      logger.debug(
+        'LM Studio API not available:',
+        error instanceof Error ? error.message : String(error)
+      );
       return [];
     }
   }
@@ -131,7 +140,10 @@ export class DynamicModelRouter extends EventEmitter {
   /**
    * Analyze model capabilities based on name patterns
    */
-  private analyzeModelCapabilities(modelName: string, provider: string): {
+  private analyzeModelCapabilities(
+    modelName: string,
+    provider: string
+  ): {
     capabilities: string[];
     strengths: string[];
     isCodeFocused: boolean;
@@ -159,7 +171,12 @@ export class DynamicModelRouter extends EventEmitter {
     } else if (name.includes('13b') || name.includes('14b')) {
       responseSpeed = 'medium';
       qualityLevel = 'high';
-    } else if (name.includes('20b') || name.includes('27b') || name.includes('30b') || name.includes('32b')) {
+    } else if (
+      name.includes('20b') ||
+      name.includes('27b') ||
+      name.includes('30b') ||
+      name.includes('32b')
+    ) {
       responseSpeed = 'slow';
       qualityLevel = 'high';
     }
@@ -193,17 +210,17 @@ export class DynamicModelRouter extends EventEmitter {
    */
   private estimateContextWindow(modelName: string): number {
     const name = modelName.toLowerCase();
-    
+
     if (name.includes('32k')) return 32768;
     if (name.includes('16k')) return 16384;
     if (name.includes('8k')) return 8192;
     if (name.includes('4k')) return 4096;
-    
+
     // Default estimates based on model type
     if (name.includes('qwen2.5')) return 32768;
     if (name.includes('gemma')) return 8192;
     if (name.includes('llama3')) return 8192;
-    
+
     return 4096; // Conservative default
   }
 
@@ -218,15 +235,13 @@ export class DynamicModelRouter extends EventEmitter {
     // Role-based filtering
     if (config.role === 'auditor') {
       // Auditor prefers LM Studio for fast analysis
-      filteredModels = filteredModels.filter(m => 
-        m.provider === 'lm-studio' || 
-        (m.provider === 'ollama' && m.isCodeFocused)
+      filteredModels = filteredModels.filter(
+        m => m.provider === 'lm-studio' || (m.provider === 'ollama' && m.isCodeFocused)
       );
     } else if (config.role === 'writer') {
       // Writer prefers Ollama for quality generation
-      filteredModels = filteredModels.filter(m => 
-        m.provider === 'ollama' || 
-        (m.provider === 'lm-studio' && m.qualityLevel === 'high')
+      filteredModels = filteredModels.filter(
+        m => m.provider === 'ollama' || (m.provider === 'lm-studio' && m.qualityLevel === 'high')
       );
     }
 
@@ -246,7 +261,7 @@ export class DynamicModelRouter extends EventEmitter {
     // Score and rank models
     const scoredModels = filteredModels.map(model => ({
       model,
-      score: this.scoreModelForRole(model, config)
+      score: this.scoreModelForRole(model, config),
     }));
 
     // Sort by score (highest first)
@@ -254,7 +269,7 @@ export class DynamicModelRouter extends EventEmitter {
 
     const selected = scoredModels[0].model;
     logger.info(`Selected model for ${config.role}: ${selected.model} (${selected.provider})`);
-    
+
     return selected;
   }
 
@@ -289,7 +304,7 @@ export class DynamicModelRouter extends EventEmitter {
 
     // Capability matching
     const relevantCapabilities = ['code-analysis', 'code-generation', 'general-reasoning'];
-    const matchedCapabilities = model.capabilities.filter(cap => 
+    const matchedCapabilities = model.capabilities.filter(cap =>
       relevantCapabilities.includes(cap)
     ).length;
     score += matchedCapabilities * 5;
@@ -303,7 +318,7 @@ export class DynamicModelRouter extends EventEmitter {
   setRole(role: 'auditor' | 'writer' | 'auto'): void {
     const previousRole = this.currentRole;
     this.currentRole = role;
-    
+
     logger.info(`Role switched: ${previousRole} -> ${role}`);
     this.emit('role-changed', { previous: previousRole, current: role });
   }
@@ -323,23 +338,25 @@ export class DynamicModelRouter extends EventEmitter {
     lmStudio: ModelCapabilities[];
   }> {
     await this.detectAvailableModels();
-    
+
     return {
       ollama: this.availableModels.filter(m => m.provider === 'ollama'),
-      lmStudio: this.availableModels.filter(m => m.provider === 'lm-studio')
+      lmStudio: this.availableModels.filter(m => m.provider === 'lm-studio'),
     };
   }
 
   /**
    * Get best model for current role
    */
-  async getBestModelForCurrentRole(taskType: string = 'general'): Promise<ModelCapabilities | null> {
+  async getBestModelForCurrentRole(
+    taskType: string = 'general'
+  ): Promise<ModelCapabilities | null> {
     const config: RoleConfiguration = {
       role: this.currentRole,
       preferredProvider: 'auto',
       taskType,
       requiresCodeAnalysis: taskType.includes('audit') || taskType.includes('analyze'),
-      requiresGeneration: taskType.includes('write') || taskType.includes('generate')
+      requiresGeneration: taskType.includes('write') || taskType.includes('generate'),
     };
 
     return this.selectModelForRole(config);

@@ -8,6 +8,7 @@ import { OllamaProvider } from '../providers/ollama.js';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { logger } from './logger.js';
+import { getErrorMessage } from '../utils/error-utils.js';
 import { ChainOfThoughtDisplay } from './chain-of-thought-display.js';
 
 export interface AnalysisResult {
@@ -323,8 +324,8 @@ Be specific about actual implementation patterns you observe in the source code.
             const icon = this.getFileIcon(item);
             structure.push(`${icon} ${item}`);
           }
-        } catch (error) {
-          structure.push(`❌ Error reading ${item}: ${error.message}`);
+        } catch (error: unknown) {
+          structure.push(`❌ Error reading ${item}: ${getErrorMessage(error)}`);
         }
       }
 
@@ -389,8 +390,8 @@ Be specific about actual implementation patterns you observe in the source code.
         contents.push(
           `\n=== ${file} ===\n${content.substring(0, 2000)}${content.length > 2000 ? '\n... (truncated)' : ''}`
         );
-      } catch (error) {
-        contents.push(`\n=== ${file} === \n[Error reading file: ${error.message}]`);
+      } catch (error: unknown) {
+        contents.push(`\n=== ${file} === \n[Error reading file: ${getErrorMessage(error)}]`);
       }
     }
 

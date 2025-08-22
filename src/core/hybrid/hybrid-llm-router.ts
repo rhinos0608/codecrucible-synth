@@ -456,7 +456,9 @@ export class HybridLLMRouter extends EventEmitter {
     // Implement LRU behavior
     if (this.routingDecisionCache.size >= this.MAX_CACHE_SIZE) {
       const firstKey = this.routingDecisionCache.keys().next().value;
-      this.routingDecisionCache.delete(firstKey);
+      if (firstKey !== undefined) {
+        this.routingDecisionCache.delete(firstKey);
+      }
     }
 
     this.routingDecisionCache.set(key, {

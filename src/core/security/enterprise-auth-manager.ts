@@ -539,13 +539,13 @@ export class EnterpriseAuthManager {
         roles: session.roles,
         type: 'access',
       };
-      
+
       const options = {
         expiresIn: this.config.jwtExpiresIn as any,
         issuer: 'codecrucible-auth',
         audience: 'codecrucible-api',
       };
-      
+
       return jwt.sign(payload, this.config.jwtSecret as string, options as jwt.SignOptions);
     } catch (error) {
       logger.error('Failed to generate access token', error as Error);
@@ -562,13 +562,13 @@ export class EnterpriseAuthManager {
         sessionId: session.id,
         type: 'refresh',
       };
-      
+
       const options = {
         expiresIn: this.config.refreshTokenExpiresIn as any,
         issuer: 'codecrucible-auth',
         audience: 'codecrucible-api',
       };
-      
+
       return jwt.sign(payload, this.config.jwtSecret as string, options as jwt.SignOptions);
     } catch (error) {
       logger.error('Failed to generate refresh token', error as Error);

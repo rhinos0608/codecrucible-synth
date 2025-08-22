@@ -10,7 +10,7 @@ import { promises as fs } from 'fs';
 import { HealthStatus, HealthCheck } from '../../core/types/global.types.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { metrics, logging } from '../monitoring/observability.js';
-import { config } from '../config/production.config.js';
+import config from '../config/production.config.js';
 
 export interface HealthCheckResult extends HealthCheck {
   duration: number;
@@ -93,8 +93,8 @@ export class HealthMonitor extends EventEmitter {
     const results: HealthCheckResult[] = [];
 
     for (const [name, check] of this.checks) {
+      const checkStart = performance.now();
       try {
-        const checkStart = performance.now();
         const result = await check();
         result.duration = performance.now() - checkStart;
         results.push(result);
@@ -133,7 +133,7 @@ export class HealthMonitor extends EventEmitter {
     this.emit('health:checked', this.lastHealthStatus);
 
     // Record overall health metric
-    metrics.memoryUsage.set({ type: 'health_check_duration' }, duration);
+    metrics.memoryUsage.set(duration);
 
     return this.lastHealthStatus;
   }
@@ -530,7 +530,7 @@ export class HealthMonitor extends EventEmitter {
         duration,
         metrics: {
           validationTime: duration,
-          testPassed: testResult.allowed,
+          testPassed: testResult.allowed ? 1 : 0,
         },
       };
     } catch (error) {

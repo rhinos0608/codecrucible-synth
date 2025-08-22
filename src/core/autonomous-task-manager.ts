@@ -234,7 +234,11 @@ export class AutonomousTaskManager extends EventEmitter {
         console.log(chalk.red('❌ Task failed validation'));
       }
     } catch (error) {
-      await taskMemoryDB.recordFailedAttempt(task_id, 'autonomous_execution', error instanceof Error ? error.message : String(error));
+      await taskMemoryDB.recordFailedAttempt(
+        task_id,
+        'autonomous_execution',
+        error instanceof Error ? error.message : String(error)
+      );
       await taskMemoryDB.updateTask(task_id, { status: 'failed' });
       console.error(chalk.red('❌ Task execution failed:'), error);
     }
@@ -268,8 +272,16 @@ export class AutonomousTaskManager extends EventEmitter {
           });
         }
       } catch (error) {
-        await taskMemoryDB.recordFailedAttempt(task_id, stepId, error instanceof Error ? error.message : String(error), assignment.agent_id);
-        console.error(chalk.red(`  ❌ ${stepId} failed:`), error instanceof Error ? error.message : String(error));
+        await taskMemoryDB.recordFailedAttempt(
+          task_id,
+          stepId,
+          error instanceof Error ? error.message : String(error),
+          assignment.agent_id
+        );
+        console.error(
+          chalk.red(`  ❌ ${stepId} failed:`),
+          error instanceof Error ? error.message : String(error)
+        );
 
         // Try alternative approach or continue to next step
         console.log(chalk.yellow(`  🔄 Continuing to next step...`));

@@ -34,41 +34,45 @@ import { logger } from './core/logger.js';
 async function main() {
   try {
     const config = await ConfigManager.load();
-    
+
     // Create a simplified client config for now
     const clientConfig = {
       executionMode: 'auto' as const,
       fallbackChain: ['ollama' as const],
-      performanceThresholds: { 
+      performanceThresholds: {
         fastModeMaxTokens: 1000,
         timeoutMs: 30000,
-        maxConcurrentRequests: 3
+        maxConcurrentRequests: 3,
       },
-      security: { 
+      security: {
         enableSandbox: true,
         maxInputLength: 50000,
-        allowedCommands: ['ls', 'cat', 'echo']
+        allowedCommands: ['ls', 'cat', 'echo'],
       },
-      providers: [] // Simplified for now
+      providers: [], // Simplified for now
     };
-    
+
     const modelClient = new UnifiedModelClient(clientConfig);
-    
+
     // Fix voice system config structure
     const voiceConfig = {
-      voices: config.voices
+      voices: config.voices,
     };
-    
+
     const voiceSystem = new VoiceArchetypeSystem(modelClient, voiceConfig);
-    
+
     // Create MCP server config
     const mcpConfig = {
       filesystem: { enabled: true, restrictedPaths: [], allowedPaths: [process.cwd()] },
       git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
-      terminal: { enabled: true, allowedCommands: ['ls', 'cat', 'echo'], blockedCommands: ['rm', 'sudo'] },
-      packageManager: { enabled: false, autoInstall: false, securityScan: true }
+      terminal: {
+        enabled: true,
+        allowedCommands: ['ls', 'cat', 'echo'],
+        blockedCommands: ['rm', 'sudo'],
+      },
+      packageManager: { enabled: false, autoInstall: false, securityScan: true },
     };
-    
+
     const mcpManager = new MCPServerManager(mcpConfig);
 
     const cli = new CLI(modelClient, voiceSystem, mcpManager, config);

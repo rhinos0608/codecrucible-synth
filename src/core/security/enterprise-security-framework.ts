@@ -69,7 +69,7 @@ export class EnterpriseSecurityFramework {
   private policyEngine: PolicyEngine;
   private auditLogger: AuditLogger;
   private threatDetector: ThreatDetector;
-  private maliciousPatterns: Set<string>;
+  private maliciousPatterns!: Set<string>;
 
   constructor() {
     this.policyEngine = new PolicyEngine();

@@ -430,7 +430,7 @@ export class UnifiedAgent extends EventEmitter {
       // Check if this is a project/directory analysis request
       const taskInput = task.input || '';
       const inputLower = (typeof taskInput === 'string' ? taskInput : '').toLowerCase();
-      const isProjectAnalysis = (
+      const isProjectAnalysis =
         inputLower.includes('project structure') ||
         inputLower.includes('analyze the project') ||
         inputLower.includes('codebase') ||
@@ -439,12 +439,11 @@ export class UnifiedAgent extends EventEmitter {
         inputLower.includes('analyze this') ||
         inputLower.includes('audit') ||
         inputLower.includes('thorough audit') ||
-        inputLower.includes('comprehensive')
-      );
-      
+        inputLower.includes('comprehensive');
+
       console.log(`🔍 DEBUG: Input analysis - "${task.input || ''}"`);
       console.log(`🔍 DEBUG: Detected as project analysis: ${isProjectAnalysis}`);
-      
+
       if (typeof taskInput === 'string' && isProjectAnalysis) {
         // Read project structure
         try {
@@ -459,7 +458,10 @@ export class UnifiedAgent extends EventEmitter {
         }
       }
       // Check if input looks like a file path or contains file extension
-      else if (typeof taskInput === 'string' && (taskInput.includes('.') || taskInput.includes('/'))) {
+      else if (
+        typeof taskInput === 'string' &&
+        (taskInput.includes('.') || taskInput.includes('/'))
+      ) {
         // Try to read as file path
         try {
           const { readFile } = await import('fs/promises');
@@ -467,13 +469,23 @@ export class UnifiedAgent extends EventEmitter {
 
           // Handle multiple potential file paths in the input
           const words = taskInput.split(/\s+/);
-          const potentialPaths = words.filter((word: string) => word.includes('.') && (
-            word.endsWith('.js') || word.endsWith('.ts') || word.endsWith('.jsx') || 
-            word.endsWith('.tsx') || word.endsWith('.py') || word.endsWith('.java') ||
-            word.endsWith('.c') || word.endsWith('.cpp') || word.endsWith('.h') ||
-            word.endsWith('.css') || word.endsWith('.html') || word.endsWith('.md')
-          ));
-          
+          const potentialPaths = words.filter(
+            (word: string) =>
+              word.includes('.') &&
+              (word.endsWith('.js') ||
+                word.endsWith('.ts') ||
+                word.endsWith('.jsx') ||
+                word.endsWith('.tsx') ||
+                word.endsWith('.py') ||
+                word.endsWith('.java') ||
+                word.endsWith('.c') ||
+                word.endsWith('.cpp') ||
+                word.endsWith('.h') ||
+                word.endsWith('.css') ||
+                word.endsWith('.html') ||
+                word.endsWith('.md'))
+          );
+
           if (potentialPaths.length > 0) {
             const firstPath = potentialPaths[0];
             if (firstPath) {
@@ -554,7 +566,7 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const prompt = `Generate code based on the following requirements:\n\n${task.input || ''}`;
-      
+
       const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
@@ -592,7 +604,7 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const prompt = `Generate comprehensive documentation for:\n\n${task.input || ''}`;
-      
+
       const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
@@ -630,7 +642,7 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const prompt = `Generate comprehensive tests for:\n\n${task.input || ''}`;
-      
+
       const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
@@ -668,7 +680,7 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const prompt = `Refactor and optimize the following code:\n\n${task.input || ''}`;
-      
+
       const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
@@ -706,7 +718,7 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const prompt = `Identify and fix bugs in the following code:\n\n${task.input || ''}`;
-      
+
       const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
@@ -744,7 +756,7 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const prompt = `Optimize the performance of the following code:\n\n${task.input || ''}`;
-      
+
       const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
@@ -782,7 +794,7 @@ export class UnifiedAgent extends EventEmitter {
 
     try {
       const prompt = `Analyze the following code for security vulnerabilities:\n\n${task.input || ''}`;
-      
+
       const response = await this.modelClient.synthesize({
         prompt,
         model: 'default',
@@ -1000,7 +1012,7 @@ export class UnifiedAgent extends EventEmitter {
 
       // Clear execution queue
       this.executionQueue.length = 0;
-        
+
       // Clean up performance monitor
       if (this.performanceMonitor && typeof this.performanceMonitor.destroy === 'function') {
         this.performanceMonitor.destroy();

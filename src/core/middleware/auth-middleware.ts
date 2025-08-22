@@ -482,4 +482,3 @@ export class AuthMiddleware {
     return this.config.requireAuth;
   }
 }
-

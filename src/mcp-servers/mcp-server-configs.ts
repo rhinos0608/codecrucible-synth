@@ -9,7 +9,7 @@ export const MCP_SERVER_CONFIGS: MCPServerConfig[] = [
     enabled: true,
     capabilities: [
       'execute_command',
-      'get_command_history', 
+      'get_command_history',
       'get_current_directory',
       'change_directory',
       'list_directory',
@@ -17,8 +17,8 @@ export const MCP_SERVER_CONFIGS: MCPServerConfig[] = [
       'read_file',
       'insert_file_content',
       'delete_file_content',
-      'update_file_content'
-    ]
+      'update_file_content',
+    ],
   },
   {
     id: 'task-manager',
@@ -31,8 +31,8 @@ export const MCP_SERVER_CONFIGS: MCPServerConfig[] = [
       'get_next_task',
       'mark_task_done',
       'approve_task_completion',
-      'approve_request_completion'
-    ]
+      'approve_request_completion',
+    ],
   },
   {
     id: 'remote-shell',
@@ -40,8 +40,6 @@ export const MCP_SERVER_CONFIGS: MCPServerConfig[] = [
     url: 'https://server.smithery.ai/@samihalawa/remote-shell-terminal-mcp/mcp',
     apiKey: '1f2853f9-af6e-4e69-814b-5f7e8cb65058',
     enabled: true,
-    capabilities: [
-      'shell-exec'
-    ]
-  }
+    capabilities: ['shell-exec'],
+  },
 ];

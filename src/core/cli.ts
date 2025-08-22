@@ -10,6 +10,7 @@ import { UnifiedAgent } from './agent.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
 import { logger } from './logger.js';
+import { getErrorMessage, toError } from '../utils/error-utils.js';
 import { StreamingAgentClient } from './streaming/streaming-agent-client.js';
 import { ContextAwareCLIIntegration } from './intelligence/context-aware-cli-integration.js';
 import { AutoConfigurator } from './model-management/auto-configurator.js';
@@ -22,6 +23,12 @@ import { CLIOptions, CLIContext, CLIDisplay, CLIParser, CLICommands } from './cl
 import { AuthMiddleware, AuthenticatedRequest } from './middleware/auth-middleware.js';
 import { RBACSystem } from './security/rbac-system.js';
 import { SecretsManager } from './security/secrets-manager.js';
+import {
+  SecurityAuditLogger,
+  AuditEventType,
+  AuditSeverity,
+  AuditOutcome,
+} from './security/security-audit-logger.js';
 import { DynamicModelRouter } from './dynamic-model-router.js';
 
 export type { CLIContext, CLIOptions };
@@ -43,6 +50,7 @@ export class CLI {
   private authMiddleware: AuthMiddleware;
   private rbacSystem: RBACSystem;
   private secretsManager: SecretsManager;
+  private auditLogger: SecurityAuditLogger;
   private dynamicModelRouter: DynamicModelRouter;
   private static globalListenersRegistered = false;
 
@@ -70,8 +78,9 @@ export class CLI {
     // Initialize security systems
     this.secretsManager = new SecretsManager();
     this.rbacSystem = new RBACSystem(this.secretsManager);
+    this.auditLogger = new SecurityAuditLogger(this.secretsManager);
     this.authMiddleware = new AuthMiddleware(this.rbacSystem, this.secretsManager);
-    
+
     // Initialize dynamic model router
     this.dynamicModelRouter = new DynamicModelRouter();
 
@@ -201,7 +210,14 @@ export class CLI {
       // Parse command and options
       const { command, remainingArgs } = CLIParser.extractCommand(args);
       const options = CLIParser.parseOptions(args);
-      console.log('🔧 DEBUG: Parsed command:', command, 'remainingArgs:', remainingArgs, 'options:', options);
+      console.log(
+        '🔧 DEBUG: Parsed command:',
+        command,
+        'remainingArgs:',
+        remainingArgs,
+        'options:',
+        options
+      );
 
       // Initialize if needed
       if (!this.initialized && !options.skipInit) {
@@ -227,7 +243,34 @@ export class CLI {
     args: string[],
     options: CLIOptions
   ): Promise<void> {
-    console.log('🔧 DEBUG: executeCommand called with:', { command: `"${command}"`, args, commandLength: command.length });
+    console.log('🔧 DEBUG: executeCommand called with:', {
+      command: `"${command}"`,
+      args,
+      commandLength: command.length,
+    });
+
+    // Audit log command execution for enterprise security compliance
+    if (this.initialized && this.auditLogger) {
+      await this.auditLogger.logEvent(
+        AuditEventType.API_ACCESS,
+        AuditSeverity.LOW,
+        AuditOutcome.SUCCESS,
+        'cli',
+        'command_execution',
+        'v4.0.0',
+        `CLI command executed: ${command}`,
+        {
+          ipAddress: 'localhost',
+          userAgent: 'codecrucible-cli',
+        },
+        {
+          command,
+          args: args.length > 0 ? args : undefined,
+          options: Object.keys(options).length > 0 ? options : undefined,
+          workingDirectory: this.workingDirectory,
+        }
+      );
+    }
     switch (command) {
       case 'status':
         await this.commands.showStatus();
@@ -267,7 +310,12 @@ export class CLI {
           const fullPrompt = [command, ...args].filter(Boolean).join(' ');
           console.log('🔧 DEBUG: About to call processPrompt with:', fullPrompt);
           const result = await this.processPrompt(fullPrompt, options);
-          console.log('🔧 DEBUG: processPrompt returned:', typeof result, result?.length || 'no length', !!result);
+          console.log(
+            '🔧 DEBUG: processPrompt returned:',
+            typeof result,
+            result?.length || 'no length',
+            !!result
+          );
           if (result && typeof result === 'string') {
             console.log('🔧 DEBUG: About to display result');
             console.log(result);
@@ -346,9 +394,13 @@ export class CLI {
     // Handle slash commands for role switching
     const { CLIParser } = await import('./cli/cli-parser.js');
     const slashCommand = CLIParser.parseSlashCommand(prompt);
-    
+
     if (slashCommand.command === 'role-switch' && slashCommand.role) {
-      return await this.handleRoleSwitch(slashCommand.role as 'auditor' | 'writer' | 'auto', slashCommand.content, options);
+      return await this.handleRoleSwitch(
+        slashCommand.role as 'auditor' | 'writer' | 'auto',
+        slashCommand.content,
+        options
+      );
     } else if (slashCommand.command === 'slash-help') {
       return this.showSlashHelp();
     } else if (slashCommand.command === 'unknown-slash') {
@@ -395,7 +447,7 @@ export class CLI {
       if (this.isAnalysisRequest(sanitizedPrompt)) {
         console.log(chalk.cyan('🔍 Performing direct codebase analysis...'));
         const analysis = await this.performDirectCodebaseAnalysis();
-        
+
         if (options.noStream || options.batch) {
           return analysis;
         } else {
@@ -404,13 +456,17 @@ export class CLI {
           return 'Analysis streaming completed';
         }
       }
-      
+
       // For non-analysis requests, use standard processing
       // TEMPORARY FIX: Force non-streaming mode to fix display issues
       if (true || options.noStream || options.batch) {
         console.log('🔧 DEBUG: About to call executePromptProcessing');
         const response = await this.executePromptProcessing(sanitizedPrompt, options);
-        console.log('🔧 DEBUG: executePromptProcessing returned:', typeof response, response?.length || 'no length');
+        console.log(
+          '🔧 DEBUG: executePromptProcessing returned:',
+          typeof response,
+          response?.length || 'no length'
+        );
         console.log('\n' + chalk.cyan('🤖 Response:'));
         console.log(response);
         console.log('🔧 DEBUG: Response displayed, returning');
@@ -434,19 +490,23 @@ export class CLI {
       // Step 1: Determine current role and task type
       const currentRole = options.role || this.dynamicModelRouter.getCurrentRole();
       const taskType = this.analyzeTaskType(prompt);
-      
+
       console.log(chalk.blue(`🎯 Processing in ${currentRole} mode for ${taskType} task`));
       console.log('DEBUG: About to select model for role');
-      
+
       // Step 2: Skip dynamic model router for now and use the unified client directly
       console.log(chalk.cyan('🤖 Using unified model client directly'));
-      
+
       // Check if we have analysis requests
-      if (prompt.toLowerCase().includes('analyz') || prompt.toLowerCase().includes('audit') || prompt.toLowerCase().includes('codebase')) {
+      if (
+        prompt.toLowerCase().includes('analyz') ||
+        prompt.toLowerCase().includes('audit') ||
+        prompt.toLowerCase().includes('codebase')
+      ) {
         const analysis = await this.performDirectCodebaseAnalysis();
         return analysis;
       }
-      
+
       // For non-analysis prompts, use the model client directly
       try {
         console.log('🎯 Calling model client with prompt...');
@@ -454,7 +514,10 @@ export class CLI {
         console.log('✅ Model response received');
         return response;
       } catch (error) {
-        console.error(chalk.red('❌ Model client error:'), error instanceof Error ? error.message : String(error));
+        console.error(
+          chalk.red('❌ Model client error:'),
+          error instanceof Error ? error.message : String(error)
+        );
         return `Error: ${error instanceof Error ? error.message : String(error)}. Please try again with a simpler prompt.`;
       }
 
@@ -473,10 +536,20 @@ export class CLI {
   private isAnalysisRequest(prompt: string): boolean {
     const lowerPrompt = prompt.toLowerCase();
     const analysisKeywords = [
-      'analyz', 'audit', 'codebase', 'review', 'inspect', 'examine', 
-      'assess', 'evaluate', 'check', 'scan', 'investigate', 'insights'
+      'analyz',
+      'audit',
+      'codebase',
+      'review',
+      'inspect',
+      'examine',
+      'assess',
+      'evaluate',
+      'check',
+      'scan',
+      'investigate',
+      'insights',
     ];
-    
+
     return analysisKeywords.some(keyword => lowerPrompt.includes(keyword));
   }
 
@@ -485,11 +558,11 @@ export class CLI {
    */
   private async streamAnalysisResult(analysis: string): Promise<void> {
     console.log(chalk.green('\n📝 Streaming Analysis Results:'));
-    
+
     // Split analysis into lines and stream them
     const lines = analysis.split('\n');
     const delay = Math.max(10, Math.min(50, 2000 / lines.length)); // Dynamic delay based on content length
-    
+
     for (const line of lines) {
       if (line.trim()) {
         process.stdout.write(line + '\n');
@@ -498,7 +571,7 @@ export class CLI {
         process.stdout.write('\n');
       }
     }
-    
+
     console.log(chalk.gray('\n   Analysis streaming completed'));
   }
 
@@ -507,7 +580,7 @@ export class CLI {
    */
   async performDirectCodebaseAnalysis(): Promise<string> {
     console.log('📊 Analyzing project structure...');
-    
+
     try {
       // Use the shared analyzer
       const { CodebaseAnalyzer } = await import('./analysis/codebase-analyzer.js');
@@ -526,16 +599,16 @@ export class CLI {
   private async performDirectCodebaseAnalysisLegacy(): Promise<string> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     console.log('📊 Analyzing project structure...');
-    
+
     // Real project analysis
     const projectAnalysis = await this.analyzeProjectStructure();
     const codeMetrics = await this.analyzeCodeMetrics();
     const dependencyAnalysis = await this.analyzeDependencies();
     const configAnalysis = await this.analyzeConfiguration();
     const testAnalysis = await this.analyzeTestCoverage();
-    
+
     // Generate dynamic analysis report
     const analysis = `
 # CodeCrucible Synth - Real-Time Codebase Analysis
@@ -560,7 +633,7 @@ ${await this.discoverArchitectureComponents()}
 
 ## File Distribution
 ${Object.entries(projectAnalysis.fileCounts)
-  .sort(([,a], [,b]) => (b as number) - (a as number))
+  .sort(([, a], [, b]) => (b as number) - (a as number))
   .map(([ext, count]) => `- ${ext}: ${count} files`)
   .join('\n')}
 
@@ -606,10 +679,10 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeProjectStructure(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     let projectInfo = { name: 'Unknown', version: 'Unknown' };
     const packageJsonPath = path.join(this.workingDirectory, 'package.json');
-    
+
     if (fs.existsSync(packageJsonPath)) {
       try {
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
@@ -618,17 +691,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         // Continue with defaults
       }
     }
-    
+
     const fileCounts = await this.countFilesByType();
     const totalFiles = Object.values(fileCounts).reduce((sum, count) => sum + count, 0);
     const discoveredComponents = await this.discoverProjectComponents();
-    
+
     return {
       name: projectInfo.name,
       version: projectInfo.version,
       totalFiles,
       fileCounts,
-      discoveredComponents
+      discoveredComponents,
     };
   }
 
@@ -638,19 +711,19 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeCodeMetrics(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     let totalLines = 0;
     let typescriptFiles = 0;
     let typescriptLines = 0;
     let javascriptFiles = 0;
     let javascriptLines = 0;
     let docFiles = 0;
-    
+
     const analyzeFile = (filePath: string, ext: string): number => {
       try {
         const content = fs.readFileSync(filePath, 'utf-8');
         const lines = content.split('\n').length;
-        
+
         if (ext === '.ts' || ext === '.tsx') {
           typescriptFiles++;
           typescriptLines += lines;
@@ -660,24 +733,25 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         } else if (ext === '.md' || ext === '.txt') {
           docFiles++;
         }
-        
+
         return lines;
       } catch (error) {
         return 0;
       }
     };
-    
+
     const scanDirectory = (dir: string, depth: number = 0): void => {
       if (depth > 3) return; // Limit recursion depth
-      
+
       try {
         const items = fs.readdirSync(dir, { withFileTypes: true });
-        
+
         for (const item of items) {
-          if (item.name.startsWith('.') || item.name === 'node_modules' || item.name === 'dist') continue;
-          
+          if (item.name.startsWith('.') || item.name === 'node_modules' || item.name === 'dist')
+            continue;
+
           const fullPath = path.join(dir, item.name);
-          
+
           if (item.isDirectory()) {
             scanDirectory(fullPath, depth + 1);
           } else if (item.isFile()) {
@@ -689,16 +763,16 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         // Ignore permission errors
       }
     };
-    
+
     scanDirectory(this.workingDirectory);
-    
+
     return {
       totalLines,
       typescriptFiles,
       typescriptLines,
       javascriptFiles,
       javascriptLines,
-      docFiles
+      docFiles,
     };
   }
 
@@ -708,27 +782,40 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeDependencies(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const packageJsonPath = path.join(this.workingDirectory, 'package.json');
     let prodDeps = 0;
     let devDeps = 0;
     let keyFrameworks: string[] = [];
-    
+
     if (fs.existsSync(packageJsonPath)) {
       try {
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
         prodDeps = Object.keys(packageJson.dependencies || {}).length;
         devDeps = Object.keys(packageJson.devDependencies || {}).length;
-        
+
         // Identify key frameworks
         const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-        const frameworks = ['express', 'react', 'vue', 'angular', 'next', 'typescript', 'jest', 'vitest', 'chalk', 'commander'];
-        keyFrameworks = frameworks.filter(fw => allDeps[fw] || Object.keys(allDeps).some(dep => dep.includes(fw)));
+        const frameworks = [
+          'express',
+          'react',
+          'vue',
+          'angular',
+          'next',
+          'typescript',
+          'jest',
+          'vitest',
+          'chalk',
+          'commander',
+        ];
+        keyFrameworks = frameworks.filter(
+          fw => allDeps[fw] || Object.keys(allDeps).some(dep => dep.includes(fw))
+        );
       } catch (error) {
         // Continue with defaults
       }
     }
-    
+
     return { prodDeps, devDeps, keyFrameworks };
   }
 
@@ -738,20 +825,20 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeConfiguration(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const configs = [
       { name: 'TypeScript Config', file: 'tsconfig.json', status: '' },
       { name: 'ESLint Config', file: '.eslintrc.cjs', status: '' },
       { name: 'Jest Config', file: 'jest.config.cjs', status: '' },
       { name: 'Package Config', file: 'package.json', status: '' },
-      { name: 'App Config', file: 'config/default.yaml', status: '' }
+      { name: 'App Config', file: 'config/default.yaml', status: '' },
     ];
-    
+
     for (const config of configs) {
       const configPath = path.join(this.workingDirectory, config.file);
       config.status = fs.existsSync(configPath) ? '✅ Present' : '❌ Missing';
     }
-    
+
     return { configs, configFiles: configs.filter(c => c.status.includes('✅')).length };
   }
 
@@ -761,32 +848,39 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzeTestCoverage(): Promise<any> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     let testFiles = 0;
     let testLines = 0;
     const frameworks: string[] = [];
-    
+
     const scanForTests = (dir: string, depth: number = 0): void => {
       if (depth > 2) return;
-      
+
       try {
         const items = fs.readdirSync(dir, { withFileTypes: true });
-        
+
         for (const item of items) {
           if (item.name.startsWith('.') || item.name === 'node_modules') continue;
-          
+
           const fullPath = path.join(dir, item.name);
-          
-          if (item.isDirectory() && (item.name === 'tests' || item.name === 'test' || item.name === '__tests__')) {
+
+          if (
+            item.isDirectory() &&
+            (item.name === 'tests' || item.name === 'test' || item.name === '__tests__')
+          ) {
             scanForTests(fullPath, depth + 1);
-          } else if (item.isFile() && (item.name.includes('.test.') || item.name.includes('.spec.'))) {
+          } else if (
+            item.isFile() &&
+            (item.name.includes('.test.') || item.name.includes('.spec.'))
+          ) {
             testFiles++;
             try {
               const content = fs.readFileSync(fullPath, 'utf-8');
               testLines += content.split('\n').length;
-              
+
               // Detect test frameworks
-              if (content.includes('describe(') || content.includes('it(')) frameworks.push('Jest/Mocha');
+              if (content.includes('describe(') || content.includes('it('))
+                frameworks.push('Jest/Mocha');
               if (content.includes('test(')) frameworks.push('Jest');
             } catch (error) {
               // Continue
@@ -797,16 +891,16 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         // Continue
       }
     };
-    
+
     scanForTests(this.workingDirectory);
-    
+
     const estimatedCoverage = testFiles > 0 ? Math.min(Math.round((testFiles / 50) * 100), 100) : 0;
-    
+
     return {
       testFiles,
       testLines,
       frameworks: [...new Set(frameworks)],
-      estimatedCoverage
+      estimatedCoverage,
     };
   }
 
@@ -816,9 +910,9 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async discoverProjectComponents(): Promise<any[]> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const components: any[] = [];
-    
+
     const checkComponent = (name: string, dirPath: string, description: string) => {
       const fullPath = path.join(this.workingDirectory, dirPath);
       if (fs.existsSync(fullPath)) {
@@ -830,18 +924,22 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         }
       }
     };
-    
+
     checkComponent('Core System', 'src/core', 'Main application logic and architecture');
     checkComponent('Voice System', 'src/voices', 'AI voice archetype system');
     checkComponent('MCP Servers', 'src/mcp-servers', 'Model Context Protocol servers');
     checkComponent('Security Framework', 'src/core/security', 'Enterprise security components');
-    checkComponent('Performance System', 'src/core/performance', 'Performance optimization modules');
+    checkComponent(
+      'Performance System',
+      'src/core/performance',
+      'Performance optimization modules'
+    );
     checkComponent('CLI Interface', 'src/core/cli', 'Command-line interface components');
     checkComponent('Tool Integration', 'src/core/tools', 'Integrated development tools');
     checkComponent('Configuration', 'config', 'Application configuration files');
     checkComponent('Documentation', 'Docs', 'Project documentation');
     checkComponent('Testing Suite', 'tests', 'Test files and utilities');
-    
+
     return components.filter(comp => comp.files > 0);
   }
 
@@ -851,28 +949,52 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async discoverArchitectureComponents(): Promise<string> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const architectureComponents: string[] = [];
-    
+
     // Check for key architecture files
     const keyFiles = [
-      { file: 'src/core/client.ts', component: '**Unified Model Client** - Consolidated LLM provider management' },
-      { file: 'src/voices/voice-archetype-system.ts', component: '**Voice Archetype System** - Multi-AI personality framework' },
-      { file: 'src/core/living-spiral-coordinator.ts', component: '**Living Spiral Coordinator** - Iterative development methodology' },
-      { file: 'src/core/security', component: '**Enterprise Security Framework** - Comprehensive security layer' },
-      { file: 'src/mcp-servers', component: '**MCP Server Integration** - Model Context Protocol implementation' },
-      { file: 'src/core/hybrid/hybrid-llm-router.ts', component: '**Hybrid LLM Router** - Intelligent model routing system' },
-      { file: 'src/core/performance', component: '**Performance Optimization Suite** - Caching, batching, monitoring' },
-      { file: 'src/core/tools', component: '**Tool Integration System** - Development tool orchestration' }
+      {
+        file: 'src/core/client.ts',
+        component: '**Unified Model Client** - Consolidated LLM provider management',
+      },
+      {
+        file: 'src/voices/voice-archetype-system.ts',
+        component: '**Voice Archetype System** - Multi-AI personality framework',
+      },
+      {
+        file: 'src/core/living-spiral-coordinator.ts',
+        component: '**Living Spiral Coordinator** - Iterative development methodology',
+      },
+      {
+        file: 'src/core/security',
+        component: '**Enterprise Security Framework** - Comprehensive security layer',
+      },
+      {
+        file: 'src/mcp-servers',
+        component: '**MCP Server Integration** - Model Context Protocol implementation',
+      },
+      {
+        file: 'src/core/hybrid/hybrid-llm-router.ts',
+        component: '**Hybrid LLM Router** - Intelligent model routing system',
+      },
+      {
+        file: 'src/core/performance',
+        component: '**Performance Optimization Suite** - Caching, batching, monitoring',
+      },
+      {
+        file: 'src/core/tools',
+        component: '**Tool Integration System** - Development tool orchestration',
+      },
     ];
-    
+
     for (const { file, component } of keyFiles) {
       const fullPath = path.join(this.workingDirectory, file);
       if (fs.existsSync(fullPath)) {
         architectureComponents.push(component);
       }
     }
-    
+
     return architectureComponents.map((comp, i) => `${i + 1}. ${comp}`).join('\n');
   }
 
@@ -881,15 +1003,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    */
   private async detectRealIssues(): Promise<string> {
     const issues: string[] = [];
-    
+
     // Check for the hanging generateText issue we discovered
-    issues.push('🔴 **Critical**: UnifiedModelClient.generateText() method hanging - blocks CLI execution');
-    
+    issues.push(
+      '🔴 **Critical**: UnifiedModelClient.generateText() method hanging - blocks CLI execution'
+    );
+
     // Check for TypeScript strict mode
     const fs = await import('fs');
     const path = await import('path');
     const tsconfigPath = path.join(this.workingDirectory, 'tsconfig.json');
-    
+
     if (fs.existsSync(tsconfigPath)) {
       try {
         const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
@@ -900,13 +1024,15 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         issues.push('🟡 **Warning**: Unable to parse tsconfig.json');
       }
     }
-    
+
     // Check for test coverage
     const testDir = path.join(this.workingDirectory, 'tests');
     if (!fs.existsSync(testDir)) {
-      issues.push('🟡 **Warning**: Limited test coverage - tests directory structure needs expansion');
+      issues.push(
+        '🟡 **Warning**: Limited test coverage - tests directory structure needs expansion'
+      );
     }
-    
+
     return issues.join('\n');
   }
 
@@ -916,15 +1042,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async assessSecurity(): Promise<string> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const securityFeatures: string[] = [];
-    
+
     // Check for security components
     const securityDir = path.join(this.workingDirectory, 'src/core/security');
     if (fs.existsSync(securityDir)) {
       const securityFiles = fs.readdirSync(securityDir);
-      securityFeatures.push(`✅ **Security Framework**: ${securityFiles.length} security modules implemented`);
-      
+      securityFeatures.push(
+        `✅ **Security Framework**: ${securityFiles.length} security modules implemented`
+      );
+
       if (securityFiles.includes('input-validator.ts')) {
         securityFeatures.push('✅ **Input Validation**: Comprehensive input sanitization system');
       }
@@ -935,7 +1063,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         securityFeatures.push('✅ **Secrets Management**: Encrypted secrets storage');
       }
     }
-    
+
     return securityFeatures.join('\n');
   }
 
@@ -945,15 +1073,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async analyzePerformance(): Promise<string> {
     const fs = await import('fs');
     const path = await import('path');
-    
+
     const performanceFeatures: string[] = [];
-    
+
     // Check for performance components
     const perfDir = path.join(this.workingDirectory, 'src/core/performance');
     if (fs.existsSync(perfDir)) {
       const perfFiles = fs.readdirSync(perfDir);
-      performanceFeatures.push(`✅ **Performance Suite**: ${perfFiles.length} optimization modules`);
-      
+      performanceFeatures.push(
+        `✅ **Performance Suite**: ${perfFiles.length} optimization modules`
+      );
+
       if (perfFiles.some(f => f.includes('cache'))) {
         performanceFeatures.push('✅ **Caching System**: Multi-layer caching implementation');
       }
@@ -964,33 +1094,49 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         performanceFeatures.push('✅ **Performance Monitoring**: Real-time performance tracking');
       }
     }
-    
+
     return performanceFeatures.join('\n');
   }
 
   /**
    * Generate recommendations based on analysis
    */
-  private async generateRecommendations(codeMetrics: any, testAnalysis: any, dependencyAnalysis: any): Promise<string> {
+  private async generateRecommendations(
+    codeMetrics: any,
+    testAnalysis: any,
+    dependencyAnalysis: any
+  ): Promise<string> {
     const recommendations: string[] = [];
-    
+
     // Critical recommendations based on real analysis
-    recommendations.push('1. **URGENT**: Fix UnifiedModelClient.generateText() hanging issue to restore full functionality');
-    
+    recommendations.push(
+      '1. **URGENT**: Fix UnifiedModelClient.generateText() hanging issue to restore full functionality'
+    );
+
     if (testAnalysis.estimatedCoverage < 50) {
-      recommendations.push('2. **High Priority**: Expand test coverage to 70%+ (currently ~' + testAnalysis.estimatedCoverage + '%)');
+      recommendations.push(
+        '2. **High Priority**: Expand test coverage to 70%+ (currently ~' +
+          testAnalysis.estimatedCoverage +
+          '%)'
+      );
     }
-    
+
     if (codeMetrics.typescriptFiles > 0) {
-      recommendations.push('3. **Medium Priority**: Enable TypeScript strict mode for better type safety');
+      recommendations.push(
+        '3. **Medium Priority**: Enable TypeScript strict mode for better type safety'
+      );
     }
-    
+
     if (dependencyAnalysis.devDeps > dependencyAnalysis.prodDeps * 2) {
-      recommendations.push('4. **Low Priority**: Review development dependencies - high dev/prod ratio');
+      recommendations.push(
+        '4. **Low Priority**: Review development dependencies - high dev/prod ratio'
+      );
     }
-    
-    recommendations.push('5. **Enhancement**: Implement automated code quality gates in CI/CD pipeline');
-    
+
+    recommendations.push(
+      '5. **Enhancement**: Implement automated code quality gates in CI/CD pipeline'
+    );
+
     return recommendations.join('\n');
   }
 
@@ -1000,20 +1146,20 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async countFilesByType(): Promise<Record<string, number>> {
     const path = await import('path');
     const fs = await import('fs');
-    
+
     const counts: Record<string, number> = {};
-    
+
     const countInDirectory = (dir: string, maxDepth: number = 2): void => {
       if (maxDepth <= 0) return;
-      
+
       try {
         const items = fs.readdirSync(dir, { withFileTypes: true });
-        
+
         for (const item of items) {
           if (item.name.startsWith('.') || item.name === 'node_modules') continue;
-          
+
           const fullPath = path.join(dir, item.name);
-          
+
           if (item.isDirectory()) {
             countInDirectory(fullPath, maxDepth - 1);
           } else if (item.isFile()) {
@@ -1025,7 +1171,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         // Ignore permission errors
       }
     };
-    
+
     countInDirectory(this.workingDirectory);
     return counts;
   }
@@ -1035,38 +1181,62 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    */
   private analyzeTaskType(prompt: string): string {
     const lowerPrompt = prompt.toLowerCase();
-    
-    if (lowerPrompt.includes('audit') || lowerPrompt.includes('security') || lowerPrompt.includes('vulnerabilit')) {
+
+    if (
+      lowerPrompt.includes('audit') ||
+      lowerPrompt.includes('security') ||
+      lowerPrompt.includes('vulnerabilit')
+    ) {
       return 'security-audit';
     }
-    if (lowerPrompt.includes('analyze') || lowerPrompt.includes('review') || lowerPrompt.includes('inspect')) {
+    if (
+      lowerPrompt.includes('analyze') ||
+      lowerPrompt.includes('review') ||
+      lowerPrompt.includes('inspect')
+    ) {
       return 'code-analysis';
     }
-    if (lowerPrompt.includes('create') || lowerPrompt.includes('generate') || lowerPrompt.includes('write')) {
+    if (
+      lowerPrompt.includes('create') ||
+      lowerPrompt.includes('generate') ||
+      lowerPrompt.includes('write')
+    ) {
       return 'code-generation';
     }
-    if (lowerPrompt.includes('refactor') || lowerPrompt.includes('improve') || lowerPrompt.includes('optimize')) {
+    if (
+      lowerPrompt.includes('refactor') ||
+      lowerPrompt.includes('improve') ||
+      lowerPrompt.includes('optimize')
+    ) {
       return 'code-refactoring';
     }
-    if (lowerPrompt.includes('document') || lowerPrompt.includes('explain') || lowerPrompt.includes('comment')) {
+    if (
+      lowerPrompt.includes('document') ||
+      lowerPrompt.includes('explain') ||
+      lowerPrompt.includes('comment')
+    ) {
       return 'documentation';
     }
-    
+
     return 'general';
   }
 
   /**
    * Execute in Auditor mode (LM Studio optimized for fast analysis)
    */
-  private async executeAuditorMode(prompt: string, model: any, options: CLIOptions): Promise<string> {
+  private async executeAuditorMode(
+    prompt: string,
+    model: any,
+    options: CLIOptions
+  ): Promise<string> {
     console.log(chalk.magenta('🔍 Auditor Mode: Fast analysis and security scanning'));
-    
+
     // Configure the model client to use the selected model
     await this.configureModelClient(model);
-    
+
     // Use focused analysis voices for auditing
     const auditVoices = ['Security', 'Analyzer', 'Guardian'];
-    
+
     const result = await this.context.voiceSystem.generateMultiVoiceSolutions(auditVoices, prompt, {
       workingDirectory: this.workingDirectory,
       config: { analysisMode: 'security', priority: 'speed' },
@@ -1083,24 +1253,32 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Execute in Writer mode (Ollama optimized for quality generation)
    */
-  private async executeWriterMode(prompt: string, model: any, options: CLIOptions): Promise<string> {
+  private async executeWriterMode(
+    prompt: string,
+    model: any,
+    options: CLIOptions
+  ): Promise<string> {
     console.log(chalk.green('✍️  Writer Mode: High-quality generation and documentation'));
-    
+
     // Configure the model client to use the selected model
     await this.configureModelClient(model);
-    
+
     // Use creative and implementation voices for writing
     const writerVoices = ['Developer', 'Architect', 'Designer'];
-    
-    const result = await this.context.voiceSystem.generateMultiVoiceSolutions(writerVoices, prompt, {
-      workingDirectory: this.workingDirectory,
-      config: { generationMode: 'creative', priority: 'quality' },
-      files: [],
-      structure: {
-        directories: [],
-        fileTypes: {},
-      },
-    });
+
+    const result = await this.context.voiceSystem.generateMultiVoiceSolutions(
+      writerVoices,
+      prompt,
+      {
+        workingDirectory: this.workingDirectory,
+        config: { generationMode: 'creative', priority: 'quality' },
+        files: [],
+        structure: {
+          directories: [],
+          fileTypes: {},
+        },
+      }
+    );
 
     return this.formatResponse(result, 'generation');
   }
@@ -1110,9 +1288,9 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    */
   private async executeAutoMode(prompt: string, model: any, options: CLIOptions): Promise<string> {
     console.log(chalk.blue('🤖 Auto Mode: Intelligent task routing'));
-    
+
     const taskType = this.analyzeTaskType(prompt);
-    
+
     // Route to appropriate mode based on task
     if (taskType.includes('audit') || taskType.includes('security')) {
       return await this.executeAuditorMode(prompt, model, options);
@@ -1121,18 +1299,22 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     } else {
       // Balanced approach for general tasks
       await this.configureModelClient(model);
-      
+
       const balancedVoices = ['Explorer', 'Developer', 'Maintainer'];
-      
-      const result = await this.context.voiceSystem.generateMultiVoiceSolutions(balancedVoices, prompt, {
-        workingDirectory: this.workingDirectory,
-        config: { mode: 'balanced' },
-        files: [],
-        structure: {
-          directories: [],
-          fileTypes: {},
-        },
-      });
+
+      const result = await this.context.voiceSystem.generateMultiVoiceSolutions(
+        balancedVoices,
+        prompt,
+        {
+          workingDirectory: this.workingDirectory,
+          config: { mode: 'balanced' },
+          files: [],
+          structure: {
+            directories: [],
+            fileTypes: {},
+          },
+        }
+      );
 
       return this.formatResponse(result, 'general');
     }
@@ -1201,7 +1383,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
               streamingStarted = true;
               console.log(chalk.cyan('\n🌊 Streaming Response:'));
             }
-            
+
             buffer += token.content;
             // Write each token immediately for real-time feel
             process.stdout.write(token.content);
@@ -1236,7 +1418,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
       });
     } catch (error) {
       spinner.stop();
-      
+
       // Handle different types of streaming errors
       if (error instanceof Error && error.message?.includes('timeout')) {
         console.error(chalk.yellow('\n⏱️ Streaming timeout - the response took too long'));
@@ -1248,9 +1430,12 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         console.error(chalk.red('\n❌ Model Error: The requested model is not available'));
         console.log(chalk.yellow('Run "crucible models" to see available models'));
       } else {
-        console.error(chalk.red('\n❌ Streaming Error:'), error instanceof Error ? error.message : String(error));
+        console.error(
+          chalk.red('\n❌ Streaming Error:'),
+          error instanceof Error ? error.message : String(error)
+        );
       }
-      
+
       // Don't throw, return gracefully to keep CLI running
       return;
     }
@@ -1281,8 +1466,9 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         } else if (prompt.prompt.trim()) {
           await this.processPrompt(prompt.prompt, options);
         }
-      } catch (error) {
-        if (error.message.includes('User force closed')) {
+      } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error);
+        if (errorMessage.includes('User force closed')) {
           console.log(chalk.yellow('\n👋 Goodbye!'));
           break;
         }
@@ -1359,7 +1545,26 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     try {
       // Initialize security systems first
+      await this.secretsManager.initialize();
+      await this.auditLogger.initialize();
       await this.authMiddleware.initialize();
+
+      // Log CLI initialization attempt
+      await this.auditLogger.logEvent(
+        AuditEventType.SYSTEM_EVENT,
+        AuditSeverity.MEDIUM,
+        AuditOutcome.SUCCESS,
+        'cli',
+        'cli_initialization',
+        'v4.0.0',
+        'CLI system initialization started',
+        {},
+        {
+          workingDirectory: this.workingDirectory,
+          authEnabled: this.authMiddleware.isAuthEnabled(),
+          authRequired: this.authMiddleware.isAuthRequired(),
+        }
+      );
 
       // Context awareness is initialized in constructor
 
@@ -1369,6 +1574,19 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         authRequired: this.authMiddleware.isAuthRequired(),
       });
     } catch (error) {
+      // Log initialization failure
+      await this.auditLogger.logEvent(
+        AuditEventType.ERROR_EVENT,
+        AuditSeverity.HIGH,
+        AuditOutcome.FAILURE,
+        'cli',
+        'cli_initialization_failed',
+        'v4.0.0',
+        `CLI initialization failed: ${error}`,
+        {},
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+
       logger.error('CLI initialization failed:', error);
       throw new CLIError(`Initialization failed: ${error}`, CLIExitCode.INITIALIZATION_FAILED);
     }
@@ -1438,6 +1656,35 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    */
   private async handleError(error: any): Promise<void> {
     console.error(chalk.red('\n❌ Error:'), error.message || error);
+
+    // Audit log error for enterprise security monitoring
+    if (this.auditLogger) {
+      try {
+        await this.auditLogger.logEvent(
+          AuditEventType.ERROR_EVENT,
+          AuditSeverity.HIGH,
+          AuditOutcome.ERROR,
+          'cli',
+          'cli_error',
+          'v4.0.0',
+          `CLI error occurred: ${error.message || error}`,
+          {
+            ipAddress: 'localhost',
+            userAgent: 'codecrucible-cli',
+          },
+          {
+            errorType: error.constructor.name,
+            errorMessage: error.message || error.toString(),
+            exitCode: error instanceof CLIError ? error.exitCode : CLIExitCode.UNEXPECTED_ERROR,
+            workingDirectory: this.workingDirectory,
+            stack: error.stack || 'No stack trace available',
+          }
+        );
+      } catch (auditError) {
+        // Don't fail on audit logging errors
+        console.warn('Failed to log error to audit system:', auditError);
+      }
+    }
 
     if (error instanceof CLIError) {
       process.exit(error.exitCode);
@@ -1511,33 +1758,39 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Handle role switching via slash commands
    */
-  private async handleRoleSwitch(role: 'auditor' | 'writer' | 'auto', content: string, options: CLIOptions): Promise<string> {
+  private async handleRoleSwitch(
+    role: 'auditor' | 'writer' | 'auto',
+    content: string,
+    options: CLIOptions
+  ): Promise<string> {
     try {
       // Switch the role in the dynamic model router
       this.dynamicModelRouter.setRole(role);
-      
+
       // Show confirmation
       const roleDescription = {
-        auditor: 'Auditor mode (LM Studio) - Optimized for fast code analysis and security auditing',
-        writer: 'Writer mode (Ollama) - Optimized for high-quality code generation and documentation',
-        auto: 'Auto mode - Intelligent routing based on task requirements'
+        auditor:
+          'Auditor mode (LM Studio) - Optimized for fast code analysis and security auditing',
+        writer:
+          'Writer mode (Ollama) - Optimized for high-quality code generation and documentation',
+        auto: 'Auto mode - Intelligent routing based on task requirements',
       };
-      
+
       console.log(chalk.green(`✅ Switched to ${role} mode`));
       console.log(chalk.blue(`📋 ${roleDescription[role]}`));
-      
+
       // Show current best model
       const bestModel = await this.dynamicModelRouter.getBestModelForCurrentRole(
         role === 'auditor' ? 'audit' : role === 'writer' ? 'generate' : 'general'
       );
-      
+
       if (bestModel) {
         console.log(chalk.cyan(`🤖 Using model: ${bestModel.model} (${bestModel.provider})`));
         console.log(chalk.gray(`   Strengths: ${bestModel.strengths.join(', ')}`));
       } else {
         console.log(chalk.yellow(`⚠️  No suitable models found for ${role} mode`));
       }
-      
+
       // If there's content after the slash command, process it with the new role
       if (content && content.trim()) {
         console.log(chalk.blue('\n🔄 Processing with new role...'));
@@ -1545,11 +1798,12 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         const updatedOptions = { ...options, role, forceProvider: bestModel?.provider };
         return await this.executePromptProcessing(content, updatedOptions);
       }
-      
+
       return `Role switched to ${role}`;
-    } catch (error) {
-      logger.error('Role switch failed:', error);
-      return `Failed to switch to ${role} mode: ${error.message}`;
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('Role switch failed:', errorMessage);
+      return `Failed to switch to ${role} mode: ${errorMessage}`;
     }
   }
 
@@ -1559,11 +1813,11 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async handleModelSwitch(modelName: string): Promise<void> {
     try {
       console.log(chalk.blue(`🔄 Switching to model: ${modelName}`));
-      
+
       // Unload current models and switch
       const providers = this.context.modelClient.getProviders();
       let switched = false;
-      
+
       for (const [providerName, provider] of providers) {
         if (provider && typeof provider.switchModel === 'function') {
           try {
@@ -1576,15 +1830,17 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
           }
         }
       }
-      
+
       if (!switched) {
         // Try to create new provider instance with the model
         await this.handleModelReload();
-        console.log(chalk.yellow(`⚠️  Model switch failed. Reloaded providers with autonomous detection.`));
+        console.log(
+          chalk.yellow(`⚠️  Model switch failed. Reloaded providers with autonomous detection.`)
+        );
       }
-      
-    } catch (error) {
-      console.error(chalk.red('❌ Model switch failed:'), error.message);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      console.error(chalk.red('❌ Model switch failed:'), errorMessage);
     }
   }
 
@@ -1595,7 +1851,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     try {
       console.log(chalk.blue('📋 Available Models:'));
       const providers = this.context.modelClient.getProviders();
-      
+
       for (const [providerName, provider] of providers) {
         if (provider && typeof provider.listModels === 'function') {
           try {
@@ -1609,11 +1865,11 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
           }
         }
       }
-      
+
       console.log(chalk.blue('\n💡 Switch models with: /model:model-name'));
-      
-    } catch (error) {
-      console.error(chalk.red('❌ Failed to list models:'), error.message);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      console.error(chalk.red('❌ Failed to list models:'), errorMessage);
     }
   }
 
@@ -1623,14 +1879,14 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async handleModelReload(): Promise<void> {
     try {
       console.log(chalk.blue('🔄 Reloading providers and detecting models...'));
-      
+
       // Reinitialize providers with autonomous detection
       await this.context.modelClient.initialize();
-      
+
       console.log(chalk.green('✅ Providers reloaded with autonomous model detection'));
-      
-    } catch (error) {
-      console.error(chalk.red('❌ Model reload failed:'), error.message);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      console.error(chalk.red('❌ Model reload failed:'), errorMessage);
     }
   }
 
@@ -1665,7 +1921,7 @@ ${chalk.gray('/model-reload               # Refresh model detection')}
 
 ${chalk.bold.cyan('Current Mode:')} ${this.dynamicModelRouter.getCurrentRole()}
 `;
-    
+
     console.log(help);
     return help;
   }

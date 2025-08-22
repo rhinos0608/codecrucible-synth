@@ -11,6 +11,7 @@ import { SecureToolFactory } from '../security/secure-tool-factory.js';
 import { RBACSystem } from '../security/rbac-system.js';
 import { SecurityAuditLogger } from '../security/security-audit-logger.js';
 import { SecretsManager } from '../security/secrets-manager.js';
+import { getErrorMessage } from '../../utils/error-utils.js';
 
 // Core Tool Interfaces
 export interface Tool {
@@ -163,7 +164,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   private costOptimizer: CostOptimizer;
   private performanceMonitor: PerformanceMonitor;
   private errorRecovery: ErrorRecoveryManager;
-  private secureToolFactory: SecureToolFactory;
+  private secureToolFactory!: SecureToolFactory;
 
   constructor(modelClient: UnifiedModelClient) {
     super();
@@ -176,7 +177,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     this.costOptimizer = new CostOptimizer();
     this.performanceMonitor = new PerformanceMonitor();
     this.errorRecovery = new ErrorRecoveryManager();
-    
+
     // Initialize SecureToolFactory with required dependencies
     this.initializeSecureToolFactory();
 
@@ -191,7 +192,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
       const rbacSystem = new RBACSystem();
       const secretsManager = new SecretsManager();
       const auditLogger = new SecurityAuditLogger(secretsManager);
-      
+
       this.secureToolFactory = new SecureToolFactory(rbacSystem, auditLogger);
     } catch (error) {
       this.logger.error('Failed to initialize SecureToolFactory', error as Error);
@@ -642,11 +643,11 @@ class ExecutionEngine {
       results.set(callId, result);
 
       this.logger.info(`Tool ${tool.name} executed successfully in ${executionTime}ms`);
-    } catch (error) {
+    } catch (error: unknown) {
       const errorResult: ToolResult = {
         toolId: call.toolId,
         success: false,
-        error: error.message,
+        error: getErrorMessage(error),
         metadata: {
           executionTime: 0,
           memoryUsed: 0,

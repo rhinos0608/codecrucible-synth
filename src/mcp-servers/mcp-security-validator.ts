@@ -3,13 +3,34 @@ import { logger } from '../core/logger.js';
 
 export class MCPSecurityValidator {
   private static SENSITIVE_COMMANDS = [
-    'rm -rf', 'sudo', 'su ', 'chmod +x', 'passwd', 'useradd', 'userdel',
-    'curl.*|.*sh', 'wget.*|.*sh', 'nc.*-e', 'python.*-c.*exec'
+    'rm -rf',
+    'sudo',
+    'su ',
+    'chmod +x',
+    'passwd',
+    'useradd',
+    'userdel',
+    'curl.*|.*sh',
+    'wget.*|.*sh',
+    'nc.*-e',
+    'python.*-c.*exec',
   ];
 
   private static ALLOWED_REMOTE_COMMANDS = [
-    'ls', 'pwd', 'cd', 'cat', 'echo', 'grep', 'find', 'git',
-    'npm', 'node', 'tsc', 'jest', 'eslint', 'prettier'
+    'ls',
+    'pwd',
+    'cd',
+    'cat',
+    'echo',
+    'grep',
+    'find',
+    'git',
+    'npm',
+    'node',
+    'tsc',
+    'jest',
+    'eslint',
+    'prettier',
   ];
 
   static async validateToolCall(serverId: string, toolName: string, args: any): Promise<boolean> {
@@ -33,7 +54,10 @@ export class MCPSecurityValidator {
     }
   }
 
-  private static async validateTerminalControllerCall(toolName: string, args: any): Promise<boolean> {
+  private static async validateTerminalControllerCall(
+    toolName: string,
+    args: any
+  ): Promise<boolean> {
     switch (toolName) {
       case 'execute_command':
         return this.validateCommand(args.command);
@@ -88,8 +112,8 @@ export class MCPSecurityValidator {
 
     // Additional restrictions for remote execution
     const baseCommand = command.trim().split(' ')[0];
-    const isAllowed = this.ALLOWED_REMOTE_COMMANDS.some(allowed => 
-      baseCommand === allowed || baseCommand.startsWith(allowed)
+    const isAllowed = this.ALLOWED_REMOTE_COMMANDS.some(
+      allowed => baseCommand === allowed || baseCommand.startsWith(allowed)
     );
 
     if (!isAllowed) {
@@ -125,7 +149,7 @@ export class MCPSecurityValidator {
       /password\s*[=:]\s*['"]/i,
       /api[_-]?key\s*[=:]\s*['"]/i,
       /secret\s*[=:]\s*['"]/i,
-      /token\s*[=:]\s*['"]/i
+      /token\s*[=:]\s*['"]/i,
     ];
 
     return sensitivePatterns.some(pattern => pattern.test(content));

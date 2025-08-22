@@ -482,7 +482,7 @@ export class ResponseValidator {
       });
     }
 
-    if (response.quality < 0 || response.quality > 1) {
+    if ((response.quality ?? 0) < 0 || (response.quality ?? 0) > 1) {
       errors.push({
         field: 'quality',
         message: 'Quality score must be between 0 and 1',
@@ -490,7 +490,7 @@ export class ResponseValidator {
       });
     }
 
-    if (response.confidence < 0 || response.confidence > 1) {
+    if ((response.confidence ?? 0) < 0 || (response.confidence ?? 0) > 1) {
       errors.push({
         field: 'confidence',
         message: 'Confidence score must be between 0 and 1',
@@ -499,7 +499,7 @@ export class ResponseValidator {
     }
 
     // Metadata validation
-    if (!response.metadata.timestamp) {
+    if (!response.metadata?.timestamp) {
       warnings.push({
         field: 'metadata.timestamp',
         message: 'Timestamp should be provided',
@@ -507,7 +507,7 @@ export class ResponseValidator {
       });
     }
 
-    if (response.metadata.duration < 0) {
+    if ((response.metadata?.duration ?? 0) < 0) {
       warnings.push({
         field: 'metadata.duration',
         message: 'Duration cannot be negative',
@@ -582,7 +582,11 @@ export class ResponseValidator {
     // Validate score ranges
     const scores = ['complexity', 'maintainability', 'performance', 'security'];
     scores.forEach(score => {
-      if (typeof analysis[score] !== 'number' || analysis[score] < 0 || analysis[score] > 100) {
+      if (
+        typeof (analysis as any)[score] !== 'number' ||
+        (analysis as any)[score] < 0 ||
+        (analysis as any)[score] > 100
+      ) {
         errors.push({
           field: `analysis.${score}`,
           message: `${score} score must be a number between 0 and 100`,
@@ -672,8 +676,8 @@ export class ResponseValidator {
       .replace(/data:text\/html/gi, '');
 
     // Ensure quality and confidence are in valid range
-    sanitized.quality = Math.max(0, Math.min(1, sanitized.quality));
-    sanitized.confidence = Math.max(0, Math.min(1, sanitized.confidence));
+    sanitized.quality = Math.max(0, Math.min(1, sanitized.quality ?? 0));
+    sanitized.confidence = Math.max(0, Math.min(1, sanitized.confidence ?? 0));
 
     return sanitized;
   }
@@ -751,15 +755,16 @@ export class ResponseProcessor {
     }
 
     const mergedContent = responses.map(r => r.content).join('\n\n---\n\n');
-    const avgQuality = responses.reduce((sum, r) => sum + r.quality, 0) / responses.length;
-    const avgConfidence = responses.reduce((sum, r) => sum + r.confidence, 0) / responses.length;
-    const totalDuration = responses.reduce((sum, r) => sum + r.metadata.duration, 0);
-    const totalTokens = responses.reduce((sum, r) => sum + r.metadata.tokens, 0);
+    const avgQuality = responses.reduce((sum, r) => sum + (r.quality ?? 0), 0) / responses.length;
+    const avgConfidence =
+      responses.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / responses.length;
+    const totalDuration = responses.reduce((sum, r) => sum + (r.metadata?.duration ?? 0), 0);
+    const totalTokens = responses.reduce((sum, r) => sum + (r.metadata?.tokens ?? 0), 0);
 
     return ResponseFactory.createLegacyAgentResponse(mergedContent, ResponseType.GENERAL, {
       duration: totalDuration,
       tokens: totalTokens,
-      model: responses[0].metadata.model,
+      model: responses[0]?.metadata?.model,
     });
   }
 }

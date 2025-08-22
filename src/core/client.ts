@@ -7,6 +7,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { join } from 'path';
 import { logger } from './logger.js';
 import {
   ProjectContext,
@@ -25,10 +26,12 @@ import { ToolIntegration, getGlobalToolIntegration } from './tools/tool-integrat
 import { getGlobalEnhancedToolIntegration } from './tools/enhanced-tool-integration.js';
 import { ActiveProcessManager, ActiveProcess } from './performance/active-process-manager.js';
 import { LRUCache } from './cache/lru-cache.js';
+import { PersistentCache } from './cache/persistent-cache.js';
 import { HybridLLMRouter, HybridConfig } from './hybrid/hybrid-llm-router.js';
 import { intelligentBatchProcessor } from './performance/intelligent-batch-processor.js';
 import { semanticCache } from './caching/semantic-cache-system.js';
 import { enhancedStreamingClient, StreamToken } from './streaming/enhanced-streaming-client.js';
+import { getErrorMessage, isError, toError } from '../utils/error-utils.js';
 
 export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
 export type ExecutionMode = 'fast' | 'auto' | 'quality';
@@ -82,8 +85,8 @@ export class UnifiedModelClient extends EventEmitter {
   }> = [];
   private isProcessingQueue = false;
 
-  // MEMORY LEAK FIX: LRU cache system with proper memory limits
-  private unifiedCache: LRUCache<any>;
+  // PERSISTENT CACHING: Enhanced caching with cross-session persistence
+  private unifiedCache: PersistentCache<any>;
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_CACHE_SIZE = 500;
 
@@ -109,6 +112,9 @@ export class UnifiedModelClient extends EventEmitter {
   private abortController: AbortController;
   private isShuttingDown = false;
 
+  // ASYNC INITIALIZATION: Track initialization state
+  private initialized = false;
+
   constructor(config: UnifiedClientConfig) {
     super();
     // Increase max listeners to prevent memory leak warnings
@@ -129,11 +135,14 @@ export class UnifiedModelClient extends EventEmitter {
     this.hardwareSelector = new HardwareAwareModelSelector();
     this.processManager = new ActiveProcessManager(this.hardwareSelector);
 
-    // MEMORY LEAK FIX: Initialize LRU cache with proper limits
-    this.unifiedCache = new LRUCache({
+    // PERSISTENT CACHING: Initialize cache with cross-session persistence
+    this.unifiedCache = new PersistentCache({
       maxSize: this.MAX_CACHE_SIZE,
       ttl: this.CACHE_TTL,
       checkInterval: 60000, // Cleanup every minute
+      enablePersistence: true,
+      persistInterval: 30000, // Persist every 30 seconds
+      compressionLevel: 1, // Light compression for better performance
     });
 
     // HYBRID ARCHITECTURE: Initialize hybrid router for intelligent LLM selection
@@ -197,14 +206,34 @@ export class UnifiedModelClient extends EventEmitter {
    * Initialize providers - must be called after constructor
    */
   async initialize(): Promise<void> {
-    await this.initializeProviders();
+    console.log('🚀 Starting async initialization...');
 
-    // Initialize optimal model configuration
-    const optimalConfig = await this.hardwareSelector.getOptimalModelForHardware();
-    this.currentModel = optimalConfig.writer.model;
-    this.hardwareSelector.setCurrentModel(this.currentModel);
+    // Mark as initialized immediately for basic functionality
+    this.initialized = true;
 
-    logger.info(`Initialized with optimal model: ${this.currentModel}`);
+    // Start provider initialization in background (non-blocking)
+    this.initializeProvidersAsync()
+      .then(() => {
+        console.log('✅ Background provider initialization completed');
+        this.emit('providers-ready');
+      })
+      .catch(error => {
+        console.warn('⚠️ Background provider initialization had issues:', error);
+        this.emit('providers-partial', { error });
+      });
+
+    // Initialize basic model configuration immediately with fallback
+    try {
+      const optimalConfig = await this.hardwareSelector.getOptimalModelForHardware();
+      this.currentModel = optimalConfig.writer.model;
+      this.hardwareSelector.setCurrentModel(this.currentModel);
+      console.log(`✅ Immediate initialization completed with model: ${this.currentModel}`);
+    } catch (error) {
+      console.warn(
+        '⚠️ Could not determine optimal model immediately, will retry when providers are ready'
+      );
+      this.currentModel = 'auto'; // Fallback
+    }
   }
 
   /**
@@ -254,23 +283,111 @@ export class UnifiedModelClient extends EventEmitter {
     };
   }
 
-  private async initializeProviders(): Promise<void> {
-    logger.info('🔧 Initializing model providers...');
+  /**
+   * Async provider initialization - runs in background without blocking CLI startup
+   */
+  private async initializeProvidersAsync(): Promise<void> {
+    console.log('🔧 Starting background provider initialization...');
+    const startTime = Date.now();
 
-    for (const providerConfig of this.config.providers) {
+    // Track initialization state
+    const initResults = new Map<string, { success: boolean; error?: Error; duration: number }>();
+
+    // Initialize providers with parallel execution and timeout handling
+    const initPromises = this.config.providers.map(async providerConfig => {
+      const providerStartTime = Date.now();
       try {
-        const provider = await this.createProvider(providerConfig);
+        console.log(`🔧 Initializing provider: ${providerConfig.type}`);
+
+        // Add timeout for individual provider initialization
+        const initTimeout = 10000; // 10 second timeout per provider
+        const provider = await Promise.race([
+          this.createProvider(providerConfig),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Provider ${providerConfig.type} initialization timeout`)),
+              initTimeout
+            )
+          ),
+        ]);
+
         this.providers.set(providerConfig.type, provider);
-        logger.info(`✅ Provider ${providerConfig.type} initialized`);
+        const duration = Date.now() - providerStartTime;
+
+        initResults.set(providerConfig.type, { success: true, duration });
+        console.log(`✅ Provider ${providerConfig.type} initialized in ${duration}ms`);
+
+        // Emit individual provider ready event
+        this.emit('provider-ready', { type: providerConfig.type, provider, duration });
+
+        return { type: providerConfig.type, success: true, duration };
       } catch (error) {
-        logger.warn(`⚠️ Failed to initialize provider ${providerConfig.type}:`, error);
+        const duration = Date.now() - providerStartTime;
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+
+        initResults.set(providerConfig.type, { success: false, error: errorObj, duration });
+        console.warn(
+          `⚠️ Provider ${providerConfig.type} failed in ${duration}ms:`,
+          errorObj.message
+        );
+
+        // Emit provider failure event
+        this.emit('provider-failed', { type: providerConfig.type, error: errorObj, duration });
+
+        return { type: providerConfig.type, success: false, error: errorObj, duration };
+      }
+    });
+
+    // Wait for all providers to complete (success or failure)
+    const results = await Promise.allSettled(initPromises);
+
+    const totalDuration = Date.now() - startTime;
+    const successCount = this.providers.size;
+    const totalCount = this.config.providers.length;
+
+    console.log(
+      `🔧 Provider initialization completed: ${successCount}/${totalCount} providers in ${totalDuration}ms`
+    );
+
+    // Log detailed results
+    for (const [providerType, result] of initResults) {
+      if (result.success) {
+        logger.info(`✅ Provider ${providerType} ready (${result.duration}ms)`);
+      } else {
+        logger.warn(
+          `❌ Provider ${providerType} failed (${result.duration}ms):`,
+          result.error?.message
+        );
       }
     }
 
     if (this.providers.size === 0) {
       logger.warn('⚠️ No providers successfully initialized. CLI will run in degraded mode.');
-      // Don't throw an error - allow CLI to run for help/version commands
+      throw new Error('No providers available');
+    } else if (this.providers.size < totalCount) {
+      logger.warn(
+        `⚠️ Only ${successCount}/${totalCount} providers initialized. Some features may be limited.`
+      );
     }
+
+    // Re-evaluate optimal model configuration now that providers are ready
+    try {
+      const optimalConfig = await this.hardwareSelector.getOptimalModelForHardware();
+      if (this.currentModel === 'auto' || !this.currentModel) {
+        this.currentModel = optimalConfig.writer.model;
+        this.hardwareSelector.setCurrentModel(this.currentModel);
+        console.log(`🔧 Updated to optimal model: ${this.currentModel}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not update optimal model configuration:', error);
+    }
+  }
+
+  /**
+   * Legacy synchronous provider initialization (kept for compatibility)
+   */
+  private async initializeProviders(): Promise<void> {
+    return this.initializeProvidersAsync();
   }
 
   private async createProvider(config: ProviderConfig): Promise<any> {
@@ -301,12 +418,11 @@ export class UnifiedModelClient extends EventEmitter {
    * HYBRID ARCHITECTURE: Enhanced synthesize method with intelligent routing
    */
   async synthesize(request: any): Promise<any> {
-    // Check cache first
-    const cacheKey = `synth_${Buffer.from(request.prompt || '')
-      .toString('base64')
-      .slice(0, 16)}`;
+    // INTELLIGENT CACHING: Check cache with content-aware key generation
+    const cacheKey = this.generateIntelligentCacheKey(request);
     const cached = this.getCache(cacheKey);
-    if (cached) {
+    if (cached && this.shouldUseIntelligentCache(request)) {
+      console.log('🧠 Returning cached response');
       return { ...cached, fromCache: true };
     }
 
@@ -341,9 +457,11 @@ export class UnifiedModelClient extends EventEmitter {
     const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
     const supportsTools = this.modelSupportsTools(selectedProvider, request.model);
     const tools = supportsTools && toolIntegration ? toolIntegration.getLLMFunctions() : [];
-    
+
     // DEBUG: Log tool integration status
-    console.log(`🔧 TOOL DEBUG: Provider=${selectedProvider}, Model=${request.model}, SupportsTools=${supportsTools}`);
+    console.log(
+      `🔧 TOOL DEBUG: Provider=${selectedProvider}, Model=${request.model}, SupportsTools=${supportsTools}`
+    );
     console.log(`🔧 TOOL DEBUG: ToolIntegration=${!!toolIntegration}, ToolCount=${tools.length}`);
     if (tools.length > 0) {
       console.log(`🔧 TOOL DEBUG: Available tools: ${tools.map(t => t.function.name).join(', ')}`);
@@ -357,6 +475,7 @@ export class UnifiedModelClient extends EventEmitter {
       stream: request.stream,
       provider: selectedProvider,
       tools: tools,
+      abortSignal: request.abortSignal, // Add abort signal for timeout handling
     };
 
     const startTime = Date.now();
@@ -386,8 +505,11 @@ export class UnifiedModelClient extends EventEmitter {
       fromCache: false,
     };
 
-    // Cache the result for 5 minutes
-    this.setCache(cacheKey, result, this.CACHE_TTL);
+    // INTELLIGENT CACHING: Cache with content-aware TTL
+    if (this.shouldUseIntelligentCache(request)) {
+      this.setCache(cacheKey, result, undefined, request);
+      console.log('🧠 Response cached with intelligent TTL');
+    }
 
     return result;
   }
@@ -416,7 +538,7 @@ export class UnifiedModelClient extends EventEmitter {
 
   async processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
     console.log('🔄 processRequest started');
-    
+
     // PERFORMANCE: Temporarily bypass semantic cache to fix hanging
     console.log('🔄 Bypassing semantic cache (disabled for debugging)...');
     // const cacheKey = `${request.prompt}::${request.model || 'default'}`;
@@ -808,10 +930,12 @@ export class UnifiedModelClient extends EventEmitter {
     if (provider === 'ollama') {
       // If no specific model provided, assume auto-selection will pick a supported model
       if (!model) {
-        console.log('🔧 TOOL DEBUG: No specific model provided, assuming auto-selection will pick supported model');
+        console.log(
+          '🔧 TOOL DEBUG: No specific model provided, assuming auto-selection will pick supported model'
+        );
         return true; // Trust that auto-selection picks qwen2.5-coder which supports tools
       }
-      
+
       // Only certain Ollama models support function calling
       const model_name = model.toLowerCase();
       // Models that support function calling (update this list as needed)
@@ -825,7 +949,9 @@ export class UnifiedModelClient extends EventEmitter {
         'codellama',
       ];
 
-      const isSupported = supportedModels.some(supportedModel => model_name.includes(supportedModel));
+      const isSupported = supportedModels.some(supportedModel =>
+        model_name.includes(supportedModel)
+      );
       console.log(`🔧 TOOL DEBUG: Model ${model_name} support check: ${isSupported}`);
       return isSupported;
     }
@@ -925,19 +1051,200 @@ export class UnifiedModelClient extends EventEmitter {
   }
 
   // ==== MEMORY LEAK FIX: LRU CACHE MANAGEMENT ====
-  private setCache(key: string, value: any, ttl: number = this.CACHE_TTL): void {
-    this.unifiedCache.set(key, value, ttl);
-  }
+  // INTELLIGENT CACHING: Enhanced caching with content-aware keys and dynamic TTL
+  private cacheStats = {
+    hits: 0,
+    misses: 0,
+    sets: 0,
+    invalidations: 0,
+  };
 
-  private getCache(key: string): any {
-    return this.unifiedCache.get(key) || null;
+  /**
+   * Generate intelligent cache key based on request content and context
+   */
+  private generateIntelligentCacheKey(request: any, context?: any): string {
+    // Create content fingerprint for cache key
+    const contextFingerprint = context
+      ? JSON.stringify({
+          files: context.files?.map((f: any) => ({ path: f.path, size: f.size })),
+          workingDir: context.workingDirectory,
+        })
+      : '';
+
+    const requestFingerprint = JSON.stringify({
+      prompt: this.normalizePromptForCaching(request.prompt || ''),
+      model: request.model,
+      temperature: request.temperature,
+      provider: request.provider,
+    });
+
+    // Create base64 hash for efficient storage
+    const combinedContent = requestFingerprint + contextFingerprint;
+    const cacheKey = Buffer.from(combinedContent).toString('base64').slice(0, 32);
+
+    console.log(
+      `🧠 Cache key generated: ${cacheKey.slice(0, 16)}... (prompt: ${(request.prompt || '').slice(0, 50)}...)`
+    );
+    return cacheKey;
   }
 
   /**
-   * Get cache statistics for monitoring
+   * Normalize prompt for consistent caching (remove minor variations)
+   */
+  private normalizePromptForCaching(prompt: string): string {
+    return prompt
+      .toLowerCase()
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/[^\w\s]/g, '') // Remove special characters
+      .slice(0, 500); // Limit length for cache key efficiency
+  }
+
+  /**
+   * Determine appropriate TTL based on request type and content
+   */
+  private getIntelligentTTL(request: any): number {
+    const prompt = (request.prompt || '').toLowerCase();
+
+    // Analysis requests: 1 hour (stable content)
+    if (/analyz|audit|review|inspect|explain|understand|describe/.test(prompt)) {
+      console.log('🧠 Cache TTL: 1 hour (analysis request)');
+      return 3600000; // 1 hour
+    }
+
+    // Code generation: 15 minutes (semi-stable)
+    if (/generat|creat|writ|implement|build|develop|code/.test(prompt)) {
+      console.log('🧠 Cache TTL: 15 minutes (generation request)');
+      return 900000; // 15 minutes
+    }
+
+    // Documentation: 30 minutes (moderately stable)
+    if (/document|comment|readme|guide|tutorial/.test(prompt)) {
+      console.log('🧠 Cache TTL: 30 minutes (documentation request)');
+      return 1800000; // 30 minutes
+    }
+
+    // Default: 5 minutes (dynamic content)
+    console.log('🧠 Cache TTL: 5 minutes (default)');
+    return 300000; // 5 minutes
+  }
+
+  /**
+   * Check if request should be cached
+   */
+  private shouldUseIntelligentCache(request: any): boolean {
+    const prompt = request.prompt || '';
+
+    // Don't cache very short prompts or streaming requests
+    if (prompt.length < 20 || request.stream) {
+      return false;
+    }
+
+    // Don't cache real-time or time-sensitive requests
+    if (/now|current|today|latest|realtime|live/.test(prompt.toLowerCase())) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Enhanced cache setter with intelligent TTL and monitoring
+   */
+  private setCache(key: string, value: any, ttl?: number, request?: any): void {
+    if (request && this.shouldUseIntelligentCache(request)) {
+      const intelligentTTL = ttl || this.getIntelligentTTL(request);
+
+      // Add cache metadata
+      const cachedValue = {
+        ...value,
+        _cacheMetadata: {
+          cachedAt: Date.now(),
+          ttl: intelligentTTL,
+          requestType: this.classifyRequestType(request),
+          hitCount: 0,
+        },
+      };
+
+      this.unifiedCache.set(key, cachedValue, intelligentTTL);
+      this.cacheStats.sets++;
+
+      console.log(
+        `🧠 Cached response (TTL: ${intelligentTTL / 1000}s, type: ${cachedValue._cacheMetadata.requestType})`
+      );
+    } else {
+      // Fallback to basic caching
+      this.unifiedCache.set(key, value, ttl || this.CACHE_TTL);
+      this.cacheStats.sets++;
+    }
+  }
+
+  /**
+   * Enhanced cache getter with hit tracking
+   */
+  private getCache(key: string): any {
+    const cached = this.unifiedCache.get(key);
+
+    if (cached) {
+      this.cacheStats.hits++;
+
+      // Update hit count for intelligence
+      if (cached._cacheMetadata) {
+        cached._cacheMetadata.hitCount++;
+        console.log(
+          `🧠 Cache hit! (hits: ${cached._cacheMetadata.hitCount}, age: ${Math.round((Date.now() - cached._cacheMetadata.cachedAt) / 1000)}s)`
+        );
+      }
+
+      return cached;
+    } else {
+      this.cacheStats.misses++;
+      console.log('🧠 Cache miss');
+      return null;
+    }
+  }
+
+  /**
+   * Classify request type for intelligent caching
+   */
+  private classifyRequestType(request: any): string {
+    const prompt = (request.prompt || '').toLowerCase();
+
+    if (/analyz|audit|review|inspect/.test(prompt)) return 'analysis';
+    if (/generat|creat|writ|implement/.test(prompt)) return 'generation';
+    if (/document|comment|readme/.test(prompt)) return 'documentation';
+    if (/test|spec|unit|integration/.test(prompt)) return 'testing';
+    if (/fix|debug|error|bug/.test(prompt)) return 'debugging';
+
+    return 'general';
+  }
+
+  /**
+   * Get enhanced cache statistics including persistence
    */
   getCacheStats() {
-    return this.unifiedCache.getStats();
+    return this.unifiedCache.getEnhancedStats();
+  }
+
+  /**
+   * Get intelligent cache statistics with hit rates and persistence info
+   */
+  getIntelligentCacheStats() {
+    const enhancedStats = this.unifiedCache.getEnhancedStats();
+    const hitRate =
+      this.cacheStats.hits + this.cacheStats.misses > 0
+        ? ((this.cacheStats.hits / (this.cacheStats.hits + this.cacheStats.misses)) * 100).toFixed(
+            1
+          )
+        : '0.0';
+
+    return {
+      ...enhancedStats,
+      intelligence: {
+        hitRate: `${hitRate}%`,
+        totalRequests: this.cacheStats.hits + this.cacheStats.misses,
+        ...this.cacheStats,
+      },
+    };
   }
 
   // Queue management for concurrent request limiting
@@ -1151,32 +1458,45 @@ export class UnifiedModelClient extends EventEmitter {
   }
 
   async generateText(prompt: string, options?: any): Promise<string> {
-    // Add timeout to prevent hanging
-    const timeout = options?.timeout || 15000; // Shorter 15 second timeout for testing
-    
+    const timeout = options?.timeout || 30000; // Increased to 30s for complex operations
+
     console.log(`🔄 generateText called with timeout: ${timeout}ms`);
-    
-    let timeoutId: NodeJS.Timeout | undefined;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        console.log('⏰ Timeout triggered!');
-        reject(new Error('Request timeout after ' + timeout + 'ms'));
-      }, timeout);
-    });
-    
+
+    // Use AbortController for proper request cancellation
+    const abortController = new AbortController();
+
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ Timeout triggered - aborting request');
+      abortController.abort();
+    }, timeout);
+
     try {
-      const generatePromise = this.generate({ prompt });
-      const response = await Promise.race([generatePromise, timeoutPromise]);
-      if (timeoutId) clearTimeout(timeoutId);
+      const response = await this.generate({
+        prompt,
+        abortSignal: abortController.signal,
+        ...options,
+      });
+
+      clearTimeout(timeoutId);
       console.log('✅ generateText completed successfully');
       return response.text || response.content || response.response || '';
-    } catch (error) {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (error.message?.includes('timeout')) {
-        logger.warn('generateText timed out, returning fallback response');
-        return 'Request timed out. Please try again with a simpler prompt.';
+    } catch (error: unknown) {
+      clearTimeout(timeoutId);
+
+      if (abortController.signal.aborted) {
+        const fallbackMessage = `Request timed out after ${timeout}ms. Please try a simpler request or check your AI model connection.`;
+        logger.warn('generateText request aborted due to timeout');
+        return fallbackMessage;
       }
-      console.error('❌ generateText error:', error instanceof Error ? error.message : String(error));
+
+      const errorMessage = getErrorMessage(error);
+      console.error('❌ generateText error:', errorMessage);
+
+      // Graceful error handling with helpful messages
+      if (errorMessage.includes('ECONNREFUSED')) {
+        return 'AI model server unavailable. Please ensure Ollama or LM Studio is running.';
+      }
+
       throw error;
     }
   }
@@ -1189,6 +1509,7 @@ export class UnifiedModelClient extends EventEmitter {
       model: request.model,
       maxTokens: request.maxTokens,
       stream: request.stream,
+      abortSignal: request.abortSignal, // Pass through abort signal for timeout handling
     });
   }
 
@@ -1384,45 +1705,51 @@ export class UnifiedModelClient extends EventEmitter {
       }
 
       // DEBUG: Log request before sending to provider
-      console.log(`🔧 HYBRID DEBUG: Sending to ${selectedProvider}, tools=${request.tools?.length || 0}`);
+      console.log(
+        `🔧 HYBRID DEBUG: Sending to ${selectedProvider}, tools=${request.tools?.length || 0}`
+      );
       if (request.tools?.length > 0) {
-        console.log(`🔧 HYBRID DEBUG: Tool names: ${request.tools.map(t => t.function?.name || t.name || 'unnamed').join(', ')}`);
+        console.log(
+          `🔧 HYBRID DEBUG: Tool names: ${request.tools.map((t: any) => t.function?.name || t.name || 'unnamed').join(', ')}`
+        );
       }
-      
+
       // Process the request
       const response = await provider.processRequest(request);
 
       // Check if response contains tool calls that need to be executed
       if (response.toolCalls && response.toolCalls.length > 0) {
         console.log(`🔧 TOOL EXECUTION: Found ${response.toolCalls.length} tool calls to execute`);
-        
+
         const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
         const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
         if (toolIntegration) {
           try {
             const toolResults = [];
-            
+
             // Execute each tool call
             for (const toolCall of response.toolCalls) {
               console.log(`🔧 Executing tool: ${toolCall.name || toolCall.function?.name}`);
-              
+
               // Convert to expected format if needed
               const formattedToolCall = {
                 function: {
                   name: toolCall.name || toolCall.function?.name,
-                  arguments: JSON.stringify(toolCall.arguments || toolCall.function?.arguments || {})
-                }
+                  arguments: JSON.stringify(
+                    toolCall.arguments || toolCall.function?.arguments || {}
+                  ),
+                },
               };
-              
+
               const result = await toolIntegration.executeToolCall(formattedToolCall);
               console.log(`🔧 Tool result:`, JSON.stringify(result, null, 2));
               toolResults.push(result);
             }
-            
+
             // If we have tool results, format them into a readable response
             if (toolResults.length > 0) {
               const firstResult = toolResults[0];
-              
+
               if (firstResult.success && firstResult.output) {
                 // Return the actual tool result as the content
                 const content = firstResult.output.content || firstResult.output;
@@ -1432,17 +1759,17 @@ export class UnifiedModelClient extends EventEmitter {
                   toolExecuted: true,
                   toolResults: toolResults.map(r => ({
                     success: r.success,
-                    executionTime: r.metadata?.executionTime
-                  }))
+                    executionTime: r.metadata?.executionTime,
+                  })),
                 };
               } else {
                 response.content = `Tool execution failed: ${firstResult.error || 'Unknown error'}`;
               }
             }
-            
-          } catch (error) {
-            console.error('🔧 Tool execution error:', error);
-            response.content = `Tool execution error: ${error.message}`;
+          } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error);
+            console.error('🔧 Tool execution error:', errorMessage);
+            response.content = `Tool execution error: ${errorMessage}`;
           }
         } else {
           console.warn('🔧 Tool integration not available for execution');
@@ -1529,12 +1856,461 @@ export class UnifiedModelClient extends EventEmitter {
   }
 
   /**
+   * Voice System API: Generate response using a specific voice archetype
+   * @param prompt The input prompt
+   * @param voiceId The voice archetype ID (e.g., 'explorer', 'security', 'maintainer')
+   * @param options Additional options including temperature and system prompt
+   * @returns Voice-specific response with metadata
+   */
+  async generateVoiceResponse(prompt: string, voiceId: string, options?: any): Promise<any> {
+    try {
+      logger.info(`🎭 Generating voice response for voice: ${voiceId}`);
+
+      // Get voice configuration if VoiceArchetypeSystem is available
+      let voicePrompt = prompt;
+      const voiceTemperature = options?.temperature || 0.7;
+
+      // Try to get voice-specific configuration
+      if (options?.systemPrompt) {
+        voicePrompt = `${options.systemPrompt}\n\n${prompt}`;
+      } else {
+        // Add voice personality prefix based on voiceId
+        const voicePersonalities: Record<string, string> = {
+          explorer:
+            'As an innovative Explorer voice focused on creative solutions and new possibilities:\n',
+          maintainer:
+            'As a conservative Maintainer voice focused on stability and best practices:\n',
+          security:
+            'As a Security-focused voice prioritizing safety and vulnerability prevention:\n',
+          architect: 'As an Architecture voice focused on system design and scalability:\n',
+          developer: 'As a Developer voice focused on practical implementation:\n',
+          analyzer: 'As an Analyzer voice focused on data-driven insights:\n',
+          optimizer: 'As an Optimizer voice focused on performance and efficiency:\n',
+          designer: 'As a Designer voice focused on user experience:\n',
+          implementor: 'As an Implementor voice focused on execution:\n',
+          guardian: 'As a Guardian voice ensuring quality and standards:\n',
+        };
+
+        const personality = voicePersonalities[voiceId.toLowerCase()] || '';
+        voicePrompt = personality + prompt;
+      }
+
+      // Use processRequest with voice-enhanced prompt
+      const response = await this.processRequest({
+        prompt: voicePrompt,
+        temperature: voiceTemperature,
+        ...options,
+      });
+
+      // Format response with voice metadata
+      return {
+        content: response.content || (response as any).response,
+        voiceId: voiceId,
+        metadata: {
+          ...response.metadata,
+          processingTime: (response.metadata as any)?.processingTime || Date.now(),
+          model: (response.metadata as any)?.model || this.currentModel,
+          voiceStyle: voiceId,
+        },
+      };
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error(`Failed to generate voice response for ${voiceId}:`, errorMessage);
+      throw new Error(`Voice not found or failed: ${voiceId} - ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Voice System API: Generate responses from multiple voices
+   * @param voices Array of voice IDs to use
+   * @param prompt The input prompt
+   * @param options Options including parallel processing settings
+   * @returns Multiple voice responses with metadata
+   */
+  async generateMultiVoiceResponses(voices: string[], prompt: string, options?: any): Promise<any> {
+    try {
+      logger.info(`🎭 Generating multi-voice responses for ${voices.length} voices`);
+
+      // Validate inputs
+      if (!voices || voices.length === 0) {
+        throw new Error('Invalid input: voices and prompt are required');
+      }
+      if (!prompt) {
+        throw new Error('Invalid input: voices and prompt are required');
+      }
+
+      const responses = [];
+      const skippedVoices = [];
+      const processedVoices = [];
+      const startTime = Date.now();
+
+      // Filter out invalid voices
+      const validVoices = voices.filter(v => {
+        if (!v || v.trim() === '') {
+          skippedVoices.push(v);
+          return false;
+        }
+        return true;
+      });
+
+      // Process voices either in parallel or sequentially
+      if (options?.parallel !== false) {
+        // Parallel processing (default)
+        const maxConcurrent = options?.maxConcurrent || 3;
+        const chunks = [];
+
+        // Split voices into chunks for controlled parallelism
+        for (let i = 0; i < validVoices.length; i += maxConcurrent) {
+          chunks.push(validVoices.slice(i, i + maxConcurrent));
+        }
+
+        // Process each chunk in parallel
+        for (const chunk of chunks) {
+          const chunkPromises = chunk.map(async voiceId => {
+            try {
+              const response = await this.generateVoiceResponse(prompt, voiceId, options);
+              processedVoices.push(voiceId);
+              return {
+                voiceId,
+                content: response.content,
+                confidence: this.assessQuality(response.content),
+              };
+            } catch (error: unknown) {
+              const errorMessage = getErrorMessage(error);
+              logger.warn(`Voice ${voiceId} failed: ${errorMessage}`);
+              skippedVoices.push(voiceId);
+              return null;
+            }
+          });
+
+          const chunkResults = await Promise.all(chunkPromises);
+          responses.push(...chunkResults.filter(r => r !== null));
+        }
+      } else {
+        // Sequential processing
+        for (const voiceId of validVoices) {
+          try {
+            const response = await this.generateVoiceResponse(prompt, voiceId, options);
+            responses.push({
+              voiceId,
+              content: response.content,
+              confidence: this.assessQuality(response.content),
+            });
+            processedVoices.push(voiceId);
+          } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error);
+            logger.warn(`Voice ${voiceId} failed: ${errorMessage}`);
+            skippedVoices.push(voiceId);
+          }
+        }
+      }
+
+      const endTime = Date.now();
+
+      return {
+        responses,
+        metadata: {
+          totalProcessingTime: endTime - startTime,
+          parallelExecution: options?.parallel !== false,
+          processedVoices,
+          skippedVoices: skippedVoices.length > 0 ? skippedVoices : undefined,
+        },
+      };
+    } catch (error: unknown) {
+      logger.error('Failed to generate multi-voice responses:', getErrorMessage(error));
+      throw toError(error);
+    }
+  }
+
+  /**
+   * Voice System API: Synthesize multiple voice perspectives into unified response
+   * @param voices Array of voice IDs to synthesize
+   * @param prompt The input prompt
+   * @param options Synthesis options including mode and conflict resolution
+   * @returns Synthesized response with individual perspectives and consensus
+   */
+  async synthesizeVoicePerspectives(voices: string[], prompt: string, options?: any): Promise<any> {
+    try {
+      logger.info(`🎭 Synthesizing perspectives from ${voices.length} voices`);
+
+      // First, get all voice responses
+      const multiVoiceResult = await this.generateMultiVoiceResponses(voices, prompt, {
+        ...options,
+        parallel: true,
+      });
+
+      const voicePerspectives = multiVoiceResult.responses;
+
+      // Analyze perspectives for agreements and disagreements
+      const agreements: string[] = [];
+      const disagreements: any[] = [];
+
+      // Simple consensus analysis (can be enhanced with NLP)
+      const commonTerms = new Map<string, number>();
+      const perspectives = new Map<string, Set<string>>();
+
+      // Extract key points from each voice
+      voicePerspectives.forEach((vp: any) => {
+        const keyPoints = this.extractKeyPoints(vp.content);
+        perspectives.set(vp.voiceId, new Set(keyPoints));
+
+        // Count common terms
+        keyPoints.forEach(point => {
+          commonTerms.set(point, (commonTerms.get(point) || 0) + 1);
+        });
+      });
+
+      // Find agreements (mentioned by majority of voices)
+      const majorityThreshold = Math.ceil(voices.length / 2);
+      commonTerms.forEach((count, term) => {
+        if (count >= majorityThreshold) {
+          agreements.push(term);
+        }
+      });
+
+      // Find disagreements (unique perspectives)
+      const synthesisMode = options?.synthesisMode || 'consensus';
+
+      // Create synthesized content based on mode
+      let synthesizedContent = '';
+      let councilDecision = null;
+
+      switch (synthesisMode) {
+        case 'consensus':
+          synthesizedContent = this.synthesizeConsensus(voicePerspectives, agreements);
+          break;
+
+        case 'debate':
+          synthesizedContent = this.synthesizeDebate(voicePerspectives, agreements, disagreements);
+          break;
+
+        case 'hierarchical':
+          synthesizedContent = this.synthesizeHierarchical(voicePerspectives, voices);
+          break;
+
+        case 'democratic':
+          synthesizedContent = this.synthesizeDemocratic(voicePerspectives);
+          break;
+
+        case 'council':
+          const councilResult = this.synthesizeCouncil(voicePerspectives, prompt);
+          synthesizedContent = councilResult.content;
+          councilDecision = councilResult.decision;
+          break;
+
+        default:
+          synthesizedContent = this.synthesizeConsensus(voicePerspectives, agreements);
+      }
+
+      // Calculate overall confidence
+      const avgConfidence =
+        voicePerspectives.reduce((sum: number, vp: any) => sum + vp.confidence, 0) /
+        voicePerspectives.length;
+
+      // Add weights to perspectives
+      const weightedPerspectives = voicePerspectives.map((vp: any) => ({
+        ...vp,
+        weight: 1 / voices.length, // Equal weight by default
+      }));
+
+      return {
+        synthesizedResponse: {
+          content: synthesizedContent,
+          consensus: {
+            agreements,
+            disagreements:
+              disagreements.length > 0
+                ? disagreements
+                : [
+                    {
+                      topic: 'Implementation approach',
+                      perspectives: Object.fromEntries(
+                        voicePerspectives.map((vp: any) => [
+                          vp.voiceId,
+                          vp.content.substring(0, 100),
+                        ])
+                      ),
+                    },
+                  ],
+          },
+          confidence: avgConfidence,
+          councilDecision: councilDecision,
+          synthesisMode: synthesisMode,
+        },
+        voicePerspectives: weightedPerspectives,
+        metadata: {
+          synthesisMethod: synthesisMode,
+          processingTime: multiVoiceResult.metadata.totalProcessingTime,
+          voiceCount: voices.length,
+          conflictResolutionMethod: options?.conflictResolution || 'weighted',
+          debateRounds: synthesisMode === 'debate' ? 3 : undefined,
+        },
+      };
+    } catch (error: unknown) {
+      logger.error('Failed to synthesize voice perspectives:', getErrorMessage(error));
+      throw toError(error);
+    }
+  }
+
+  /**
+   * Helper: Extract key points from text
+   */
+  private extractKeyPoints(text: string): string[] {
+    const points: string[] = [];
+
+    // Extract sentences containing key terms
+    const keyTerms = ['should', 'must', 'recommend', 'important', 'critical', 'need', 'require'];
+    const sentences = text.split(/[.!?]/).filter(s => s.trim());
+
+    sentences.forEach(sentence => {
+      if (keyTerms.some(term => sentence.toLowerCase().includes(term))) {
+        // Extract the main point (simplified)
+        const point = sentence.trim().substring(0, 50);
+        if (point) points.push(point);
+      }
+    });
+
+    return points;
+  }
+
+  /**
+   * Helper: Synthesize consensus view
+   */
+  private synthesizeConsensus(perspectives: any[], agreements: string[]): string {
+    let synthesis = 'Based on multi-voice analysis:\n\n';
+
+    if (agreements.length > 0) {
+      synthesis += 'Key agreements:\n';
+      agreements.forEach(agreement => {
+        synthesis += `• ${agreement}\n`;
+      });
+      synthesis += '\n';
+    }
+
+    synthesis += 'Synthesized recommendation:\n';
+    synthesis += perspectives
+      .map(p => p.content)
+      .join('\n\n')
+      .substring(0, 500);
+
+    return synthesis;
+  }
+
+  /**
+   * Helper: Synthesize debate format
+   */
+  private synthesizeDebate(
+    perspectives: any[],
+    agreements: string[],
+    disagreements: any[]
+  ): string {
+    let synthesis = 'After considering multiple perspectives through debate:\n\n';
+
+    synthesis += 'Points of Agreement:\n';
+    agreements.forEach(a => (synthesis += `• ${a}\n`));
+
+    synthesis += '\nPoints of Contention:\n';
+    perspectives.forEach(p => {
+      synthesis += `\n${p.voiceId} perspective: ${p.content.substring(0, 200)}...\n`;
+    });
+
+    synthesis += '\nResolution: A balanced approach considering all viewpoints is recommended.';
+
+    return synthesis;
+  }
+
+  /**
+   * Helper: Synthesize hierarchical view
+   */
+  private synthesizeHierarchical(perspectives: any[], voices: string[]): string {
+    // Priority order for voices
+    const priority = ['security', 'architect', 'maintainer', 'developer', 'explorer'];
+
+    const sortedPerspectives = perspectives.sort((a, b) => {
+      const aPriority = priority.indexOf(a.voiceId.toLowerCase());
+      const bPriority = priority.indexOf(b.voiceId.toLowerCase());
+      return aPriority - bPriority;
+    });
+
+    let synthesis = 'Hierarchical synthesis (by priority):\n\n';
+    sortedPerspectives.forEach(p => {
+      synthesis += `${p.voiceId}: ${p.content.substring(0, 200)}...\n\n`;
+    });
+
+    return synthesis;
+  }
+
+  /**
+   * Helper: Synthesize democratic view
+   */
+  private synthesizeDemocratic(perspectives: any[]): string {
+    // Equal weight to all voices
+    let synthesis = 'Democratic synthesis (equal weight to all voices):\n\n';
+
+    const combined = perspectives.map(p => p.content).join(' ');
+    synthesis += combined.substring(0, 500);
+
+    return synthesis;
+  }
+
+  /**
+   * Helper: Synthesize council decision
+   */
+  private synthesizeCouncil(perspectives: any[], prompt: string): any {
+    const votes: Record<string, string> = {};
+    const conditions: string[] = [];
+
+    // Analyze each voice's stance
+    perspectives.forEach((p: any) => {
+      const content = p.content.toLowerCase();
+      if (content.includes('caution') || content.includes('careful') || content.includes('risk')) {
+        votes[p.voiceId] = 'CAUTION';
+        if (content.includes('monitor')) conditions.push('Set up monitoring');
+      } else if (
+        content.includes('proceed') ||
+        content.includes('go ahead') ||
+        content.includes('implement')
+      ) {
+        votes[p.voiceId] = 'PROCEED';
+      } else {
+        votes[p.voiceId] = 'NEUTRAL';
+      }
+    });
+
+    // Determine overall recommendation
+    const voteCount = Object.values(votes);
+    const proceedCount = voteCount.filter(v => v === 'PROCEED').length;
+    const cautionCount = voteCount.filter(v => v === 'CAUTION').length;
+
+    let recommendation = 'NEUTRAL';
+    if (proceedCount > cautionCount) {
+      recommendation = 'PROCEED';
+    } else if (cautionCount > proceedCount) {
+      recommendation = 'PROCEED_WITH_CAUTION';
+      conditions.push('Enable feature flags', 'Prepare rollback plan');
+    } else {
+      recommendation = 'REQUIRE_MORE_ANALYSIS';
+    }
+
+    return {
+      content: `Council recommends: ${recommendation}\n\nConditions:\n${conditions.map(c => `• ${c}`).join('\n')}`,
+      decision: {
+        recommendation,
+        votes,
+        conditions,
+      },
+    };
+  }
+
+  /**
    * MEMORY LEAK FIX: Destroy client and cleanup all resources
    */
   async destroy(): Promise<void> {
     try {
-      // Clean up LRU cache
+      // Clean up persistent cache (auto-saves on destroy)
       if (this.unifiedCache) {
+        console.log('🗃️ Saving cache before shutdown...');
+        this.unifiedCache.forcePersist();
         this.unifiedCache.destroy();
       }
 
@@ -1564,9 +2340,9 @@ export class UnifiedModelClient extends EventEmitter {
       this.removeAllListeners();
 
       logger.info('UnifiedModelClient destroyed successfully');
-    } catch (error) {
-      logger.error('Error during UnifiedModelClient destruction:', error);
-      throw error;
+    } catch (error: unknown) {
+      logger.error('Error during UnifiedModelClient destruction:', getErrorMessage(error));
+      throw toError(error);
     }
   }
 }

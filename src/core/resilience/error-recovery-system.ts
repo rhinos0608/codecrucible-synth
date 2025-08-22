@@ -5,6 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
+import { getErrorMessage } from '../../utils/error-utils.js';
 
 export interface ErrorContext {
   operation: string;
@@ -205,9 +206,9 @@ export class ErrorRecoverySystem extends EventEmitter {
           this.emit('recovery:success', { error, context, action, result });
           return result;
         }
-      } catch (recoveryError) {
+      } catch (recoveryError: unknown) {
         this.logger.warn(`Recovery action failed: ${action.description}`, {
-          error: recoveryError.message,
+          error: getErrorMessage(recoveryError),
         });
       }
     }

@@ -9,6 +9,7 @@ import {
   SecurityAuditLogger,
   AuditEventType,
   AuditSeverity,
+  AuditOutcome,
 } from '../core/security/security-audit-logger.js';
 import { PerformanceMonitor } from '../core/performance/performance-monitor.js';
 
@@ -257,7 +258,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
       this.auditLogger.logEvent(
         AuditEventType.SYSTEM_EVENT,
         AuditSeverity.MEDIUM,
-        'INFO',
+        AuditOutcome.SUCCESS,
         'enterprise-deployment-system',
         'deployment_start',
         plan.version,
@@ -729,7 +730,13 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
       strategy: string;
       activeInstances: number;
     };
-    deploymentHistory: typeof this.deploymentHistory;
+    deploymentHistory: Array<{
+      version: string;
+      environment: string;
+      timestamp: number;
+      success: boolean;
+      duration: number;
+    }>;
   } {
     const instances = Array.from(this.instances.values());
     const health = instances.reduce(

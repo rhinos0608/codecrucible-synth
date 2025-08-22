@@ -168,9 +168,9 @@ export interface RAGConfig {
 export class VectorRAGSystem extends EventEmitter {
   private logger: Logger;
   private config: RAGConfig;
-  private vectorStore: VectorStore;
-  private embeddingModel: EmbeddingModel;
-  private codeChunker: CodeChunker;
+  private vectorStore!: VectorStore;
+  private embeddingModel!: EmbeddingModel;
+  private codeChunker!: CodeChunker;
   private modelClient: UnifiedModelClient;
   private fileWatcher?: chokidar.FSWatcher;
   private embeddingCache: Map<string, number[]> = new Map();

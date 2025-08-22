@@ -107,23 +107,25 @@ export class SecurityUtils {
         }
       }
 
-      // Check for suspicious file operations
-      const suspiciousFileOps = [
-        /\.\.\//, // Directory traversal
-        /\/etc\/passwd/, // System files
-        /\/proc\//, // Process information
-        /\/sys\//, // System information
-        /C:\\Windows\\/, // Windows system
-        /\/bin\//, // System binaries
-      ];
+      // Check for suspicious file operations (skip if legitimate code analysis)
+      if (!isCodeAnalysis) {
+        const suspiciousFileOps = [
+          /\.\.\//, // Directory traversal
+          /\/etc\/passwd/, // System files
+          /\/proc\//, // Process information
+          /\/sys\//, // System information
+          /C:\\Windows\\/, // Windows system
+          /\/bin\//, // System binaries
+        ];
 
-      for (const pattern of suspiciousFileOps) {
-        if (pattern.test(input)) {
-          return {
-            isValid: false,
-            reason: 'Input contains suspicious file operation patterns',
-            riskLevel: 'high',
-          };
+        for (const pattern of suspiciousFileOps) {
+          if (pattern.test(input)) {
+            return {
+              isValid: false,
+              reason: 'Input contains suspicious file operation patterns',
+              riskLevel: 'high',
+            };
+          }
         }
       }
 
@@ -544,6 +546,17 @@ export class SecurityUtils {
       /potential\s+issues/gi,
       /security\s+concerns/gi,
       /\.(js|ts|tsx|jsx|py|java|cpp|c|h|css|html|json|md|yml|yaml)\s+code\s+file/gi,
+      // Voice archetype patterns
+      /You are .* Voice.*focused on.*analysis/gi,
+      /analyzer voice/gi,
+      /specialized.*CLI agent/gi,
+      /performance analysis/gi,
+      /code quality assessment/gi,
+      /architectural analysis/gi,
+      /security analysis/gi,
+      /file analysis/gi,
+      /src\/.*\.ts/gi, // Source file paths
+      /dist\/.*\.js/gi, // Distribution file paths
     ];
 
     // Check for legitimate code patterns

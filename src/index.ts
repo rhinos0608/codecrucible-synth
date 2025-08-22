@@ -4,9 +4,25 @@ import { UnifiedModelClient, UnifiedClientConfig } from './core/client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { getErrorMessage } from './utils/error-utils.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 // Fix EventEmitter memory leak warning
 process.setMaxListeners(50);
+
+// Get package version
+function getPackageVersion(): string {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const packagePath = join(__dirname, '..', 'package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+    return packageJson.version;
+  } catch {
+    return '4.0.3'; // Fallback version
+  }
+}
 
 export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLIContext }> {
   try {
@@ -166,7 +182,7 @@ export async function main() {
     }
 
     if (args.includes('--version') || args.includes('-v')) {
-      console.log('CodeCrucible Synth v3.8.9');
+      console.log(`CodeCrucible Synth v${getPackageVersion()}`);
       return;
     }
 
@@ -279,7 +295,7 @@ async function showQuickStatus() {
   console.log('📊 CodeCrucible Synth Status');
   console.log('━'.repeat(40));
 
-  console.log(`Version: 3.8.9`);
+  console.log(`Version: ${getPackageVersion()}`);
   console.log(`Node.js: ${process.version}`);
   console.log(`Platform: ${process.platform}`);
 

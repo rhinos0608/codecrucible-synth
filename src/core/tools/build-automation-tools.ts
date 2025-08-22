@@ -129,15 +129,17 @@ export class BuildAutomatorTool extends BaseTool {
     const scripts = packageJson.scripts || {};
 
     switch (buildTool) {
-      case 'npm':
+      case 'npm': {
         if (scripts.build) return `npm run build${watch ? ':watch' : ''}`;
         if (scripts.compile) return 'npm run compile';
         return 'npm run build'; // Will fail if no build script
+      }
 
-      case 'yarn':
+      case 'yarn': {
         if (scripts.build) return `yarn build${watch ? ':watch' : ''}`;
         if (scripts.compile) return 'yarn compile';
         return 'yarn build';
+      }
 
       case 'webpack': {
         let webpackCmd = 'npx webpack';
@@ -149,9 +151,10 @@ export class BuildAutomatorTool extends BaseTool {
         return webpackCmd;
       }
 
-      case 'vite':
+      case 'vite': {
         if (watch) return 'npx vite';
         return 'npx vite build';
+      }
 
       case 'rollup': {
         let rollupCmd = 'npx rollup -c';

@@ -927,17 +927,17 @@ if (!isMainThread && parentPort) {
       }
     }
   });
+}
 
-  async function executeTaskInWorker(task: IsolatedTaskRequest): Promise<any> {
-    // Isolated execution logic
-    switch (task.type) {
-      case 'analysis':
-        return `Worker analysis result for ${task.payload?.prompt || 'unknown'}`;
-      case 'generation':
-        return `Worker generated content for ${task.payload?.prompt || 'unknown'}`;
-      default:
-        throw new Error(`Unsupported task type in worker: ${task.type}`);
-    }
+// Isolated execution logic for worker threads
+async function executeTaskInWorker(task: IsolatedTaskRequest): Promise<any> {
+  switch (task.type) {
+    case 'analysis':
+      return `Worker analysis result for ${task.payload?.prompt || 'unknown'}`;
+    case 'generation':
+      return `Worker generated content for ${task.payload?.prompt || 'unknown'}`;
+    default:
+      throw new Error(`Unsupported task type in worker: ${task.type}`);
   }
 }
 

@@ -576,7 +576,8 @@ export class AdvancedInputValidator {
 
     // Remove control characters
     if (options.removeControlChars) {
-      sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, '');
+      // Remove ASCII control characters (0-31) and DEL (127)
+      sanitized = sanitized.replace(/[\u0000-\u001F\u007F]/g, '');
     }
 
     // Remove HTML tags

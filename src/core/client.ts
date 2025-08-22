@@ -15,7 +15,7 @@ import {
   ModelResponse,
   UnifiedClientConfig as BaseUnifiedClientConfig,
 } from './types.js';
-import { SecurityUtils } from './security.js';
+import { SecurityValidator, ISecurityValidator } from './security/security-validator.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 import {
   IntegratedCodeCrucibleSystem,
@@ -28,15 +28,16 @@ import { ActiveProcessManager, ActiveProcess } from './performance/active-proces
 import { unifiedCache } from './cache/unified-cache-system.js';
 import { HybridLLMRouter, HybridConfig } from './hybrid/hybrid-llm-router.js';
 import { intelligentBatchProcessor } from './performance/intelligent-batch-processor.js';
-import { ProviderRepository, ProviderType, IProviderRepository } from './providers/provider-repository.js';
-import { getErrorMessage, isError, toError } from '../utils/error-utils.js';
-import { createHash } from 'crypto';
-import { StreamingManager, IStreamingManager } from './streaming/streaming-manager.js';
 import {
   ProviderRepository,
+  ProviderType,
   IProviderRepository,
   ProviderConfig,
 } from './providers/provider-repository.js';
+import { getErrorMessage, isError, toError } from '../utils/error-utils.js';
+import { createHash } from 'crypto';
+import { StreamingManager, IStreamingManager } from './streaming/streaming-manager.js';
+import { CacheCoordinator, ICacheCoordinator } from './caching/cache-coordinator.js';
 
 // Import streaming interfaces from extracted module
 import type { StreamToken, StreamConfig, StreamMetrics } from './streaming/streaming-manager.js';
@@ -119,7 +120,7 @@ export class UnifiedModelClient extends EventEmitter {
   // Provider management extracted to ProviderRepository
   private providerRepository: IProviderRepository;
   private performanceMonitor: PerformanceMonitor;
-  private securityUtils: SecurityUtils;
+  private securityValidator: ISecurityValidator;
   private activeRequests: Map<string, RequestMetrics> = new Map();
   private requestQueue: Array<{
     id: string;
@@ -129,13 +130,8 @@ export class UnifiedModelClient extends EventEmitter {
   }> = [];
   private isProcessingQueue = false;
 
-  // PERSISTENT CACHING: Enhanced caching with cross-session persistence
-  private cache = unifiedCache;
-  private readonly CACHE_TTL = 300000; // 5 minutes
-  private readonly MAX_CACHE_SIZE = 500;
-
-  // OPTIMIZED: Cached health checks
-  private healthCheckCache: Map<string, { healthy: boolean; timestamp: number }> = new Map();
+  // Cache management extracted to CacheCoordinator
+  private cacheCoordinator: ICacheCoordinator;
 
   // Hardware-aware model management
   private hardwareSelector: HardwareAwareModelSelector;
@@ -176,7 +172,10 @@ export class UnifiedModelClient extends EventEmitter {
       ...config,
     };
     this.performanceMonitor = new PerformanceMonitor();
-    this.securityUtils = new SecurityUtils();
+    this.securityValidator = new SecurityValidator({
+      enableSandbox: this.config.security?.enableSandbox,
+      maxInputLength: this.config.security?.maxInputLength,
+    });
 
     // Initialize hardware-aware components
     this.hardwareSelector = new HardwareAwareModelSelector();
@@ -188,7 +187,8 @@ export class UnifiedModelClient extends EventEmitter {
     // Initialize provider repository for extracted provider management
     this.providerRepository = new ProviderRepository();
 
-    // Using unified cache system singleton (no initialization needed)
+    // Initialize cache coordinator for centralized caching
+    this.cacheCoordinator = new CacheCoordinator();
 
     // HYBRID ARCHITECTURE: Initialize hybrid router for intelligent LLM selection
     this.initializeHybridRouter();
@@ -363,7 +363,7 @@ export class UnifiedModelClient extends EventEmitter {
           ),
         ]);
 
-        this.providers.set(providerConfig.type, provider);
+        await this.providerRepository.initialize([providerConfig]);
         const duration = Date.now() - providerStartTime;
 
         initResults.set(providerConfig.type, { success: true, duration });
@@ -394,7 +394,7 @@ export class UnifiedModelClient extends EventEmitter {
     const results = await Promise.allSettled(initPromises);
 
     const totalDuration = Date.now() - startTime;
-    const successCount = this.providers.size;
+    const successCount = this.providerRepository.getAvailableProviders().size;
     const totalCount = this.config.providers.length;
 
     console.log(
@@ -413,10 +413,10 @@ export class UnifiedModelClient extends EventEmitter {
       }
     }
 
-    if (this.providers.size === 0) {
+    if (this.providerRepository.getAvailableProviders().size === 0) {
       logger.warn('⚠️ No providers successfully initialized. CLI will run in degraded mode.');
       throw new Error('No providers available');
-    } else if (this.providers.size < totalCount) {
+    } else if (this.providerRepository.getAvailableProviders().size < totalCount) {
       logger.warn(
         `⚠️ Only ${successCount}/${totalCount} providers initialized. Some features may be limited.`
       );
@@ -471,9 +471,9 @@ export class UnifiedModelClient extends EventEmitter {
    */
   async synthesize(request: any): Promise<any> {
     // INTELLIGENT CACHING: Check cache with content-aware key generation
-    const cacheKey = this.generateIntelligentCacheKey(request);
-    const cached = await this.getCache(cacheKey);
-    if (cached && this.shouldUseIntelligentCache(request)) {
+    const cacheKey = this.cacheCoordinator.generateIntelligentCacheKey(request);
+    const cached = await this.cacheCoordinator.get(cacheKey);
+    if (cached && this.cacheCoordinator.shouldUseIntelligentCache(request)) {
       console.log('🧠 Returning cached response');
       return { ...cached, fromCache: true };
     }
@@ -558,8 +558,8 @@ export class UnifiedModelClient extends EventEmitter {
     };
 
     // INTELLIGENT CACHING: Cache with content-aware TTL
-    if (this.shouldUseIntelligentCache(request)) {
-      this.setCache(cacheKey, result, undefined, request);
+    if (this.cacheCoordinator.shouldUseIntelligentCache(request)) {
+      this.cacheCoordinator.set(cacheKey, result);
       console.log('🧠 Response cached with intelligent TTL');
     }
 
@@ -577,7 +577,7 @@ export class UnifiedModelClient extends EventEmitter {
   private selectProvider(model?: string): any {
     // Select provider based on model or availability
     if (model) {
-      for (const [type, provider] of this.providers) {
+      for (const [type, provider] of this.providerRepository.getAvailableProviders()) {
         if (provider.supportsModel && provider.supportsModel(model)) {
           return provider;
         }
@@ -585,7 +585,7 @@ export class UnifiedModelClient extends EventEmitter {
     }
 
     // Return first available provider
-    return this.providers.values().next().value;
+    return this.providerRepository.getAvailableProviders().values().next().value;
   }
 
   async processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
@@ -606,14 +606,9 @@ export class UnifiedModelClient extends EventEmitter {
 
     // CRITICAL SECURITY: ALWAYS validate input - cannot be bypassed
     console.log('🔄 Starting security validation...');
-    const validation = await this.securityUtils.validateInput(request.prompt);
+    const validation = await this.securityValidator.validateRequest(request);
     console.log('✅ Security validation complete');
     if (!validation.isValid) {
-      logger.error('🚨 SECURITY VIOLATION: Input validation failed', {
-        reason: validation.reason,
-        riskLevel: validation.riskLevel,
-        prompt: request.prompt.substring(0, 100) + '...',
-      });
       throw new Error(`Security validation failed: ${validation.reason}`);
     }
 
@@ -685,13 +680,8 @@ export class UnifiedModelClient extends EventEmitter {
     });
 
     // CRITICAL SECURITY: ALWAYS validate input - cannot be bypassed
-    const validation = await this.securityUtils.validateInput(request.prompt);
+    const validation = await this.securityValidator.validateRequest(request);
     if (!validation.isValid) {
-      logger.error('🚨 SECURITY VIOLATION: Input validation failed', {
-        reason: validation.reason,
-        riskLevel: validation.riskLevel,
-        prompt: request.prompt.substring(0, 100) + '...',
-      });
       throw new Error(`Security validation failed: ${validation.reason}`);
     }
 
@@ -702,10 +692,7 @@ export class UnifiedModelClient extends EventEmitter {
 
     // Check semantic cache first
     const promptKey = `ai:prompt:${createHash('sha256').update(request.prompt).digest('hex')}`;
-    const cachedResponse = await this.cache.get(promptKey, {
-      prompt: request.prompt,
-      context: context?.files?.map(f => f.path) || [],
-    });
+    const cachedResponse = await this.cacheCoordinator.get(promptKey);
 
     if (cachedResponse?.hit) {
       logger.debug('Cache hit for streaming request', {
@@ -745,18 +732,23 @@ export class UnifiedModelClient extends EventEmitter {
 
       // Real provider integration for streaming
       let responseContent: string;
-      
+
       try {
         // Use hybrid routing to get real response from available providers
-        const routingDecision = await this.hybridRouter.routeTask(request.prompt, {
-          taskType: 'general',
-          userIntent: 'code_generation',
-          expectedLength: 'medium',
-          context: context
-        });
+        if (!this.hybridRouter) {
+          throw new Error('Hybrid router not initialized');
+        }
+        const routingDecision = await this.hybridRouter.routeTask(
+          'code_generation',
+          request.prompt,
+          {
+            requiresDeepAnalysis: false,
+            estimatedProcessingTime: 10000,
+          }
+        );
         const providerResponse = await this.processRequestWithHybrid(request, routingDecision);
         responseContent = providerResponse.content || '';
-        
+
         if (!responseContent) {
           throw new Error('Provider returned empty content');
         }
@@ -765,17 +757,20 @@ export class UnifiedModelClient extends EventEmitter {
         logger.warn('Primary provider failed, attempting fallback', error);
         const availableProviders = this.providerRepository.getAvailableProviders();
         const fallbackProviderType = availableProviders.keys().next().value;
-        
+
         if (fallbackProviderType) {
           const fallbackProvider = this.providerRepository.getProvider(fallbackProviderType);
           if (fallbackProvider) {
             const fallbackResponse = await fallbackProvider.processRequest(request, context);
-            responseContent = fallbackResponse.content || 'Unable to generate response - all providers unavailable';
+            responseContent =
+              fallbackResponse.content || 'Unable to generate response - all providers unavailable';
           } else {
-            responseContent = 'No AI providers are currently available. Please check your configuration.';
+            responseContent =
+              'No AI providers are currently available. Please check your configuration.';
           }
         } else {
-          responseContent = 'No AI providers are currently available. Please check your configuration.';
+          responseContent =
+            'No AI providers are currently available. Please check your configuration.';
         }
       }
 
@@ -1033,7 +1028,7 @@ export class UnifiedModelClient extends EventEmitter {
     let lastError: Error | null = null;
 
     for (const providerType of fallbackChain) {
-      const provider = this.providers.get(providerType);
+      const provider = this.providerRepository.getProvider(providerType);
       if (!provider) {
         logger.warn(`Provider ${providerType} not available, skipping`);
         continue;
@@ -1069,13 +1064,12 @@ export class UnifiedModelClient extends EventEmitter {
 
         // PERFORMANCE: Cache successful response
         const responseKey = `ai:response:${createHash('sha256').update(request.prompt).digest('hex')}`;
-        await this.cache.set(responseKey, response.content || response.text || '', {
+        this.cacheCoordinator.set(responseKey, response.content || response.text || '', {
           ttl: 3600,
           metadata: {
-            prompt: request.prompt,
-            context: context?.files?.map(f => f.path) || [],
-            model: providerType,
-            processingTime: metrics.endTime! - metrics.startTime,
+            cachedAt: Date.now(),
+            requestType: 'general',
+            hitCount: 0,
           },
         });
 
@@ -1113,200 +1107,24 @@ export class UnifiedModelClient extends EventEmitter {
     });
   }
 
-  // ==== MEMORY LEAK FIX: LRU CACHE MANAGEMENT ====
-  // INTELLIGENT CACHING: Enhanced caching with content-aware keys and dynamic TTL
-  private cacheStats = {
-    hits: 0,
-    misses: 0,
-    sets: 0,
-    invalidations: 0,
-  };
+  // Cache management delegated to CacheCoordinator
+
+  // Cache key generation delegated to CacheCoordinator
+
+  // Cache methods delegated to CacheCoordinator
 
   /**
-   * Generate intelligent cache key based on request content and context
-   */
-  private generateIntelligentCacheKey(request: any, context?: any): string {
-    // Create content fingerprint for cache key
-    const contextFingerprint = context
-      ? JSON.stringify({
-          files: context.files?.map((f: any) => ({ path: f.path, size: f.size })),
-          workingDir: context.workingDirectory,
-        })
-      : JSON.stringify({
-          workingDir: process.cwd(), // Always include current working directory
-        });
-
-    const requestFingerprint = JSON.stringify({
-      prompt: this.normalizePromptForCaching(request.prompt || ''),
-      model: request.model,
-      temperature: request.temperature,
-      provider: request.provider,
-    });
-
-    // Create base64 hash for efficient storage
-    const combinedContent = requestFingerprint + contextFingerprint;
-    const cacheKey = Buffer.from(combinedContent).toString('base64').slice(0, 32);
-
-    console.log(
-      `🧠 Cache key generated: ${cacheKey.slice(0, 16)}... (prompt: ${(request.prompt || '').slice(0, 50)}...)`
-    );
-    return cacheKey;
-  }
-
-  /**
-   * Normalize prompt for consistent caching (remove minor variations)
-   */
-  private normalizePromptForCaching(prompt: string): string {
-    return prompt
-      .toLowerCase()
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .replace(/[^\w\s]/g, '') // Remove special characters
-      .slice(0, 500); // Limit length for cache key efficiency
-  }
-
-  /**
-   * Determine appropriate TTL based on request type and content
-   */
-  private getIntelligentTTL(request: any): number {
-    const prompt = (request.prompt || '').toLowerCase();
-
-    // Analysis requests: 1 hour (stable content)
-    if (/analyz|audit|review|inspect|explain|understand|describe/.test(prompt)) {
-      console.log('🧠 Cache TTL: 1 hour (analysis request)');
-      return 3600000; // 1 hour
-    }
-
-    // Code generation: 15 minutes (semi-stable)
-    if (/generat|creat|writ|implement|build|develop|code/.test(prompt)) {
-      console.log('🧠 Cache TTL: 15 minutes (generation request)');
-      return 900000; // 15 minutes
-    }
-
-    // Documentation: 30 minutes (moderately stable)
-    if (/document|comment|readme|guide|tutorial/.test(prompt)) {
-      console.log('🧠 Cache TTL: 30 minutes (documentation request)');
-      return 1800000; // 30 minutes
-    }
-
-    // Default: 5 minutes (dynamic content)
-    console.log('🧠 Cache TTL: 5 minutes (default)');
-    return 300000; // 5 minutes
-  }
-
-  /**
-   * Check if request should be cached
-   */
-  private shouldUseIntelligentCache(request: any): boolean {
-    const prompt = request.prompt || '';
-
-    // Don't cache very short prompts or streaming requests
-    if (prompt.length < 20 || request.stream) {
-      return false;
-    }
-
-    // Don't cache real-time or time-sensitive requests
-    if (/now|current|today|latest|realtime|live/.test(prompt.toLowerCase())) {
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Enhanced cache setter with intelligent TTL and monitoring
-   */
-  private setCache(key: string, value: any, ttl?: number, request?: any): void {
-    if (request && this.shouldUseIntelligentCache(request)) {
-      const intelligentTTL = ttl || this.getIntelligentTTL(request);
-
-      // Store with metadata in unified cache system
-      this.cache.set(key, value, {
-        ttl: intelligentTTL,
-        metadata: {
-          cachedAt: Date.now(),
-          requestType: this.classifyRequestType(request),
-          hitCount: 0,
-        },
-      });
-      this.cacheStats.sets++;
-
-      console.log(
-        `🧠 Cached response (TTL: ${intelligentTTL / 1000}s, type: ${this.classifyRequestType(request)})`
-      );
-    } else {
-      // Fallback to basic caching
-      this.cache.set(key, value, { ttl: ttl || this.CACHE_TTL });
-      this.cacheStats.sets++;
-    }
-  }
-
-  /**
-   * Enhanced cache getter with hit tracking
-   */
-  private async getCache(key: string): Promise<any> {
-    const cached = await this.cache.get(key);
-
-    if (cached?.hit) {
-      this.cacheStats.hits++;
-
-      // Update hit count for intelligence
-      if (cached.metadata?.cachedAt) {
-        const age = Math.round((Date.now() - cached.metadata.cachedAt) / 1000);
-        console.log(
-          `🧠 Cache hit! (source: ${cached.source}, age: ${age}s, similarity: ${cached.similarity || 'exact'})`
-        );
-      }
-
-      return cached.value;
-    } else {
-      this.cacheStats.misses++;
-      console.log('🧠 Cache miss');
-      return null;
-    }
-  }
-
-  /**
-   * Classify request type for intelligent caching
-   */
-  private classifyRequestType(request: any): string {
-    const prompt = (request.prompt || '').toLowerCase();
-
-    if (/analyz|audit|review|inspect/.test(prompt)) return 'analysis';
-    if (/generat|creat|writ|implement/.test(prompt)) return 'generation';
-    if (/document|comment|readme/.test(prompt)) return 'documentation';
-    if (/test|spec|unit|integration/.test(prompt)) return 'testing';
-    if (/fix|debug|error|bug/.test(prompt)) return 'debugging';
-
-    return 'general';
-  }
-
-  /**
-   * Get enhanced cache statistics including persistence
+   * Get enhanced cache statistics - delegated to CacheCoordinator
    */
   getCacheStats() {
-    return this.cache.getStats();
+    return this.cacheCoordinator.getCacheStats();
   }
 
   /**
-   * Get intelligent cache statistics with hit rates and persistence info
+   * Get intelligent cache statistics - delegated to CacheCoordinator
    */
   getIntelligentCacheStats() {
-    const enhancedStats = this.cache.getStats();
-    const hitRate =
-      this.cacheStats.hits + this.cacheStats.misses > 0
-        ? ((this.cacheStats.hits / (this.cacheStats.hits + this.cacheStats.misses)) * 100).toFixed(
-            1
-          )
-        : '0.0';
-
-    return {
-      ...enhancedStats,
-      intelligence: {
-        hitRate: `${hitRate}%`,
-        totalRequests: this.cacheStats.hits + this.cacheStats.misses,
-        ...this.cacheStats,
-      },
-    };
+    return this.cacheCoordinator.getIntelligentCacheStats();
   }
 
   // Queue management for concurrent request limiting
@@ -1355,23 +1173,24 @@ export class UnifiedModelClient extends EventEmitter {
   async healthCheck(): Promise<Record<string, boolean>> {
     const health: Record<string, boolean> = {};
 
-    for (const [type, provider] of this.providers) {
+    for (const [type, provider] of this.providerRepository.getAvailableProviders()) {
       const cacheKey = `health_${type}`;
-      const cached = this.healthCheckCache.get(cacheKey);
-
-      // Use cached result if less than 30 seconds old
-      if (cached && Date.now() - cached.timestamp < this.HEALTH_CACHE_TTL) {
-        health[type] = cached.healthy;
+      
+      // Use cached result if available
+      if (this.cacheCoordinator.isHealthCheckCached(cacheKey, 30000)) {
+        const healthCheckCache = this.cacheCoordinator.getHealthCheckCache();
+        const cached = healthCheckCache.get(cacheKey);
+        health[type] = cached?.healthy || false;
         continue;
       }
 
       try {
         await provider.healthCheck?.();
         health[type] = true;
-        this.healthCheckCache.set(cacheKey, { healthy: true, timestamp: Date.now() });
+        this.cacheCoordinator.setHealthCheck(cacheKey, true);
       } catch {
         health[type] = false;
-        this.healthCheckCache.set(cacheKey, { healthy: false, timestamp: Date.now() });
+        this.cacheCoordinator.setHealthCheck(cacheKey, false);
       }
     }
 
@@ -1423,7 +1242,7 @@ export class UnifiedModelClient extends EventEmitter {
     }
 
     // Close all providers
-    for (const [type, provider] of this.providers) {
+    for (const [type, provider] of this.providerRepository.getAvailableProviders()) {
       try {
         await provider.shutdown?.();
         logger.info(`✅ Provider ${type} shut down`);
@@ -1433,11 +1252,10 @@ export class UnifiedModelClient extends EventEmitter {
     }
 
     // OPTIMIZED: Clear all caches and prevent memory leaks
-    this.providers.clear();
+    await this.providerRepository.shutdown();
     this.activeRequests.clear();
     this.requestQueue.length = 0;
-    this.cache.clear();
-    this.healthCheckCache.clear();
+    this.cacheCoordinator.clear();
 
     logger.info('✅ UnifiedModelClient shutdown complete with memory cleanup');
   }
@@ -1585,7 +1403,7 @@ export class UnifiedModelClient extends EventEmitter {
    * Get all available providers for model management
    */
   getProviders(): Map<string, any> {
-    return this.providers;
+    return this.providerRepository.getAvailableProviders();
   }
 
   /**
@@ -1767,7 +1585,7 @@ export class UnifiedModelClient extends EventEmitter {
 
     try {
       // Get the appropriate provider
-      const provider = this.providers.get(selectedProvider);
+      const provider = this.providerRepository.getProvider(selectedProvider);
       if (!provider) {
         throw new Error(`Provider ${selectedProvider} not available`);
       }
@@ -1856,7 +1674,7 @@ export class UnifiedModelClient extends EventEmitter {
 
       // Fallback to alternative provider if available
       const fallbackProvider = selectedProvider === 'lm-studio' ? 'ollama' : 'lm-studio';
-      const fallback = this.providers.get(fallbackProvider);
+      const fallback = this.providerRepository.getProvider(fallbackProvider);
 
       if (fallback) {
         logger.info(`Falling back to ${fallbackProvider}`);
@@ -2377,10 +2195,9 @@ export class UnifiedModelClient extends EventEmitter {
   async destroy(): Promise<void> {
     try {
       // Clean up persistent cache (auto-saves on destroy)
-      if (this.cache) {
+      if (this.cacheCoordinator) {
         console.log('🗃️ Saving cache before shutdown...');
-        // Force persist not needed with unified cache
-        this.cache.destroy();
+        this.cacheCoordinator.destroy();
       }
 
       // Clean up hardware selector
@@ -2407,8 +2224,7 @@ export class UnifiedModelClient extends EventEmitter {
       this.activeRequests.clear();
       this.requestQueue = [];
 
-      // Clear health check cache
-      this.healthCheckCache.clear();
+      // Health check cache cleared by CacheCoordinator.destroy()
 
       // Remove all event listeners
       this.removeAllListeners();

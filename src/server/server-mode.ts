@@ -294,7 +294,7 @@ export async function startServerMode(context: CLIContext, options: ServerOption
           });
           break;
 
-        case 'refactor':
+        case 'refactor': {
           if (!file_path || !prompt) {
             return res.status(400).json({ error: 'file_path and prompt are required' });
           }
@@ -375,6 +375,7 @@ ${refactorPrompt}`,
               ((response as unknown as Record<string, unknown>).confidence as number) || 0.8,
           });
           break;
+        }
 
         default:
           res.status(400).json({ error: `Unknown operation: ${operation}` });

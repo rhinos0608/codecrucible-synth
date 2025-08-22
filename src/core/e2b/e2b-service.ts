@@ -259,14 +259,15 @@ export class E2BService {
         return await sandbox.runCode(code);
 
       case 'javascript':
-      case 'js':
+      case 'js': {
         // Convert to Python execution of JavaScript-like logic where possible
         // Note: E2B primarily supports Python, so we convert simple JS to Python
         const pythonCode = this.convertJSToPython(code);
         return await sandbox.runCode(pythonCode);
+      }
 
       case 'bash':
-      case 'shell':
+      case 'shell': {
         // Execute bash commands safely
         const bashCode = `
 import subprocess
@@ -287,6 +288,7 @@ except Exception as e:
     sys.exit(1)
 `;
         return await sandbox.runCode(bashCode);
+      }
 
       default:
         throw new Error(`Unsupported language: ${language}`);

@@ -131,9 +131,7 @@ export class CacheCoordinator implements ICacheCoordinator {
       });
       this.cacheStats.sets++;
 
-      console.log(
-        `🧠 Response cached with intelligent TTL: ${Math.round(ttl / 1000)}s`
-      );
+      console.log(`🧠 Response cached with intelligent TTL: ${Math.round(ttl / 1000)}s`);
     } catch (error) {
       // Fallback to basic caching
       this.cache.set(key, value, { ttl: options?.ttl || this.CACHE_TTL });
@@ -261,9 +259,10 @@ export class CacheCoordinator implements ICacheCoordinator {
    */
   private updateCacheStats(): void {
     this.cacheStats.totalRequests = this.cacheStats.hits + this.cacheStats.misses;
-    this.cacheStats.hitRate = this.cacheStats.totalRequests > 0
-      ? ((this.cacheStats.hits / this.cacheStats.totalRequests) * 100).toFixed(1) + '%'
-      : '0%';
+    this.cacheStats.hitRate =
+      this.cacheStats.totalRequests > 0
+        ? ((this.cacheStats.hits / this.cacheStats.totalRequests) * 100).toFixed(1) + '%'
+        : '0%';
   }
 
   /**
@@ -278,7 +277,7 @@ export class CacheCoordinator implements ICacheCoordinator {
    */
   getIntelligentCacheStats(): EnhancedCacheStats {
     const enhancedStats = this.cache.getStats();
-    
+
     return {
       basic: enhancedStats,
       intelligence: {
@@ -300,7 +299,7 @@ export class CacheCoordinator implements ICacheCoordinator {
 
   isHealthCheckCached(key: string, ttl: number = this.HEALTH_CACHE_TTL): boolean {
     const cached = this.healthCheckCache.get(key);
-    return cached ? (Date.now() - cached.timestamp < ttl) : false;
+    return cached ? Date.now() - cached.timestamp < ttl : false;
   }
 
   /**

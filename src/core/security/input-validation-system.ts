@@ -577,6 +577,7 @@ export class AdvancedInputValidator {
     // Remove control characters
     if (options.removeControlChars) {
       // Remove ASCII control characters (0-31) and DEL (127)
+      // eslint-disable-next-line no-control-regex
       sanitized = sanitized.replace(/[\u0000-\u001F\u007F]/g, '');
     }
 

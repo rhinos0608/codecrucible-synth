@@ -48,6 +48,9 @@ export type {
   IStreamingManager,
 } from './streaming/streaming-manager.js';
 
+// Import DI interfaces
+import type { IModelClient } from './interfaces/client-interfaces.js';
+
 // Re-export provider types from ProviderRepository
 export type { ProviderType, ProviderConfig } from './providers/provider-repository.js';
 export type ExecutionMode = 'fast' | 'auto' | 'quality';
@@ -115,7 +118,7 @@ export interface RequestMetrics {
   error?: string;
 }
 
-export class UnifiedModelClient extends EventEmitter {
+export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private config: UnifiedClientConfig;
   // Provider management extracted to ProviderRepository
   private providerRepository: IProviderRepository;
@@ -158,7 +161,18 @@ export class UnifiedModelClient extends EventEmitter {
   // ASYNC INITIALIZATION: Track initialization state
   private initialized = false;
 
-  constructor(config: UnifiedClientConfig) {
+  constructor(
+    config: UnifiedClientConfig,
+    // DI-enabled constructor with optional injected dependencies
+    injectedDependencies?: {
+      providerRepository?: IProviderRepository;
+      securityValidator?: ISecurityValidator;
+      streamingManager?: IStreamingManager;
+      cacheCoordinator?: ICacheCoordinator;
+      performanceMonitor?: any; // Use any for now to avoid interface mismatch
+      hybridRouter?: any; // Use any for now to avoid interface mismatch
+    }
+  ) {
     super();
     // Increase max listeners to prevent memory leak warnings
     this.setMaxListeners(50);
@@ -171,27 +185,31 @@ export class UnifiedModelClient extends EventEmitter {
       ...this.getDefaultConfig(),
       ...config,
     };
-    this.performanceMonitor = new PerformanceMonitor();
-    this.securityValidator = new SecurityValidator({
+
+    // Use injected dependencies if available, otherwise create them (backward compatibility)
+    this.performanceMonitor = injectedDependencies?.performanceMonitor || new PerformanceMonitor();
+    
+    this.securityValidator = injectedDependencies?.securityValidator || new SecurityValidator({
       enableSandbox: this.config.security?.enableSandbox,
       maxInputLength: this.config.security?.maxInputLength,
     });
 
-    // Initialize hardware-aware components
+    // Initialize hardware-aware components (these don't have circular dependencies yet)
     this.hardwareSelector = new HardwareAwareModelSelector();
     this.processManager = new ActiveProcessManager(this.hardwareSelector);
 
-    // Initialize streaming manager with configuration
-    this.streamingManager = new StreamingManager(config.streaming);
+    // Use injected dependencies or create new ones
+    this.streamingManager = injectedDependencies?.streamingManager || new StreamingManager(config.streaming);
+    this.providerRepository = injectedDependencies?.providerRepository || new ProviderRepository();
+    this.cacheCoordinator = injectedDependencies?.cacheCoordinator || new CacheCoordinator();
 
-    // Initialize provider repository for extracted provider management
-    this.providerRepository = new ProviderRepository();
-
-    // Initialize cache coordinator for centralized caching
-    this.cacheCoordinator = new CacheCoordinator();
-
-    // HYBRID ARCHITECTURE: Initialize hybrid router for intelligent LLM selection
-    this.initializeHybridRouter();
+    // HYBRID ARCHITECTURE: Use injected router or initialize new one
+    if (injectedDependencies?.hybridRouter) {
+      this.hybridRouter = injectedDependencies.hybridRouter;
+      logger.info('🚀 Using injected Hybrid LLM Router');
+    } else {
+      this.initializeHybridRouter();
+    }
 
     // Setup event listeners for model switching
     this.setupModelSwitchingEvents();
@@ -1175,7 +1193,7 @@ export class UnifiedModelClient extends EventEmitter {
 
     for (const [type, provider] of this.providerRepository.getAvailableProviders()) {
       const cacheKey = `health_${type}`;
-      
+
       // Use cached result if available
       if (this.cacheCoordinator.isHealthCheckCached(cacheKey, 30000)) {
         const healthCheckCache = this.cacheCoordinator.getHealthCheckCache();

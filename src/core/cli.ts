@@ -6,11 +6,10 @@
 import { CLIExitCode, CLIError, ModelRequest } from './types.js';
 import { UnifiedModelClient } from './client.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
-import { UnifiedAgent } from './agent.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
 import { logger } from './logger.js';
-import { getErrorMessage, toError } from '../utils/error-utils.js';
+import { getErrorMessage } from '../utils/error-utils.js';
 import { ContextAwareCLIIntegration } from './intelligence/context-aware-cli-integration.js';
 import { AutoConfigurator } from './model-management/auto-configurator.js';
 import { InteractiveREPL } from './interactive-repl.js';
@@ -686,8 +685,8 @@ export class CLI {
    * Legacy analysis method (kept for backward compatibility)
    */
   private async performDirectCodebaseAnalysisLegacy(): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
+    // const fs = await import('fs');
+    // const path = await import('path');
 
     console.log('📊 Analyzing project structure...');
 
@@ -1316,7 +1315,8 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async executeAuditorMode(
     prompt: string,
     model: any,
-    options: CLIOptions
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _options: CLIOptions
   ): Promise<string> {
     console.log(chalk.magenta('🔍 Auditor Mode: Fast analysis and security scanning'));
 
@@ -1345,7 +1345,8 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async executeWriterMode(
     prompt: string,
     model: any,
-    options: CLIOptions
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _options: CLIOptions
   ): Promise<string> {
     console.log(chalk.green('✍️  Writer Mode: High-quality generation and documentation'));
 
@@ -1421,7 +1422,8 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Format the response based on execution mode
    */
-  private formatResponse(result: any, mode: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private formatResponse(result: any, _mode: string): string {
     // Handle array of voice responses
     if (Array.isArray(result) && result.length > 0) {
       const firstResponse = result[0];
@@ -1570,7 +1572,8 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Handle slash commands
    */
-  private async handleSlashCommand(command: string, options: CLIOptions): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async handleSlashCommand(command: string, _options: CLIOptions): Promise<void> {
     const cmd = command.slice(1).toLowerCase();
 
     switch (cmd) {
@@ -1685,7 +1688,8 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Handle configuration management
    */
-  private async handleConfiguration(options: CLIOptions): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async handleConfiguration(_options: CLIOptions): Promise<void> {
     console.log(chalk.cyan('\n⚙️  Configuration Management'));
 
     const choices = [
@@ -1815,7 +1819,8 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     }
   }
 
-  async updateConfiguration(newConfig: any): Promise<boolean> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async updateConfiguration(_newConfig: any): Promise<boolean> {
     try {
       // Update configuration logic here
       return true;

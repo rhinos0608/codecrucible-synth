@@ -4,6 +4,7 @@ import { UnifiedModelClient, UnifiedClientConfig } from './core/client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { getErrorMessage } from './utils/error-utils.js';
+import { createSystem } from './core/di/system-bootstrap.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -37,7 +38,77 @@ async function getPackageVersion(): Promise<string> {
   }
 }
 
+/**
+ * Initialize CLI Context using Dependency Injection System
+ * This replaces the legacy initialization with proper DI
+ */
+export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context: CLIContext }> {
+  try {
+    console.log('🚀 Initializing with Dependency Injection System...');
+    
+    // Bootstrap the entire system with DI
+    const bootResult = await createSystem({
+      skipValidation: false,
+      enablePerformanceMonitoring: true,
+      logLevel: 'info',
+      environment: 'development',
+    });
+    
+    console.log(`✅ DI System initialized in ${bootResult.initializationTime}ms`);
+    console.log(`📦 Services initialized: ${bootResult.servicesInitialized.length}`);
+    
+    if (bootResult.warnings.length > 0) {
+      console.log('⚠️ Warnings:', bootResult.warnings);
+    }
+    
+    // Get the injected client from DI container (cast to concrete type for CLI compatibility)
+    const client = bootResult.client as UnifiedModelClient;
+    
+    // Initialize voice system with DI-enabled client
+    const voiceSystem = new VoiceArchetypeSystem(client);
+    
+    // Minimal MCP manager setup for fast startup
+    const mcpManager = {
+      startServers: async () => {
+        console.log('ℹ️ MCP servers will be started when needed');
+      },
+      stopServers: async () => {},
+      getServerStatus: () => ({ filesystem: { status: 'lazy-loaded' } }),
+    } as any;
+    
+    // Load configuration
+    const configManager = new ConfigManager();
+    const config = await configManager.loadConfiguration();
+    
+    const context: CLIContext = {
+      modelClient: client,
+      voiceSystem,
+      mcpManager,
+      config,
+    };
+    
+    const cli = new CLI(client, voiceSystem, mcpManager, config);
+    
+    return { cli, context };
+    
+  } catch (error) {
+    console.error('❌ Failed to initialize CLI context with DI:', getErrorMessage(error));
+    console.log('🔄 Falling back to legacy initialization...');
+    return await initializeCLIContextLegacy();
+  }
+}
+
+/**
+ * Default CLI Context initialization - uses DI system by default
+ */
 export async function initializeCLIContext(): Promise<{ cli: CLI; context: CLIContext }> {
+  return await initializeCLIContextWithDI();
+}
+
+/**
+ * Legacy CLI Context initialization (kept for backward compatibility)
+ */
+export async function initializeCLIContextLegacy(): Promise<{ cli: CLI; context: CLIContext }> {
   try {
     // Fast initialization with lazy loading
     const configManager = new ConfigManager();

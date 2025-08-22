@@ -38,11 +38,11 @@ Use available research tools to:
 
 // Simplified placeholder implementation
 export class ResearchAgent {
-  constructor(dependencies: any) {
+  constructor() {
     // Placeholder constructor
   }
 
-  async processRequest(input: string, streaming?: boolean): Promise<any> {
+  async processRequest(): Promise<any> {
     return {
       content: 'Agent temporarily disabled',
       metadata: {},

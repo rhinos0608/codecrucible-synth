@@ -153,6 +153,7 @@ export interface SecurityValidation {
   riskLevel?: 'low' | 'medium' | 'high';
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SecurityError extends Error {
   code: string;
   risk: string;
@@ -172,6 +173,7 @@ export class SecurityError extends Error {
 }
 
 // CLI Types
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CLIError extends Error {
   code: string;
   exitCode: number;

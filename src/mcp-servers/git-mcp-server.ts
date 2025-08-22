@@ -1150,7 +1150,7 @@ export class GitMCPServer extends BaseMCPServer {
 
     for (const line of lines) {
       // Parse oneline format: hash message
-      const match = line.match(/^[*\|\\\s]*([a-f0-9]+)\s+(.+)$/);
+      const match = line.match(/^[*|\\\s]*([a-f0-9]+)\s+(.+)$/);
       if (match) {
         const [, hash, message] = match;
         commits.push({

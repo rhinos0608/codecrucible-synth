@@ -338,11 +338,11 @@ You excel at finding creative solutions and helping teams think outside conventi
 
 // Simplified placeholder implementation
 export class ExplorerAgent {
-  constructor(dependencies: any) {
+  constructor() {
     // Placeholder constructor
   }
 
-  async processRequest(input: string, streaming?: boolean): Promise<any> {
+  async processRequest(): Promise<any> {
     return {
       content: 'Agent temporarily disabled',
       metadata: {},

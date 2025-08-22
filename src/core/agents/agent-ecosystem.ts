@@ -1187,6 +1187,7 @@ class ExplorerAgent extends BaseAgent {
     return `Explored codebase structure for: ${request.content}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async generateExplorationActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
@@ -1292,6 +1293,7 @@ class AnalyzerAgent extends BaseAgent {
     return `Analyzed code for: ${request.content}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async generateAnalysisActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
@@ -1378,6 +1380,7 @@ class ImplementorAgent extends BaseAgent {
     return `Generated implementation for: ${request.content}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async generateImplementationActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
@@ -1463,6 +1466,7 @@ class MaintainerAgent extends BaseAgent {
     return `Performed maintenance for: ${request.content}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async generateMaintenanceActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
@@ -1553,6 +1557,7 @@ class SecurityAgent extends BaseAgent {
     return `Performed security analysis for: ${request.content}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async generateSecurityActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
@@ -1887,6 +1892,7 @@ class TesterAgent extends BaseAgent {
     return `Performed testing for: ${request.content}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async generateTestingActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
@@ -1977,6 +1983,7 @@ class ArchitectAgent extends BaseAgent {
     return `Designed architecture for: ${request.content}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async generateArchitectureActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
@@ -2067,6 +2074,7 @@ class ReviewerAgent extends BaseAgent {
     return `Reviewed code for: ${request.content}`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async generateReviewActions(_request: AgentRequest): Promise<AgentAction[]> {
     return [
       {
@@ -2187,6 +2195,7 @@ class CollaborationManager {
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private measureConsensus(_phaseResults: PhaseResult[]): ConsensusMeasure {
     // Simple consensus measurement
     return {
@@ -2277,6 +2286,7 @@ class AgentPerformanceMonitor {
     this.logger.info('Agent performance monitoring stopped');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   recordRequest(_request: AgentRequest, response: AgentResponse): void {
     if (!this.metrics.has(response.agentId)) {
       this.metrics.set(response.agentId, {

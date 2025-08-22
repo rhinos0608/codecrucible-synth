@@ -10,6 +10,7 @@ import { UnifiedModelClient, createDefaultUnifiedClientConfig } from './client.j
 import { configManager, AgentConfig } from '../config/config-manager.js';
 export type { AgentConfig };
 import { PerformanceMonitor } from '../utils/performance.js';
+import { logger } from './logger.js';
 import {
   ExecutionRequest,
   ExecutionResponse,
@@ -1003,7 +1004,7 @@ export class UnifiedAgent extends EventEmitter {
       // Remove all listeners
       this.removeAllListeners();
     } catch (error) {
-      console.error('Error during UnifiedAgent cleanup:', error);
+      logger.error('Error during UnifiedAgent cleanup:', error);
     }
   }
 
@@ -1088,7 +1089,7 @@ export const globalEditConfirmation = {
   applyEdits: async (edits: unknown): Promise<EditApplicationResult> => ({ success: true, edits }),
   clearPendingEdits: () => {},
   generateEditSummary: (): EditSummary => ({ total: 0, approved: 0, rejected: 0 }),
-  displayEditSummary: (_summary: EditSummary) => {},
+  displayEditSummary: () => {},
 };
 
 interface IndexResult {
@@ -1097,7 +1098,7 @@ interface IndexResult {
 }
 
 export const globalRAGSystem = {
-  indexPath: async (path: string, _options?: unknown): Promise<IndexResult> => ({
+  indexPath: async (path: string): Promise<IndexResult> => ({
     indexed: true,
     path,
   }),
@@ -1121,8 +1122,7 @@ export const clearManagedInterval = (id: NodeJS.Timeout) => {
   clearInterval(id);
 };
 
-export const initializeEditConfirmation = (_path: string, _options?: unknown) =>
-  globalEditConfirmation;
+export const initializeEditConfirmation = () => globalEditConfirmation;
 export const createUnifiedModelClient = (config: Record<string, unknown>) => {
   // Use the helper function to create a complete config with streaming
   const unifiedConfig = createDefaultUnifiedClientConfig({

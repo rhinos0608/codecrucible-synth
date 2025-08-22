@@ -33,11 +33,11 @@ export interface ISecurityValidator {
   // Core validation
   validateInput(input: string, options?: SecurityValidationOptions): Promise<ValidationResult>;
   validateRequest(request: any, options?: SecurityValidationOptions): Promise<ValidationResult>;
-  
+
   // Security analysis
   analyzeRisk(input: string): Promise<{ level: string; threats: string[] }>;
   detectSuspiciousPatterns(input: string): string[];
-  
+
   // Configuration
   updateSecurityConfig(config: SecurityValidationOptions): void;
   getSecurityStatus(): { enabled: boolean; rulesCount: number; lastUpdate: number };
@@ -75,14 +75,17 @@ export class SecurityValidator implements ISecurityValidator {
   /**
    * Core input validation with comprehensive security checks
    */
-  async validateInput(input: string, options?: SecurityValidationOptions): Promise<ValidationResult> {
+  async validateInput(
+    input: string,
+    options?: SecurityValidationOptions
+  ): Promise<ValidationResult> {
     const config = { ...this.validationOptions, ...options };
     this.validationStats.totalValidations++;
 
     try {
       // Use SecurityUtils for core validation
       const validation = await this.securityUtils.validateInput(input);
-      
+
       // Convert SecurityValidation to ValidationResult format
       const result: ValidationResult = {
         isValid: validation.isValid,
@@ -94,7 +97,7 @@ export class SecurityValidator implements ISecurityValidator {
       // Additional validation logic specific to client context
       if (!validation.isValid) {
         this.validationStats.violations++;
-        
+
         if (config.logViolations) {
           logger.error('🚨 SECURITY VIOLATION: Input validation failed', {
             reason: validation.reason,
@@ -105,7 +108,7 @@ export class SecurityValidator implements ISecurityValidator {
 
         // Determine violation type for better error handling
         result.violationType = this.categorizeViolation(validation.reason || '');
-        
+
         // In strict mode, block all violations
         if (config.strictMode) {
           this.validationStats.blocked++;
@@ -121,7 +124,7 @@ export class SecurityValidator implements ISecurityValidator {
       return result;
     } catch (error) {
       this.validationStats.violations++;
-      
+
       if (config.logViolations) {
         logger.error('🚨 SECURITY ERROR: Validation process failed', error);
       }
@@ -138,7 +141,10 @@ export class SecurityValidator implements ISecurityValidator {
   /**
    * Validate entire request object with context-aware security
    */
-  async validateRequest(request: any, options?: SecurityValidationOptions): Promise<ValidationResult> {
+  async validateRequest(
+    request: any,
+    options?: SecurityValidationOptions
+  ): Promise<ValidationResult> {
     if (!request?.prompt) {
       return {
         isValid: false,
@@ -150,7 +156,7 @@ export class SecurityValidator implements ISecurityValidator {
 
     // Validate the main prompt
     const promptValidation = await this.validateInput(request.prompt, options);
-    
+
     if (!promptValidation.isValid) {
       return promptValidation;
     }
@@ -275,7 +281,7 @@ export class SecurityValidator implements ISecurityValidator {
    */
   private categorizeViolation(reason: string): string {
     const lowerReason = reason.toLowerCase();
-    
+
     if (lowerReason.includes('command') || lowerReason.includes('exec')) {
       return 'command_injection';
     }
@@ -291,7 +297,7 @@ export class SecurityValidator implements ISecurityValidator {
     if (lowerReason.includes('pattern') || lowerReason.includes('blocked')) {
       return 'pattern_violation';
     }
-    
+
     return 'unknown_violation';
   }
 
@@ -300,7 +306,7 @@ export class SecurityValidator implements ISecurityValidator {
    */
   updateSecurityConfig(config: SecurityValidationOptions): void {
     this.validationOptions = { ...this.validationOptions, ...config };
-    
+
     // Reinitialize SecurityUtils with new config
     this.securityUtils = new SecurityUtils({
       enableSandbox: this.validationOptions.enableSandbox,
@@ -325,9 +331,13 @@ export class SecurityValidator implements ISecurityValidator {
   getValidationStats() {
     return {
       ...this.validationStats,
-      violationRate: this.validationStats.totalValidations > 0 
-        ? ((this.validationStats.violations / this.validationStats.totalValidations) * 100).toFixed(2) + '%'
-        : '0%',
+      violationRate:
+        this.validationStats.totalValidations > 0
+          ? (
+              (this.validationStats.violations / this.validationStats.totalValidations) *
+              100
+            ).toFixed(2) + '%'
+          : '0%',
     };
   }
 

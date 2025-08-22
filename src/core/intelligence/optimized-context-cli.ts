@@ -7,7 +7,6 @@ import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
 import {
   LazyProjectIntelligenceSystem,
-  LazyProjectIntelligence,
   BasicProjectInfo,
 } from './lazy-project-intelligence.js';
 import { ProjectIntelligence } from './project-intelligence-system.js';
@@ -18,7 +17,7 @@ import {
   SmartSuggestion,
   IntelligentCommand,
 } from './context-aware-cli-integration.js';
-import chalk from 'chalk';
+// import chalk from 'chalk';
 
 export interface OptimizedContextOptions extends ContextAwareOptions {
   lazyLoading?: boolean;
@@ -247,6 +246,7 @@ export class OptimizedContextAwareCLI extends EventEmitter {
   private enhanceWithQuickContext(
     prompt: string,
     context: ContextInformation,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     options: OptimizedContextOptions
   ): ContextualPromptEnhancement {
     const enhancedPrompt = this.buildEnhancedPrompt(prompt, context, false);
@@ -267,6 +267,7 @@ export class OptimizedContextAwareCLI extends EventEmitter {
   private enhanceWithFullContext(
     prompt: string,
     intelligence: ProjectIntelligence,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     options: OptimizedContextOptions
   ): ContextualPromptEnhancement {
     const context = this.buildFullContext(intelligence);
@@ -473,6 +474,7 @@ Please provide a response considering the project context above.`;
   /**
    * Get intelligent commands (optimized)
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getIntelligentCommands(context?: string): Promise<IntelligentCommand[]> {
     const basic = await this.lazyIntelligence.getBasicInfo(this.currentWorkingDir);
     if (!basic) return [];

@@ -718,7 +718,7 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
       metadata: {
         processingTime: 0,
         voicesConsulted: 1,
-        modelsUsed: [response.metadata?.model || 'unknown'],
+        modelsUsed: [response.model || 'unknown'],
         totalTokens: response.metadata?.tokens || 0,
         cachingUsed: false,
         ragUsed: false,

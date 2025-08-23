@@ -524,7 +524,7 @@ export class UnifiedAgent extends EventEmitter {
         content: response.content,
         metadata: {
           model: 'default',
-          tokens: response.tokensUsed || 0,
+          tokens: response.tokens_used || 0,
           latency: Date.now() - startTime,
           type: 'code-analysis',
         },
@@ -562,7 +562,7 @@ export class UnifiedAgent extends EventEmitter {
         content: response.content,
         metadata: {
           model: 'default',
-          tokens: response.tokensUsed || 0,
+          tokens: response.tokens_used || 0,
           latency: Date.now() - startTime,
           type: 'code-generation',
         },
@@ -600,7 +600,7 @@ export class UnifiedAgent extends EventEmitter {
         content: response.content,
         metadata: {
           model: 'default',
-          tokens: response.tokensUsed || 0,
+          tokens: response.tokens_used || 0,
           latency: Date.now() - startTime,
           type: 'documentation',
         },
@@ -638,7 +638,7 @@ export class UnifiedAgent extends EventEmitter {
         content: response.content,
         metadata: {
           model: 'default',
-          tokens: response.tokensUsed || 0,
+          tokens: response.tokens_used || 0,
           latency: Date.now() - startTime,
           type: 'testing',
         },
@@ -676,7 +676,7 @@ export class UnifiedAgent extends EventEmitter {
         content: response.content,
         metadata: {
           model: 'default',
-          tokens: response.tokensUsed || 0,
+          tokens: response.tokens_used || 0,
           latency: Date.now() - startTime,
           type: 'refactoring',
         },
@@ -714,7 +714,7 @@ export class UnifiedAgent extends EventEmitter {
         content: response.content,
         metadata: {
           model: 'default',
-          tokens: response.tokensUsed || 0,
+          tokens: response.tokens_used || 0,
           latency: Date.now() - startTime,
           type: 'bug-fixing',
         },
@@ -752,7 +752,7 @@ export class UnifiedAgent extends EventEmitter {
         content: response.content,
         metadata: {
           model: 'default',
-          tokens: response.tokensUsed || 0,
+          tokens: response.tokens_used || 0,
           latency: Date.now() - startTime,
           type: 'performance-optimization',
         },
@@ -790,7 +790,7 @@ export class UnifiedAgent extends EventEmitter {
         content: response.content,
         metadata: {
           model: 'default',
-          tokens: response.tokensUsed || 0,
+          tokens: response.tokens_used || 0,
           latency: Date.now() - startTime,
           type: 'security-analysis',
         },

@@ -44,6 +44,9 @@ export interface ModelRequest {
       };
     };
   }>;
+  // Properties used for complexity analysis
+  context?: Record<string, JsonValue>;
+  files?: string[];
 }
 
 export interface ModelResponse {
@@ -511,3 +514,30 @@ export interface MessageData {
   timestamp: number;
   metadata?: Record<string, JsonValue>;
 }
+
+// Task analysis and complexity types
+export interface ComplexityAnalysis {
+  score: number;
+  level: 'simple' | 'medium' | 'complex';
+  factors: {
+    promptLength: number;
+    hasContext: boolean;
+    hasFiles: boolean;
+    fileCount: number;
+  };
+  estimatedTime: string;
+}
+
+export type TaskType = 
+  | 'analysis'
+  | 'generation' 
+  | 'refactoring'
+  | 'debug'
+  | 'documentation'
+  | 'testing'
+  | 'optimization'
+  | 'general'
+  | 'template'
+  | 'security'
+  | 'planning'
+  | 'generate';

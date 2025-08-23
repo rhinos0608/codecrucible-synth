@@ -45,8 +45,8 @@ export const LM_STUDIO_PROVIDER_TOKEN = createServiceToken<IModelProvider>('lm-s
 export const HUGGINGFACE_PROVIDER_TOKEN =
   createServiceToken<IModelProvider>('huggingface-provider');
 
-// Routing services
-export const HYBRID_ROUTER_TOKEN = createServiceToken<IModelRouter>('hybrid-router');
+// Routing services - using concrete types for DI compatibility
+export const HYBRID_ROUTER_TOKEN = createServiceToken<any>('hybrid-router');
 export const ROUTING_STRATEGY_TOKEN = createServiceToken<IRoutingStrategy>('routing-strategy');
 export const TASK_ANALYZER_TOKEN = createServiceToken<ITaskAnalyzer>('task-analyzer');
 export const LOAD_BALANCER_TOKEN = createServiceToken<ILoadBalancer>('load-balancer');
@@ -62,9 +62,9 @@ export const SECURITY_UTILS_TOKEN = createServiceToken<any>('security-utils');
 // Streaming services
 export const STREAMING_MANAGER_TOKEN = createServiceToken<any>('streaming-manager');
 
-// Performance monitoring
+// Performance monitoring - using concrete type for DI compatibility
 export const PERFORMANCE_MONITOR_TOKEN =
-  createServiceToken<IPerformanceMonitor>('performance-monitor');
+  createServiceToken<any>('performance-monitor');
 
 // =============================================================================
 // ADVANCED SERVICE TOKENS

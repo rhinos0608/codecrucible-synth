@@ -15,6 +15,8 @@ import {
   ModelResponse,
   UnifiedClientConfig as BaseUnifiedClientConfig,
   MetricsData,
+  ComplexityAnalysis,
+  TaskType,
 } from './types.js';
 import { SecurityValidator, ISecurityValidator } from './security/security-validator.js';
 import { PerformanceMonitor } from '../utils/performance.js';
@@ -27,7 +29,7 @@ import { getGlobalToolIntegration } from './tools/tool-integration.js';
 import { getGlobalEnhancedToolIntegration } from './tools/enhanced-tool-integration.js';
 import { ActiveProcessManager, ActiveProcess } from './performance/active-process-manager.js';
 // import { unifiedCache } from './cache/unified-cache-system.js';
-import { HybridLLMRouter, HybridConfig } from './hybrid/hybrid-llm-router.js';
+import { HybridLLMRouter, HybridConfig, TaskComplexityMetrics } from './hybrid/hybrid-llm-router.js';
 // import { intelligentBatchProcessor } from './performance/intelligent-batch-processor.js';
 import {
   ProviderRepository,
@@ -494,13 +496,18 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   /**
    * HYBRID ARCHITECTURE: Enhanced synthesize method with intelligent routing
    */
-  async synthesize(request: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async synthesize(request: ModelRequest): Promise<ModelResponse> {
     // INTELLIGENT CACHING: Check cache with content-aware key generation
     const cacheKey = this.cacheCoordinator.generateIntelligentCacheKey(request);
     const cached = await this.cacheCoordinator.get(cacheKey);
     if (cached && this.cacheCoordinator.shouldUseIntelligentCache(request)) {
       logger.debug('Returning cached response');
-      return { ...cached, fromCache: true };
+      return { 
+        ...cached, 
+        cached: true,
+        model: cached.model || 'unknown',
+        provider: cached.provider || 'unknown'
+      } as ModelResponse;
     }
 
     let selectedProvider = request.provider;
@@ -515,7 +522,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         routingDecision = await this.hybridRouter.routeTask(
           taskType,
           request.prompt || '',
-          complexity
+          this.convertToTaskMetrics(complexity, request)
         );
         selectedProvider = routingDecision.selectedLLM === 'lm-studio' ? 'lm-studio' : 'ollama';
 
@@ -532,7 +539,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     // Try enhanced tool integration first, fallback to local tools
     const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
     const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
-    const supportsTools = this.modelSupportsTools(selectedProvider, request.model);
+    const supportsTools = this.modelSupportsTools((selectedProvider || 'ollama') as ProviderType, request.model);
     const tools = supportsTools && toolIntegration ? toolIntegration.getLLMFunctions() : [];
 
     // DEBUG: Log tool integration status
@@ -576,15 +583,17 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       });
     }
 
-    const result = {
+    const result: ModelResponse = {
       content: response.content,
+      model: response.model || 'unknown',
+      provider: selectedProvider as string,
       metadata: {
-        ...response.metadata,
-        hybridRouting: routingDecision,
-        provider: selectedProvider,
-        responseTime,
+        tokens: response.metadata?.tokens || 0,
+        latency: responseTime,
+        quality: response.metadata?.quality,
       },
-      fromCache: false,
+      usage: response.usage,
+      cached: false,
     };
 
     // INTELLIGENT CACHING: Cache with content-aware TTL
@@ -1194,7 +1203,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         const response = await this.processRequest(queuedRequest.request);
         queuedRequest.resolve(response);
       } catch (error) {
-        queuedRequest.reject(error);
+        queuedRequest.reject(toError(error));
       }
     }
 
@@ -1231,10 +1240,15 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
   getMetrics(): MetricsData {
     return {
-      activeRequests: this.activeRequests.size,
-      queuedRequests: this.requestQueue.length,
-      providerMetrics: this.performanceMonitor.getProviderMetrics(),
-      performance: this.performanceMonitor.getSummary(),
+      timestamp: Date.now(),
+      values: {
+        activeRequests: this.activeRequests.size,
+        queuedRequests: this.requestQueue.length,
+      },
+      metadata: {
+        providerMetrics: JSON.parse(JSON.stringify(this.performanceMonitor.getProviderMetrics())),
+        performance: JSON.parse(JSON.stringify(this.performanceMonitor.getSummary())),
+      },
     };
   }
 
@@ -1503,7 +1517,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   /**
    * HYBRID ARCHITECTURE: Infer task type from prompt content
    */
-  private inferTaskType(prompt: string): string {
+  private inferTaskType(prompt: string): TaskType {
     const lowerPrompt = prompt.toLowerCase();
 
     // Fast tasks - simple operations
@@ -1567,10 +1581,10 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   /**
    * HYBRID ARCHITECTURE: Analyze task complexity
    */
-  private analyzeComplexity(prompt: string, request: any): any {
+  private analyzeComplexity(prompt: string, request: ModelRequest): ComplexityAnalysis {
     const promptLength = prompt.length;
-    const hasContext = request.context && Object.keys(request.context).length > 0;
-    const hasFiles = request.files && request.files.length > 0;
+    const hasContext = !!(request.context && Object.keys(request.context).length > 0);
+    const hasFiles = !!(request.files && request.files.length > 0);
 
     let complexityScore = 0;
 
@@ -1581,7 +1595,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
     // Context-based scoring
     if (hasContext) complexityScore += 2;
-    if (hasFiles) complexityScore += request.files.length;
+    if (hasFiles) complexityScore += request.files?.length || 0;
 
     // Content-based scoring
     const lowerPrompt = prompt.toLowerCase();
@@ -1613,6 +1627,21 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
 
   /**
+   * Convert ComplexityAnalysis to TaskComplexityMetrics for hybrid router
+   */
+  private convertToTaskMetrics(complexity: ComplexityAnalysis, request: ModelRequest): TaskComplexityMetrics {
+    return {
+      linesOfCode: complexity.factors.promptLength / 50, // Rough approximation
+      fileCount: complexity.factors.fileCount,
+      hasMultipleFiles: complexity.factors.fileCount > 1,
+      requiresDeepAnalysis: complexity.level === 'complex',
+      isTemplateGeneration: complexity.level === 'simple',
+      hasSecurityImplications: (request.prompt || '').toLowerCase().includes('security'),
+      estimatedProcessingTime: complexity.level === 'simple' ? 5 : complexity.level === 'medium' ? 8 : 12,
+    };
+  }
+
+  /**
    * HYBRID ARCHITECTURE: Process request with hybrid routing
    */
   private async processRequestWithHybrid(request: any, routingDecision: any): Promise<any> {
@@ -1636,8 +1665,25 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         });
       }
 
-      // Process the request
-      const response = await provider.processRequest(request);
+      // Process the request with timeout handling
+      const processRequest = async () => {
+        if (request.abortSignal?.aborted) {
+          throw new Error('Request was aborted');
+        }
+        return await provider.processRequest(request);
+      };
+
+      // Add timeout protection at provider level
+      const response = await Promise.race([
+        processRequest(),
+        new Promise((_, reject) => {
+          if (request.abortSignal) {
+            request.abortSignal.addEventListener('abort', () => {
+              reject(new Error('Request timed out'));
+            });
+          }
+        })
+      ]);
 
       // Check if response contains tool calls that need to be executed
       if (response.toolCalls && response.toolCalls.length > 0) {

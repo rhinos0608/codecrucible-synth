@@ -156,26 +156,88 @@ class LRUCache<T> {
 }
 
 /**
- * Redis Cache Layer (Mock implementation for now)
+ * Redis Cache Layer - Real Redis implementation with fallback
  */
 class RedisCache {
+  private client: any = null;
   private mockStorage = new Map<string, string>();
   private config: CacheConfig['layers']['redis'];
+  private isConnected = false;
+  private useRealRedis = false;
 
   constructor(config: CacheConfig['layers']['redis']) {
     this.config = config;
+    this.initializeRedis().catch(() => {
+      console.warn('Redis connection failed, using in-memory fallback');
+    });
+  }
+
+  private async initializeRedis(): Promise<void> {
+    try {
+      const { createClient } = await import('redis');
+      
+      const redisUrl = `redis://${this.config.host || 'localhost'}:${this.config.port || 6379}`;
+      
+      this.client = createClient({
+        url: redisUrl,
+        socket: {
+          connectTimeout: 5000,
+        }
+      });
+
+      this.client.on('error', (err: Error) => {
+        console.warn('Redis connection error, falling back to in-memory cache:', err.message);
+        this.isConnected = false;
+        this.useRealRedis = false;
+      });
+
+      this.client.on('connect', () => {
+        this.isConnected = true;
+        this.useRealRedis = true;
+      });
+
+      await this.client.connect();
+    } catch (error) {
+      console.warn('Redis initialization failed, using in-memory fallback:', error);
+      this.useRealRedis = false;
+    }
   }
 
   async get(key: string): Promise<string | null> {
     const fullKey = `${this.config.keyPrefix}${key}`;
+    
+    if (this.useRealRedis && this.isConnected && this.client) {
+      try {
+        return await this.client.get(fullKey);
+      } catch (error) {
+        console.warn('Redis get failed, using fallback:', error);
+        this.useRealRedis = false;
+      }
+    }
+    
+    // Fallback to in-memory storage
     return this.mockStorage.get(fullKey) || null;
   }
 
   async set(key: string, value: string, ttl?: number): Promise<void> {
     const fullKey = `${this.config.keyPrefix}${key}`;
+    
+    if (this.useRealRedis && this.isConnected && this.client) {
+      try {
+        if (ttl) {
+          await this.client.setEx(fullKey, ttl, value);
+        } else {
+          await this.client.set(fullKey, value);
+        }
+        return;
+      } catch (error) {
+        console.warn('Redis set failed, using fallback:', error);
+        this.useRealRedis = false;
+      }
+    }
+    
+    // Fallback to in-memory storage
     this.mockStorage.set(fullKey, value);
-
-    // In real implementation, set TTL
     if (ttl) {
       setTimeout(() => {
         this.mockStorage.delete(fullKey);
@@ -185,16 +247,65 @@ class RedisCache {
 
   async delete(key: string): Promise<boolean> {
     const fullKey = `${this.config.keyPrefix}${key}`;
+    
+    if (this.useRealRedis && this.isConnected && this.client) {
+      try {
+        const result = await this.client.del(fullKey);
+        return result > 0;
+      } catch (error) {
+        console.warn('Redis delete failed, using fallback:', error);
+        this.useRealRedis = false;
+      }
+    }
+    
+    // Fallback to in-memory storage
     return this.mockStorage.delete(fullKey);
   }
 
   async clear(): Promise<void> {
+    if (this.useRealRedis && this.isConnected && this.client) {
+      try {
+        const keys = await this.client.keys(`${this.config.keyPrefix}*`);
+        if (keys.length > 0) {
+          await this.client.del(keys);
+        }
+        return;
+      } catch (error) {
+        console.warn('Redis clear failed, using fallback:', error);
+        this.useRealRedis = false;
+      }
+    }
+    
+    // Fallback to in-memory storage
     this.mockStorage.clear();
   }
 
   async keys(pattern: string): Promise<string[]> {
+    if (this.useRealRedis && this.isConnected && this.client) {
+      try {
+        const fullPattern = `${this.config.keyPrefix}${pattern}`;
+        return await this.client.keys(fullPattern);
+      } catch (error) {
+        console.warn('Redis keys failed, using fallback:', error);
+        this.useRealRedis = false;
+      }
+    }
+    
+    // Fallback to in-memory storage
     const regex = new RegExp(pattern.replace('*', '.*'));
     return Array.from(this.mockStorage.keys()).filter(key => regex.test(key));
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.client && this.isConnected) {
+      try {
+        await this.client.disconnect();
+      } catch (error) {
+        console.warn('Error disconnecting from Redis:', error);
+      }
+    }
+    this.isConnected = false;
+    this.useRealRedis = false;
   }
 }
 

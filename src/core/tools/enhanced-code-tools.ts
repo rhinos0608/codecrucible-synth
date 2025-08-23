@@ -521,7 +521,11 @@ export class CodeAnalysisTool extends BaseTool {
 
   private async getFilesToAnalyze(args: Record<string, unknown>): Promise<string[]> {
     if (args.files) {
-      return Array.isArray(args.files) ? args.files : [args.files];
+      if (Array.isArray(args.files)) {
+        return args.files.filter((f): f is string => typeof f === 'string');
+      } else if (typeof args.files === 'string') {
+        return [args.files];
+      }
     }
 
     // Default file patterns for code analysis
@@ -535,7 +539,9 @@ export class CodeAnalysisTool extends BaseTool {
       '**/*.cpp',
       '**/*.c',
     ];
-    const patterns = args.includePatterns || defaultPatterns;
+    const patterns = Array.isArray(args.includePatterns) 
+      ? args.includePatterns.filter((p): p is string => typeof p === 'string')
+      : defaultPatterns;
 
     // Use glob to find files (simplified implementation)
     const files: string[] = [];
@@ -594,18 +600,28 @@ export class CodeAnalysisTool extends BaseTool {
     }
 
     const totalComplexity = validResults.reduce(
-      (sum, r) => sum + r.metrics.cyclomaticComplexity,
+      (sum, r) => sum + (
+        (r.metrics && typeof r.metrics === 'object' && 'cyclomaticComplexity' in r.metrics && typeof r.metrics.cyclomaticComplexity === 'number')
+          ? r.metrics.cyclomaticComplexity
+          : 0
+      ),
       0
     );
     const avgComplexity = totalComplexity / validResults.length;
-    const maxComplexity = Math.max(...validResults.map(r => r.metrics.cyclomaticComplexity));
+    const maxComplexity = Math.max(...validResults.map(r => 
+      (r.metrics && typeof r.metrics === 'object' && 'cyclomaticComplexity' in r.metrics && typeof r.metrics.cyclomaticComplexity === 'number')
+        ? r.metrics.cyclomaticComplexity
+        : 0
+    ));
 
     return {
       filesAnalyzed: validResults.length,
       averageComplexity: Math.round(avgComplexity * 100) / 100,
       maxComplexity,
       overallScore: Math.round(
-        validResults.reduce((sum, r) => sum + r.score, 0) / validResults.length
+        validResults.reduce((sum, r) => sum + (
+          (r.score && typeof r.score === 'number') ? r.score : 0
+        ), 0) / validResults.length
       ),
     };
   }

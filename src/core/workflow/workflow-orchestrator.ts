@@ -19,6 +19,31 @@ import {
   GenericResult,
 } from '../types.js';
 
+// Utility Functions
+/**
+ * Convert ModelResponse to JsonValue for workflow compatibility
+ */
+function modelResponseToJsonValue(response: any): JsonValue {
+  if (!response || typeof response !== 'object') {
+    return response;
+  }
+  
+  // Convert ModelResponse to plain JsonObject
+  const jsonObject: JsonObject = {
+    content: response.content || '',
+    model: response.model || '',
+    provider: response.provider || '',
+    metadata: response.metadata || {},
+    tokens_used: response.tokens_used || 0,
+    usage: response.usage || {},
+    cached: response.cached || false,
+    streamed: response.streamed || false,
+    processingTime: response.processingTime || 0
+  };
+  
+  return jsonObject;
+}
+
 // Core Types
 export interface ExecutionRequest {
   id?: string;
@@ -471,8 +496,9 @@ class SequentialHandler extends PatternHandler {
 
       const result = await this.modelClient.synthesize(stepRequest);
 
-      // Transform and store result
-      const transformed = step.transform ? step.transform(result) : result;
+      // Transform and store result - convert to JsonValue for compatibility
+      const jsonResult = modelResponseToJsonValue(result);
+      const transformed = step.transform ? step.transform(jsonResult) : jsonResult;
       context.set(step.id, transformed);
       results.push(transformed);
     }
@@ -961,6 +987,7 @@ class FeedbackHandler extends PatternHandler {
     };
 
     let result = await this.modelClient.synthesize(request);
+    let jsonResult = modelResponseToJsonValue(result);
     let finalResult = result;
     const checkpointsPassed = [];
     const feedbackCollected = [];
@@ -973,7 +1000,7 @@ class FeedbackHandler extends PatternHandler {
       const checkpoint = checkpoints[i];
       onProgress(20 + (i / checkpoints.length) * 60);
 
-      if (checkpoint.condition(result)) {
+      if (checkpoint.condition(jsonResult)) {
         // Checkpoint triggered - request human feedback
         const feedback = await this.requestHumanFeedback(
           checkpoint,
@@ -994,11 +1021,13 @@ class FeedbackHandler extends PatternHandler {
             };
 
             result = await this.modelClient.synthesize(improvedRequest);
+            jsonResult = modelResponseToJsonValue(result);
             retryCount++;
             i--; // Re-check same checkpoint
           } else {
             // Max retries reached - escalate or fallback
             result = await this.handleEscalation(request, result, escalationPolicy, feedback);
+            jsonResult = modelResponseToJsonValue(result);
           }
         } else if (feedback.action === 'modify') {
           // Direct modification
@@ -1028,9 +1057,11 @@ class FeedbackHandler extends PatternHandler {
       finalResult = {
         ...result,
         metadata: {
-          ...result.metadata,
+          tokens: result.metadata?.tokens || 0,
+          latency: result.metadata?.latency || 0,
+          quality: result.metadata?.quality,
           feedbackMetrics: metrics,
-        },
+        } as any,
       };
     }
 

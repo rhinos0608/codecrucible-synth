@@ -10,7 +10,7 @@ import { createHash } from 'crypto';
 import { performance } from 'perf_hooks';
 import { logger } from '../logger.js';
 // import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
-// import { UnifiedModelClient } from '../client.js';
+// import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 
 // Agent isolation levels
 export enum IsolationLevel {

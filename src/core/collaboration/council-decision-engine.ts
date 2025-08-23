@@ -4,7 +4,7 @@
  * Enhanced with Claude Code patterns for enterprise-grade coordination
  */
 
-import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
+import { VoiceArchetypeSystemInterface } from '../../refactor/voice-archetype-system-interface.js';
 import { logger } from '../logger.js';
 import { EventEmitter } from 'events';
 import { subAgentIsolationSystem, IsolationLevel } from '../agents/sub-agent-isolation-system.js';
@@ -57,7 +57,7 @@ export interface CouncilConfig {
 }
 
 export class CouncilDecisionEngine extends EventEmitter {
-  private voiceSystem: VoiceArchetypeSystem;
+  private voiceSystem: VoiceArchetypeSystemInterface;
   private modelClient: any;
   private securityFramework: EnterpriseSecurityFramework;
   private performanceMetrics: Map<string, PerformanceMetric[]> = new Map();

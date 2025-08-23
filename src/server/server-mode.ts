@@ -23,7 +23,8 @@ export interface ServerOptions {
  * Provides HTTP and WebSocket APIs for IDE extensions and external tools
  * Compatible with VS Code, JetBrains IDEs, and other development environments
  */
-export async function startServerMode(context: CLIContext, options: ServerOptions): Promise<void> {
+export class ServerMode implements ServerModeInterface {
+  async startServerMode(context: CLIContext, options: ServerOptions): Promise<void> {
   // Validate context initialization
   if (!context) {
     throw new Error('CLI context is required for server mode');

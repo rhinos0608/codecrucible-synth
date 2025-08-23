@@ -275,7 +275,7 @@ export class PerformanceOptimizer extends EventEmitter {
   private async callModelWithBatch(prompt: string, batchId: string): Promise<string> {
     try {
       // Import the UnifiedModelClient
-      const { UnifiedModelClient } = await import('../client.js');
+      const { UnifiedModelClient } = await import('../../refactor/unified-model-client.js');
 
       // Create a lightweight client configuration for batch processing
       const clientConfig = {

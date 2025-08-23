@@ -10,7 +10,7 @@ import * as path from 'path';
 import { Worker } from 'worker_threads';
 import chokidar from 'chokidar';
 import { Logger } from '../logger.js';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 
 // Core RAG Interfaces
 export interface VectorDocument {

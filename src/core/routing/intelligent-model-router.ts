@@ -6,7 +6,7 @@
 
 import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 
 // Core Router Interfaces
 export interface ModelProvider {

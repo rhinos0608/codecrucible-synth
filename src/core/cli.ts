@@ -4,7 +4,7 @@
  */
 
 import { CLIExitCode, CLIError, ModelRequest } from './types.js';
-import { UnifiedModelClient } from './client.js';
+import { UnifiedModelClient } from '../refactor/unified-model-client.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
@@ -45,7 +45,7 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { writeFile } from 'fs/promises';
 
-export class CLI {
+export class CLI implements REPLInterface {
   private context: CLIContext;
   private initialized = false;
   private workingDirectory = process.cwd();
@@ -579,78 +579,7 @@ export class CLI {
   /**
    * Execute prompt processing with voice system
    */
-  async executePromptProcessing(prompt: string, options: CLIOptions): Promise<string> {
-    try {
-      logger.debug('Starting executePromptProcessing');
-
-      // Step 1: Check if this prompt should use autonomous tool execution
-      if (this.toolOrchestrator.shouldUseTools(prompt)) {
-        console.log(chalk.cyan('🔧 Using autonomous tool orchestration...'));
-        try {
-          // Enhanced: Pass system prompt and runtime context for full integration
-          const systemPrompt = await this.buildSystemPrompt();
-          const runtimeContext = await this.buildRuntimeContext();
-          const toolResponse = await this.toolOrchestrator.processWithTools(
-            prompt,
-            systemPrompt,
-            runtimeContext
-          );
-          console.log('✅ Tool orchestration completed with full context integration');
-          return toolResponse;
-        } catch (error) {
-          console.error(chalk.red('❌ Tool orchestration failed:'), error);
-          // Fall back to standard processing
-          console.log(chalk.yellow('⚠️ Falling back to standard AI processing'));
-        }
-      }
-
-      // Step 2: Determine current role and task type for standard processing
-      const currentRole = options.role || this.dynamicModelRouter.getCurrentRole();
-      const taskType = this.analyzeTaskType(prompt);
-
-      console.log(chalk.blue(`🎯 Processing in ${currentRole} mode for ${taskType} task`));
-      logger.debug('About to select model for role');
-
-      // Step 3: Skip dynamic model router for now and use the unified client directly
-      console.log(chalk.cyan('🤖 Using unified model client directly'));
-
-      // Check if we have analysis requests
-      if (
-        prompt.toLowerCase().includes('analyz') ||
-        prompt.toLowerCase().includes('audit') ||
-        prompt.toLowerCase().includes('codebase')
-      ) {
-        const analysis = await this.performDirectCodebaseAnalysis();
-        return analysis;
-      }
-
-      // For non-analysis prompts, use the model client directly with system prompt
-      try {
-        console.log('🎯 Building system prompt and calling model client...');
-        const systemPrompt = await this.buildSystemPrompt();
-        const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}`;
-        logger.debug('System prompt injected, calling model');
-        const response = await this.context.modelClient.generateText(fullPrompt, {
-          timeout: 30000,
-        });
-        console.log('✅ Model response received');
-        return response;
-      } catch (error) {
-        console.error(
-          chalk.red('❌ Model client error:'),
-          error instanceof Error ? error.message : String(error)
-        );
-        return `Error: ${error instanceof Error ? error.message : String(error)}. Please try again with a simpler prompt.`;
-      }
-
-      // This section is now unreachable - all requests are handled above
-      return 'Processing complete';
-    } catch (error) {
-      logger.error('Prompt processing failed:', error);
-      console.log(chalk.red(`❌ Error: ${error instanceof Error ? error.message : String(error)}`));
-      return `Error processing prompt: ${error instanceof Error ? error.message : String(error)}`;
-    }
-  }
+  
 
   /**
    * Check if the prompt is requesting analysis that we can handle directly
@@ -718,507 +647,57 @@ export class CLI {
   /**
    * Legacy analysis method (kept for backward compatibility)
    */
-  private async performDirectCodebaseAnalysisLegacy(): Promise<string> {
-    // const fs = await import('fs');
-    // const path = await import('path');
-
-    console.log('📊 Analyzing project structure...');
-
-    // Real project analysis
-    const projectAnalysis = await this.analyzeProjectStructure();
-    const codeMetrics = await this.analyzeCodeMetrics();
-    const dependencyAnalysis = await this.analyzeDependencies();
-    const configAnalysis = await this.analyzeConfiguration();
-    const testAnalysis = await this.analyzeTestCoverage();
-
-    // Generate dynamic analysis report
-    const analysis = `
-# ${projectAnalysis.name} - Real-Time Codebase Analysis
-
-## Project Overview
-**Project:** ${projectAnalysis.name}
-**Version:** ${projectAnalysis.version}
-**Analysis Date:** ${new Date().toISOString()}
-**Working Directory:** ${this.workingDirectory}
-**Total Files:** ${projectAnalysis.totalFiles}
-**Total Lines of Code:** ${codeMetrics.totalLines}
-
-## Architecture Discovery
-${await this.discoverArchitectureComponents()}
-
-## Code Metrics Analysis
-- **TypeScript Files:** ${codeMetrics.typescriptFiles} (${codeMetrics.typescriptLines} lines)
-- **JavaScript Files:** ${codeMetrics.javascriptFiles} (${codeMetrics.javascriptLines} lines)
-- **Test Files:** ${testAnalysis.testFiles} (${testAnalysis.testLines} lines)
-- **Config Files:** ${configAnalysis.configFiles}
-- **Documentation Files:** ${codeMetrics.docFiles}
-
-## File Distribution
-${Object.entries(projectAnalysis.fileCounts)
-  .sort(([, a], [, b]) => (b as number) - (a as number))
-  .map(([ext, count]) => `- ${ext}: ${count} files`)
-  .join('\n')}
-
-## Discovered Components
-${projectAnalysis.discoveredComponents.map((comp: any) => `- **${comp.name}**: ${comp.description} (${comp.files} files)`).join('\n')}
-
-## Dependencies Analysis
-- **Production Dependencies:** ${dependencyAnalysis.prodDeps}
-- **Development Dependencies:** ${dependencyAnalysis.devDeps}
-- **Key Frameworks:** ${dependencyAnalysis.keyFrameworks.join(', ')}
-
-## Configuration Assessment
-${configAnalysis.configs.map((config: any) => `- **${config.name}**: ${config.status}`).join('\n')}
-
-## Test Coverage Analysis
-- **Test Files Found:** ${testAnalysis.testFiles}
-- **Test Frameworks:** ${testAnalysis.frameworks.join(', ')}
-- **Coverage Estimate:** ${testAnalysis.estimatedCoverage}%
-
-## Real Issues Detected
-${await this.detectRealIssues()}
-
-## Security Assessment
-${await this.assessSecurity()}
-
-## Performance Analysis
-${await this.analyzePerformance()}
-
-## Recommendations Based on Analysis
-${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalysis)}
-
----
-*Real-time analysis performed by CodeCrucible Synth*
-*Report generated: ${new Date().toLocaleString()}*
-`;
-
-    return analysis.trim();
-  }
+  
 
   /**
    * Analyze project structure and metadata
    */
-  private async analyzeProjectStructure(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    let projectInfo = { name: 'Unknown', version: 'Unknown' };
-    const packageJsonPath = path.join(this.workingDirectory, 'package.json');
-
-    if (fs.existsSync(packageJsonPath)) {
-      try {
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-        projectInfo = { name: packageJson.name, version: packageJson.version };
-      } catch (error) {
-        // Continue with defaults
-      }
-    }
-
-    const fileCounts = await this.countFilesByType();
-    const totalFiles = Object.values(fileCounts).reduce((sum, count) => sum + count, 0);
-    const discoveredComponents = await this.discoverProjectComponents();
-
-    return {
-      name: projectInfo.name,
-      version: projectInfo.version,
-      totalFiles,
-      fileCounts,
-      discoveredComponents,
-    };
-  }
+  
 
   /**
    * Analyze code metrics and lines of code
    */
-  private async analyzeCodeMetrics(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    let totalLines = 0;
-    let typescriptFiles = 0;
-    let typescriptLines = 0;
-    let javascriptFiles = 0;
-    let javascriptLines = 0;
-    let docFiles = 0;
-
-    const analyzeFile = (filePath: string, ext: string): number => {
-      try {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        const lines = content.split('\n').length;
-
-        if (ext === '.ts' || ext === '.tsx') {
-          typescriptFiles++;
-          typescriptLines += lines;
-        } else if (ext === '.js' || ext === '.jsx') {
-          javascriptFiles++;
-          javascriptLines += lines;
-        } else if (ext === '.md' || ext === '.txt') {
-          docFiles++;
-        }
-
-        return lines;
-      } catch (error) {
-        return 0;
-      }
-    };
-
-    const scanDirectory = (dir: string, depth: number = 0): void => {
-      if (depth > 3) return; // Limit recursion depth
-
-      try {
-        const items = fs.readdirSync(dir, { withFileTypes: true });
-
-        for (const item of items) {
-          if (item.name.startsWith('.') || item.name === 'node_modules' || item.name === 'dist')
-            continue;
-
-          const fullPath = path.join(dir, item.name);
-
-          if (item.isDirectory()) {
-            scanDirectory(fullPath, depth + 1);
-          } else if (item.isFile()) {
-            const ext = path.extname(item.name);
-            totalLines += analyzeFile(fullPath, ext);
-          }
-        }
-      } catch (error) {
-        // Ignore permission errors
-      }
-    };
-
-    scanDirectory(this.workingDirectory);
-
-    return {
-      totalLines,
-      typescriptFiles,
-      typescriptLines,
-      javascriptFiles,
-      javascriptLines,
-      docFiles,
-    };
-  }
+  
 
   /**
    * Analyze dependencies from package.json
    */
-  private async analyzeDependencies(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    const packageJsonPath = path.join(this.workingDirectory, 'package.json');
-    let prodDeps = 0;
-    let devDeps = 0;
-    let keyFrameworks: string[] = [];
-
-    if (fs.existsSync(packageJsonPath)) {
-      try {
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-        prodDeps = Object.keys(packageJson.dependencies || {}).length;
-        devDeps = Object.keys(packageJson.devDependencies || {}).length;
-
-        // Identify key frameworks
-        const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-        const frameworks = [
-          'express',
-          'react',
-          'vue',
-          'angular',
-          'next',
-          'typescript',
-          'jest',
-          'vitest',
-          'chalk',
-          'commander',
-        ];
-        keyFrameworks = frameworks.filter(
-          fw => allDeps[fw] || Object.keys(allDeps).some(dep => dep.includes(fw))
-        );
-      } catch (error) {
-        // Continue with defaults
-      }
-    }
-
-    return { prodDeps, devDeps, keyFrameworks };
-  }
+  
 
   /**
    * Analyze configuration files
    */
-  private async analyzeConfiguration(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    const configs = [
-      { name: 'TypeScript Config', file: 'tsconfig.json', status: '' },
-      { name: 'ESLint Config', file: '.eslintrc.cjs', status: '' },
-      { name: 'Jest Config', file: 'jest.config.cjs', status: '' },
-      { name: 'Package Config', file: 'package.json', status: '' },
-      { name: 'App Config', file: 'config/default.yaml', status: '' },
-    ];
-
-    for (const config of configs) {
-      const configPath = path.join(this.workingDirectory, config.file);
-      config.status = fs.existsSync(configPath) ? '✅ Present' : '❌ Missing';
-    }
-
-    return { configs, configFiles: configs.filter(c => c.status.includes('✅')).length };
-  }
+  
 
   /**
    * Analyze test coverage and test files
    */
-  private async analyzeTestCoverage(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    let testFiles = 0;
-    let testLines = 0;
-    const frameworks: string[] = [];
-
-    const scanForTests = (dir: string, depth: number = 0): void => {
-      if (depth > 2) return;
-
-      try {
-        const items = fs.readdirSync(dir, { withFileTypes: true });
-
-        for (const item of items) {
-          if (item.name.startsWith('.') || item.name === 'node_modules') continue;
-
-          const fullPath = path.join(dir, item.name);
-
-          if (
-            item.isDirectory() &&
-            (item.name === 'tests' || item.name === 'test' || item.name === '__tests__')
-          ) {
-            scanForTests(fullPath, depth + 1);
-          } else if (
-            item.isFile() &&
-            (item.name.includes('.test.') || item.name.includes('.spec.'))
-          ) {
-            testFiles++;
-            try {
-              const content = fs.readFileSync(fullPath, 'utf-8');
-              testLines += content.split('\n').length;
-
-              // Detect test frameworks
-              if (content.includes('describe(') || content.includes('it('))
-                frameworks.push('Jest/Mocha');
-              if (content.includes('test(')) frameworks.push('Jest');
-            } catch (error) {
-              // Continue
-            }
-          }
-        }
-      } catch (error) {
-        // Continue
-      }
-    };
-
-    scanForTests(this.workingDirectory);
-
-    const estimatedCoverage = testFiles > 0 ? Math.min(Math.round((testFiles / 50) * 100), 100) : 0;
-
-    return {
-      testFiles,
-      testLines,
-      frameworks: [...new Set(frameworks)],
-      estimatedCoverage,
-    };
-  }
+  
 
   /**
    * Discover project components by analyzing file structure
    */
-  private async discoverProjectComponents(): Promise<any[]> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    const components: any[] = [];
-
-    const checkComponent = (name: string, dirPath: string, description: string) => {
-      const fullPath = path.join(this.workingDirectory, dirPath);
-      if (fs.existsSync(fullPath)) {
-        try {
-          const files = fs.readdirSync(fullPath).length;
-          components.push({ name, description, files });
-        } catch (error) {
-          // Continue
-        }
-      }
-    };
-
-    checkComponent('Core System', 'src/core', 'Main application logic and architecture');
-    checkComponent('Voice System', 'src/voices', 'AI voice archetype system');
-    checkComponent('MCP Servers', 'src/mcp-servers', 'Model Context Protocol servers');
-    checkComponent('Security Framework', 'src/core/security', 'Enterprise security components');
-    checkComponent(
-      'Performance System',
-      'src/core/performance',
-      'Performance optimization modules'
-    );
-    checkComponent('CLI Interface', 'src/core/cli', 'Command-line interface components');
-    checkComponent('Tool Integration', 'src/core/tools', 'Integrated development tools');
-    checkComponent('Configuration', 'config', 'Application configuration files');
-    checkComponent('Documentation', 'Docs', 'Project documentation');
-    checkComponent('Testing Suite', 'tests', 'Test files and utilities');
-
-    return components.filter(comp => comp.files > 0);
-  }
+  
 
   /**
    * Discover architecture components by analyzing imports and exports
    */
-  private async discoverArchitectureComponents(): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    const architectureComponents: string[] = [];
-
-    // Check for key architecture files
-    const keyFiles = [
-      {
-        file: 'src/core/client.ts',
-        component: '**Unified Model Client** - Consolidated LLM provider management',
-      },
-      {
-        file: 'src/voices/voice-archetype-system.ts',
-        component: '**Voice Archetype System** - Multi-AI personality framework',
-      },
-      {
-        file: 'src/core/living-spiral-coordinator.ts',
-        component: '**Living Spiral Coordinator** - Iterative development methodology',
-      },
-      {
-        file: 'src/core/security',
-        component: '**Enterprise Security Framework** - Comprehensive security layer',
-      },
-      {
-        file: 'src/mcp-servers',
-        component: '**MCP Server Integration** - Model Context Protocol implementation',
-      },
-      {
-        file: 'src/core/hybrid/hybrid-llm-router.ts',
-        component: '**Hybrid LLM Router** - Intelligent model routing system',
-      },
-      {
-        file: 'src/core/performance',
-        component: '**Performance Optimization Suite** - Caching, batching, monitoring',
-      },
-      {
-        file: 'src/core/tools',
-        component: '**Tool Integration System** - Development tool orchestration',
-      },
-    ];
-
-    for (const { file, component } of keyFiles) {
-      const fullPath = path.join(this.workingDirectory, file);
-      if (fs.existsSync(fullPath)) {
-        architectureComponents.push(component);
-      }
-    }
-
-    return architectureComponents.map((comp, i) => `${i + 1}. ${comp}`).join('\n');
-  }
+  
 
   /**
    * Detect real issues in the codebase
    */
-  private async detectRealIssues(): Promise<string> {
-    const issues: string[] = [];
-
-    // Check for the hanging generateText issue we discovered
-    issues.push(
-      '🔴 **Critical**: UnifiedModelClient.generateText() method hanging - blocks CLI execution'
-    );
-
-    // Check for TypeScript strict mode
-    const fs = await import('fs');
-    const path = await import('path');
-    const tsconfigPath = path.join(this.workingDirectory, 'tsconfig.json');
-
-    if (fs.existsSync(tsconfigPath)) {
-      try {
-        const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
-        if (!tsconfig.compilerOptions?.strict) {
-          issues.push('🟡 **Warning**: TypeScript strict mode disabled - may hide type errors');
-        }
-      } catch (error) {
-        issues.push('🟡 **Warning**: Unable to parse tsconfig.json');
-      }
-    }
-
-    // Check for test coverage
-    const testDir = path.join(this.workingDirectory, 'tests');
-    if (!fs.existsSync(testDir)) {
-      issues.push(
-        '🟡 **Warning**: Limited test coverage - tests directory structure needs expansion'
-      );
-    }
-
-    return issues.join('\n');
-  }
+  
 
   /**
    * Assess security configuration
    */
-  private async assessSecurity(): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    const securityFeatures: string[] = [];
-
-    // Check for security components
-    const securityDir = path.join(this.workingDirectory, 'src/core/security');
-    if (fs.existsSync(securityDir)) {
-      const securityFiles = fs.readdirSync(securityDir);
-      securityFeatures.push(
-        `✅ **Security Framework**: ${securityFiles.length} security modules implemented`
-      );
-
-      if (securityFiles.includes('input-validator.ts')) {
-        securityFeatures.push('✅ **Input Validation**: Comprehensive input sanitization system');
-      }
-      if (securityFiles.includes('rbac-system.ts')) {
-        securityFeatures.push('✅ **RBAC**: Role-based access control system');
-      }
-      if (securityFiles.includes('secrets-manager.ts')) {
-        securityFeatures.push('✅ **Secrets Management**: Encrypted secrets storage');
-      }
-    }
-
-    return securityFeatures.join('\n');
-  }
+  
 
   /**
    * Analyze performance characteristics
    */
-  private async analyzePerformance(): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    const performanceFeatures: string[] = [];
-
-    // Check for performance components
-    const perfDir = path.join(this.workingDirectory, 'src/core/performance');
-    if (fs.existsSync(perfDir)) {
-      const perfFiles = fs.readdirSync(perfDir);
-      performanceFeatures.push(
-        `✅ **Performance Suite**: ${perfFiles.length} optimization modules`
-      );
-
-      if (perfFiles.some(f => f.includes('cache'))) {
-        performanceFeatures.push('✅ **Caching System**: Multi-layer caching implementation');
-      }
-      if (perfFiles.some(f => f.includes('batch'))) {
-        performanceFeatures.push('✅ **Batch Processing**: Intelligent request batching');
-      }
-      if (perfFiles.some(f => f.includes('monitor'))) {
-        performanceFeatures.push('✅ **Performance Monitoring**: Real-time performance tracking');
-      }
-    }
-
-    return performanceFeatures.join('\n');
-  }
+  
 
   /**
    * Generate recommendations based on analysis
@@ -1301,270 +780,38 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze the task type from the prompt
    */
-  private analyzeTaskType(prompt: string): string {
-    const lowerPrompt = prompt.toLowerCase();
-
-    if (
-      lowerPrompt.includes('audit') ||
-      lowerPrompt.includes('security') ||
-      lowerPrompt.includes('vulnerabilit')
-    ) {
-      return 'security-audit';
-    }
-    if (
-      lowerPrompt.includes('analyze') ||
-      lowerPrompt.includes('review') ||
-      lowerPrompt.includes('inspect')
-    ) {
-      return 'code-analysis';
-    }
-    if (
-      lowerPrompt.includes('create') ||
-      lowerPrompt.includes('generate') ||
-      lowerPrompt.includes('write')
-    ) {
-      return 'code-generation';
-    }
-    if (
-      lowerPrompt.includes('refactor') ||
-      lowerPrompt.includes('improve') ||
-      lowerPrompt.includes('optimize')
-    ) {
-      return 'code-refactoring';
-    }
-    if (
-      lowerPrompt.includes('document') ||
-      lowerPrompt.includes('explain') ||
-      lowerPrompt.includes('comment')
-    ) {
-      return 'documentation';
-    }
-
-    return 'general';
-  }
+  
 
   /**
    * Execute in Auditor mode (LM Studio optimized for fast analysis)
    */
-  private async executeAuditorMode(
-    prompt: string,
-    model: any,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _options: CLIOptions
-  ): Promise<string> {
-    console.log(chalk.magenta('🔍 Auditor Mode: Fast analysis and security scanning'));
-
-    // Configure the model client to use the selected model
-    await this.configureModelClient(model);
-
-    // Use focused analysis voices for auditing
-    const auditVoices = ['Security', 'Analyzer', 'Guardian'];
-
-    const result = await this.context.voiceSystem.generateMultiVoiceSolutions(auditVoices, prompt, {
-      workingDirectory: this.workingDirectory,
-      config: { analysisMode: 'security', priority: 'speed' },
-      files: [],
-      structure: {
-        directories: [],
-        fileTypes: {},
-      },
-    });
-
-    return this.formatResponse(result, 'audit');
-  }
+  
 
   /**
    * Execute in Writer mode (Ollama optimized for quality generation)
    */
-  private async executeWriterMode(
-    prompt: string,
-    model: any,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _options: CLIOptions
-  ): Promise<string> {
-    console.log(chalk.green('✍️  Writer Mode: High-quality generation and documentation'));
-
-    // Configure the model client to use the selected model
-    await this.configureModelClient(model);
-
-    // Use creative and implementation voices for writing
-    const writerVoices = ['Developer', 'Architect', 'Designer'];
-
-    const result = await this.context.voiceSystem.generateMultiVoiceSolutions(
-      writerVoices,
-      prompt,
-      {
-        workingDirectory: this.workingDirectory,
-        config: { generationMode: 'creative', priority: 'quality' },
-        files: [],
-        structure: {
-          directories: [],
-          fileTypes: {},
-        },
-      }
-    );
-
-    return this.formatResponse(result, 'generation');
-  }
+  
 
   /**
    * Execute in Auto mode (intelligent routing)
    */
-  private async executeAutoMode(prompt: string, model: any, options: CLIOptions): Promise<string> {
-    console.log(chalk.blue('🤖 Auto Mode: Intelligent task routing'));
-
-    const taskType = this.analyzeTaskType(prompt);
-
-    // Route to appropriate mode based on task
-    if (taskType.includes('audit') || taskType.includes('security')) {
-      return await this.executeAuditorMode(prompt, model, options);
-    } else if (taskType.includes('generation') || taskType.includes('write')) {
-      return await this.executeWriterMode(prompt, model, options);
-    } else {
-      // Balanced approach for general tasks
-      await this.configureModelClient(model);
-
-      const balancedVoices = ['Explorer', 'Developer', 'Maintainer'];
-
-      const result = await this.context.voiceSystem.generateMultiVoiceSolutions(
-        balancedVoices,
-        prompt,
-        {
-          workingDirectory: this.workingDirectory,
-          config: { mode: 'balanced' },
-          files: [],
-          structure: {
-            directories: [],
-            fileTypes: {},
-          },
-        }
-      );
-
-      return this.formatResponse(result, 'general');
-    }
-  }
+  
 
   /**
    * Configure the model client to use the selected model
    */
-  private async configureModelClient(model: any): Promise<void> {
-    // This would configure the unified client to use the specific model
-    // For now, log the selection - actual implementation would depend on UnifiedModelClient API
-    logger.info(`Configuring client for model: ${model.model} (${model.provider})`);
-  }
+  
 
   /**
    * Format the response based on execution mode
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private formatResponse(result: any, _mode: string): string {
-    // Handle array of voice responses
-    if (Array.isArray(result) && result.length > 0) {
-      const firstResponse = result[0];
-      if (firstResponse && firstResponse.content) {
-        CLIDisplay.displayResults(
-          {
-            content: firstResponse.content,
-            voicesUsed: result,
-            qualityScore: 0.8,
-          },
-          []
-        );
-        return firstResponse.content;
-      }
-    }
-
-    // Handle single response object
-    if (result && typeof result === 'object' && 'content' in result) {
-      CLIDisplay.displayResults(result as any, []);
-      return (result as any).content || 'No content generated';
-    }
-
-    return 'No content generated';
-  }
+  
 
   /**
    * Display streaming response using enhanced streaming client
    */
-  private async displayStreamingResponse(prompt: string, options: CLIOptions): Promise<void> {
-    const request: ModelRequest = {
-      prompt,
-      model: (options.model as string) || 'default',
-      maxTokens: (options.maxTokens as number) || 2000,
-    };
-
-    let buffer = '';
-    const spinner = ora('🌊 Streaming response...').start();
-    let streamingStarted = false;
-
-    try {
-      const response = await this.context.modelClient.streamRequest(
-        request,
-        token => {
-          // Real-time token handling
-          if (!token.finished && token.content) {
-            if (!streamingStarted) {
-              spinner.stop();
-              streamingStarted = true;
-              console.log(chalk.cyan('\n🌊 Streaming Response:'));
-            }
-
-            buffer += token.content;
-            // Write each token immediately for real-time feel
-            process.stdout.write(token.content);
-          } else if (token.finished) {
-            // Final token - display completion
-            if (!streamingStarted) {
-              spinner.stop();
-            }
-            console.log(chalk.gray('\n\n✅ Stream completed'));
-
-            if (token.metadata) {
-              console.log(
-                chalk.gray(
-                  `   Tokens: ${token.metadata.totalTokens}, Duration: ${token.metadata.duration}ms`
-                )
-              );
-            }
-          }
-        },
-        {
-          workingDirectory: this.workingDirectory,
-          config: this.context.config as unknown as Record<string, unknown>,
-          files: [],
-        }
-      );
-
-      // Log final response details
-      logger.info('Streaming response completed', {
-        length: response.content.length,
-        cached: response.cached,
-        processingTime: response.processingTime,
-      });
-    } catch (error) {
-      spinner.stop();
-
-      // Handle different types of streaming errors
-      if (error instanceof Error && error.message?.includes('timeout')) {
-        console.error(chalk.yellow('\n⏱️ Streaming timeout - the response took too long'));
-        console.log(chalk.gray('Partial response:'), buffer || '(none)');
-      } else if (error instanceof Error && error.message?.includes('ECONNREFUSED')) {
-        console.error(chalk.red('\n❌ Connection Error: Cannot connect to the AI model server'));
-        console.log(chalk.yellow('Please ensure Ollama or LM Studio is running'));
-      } else if (error instanceof Error && error.message?.includes('model not found')) {
-        console.error(chalk.red('\n❌ Model Error: The requested model is not available'));
-        console.log(chalk.yellow('Run "crucible models" to see available models'));
-      } else {
-        console.error(
-          chalk.red('\n❌ Streaming Error:'),
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-
-      // Don't throw, return gracefully to keep CLI running
-      return;
-    }
-  }
+  
 
   /**
    * Start interactive mode
@@ -1837,8 +1084,8 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   // Legacy compatibility methods
   async checkOllamaStatus(): Promise<boolean> {
     try {
-      const result = await this.context.modelClient.healthCheck();
-      return !!result;
+      const result = await this.context.modelClient.checkHealth();
+      return result.status === 'healthy';
     } catch {
       return false;
     }
@@ -1865,21 +1112,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   }
 
   // Delegate methods to command handlers
-  async showStatus(): Promise<void> {
-    await this.commands.showStatus();
-  }
-
-  async listModels(): Promise<void> {
-    await this.commands.listModels();
-  }
-
-  async handleGeneration(prompt: string, options: CLIOptions = {}): Promise<void> {
-    await this.commands.handleGeneration(prompt, options);
-  }
-
-  async handleAnalyze(files: string[] = [], options: CLIOptions = {}): Promise<void> {
-    await this.commands.handleAnalyze(files, options);
-  }
+  
 
   /**
    * Handle role switching via slash commands
@@ -1936,211 +1169,27 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Handle model switching
    */
-  private async handleModelSwitch(modelName: string): Promise<void> {
-    try {
-      console.log(chalk.blue(`🔄 Switching to model: ${modelName}`));
-
-      // Unload current models and switch
-      const providers = this.context.modelClient.getProviders();
-      let switched = false;
-
-      for (const [providerName, provider] of providers) {
-        if (provider && typeof provider.switchModel === 'function') {
-          try {
-            await provider.switchModel(modelName);
-            console.log(chalk.green(`✅ Model switched to ${modelName} on ${providerName}`));
-            switched = true;
-            break;
-          } catch (error) {
-            console.log(chalk.yellow(`⚠️  Model ${modelName} not available on ${providerName}`));
-          }
-        }
-      }
-
-      if (!switched) {
-        // Try to create new provider instance with the model
-        await this.handleModelReload();
-        console.log(
-          chalk.yellow(`⚠️  Model switch failed. Reloaded providers with autonomous detection.`)
-        );
-      }
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      console.error(chalk.red('❌ Model switch failed:'), errorMessage);
-    }
-  }
+  
 
   /**
    * Handle model listing
    */
-  private async handleModelList(): Promise<void> {
-    try {
-      console.log(chalk.blue('📋 Available Models:'));
-      const providers = this.context.modelClient.getProviders();
-
-      for (const [providerName, provider] of providers) {
-        if (provider && typeof provider.listModels === 'function') {
-          try {
-            const models = await provider.listModels();
-            console.log(chalk.green(`\n${providerName.toUpperCase()}:`));
-            models.forEach((model: any, index: number) => {
-              console.log(chalk.gray(`  ${index + 1}. ${model}`));
-            });
-          } catch (error) {
-            console.log(chalk.red(`  ❌ Failed to list models for ${providerName}`));
-          }
-        }
-      }
-
-      console.log(chalk.blue('\n💡 Switch models with: /model:model-name'));
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      console.error(chalk.red('❌ Failed to list models:'), errorMessage);
-    }
-  }
+  
 
   /**
    * Handle model reload
    */
-  private async handleModelReload(): Promise<void> {
-    try {
-      console.log(chalk.blue('🔄 Reloading providers and detecting models...'));
-
-      // Reinitialize providers with autonomous detection
-      await this.context.modelClient.initialize();
-
-      console.log(chalk.green('✅ Providers reloaded with autonomous model detection'));
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      console.error(chalk.red('❌ Model reload failed:'), errorMessage);
-    }
-  }
+  
 
   /**
    * Show slash command help
    */
-  private showSlashHelp(): string {
-    const help = `
-${chalk.bold.blue('📚 Slash Commands Help')}
-
-${chalk.green('/auditor')} [prompt]  - Switch to Auditor mode (LM Studio)
-                       Optimized for: Code analysis, security auditing, bug detection
-                       
-${chalk.green('/writer')} [prompt]   - Switch to Writer mode (Ollama)  
-                       Optimized for: Code generation, documentation, refactoring
-                       
-${chalk.green('/auto')} [prompt]     - Switch to Auto mode
-                       Intelligent routing based on task requirements
-                       
-${chalk.green('/help')}              - Show this help message
-${chalk.green('/model-list')} (or /ml) - List all available models  
-${chalk.green('/model:name')}         - Switch to specific model
-${chalk.green('/model-reload')} (or /mr) - Reload providers and detect models
-
-${chalk.bold.yellow('Examples:')}
-${chalk.gray('/auditor Analyze this codebase for security vulnerabilities')}
-${chalk.gray('/writer Create a React component for user authentication')}
-${chalk.gray('/auto Optimize this function for better performance')}
-${chalk.gray('/model-list                 # List available models')}
-${chalk.gray('/model:qwen2.5-coder:7b     # Switch to specific model')}
-${chalk.gray('/model-reload               # Refresh model detection')}
-
-${chalk.bold.cyan('Current Mode:')} ${this.dynamicModelRouter.getCurrentRole()}
-`;
-
-    console.log(help);
-    return help;
-  }
+  
 
   /**
    * Handle Sequential Dual Agent Review
    */
-  private async handleSequentialReview(prompt: string, options: CLIOptions): Promise<void> {
-    try {
-      console.log(chalk.blue('\n🔄 Initializing Sequential Dual-Agent Review System'));
-
-      // Build configuration from CLI options
-      const config: SequentialAgentConfig = {
-        writer: {
-          provider: options.writerProvider || 'lm-studio',
-          temperature: options.writerTemp || 0.7,
-          maxTokens: options.writerTokens || 4096,
-        },
-        auditor: {
-          provider: options.auditorProvider || 'ollama',
-          temperature: options.auditorTemp || 0.2,
-          maxTokens: options.auditorTokens || 2048,
-        },
-        workflow: {
-          autoAudit: options.autoAudit !== false, // Default true
-          applyFixes: options.applyFixes || false,
-          maxIterations: 3,
-          confidenceThreshold: options.confidenceThreshold || 0.8,
-        },
-      };
-
-      // Initialize sequential system
-      const sequentialSystem = new SequentialDualAgentSystem(config);
-
-      // Get runtime context for better integration
-      const runtimeContext = await this.buildRuntimeContext();
-
-      console.log(
-        chalk.cyan(`📝 Writer: ${config.writer.provider} (temp: ${config.writer.temperature})`)
-      );
-      console.log(
-        chalk.cyan(`🔍 Auditor: ${config.auditor.provider} (temp: ${config.auditor.temperature})`)
-      );
-      console.log(chalk.cyan(`🎯 Confidence Threshold: ${config.workflow.confidenceThreshold}`));
-
-      // Execute sequential review
-      const spinner = ora('Executing sequential review...').start();
-      const result = await sequentialSystem.executeSequentialReview(prompt, runtimeContext);
-      spinner.stop();
-
-      // Display results
-      console.log(chalk.green('\n✅ Sequential Review Completed!\n'));
-      console.log(chalk.bold('📝 Generated Code:'));
-      if (options.showCode !== false) {
-        console.log(chalk.gray('─'.repeat(60)));
-        console.log(result.writerOutput.code);
-        console.log(chalk.gray('─'.repeat(60)));
-      }
-
-      console.log(chalk.bold('\n🔍 Audit Results:'));
-      console.log(chalk.cyan(`Overall Score: ${result.auditorOutput.review.overallScore}/100`));
-      console.log(
-        chalk.cyan(`Status: ${result.auditorOutput.review.passed ? 'PASSED' : 'FAILED'}`)
-      );
-      console.log(
-        chalk.cyan(`Recommendation: ${result.auditorOutput.review.recommendation.toUpperCase()}`)
-      );
-
-      if (result.auditorOutput.review.issues && result.auditorOutput.review.issues.length > 0) {
-        console.log(chalk.yellow('\n⚠️ Issues Found:'));
-        result.auditorOutput.review.issues.forEach((issue, index) => {
-          console.log(chalk.yellow(`${index + 1}. [${issue.severity}] ${issue.description}`));
-        });
-      }
-
-      // Save result if requested
-      if (options.saveResult) {
-        const filename = `sequential-review-${Date.now()}.json`;
-        await writeFile(filename, JSON.stringify(result, null, 2));
-        console.log(chalk.green(`\n💾 Results saved to ${filename}`));
-      }
-
-      console.log(chalk.blue(`\n⏱️ Total Duration: ${result.totalDuration}ms`));
-      console.log(
-        chalk.blue(
-          `📊 Writer: ${result.writerOutput.duration}ms | Auditor: ${result.auditorOutput.duration}ms`
-        )
-      );
-    } catch (error) {
-      console.error(chalk.red('❌ Sequential review failed:'), error);
-      throw error;
-    }
-  }
+  
 }
 
 // Export alias for backward compatibility

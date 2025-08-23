@@ -1,4 +1,4 @@
-import { LivingSpiralCoordinator } from '../core/living-spiral-coordinator.js';
+import { LivingSpiralCoordinatorInterface } from '../refactor/living-spiral-coordinator-interface.js';
 import {
   CouncilDecisionEngine,
   CouncilMode,
@@ -27,9 +27,11 @@ interface VoiceConfig {
   };
 }
 
-export class VoiceArchetypeSystem {
+import { VoiceArchetypeSystemInterface } from '../refactor/voice-archetype-system-interface.js';
+
+export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
   private voices: Map<string, Voice> = new Map();
-  private livingSpiralCoordinator: LivingSpiralCoordinator;
+  private livingSpiralCoordinator: LivingSpiralCoordinatorInterface;
   private councilEngine: CouncilDecisionEngine;
   private config: VoiceConfig;
   private modelClient: any;
@@ -692,7 +694,7 @@ export class VoiceArchetypeSystem {
     return this.generateMultiVoiceSolutions(['explorer', 'maintainer', 'security'], prompt);
   }
 
-  getLivingSpiralCoordinator(): LivingSpiralCoordinator {
+  getLivingSpiralCoordinator(): LivingSpiralCoordinatorInterface {
     if (!this.livingSpiralCoordinator) {
       // Lazy initialization - need to import here to avoid circular dependencies
       const defaultConfig = {

@@ -5,7 +5,7 @@
 
 import { UnifiedAgent } from '../agent.js';
 import { ExecutionRequest, ExecutionResponse } from '../types.js';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import { PerformanceMonitor } from '../../utils/performance.js';
 import { logger } from '../logger.js';
 import { promises as fs } from 'fs';

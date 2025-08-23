@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { join, relative, isAbsolute, dirname } from 'path';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 
 const GenerateCodeSchema = z.object({
   specification: z.string().describe('Natural language description of what code to generate'),

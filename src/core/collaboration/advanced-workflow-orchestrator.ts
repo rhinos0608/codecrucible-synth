@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
 import { UnifiedAgent } from '../agent.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 
 export interface WorkflowTask {
   id: string;

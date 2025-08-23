@@ -5,7 +5,8 @@
 
 import { logger } from './logger.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
-import { UnifiedModelClient } from './client.js';
+import { UnifiedModelClient } from '../refactor/unified-model-client.js';
+import { LivingSpiralCoordinatorInterface } from '../refactor/living-spiral-coordinator-interface.js';
 
 export enum SpiralPhase {
   COLLAPSE = 'collapse',
@@ -47,7 +48,7 @@ export interface SpiralResult {
   synthesisResults: any[];
 }
 
-export class LivingSpiralCoordinator {
+export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface {
   private voiceSystem: VoiceArchetypeSystem;
   private modelClient: UnifiedModelClient;
   private config: SpiralConfig;

@@ -5,7 +5,7 @@
 
 import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
 import { cpus } from 'os';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 
 export interface AnalysisTask {

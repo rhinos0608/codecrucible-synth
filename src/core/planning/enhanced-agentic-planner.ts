@@ -1,4 +1,4 @@
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { logger } from '../logger.js';

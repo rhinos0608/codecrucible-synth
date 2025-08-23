@@ -1,5 +1,5 @@
 import { logger } from '../logger.js';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 

@@ -15,7 +15,7 @@ import {
   AnalysisOptions,
 } from './project-intelligence-system.js';
 import { ExecutionRequest } from '../types.js';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 
 export interface ContextAwareOptions {
   enableIntelligence?: boolean;

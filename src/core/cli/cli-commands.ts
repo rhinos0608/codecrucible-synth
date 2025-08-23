@@ -13,7 +13,7 @@ import { logger } from '../logger.js';
 import { CLIOptions, CLIContext } from './cli-types.js';
 // import { CLIDisplay } from './cli-display.js';
 // import { ProjectContext } from '../client.js';
-import { startServerMode, ServerOptions } from '../../server/server-mode.js';
+import { ServerModeInterface } from '../../refactor/server-mode-interface.js';
 import { analysisWorkerPool, AnalysisTask } from '../workers/analysis-worker.js';
 import { randomUUID } from 'crypto';
 
@@ -263,19 +263,19 @@ export class CLICommands {
   /**
    * Start server mode
    */
-  async startServer(options: CLIOptions): Promise<void> {
+  async startServer(options: CLIOptions, serverMode: ServerModeInterface): Promise<void> {
     const port = parseInt(options.port || '3002', 10);
 
     console.log(chalk.cyan(`\n🚀 Starting CodeCrucible Server on port ${port}...`));
 
-    const serverOptions: ServerOptions = {
+    const serverOptions: any = {
       port,
       host: 'localhost',
       cors: true,
     };
 
     try {
-      await startServerMode(this.context, serverOptions);
+      await serverMode.startServerMode(this.context, serverOptions);
       console.log(chalk.green(`✅ Server running at http://localhost:${port}`));
     } catch (error) {
       console.error(chalk.red('❌ Failed to start server:'), error);

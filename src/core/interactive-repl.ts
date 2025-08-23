@@ -5,7 +5,7 @@
 
 import * as readline from 'readline';
 import chalk from 'chalk';
-import { CLI, CLIContext } from './cli.js';
+import { REPLInterface } from '../refactor/repl-interface.js';
 import { Logger } from './logger.js';
 import { getErrorMessage } from '../utils/error-utils.js';
 
@@ -18,7 +18,7 @@ export class InteractiveREPL {
   private history: string[] = [];
   private currentModel: string = '';
 
-  constructor(cli: CLI, context: CLIContext) {
+  constructor(cli: REPLInterface, context: CLIContext) {
     this.cli = cli;
     this.context = context;
     this.logger = new Logger('InteractiveREPL');

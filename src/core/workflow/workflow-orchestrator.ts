@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import { Logger } from '../logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import {

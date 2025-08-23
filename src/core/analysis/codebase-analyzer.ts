@@ -419,7 +419,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     // Check for the hanging generateText issue we discovered
     issues.push(
-      '🔴 **Critical**: UnifiedModelClient.generateText() method hanging - blocks CLI execution'
+      '🔴 **Critical**: Text generation method hanging - blocks CLI execution'
     );
 
     // Check for TypeScript strict mode
@@ -523,7 +523,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     // Critical recommendations based on real analysis
     recommendations.push(
-      '1. **URGENT**: Fix UnifiedModelClient.generateText() hanging issue to restore full functionality'
+      '1. **URGENT**: Fix text generation method hanging issue to restore full functionality'
     );
 
     if (testAnalysis.estimatedCoverage < 50) {

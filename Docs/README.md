@@ -270,6 +270,8 @@ Special thanks to the open-source AI community for advancing local AI capabiliti
 
 **🎯 Mission**: Making advanced AI coding assistance fast, local, and secure.
 
-**🚀 Vision**: A world where every developer has a personal AI coding expert running securely on their machine.
+**🚀 Vision**: A world where every developer has a personal AI coding expert with external tool integration.
 
-**🔒 Security**: Enterprise-grade security with E2B sandboxing and comprehensive validation.
+**🔒 Security**: Enterprise-grade security with environment-based API key management, MCP integration, and comprehensive validation.
+
+**🔧 Integration**: Extensible architecture with Smithery registry for discovering and connecting to external MCP servers.

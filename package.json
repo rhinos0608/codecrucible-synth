@@ -1,7 +1,7 @@
 {
   "name": "codecrucible-synth",
   "version": "4.0.6",
-  "description": "Production-Ready AI-Powered Code Generation & Analysis Tool with Multi-Voice Synthesis, Optimized Performance, Cross-Session Caching, and Zero-Timeout Reliability",
+  "description": "Production-Ready AI Development Platform with Multi-Voice Synthesis, Smithery MCP Integration, Enterprise Security, and Zero-Timeout Reliability",
   "main": "dist/index.js",
   "type": "module",
   "bin": {

@@ -161,10 +161,12 @@ Docs/                      # Comprehensive documentation
 
 ## Key Configuration Files
 
-- **`package.json`**: Dependencies, scripts, and build configuration
+- **`package.json`**: Dependencies including Smithery SDK, scripts, and build configuration
 - **`tsconfig.json`**: TypeScript compilation settings with path aliases
 - **`config/default.yaml`**: Default application configuration
 - **`config/hybrid-config.json`**: Hybrid model routing configuration
+- **`.env.example`**: Template for environment variables (API keys)
+- **`.env`**: Actual environment configuration (excluded from git)
 - **`jest.config.cjs`**: Test configuration
 
 ## Development Guidelines
@@ -183,7 +185,10 @@ Docs/                      # Comprehensive documentation
 - **Mock Providers**: Extensive mocking for AI model dependencies
 
 ### Security Considerations
+- **API Key Management**: Environment variables for all sensitive data
+- **Git Security**: Automatic .env exclusion from version control
 - **Input Validation**: All user inputs are sanitized through SecurityUtils
+- **MCP Security**: Bearer token authentication for external connections
 - **Sandboxing**: Tool execution is containerized and restricted
 - **Path Restrictions**: File operations are limited to allowed directories
 - **Command Whitelisting**: Terminal operations use approved command lists
@@ -218,6 +223,20 @@ Docs/                      # Comprehensive documentation
 - Node.js 18+ (specified in package.json engines)
 - Optional: Ollama for local AI models
 - Optional: LM Studio for hybrid model architecture
+- Optional: Smithery API key for external MCP integrations
+
+### MCP Integration Setup
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Add your Smithery API key for external MCP servers
+echo "SMITHERY_API_KEY=your_smithery_api_key_here" >> .env
+
+# Verify MCP integration
+npm run build
+node dist/index.js status
+```
 
 ### AI Model Setup
 ```bash
@@ -258,20 +277,27 @@ crucible --version
 # Enable verbose logging
 DEBUG=codecrucible:* npm run dev
 
-# Check system status
+# Check system status including MCP integration
 crucible status
 
 # Analyze specific files
 crucible analyze src/core/cli.ts
+
+# Test MCP integration
+node dist/index.js "Show me available MCP tools"
 ```
 
 ## Notable Implementation Details
 
+- **Production Security**: Environment-based API key management with git protection
+- **MCP Registry Integration**: Smithery discovery with 10+ external servers
 - **Graceful Model Handling**: System continues to work without AI models for basic operations
 - **Streaming Responses**: Real-time token generation for better user experience
 - **Memory Management**: Automatic cleanup and resource monitoring
 - **Configuration Flexibility**: YAML-based configuration with environment overrides
+- **External Tool Integration**: Task Manager, Terminal Controller, Remote Shell via MCP
+- **Health Monitoring**: Built-in connection health checks and failover
 - **Cross-Platform**: Designed to work on Windows, macOS, and Linux
 
-The codebase follows a modular, event-driven architecture with strong security principles and comprehensive error handling. The Living Spiral methodology provides a structured approach to iterative development with AI assistance.
+The codebase follows a modular, event-driven architecture with enterprise security principles, comprehensive error handling, and extensible MCP integration. The Living Spiral methodology provides a structured approach to iterative development with AI assistance.
 

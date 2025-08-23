@@ -41,6 +41,12 @@ import { getErrorMessage, toError } from '../utils/error-utils.js';
 import { createHash } from 'crypto';
 import { StreamingManager, IStreamingManager } from './streaming/streaming-manager.js';
 import { CacheCoordinator, ICacheCoordinator } from './caching/cache-coordinator.js';
+import { VoiceSynthesisManager, IVoiceSynthesisManager } from './voice-system/voice-synthesis-manager.js';
+import { ProviderSelectionStrategy, IProviderSelectionStrategy, ExecutionMode as StrategyExecutionMode } from './providers/provider-selection-strategy.js';
+import { RequestExecutionManager, IRequestExecutionManager } from './execution/request-execution-manager.js';
+import { HealthStatusManager, IHealthStatusManager } from './health/health-status-manager.js';
+import { ConfigurationManager, IConfigurationManager } from './config/configuration-manager.js';
+import { RequestProcessingCoreManager, IRequestProcessingCoreManager } from './processing/request-processing-core-manager.js';
 
 // Import streaming interfaces from extracted module
 import type { StreamToken, StreamConfig } from './streaming/streaming-manager.js';
@@ -56,47 +62,27 @@ import type { IModelClient } from './interfaces/client-interfaces.js';
 
 // Re-export provider types from ProviderRepository
 export type { ProviderType, ProviderConfig } from './providers/provider-repository.js';
-export type ExecutionMode = 'fast' | 'auto' | 'quality';
+export type { ExecutionMode } from './execution/request-execution-manager.js';
+export type ExecutionModeClient = 'fast' | 'auto' | 'quality';
+
+// Import ExecutionMode for local use
+import type { ExecutionMode } from './execution/request-execution-manager.js';
 
 /**
- * Helper function to create default UnifiedClientConfig with streaming
+ * Helper function to create default UnifiedClientConfig with streaming - delegated to ConfigurationManager
  */
 export function createDefaultUnifiedClientConfig(
   overrides: Partial<UnifiedClientConfig> = {}
 ): UnifiedClientConfig {
-  return {
-    providers: [
-      { type: 'ollama', endpoint: 'http://localhost:11434' },
-      { type: 'lm-studio', endpoint: 'http://localhost:1234' },
-    ],
-    executionMode: 'auto',
-    fallbackChain: ['ollama', 'lm-studio', 'huggingface'],
-    performanceThresholds: {
-      fastModeMaxTokens: 1000,
-      timeoutMs: 180000,
-      maxConcurrentRequests: 3,
-    },
-    security: {
-      enableSandbox: true,
-      maxInputLength: 50000,
-      allowedCommands: ['npm', 'node', 'git'],
-    },
-    streaming: {
-      chunkSize: 50,
-      bufferSize: 1024,
-      enableBackpressure: true,
-      timeout: 30000,
-      encoding: 'utf8',
-    },
-    ...overrides,
-  };
+  const configManager = new ConfigurationManager();
+  return configManager.createDefaultUnifiedClientConfig(overrides);
 }
 
 // ProviderConfig moved to ProviderRepository
 
 export interface UnifiedClientConfig extends BaseUnifiedClientConfig {
   providers: ProviderConfig[];
-  executionMode: ExecutionMode;
+  executionMode: ExecutionModeClient;
   fallbackChain: ProviderType[];
   performanceThresholds: {
     fastModeMaxTokens: number;
@@ -164,6 +150,14 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   // ASYNC INITIALIZATION: Track initialization state
   private initialized = false;
 
+  // Extracted module managers
+  private voiceSynthesisManager: IVoiceSynthesisManager;
+  private providerSelectionStrategy: IProviderSelectionStrategy; 
+  private requestExecutionManager: IRequestExecutionManager;
+  private healthStatusManager: IHealthStatusManager;
+  private configurationManager: IConfigurationManager;
+  private requestProcessingCoreManager: IRequestProcessingCoreManager;
+
   constructor(
     config: UnifiedClientConfig,
     // DI-enabled constructor with optional injected dependencies
@@ -174,6 +168,12 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       cacheCoordinator?: ICacheCoordinator;
       performanceMonitor?: PerformanceMonitor;
       hybridRouter?: HybridLLMRouter;
+      voiceSynthesisManager?: IVoiceSynthesisManager;
+      providerSelectionStrategy?: IProviderSelectionStrategy;
+      requestExecutionManager?: IRequestExecutionManager;
+      healthStatusManager?: IHealthStatusManager;
+      configurationManager?: IConfigurationManager;
+      requestProcessingCoreManager?: IRequestProcessingCoreManager;
     }
   ) {
     super();
@@ -208,6 +208,64 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       injectedDependencies?.streamingManager || new StreamingManager(config.streaming);
     this.providerRepository = injectedDependencies?.providerRepository || new ProviderRepository();
     this.cacheCoordinator = injectedDependencies?.cacheCoordinator || new CacheCoordinator();
+
+    // Initialize extracted managers
+    this.voiceSynthesisManager = injectedDependencies?.voiceSynthesisManager || new VoiceSynthesisManager(
+      undefined, // voiceArchetypeSystem - not available yet
+      (request: any) => this.processRequest(request) // Pass processRequest method
+    );
+    
+    this.providerSelectionStrategy = injectedDependencies?.providerSelectionStrategy || new ProviderSelectionStrategy(
+      {
+        fallbackChain: this.config.fallbackChain,
+        selectionStrategy: 'balanced',
+        timeoutMs: this.config.performanceThresholds?.timeoutMs || 30000,
+        maxRetries: 3,
+      },
+      this.performanceMonitor
+    );
+
+    this.requestExecutionManager = injectedDependencies?.requestExecutionManager || new RequestExecutionManager(
+      {
+        maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 3,
+        defaultTimeout: this.config.performanceThresholds?.timeoutMs || 30000,
+        complexityTimeouts: {
+          simple: 10000,
+          medium: 30000,
+          complex: 60000,
+        },
+        memoryThresholds: {
+          low: 100,
+          medium: 500,
+          high: 1000,
+        },
+      },
+      this.processManager,
+      this.providerRepository
+    );
+
+    this.healthStatusManager = injectedDependencies?.healthStatusManager || new HealthStatusManager(
+      this.providerRepository,
+      this.cacheCoordinator,
+      this.performanceMonitor,
+      {
+        healthCheckTimeoutMs: 5000,
+        overallTimeoutMs: 15000,
+        cacheTtlMs: 30000,
+      }
+    );
+
+    this.configurationManager = injectedDependencies?.configurationManager || new ConfigurationManager();
+
+    this.requestProcessingCoreManager = injectedDependencies?.requestProcessingCoreManager || new RequestProcessingCoreManager({
+      maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 3,
+      defaultTimeoutMs: this.config.performanceThresholds?.timeoutMs || 180000,
+      memoryThresholds: {
+        base: 50,
+        lengthMultiplier: 0.01,
+        complexityMultiplier: 30,
+      },
+    });
 
     // HYBRID ARCHITECTURE: Use injected router or initialize new one
     if (injectedDependencies?.hybridRouter) {
@@ -332,31 +390,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
 
   private getDefaultConfig(): UnifiedClientConfig {
-    return {
-      providers: [
-        { type: 'ollama', endpoint: 'http://localhost:11434' },
-        { type: 'lm-studio', endpoint: 'http://localhost:1234' },
-      ],
-      executionMode: 'auto',
-      fallbackChain: ['ollama', 'lm-studio', 'huggingface'],
-      performanceThresholds: {
-        fastModeMaxTokens: 1000,
-        timeoutMs: 180000, // 3 minutes default timeout
-        maxConcurrentRequests: 3, // Increased back to 3 for faster parallel processing
-      },
-      security: {
-        enableSandbox: true,
-        maxInputLength: 50000,
-        allowedCommands: ['npm', 'node', 'git'],
-      },
-      streaming: {
-        chunkSize: 50,
-        bufferSize: 1024,
-        enableBackpressure: true,
-        timeout: 30000,
-        encoding: 'utf8',
-      },
-    };
+    return this.configurationManager.getDefaultConfig();
   }
 
   /**
@@ -858,77 +892,29 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
 
   /**
-   * Estimate memory usage for a request
+   * Estimate memory usage for a request - delegated to RequestProcessingCoreManager
    */
   private estimateMemoryUsage(request: ModelRequest): number {
-    const baseMemory = 50; // Base memory in MB
-    const promptLength = request.prompt.length;
-
-    // Estimate based on prompt length and complexity
-    let estimatedMemory = baseMemory;
-
-    if (promptLength > 1000) estimatedMemory += 20;
-    if (promptLength > 5000) estimatedMemory += 50;
-    if (promptLength > 10000) estimatedMemory += 100;
-
-    // Add memory for complex operations
-    if (request.prompt.includes('analyze') || request.prompt.includes('review')) {
-      estimatedMemory += 30;
-    }
-    if (request.prompt.includes('generate') || request.prompt.includes('create')) {
-      estimatedMemory += 40;
-    }
-
-    return estimatedMemory;
+    return this.requestProcessingCoreManager.estimateMemoryUsage(request);
   }
 
   /**
-   * Determine process type based on request
+   * Determine process type based on request - delegated to RequestProcessingCoreManager
    */
   private getProcessType(request: ModelRequest): ActiveProcess['type'] {
-    const prompt = request.prompt.toLowerCase();
-
-    if (prompt.includes('analyze') || prompt.includes('review')) {
-      return 'analysis';
-    }
-    if (prompt.includes('generate') || prompt.includes('create') || prompt.includes('write')) {
-      return 'generation';
-    }
-    if (prompt.includes('stream')) {
-      return 'streaming';
-    }
-
-    return 'model_inference';
+    return this.requestProcessingCoreManager.getProcessType(request);
   }
 
   /**
-   * Determine request priority
+   * Determine request priority - delegated to RequestProcessingCoreManager
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private getRequestPriority(request: ModelRequest): ActiveProcess['priority'] {
-    // Default to medium priority
-    // Could be enhanced with explicit priority in request
-    return 'medium';
+    return this.requestProcessingCoreManager.getRequestPriority(request);
   }
 
-  // OPTIMIZED: Fast complexity assessment for timeout determination
+  // OPTIMIZED: Fast complexity assessment for timeout determination - delegated to RequestProcessingCoreManager
   private assessComplexityFast(prompt: string): 'simple' | 'medium' | 'complex' {
-    const length = prompt.length;
-
-    // Fast bit-flag classification
-    let flags = 0;
-    if (length > 200) flags |= 1;
-    if (prompt.includes('analyze')) flags |= 2;
-    if (prompt.includes('review')) flags |= 2;
-    if (prompt.includes('debug')) flags |= 2;
-    if (prompt.includes('function')) flags |= 4;
-    if (prompt.includes('class')) flags |= 4;
-    if (prompt.includes('interface')) flags |= 4;
-
-    // Fast O(1) classification
-    if (flags >= 4 || flags & 2) return 'complex';
-    if (length < 50 && flags === 0) return 'simple';
-    return 'medium';
+    return this.requestProcessingCoreManager.assessComplexityFast(prompt);
   }
 
   private determineExecutionStrategy(
@@ -940,117 +926,30 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     timeout: number;
     complexity: string;
   } {
-    // OPTIMIZED: Fast complexity assessment
-    const complexity = this.assessComplexityFast(request.prompt);
-
-    // Auto-determine execution mode if not specified
-    let mode = this.config.executionMode;
-    if (mode === 'auto') {
-      const hasContext = context && Object.keys(context).length > 0;
-
-      if (complexity === 'simple' && !hasContext) {
-        mode = 'fast';
-      } else if (complexity === 'complex' || (hasContext && context.files?.length > 10)) {
-        mode = 'quality';
-      } else {
-        mode = 'auto';
-      }
-    }
-
-    // Select provider based on mode and availability
-    let provider: ProviderType = 'auto';
-    let timeout = this.config.performanceThresholds.timeoutMs;
-
-    // OPTIMIZED: Adaptive timeouts based on complexity
-    switch (mode) {
-      case 'fast':
-        provider = this.selectFastestProvider();
-        timeout = complexity === 'simple' ? 120000 : 180000; // 2min for simple, 3min for others
-        break;
-
-      case 'quality':
-        provider = this.selectMostCapableProvider();
-        timeout = complexity === 'complex' ? 240000 : 180000; // 4min for complex, 3min for others
-        break;
-
-      case 'auto':
-      default:
-        provider = this.selectBalancedProvider();
-        timeout = complexity === 'simple' ? 120000 : complexity === 'complex' ? 240000 : 180000; // Adaptive timeouts: 2-4 minutes
-        break;
-    }
-
-    return { mode, provider, timeout, complexity };
+    return this.requestProcessingCoreManager.determineExecutionStrategy(
+      request, 
+      context, 
+      this.config.executionMode
+    );
   }
 
   private selectFastestProvider(): ProviderType {
-    // Return provider with best latency metrics
-    const metrics = this.performanceMonitor.getProviderMetrics();
-    const sortedByLatency = Object.entries(metrics).sort(
-      ([, a], [, b]) => a.averageLatency - b.averageLatency
-    );
-
-    return (sortedByLatency[0]?.[0] as ProviderType) || this.config.fallbackChain[0];
+    return this.providerSelectionStrategy.selectProvider({ prioritizeSpeed: true }).provider;
   }
 
   private selectMostCapableProvider(): ProviderType {
-    // Return provider with best quality metrics
-    const metrics = this.performanceMonitor.getProviderMetrics();
-    const sortedByQuality = Object.entries(metrics).sort(
-      ([, a], [, b]) => b.successRate - a.successRate
-    );
-
-    return (sortedByQuality[0]?.[0] as ProviderType) || this.config.fallbackChain[0];
+    return this.providerSelectionStrategy.selectProvider({ complexity: 'complex' }).provider;
   }
 
   private selectBalancedProvider(): ProviderType {
-    // Return provider with best balance of speed and quality
-    const metrics = this.performanceMonitor.getProviderMetrics();
-    const scored = Object.entries(metrics).map(([provider, stats]) => ({
-      provider,
-      score: stats.successRate * 0.6 + (1 - stats.averageLatency / 30000) * 0.4,
-    }));
-
-    scored.sort((a, b) => b.score - a.score);
-    return (scored[0]?.provider as ProviderType) || this.config.fallbackChain[0];
+    return this.providerSelectionStrategy.selectProvider({}).provider;
   }
 
   private modelSupportsTools(provider: ProviderType, model?: string): boolean {
-    // Only enable tools for specific models that support function calling
-    if (provider === 'lm-studio') {
-      return true; // LM Studio generally supports OpenAI-compatible function calling
-    }
-
-    if (provider === 'ollama') {
-      // If no specific model provided, assume auto-selection will pick a supported model
-      if (!model) {
-        logger.debug(
-          'No specific model provided, assuming auto-selection will pick supported model'
-        );
-        return true; // Trust that auto-selection picks qwen2.5-coder which supports tools
-      }
-
-      // Only certain Ollama models support function calling
-      const model_name = model.toLowerCase();
-      // Models that support function calling (update this list as needed)
-      const supportedModels = [
-        'llama3',
-        'llama3.1',
-        'llama3.2',
-        'qwen2.5',
-        'qwq',
-        'mistral',
-        'codellama',
-      ];
-
-      const isSupported = supportedModels.some(supportedModel =>
-        model_name.includes(supportedModel)
-      );
-      logger.debug('Model tool support check', { model: model_name, isSupported });
-      return isSupported;
-    }
-
-    return false; // Conservative default - no tools for unknown providers
+    return this.providerSelectionStrategy.validateProviderForContext(provider, { 
+      requiresTools: true, 
+      model 
+    });
   }
 
   private async executeWithFallback(
@@ -1058,94 +957,19 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     request: ModelRequest,
     context: ProjectContext | undefined,
     strategy: { mode: ExecutionMode; provider: ProviderType; timeout: number; complexity: string },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     abortSignal?: AbortSignal
   ): Promise<ModelResponse> {
-    const fallbackChain =
-      strategy.provider === 'auto'
-        ? this.config.fallbackChain
-        : [strategy.provider, ...this.config.fallbackChain.filter(p => p !== strategy.provider)];
-
-    let lastError: Error | null = null;
-
-    for (const providerType of fallbackChain) {
-      const provider = this.providerRepository.getProvider(providerType);
-      if (!provider) {
-        logger.warn(`Provider ${providerType} not available, skipping`);
-        continue;
-      }
-
-      try {
-        const metrics: RequestMetrics = {
-          provider: providerType,
-          model: provider.getModelName?.() || 'unknown',
-          startTime: Date.now(),
-          success: false,
-        };
-
-        this.activeRequests.set(requestId, metrics);
-        this.emit('requestStart', { requestId, provider: providerType });
-
-        logger.info(`🚀 Attempting request with ${providerType}`);
-
-        const response = await Promise.race([
-          provider.processRequest(request, context),
-          this.createTimeoutPromise(strategy.timeout),
-        ]);
-
-        metrics.endTime = Date.now();
-        metrics.success = true;
-        metrics.tokenCount = response.usage?.totalTokens;
-
-        this.performanceMonitor.recordRequest(providerType, metrics);
-        this.activeRequests.delete(requestId);
-        this.emit('requestComplete', { requestId, provider: providerType, success: true });
-
-        logger.info(`✅ Request ${requestId} completed successfully with ${providerType}`);
-
-        // PERFORMANCE: Cache successful response
-        const responseKey = `ai:response:${createHash('sha256').update(request.prompt).digest('hex')}`;
-        this.cacheCoordinator.set(responseKey, response.content || response.text || '', {
-          ttl: 3600,
-          metadata: {
-            cachedAt: Date.now(),
-            requestType: 'general',
-            hitCount: 0,
-          },
-        });
-
-        return response;
-      } catch (error) {
-        const metrics = this.activeRequests.get(requestId);
-        if (metrics) {
-          metrics.endTime = Date.now();
-          metrics.success = false;
-          metrics.error = error instanceof Error ? error.message : String(error);
-          this.performanceMonitor.recordRequest(providerType, metrics);
-        }
-
-        this.activeRequests.delete(requestId);
-        this.emit('requestComplete', { requestId, provider: providerType, success: false, error });
-
-        lastError = error instanceof Error ? error : new Error(String(error));
-        logger.warn(`❌ Provider ${providerType} failed:`, error);
-
-        // Don't retry if it's a validation error
-        if (error instanceof Error && error.message.includes('validation')) {
-          throw error;
-        }
-      }
-    }
-
-    throw new Error(`All providers failed. Last error: ${lastError?.message}`);
+    return this.requestExecutionManager.executeWithFallback(
+      requestId,
+      request,
+      context,
+      strategy,
+      abortSignal
+    );
   }
 
   private createTimeoutPromise(timeoutMs: number): Promise<never> {
-    return new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`Request timeout after ${timeoutMs}ms`));
-      }, timeoutMs);
-    });
+    return this.requestProcessingCoreManager.createTimeoutPromise(timeoutMs);
   }
 
   // Cache management delegated to CacheCoordinator
@@ -1210,70 +1034,13 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.isProcessingQueue = false;
   }
 
-  // OPTIMIZED: Management methods with caching
+  // OPTIMIZED: Management methods with caching - delegated to HealthStatusManager
   async healthCheck(): Promise<Record<string, boolean>> {
-    const health: Record<string, boolean> = {};
-
-    // Overall timeout for entire health check (prevent CLI hanging)
-    const timeoutPromise = new Promise<Record<string, boolean>>((_, reject) => {
-      setTimeout(() => reject(new Error('Health check overall timeout (15s)')), 15000);
-    });
-
-    const healthCheckPromise = async (): Promise<Record<string, boolean>> => {
-
-    for (const [type, provider] of this.providerRepository.getAvailableProviders()) {
-      const cacheKey = `health_${type}`;
-
-      // Use cached result if available
-      if (this.cacheCoordinator.isHealthCheckCached(cacheKey, 30000)) {
-        const healthCheckCache = this.cacheCoordinator.getHealthCheckCache();
-        const cached = healthCheckCache.get(cacheKey);
-        health[type] = cached?.healthy || false;
-        continue;
-      }
-
-      try {
-        // Add timeout protection to prevent infinite hangs
-        const healthCheckPromise = provider.healthCheck?.() ?? Promise.resolve();
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error(`Health check timeout for ${type}`)), 5000);
-        });
-        
-        await Promise.race([healthCheckPromise, timeoutPromise]);
-        health[type] = true;
-        this.cacheCoordinator.setHealthCheck(cacheKey, true);
-      } catch (error) {
-        // Log timeout/connection errors but continue with other providers
-        logger.debug(`Health check failed for ${type}:`, error instanceof Error ? error.message : error);
-        health[type] = false;
-        this.cacheCoordinator.setHealthCheck(cacheKey, false);
-      }
-    }
-
-      return health;
-    };
-
-    try {
-      return await Promise.race([healthCheckPromise(), timeoutPromise]);
-    } catch (error) {
-      logger.warn('Health check failed:', error instanceof Error ? error.message : error);
-      // Return empty health status on timeout/error
-      return {};
-    }
+    return this.healthStatusManager.healthCheck();
   }
 
   getMetrics(): MetricsData {
-    return {
-      timestamp: Date.now(),
-      values: {
-        activeRequests: this.activeRequests.size,
-        queuedRequests: this.requestQueue.length,
-      },
-      metadata: {
-        providerMetrics: JSON.parse(JSON.stringify(this.performanceMonitor.getProviderMetrics())),
-        performance: JSON.parse(JSON.stringify(this.performanceMonitor.getSummary())),
-      },
-    };
+    return this.healthStatusManager.getMetrics(this.activeRequests.size, this.requestQueue.length);
   }
 
   async shutdown(): Promise<void> {
@@ -1864,61 +1631,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
    * @returns Voice-specific response with metadata
    */
   async generateVoiceResponse(prompt: string, voiceId: string, options?: any): Promise<any> {
-    try {
-      logger.info(`🎭 Generating voice response for voice: ${voiceId}`);
-
-      // Get voice configuration if VoiceArchetypeSystem is available
-      let voicePrompt = prompt;
-      const voiceTemperature = options?.temperature || 0.7;
-
-      // Try to get voice-specific configuration
-      if (options?.systemPrompt) {
-        voicePrompt = `${options.systemPrompt}\n\n${prompt}`;
-      } else {
-        // Add voice personality prefix based on voiceId
-        const voicePersonalities: Record<string, string> = {
-          explorer:
-            'As an innovative Explorer voice focused on creative solutions and new possibilities:\n',
-          maintainer:
-            'As a conservative Maintainer voice focused on stability and best practices:\n',
-          security:
-            'As a Security-focused voice prioritizing safety and vulnerability prevention:\n',
-          architect: 'As an Architecture voice focused on system design and scalability:\n',
-          developer: 'As a Developer voice focused on practical implementation:\n',
-          analyzer: 'As an Analyzer voice focused on data-driven insights:\n',
-          optimizer: 'As an Optimizer voice focused on performance and efficiency:\n',
-          designer: 'As a Designer voice focused on user experience:\n',
-          implementor: 'As an Implementor voice focused on execution:\n',
-          guardian: 'As a Guardian voice ensuring quality and standards:\n',
-        };
-
-        const personality = voicePersonalities[voiceId.toLowerCase()] || '';
-        voicePrompt = personality + prompt;
-      }
-
-      // Use processRequest with voice-enhanced prompt
-      const response = await this.processRequest({
-        prompt: voicePrompt,
-        temperature: voiceTemperature,
-        ...options,
-      });
-
-      // Format response with voice metadata
-      return {
-        content: response.content || (response as any).response,
-        voiceId: voiceId,
-        metadata: {
-          ...response.metadata,
-          processingTime: (response.metadata as any)?.processingTime || Date.now(),
-          model: (response.metadata as any)?.model || this.currentModel,
-          voiceStyle: voiceId,
-        },
-      };
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error(`Failed to generate voice response for ${voiceId}:`, errorMessage);
-      throw new Error(`Voice not found or failed: ${voiceId} - ${errorMessage}`);
-    }
+    return this.voiceSynthesisManager.generateVoiceResponse(prompt, voiceId, options);
   }
 
   /**
@@ -1929,98 +1642,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
    * @returns Multiple voice responses with metadata
    */
   async generateMultiVoiceResponses(voices: string[], prompt: string, options?: any): Promise<any> {
-    try {
-      logger.info(`🎭 Generating multi-voice responses for ${voices.length} voices`);
-
-      // Validate inputs
-      if (!voices || voices.length === 0) {
-        throw new Error('Invalid input: voices and prompt are required');
-      }
-      if (!prompt) {
-        throw new Error('Invalid input: voices and prompt are required');
-      }
-
-      const responses = [];
-      const skippedVoices = [];
-      const processedVoices = [];
-      const startTime = Date.now();
-
-      // Filter out invalid voices
-      const validVoices = voices.filter(v => {
-        if (!v || v.trim() === '') {
-          skippedVoices.push(v);
-          return false;
-        }
-        return true;
-      });
-
-      // Process voices either in parallel or sequentially
-      if (options?.parallel !== false) {
-        // Parallel processing (default)
-        const maxConcurrent = options?.maxConcurrent || 3;
-        const chunks = [];
-
-        // Split voices into chunks for controlled parallelism
-        for (let i = 0; i < validVoices.length; i += maxConcurrent) {
-          chunks.push(validVoices.slice(i, i + maxConcurrent));
-        }
-
-        // Process each chunk in parallel
-        for (const chunk of chunks) {
-          const chunkPromises = chunk.map(async voiceId => {
-            try {
-              const response = await this.generateVoiceResponse(prompt, voiceId, options);
-              processedVoices.push(voiceId);
-              return {
-                voiceId,
-                content: response.content,
-                confidence: this.assessQuality(response.content),
-              };
-            } catch (error: unknown) {
-              const errorMessage = getErrorMessage(error);
-              logger.warn(`Voice ${voiceId} failed: ${errorMessage}`);
-              skippedVoices.push(voiceId);
-              return null;
-            }
-          });
-
-          const chunkResults = await Promise.all(chunkPromises);
-          responses.push(...chunkResults.filter(r => r !== null));
-        }
-      } else {
-        // Sequential processing
-        for (const voiceId of validVoices) {
-          try {
-            const response = await this.generateVoiceResponse(prompt, voiceId, options);
-            responses.push({
-              voiceId,
-              content: response.content,
-              confidence: this.assessQuality(response.content),
-            });
-            processedVoices.push(voiceId);
-          } catch (error: unknown) {
-            const errorMessage = getErrorMessage(error);
-            logger.warn(`Voice ${voiceId} failed: ${errorMessage}`);
-            skippedVoices.push(voiceId);
-          }
-        }
-      }
-
-      const endTime = Date.now();
-
-      return {
-        responses,
-        metadata: {
-          totalProcessingTime: endTime - startTime,
-          parallelExecution: options?.parallel !== false,
-          processedVoices,
-          skippedVoices: skippedVoices.length > 0 ? skippedVoices : undefined,
-        },
-      };
-    } catch (error: unknown) {
-      logger.error('Failed to generate multi-voice responses:', getErrorMessage(error));
-      throw toError(error);
-    }
+    return this.voiceSynthesisManager.generateMultiVoiceResponses(voices, prompt, options);
   }
 
   /**
@@ -2031,127 +1653,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
    * @returns Synthesized response with individual perspectives and consensus
    */
   async synthesizeVoicePerspectives(voices: string[], prompt: string, options?: any): Promise<any> {
-    try {
-      logger.info(`🎭 Synthesizing perspectives from ${voices.length} voices`);
-
-      // First, get all voice responses
-      const multiVoiceResult = await this.generateMultiVoiceResponses(voices, prompt, {
-        ...options,
-        parallel: true,
-      });
-
-      const voicePerspectives = multiVoiceResult.responses;
-
-      // Analyze perspectives for agreements and disagreements
-      const agreements: string[] = [];
-      const disagreements: any[] = [];
-
-      // Simple consensus analysis (can be enhanced with NLP)
-      const commonTerms = new Map<string, number>();
-      const perspectives = new Map<string, Set<string>>();
-
-      // Extract key points from each voice
-      voicePerspectives.forEach((vp: any) => {
-        const keyPoints = this.extractKeyPoints(vp.content);
-        perspectives.set(vp.voiceId, new Set(keyPoints));
-
-        // Count common terms
-        keyPoints.forEach(point => {
-          commonTerms.set(point, (commonTerms.get(point) || 0) + 1);
-        });
-      });
-
-      // Find agreements (mentioned by majority of voices)
-      const majorityThreshold = Math.ceil(voices.length / 2);
-      commonTerms.forEach((count, term) => {
-        if (count >= majorityThreshold) {
-          agreements.push(term);
-        }
-      });
-
-      // Find disagreements (unique perspectives)
-      const synthesisMode = options?.synthesisMode || 'consensus';
-
-      // Create synthesized content based on mode
-      let synthesizedContent = '';
-      let councilDecision = null;
-
-      switch (synthesisMode) {
-        case 'consensus':
-          synthesizedContent = this.synthesizeConsensus(voicePerspectives, agreements);
-          break;
-
-        case 'debate':
-          synthesizedContent = this.synthesizeDebate(voicePerspectives, agreements, disagreements);
-          break;
-
-        case 'hierarchical':
-          synthesizedContent = this.synthesizeHierarchical(voicePerspectives, voices);
-          break;
-
-        case 'democratic':
-          synthesizedContent = this.synthesizeDemocratic(voicePerspectives);
-          break;
-
-        case 'council': {
-          const councilResult = this.synthesizeCouncil(voicePerspectives, prompt);
-          synthesizedContent = councilResult.content;
-          councilDecision = councilResult.decision;
-          break;
-        }
-
-        default:
-          synthesizedContent = this.synthesizeConsensus(voicePerspectives, agreements);
-      }
-
-      // Calculate overall confidence
-      const avgConfidence =
-        voicePerspectives.reduce((sum: number, vp: any) => sum + vp.confidence, 0) /
-        voicePerspectives.length;
-
-      // Add weights to perspectives
-      const weightedPerspectives = voicePerspectives.map((vp: any) => ({
-        ...vp,
-        weight: 1 / voices.length, // Equal weight by default
-      }));
-
-      return {
-        synthesizedResponse: {
-          content: synthesizedContent,
-          consensus: {
-            agreements,
-            disagreements:
-              disagreements.length > 0
-                ? disagreements
-                : [
-                    {
-                      topic: 'Implementation approach',
-                      perspectives: Object.fromEntries(
-                        voicePerspectives.map((vp: any) => [
-                          vp.voiceId,
-                          vp.content.substring(0, 100),
-                        ])
-                      ),
-                    },
-                  ],
-          },
-          confidence: avgConfidence,
-          councilDecision: councilDecision,
-          synthesisMode: synthesisMode,
-        },
-        voicePerspectives: weightedPerspectives,
-        metadata: {
-          synthesisMethod: synthesisMode,
-          processingTime: multiVoiceResult.metadata.totalProcessingTime,
-          voiceCount: voices.length,
-          conflictResolutionMethod: options?.conflictResolution || 'weighted',
-          debateRounds: synthesisMode === 'debate' ? 3 : undefined,
-        },
-      };
-    } catch (error: unknown) {
-      logger.error('Failed to synthesize voice perspectives:', getErrorMessage(error));
-      throw toError(error);
-    }
+    return this.voiceSynthesisManager.synthesizeVoicePerspectives(voices, prompt, options);
   }
 
   /**
@@ -2311,32 +1813,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
    * Check health status of the client and providers
    */
   async checkHealth(): Promise<{ status: string; details: any }> {
-    try {
-      const providerHealth = await this.healthCheck();
-      const availableProviders = Object.values(providerHealth).filter(Boolean).length;
-      const totalProviders = Object.keys(providerHealth).length;
-      
-      const status = this.initialized && availableProviders > 0 ? 'healthy' : 
-                     this.initialized ? 'degraded' : 'initializing';
-      
-      return {
-        status,
-        details: {
-          initialized: this.initialized,
-          providersAvailable: availableProviders,
-          totalProviders,
-          providers: providerHealth
-        }
-      };
-    } catch (error) {
-      return {
-        status: 'unhealthy',
-        details: {
-          initialized: this.initialized,
-          error: error instanceof Error ? error.message : String(error)
-        }
-      };
-    }
+    return this.healthStatusManager.checkHealth(this.initialized);
   }
 
   /**
@@ -2363,6 +1840,11 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       // Clean up streaming manager
       if (this.streamingManager) {
         await this.streamingManager.cleanup();
+      }
+
+      // Clean up health status manager
+      if (this.healthStatusManager) {
+        await this.healthStatusManager.cleanup();
       }
 
       // Clean up integrated system

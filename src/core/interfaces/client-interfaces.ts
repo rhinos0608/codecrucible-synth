@@ -17,15 +17,19 @@ export { ProjectContext, ModelRequest, ModelResponse };
 // Streaming interfaces
 export interface StreamToken {
   content: string;
-  finished: boolean;
+  finished?: boolean;
   index: number;
   timestamp: number;
+  metadata?: Record<string, any>;
 }
 
 // Main client interface - simplified to match existing implementation
 export interface IModelClient {
   // Core processing
   processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse>;
+  streamRequest(request: ModelRequest, onToken: (token: StreamToken) => void, context?: ProjectContext): Promise<ModelResponse>;
+  generateText(prompt: string, options?: any): Promise<string>;
+  synthesize(request: ModelRequest): Promise<ModelResponse>;
 
   // Management
   healthCheck(): Promise<Record<string, boolean>>;

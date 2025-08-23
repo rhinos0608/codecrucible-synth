@@ -64,6 +64,16 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
 
     // Get the injected client from DI container (cast to concrete type for CLI compatibility)
     const client = bootResult.client as UnifiedModelClient;
+    
+    // DEBUG: Check if client has expected methods
+    console.log('🔧 DEBUG: Client instance type check:');
+    console.log('  - generateText available:', typeof client.generateText === 'function');
+    console.log('  - synthesize available:', typeof client.synthesize === 'function');
+    console.log('  - processRequest available:', typeof client.processRequest === 'function');
+    console.log('  - healthCheck available:', typeof client.healthCheck === 'function');
+    console.log('  - Client constructor name:', client.constructor.name);
+    console.log('  - Is Promise:', client instanceof Promise);
+    console.log('  - Client type:', typeof client);
 
     // Initialize voice system with DI-enabled client
     const voiceSystem = new VoiceArchetypeSystem(client);

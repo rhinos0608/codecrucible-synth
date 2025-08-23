@@ -168,7 +168,7 @@ export class DependencyContainer extends EventEmitter {
   }
 
   /**
-   * Resolve a service by token
+   * Resolve a service by token (synchronous)
    */
   resolve<T>(token: string | ServiceToken<T>, context: { scope?: DependencyScope } = {}): T {
     if (this.isDisposed) {
@@ -188,20 +188,20 @@ export class DependencyContainer extends EventEmitter {
       throw new Error(`Circular dependency detected: ${cycle}`);
     }
 
-    // Handle different lifecycles
+    // Handle different lifecycles - return Promise for async factories
     switch (registration.options.lifecycle) {
       case 'singleton':
-        return this.resolveSingleton(registration, context);
+        return this.resolveSingletonSync(registration, context);
 
       case 'scoped':
         if (context.scope) {
           return context.scope.resolve(tokenName);
         }
         // Fall through to transient if no scope provided
-        return this.resolveTransient(registration, context);
+        return this.resolveTransientSync(registration, context);
 
       case 'transient':
-        return this.resolveTransient(registration, context);
+        return this.resolveTransientSync(registration, context);
 
       default:
         throw new Error(`Unknown lifecycle: ${registration.options.lifecycle}`);
@@ -210,19 +210,50 @@ export class DependencyContainer extends EventEmitter {
 
   /**
    * Resolve a service asynchronously
+   * ENHANCED: Properly handles async factories by using async resolution path
    */
   async resolveAsync<T>(
     token: string | ServiceToken<T>,
     context: { scope?: DependencyScope } = {}
   ): Promise<T> {
-    const instance = this.resolve(token, context);
-
-    // If instance is a promise, await it
-    if (instance && typeof (instance as any).then === 'function') {
-      return await (instance as unknown as Promise<T>);
+    if (this.isDisposed) {
+      throw new Error('Cannot resolve services from disposed container');
     }
 
-    return instance;
+    const tokenName = typeof token === 'string' ? token : token.name;
+    const registration = this.services.get(tokenName);
+
+    if (!registration) {
+      throw new Error(`Service not registered: ${tokenName}`);
+    }
+
+    // Check for circular dependencies
+    if (this.resolutionStack.includes(tokenName)) {
+      const cycle = [...this.resolutionStack, tokenName].join(' → ');
+      throw new Error(`Circular dependency detected: ${cycle}`);
+    }
+
+    // Handle different lifecycles using ASYNC resolution path
+    switch (registration.options.lifecycle) {
+      case 'singleton':
+        return await this.resolveSingleton(registration, context);
+
+      case 'scoped':
+        if (context.scope) {
+          const result = context.scope.resolve(tokenName);
+          return (result && typeof (result as any).then === 'function') 
+            ? await (result as any) 
+            : result as T;
+        }
+        // Fall through to transient if no scope provided
+        return await this.resolveTransient(registration, context);
+
+      case 'transient':
+        return await this.resolveTransient(registration, context);
+
+      default:
+        throw new Error(`Unknown lifecycle: ${registration.options.lifecycle}`);
+    }
   }
 
   /**
@@ -312,9 +343,9 @@ export class DependencyContainer extends EventEmitter {
   }
 
   /**
-   * Resolve singleton service
+   * Resolve singleton service (synchronous - may return Promise for async factories)
    */
-  private resolveSingleton<T>(
+  private resolveSingletonSync<T>(
     registration: ServiceRegistration<T>,
     context: { scope?: DependencyScope }
   ): T {
@@ -322,7 +353,7 @@ export class DependencyContainer extends EventEmitter {
       return registration.instance;
     }
 
-    registration.instance = this.createInstance(registration, context);
+    registration.instance = this.createInstanceSync(registration, context);
 
     if (!this.initializationOrder.includes(registration.token)) {
       this.initializationOrder.push(registration.token);
@@ -332,19 +363,53 @@ export class DependencyContainer extends EventEmitter {
   }
 
   /**
-   * Resolve transient service
+   * Resolve singleton service (async)
    */
-  private resolveTransient<T>(
+  private async resolveSingleton<T>(
     registration: ServiceRegistration<T>,
     context: { scope?: DependencyScope }
-  ): T {
-    return this.createInstance(registration, context);
+  ): Promise<T> {
+    if (registration.instance) {
+      // If instance is a Promise, await it
+      if (registration.instance && typeof (registration.instance as any).then === 'function') {
+        return await (registration.instance as unknown as Promise<T>);
+      }
+      return registration.instance;
+    }
+
+    registration.instance = await this.createInstance(registration, context);
+
+    if (!this.initializationOrder.includes(registration.token)) {
+      this.initializationOrder.push(registration.token);
+    }
+
+    return registration.instance;
   }
 
   /**
-   * Create service instance using factory
+   * Resolve transient service (synchronous)
    */
-  private createInstance<T>(
+  private resolveTransientSync<T>(
+    registration: ServiceRegistration<T>,
+    context: { scope?: DependencyScope }
+  ): T {
+    return this.createInstanceSync(registration, context);
+  }
+
+  /**
+   * Resolve transient service (async)
+   */
+  private async resolveTransient<T>(
+    registration: ServiceRegistration<T>,
+    context: { scope?: DependencyScope }
+  ): Promise<T> {
+    return await this.createInstance(registration, context);
+  }
+
+  /**
+   * Create service instance using factory (synchronous - may return Promise)
+   */
+  private createInstanceSync<T>(
     registration: ServiceRegistration<T>,
     context: { scope?: DependencyScope }
   ): T {
@@ -360,6 +425,40 @@ export class DependencyContainer extends EventEmitter {
       });
 
       return instance as T;
+    } catch (error) {
+      logger.error(`Error creating instance for service ${registration.token}:`, error);
+      throw error;
+    } finally {
+      this.resolutionStack.pop();
+    }
+  }
+
+  /**
+   * Create service instance using factory (async)
+   * FIXED: Now properly handles async factory functions that return Promises
+   */
+  private async createInstance<T>(
+    registration: ServiceRegistration<T>,
+    context: { scope?: DependencyScope }
+  ): Promise<T> {
+    this.resolutionStack.push(registration.token);
+
+    try {
+      const instance = registration.factory(this);
+      
+      // FIX: Properly await async factories that return Promises
+      const resolvedInstance = instance && typeof (instance as any).then === 'function' 
+        ? await (instance as any)
+        : instance;
+        
+      registration.initialized = true;
+
+      this.emit('serviceResolved', {
+        token: registration.token,
+        lifecycle: registration.options.lifecycle,
+      });
+
+      return resolvedInstance as T;
     } catch (error) {
       logger.error(`Error creating instance for service ${registration.token}:`, error);
       throw error;

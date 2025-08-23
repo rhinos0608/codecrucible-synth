@@ -1214,6 +1214,13 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   async healthCheck(): Promise<Record<string, boolean>> {
     const health: Record<string, boolean> = {};
 
+    // Overall timeout for entire health check (prevent CLI hanging)
+    const timeoutPromise = new Promise<Record<string, boolean>>((_, reject) => {
+      setTimeout(() => reject(new Error('Health check overall timeout (15s)')), 15000);
+    });
+
+    const healthCheckPromise = async (): Promise<Record<string, boolean>> => {
+
     for (const [type, provider] of this.providerRepository.getAvailableProviders()) {
       const cacheKey = `health_${type}`;
 
@@ -1226,16 +1233,33 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       }
 
       try {
-        await provider.healthCheck?.();
+        // Add timeout protection to prevent infinite hangs
+        const healthCheckPromise = provider.healthCheck?.() ?? Promise.resolve();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(`Health check timeout for ${type}`)), 5000);
+        });
+        
+        await Promise.race([healthCheckPromise, timeoutPromise]);
         health[type] = true;
         this.cacheCoordinator.setHealthCheck(cacheKey, true);
-      } catch {
+      } catch (error) {
+        // Log timeout/connection errors but continue with other providers
+        logger.debug(`Health check failed for ${type}:`, error instanceof Error ? error.message : error);
         health[type] = false;
         this.cacheCoordinator.setHealthCheck(cacheKey, false);
       }
     }
 
-    return health;
+      return health;
+    };
+
+    try {
+      return await Promise.race([healthCheckPromise(), timeoutPromise]);
+    } catch (error) {
+      logger.warn('Health check failed:', error instanceof Error ? error.message : error);
+      // Return empty health status on timeout/error
+      return {};
+    }
   }
 
   getMetrics(): MetricsData {

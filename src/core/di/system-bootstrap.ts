@@ -20,6 +20,7 @@ import {
   SECURITY_VALIDATOR_TOKEN,
   STREAMING_MANAGER_TOKEN,
   PERFORMANCE_MONITOR_TOKEN,
+  SYNTHESIS_COORDINATOR_TOKEN,
   LOGGER_TOKEN,
   CONFIG_MANAGER_TOKEN,
 } from './service-tokens.js';
@@ -109,12 +110,15 @@ export class SystemBootstrap {
       // Phase 9: Main client (depends on all above)
       await this.initializeClient();
 
-      // Phase 10: Validation and health checks
+      // Phase 10: Application layer services (depends on client)
+      await this.initializeSynthesisCoordinator();
+
+      // Phase 11: Validation and health checks
       if (!this.config.skipValidation) {
         await this.validateSystemHealth();
       }
 
-      const client = this.container.resolve<IModelClient>(CLIENT_TOKEN);
+      const client = await this.container.resolveAsync<IModelClient>(CLIENT_TOKEN);
       const initializationTime = Date.now() - this.initializationStartTime;
 
       logger.info(`✅ System bootstrap completed in ${initializationTime}ms`);
@@ -379,10 +383,37 @@ export class SystemBootstrap {
   }
 
   /**
-   * Phase 10: System validation
+   * Phase 10: Application layer services
+   */
+  private async initializeSynthesisCoordinator(): Promise<void> {
+    logger.debug('Phase 10: Initializing SynthesisCoordinator...');
+
+    this.container.register(
+      SYNTHESIS_COORDINATOR_TOKEN,
+      async container => {
+        const { SynthesisCoordinator } = await import('../application/synthesis-coordinator.js');
+        return new SynthesisCoordinator(container);
+      },
+      {
+        lifecycle: 'singleton',
+        dependencies: [
+          CLIENT_TOKEN.name,
+          HYBRID_ROUTER_TOKEN.name,
+          CACHE_COORDINATOR_TOKEN.name,
+          SECURITY_VALIDATOR_TOKEN.name,
+          STREAMING_MANAGER_TOKEN.name,
+          PERFORMANCE_MONITOR_TOKEN.name,
+        ],
+        lazy: true,
+      }
+    );
+  }
+
+  /**
+   * Phase 11: System validation
    */
   private async validateSystemHealth(): Promise<void> {
-    logger.debug('Phase 10: Validating system health...');
+    logger.debug('Phase 11: Validating system health...');
 
     // Validate dependency graph
     const validation = this.container.validateDependencyGraph();

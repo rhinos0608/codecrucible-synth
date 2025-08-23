@@ -70,6 +70,9 @@ export const PERFORMANCE_MONITOR_TOKEN =
 // ADVANCED SERVICE TOKENS
 // =============================================================================
 
+// Application layer services
+export const SYNTHESIS_COORDINATOR_TOKEN = createServiceToken<any>('synthesis-coordinator');
+
 // Voice system services
 export const VOICE_SYSTEM_TOKEN = createServiceToken<IVoiceSystem>('voice-system');
 export const VOICE_ARCHETYPE_TOKEN = createServiceToken<any>('voice-archetype');
@@ -143,6 +146,9 @@ export const SERVICE_TOKEN_REGISTRY = {
 
   // Performance monitoring
   PERFORMANCE_MONITOR: PERFORMANCE_MONITOR_TOKEN,
+
+  // Application layer
+  SYNTHESIS_COORDINATOR: SYNTHESIS_COORDINATOR_TOKEN,
 
   // Voice system
   VOICE_SYSTEM: VOICE_SYSTEM_TOKEN,

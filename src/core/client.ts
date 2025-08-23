@@ -47,6 +47,9 @@ import { RequestExecutionManager, IRequestExecutionManager } from './execution/r
 import { HealthStatusManager, IHealthStatusManager } from './health/health-status-manager.js';
 import { ConfigurationManager, IConfigurationManager } from './config/configuration-manager.js';
 import { RequestProcessingCoreManager, IRequestProcessingCoreManager } from './processing/request-processing-core-manager.js';
+import { ModelManagementManager, IModelManagementManager } from './models/model-management-manager.js';
+import { ResourceCleanupManager, IResourceCleanupManager } from './cleanup/resource-cleanup-manager.js';
+import { StreamProcessingManager, IStreamProcessingManager } from './streaming/stream-processing-manager.js';
 
 // Import streaming interfaces from extracted module
 import type { StreamToken, StreamConfig } from './streaming/streaming-manager.js';
@@ -157,6 +160,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private healthStatusManager: IHealthStatusManager;
   private configurationManager: IConfigurationManager;
   private requestProcessingCoreManager: IRequestProcessingCoreManager;
+  private modelManagementManager: IModelManagementManager;
+  private resourceCleanupManager: IResourceCleanupManager;
+  private streamProcessingManager: IStreamProcessingManager;
 
   constructor(
     config: UnifiedClientConfig,
@@ -174,6 +180,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       healthStatusManager?: IHealthStatusManager;
       configurationManager?: IConfigurationManager;
       requestProcessingCoreManager?: IRequestProcessingCoreManager;
+      modelManagementManager?: IModelManagementManager;
+      resourceCleanupManager?: IResourceCleanupManager;
+      streamProcessingManager?: IStreamProcessingManager;
     }
   ) {
     super();
@@ -266,6 +275,37 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         complexityMultiplier: 30,
       },
     });
+
+    this.modelManagementManager = injectedDependencies?.modelManagementManager || new ModelManagementManager(
+      {
+        endpoint: this.config.endpoint || 'http://localhost:11434',
+        defaultModel: 'llama2',
+        requestTimeoutMs: this.config.performanceThresholds?.timeoutMs || 30000,
+      },
+      this.makeRequest.bind(this),
+      this.generate.bind(this)
+    );
+
+    this.resourceCleanupManager = injectedDependencies?.resourceCleanupManager || new ResourceCleanupManager({
+      shutdownTimeoutMs: 10000,
+      gracefulShutdown: true,
+    });
+
+    this.streamProcessingManager = injectedDependencies?.streamProcessingManager || new StreamProcessingManager(
+      this.securityValidator,
+      this.cacheCoordinator,
+      this.streamingManager,
+      (request, context) => this.processRequest(request, context),
+      () => this.generateRequestId(),
+      {
+        validateSecurity: true,
+        enableCaching: true,
+        requestTimeoutMs: 30000,
+      }
+    );
+
+    // Register resources for cleanup
+    this.registerCleanupResources();
 
     // HYBRID ARCHITECTURE: Use injected router or initialize new one
     if (injectedDependencies?.hybridRouter) {
@@ -391,6 +431,51 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
   private getDefaultConfig(): UnifiedClientConfig {
     return this.configurationManager.getDefaultConfig();
+  }
+
+  private registerCleanupResources(): void {
+    // Register resources in cleanup priority order
+    this.resourceCleanupManager.registerResource({
+      name: 'CacheCoordinator',
+      priority: 1,
+      cleanup: () => this.cacheCoordinator?.destroy(),
+    });
+
+    this.resourceCleanupManager.registerResource({
+      name: 'HardwareSelector',
+      priority: 2,
+      cleanup: async () => this.hardwareSelector?.destroy(),
+    });
+
+    this.resourceCleanupManager.registerResource({
+      name: 'ProcessManager', 
+      priority: 3,
+      cleanup: async () => this.processManager?.destroy(),
+    });
+
+    this.resourceCleanupManager.registerResource({
+      name: 'StreamingManager',
+      priority: 4,
+      cleanup: async () => this.streamingManager?.cleanup(),
+    });
+
+    this.resourceCleanupManager.registerResource({
+      name: 'HealthStatusManager',
+      priority: 5,
+      cleanup: async () => this.healthStatusManager?.cleanup(),
+    });
+
+    this.resourceCleanupManager.registerResource({
+      name: 'IntegratedSystem',
+      priority: 6,
+      cleanup: async () => this.integratedSystem?.shutdown(),
+    });
+
+    this.resourceCleanupManager.registerResource({
+      name: 'ProviderRepository',
+      priority: 7,
+      cleanup: async () => this.providerRepository?.shutdown(),
+    });
   }
 
   /**
@@ -992,46 +1077,14 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return this.cacheCoordinator.getIntelligentCacheStats();
   }
 
-  // Queue management for concurrent request limiting
+  // Queue management for concurrent request limiting - delegated to RequestProcessingCoreManager
   async queueRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
-    if (this.activeRequests.size < this.config.performanceThresholds.maxConcurrentRequests) {
-      return this.processRequest(request, context);
-    }
-
-    return new Promise((resolve, reject) => {
-      this.requestQueue.push({
-        id: this.generateRequestId(),
-        request,
-        resolve,
-        reject,
-      });
-      this.processQueue();
-    });
-  }
-
-  private async processQueue(): Promise<void> {
-    if (this.isProcessingQueue || this.requestQueue.length === 0) {
-      return;
-    }
-
-    this.isProcessingQueue = true;
-
-    while (
-      this.requestQueue.length > 0 &&
-      this.activeRequests.size < this.config.performanceThresholds.maxConcurrentRequests
-    ) {
-      const queuedRequest = this.requestQueue.shift();
-      if (!queuedRequest) break;
-
-      try {
-        const response = await this.processRequest(queuedRequest.request);
-        queuedRequest.resolve(response);
-      } catch (error) {
-        queuedRequest.reject(toError(error));
-      }
-    }
-
-    this.isProcessingQueue = false;
+    return this.requestProcessingCoreManager.queueRequest(
+      request,
+      this.activeRequests.size,
+      (req, ctx) => this.processRequest(req, ctx),
+      context
+    );
   }
 
   // OPTIMIZED: Management methods with caching - delegated to HealthStatusManager
@@ -1045,56 +1098,28 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
   async shutdown(): Promise<void> {
     logger.info('🛑 Shutting down UnifiedModelClient...');
+    
+    // Wait for active operations to complete
+    await this.resourceCleanupManager.waitForActiveOperations(
+      () => this.activeRequests.size,
+      10000
+    );
 
-    // LRU cache cleanup is handled automatically
+    // Clear request queue
+    this.resourceCleanupManager.clearRequestQueue(
+      this.requestQueue as Array<{ reject: (error: Error) => void }>,
+      'System shutting down'
+    );
 
-    // Shutdown performance monitor
-    if (this.performanceMonitor) {
-      this.performanceMonitor.destroy();
-    }
+    // Perform graceful shutdown of all registered resources
+    await this.resourceCleanupManager.shutdown();
 
-    // Emergency shutdown of active processes
-    if (this.processManager) {
-      await this.processManager.emergencyShutdown();
-      this.processManager.destroy();
-    }
-
-    // Shutdown hardware selector
-    if (this.hardwareSelector) {
-      this.hardwareSelector.destroy();
-    }
-
-    // Shutdown integrated system first
-    if (this.integratedSystem) {
-      await this.integratedSystem.shutdown();
-      this.integratedSystem = null;
-    }
-
-    // Wait for active requests to complete (with timeout)
-    const shutdownTimeout = 10000; // 10 seconds
-    const startTime = Date.now();
-
-    while (this.activeRequests.size > 0 && Date.now() - startTime < shutdownTimeout) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    // Close all providers
-    for (const [type, provider] of this.providerRepository.getAvailableProviders()) {
-      try {
-        await provider.shutdown?.();
-        logger.info(`✅ Provider ${type} shut down`);
-      } catch (error) {
-        logger.warn(`⚠️ Error shutting down provider ${type}:`, error);
-      }
-    }
-
-    // OPTIMIZED: Clear all caches and prevent memory leaks
-    await this.providerRepository.shutdown();
+    // Clear remaining collections
     this.activeRequests.clear();
     this.requestQueue.length = 0;
     this.cacheCoordinator.clear();
 
-    logger.info('✅ UnifiedModelClient shutdown complete with memory cleanup');
+    logger.info('✅ UnifiedModelClient shutdown complete');
   }
 
   // Streaming methods removed - now handled by StreamingManager
@@ -1114,73 +1139,43 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
 
   async getAllAvailableModels(): Promise<any[]> {
-    return this.getAvailableModels();
+    return this.modelManagementManager.getAllAvailableModels();
   }
 
   async getAvailableModels(): Promise<any[]> {
-    try {
-      const response = await this.makeRequest('GET', '/api/tags');
-      const data = await response.json();
-      return data.models || [];
-    } catch (error) {
-      return [];
-    }
+    return this.modelManagementManager.getAvailableModels();
   }
 
   async getBestAvailableModel(): Promise<string> {
-    const models = await this.getAvailableModels();
-    return models.length > 0 ? models[0].name : 'llama2';
+    return this.modelManagementManager.getBestAvailableModel();
   }
 
   async pullModel(modelName: string): Promise<boolean> {
-    try {
-      await this.makeRequest('POST', '/api/pull', { name: modelName });
-      return true;
-    } catch (error) {
-      return false;
-    }
+    return this.modelManagementManager.pullModel(modelName);
   }
 
   async testModel(modelName: string): Promise<boolean> {
-    try {
-      const response = await this.generate({
-        prompt: 'Hello',
-        model: modelName,
-      });
-      return !!response.content;
-    } catch (error) {
-      return false;
-    }
+    return this.modelManagementManager.testModel(modelName);
   }
 
   async removeModel(modelName: string): Promise<boolean> {
-    try {
-      await this.makeRequest('DELETE', '/api/delete', { name: modelName });
-      return true;
-    } catch (error) {
-      return false;
-    }
+    return this.modelManagementManager.removeModel(modelName);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async addApiModel(config: any): Promise<boolean> {
-    // Implementation for API model management
-    return true;
+    return this.modelManagementManager.addApiModel(config);
   }
 
   async testApiModel(modelName: string): Promise<boolean> {
-    return this.testModel(modelName);
+    return this.modelManagementManager.testApiModel(modelName);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   removeApiModel(modelName: string): boolean {
-    // Implementation for API model removal
-    return true;
+    return this.modelManagementManager.removeApiModel(modelName);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async autoSetup(force: boolean = false): Promise<any> {
-    return { success: true, message: 'Auto setup complete' };
+    return this.modelManagementManager.autoSetup(force);
   }
 
   async generateText(prompt: string, options?: any): Promise<string> {
@@ -1821,42 +1816,12 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
    */
   async destroy(): Promise<void> {
     try {
-      // Clean up persistent cache (auto-saves on destroy)
-      if (this.cacheCoordinator) {
-        logger.info('Saving cache before shutdown');
-        this.cacheCoordinator.destroy();
-      }
+      // Emergency cleanup of all registered resources
+      await this.resourceCleanupManager.destroy();
 
-      // Clean up hardware selector
-      if (this.hardwareSelector) {
-        await this.hardwareSelector.destroy();
-      }
-
-      // Clean up process manager
-      if (this.processManager) {
-        await this.processManager.destroy();
-      }
-
-      // Clean up streaming manager
-      if (this.streamingManager) {
-        await this.streamingManager.cleanup();
-      }
-
-      // Clean up health status manager
-      if (this.healthStatusManager) {
-        await this.healthStatusManager.cleanup();
-      }
-
-      // Clean up integrated system
-      if (this.integratedSystem) {
-        await this.integratedSystem.shutdown();
-      }
-
-      // Clear active requests
+      // Clear remaining collections
       this.activeRequests.clear();
       this.requestQueue = [];
-
-      // Health check cache cleared by CacheCoordinator.destroy()
 
       // Remove all event listeners
       this.removeAllListeners();

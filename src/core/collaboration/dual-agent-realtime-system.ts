@@ -606,6 +606,7 @@ Provide the complete refactored code with all issues resolved. Maintain the orig
     // Wait for pull to complete
     const reader = response.body?.getReader();
     if (reader) {
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done } = await reader.read();
         if (done) break;

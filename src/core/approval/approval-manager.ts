@@ -277,6 +277,8 @@ export class ApprovalManager {
     context: OperationContext,
     riskAssessment: RiskAssessment
   ): Promise<ApprovalResult> {
+    /* eslint-disable no-console */
+    // User interface output - console.log is intentional for approval prompts
     console.log('\n' + '='.repeat(60));
     console.log('🔐 OPERATION APPROVAL REQUIRED');
     console.log('='.repeat(60));
@@ -361,6 +363,7 @@ export class ApprovalManager {
 
       askForInput();
     });
+    /* eslint-enable no-console */
   }
 
   /**
@@ -383,6 +386,8 @@ export class ApprovalManager {
     context: OperationContext,
     riskAssessment: RiskAssessment
   ): void {
+    /* eslint-disable no-console */
+    // User interface output - console.log is intentional for detailed information display
     console.log('\n' + '='.repeat(60));
     console.log('📊 DETAILED OPERATION ANALYSIS');
     console.log('='.repeat(60));
@@ -425,6 +430,7 @@ export class ApprovalManager {
     });
 
     console.log('='.repeat(60));
+    /* eslint-enable no-console */
   }
 
   /**

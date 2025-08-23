@@ -1194,7 +1194,7 @@ export class LocalProcessBackend extends ExecutionBackend {
 
       // Shell injection patterns (allow basic pipes and redirects for legitimate use)
       /[;&`$()]/,
-      /\>\s*\/dev\//,
+      />\s*\/dev\//,
       /\|\s*sh/,
       /\|\s*bash/,
 

@@ -53,7 +53,10 @@ export class LMStudioProvider {
       },
     });
 
-    logger.debug('LM Studio HTTP connection pooling configured', { maxSockets: 5, keepAlive: '30s' });
+    logger.debug('LM Studio HTTP connection pooling configured', {
+      maxSockets: 5,
+      keepAlive: '30s',
+    });
   }
 
   async processRequest(request: any, _context?: any): Promise<any> {

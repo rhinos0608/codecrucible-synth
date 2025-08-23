@@ -4,8 +4,60 @@ import { promises as fs, existsSync } from 'fs';
 import { join, extname, dirname, basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { JsonValue, JsonObject, AnalysisResult, ToolArguments, ToolResult } from '../types.js';
 
 const execAsync = promisify(exec);
+
+// Analysis result interfaces
+interface ComplexityResult {
+  file: string;
+  cyclomaticComplexity: number;
+  cognitiveComplexity: number;
+  maintainabilityIndex: number;
+  linesOfCode: number;
+  nestingDepth: number;
+  error?: string;
+}
+
+interface DependencyAnalysis {
+  packageInfo: JsonObject | null;
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+  importGraph: Record<string, string[]>;
+  unusedDependencies: string[];
+  outdatedDependencies: Array<{
+    name: string;
+    current: string;
+    latest: string;
+  }>;
+}
+
+interface StructureAnalysis {
+  directories: Set<string>;
+  fileTypes: Record<string, number>;
+  totalFiles: number;
+  totalDirectories: number;
+  averageFileSize: number;
+  largestFiles: Array<{ file: string; size: number }>;
+  deepestNesting: number;
+}
+
+interface QualityIssue {
+  type: 'error' | 'warning' | 'info' | 'todo' | 'fixme' | 'deprecated';
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  message: string;
+  file: string;
+  line: number;
+}
+
+interface QualityMetrics {
+  overallScore: number;
+  maintainabilityScore: number;
+  readabilityScore: number;
+  testCoverage: number;
+  issues: QualityIssue[];
+  suggestions: string[];
+}
 
 /**
  * Comprehensive Code Analysis Tool
@@ -93,7 +145,7 @@ export class CodeAnalysisTool extends BaseTool {
     }
   }
 
-  private async analyzeComplexity(args: any): Promise<any> {
+  private async analyzeComplexity(args: Record<string, unknown>): Promise<Record<string, unknown>> {
     const files = await this.getFilesToAnalyze(args);
     const results = [];
 
@@ -117,7 +169,7 @@ export class CodeAnalysisTool extends BaseTool {
     };
   }
 
-  private calculateComplexity(content: string, file: string): any {
+  private calculateComplexity(content: string, file: string): Record<string, unknown> {
     const lines = content.split('\n');
     const ext = extname(file);
 
@@ -199,7 +251,9 @@ export class CodeAnalysisTool extends BaseTool {
     return maxNesting;
   }
 
-  private async analyzeDependencies(args: any): Promise<any> {
+  private async analyzeDependencies(
+    args: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     try {
       const packageJsonPath = join(this.agentContext.workingDirectory, 'package.json');
       let packageInfo = null;
@@ -298,7 +352,7 @@ export class CodeAnalysisTool extends BaseTool {
     return imports;
   }
 
-  private async analyzeStructure(args: any): Promise<any> {
+  private async analyzeStructure(args: Record<string, unknown>): Promise<Record<string, unknown>> {
     const files = await this.getFilesToAnalyze(args);
     const structure = {
       directories: new Set<string>(),
@@ -347,11 +401,11 @@ export class CodeAnalysisTool extends BaseTool {
     };
   }
 
-  private async analyzeQuality(args: any): Promise<any> {
+  private async analyzeQuality(args: Record<string, unknown>): Promise<Record<string, unknown>> {
     const files = await this.getFilesToAnalyze(args);
     const qualityMetrics = {
       overallScore: 0,
-      issues: [] as any[],
+      issues: [] as QualityIssue[],
       suggestions: [] as string[],
     };
 
@@ -364,7 +418,9 @@ export class CodeAnalysisTool extends BaseTool {
       } catch (error) {
         qualityMetrics.issues.push({
           file,
-          type: 'access_error',
+          type: 'error',
+          severity: 'high',
+          line: 0,
           message: `Could not analyze file: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
       }
@@ -399,7 +455,7 @@ export class CodeAnalysisTool extends BaseTool {
     });
 
     // TODO comments
-    const todoRegex = /\/\/\s*TODO|\/\*\s*TODO|\#\s*TODO/gi;
+    const todoRegex = /\/\/\s*TODO|\/\*\s*TODO|#\s*TODO/gi;
     let match;
     while ((match = todoRegex.exec(content)) !== null) {
       const lineNum = content.substring(0, match.index).split('\n').length;
@@ -463,7 +519,7 @@ export class CodeAnalysisTool extends BaseTool {
     return -1;
   }
 
-  private async getFilesToAnalyze(args: any): Promise<string[]> {
+  private async getFilesToAnalyze(args: Record<string, unknown>): Promise<string[]> {
     if (args.files) {
       return Array.isArray(args.files) ? args.files : [args.files];
     }
@@ -530,7 +586,7 @@ export class CodeAnalysisTool extends BaseTool {
     return recommendations;
   }
 
-  private summarizeComplexity(results: any[]): any {
+  private summarizeComplexity(results: Array<Record<string, unknown>>): Record<string, unknown> {
     const validResults = results.filter(r => !r.error);
 
     if (validResults.length === 0) {

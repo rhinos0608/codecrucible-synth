@@ -1,7 +1,7 @@
 /**
  * Voice Domain Entity
  * Pure business logic for AI voice archetypes
- * 
+ *
  * Living Spiral Council Applied:
  * - Domain-driven design with pure business entities
  * - No external dependencies or infrastructure concerns
@@ -34,7 +34,7 @@ export class Voice {
     isEnabled: boolean = true
   ) {
     this.validateInputs(id, name, systemPrompt, expertise, personality);
-    
+
     this._id = id;
     this._name = name;
     this._style = style;
@@ -79,7 +79,7 @@ export class Voice {
   }
 
   // Business methods
-  
+
   /**
    * Enable this voice for synthesis
    */
@@ -147,9 +147,7 @@ export class Voice {
 
     // Expertise matching
     if (context.requiredExpertise) {
-      const matchingExpertise = context.requiredExpertise.filter(req =>
-        this.hasExpertise(req)
-      );
+      const matchingExpertise = context.requiredExpertise.filter(req => this.hasExpertise(req));
       score += (matchingExpertise.length / context.requiredExpertise.length) * 0.6;
     }
 

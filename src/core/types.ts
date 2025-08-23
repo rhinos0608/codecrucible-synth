@@ -39,7 +39,7 @@ export interface ModelRequest {
       description: string;
       parameters: {
         type: 'object';
-        properties: Record<string, any>;
+        properties: Record<string, unknown>;
         required?: string[];
       };
     };
@@ -225,7 +225,7 @@ export interface LLMProvider {
   name: string;
   endpoint: string;
   isAvailable(): Promise<boolean>;
-  generateCode(prompt: string, options?: any): Promise<LLMResponse>;
+  generateCode(prompt: string, options?: Record<string, unknown>): Promise<LLMResponse>;
   getCapabilities(): LLMCapabilities;
   getStatus(): Promise<LLMStatus>;
 }
@@ -236,7 +236,7 @@ export interface LLMResponse {
   responseTime: number;
   model: string;
   provider: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface LLMCapabilities {
@@ -409,4 +409,105 @@ export const ExecutionMode = {} as Record<string, unknown>;
 export interface ModelClient {
   generate(request: Record<string, unknown>): Promise<Record<string, unknown>>;
   checkStatus(): Promise<boolean>;
+}
+
+// Common types to replace 'any' usage
+export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+
+export interface JsonArray extends Array<JsonValue> {}
+
+// Generic function types
+export type TransformFunction<T, R> = (input: T) => R;
+export type PredicateFunction<T> = (input: T) => boolean;
+export type EvaluationFunction<T> = (input: T) => number;
+
+// Configuration and context types
+export interface ConfigurationObject extends Record<string, JsonValue> {}
+export interface ExecutionContext {
+  timestamp?: number;
+  executionId?: string;
+  [key: string]: JsonValue | undefined;
+}
+
+// Result and response types
+export interface GenericResult<T = JsonValue> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  metadata?: Record<string, JsonValue>;
+}
+
+export interface ProcessingResult<T = JsonValue> extends GenericResult<T> {
+  processingTime?: number;
+  iterations?: number;
+}
+
+// Workflow and orchestration types
+export interface WorkflowNode {
+  id: string;
+  type: string;
+  name: string;
+  config?: ConfigurationObject;
+}
+
+export interface WorkflowContext {
+  nodeId: string;
+  history: Array<{
+    nodeId: string;
+    timestamp: number;
+    result: JsonValue;
+  }>;
+  metrics?: Record<string, JsonValue>;
+}
+
+// Tool and MCP types
+export interface ToolArguments extends Record<string, JsonValue> {}
+export interface ToolResult<T = JsonValue> extends GenericResult<T> {}
+
+// Memory and caching types
+export interface MemoryItem {
+  id: string;
+  content: JsonValue;
+  timestamp: number;
+  importance?: number;
+  metadata?: Record<string, JsonValue>;
+}
+
+export interface CacheEntry<T = JsonValue> {
+  key: string;
+  value: T;
+  timestamp: number;
+  ttl?: number;
+}
+
+// Analysis and metrics types
+export interface AnalysisResult {
+  type: string;
+  results: Record<string, JsonValue>;
+  recommendations?: string[];
+  score?: number;
+}
+
+export interface MetricsData {
+  timestamp: number;
+  values: Record<string, number>;
+  metadata?: Record<string, JsonValue>;
+}
+
+// Event and message types
+export interface EventData extends Record<string, JsonValue> {
+  type: string;
+  timestamp: number;
+}
+
+export interface MessageData {
+  from: string;
+  to?: string;
+  content: JsonValue;
+  timestamp: number;
+  metadata?: Record<string, JsonValue>;
 }

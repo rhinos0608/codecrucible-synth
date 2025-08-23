@@ -472,7 +472,7 @@ export class RateLimiter extends EventEmitter {
    */
   async getStatus(key: string): Promise<RateLimitInfo | null> {
     switch (this.config.algorithm) {
-      case 'token-bucket':
+      case 'token-bucket': {
         const bucket = this.tokenBuckets.get(key);
         if (!bucket) return null;
 
@@ -483,8 +483,9 @@ export class RateLimiter extends EventEmitter {
           msBeforeNext: 0,
           resetTime: new Date(Date.now() + this.config.windowMs),
         };
+      }
 
-      case 'sliding-window':
+      case 'sliding-window': {
         const window = this.slidingWindows.get(key);
         if (!window) return null;
 
@@ -496,6 +497,7 @@ export class RateLimiter extends EventEmitter {
           msBeforeNext: 0,
           resetTime: new Date(Date.now() + this.config.windowMs),
         };
+      }
 
       case 'fixed-window':
       default:

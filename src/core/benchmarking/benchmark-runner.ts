@@ -639,7 +639,7 @@ except Exception as e:
    */
   private assessCodeQuality(
     code: string,
-    challenge: CodingChallenge
+    _challenge: CodingChallenge
   ): {
     readability: number;
     efficiency: number;

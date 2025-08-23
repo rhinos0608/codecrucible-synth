@@ -1,7 +1,7 @@
 /**
  * Voice Orchestration Domain Service
  * Pure business logic for multi-voice coordination and synthesis
- * 
+ *
  * Living Spiral Council Applied:
  * - Domain service for business logic that doesn't fit in entities
  * - Pure business rules without infrastructure dependencies
@@ -28,16 +28,16 @@ export class VoiceOrchestrationService {
     preferences?: VoiceSelectionPreferences
   ): Promise<VoiceSelection> {
     const availableVoices = await this.voiceRepository.findEnabledVoices();
-    
+
     if (availableVoices.length === 0) {
       throw new Error('No voices available for processing');
     }
 
     const requiredCapabilities = request.requiresCapabilities();
     const taskType = this.determineTaskType(request);
-    
+
     // Apply constraints from request
-    let candidateVoices = availableVoices.filter(voice => {
+    const candidateVoices = availableVoices.filter(voice => {
       if (request.constraints.excludedVoices?.includes(voice.id)) {
         return false;
       }
@@ -68,11 +68,7 @@ export class VoiceOrchestrationService {
     scoredVoices.sort((a, b) => b.score - a.score);
 
     // Select voices based on preferences and business rules
-    const selectedVoices = this.selectOptimalVoiceSet(
-      scoredVoices,
-      mustIncludeVoices,
-      preferences
-    );
+    const selectedVoices = this.selectOptimalVoiceSet(scoredVoices, mustIncludeVoices, preferences);
 
     return {
       primaryVoice: selectedVoices[0],
@@ -141,10 +137,7 @@ export class VoiceOrchestrationService {
    * Resolve conflicts between voices
    * Business rule: Use expertise, confidence, and reasoning quality
    */
-  resolveVoiceConflicts(
-    conflicts: VoiceConflict[],
-    voices: Voice[]
-  ): ConflictResolution[] {
+  resolveVoiceConflicts(conflicts: VoiceConflict[], voices: Voice[]): ConflictResolution[] {
     return conflicts.map(conflict => {
       const voice1 = voices.find(v => v.id === conflict.voice1Id);
       const voice2 = voices.find(v => v.id === conflict.voice2Id);
@@ -162,7 +155,7 @@ export class VoiceOrchestrationService {
       const voice1Expertise = voice1.expertise.filter(exp =>
         conflict.topic.toLowerCase().includes(exp.toLowerCase())
       ).length;
-      
+
       const voice2Expertise = voice2.expertise.filter(exp =>
         conflict.topic.toLowerCase().includes(exp.toLowerCase())
       ).length;
@@ -220,16 +213,16 @@ export class VoiceOrchestrationService {
   ): Voice[] {
     const maxVoices = preferences?.maxVoices || 3;
     const minVoices = preferences?.minVoices || 1;
-    
+
     const selected: Voice[] = [...mustIncludeVoices];
-    const remaining = scoredVoices.filter(sv =>
-      !mustIncludeVoices.some(mv => mv.id === sv.voice.id)
+    const remaining = scoredVoices.filter(
+      sv => !mustIncludeVoices.some(mv => mv.id === sv.voice.id)
     );
 
     // Add highest scoring voices until we reach the target count
     for (const { voice } of remaining) {
       if (selected.length >= maxVoices) break;
-      
+
       // Ensure diversity by avoiding too many similar voices
       const isDiverse = this.ensureVoiceDiversity(selected, voice);
       if (isDiverse || selected.length < minVoices) {
@@ -248,9 +241,10 @@ export class VoiceOrchestrationService {
     }
 
     // Check temperature diversity
-    const avgTemperature = selectedVoices.reduce((sum, v) => sum + v.temperature.value, 0) / selectedVoices.length;
+    const avgTemperature =
+      selectedVoices.reduce((sum, v) => sum + v.temperature.value, 0) / selectedVoices.length;
     const temperatureDiff = Math.abs(candidateVoice.temperature.value - avgTemperature);
-    
+
     return temperatureDiff > 0.2; // Require significant temperature difference
   }
 
@@ -280,12 +274,16 @@ export class VoiceOrchestrationService {
       const primaryVoice = selectedVoices[0];
       reasons.push(`Selected ${primaryVoice.name} as the primary voice`);
       reasons.push(`Expertise: ${primaryVoice.expertise.join(', ')}`);
-      reasons.push(`Style: ${primaryVoice.style.value}, Temperature: ${primaryVoice.temperature.value}`);
+      reasons.push(
+        `Style: ${primaryVoice.style.value}, Temperature: ${primaryVoice.temperature.value}`
+      );
     } else {
       reasons.push(`Selected ${selectedVoices.length} voices for multi-voice synthesis:`);
       selectedVoices.forEach((voice, index) => {
         const score = allScoredVoices.find(sv => sv.voice.id === voice.id)?.score || 0;
-        reasons.push(`${index + 1}. ${voice.name} (score: ${score.toFixed(2)}) - ${voice.expertise.slice(0, 2).join(', ')}`);
+        reasons.push(
+          `${index + 1}. ${voice.name} (score: ${score.toFixed(2)}) - ${voice.expertise.slice(0, 2).join(', ')}`
+        );
       });
     }
 
@@ -331,9 +329,8 @@ export class VoiceOrchestrationService {
     const consensusElements = this.findConsensusElements(responses);
     const consensusLevel = this.calculateConsensusLevel(responses);
 
-    const finalResponse = consensusElements.length > 0
-      ? consensusElements.join('\n')
-      : responses[0].content; // Fallback to first response
+    const finalResponse =
+      consensusElements.length > 0 ? consensusElements.join('\n') : responses[0].content; // Fallback to first response
 
     return {
       finalResponse,
@@ -355,8 +352,9 @@ export class VoiceOrchestrationService {
       .map(r => r.content)
       .join('\n\n');
 
-    const weightedConfidence = responses.reduce((sum, r) => sum + r.confidence * (r.expertiseMatch || 1), 0) /
-                              responses.reduce((sum, r) => sum + (r.expertiseMatch || 1), 0);
+    const weightedConfidence =
+      responses.reduce((sum, r) => sum + r.confidence * (r.expertiseMatch || 1), 0) /
+      responses.reduce((sum, r) => sum + (r.expertiseMatch || 1), 0);
 
     return {
       finalResponse: weightedContent,
@@ -367,7 +365,10 @@ export class VoiceOrchestrationService {
     };
   }
 
-  private analyzeResponseConflict(response1: VoiceResponse, response2: VoiceResponse): VoiceConflict | null {
+  private analyzeResponseConflict(
+    response1: VoiceResponse,
+    response2: VoiceResponse
+  ): VoiceConflict | null {
     // Simple conflict detection based on contradictory keywords
     const conflictKeywords = [
       ['recommend', 'avoid'],
@@ -410,7 +411,10 @@ export class VoiceOrchestrationService {
 
     for (let i = 0; i < responses.length; i++) {
       for (let j = i + 1; j < responses.length; j++) {
-        const similarity = this.calculateContentSimilarity(responses[i].content, responses[j].content);
+        const similarity = this.calculateContentSimilarity(
+          responses[i].content,
+          responses[j].content
+        );
         totalSimilarity += similarity;
         comparisons++;
       }
@@ -423,21 +427,24 @@ export class VoiceOrchestrationService {
     // Simple similarity based on common words (could be enhanced with NLP)
     const words1 = content1.toLowerCase().split(/\s+/);
     const words2 = content2.toLowerCase().split(/\s+/);
-    
+
     const intersection = words1.filter(word => words2.includes(word));
     const union = [...new Set([...words1, ...words2])];
-    
+
     return union.length > 0 ? intersection.length / union.length : 0;
   }
 
   private findConsensusElements(responses: VoiceResponse[]): string[] {
     // Find common sentences or concepts across responses
-    const sentences = responses.map(r => 
-      r.content.split('.').map(s => s.trim()).filter(s => s.length > 0)
+    const sentences = responses.map(r =>
+      r.content
+        .split('.')
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
     );
 
     const consensusElements: string[] = [];
-    
+
     // Find sentences that appear in multiple responses
     for (const sentence of sentences[0]) {
       const appearanceCount = sentences.filter(sentenceList =>

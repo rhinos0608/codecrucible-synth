@@ -1,7 +1,7 @@
 /**
  * Voice Value Objects
  * Immutable domain values for voice configuration
- * 
+ *
  * Living Spiral Council Applied:
  * - Immutable value objects with built-in validation
  * - Type safety and business rule enforcement
@@ -25,7 +25,7 @@ export class VoiceStyle {
 
   static create(style: string): VoiceStyle {
     const normalizedStyle = style.toLowerCase().trim();
-    
+
     if (!this.isValidStyle(normalizedStyle)) {
       throw new Error(
         `Invalid voice style: ${style}. Must be one of: ${this.getValidStyles().join(', ')}`
@@ -64,14 +64,7 @@ export class VoiceStyle {
   }
 
   private static getValidStyles(): string[] {
-    return [
-      'experimental',
-      'conservative', 
-      'analytical',
-      'systematic',
-      'creative',
-      'practical'
-    ];
+    return ['experimental', 'conservative', 'analytical', 'systematic', 'creative', 'practical'];
   }
 
   equals(other: VoiceStyle): boolean {
@@ -100,9 +93,7 @@ export class VoiceTemperature {
 
   static create(temperature: number): VoiceTemperature {
     if (!this.isValidTemperature(temperature)) {
-      throw new Error(
-        `Invalid voice temperature: ${temperature}. Must be between 0.0 and 1.0`
-      );
+      throw new Error(`Invalid voice temperature: ${temperature}. Must be between 0.0 and 1.0`);
     }
 
     return new VoiceTemperature(Number(temperature.toFixed(2)));
@@ -121,10 +112,12 @@ export class VoiceTemperature {
   }
 
   private static isValidTemperature(temperature: number): boolean {
-    return typeof temperature === 'number' &&
-           !isNaN(temperature) &&
-           temperature >= 0.0 &&
-           temperature <= 1.0;
+    return (
+      typeof temperature === 'number' &&
+      !isNaN(temperature) &&
+      temperature >= 0.0 &&
+      temperature <= 1.0
+    );
   }
 
   /**
@@ -174,7 +167,7 @@ export class ProviderType {
 
   static create(type: string): ProviderType {
     const normalizedType = type.toLowerCase().trim();
-    
+
     if (!this.isValidType(normalizedType)) {
       throw new Error(
         `Invalid provider type: ${type}. Must be one of: ${this.getValidTypes().join(', ')}`
@@ -234,7 +227,7 @@ export class ModelName {
 
   static create(name: string): ModelName {
     const trimmedName = name.trim();
-    
+
     if (!trimmedName || trimmedName.length === 0) {
       throw new Error('Model name cannot be empty');
     }
@@ -243,7 +236,7 @@ export class ModelName {
       throw new Error('Model name cannot exceed 100 characters');
     }
 
-    if (!/^[a-zA-Z0-9\-_:.\/]+$/.test(trimmedName)) {
+    if (!/^[a-zA-Z0-9\-_:./]+$/.test(trimmedName)) {
       throw new Error(
         'Model name can only contain letters, numbers, hyphens, underscores, colons, dots, and forward slashes'
       );
@@ -284,7 +277,7 @@ export class RequestPriority {
 
   static create(priority: string): RequestPriority {
     const normalizedPriority = priority.toLowerCase().trim();
-    
+
     switch (normalizedPriority) {
       case 'low':
         return new RequestPriority('low', 1);

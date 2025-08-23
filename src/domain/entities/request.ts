@@ -1,7 +1,7 @@
 /**
  * Request Domain Entity
  * Pure business logic for processing requests
- * 
+ *
  * Living Spiral Council Applied:
  * - Domain-driven design with immutable request entities
  * - Business rules for request validation and prioritization
@@ -32,7 +32,7 @@ export class ProcessingRequest {
     constraints: RequestConstraints
   ) {
     this.validateInputs(id, content);
-    
+
     this._id = id;
     this._content = content;
     this._type = type;
@@ -195,7 +195,7 @@ export class ProcessingRequest {
     const baseTime = 1000; // 1 second base
     const complexity = this.calculateComplexity();
     const priorityMultiplier = this.getPriorityMultiplier();
-    
+
     return baseTime * (1 + complexity * 3) * priorityMultiplier;
   }
 
@@ -387,14 +387,7 @@ export class RequestFactory {
     priority: RequestPriority,
     context: RequestContext
   ): ProcessingRequest {
-    return new ProcessingRequest(
-      id,
-      content,
-      RequestType.CODE_GENERATION,
-      priority,
-      context,
-      {}
-    );
+    return new ProcessingRequest(id, content, RequestType.CODE_GENERATION, priority, context, {});
   }
 
   /**
@@ -406,14 +399,7 @@ export class RequestFactory {
     priority: RequestPriority,
     context: RequestContext
   ): ProcessingRequest {
-    return new ProcessingRequest(
-      id,
-      content,
-      RequestType.CODE_ANALYSIS,
-      priority,
-      context,
-      {}
-    );
+    return new ProcessingRequest(id, content, RequestType.CODE_ANALYSIS, priority, context, {});
   }
 
   /**

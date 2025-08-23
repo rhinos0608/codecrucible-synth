@@ -1,7 +1,7 @@
 /**
  * Model Repository Interface
  * Domain layer contract for model persistence and management
- * 
+ *
  * Living Spiral Council Applied:
  * - Pure domain interface with no implementation details
  * - Repository pattern for decoupled data access
@@ -130,7 +130,10 @@ export interface IAdvancedModelRepository extends IModelRepository {
   /**
    * Get model performance statistics
    */
-  getPerformanceStats(name: string, providerType: ProviderType): Promise<ModelPerformanceStats | null>;
+  getPerformanceStats(
+    name: string,
+    providerType: ProviderType
+  ): Promise<ModelPerformanceStats | null>;
 
   /**
    * Get all model performance statistics
@@ -145,12 +148,20 @@ export interface IAdvancedModelRepository extends IModelRepository {
   /**
    * Bulk update model enabled status
    */
-  bulkUpdateEnabled(modelIds: Array<{name: string, provider: ProviderType}>, enabled: boolean): Promise<void>;
+  bulkUpdateEnabled(
+    modelIds: Array<{ name: string; provider: ProviderType }>,
+    enabled: boolean
+  ): Promise<void>;
 
   /**
    * Record model usage
    */
-  recordUsage(name: string, providerType: ProviderType, success: boolean, latency: number): Promise<void>;
+  recordUsage(
+    name: string,
+    providerType: ProviderType,
+    success: boolean,
+    latency: number
+  ): Promise<void>;
 
   /**
    * Get model recommendations based on usage patterns
@@ -192,5 +203,10 @@ export interface ModelRepositoryEvents {
   modelHealthChanged: { modelName: string; providerType: string; isHealthy: boolean };
   modelEnabled: { modelName: string; providerType: string };
   modelDisabled: { modelName: string; providerType: string };
-  modelUsageRecorded: { modelName: string; providerType: string; success: boolean; latency: number };
+  modelUsageRecorded: {
+    modelName: string;
+    providerType: string;
+    success: boolean;
+    latency: number;
+  };
 }

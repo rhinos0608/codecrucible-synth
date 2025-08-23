@@ -5,12 +5,12 @@
 
 // Extended UnifiedModelClient with missing methods
 export interface ExtendedUnifiedModelClient {
-  currentOptimization?: any;
-  executeCommand?: (command: string) => Promise<any>;
-  generateCode?: (prompt: string) => Promise<any>;
+  currentOptimization?: Record<string, unknown>;
+  executeCommand?: (command: string) => Promise<Record<string, unknown>>;
+  generateCode?: (prompt: string) => Promise<string>;
   checkConnection?: () => Promise<boolean>;
-  analyzeCode?: (code: string) => Promise<any>;
-  generateVoiceResponse?: (input: any) => Promise<any>;
+  analyzeCode?: (code: string) => Promise<Record<string, unknown>>;
+  generateVoiceResponse?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }
 
 // Extended voice archetype with missing properties
@@ -31,7 +31,7 @@ export interface ExtendedSynthesisResult {
   combinedCode?: string;
   convergenceReason?: string;
   lessonsLearned?: string[];
-  voicesUsed?: any[];
+  voicesUsed?: string[];
   qualityScore?: number;
 }
 
@@ -42,12 +42,12 @@ export interface ExtendedIterationResult {
   content: string;
   iterations: Array<{
     content: string;
-    feedback: any;
+    feedback: string;
     improvement: number;
   }>;
-  writerVoice: any;
-  auditorVoice: any;
-  totalIterations: any;
+  writerVoice: string;
+  auditorVoice: string;
+  totalIterations: number;
   finalQualityScore: number;
   converged: boolean;
   finalCode: string;
@@ -55,40 +55,50 @@ export interface ExtendedIterationResult {
 
 // CLI Context interface
 export interface CLIContext {
-  modelClient: any;
-  voiceSystem: any;
-  mcpManager: any;
-  config: any;
+  modelClient: Record<string, unknown>;
+  voiceSystem: Record<string, unknown>;
+  mcpManager: Record<string, unknown>;
+  config: Record<string, unknown>;
   getPendingEditsCount?: () => number;
-  proposeEdits?: (edits: any) => Promise<{ approved: boolean; edits: any }>;
-  confirmAllEdits?: () => Promise<{ approved: any[]; rejected: any[] }>;
-  applyEdits?: (edits: any) => Promise<any>;
+  proposeEdits?: (
+    edits: Record<string, unknown>[]
+  ) => Promise<{ approved: boolean; edits: Record<string, unknown>[] }>;
+  confirmAllEdits?: () => Promise<{
+    approved: Record<string, unknown>[];
+    rejected: Record<string, unknown>[];
+  }>;
+  applyEdits?: (edits: Record<string, unknown>[]) => Promise<Record<string, unknown>>;
   clearPendingEdits?: () => void;
-  generateEditSummary?: () => any;
+  generateEditSummary?: () => Record<string, unknown>;
   displayEditSummary?: () => void;
-  options?: any;
+  options?: Record<string, unknown>;
 }
 
 // Global edit confirmation interface
 export interface GlobalEditConfirmation {
   getPendingEditsCount: () => number;
-  proposeEdits: (edits: any) => Promise<{ approved: boolean; edits: any }>;
-  confirmAllEdits: () => Promise<{ approved: any[]; rejected: any[] }>;
-  applyEdits: (edits: any) => Promise<any>;
+  proposeEdits: (
+    edits: Record<string, unknown>[]
+  ) => Promise<{ approved: boolean; edits: Record<string, unknown>[] }>;
+  confirmAllEdits: () => Promise<{
+    approved: Record<string, unknown>[];
+    rejected: Record<string, unknown>[];
+  }>;
+  applyEdits: (edits: Record<string, unknown>[]) => Promise<Record<string, unknown>>;
   clearPendingEdits: () => void;
-  generateEditSummary: () => any;
+  generateEditSummary: () => Record<string, unknown>;
   displayEditSummary: () => void;
-  options?: any;
+  options?: Record<string, unknown>;
 }
 
 // Memory interfaces for workflow orchestrator
 export interface WorkflowMemory {
   id: string;
-  content: any;
+  content: Record<string, unknown>;
   timestamp: number;
   importance?: number;
   embedding?: number[];
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 // Performance metrics with all required fields

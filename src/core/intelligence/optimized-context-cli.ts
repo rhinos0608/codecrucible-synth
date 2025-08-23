@@ -5,10 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
-import {
-  LazyProjectIntelligenceSystem,
-  BasicProjectInfo,
-} from './lazy-project-intelligence.js';
+import { LazyProjectIntelligenceSystem, BasicProjectInfo } from './lazy-project-intelligence.js';
 import { ProjectIntelligence } from './project-intelligence-system.js';
 import {
   ContextAwareOptions,

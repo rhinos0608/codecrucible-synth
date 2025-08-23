@@ -1,7 +1,7 @@
 /**
  * Voice Repository Interface
  * Domain layer contract for voice persistence
- * 
+ *
  * Living Spiral Council Applied:
  * - Pure domain interface with no implementation details
  * - Repository pattern for decoupled data access

@@ -1,7 +1,7 @@
 /**
  * Model Domain Entity
  * Pure business logic for AI model management
- * 
+ *
  * Living Spiral Council Applied:
  * - Domain-driven design with pure business entities
  * - No external dependencies or infrastructure concerns
@@ -32,7 +32,7 @@ export class Model {
     isEnabled: boolean = true
   ) {
     this.validateInputs(capabilities, parameters);
-    
+
     this._name = name;
     this._providerType = providerType;
     this._capabilities = Object.freeze([...capabilities]);
@@ -327,11 +327,7 @@ export class ModelFactory {
   /**
    * Create a coding-specialized model
    */
-  static createCodingModel(
-    name: string,
-    providerType: string,
-    parameters: ModelParameters
-  ): Model {
+  static createCodingModel(name: string, providerType: string, parameters: ModelParameters): Model {
     return new Model(
       ModelName.create(name),
       ProviderType.create(providerType),

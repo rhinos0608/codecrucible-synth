@@ -520,10 +520,11 @@ export class EncryptedConfig {
     switch (type) {
       case 'string':
         return value;
-      case 'number':
+      case 'number': {
         const num = Number(value);
         if (isNaN(num)) throw new Error(`Cannot parse '${value}' as number`);
         return num;
+      }
       case 'boolean':
         return ['true', '1', 'yes', 'on'].includes(value.toLowerCase());
       case 'object':

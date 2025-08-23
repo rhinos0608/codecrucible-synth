@@ -10,7 +10,6 @@
  * - Architect: Clear separation between caching logic and client operations
  */
 
-import { createHash } from 'crypto';
 import { unifiedCache } from '../cache/unified-cache-system.js';
 import { logger } from '../logger.js';
 

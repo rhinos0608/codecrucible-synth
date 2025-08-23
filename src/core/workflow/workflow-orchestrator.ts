@@ -7,6 +7,17 @@ import { EventEmitter } from 'events';
 import { UnifiedModelClient } from '../client.js';
 import { Logger } from '../logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
+import {
+  JsonValue,
+  JsonObject,
+  ConfigurationObject,
+  TransformFunction,
+  PredicateFunction,
+  EvaluationFunction,
+  WorkflowContext,
+  MemoryItem,
+  GenericResult,
+} from '../types.js';
 
 // Core Types
 export interface ExecutionRequest {
@@ -17,21 +28,21 @@ export interface ExecutionRequest {
   maxTokens?: number;
   temperature?: number;
   stream?: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ExecutionResponse {
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
   executionTime: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ExecutionResult {
   success: boolean;
-  content: any;
-  metadata?: Record<string, any>;
+  content: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 // Workflow Pattern Types
@@ -50,7 +61,7 @@ export enum WorkflowPatternType {
 // Pattern Interfaces
 export interface PromptChaining {
   steps: ChainStep[];
-  context: Map<string, any>;
+  context: Map<string, unknown>;
 }
 
 export interface ChainStep {
@@ -58,7 +69,7 @@ export interface ChainStep {
   prompt: string;
   voice?: string;
   dependencies?: string[];
-  transform?: (input: any) => any;
+  transform?: TransformFunction<JsonValue, JsonValue>;
 }
 
 export interface ParallelProcessing {
@@ -96,18 +107,18 @@ export interface DynamicWorkflow {
 export interface WorkflowNode {
   id: string;
   type: WorkflowPatternType;
-  config: any;
+  config: ConfigurationObject;
   transitions: Transition[];
 }
 
 export interface Transition {
   to: string;
-  condition: (context: any) => boolean;
+  condition: PredicateFunction<WorkflowContext>;
   probability?: number;
 }
 
 export interface AdaptationRule {
-  trigger: (context: any, history: any[]) => boolean;
+  trigger: (context: WorkflowContext, history: JsonValue[]) => boolean;
   action: (workflow: DynamicWorkflow) => void;
 }
 
@@ -119,7 +130,7 @@ export interface HumanInTheLoop {
 
 export interface Checkpoint {
   id: string;
-  condition: (result: any) => boolean;
+  condition: PredicateFunction<JsonValue>;
   prompt: string;
   timeout: number;
 }
@@ -743,7 +754,9 @@ class AdaptiveHandler extends PatternHandler {
     const learningRate = config?.learningRate || 0.1;
 
     this.currentWorkflow = [...initialPlan];
+    let currentNodeId = initialPlan[0]?.id || 'start';
     const context = {
+      nodeId: currentNodeId,
       request,
       history: [],
       metrics: {
@@ -753,7 +766,6 @@ class AdaptiveHandler extends PatternHandler {
       },
     };
 
-    let currentNodeId = initialPlan[0]?.id || 'start';
     let progress = 0;
     const results = [];
 
@@ -779,6 +791,7 @@ class AdaptiveHandler extends PatternHandler {
           const adaptedNode = this.findBestNode(context, this.currentWorkflow);
           if (adaptedNode) {
             currentNodeId = adaptedNode.id;
+            context.nodeId = currentNodeId;
             continue;
           }
         }
@@ -787,6 +800,7 @@ class AdaptiveHandler extends PatternHandler {
       // Determine next node based on transitions
       const nextNode = this.selectNextNode(node, context);
       currentNodeId = nextNode?.id || 'end';
+      context.nodeId = currentNodeId;
 
       // Update metrics
       this.updateMetrics(context, nodeResult);

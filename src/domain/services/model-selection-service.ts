@@ -1,7 +1,7 @@
 /**
  * Model Selection Domain Service
  * Pure business logic for intelligent model selection and routing
- * 
+ *
  * Living Spiral Council Applied:
  * - Domain service for model selection business rules
  * - Pure business logic without infrastructure dependencies
@@ -29,7 +29,7 @@ export class ModelSelectionService {
     preferences?: ModelSelectionPreferences
   ): Promise<ModelSelection> {
     const availableModels = await this.modelRepository.findAvailableModels();
-    
+
     if (availableModels.length === 0) {
       throw new Error('No models available for processing');
     }
@@ -39,11 +39,7 @@ export class ModelSelectionService {
     const estimatedTime = request.estimateProcessingTime();
 
     // Filter models by hard constraints
-    let candidateModels = this.filterModelsByConstraints(
-      availableModels,
-      request,
-      preferences
-    );
+    let candidateModels = this.filterModelsByConstraints(availableModels, request, preferences);
 
     if (candidateModels.length === 0) {
       // Fallback: relax constraints and try again
@@ -96,27 +92,23 @@ export class ModelSelectionService {
     const requiredCapabilities = request.requiresCapabilities();
 
     // Separate models by performance characteristics
-    const fastModels = availableModels.filter(model =>
-      model.parameters.estimatedLatency < (preferences?.maxLatency || 5000)
+    const fastModels = availableModels.filter(
+      model => model.parameters.estimatedLatency < (preferences?.maxLatency || 5000)
     );
 
-    const qualityModels = availableModels.filter(model =>
-      model.parameters.qualityRating >= (preferences?.minQuality || 0.7)
+    const qualityModels = availableModels.filter(
+      model => model.parameters.qualityRating >= (preferences?.minQuality || 0.7)
     );
 
     // Select fast model for initial processing
-    const fastModelSelection = await this.selectOptimalFromCandidates(
-      fastModels,
-      request,
-      { prioritize: 'speed' }
-    );
+    const fastModelSelection = await this.selectOptimalFromCandidates(fastModels, request, {
+      prioritize: 'speed',
+    });
 
     // Select quality model for refinement/validation
-    const qualityModelSelection = await this.selectOptimalFromCandidates(
-      qualityModels,
-      request,
-      { prioritize: 'quality' }
-    );
+    const qualityModelSelection = await this.selectOptimalFromCandidates(qualityModels, request, {
+      prioritize: 'quality',
+    });
 
     return {
       fastModel: fastModelSelection?.model || null,
@@ -146,13 +138,13 @@ export class ModelSelectionService {
     preferences?: LoadBalancingPreferences
   ): Promise<LoadBalancingPlan> {
     const availableModels = await this.modelRepository.findAvailableModels();
-    
+
     // Group requests by complexity and type
     const requestGroups = this.groupRequestsByComplexity(requests);
-    
+
     // Assign models to request groups
     const assignments: RequestModelAssignment[] = [];
-    
+
     for (const group of requestGroups) {
       const suitableModels = availableModels.filter(model =>
         group.requests[0].requiresCapabilities().some(cap => model.hasCapability(cap))
@@ -241,9 +233,7 @@ export class ModelSelectionService {
     return models.filter(model => {
       // Check required capabilities
       const requiredCapabilities = request.requiresCapabilities();
-      const hasRequiredCapabilities = requiredCapabilities.every(cap =>
-        model.hasCapability(cap)
-      );
+      const hasRequiredCapabilities = requiredCapabilities.every(cap => model.hasCapability(cap));
 
       if (!hasRequiredCapabilities) return false;
 
@@ -290,31 +280,28 @@ export class ModelSelectionService {
     const contextScore = this.calculateContextScore(model, request);
 
     return (
-      suitabilityScore * 0.4 +
-      performanceScore * 0.3 +
-      reliabilityScore * 0.2 +
-      contextScore * 0.1
+      suitabilityScore * 0.4 + performanceScore * 0.3 + reliabilityScore * 0.2 + contextScore * 0.1
     );
   }
 
   private calculatePerformanceScore(model: Model, request: ProcessingRequest): number {
     const maxAcceptableLatency = request.constraints.maxResponseTime || 30000;
-    const latencyScore = Math.max(0, 1 - (model.parameters.estimatedLatency / maxAcceptableLatency));
-    
+    const latencyScore = Math.max(0, 1 - model.parameters.estimatedLatency / maxAcceptableLatency);
+
     const qualityScore = model.parameters.qualityRating;
-    
+
     // Balance latency and quality based on request priority
     const priorityWeight = request.priority.numericValue / 4; // 0.25 to 1.0
-    return (latencyScore * (1 - priorityWeight) + qualityScore * priorityWeight);
+    return latencyScore * (1 - priorityWeight) + qualityScore * priorityWeight;
   }
 
   private calculateReliabilityScore(model: Model): number {
     if (!model.isHealthy) return 0;
-    
+
     // Simple reliability based on error count and health status
     const baseScore = 0.8;
     const errorPenalty = Math.min(model.errorCount * 0.1, 0.3);
-    
+
     return Math.max(0, baseScore - errorPenalty);
   }
 
@@ -350,12 +337,13 @@ export class ModelSelectionService {
 
       if (criteria.prioritize === 'speed') {
         // Prioritize low latency
-        const latencyScore = 1 - (model.parameters.estimatedLatency / 10000);
+        const latencyScore = 1 - model.parameters.estimatedLatency / 10000;
         score = Math.max(0, latencyScore) * 0.7 + model.parameters.qualityRating * 0.3;
       } else {
         // Prioritize quality
-        score = model.parameters.qualityRating * 0.7 + 
-                (1 - model.parameters.estimatedLatency / 30000) * 0.3;
+        score =
+          model.parameters.qualityRating * 0.7 +
+          (1 - model.parameters.estimatedLatency / 30000) * 0.3;
       }
 
       return { model, score: Math.max(0, score) };
@@ -365,12 +353,9 @@ export class ModelSelectionService {
     return scoredModels[0];
   }
 
-  private determineRoutingStrategy(
-    request: ProcessingRequest,
-    model: Model
-  ): RoutingStrategy {
+  private determineRoutingStrategy(request: ProcessingRequest, model: Model): RoutingStrategy {
     const complexity = request.calculateComplexity();
-    
+
     if (complexity > 0.8) {
       return RoutingStrategy.HYBRID;
     } else if (request.priority.value === 'critical') {
@@ -406,14 +391,14 @@ export class ModelSelectionService {
     const baseCost = 0.01; // Base cost per request
     const complexityMultiplier = 1 + request.calculateComplexity();
     const modelSizeMultiplier = model.parameters.maxTokens / 4000;
-    
+
     return baseCost * complexityMultiplier * modelSizeMultiplier;
   }
 
   private estimateProcessingLatency(model: Model, request: ProcessingRequest): number {
     const baseLatency = model.parameters.estimatedLatency;
-    const complexityMultiplier = 1 + (request.calculateComplexity() * 0.5);
-    
+    const complexityMultiplier = 1 + request.calculateComplexity() * 0.5;
+
     return Math.round(baseLatency * complexityMultiplier);
   }
 
@@ -431,7 +416,7 @@ export class ModelSelectionService {
     }
 
     const complexity = request.calculateComplexity();
-    
+
     if (complexity > 0.7) {
       return HybridProcessingStrategy.PARALLEL_VALIDATION;
     } else {
@@ -439,26 +424,21 @@ export class ModelSelectionService {
     }
   }
 
-  private calculateExpectedSpeedup(
-    fastModel: Model | null,
-    qualityModel: Model | null
-  ): number {
+  private calculateExpectedSpeedup(fastModel: Model | null, qualityModel: Model | null): number {
     if (!fastModel || !qualityModel) return 1.0;
 
     const fastLatency = fastModel.parameters.estimatedLatency;
     const qualityLatency = qualityModel.parameters.estimatedLatency;
-    
+
     // Estimated speedup when using fast model for initial processing
     return Math.max(1.0, qualityLatency / (fastLatency + qualityLatency * 0.3));
   }
 
-  private calculateQualityTradeoff(
-    fastModel: Model | null,
-    qualityModel: Model | null
-  ): number {
+  private calculateQualityTradeoff(fastModel: Model | null, qualityModel: Model | null): number {
     if (!fastModel || !qualityModel) return 0;
 
-    const qualityDifference = qualityModel.parameters.qualityRating - fastModel.parameters.qualityRating;
+    const qualityDifference =
+      qualityModel.parameters.qualityRating - fastModel.parameters.qualityRating;
     return Math.max(0, Math.min(1, qualityDifference));
   }
 
@@ -495,11 +475,13 @@ export class ModelSelectionService {
 
     // Select top models based on performance and availability
     const selectedCount = Math.min(maxModels, Math.max(minModels, Math.ceil(requestCount / 3)));
-    
+
     return models
-      .sort((a, b) => 
-        (b.parameters.qualityRating - a.parameters.qualityRating) +
-        (a.parameters.estimatedLatency - b.parameters.estimatedLatency) / 10000
+      .sort(
+        (a, b) =>
+          b.parameters.qualityRating -
+          a.parameters.qualityRating +
+          (a.parameters.estimatedLatency - b.parameters.estimatedLatency) / 10000
       )
       .slice(0, selectedCount);
   }
@@ -507,9 +489,7 @@ export class ModelSelectionService {
   private calculateTotalProcessingTime(assignments: RequestModelAssignment[]): number {
     if (assignments.length === 0) return 0;
 
-    const endTimes = assignments.map(a => 
-      a.estimatedStartTime.getTime() + a.estimatedDuration
-    );
+    const endTimes = assignments.map(a => a.estimatedStartTime.getTime() + a.estimatedDuration);
 
     return Math.max(...endTimes) - Date.now();
   }
@@ -528,14 +508,14 @@ export class ModelSelectionService {
   private calculateLoadBalancingEfficiency(assignments: RequestModelAssignment[]): number {
     const distribution = this.calculateLoadDistribution(assignments);
     const values = Array.from(distribution.values());
-    
+
     if (values.length === 0) return 0;
 
     const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
     const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
-    
+
     // Efficiency is inversely related to variance (lower variance = better distribution)
-    return Math.max(0, 1 - (variance / (mean * mean)));
+    return Math.max(0, 1 - variance / (mean * mean));
   }
 }
 

@@ -14,6 +14,7 @@ import {
   ModelRequest,
   ModelResponse,
   UnifiedClientConfig as BaseUnifiedClientConfig,
+  MetricsData,
 } from './types.js';
 import { SecurityValidator, ISecurityValidator } from './security/security-validator.js';
 import { PerformanceMonitor } from '../utils/performance.js';
@@ -128,8 +129,8 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private requestQueue: Array<{
     id: string;
     request: ModelRequest;
-    resolve: (value: any) => void;
-    reject: (reason?: any) => void;
+    resolve: (value: ModelResponse) => void;
+    reject: (reason?: Error) => void;
   }> = [];
   private isProcessingQueue = false;
 
@@ -169,8 +170,8 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       securityValidator?: ISecurityValidator;
       streamingManager?: IStreamingManager;
       cacheCoordinator?: ICacheCoordinator;
-      performanceMonitor?: any; // Use any for now to avoid interface mismatch
-      hybridRouter?: any; // Use any for now to avoid interface mismatch
+      performanceMonitor?: PerformanceMonitor;
+      hybridRouter?: HybridLLMRouter;
     }
   ) {
     super();
@@ -188,18 +189,21 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
     // Use injected dependencies if available, otherwise create them (backward compatibility)
     this.performanceMonitor = injectedDependencies?.performanceMonitor || new PerformanceMonitor();
-    
-    this.securityValidator = injectedDependencies?.securityValidator || new SecurityValidator({
-      enableSandbox: this.config.security?.enableSandbox,
-      maxInputLength: this.config.security?.maxInputLength,
-    });
+
+    this.securityValidator =
+      injectedDependencies?.securityValidator ||
+      new SecurityValidator({
+        enableSandbox: this.config.security?.enableSandbox,
+        maxInputLength: this.config.security?.maxInputLength,
+      });
 
     // Initialize hardware-aware components (these don't have circular dependencies yet)
     this.hardwareSelector = new HardwareAwareModelSelector();
     this.processManager = new ActiveProcessManager(this.hardwareSelector);
 
     // Use injected dependencies or create new ones
-    this.streamingManager = injectedDependencies?.streamingManager || new StreamingManager(config.streaming);
+    this.streamingManager =
+      injectedDependencies?.streamingManager || new StreamingManager(config.streaming);
     this.providerRepository = injectedDependencies?.providerRepository || new ProviderRepository();
     this.cacheCoordinator = injectedDependencies?.cacheCoordinator || new CacheCoordinator();
 
@@ -292,7 +296,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       this.hardwareSelector.setCurrentModel(this.currentModel);
       logger.info('Immediate initialization completed', { model: this.currentModel });
     } catch (error) {
-      logger.warn('Could not determine optimal model immediately, will retry when providers are ready');
+      logger.warn(
+        'Could not determine optimal model immediately, will retry when providers are ready'
+      );
       this.currentModel = 'auto'; // Fallback
     }
   }
@@ -394,10 +400,10 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         const errorObj = error instanceof Error ? error : new Error(String(error));
 
         initResults.set(providerConfig.type, { success: false, error: errorObj, duration });
-        logger.warn('Provider failed', { 
-          type: providerConfig.type, 
-          duration, 
-          error: errorObj.message 
+        logger.warn('Provider failed', {
+          type: providerConfig.type,
+          duration,
+          error: errorObj.message,
         });
 
         // Emit provider failure event
@@ -417,7 +423,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     logger.info('Provider initialization completed', {
       successful: successCount,
       total: totalCount,
-      duration: totalDuration
+      duration: totalDuration,
     });
 
     // Log detailed results
@@ -488,7 +494,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   /**
    * HYBRID ARCHITECTURE: Enhanced synthesize method with intelligent routing
    */
-  async synthesize(request: any): Promise<any> {
+  async synthesize(request: Record<string, unknown>): Promise<Record<string, unknown>> {
     // INTELLIGENT CACHING: Check cache with content-aware key generation
     const cacheKey = this.cacheCoordinator.generateIntelligentCacheKey(request);
     const cached = await this.cacheCoordinator.get(cacheKey);
@@ -533,9 +539,12 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     logger.debug('Tool debug info', {
       provider: selectedProvider,
       model: request.model,
-      supportsTools
+      supportsTools,
     });
-    logger.debug('Tool integration status', { hasIntegration: !!toolIntegration, toolCount: tools.length });
+    logger.debug('Tool integration status', {
+      hasIntegration: !!toolIntegration,
+      toolCount: tools.length,
+    });
     if (tools.length > 0) {
       logger.debug('Available tools', { tools: tools.map(t => t.function.name) });
     }
@@ -595,7 +604,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return chunks;
   }
 
-  private selectProvider(model?: string): any {
+  private selectProvider(model?: string): ProviderConfig | null {
     // Select provider based on model or availability
     if (model) {
       for (const [, provider] of this.providerRepository.getAvailableProviders()) {
@@ -1006,7 +1015,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     if (provider === 'ollama') {
       // If no specific model provided, assume auto-selection will pick a supported model
       if (!model) {
-        logger.debug('No specific model provided, assuming auto-selection will pick supported model');
+        logger.debug(
+          'No specific model provided, assuming auto-selection will pick supported model'
+        );
         return true; // Trust that auto-selection picks qwen2.5-coder which supports tools
       }
 
@@ -1218,7 +1229,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return health;
   }
 
-  getMetrics(): any {
+  getMetrics(): MetricsData {
     return {
       activeRequests: this.activeRequests.size,
       queuedRequests: this.requestQueue.length,
@@ -1477,7 +1488,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
 
   static displayTroubleshootingHelp(): void {
-    console.log('Troubleshooting help would be displayed here');
+    logger.info('Troubleshooting help would be displayed here');
   }
 
   async makeRequest(method: string, endpoint: string, data?: any): Promise<Response> {
@@ -1615,13 +1626,14 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       }
 
       // DEBUG: Log request before sending to provider
-      console.log(
-        `🔧 HYBRID DEBUG: Sending to ${selectedProvider}, tools=${request.tools?.length || 0}`
-      );
+      logger.debug('Hybrid debug: Sending to provider', {
+        provider: selectedProvider,
+        toolCount: request.tools?.length || 0,
+      });
       if (request.tools?.length > 0) {
-        console.log(
-          `🔧 HYBRID DEBUG: Tool names: ${request.tools.map((t: any) => t.function?.name || t.name || 'unnamed').join(', ')}`
-        );
+        logger.debug('Hybrid debug: Tool names', {
+          toolNames: request.tools.map((t: any) => t.function?.name || t.name || 'unnamed'),
+        });
       }
 
       // Process the request
@@ -1629,7 +1641,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
       // Check if response contains tool calls that need to be executed
       if (response.toolCalls && response.toolCalls.length > 0) {
-        console.log(`🔧 TOOL EXECUTION: Found ${response.toolCalls.length} tool calls to execute`);
+        logger.debug('Tool execution: Found tool calls', { count: response.toolCalls.length });
 
         const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
         const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
@@ -1639,7 +1651,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
             // Execute each tool call
             for (const toolCall of response.toolCalls) {
-              console.log(`🔧 Executing tool: ${toolCall.name || toolCall.function?.name}`);
+              logger.debug('Executing tool', {
+                toolName: toolCall.name || toolCall.function?.name,
+              });
 
               // Convert to expected format if needed
               const formattedToolCall = {
@@ -1652,7 +1666,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
               };
 
               const result = await toolIntegration.executeToolCall(formattedToolCall);
-              console.log(`🔧 Tool result:`, JSON.stringify(result, null, 2));
+              logger.debug('Tool result', { result });
               toolResults.push(result);
             }
 
@@ -1678,11 +1692,11 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
             }
           } catch (error: unknown) {
             const errorMessage = getErrorMessage(error);
-            console.error('🔧 Tool execution error:', errorMessage);
+            logger.error('Tool execution error', error);
             response.content = `Tool execution error: ${errorMessage}`;
           }
         } else {
-          console.warn('🔧 Tool integration not available for execution');
+          logger.warn('Tool integration not available for execution');
         }
       }
 
@@ -2223,7 +2237,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     try {
       // Clean up persistent cache (auto-saves on destroy)
       if (this.cacheCoordinator) {
-        console.log('🗃️ Saving cache before shutdown...');
+        logger.info('Saving cache before shutdown');
         this.cacheCoordinator.destroy();
       }
 

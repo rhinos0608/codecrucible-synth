@@ -359,7 +359,7 @@ export class SystemBootstrap {
           performanceMonitor,
           hybridRouter,
         });
-        
+
         return client;
       },
       {

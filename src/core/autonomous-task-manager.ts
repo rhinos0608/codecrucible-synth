@@ -289,7 +289,7 @@ export class AutonomousTaskManager extends EventEmitter {
     }
   }
 
-  private async validateTaskCompletion(task_id: string): Promise<boolean> {
+  private async validateTaskCompletion(_task_id: string): Promise<boolean> {
     console.log(chalk.blue('🔍 Validating task completion...'));
 
     const validations = [

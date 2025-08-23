@@ -2,8 +2,47 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { spawn, exec, ChildProcess } from 'child_process';
 import { promisify } from 'util';
+import { logger } from '../logger.js';
 
 const execAsync = promisify(exec);
+
+// SECURITY: Command whitelist and validation
+const ALLOWED_COMMANDS = ['node', 'npm', 'git', 'ls', 'pwd', 'cat', 'grep', 'find', 'echo'];
+const BLOCKED_PATTERNS = [
+  /rm\s+-rf/i, // Dangerous deletions
+  /chmod\s+777/i, // Permission changes
+  /sudo/i, // Privilege escalation
+  /su\s+/i, // User switching
+  /curl.*\|.*sh/i, // Remote code execution
+  /wget.*\|.*sh/i, // Remote code execution
+  /eval/i, // Code evaluation
+  /exec/i, // Code execution
+  />\s*\/dev\//i, // Device access
+  /[;&|`$()]/, // Shell injection characters
+];
+
+function validateCommand(command: string): { isValid: boolean; reason?: string } {
+  if (!command || command.trim() === '') {
+    return { isValid: false, reason: 'Empty command' };
+  }
+
+  // Check against blocked patterns
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(command)) {
+      return { isValid: false, reason: `Command contains blocked pattern: ${pattern}` };
+    }
+  }
+
+  // Extract base command
+  const baseCommand = command.split(' ')[0];
+
+  // Check if base command is allowed
+  if (!ALLOWED_COMMANDS.includes(baseCommand)) {
+    return { isValid: false, reason: `Command '${baseCommand}' is not in allowed list` };
+  }
+
+  return { isValid: true };
+}
 
 interface ProcessSession {
   id: string;
@@ -78,9 +117,24 @@ export class AdvancedProcessTool extends BaseTool {
       const sessionId = `session_${++this.sessionCounter}_${Date.now()}`;
       const cwd = args.workingDirectory || this.agentContext.workingDirectory;
 
+      // SECURITY: Validate command before execution
+      const validation = validateCommand(args.command);
+      if (!validation.isValid) {
+        logger.error(`🚨 SECURITY: Blocked dangerous command: ${args.command}`);
+        logger.error(`🚨 Reason: ${validation.reason}`);
+        return {
+          success: false,
+          sessionId: null,
+          error: `SECURITY BLOCKED: ${validation.reason}`,
+          output: '',
+          stderr: `Command blocked for security: ${validation.reason}`,
+        };
+      }
+
       // Parse command and arguments
       const [command, ...cmdArgs] = args.command.split(' ');
 
+      logger.info(`✅ SECURITY: Executing validated command: ${command}`);
       const childProcess = spawn(command, cmdArgs, {
         cwd,
         env: { ...process.env, ...args.environment },

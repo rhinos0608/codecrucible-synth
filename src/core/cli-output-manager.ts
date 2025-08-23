@@ -25,7 +25,7 @@ export function createCLIOutputManager(): CLIOutputManager {
     outputProgress: (message: string) => {
       console.log('⏳', message);
     },
-    configure: (options: Record<string, unknown>) => {
+    configure: (_options: Record<string, unknown>) => {
       // Configuration logic
     },
   };

@@ -5,7 +5,7 @@
 
 import * as jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { RBACSystem, Session, User } from './rbac-system.js';
+import { RBACSystem, Session, User } from './production-rbac-system.js';
 import { SecretsManager } from './secrets-manager.js';
 import { InputSanitizer } from '../security/input-sanitizer.js';
 import { logger } from '../logger.js';

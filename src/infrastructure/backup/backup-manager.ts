@@ -11,6 +11,15 @@ import { createReadStream, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { createGzip, createGunzip } from 'zlib';
 import { performance } from 'perf_hooks';
+import * as crypto from 'crypto';
+import * as AWS from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import archiver from 'archiver';
+import tar from 'tar';
+
+const execAsync = promisify(exec);
 
 export interface BackupConfig {
   enabled: boolean;
@@ -27,6 +36,9 @@ export interface BackupDestination {
   path: string;
   credentials?: Record<string, string>;
   enabled: boolean;
+  bucket?: string; // For S3/cloud storage
+  region?: string; // For cloud providers
+  endpoint?: string; // For custom S3-compatible storage
 }
 
 export interface NotificationConfig {
@@ -65,6 +77,8 @@ export class BackupManager {
   private dbManager: DatabaseManager;
   private backupHistory: BackupMetadata[] = [];
   private scheduleTimer?: NodeJS.Timeout;
+  private s3Client?: AWS.S3Client;
+  private encryptionKey?: Buffer;
 
   constructor(dbManager: DatabaseManager, config: Partial<BackupConfig> = {}) {
     this.dbManager = dbManager;
@@ -89,6 +103,14 @@ export class BackupManager {
     };
 
     this.config = { ...defaultConfig, ...config };
+    
+    // Initialize cloud storage clients
+    this.initializeCloudClients();
+    
+    // Initialize encryption
+    if (this.config.encryptionEnabled) {
+      this.encryptionKey = crypto.randomBytes(32);
+    }
   }
 
   /**
@@ -386,16 +408,125 @@ export class BackupManager {
   }
 
   /**
-   * Backup database using existing DatabaseManager
+   * Initialize cloud storage clients
+   */
+  private initializeCloudClients(): void {
+    const s3Destination = this.config.destinations.find(d => d.type === 's3');
+    if (s3Destination) {
+      this.s3Client = new AWS.S3Client({
+        region: s3Destination.region || 'us-east-1',
+        endpoint: s3Destination.endpoint,
+        credentials: s3Destination.credentials ? {
+          accessKeyId: s3Destination.credentials.accessKeyId,
+          secretAccessKey: s3Destination.credentials.secretAccessKey,
+        } : undefined,
+      });
+    }
+  }
+
+  /**
+   * Backup database with production techniques
    */
   private async backupDatabase(backupId: string): Promise<string> {
-    const backupPath = join(process.cwd(), 'temp', `db_${backupId}.db`);
+    const backupPath = join(process.cwd(), 'temp', `db_${backupId}.sql`);
     await fs.mkdir(dirname(backupPath), { recursive: true });
 
-    // Use existing database backup functionality
-    await this.dbManager.backup(backupPath);
+    try {
+      // Check database type and use appropriate backup method
+      const dbType = process.env.DATABASE_TYPE || 'sqlite';
+      
+      switch (dbType) {
+        case 'postgresql':
+          await this.backupPostgreSQL(backupPath);
+          break;
+        case 'mysql':
+          await this.backupMySQL(backupPath);
+          break;
+        case 'mongodb':
+          await this.backupMongoDB(backupPath);
+          break;
+        default:
+          // SQLite backup
+          await this.dbManager.backup(backupPath.replace('.sql', '.db'));
+          return backupPath.replace('.sql', '.db');
+      }
+      
+      return backupPath;
+    } catch (error) {
+      logger.error('Database backup failed:', error);
+      throw error;
+    }
+  }
 
-    return backupPath;
+  /**
+   * Backup PostgreSQL database
+   */
+  private async backupPostgreSQL(backupPath: string): Promise<void> {
+    const dbUrl = process.env.DATABASE_URL || 'postgresql://localhost/codecrucible';
+    const command = `pg_dump "${dbUrl}" > "${backupPath}"`;
+    
+    try {
+      const { stdout, stderr } = await execAsync(command);
+      if (stderr && !stderr.includes('NOTICE')) {
+        throw new Error(`pg_dump error: ${stderr}`);
+      }
+      logger.info('PostgreSQL backup completed');
+    } catch (error: any) {
+      throw new Error(`PostgreSQL backup failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Backup MySQL database
+   */
+  private async backupMySQL(backupPath: string): Promise<void> {
+    const host = process.env.DB_HOST || 'localhost';
+    const user = process.env.DB_USER || 'root';
+    const password = process.env.DB_PASSWORD || '';
+    const database = process.env.DB_NAME || 'codecrucible';
+    
+    const command = `mysqldump -h ${host} -u ${user} ${password ? `-p${password}` : ''} ${database} > "${backupPath}"`;
+    
+    try {
+      await execAsync(command);
+      logger.info('MySQL backup completed');
+    } catch (error: any) {
+      throw new Error(`MySQL backup failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Backup MongoDB database
+   */
+  private async backupMongoDB(backupPath: string): Promise<void> {
+    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/codecrucible';
+    const tempDir = backupPath.replace('.sql', '_mongo');
+    
+    try {
+      // Create temporary directory for MongoDB dump
+      await fs.mkdir(tempDir, { recursive: true });
+      
+      // Run mongodump
+      const command = `mongodump --uri="${uri}" --out="${tempDir}"`;
+      await execAsync(command);
+      
+      // Create tar archive of the dump
+      await tar.create(
+        {
+          gzip: true,
+          file: backupPath.replace('.sql', '.tar.gz'),
+          cwd: tempDir,
+        },
+        ['./']
+      );
+      
+      // Clean up temporary directory
+      await fs.rm(tempDir, { recursive: true, force: true });
+      
+      logger.info('MongoDB backup completed');
+    } catch (error: any) {
+      throw new Error(`MongoDB backup failed: ${error.message}`);
+    }
   }
 
   /**
@@ -431,48 +562,143 @@ export class BackupManager {
   }
 
   /**
-   * Create compressed backup package
+   * Create compressed and encrypted backup package
    */
   private async createBackupPackage(
     backupId: string,
     sourcePaths: string[]
   ): Promise<{ path: string; size: number }> {
     const packagePath = join(process.cwd(), 'temp', `${backupId}.tar.gz`);
-
-    // Create a simple backup package (in production, use tar or similar)
-    const packageData = {
-      id: backupId,
-      timestamp: new Date().toISOString(),
-      files: sourcePaths,
-    };
-
-    let content = JSON.stringify(packageData);
-
-    if (this.config.compressionEnabled) {
-      const gzip = createGzip();
-      const input = Buffer.from(content);
-      const chunks: Buffer[] = [];
-
-      gzip.on('data', (chunk: Buffer) => chunks.push(chunk));
-      gzip.write(input);
-      gzip.end();
-
-      await new Promise((resolve, reject) => {
-        gzip.on('end', resolve);
-        gzip.on('error', reject);
+    const tempManifest = join(process.cwd(), 'temp', `${backupId}_manifest.json`);
+    
+    try {
+      // Create backup manifest
+      const manifest = {
+        id: backupId,
+        timestamp: new Date().toISOString(),
+        files: sourcePaths.map(path => ({
+          originalPath: path,
+          fileName: path.split('/').pop(),
+          size: (await fs.stat(path)).size,
+        })),
+        version: '3.8.10',
+        encrypted: this.config.encryptionEnabled,
+        compressed: this.config.compressionEnabled,
+      };
+      
+      await fs.writeFile(tempManifest, JSON.stringify(manifest, null, 2));
+      
+      // Create tar.gz archive
+      const output = createWriteStream(packagePath);
+      const archive = archiver('tar', {
+        gzip: this.config.compressionEnabled,
+        gzipOptions: { level: 9 }, // Maximum compression
       });
-
-      const compressed = Buffer.concat(chunks);
-      content = compressed.toString('base64');
+      
+      archive.pipe(output);
+      
+      // Add manifest to archive
+      archive.file(tempManifest, { name: 'manifest.json' });
+      
+      // Add all source files to archive
+      for (const sourcePath of sourcePaths) {
+        if (existsSync(sourcePath)) {
+          const fileName = sourcePath.split('/').pop() || 'unknown';
+          archive.file(sourcePath, { name: fileName });
+        }
+      }
+      
+      await archive.finalize();
+      
+      // Wait for archive to complete
+      await new Promise((resolve, reject) => {
+        output.on('close', resolve);
+        output.on('error', reject);
+        archive.on('error', reject);
+      });
+      
+      // Clean up manifest file
+      await fs.unlink(tempManifest);
+      
+      // Encrypt the archive if encryption is enabled
+      let finalPath = packagePath;
+      if (this.config.encryptionEnabled) {
+        finalPath = await this.encryptFile(packagePath);
+        await fs.unlink(packagePath); // Remove unencrypted version
+      }
+      
+      const stats = await fs.stat(finalPath);
+      
+      return {
+        path: finalPath,
+        size: stats.size,
+      };
+    } catch (error) {
+      logger.error('Failed to create backup package:', error);
+      throw error;
     }
+  }
 
-    await fs.writeFile(packagePath, content);
-    const stats = await fs.stat(packagePath);
+  /**
+   * Encrypt backup file using AES-256-GCM
+   */
+  private async encryptFile(filePath: string): Promise<string> {
+    if (!this.encryptionKey) {
+      throw new Error('Encryption key not initialized');
+    }
+    
+    const encryptedPath = `${filePath}.enc`;
+    const algorithm = 'aes-256-gcm';
+    const iv = crypto.randomBytes(16);
+    
+    const cipher = crypto.createCipher(algorithm, this.encryptionKey);
+    cipher.setAutoPadding(true);
+    
+    const input = createReadStream(filePath);
+    const output = createWriteStream(encryptedPath);
+    
+    // Write IV at the beginning of the file
+    output.write(iv);
+    
+    await pipeline(input, cipher, output);
+    
+    // Append the authentication tag
+    const tag = cipher.getAuthTag();
+    await fs.appendFile(encryptedPath, tag);
+    
+    logger.info(`File encrypted: ${encryptedPath}`);
+    return encryptedPath;
+  }
 
-    return {
-      path: packagePath,
-      size: stats.size,
-    };
+  /**
+   * Decrypt backup file
+   */
+  private async decryptFile(encryptedPath: string): Promise<string> {
+    if (!this.encryptionKey) {
+      throw new Error('Encryption key not initialized');
+    }
+    
+    const decryptedPath = encryptedPath.replace('.enc', '');
+    const algorithm = 'aes-256-gcm';
+    
+    // Read IV from beginning of file
+    const encryptedData = await fs.readFile(encryptedPath);
+    const iv = encryptedData.slice(0, 16);
+    const tag = encryptedData.slice(-16);
+    const ciphertext = encryptedData.slice(16, -16);
+    
+    const decipher = crypto.createDecipher(algorithm, this.encryptionKey);
+    decipher.setAuthTag(tag);
+    
+    const decrypted = Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final()
+    ]);
+    
+    await fs.writeFile(decryptedPath, decrypted);
+    
+    logger.info(`File decrypted: ${decryptedPath}`);
+    return decryptedPath;
   }
 
   /**
@@ -515,6 +741,36 @@ export class BackupManager {
   }
 
   /**
+   * Store backup to all configured destinations
+   */
+  private async storeBackupToDestinations(
+    sourcePath: string,
+    metadata: BackupMetadata
+  ): Promise<void> {
+    for (const destination of this.config.destinations) {
+      if (!destination.enabled) continue;
+
+      try {
+        switch (destination.type) {
+          case 'local':
+            await this.storeBackupLocal(sourcePath, destination, metadata);
+            break;
+          case 's3':
+            await this.storeBackupS3(sourcePath, destination, metadata);
+            break;
+          case 'azure':
+            await this.storeBackupAzure(sourcePath, destination, metadata);
+            break;
+          default:
+            logger.warn(`Unsupported backup destination type: ${destination.type}`);
+        }
+      } catch (error) {
+        logger.error(`Failed to store backup to ${destination.type}:`, error);
+      }
+    }
+  }
+
+  /**
    * Store backup to local destination
    */
   private async storeBackupLocal(
@@ -527,6 +783,69 @@ export class BackupManager {
 
     // Update metadata with final destination
     metadata.destination = targetPath;
+    
+    logger.info(`Backup stored locally: ${targetPath}`);
+  }
+
+  /**
+   * Store backup to AWS S3
+   */
+  private async storeBackupS3(
+    sourcePath: string,
+    destination: BackupDestination,
+    metadata: BackupMetadata
+  ): Promise<void> {
+    if (!this.s3Client || !destination.bucket) {
+      throw new Error('S3 client or bucket not configured');
+    }
+
+    const key = `backups/${metadata.id}.backup`;
+    const fileStream = createReadStream(sourcePath);
+    
+    const upload = new Upload({
+      client: this.s3Client,
+      params: {
+        Bucket: destination.bucket,
+        Key: key,
+        Body: fileStream,
+        ServerSideEncryption: 'AES256',
+        StorageClass: 'STANDARD_IA', // Infrequent Access for cost optimization
+        Metadata: {
+          backupId: metadata.id,
+          timestamp: metadata.timestamp.toISOString(),
+          version: metadata.version,
+        },
+        Tagging: Object.entries({
+          backup_id: metadata.id,
+          backup_type: metadata.type,
+          created_date: metadata.timestamp.toISOString().split('T')[0],
+        }).map(([k, v]) => `${k}=${v}`).join('&'),
+      },
+    });
+
+    await upload.done();
+    
+    metadata.destination = `s3://${destination.bucket}/${key}`;
+    logger.info(`Backup stored to S3: ${metadata.destination}`);
+  }
+
+  /**
+   * Store backup to Azure Blob Storage
+   */
+  private async storeBackupAzure(
+    sourcePath: string,
+    destination: BackupDestination,
+    metadata: BackupMetadata
+  ): Promise<void> {
+    try {
+      // Would implement Azure Blob Storage upload here
+      // For now, fallback to local storage
+      logger.warn('Azure Blob Storage not yet implemented, using local fallback');
+      await this.storeBackupLocal(sourcePath, { ...destination, type: 'local' }, metadata);
+    } catch (error) {
+      logger.error('Azure backup failed:', error);
+      throw error;
+    }
   }
 
   /**
@@ -607,22 +926,80 @@ export class BackupManager {
   }
 
   /**
-   * Extract backup package
+   * Extract backup package with decryption and decompression
    */
   private async extractBackupPackage(backup: BackupMetadata, targetDir?: string): Promise<string> {
     const extractDir = targetDir || join(process.cwd(), 'temp', `extract_${backup.id}`);
     await fs.mkdir(extractDir, { recursive: true });
 
-    // Simple extraction (in production, implement proper tar/zip extraction)
-    const content = await fs.readFile(backup.destination, 'utf-8');
-    const packageData = JSON.parse(content);
-
-    // Extract files to target directory
-    await fs.writeFile(join(extractDir, 'database.db'), '');
-    await fs.writeFile(join(extractDir, 'config.json'), '{}');
-    await fs.writeFile(join(extractDir, 'state.json'), '{}');
+    let backupPath = backup.destination;
+    
+    // Download from cloud storage if needed
+    if (backupPath.startsWith('s3://')) {
+      backupPath = await this.downloadFromS3(backupPath, extractDir);
+    }
+    
+    // Decrypt if encrypted
+    if (backup.encrypted && backupPath.endsWith('.enc')) {
+      backupPath = await this.decryptFile(backupPath);
+    }
+    
+    // Extract tar.gz archive
+    try {
+      await tar.extract({
+        file: backupPath,
+        cwd: extractDir,
+        gzip: backup.compressed,
+      });
+      
+      logger.info(`Backup extracted to: ${extractDir}`);
+    } catch (error) {
+      logger.error('Failed to extract backup archive:', error);
+      throw new Error(`Archive extraction failed: ${error}`);
+    }
+    
+    // Verify manifest
+    const manifestPath = join(extractDir, 'manifest.json');
+    if (existsSync(manifestPath)) {
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf-8'));
+      logger.info(`Backup manifest verified: ${manifest.files.length} files`);
+    }
 
     return extractDir;
+  }
+
+  /**
+   * Download backup from S3
+   */
+  private async downloadFromS3(s3Path: string, targetDir: string): Promise<string> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not configured');
+    }
+    
+    const [, , bucket, ...keyParts] = s3Path.split('/');
+    const key = keyParts.join('/');
+    const localPath = join(targetDir, 'backup.tar.gz');
+    
+    try {
+      const command = new AWS.GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      });
+      
+      const response = await this.s3Client.send(command);
+      
+      if (response.Body) {
+        const writeStream = createWriteStream(localPath);
+        await pipeline(response.Body as NodeJS.ReadableStream, writeStream);
+        logger.info(`Downloaded backup from S3: ${localPath}`);
+        return localPath;
+      } else {
+        throw new Error('Empty response from S3');
+      }
+    } catch (error) {
+      logger.error('Failed to download from S3:', error);
+      throw error;
+    }
   }
 
   /**

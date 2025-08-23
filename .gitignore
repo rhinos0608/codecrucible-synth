@@ -137,3 +137,4 @@ test-logs/
 *.cer
 private-keys/
 certificates/.env
+.env

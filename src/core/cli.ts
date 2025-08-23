@@ -19,7 +19,7 @@ import { InputSanitizer } from './security/input-sanitizer.js';
 // Import modular CLI components
 import { CLIOptions, CLIContext, CLIDisplay, CLIParser, CLICommands } from './cli/index.js';
 import { AuthMiddleware, AuthenticatedRequest } from './middleware/auth-middleware.js';
-import { RBACSystem } from './security/rbac-system.js';
+import { RBACSystem } from './security/production-rbac-system.js';
 import { SecretsManager } from './security/secrets-manager.js';
 import {
   SecurityAuditLogger,

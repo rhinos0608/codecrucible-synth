@@ -5,7 +5,7 @@
  */
 
 import { EnterpriseAuthManager, AuthRequest, AuthConfig } from '../../src/core/security/enterprise-auth-manager.js';
-import { RBACSystem, User } from '../../src/core/security/rbac-system.js';
+import { RBACSystem, User } from '../../src/core/security/production-rbac-system.js';
 import { SecretsManager } from '../../src/core/security/secrets-manager.js';
 
 describe('Enterprise Authentication Manager - Comprehensive Real Tests', () => {

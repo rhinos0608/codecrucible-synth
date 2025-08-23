@@ -5,7 +5,7 @@
 
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import { SecretsManager } from '../../src/core/security/secrets-manager.js';
-import { RBACSystem } from '../../src/core/security/rbac-system.js';
+import { RBACSystem } from '../../src/core/security/production-rbac-system.js';
 import { EnterpriseAuthManager } from '../../src/core/security/enterprise-auth-manager.js';
 import { SecurityAuditLogger } from '../../src/core/security/security-audit-logger.js';
 import { InputValidator } from '../../src/core/error-handling/structured-error-system.js';

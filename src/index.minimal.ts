@@ -12,7 +12,7 @@ export { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 // Security exports (working ones)
 export { SecurityUtils } from './core/security-utils.js';
 export { InputSanitizer } from './core/security/input-sanitizer.js';
-export { RBACSystem } from './core/security/rbac-system.js';
+export { RBACSystem } from './core/security/production-rbac-system.js';
 export { SecretsManager } from './core/security/secrets-manager.js';
 export { EnterpriseAuthManager } from './core/security/enterprise-auth-manager.js';
 

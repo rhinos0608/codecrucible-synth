@@ -8,7 +8,7 @@ import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
 import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import { SecureToolFactory } from '../security/secure-tool-factory.js';
-import { RBACSystem } from '../security/rbac-system.js';
+import { RBACSystem } from '../security/production-rbac-system.js';
 import { SecurityAuditLogger } from '../security/security-audit-logger.js';
 import { SecretsManager } from '../security/secrets-manager.js';
 import { getErrorMessage } from '../../utils/error-utils.js';

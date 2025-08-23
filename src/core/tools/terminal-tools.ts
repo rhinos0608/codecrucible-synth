@@ -299,7 +299,7 @@ export class ProcessManagementTool extends BaseTool {
   async execute(args: z.infer<typeof this.definition.parameters>): Promise<any> {
     try {
       // Use secure tool factory instead of direct TerminalExecuteTool
-      const { RBACSystem } = await import('../security/rbac-system.js');
+      const { RBACSystem } = await import('../security/production-rbac-system.js');
       const { SecurityAuditLogger } = await import('../security/security-audit-logger.js');
       const { SecretsManager } = await import('../security/secrets-manager.js');
       const secretsManager = new SecretsManager();
@@ -603,7 +603,7 @@ export class PackageManagerTool extends BaseTool {
 
       // Execute command using terminal tool
       // Use secure tool factory for terminal execution
-      const { RBACSystem } = await import('../security/rbac-system.js');
+      const { RBACSystem } = await import('../security/production-rbac-system.js');
       const { SecurityAuditLogger } = await import('../security/security-audit-logger.js');
       const { SecretsManager } = await import('../security/secrets-manager.js');
       const secretsManager = new SecretsManager();

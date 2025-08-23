@@ -11,7 +11,7 @@ import {
   AuditSeverity,
   AuditOutcome,
 } from './security-audit-logger.js';
-import { RBACSystem, AuthorizationContext } from './rbac-system.js';
+import { RBACSystem, AuthorizationContext } from './production-rbac-system.js';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 import crypto from 'crypto';

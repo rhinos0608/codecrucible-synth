@@ -8,7 +8,7 @@ import {
   AuthRequest,
   TokenValidationResult,
 } from '../security/enterprise-auth-manager.js';
-import { RBACSystem } from '../security/rbac-system.js';
+import { RBACSystem } from '../security/production-rbac-system.js';
 import { SecretsManager } from '../security/secrets-manager.js';
 import { logger } from '../logger.js';
 import { CLIError, CLIExitCode } from '../types.js';

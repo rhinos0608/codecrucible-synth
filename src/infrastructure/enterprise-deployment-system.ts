@@ -12,9 +12,27 @@ import {
   AuditOutcome,
 } from '../core/security/security-audit-logger.js';
 import { PerformanceMonitor } from '../core/performance/performance-monitor.js';
+import { AWSProvider } from './cloud-providers/aws-provider.js';
+import { AzureProvider } from './cloud-providers/azure-provider.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export interface DeploymentConfig {
   environment: 'development' | 'staging' | 'production';
+  cloudProvider?: 'aws' | 'azure' | 'gcp' | 'local';
+  awsConfig?: {
+    region: string;
+    accountId: string;
+    vpcId?: string;
+    subnetIds?: string[];
+  };
+  azureConfig?: {
+    subscriptionId: string;
+    resourceGroupName: string;
+    location: string;
+  };
   scaling: {
     enabled: boolean;
     minInstances: number;
@@ -124,6 +142,8 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
   private config: DeploymentConfig;
   private auditLogger?: SecurityAuditLogger;
   private performanceMonitor?: PerformanceMonitor;
+  private awsProvider?: AWSProvider;
+  private azureProvider?: AzureProvider;
 
   private instances = new Map<string, DeploymentInstance>();
   private scalingEvents: ScalingEvent[] = [];
@@ -151,6 +171,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
 
     this.config = {
       environment: 'development',
+      cloudProvider: 'local',
       scaling: {
         enabled: true,
         minInstances: 1,
@@ -206,6 +227,24 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
    * Initialize deployment system
    */
   private initialize(): void {
+    // Initialize cloud providers if configured
+    if (this.config.cloudProvider === 'aws' && this.config.awsConfig) {
+      this.awsProvider = new AWSProvider({
+        region: this.config.awsConfig.region,
+        accountId: this.config.awsConfig.accountId,
+        vpcId: this.config.awsConfig.vpcId,
+        subnetIds: this.config.awsConfig.subnetIds,
+      });
+    }
+    
+    if (this.config.cloudProvider === 'azure' && this.config.azureConfig) {
+      this.azureProvider = new AzureProvider({
+        subscriptionId: this.config.azureConfig.subscriptionId,
+        resourceGroupName: this.config.azureConfig.resourceGroupName,
+        location: this.config.azureConfig.location,
+      });
+    }
+    
     // Initialize load balancer
     this.loadBalancer = new LoadBalancer({
       instances: Array.from(this.instances.values()),
@@ -337,8 +376,8 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
 
     while (attempt <= step.retries) {
       try {
-        // Simulate step execution (in real implementation, this would execute actual commands)
-        await this.simulateCommand(step.command, step.timeout);
+        // Execute real command based on cloud provider
+        await this.executeRealCommand(step, plan);
 
         logger.info(`Deployment step completed: ${step.name}`, {
           step: step.id,
@@ -371,8 +410,8 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
     logger.info(`Executing post-deployment task: ${task}`);
 
     try {
-      // Simulate task execution
-      await this.simulateCommand(task, 30000);
+      // Execute real post-deployment task
+      await this.executeLocalCommand(task, 30000);
 
       logger.info(`Post-deployment task completed: ${task}`);
     } catch (error) {
@@ -405,27 +444,96 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
   }
 
   /**
-   * Simulate command execution (placeholder for real command execution)
+   * Execute real deployment command
    */
-  private async simulateCommand(command: string, timeout: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const executionTime = Math.random() * 1000 + 500; // Random time between 500-1500ms
+  private async executeRealCommand(step: DeploymentStep, plan: DeploymentPlan): Promise<void> {
+    const { cloudProvider } = this.config;
+    
+    if (cloudProvider === 'aws' && this.awsProvider) {
+      return this.executeAWSCommand(step, plan);
+    } else if (cloudProvider === 'azure' && this.azureProvider) {
+      return this.executeAzureCommand(step, plan);
+    } else {
+      // Execute local command for development/testing
+      return this.executeLocalCommand(step.command, step.timeout);
+    }
+  }
 
-      const timer = setTimeout(() => {
-        // Simulate 5% failure rate
-        if (Math.random() < 0.05) {
-          reject(new Error(`Command failed: ${command}`));
-        } else {
-          resolve();
-        }
-      }, executionTime);
+  /**
+   * Execute AWS-specific deployment command
+   */
+  private async executeAWSCommand(step: DeploymentStep, plan: DeploymentPlan): Promise<void> {
+    if (!this.awsProvider) throw new Error('AWS provider not initialized');
+    
+    switch (step.type) {
+      case 'provision':
+        await this.awsProvider.launchInstances('t3.medium', 2);
+        break;
+      case 'deploy':
+        await this.awsProvider.deployToECS(
+          `codecrucible-${plan.environment}`,
+          'codecrucible-task',
+          3
+        );
+        break;
+      case 'configure':
+        await this.awsProvider.createAutoScalingGroup(
+          `codecrucible-asg-${plan.environment}`,
+          1, 10, 2
+        );
+        break;
+      default:
+        await this.executeLocalCommand(step.command, step.timeout);
+    }
+  }
 
-      // Respect timeout
-      setTimeout(() => {
-        clearTimeout(timer);
-        reject(new Error(`Command timeout: ${command}`));
-      }, timeout);
-    });
+  /**
+   * Execute Azure-specific deployment command  
+   */
+  private async executeAzureCommand(step: DeploymentStep, plan: DeploymentPlan): Promise<void> {
+    if (!this.azureProvider) throw new Error('Azure provider not initialized');
+    
+    switch (step.type) {
+      case 'provision':
+        await this.azureProvider.createVirtualMachine(
+          `codecrucible-vm-${plan.environment}`
+        );
+        break;
+      case 'deploy':
+        await this.azureProvider.deployContainerInstance(
+          `codecrucible-${plan.environment}`,
+          'codecrucible/synth:latest'
+        );
+        break;
+      case 'configure':
+        await this.azureProvider.createVMScaleSet(
+          `codecrucible-vmss-${plan.environment}`,
+          3
+        );
+        break;
+      default:
+        await this.executeLocalCommand(step.command, step.timeout);
+    }
+  }
+
+  /**
+   * Execute local command using shell
+   */
+  private async executeLocalCommand(command: string, timeout: number): Promise<void> {
+    try {
+      const { stdout, stderr } = await execAsync(command, {
+        timeout: timeout,
+        env: { ...process.env, NODE_ENV: this.config.environment },
+      });
+      
+      if (stdout) logger.debug(`Command output: ${stdout}`);
+      if (stderr) logger.warn(`Command stderr: ${stderr}`);
+    } catch (error: any) {
+      if (error.killed && error.signal === 'SIGTERM') {
+        throw new Error(`Command timed out after ${timeout}ms: ${command}`);
+      }
+      throw new Error(`Command failed: ${error.message}`);
+    }
   }
 
   /**

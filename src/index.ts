@@ -77,8 +77,8 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
       terminal: { enabled: true, allowedCommands: ['npm', 'node', 'git', 'ls', 'cat'], blockedCommands: [] },
       packageManager: { enabled: true, autoInstall: false, securityScan: true },
       smithery: {
-        enabled: true,
-        apiKey: '894c8f05-44bb-490d-bf7b-a7d6fb238a87',
+        enabled: !!process.env.SMITHERY_API_KEY,
+        apiKey: process.env.SMITHERY_API_KEY,
         autoDiscovery: true,
       },
     };

@@ -63,7 +63,7 @@ export class SmitheryMCPServer {
 
   private async discoverServers(): Promise<void> {
     try {
-      let servers = [];
+      let servers: any[] = [];
       
       if (this.config.enabledServers && this.config.enabledServers.length > 0) {
         // Load specific servers

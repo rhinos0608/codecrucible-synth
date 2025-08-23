@@ -136,4 +136,4 @@ test-logs/
 *.crt
 *.cer
 private-keys/
-certificates/
+certificates/.env

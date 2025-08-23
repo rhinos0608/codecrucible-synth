@@ -76,7 +76,10 @@ export class SmitheryRegistryIntegration {
       for await (const page of result) {
         if (servers.length >= limit) break;
         
-        for (const server of page.servers) {
+        // Check if page has result property
+        const pageServers = (page as any).result?.servers || (page as any).servers || [];
+        
+        for (const server of pageServers) {
           if (servers.length >= limit) break;
           
           const serverDetails: SmitheryServer = {
@@ -123,10 +126,14 @@ export class SmitheryRegistryIntegration {
       const serverDetails: SmitheryServer = {
         qualifiedName: result.qualifiedName,
         displayName: result.displayName,
-        description: result.description || 'No description available',
-        homepage: result.homepage || '',
-        useCount: result.useCount || 0,
-        tools: result.tools || [],
+        description: (result as any).description || 'No description available',
+        homepage: (result as any).homepage || '',
+        useCount: (result as any).useCount || 0,
+        tools: (result.tools || []).map((tool: any) => ({
+          name: tool.name,
+          description: tool.description || 'No description available',
+          inputSchema: tool.inputSchema || {},
+        })),
       };
 
       this.cachedServers.set(qualifiedName, serverDetails);
@@ -187,7 +194,8 @@ export class SmitheryRegistryIntegration {
 
       let count = 0;
       for await (const page of result) {
-        count += page.servers.length;
+        const pageServers = (page as any).result?.servers || (page as any).servers || [];
+        count += pageServers.length;
         break; // Just check first page
       }
 

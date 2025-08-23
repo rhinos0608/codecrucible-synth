@@ -449,7 +449,18 @@ Provide a JSON response:
 
   private async executeSmitheryTask(args: any): Promise<any> {
     const { query, numResults } = args;
-    return await this.mcpManager.smitheryWebSearch(query, numResults);
+    // Use the new Smithery status method instead
+    const smitheryStatus = await this.mcpManager.getSmitheryStatus();
+    if (!smitheryStatus.enabled) {
+      throw new Error('Smithery integration not available');
+    }
+    // Return information about available Smithery tools for now
+    return {
+      query,
+      message: 'Smithery integration is available',
+      servers: smitheryStatus.servers,
+      tools: smitheryStatus.tools,
+    };
   }
 
   private async executePackageManagerTask(args: any): Promise<any> {

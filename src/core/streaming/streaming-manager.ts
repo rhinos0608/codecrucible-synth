@@ -12,6 +12,80 @@
 import { EventEmitter } from 'events';
 import { logger } from '../logger.js';
 
+// Enhanced: AI SDK v5.0 Compatible Streaming Interfaces
+export interface StreamChunk {
+  type: 
+    | 'stream-start'
+    | 'text-start' 
+    | 'text-delta'
+    | 'text-end'
+    | 'reasoning-start'
+    | 'reasoning-delta' 
+    | 'reasoning-end'
+    | 'tool-input-start'
+    | 'tool-input-delta'
+    | 'tool-input-end'
+    | 'tool-call'
+    | 'tool-result'
+    | 'finish'
+    | 'error';
+  
+  // Common properties
+  id?: string;
+  timestamp: number;
+  
+  // Stream start properties
+  warnings?: StreamWarning[];
+  
+  // Text streaming properties
+  delta?: string;
+  
+  // Tool properties
+  toolCallId?: string;
+  toolName?: string;
+  args?: unknown;
+  result?: unknown;
+  
+  // Finish properties
+  usage?: StreamUsage;
+  finishReason?: 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error';
+  
+  // Error properties
+  error?: string;
+  errorCode?: string;
+  
+  // Provider metadata
+  providerMetadata?: Record<string, unknown>;
+  
+  // Legacy compatibility
+  content?: string;
+  finished?: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface StreamWarning {
+  type: string;
+  message: string;
+  code?: string;
+}
+
+export interface StreamUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+}
+
+export interface StreamBlock {
+  id: string;
+  type: 'text' | 'reasoning' | 'tool-input' | 'tool-call';
+  startTime: number;
+  endTime?: number;
+  content: string[];
+  metadata?: Record<string, any>;
+}
+
 // Streaming interfaces (moved from client.ts)
 export interface StreamToken {
   content: string;
@@ -27,6 +101,13 @@ export interface StreamConfig {
   enableBackpressure?: boolean;
   timeout?: number;
   encoding?: BufferEncoding;
+  
+  // Enhanced: Modern streaming features
+  enableReasoningStream?: boolean;
+  enableToolStreaming?: boolean;
+  maxRetries?: number;
+  enableProviderMetadata?: boolean;
+  enableLifecycleEvents?: boolean;
 }
 
 export interface StreamMetrics {
@@ -41,8 +122,11 @@ export interface StreamSession {
   id: string;
   startTime: number;
   tokens: StreamToken[];
+  chunks: StreamChunk[]; // Enhanced: Modern chunks support
+  activeBlocks: Map<string, StreamBlock>; // Enhanced: Track streaming blocks
   metrics: StreamMetrics;
   isActive: boolean;
+  status: 'active' | 'completed' | 'error' | 'cancelled'; // Enhanced: Better status tracking
 }
 
 export interface IStreamingManager {
@@ -52,6 +136,20 @@ export interface IStreamingManager {
     onToken: (token: StreamToken) => void,
     config?: StreamConfig
   ): Promise<string>;
+  
+  // Enhanced: Modern streaming with AI SDK v5.0 patterns
+  startModernStream(
+    content: string,
+    onChunk: (chunk: StreamChunk) => void,
+    config?: StreamConfig
+  ): Promise<string>;
+  
+  // Enhanced: Tool streaming support
+  streamToolExecution(
+    toolName: string,
+    args: unknown,
+    onChunk: (chunk: StreamChunk) => void
+  ): Promise<unknown>;
 
   // Session management
   createSession(sessionId?: string): StreamSession;
@@ -84,6 +182,13 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     enableBackpressure: true,
     timeout: 30000,
     encoding: 'utf8',
+    
+    // Enhanced: Modern streaming defaults
+    enableReasoningStream: true,
+    enableToolStreaming: true,
+    maxRetries: 3,
+    enableProviderMetadata: true,
+    enableLifecycleEvents: true,
   };
 
   constructor(config: Partial<StreamConfig> = {}) {
@@ -99,6 +204,19 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     this.on('session-created', (sessionId: string) => {
       logger.debug('Stream session created', { sessionId });
     });
+    
+    // Enhanced: Modern streaming events
+    this.on('stream-start', (chunk: StreamChunk) => {
+      logger.debug('Modern stream started', { id: chunk.id });
+    });
+    
+    this.on('text-block-start', (chunk: StreamChunk) => {
+      logger.debug('Text block started', { id: chunk.id });
+    });
+    
+    this.on('tool-call', (chunk: StreamChunk) => {
+      logger.debug('Tool call received', { toolName: chunk.toolName, id: chunk.toolCallId });
+    });
 
     this.on('session-destroyed', (sessionId: string) => {
       logger.debug('Stream session destroyed', { sessionId });
@@ -107,6 +225,197 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     this.on('backpressure', (sessionId: string) => {
       logger.warn('Backpressure event detected', { sessionId });
     });
+  }
+
+  /**
+   * Enhanced: Start modern streaming with AI SDK v5.0 lifecycle patterns
+   */
+  async startModernStream(
+    content: string,
+    onChunk: (chunk: StreamChunk) => void,
+    config?: StreamConfig
+  ): Promise<string> {
+    const sessionConfig = { ...this.config, ...config };
+    const sessionId = this.generateSessionId();
+    const streamId = this.generateStreamId();
+
+    try {
+      const session = this.createSession(sessionId);
+      session.status = 'active';
+      this.activeStreams.add(sessionId);
+
+      // Send stream-start chunk
+      const streamStartChunk: StreamChunk = {
+        type: 'stream-start',
+        id: streamId,
+        timestamp: Date.now(),
+        warnings: []
+      };
+      session.chunks.push(streamStartChunk);
+      onChunk(streamStartChunk);
+      this.emit('stream-start', streamStartChunk);
+
+      // Send text-start chunk
+      const textBlockId = this.generateBlockId();
+      const textStartChunk: StreamChunk = {
+        type: 'text-start',
+        id: textBlockId,
+        timestamp: Date.now()
+      };
+      session.chunks.push(textStartChunk);
+      onChunk(textStartChunk);
+      this.emit('text-block-start', textStartChunk);
+
+      // Create text block
+      const textBlock: StreamBlock = {
+        id: textBlockId,
+        type: 'text',
+        startTime: Date.now(),
+        content: []
+      };
+      session.activeBlocks.set(textBlockId, textBlock);
+
+      // Stream content as deltas
+      const tokens = this.tokenizeContent(content, sessionConfig.chunkSize || 50);
+      let streamedContent = '';
+
+      for (let i = 0; i < tokens.length; i++) {
+        if (!this.activeStreams.has(sessionId)) {
+          throw new Error(`Stream session ${sessionId} was terminated`);
+        }
+
+        const deltaChunk: StreamChunk = {
+          type: 'text-delta',
+          id: textBlockId,
+          delta: tokens[i],
+          timestamp: Date.now()
+        };
+
+        textBlock.content.push(tokens[i]);
+        session.chunks.push(deltaChunk);
+        onChunk(deltaChunk);
+        this.emit('text-delta', deltaChunk);
+
+        streamedContent += tokens[i];
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+
+      // Send text-end chunk
+      textBlock.endTime = Date.now();
+      const textEndChunk: StreamChunk = {
+        type: 'text-end',
+        id: textBlockId,
+        timestamp: Date.now()
+      };
+      session.chunks.push(textEndChunk);
+      onChunk(textEndChunk);
+      this.emit('text-block-end', textEndChunk);
+
+      // Send finish chunk
+      const finishChunk: StreamChunk = {
+        type: 'finish',
+        timestamp: Date.now(),
+        finishReason: 'stop',
+        usage: {
+          inputTokens: content.length,
+          outputTokens: streamedContent.length,
+          totalTokens: content.length + streamedContent.length
+        }
+      };
+      session.chunks.push(finishChunk);
+      onChunk(finishChunk);
+      this.emit('stream-finish', finishChunk);
+
+      // Finalize session
+      session.status = 'completed';
+      session.isActive = false;
+      this.activeStreams.delete(sessionId);
+
+      logger.info('Modern stream session completed', {
+        sessionId,
+        streamId,
+        chunksGenerated: session.chunks.length,
+        contentLength: streamedContent.length
+      });
+
+      return streamedContent;
+
+    } catch (error) {
+      const session = this.sessions.get(sessionId);
+      if (session) {
+        session.status = 'error';
+        
+        const errorChunk: StreamChunk = {
+          type: 'error',
+          timestamp: Date.now(),
+          error: error instanceof Error ? error.message : String(error),
+          errorCode: 'STREAM_ERROR'
+        };
+        session.chunks.push(errorChunk);
+        onChunk(errorChunk);
+      }
+      
+      this.activeStreams.delete(sessionId);
+      this.destroySession(sessionId);
+      
+      logger.error('Modern stream session failed', {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced: Stream tool execution with proper lifecycle
+   */
+  async streamToolExecution(
+    toolName: string,
+    args: unknown,
+    onChunk: (chunk: StreamChunk) => void
+  ): Promise<unknown> {
+    const toolCallId = this.generateBlockId();
+    
+    try {
+      // Send tool-call chunk
+      const toolCallChunk: StreamChunk = {
+        type: 'tool-call',
+        toolCallId,
+        toolName,
+        args,
+        timestamp: Date.now()
+      };
+      onChunk(toolCallChunk);
+      this.emit('tool-call', toolCallChunk);
+      
+      // Simulate tool execution (in real implementation, this would call actual tools)
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const result = { success: true, output: `Tool ${toolName} executed successfully` };
+      
+      // Send tool-result chunk
+      const toolResultChunk: StreamChunk = {
+        type: 'tool-result',
+        toolCallId,
+        result,
+        timestamp: Date.now()
+      };
+      onChunk(toolResultChunk);
+      this.emit('tool-result', toolResultChunk);
+      
+      return result;
+      
+    } catch (error) {
+      const errorChunk: StreamChunk = {
+        type: 'error',
+        timestamp: Date.now(),
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'TOOL_ERROR'
+      };
+      onChunk(errorChunk);
+      throw error;
+    }
   }
 
   /**
@@ -212,6 +521,8 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       id,
       startTime: Date.now(),
       tokens: [],
+      chunks: [], // Enhanced: Modern chunks support
+      activeBlocks: new Map(), // Enhanced: Track streaming blocks
       metrics: {
         tokensStreamed: 0,
         streamDuration: 0,
@@ -220,6 +531,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
         backpressureEvents: 0,
       },
       isActive: true,
+      status: 'active', // Enhanced: Better status tracking
     };
 
     this.sessions.set(id, session);
@@ -370,10 +682,24 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   }
 
   /**
+   * Enhanced: Generate unique stream ID for AI SDK v5.0 compatibility
+   */
+  private generateStreamId(): string {
+    return `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Enhanced: Generate unique block ID for streaming blocks
+   */
+  private generateBlockId(): string {
+    return `block_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  }
+
+  /**
    * Private: Generate unique session ID
    */
   private generateSessionId(): string {
-    return `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 }
 

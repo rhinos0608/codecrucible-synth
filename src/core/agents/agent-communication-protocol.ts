@@ -14,7 +14,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../logger.js';
-import { getTelemetryProvider } from '../observability/telemetry-provider.js';
+import { getTelemetryProvider } from '../observability/observability-system.js';
 
 // Core agent interfaces
 export interface Agent {

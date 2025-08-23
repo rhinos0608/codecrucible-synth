@@ -192,6 +192,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     // PERFORMANCE FIX: Initialize AbortController
     this.abortController = new AbortController();
 
+    // Initialize configuration manager first to avoid undefined reference
+    this.configurationManager = injectedDependencies?.configurationManager || new ConfigurationManager();
+
     this.config = {
       endpoint: 'http://localhost:11434',
       ...this.getDefaultConfig(),
@@ -264,7 +267,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       }
     );
 
-    this.configurationManager = injectedDependencies?.configurationManager || new ConfigurationManager();
+    // Already initialized above
 
     this.requestProcessingCoreManager = injectedDependencies?.requestProcessingCoreManager || new RequestProcessingCoreManager({
       maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 3,

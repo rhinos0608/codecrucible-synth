@@ -12,6 +12,29 @@ import { RBACSystem } from '../security/rbac-system.js';
 import { SecurityAuditLogger } from '../security/security-audit-logger.js';
 import { SecretsManager } from '../security/secrets-manager.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
+import { getTelemetryProvider } from '../observability/observability-system.js';
+
+// AI SDK v5.0 Streaming Interfaces
+export interface StreamChunk {
+  type: 'stream-start' | 'text-start' | 'text-delta' | 'text-end' | 'reasoning-start' | 'reasoning-delta' | 'reasoning-end' 
+       | 'tool-input-start' | 'tool-input-delta' | 'tool-input-end' | 'tool-call' | 'tool-result' | 'finish' | 'error';
+  id?: string;
+  toolName?: string;
+  toolCallId?: string;
+  delta?: string;
+  args?: any;
+  result?: any;
+  timestamp: number;
+  error?: string;
+  errorCode?: string;
+}
+
+export interface ToolExecutionDelta {
+  type: 'input' | 'output' | 'progress' | 'error' | 'metadata';
+  content: string;
+  progress?: number;
+  metadata?: Record<string, any>;
+}
 
 // Core Tool Interfaces
 export interface Tool {
@@ -23,6 +46,10 @@ export interface Tool {
   outputSchema: JSONSchema;
   execute: (input: any, context: ToolContext) => Promise<ToolResult>;
   metadata: ToolMetadata;
+  
+  // Enhanced: Streaming support for modern tool execution patterns
+  stream?: (input: any, context: ToolContext) => AsyncGenerator<ToolExecutionDelta>;
+  validate?: (input: any) => { valid: boolean; errors: string[]; normalizedInput?: any };
 }
 
 export interface ToolMetadata {
@@ -166,6 +193,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   private performanceMonitor: PerformanceMonitor;
   private errorRecovery: ErrorRecoveryManager;
   private secureToolFactory!: SecureToolFactory;
+  private telemetryProvider: any; // Enhanced: Telemetry integration for modern observability
 
   constructor(modelClient: UnifiedModelClient) {
     super();
@@ -178,6 +206,14 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     this.costOptimizer = new CostOptimizer();
     this.performanceMonitor = new PerformanceMonitor();
     this.errorRecovery = new ErrorRecoveryManager();
+    
+    // Enhanced: Initialize telemetry provider for observability
+    try {
+      this.telemetryProvider = getTelemetryProvider();
+    } catch (error) {
+      this.logger.warn('Telemetry provider not available, running without telemetry');
+      this.telemetryProvider = null;
+    }
 
     // Initialize SecureToolFactory with required dependencies
     this.initializeSecureToolFactory();
@@ -199,6 +235,161 @@ export class AdvancedToolOrchestrator extends EventEmitter {
       this.logger.error('Failed to initialize SecureToolFactory', error as Error);
       // Create a minimal implementation to prevent blocking
       this.secureToolFactory = null as any;
+    }
+  }
+
+  /**
+   * Enhanced: Execute tool call with AI SDK v5.0 streaming support
+   */
+  async executeToolCallStreaming(
+    toolCall: ToolCall,
+    context: ToolContext,
+    onChunk: (chunk: StreamChunk) => void
+  ): Promise<ToolResult> {
+    const startTime = Date.now();
+    const tool = this.toolRegistry.getTool(toolCall.toolId);
+    
+    if (!tool) {
+      const error = `Tool ${toolCall.toolId} not found`;
+      onChunk({
+        type: 'error',
+        timestamp: Date.now(),
+        error,
+        errorCode: 'TOOL_NOT_FOUND'
+      });
+      throw new Error(error);
+    }
+
+    try {
+      // Send tool-input-start chunk
+      onChunk({
+        type: 'tool-input-start',
+        id: toolCall.id,
+        toolName: tool.name,
+        timestamp: Date.now()
+      });
+
+      // Stream tool input parameters if they exist
+      if (toolCall.input && typeof toolCall.input === 'object') {
+        const inputString = JSON.stringify(toolCall.input, null, 2);
+        const chunks = this.tokenizeForStreaming(inputString, 50);
+        
+        for (const chunk of chunks) {
+          onChunk({
+            type: 'tool-input-delta',
+            id: toolCall.id,
+            delta: chunk,
+            timestamp: Date.now()
+          });
+          await this.delay(10); // Small delay for realistic streaming
+        }
+      }
+
+      // Send tool-input-end chunk
+      onChunk({
+        type: 'tool-input-end',
+        id: toolCall.id,
+        timestamp: Date.now()
+      });
+
+      // Validate input if tool supports validation
+      if (tool.validate) {
+        const validation = tool.validate(toolCall.input);
+        if (!validation.valid) {
+          const error = `Validation failed: ${validation.errors.join(', ')}`;
+          onChunk({
+            type: 'error',
+            timestamp: Date.now(),
+            error,
+            errorCode: 'VALIDATION_ERROR'
+          });
+          throw new Error(error);
+        }
+      }
+
+      // Send tool-call chunk
+      onChunk({
+        type: 'tool-call',
+        toolCallId: toolCall.id,
+        toolName: tool.name,
+        args: toolCall.input,
+        timestamp: Date.now()
+      });
+
+      // Execute tool with streaming if supported
+      let result: ToolResult;
+      
+      if (tool.stream) {
+        // Use streaming execution
+        const outputParts: string[] = [];
+        
+        for await (const delta of tool.stream(toolCall.input, context)) {
+          if (delta.type === 'output') {
+            outputParts.push(delta.content);
+            onChunk({
+              type: 'text-delta',
+              id: `${toolCall.id}_output`,
+              delta: delta.content,
+              timestamp: Date.now()
+            });
+          }
+        }
+        
+        result = {
+          toolId: tool.id,
+          success: true,
+          output: outputParts.join(''),
+          metadata: {
+            executionTime: Date.now() - startTime,
+            memoryUsed: 0,
+            cost: tool.metadata.cost,
+            version: tool.metadata.version
+          }
+        };
+      } else {
+        // Use regular execution
+        result = await tool.execute(toolCall.input, context);
+        result.metadata.executionTime = Date.now() - startTime;
+      }
+
+      // Send tool-result chunk
+      onChunk({
+        type: 'tool-result',
+        toolCallId: toolCall.id,
+        result: result.output,
+        timestamp: Date.now()
+      });
+
+      // Record telemetry if available
+      if (this.telemetryProvider) {
+        this.telemetryProvider.recordToolExecution(
+          tool.name,
+          result.metadata.executionTime,
+          result.success
+        );
+      }
+
+      return result;
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      onChunk({
+        type: 'error',
+        timestamp: Date.now(),
+        error: errorMsg,
+        errorCode: 'EXECUTION_ERROR'
+      });
+      
+      if (this.telemetryProvider) {
+        this.telemetryProvider.recordToolExecution(
+          tool.name,
+          Date.now() - startTime,
+          false,
+          errorMsg
+        );
+      }
+      
+      throw error;
     }
   }
 
@@ -603,6 +794,103 @@ Please provide a clear, helpful response based on these tool results. If there w
 
   private generatePlanId(): string {
     return `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Enhanced: Utility methods for streaming support
+   */
+  private tokenizeForStreaming(content: string, chunkSize: number): string[] {
+    const chunks: string[] = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+      chunks.push(content.slice(i, i + chunkSize));
+    }
+    return chunks.length > 0 ? chunks : [content];
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Enhanced: Find tools suitable for a given task with modern matching
+   */
+  async findToolsForTask(
+    task: string, 
+    requirements?: {
+      categories?: ToolCategory[];
+      capabilities?: string[];
+      maxCost?: number;
+      maxLatency?: number;
+    }
+  ): Promise<Array<{ tool: Tool; confidence: number; reasoning: string }>> {
+    const matches: Array<{ tool: Tool; confidence: number; reasoning: string }> = [];
+    const taskLower = task.toLowerCase();
+
+    for (const tool of this.toolRegistry.getAllTools()) {
+      // Apply requirement filters
+      if (requirements?.categories && !requirements.categories.includes(tool.category)) {
+        continue;
+      }
+      
+      if (requirements?.maxCost && tool.metadata.cost > requirements.maxCost) {
+        continue;
+      }
+      
+      if (requirements?.maxLatency && tool.metadata.latency > requirements.maxLatency) {
+        continue;
+      }
+
+      // Calculate confidence based on various factors
+      let confidence = 0;
+      const reasons: string[] = [];
+
+      // Name match (highest priority)
+      if (tool.name.toLowerCase().includes(taskLower) || taskLower.includes(tool.name.toLowerCase())) {
+        confidence += 0.4;
+        reasons.push('tool name matches');
+      }
+
+      // Description match
+      if (tool.description.toLowerCase().includes(taskLower)) {
+        confidence += 0.3;
+        reasons.push('description contains keywords');
+      }
+
+      // Tag matches
+      const matchingTags = tool.metadata.tags.filter(tag =>
+        tag.toLowerCase().includes(taskLower) || taskLower.includes(tag.toLowerCase())
+      );
+      if (matchingTags.length > 0) {
+        confidence += matchingTags.length * 0.1;
+        reasons.push(`tags match: ${matchingTags.join(', ')}`);
+      }
+
+      // Capability matches
+      if (requirements?.capabilities) {
+        const hasRequiredCaps = requirements.capabilities.some(reqCap =>
+          tool.metadata.capabilities.some(toolCap => 
+            toolCap.type.includes(reqCap) || toolCap.scope.includes(reqCap)
+          )
+        );
+        if (hasRequiredCaps) {
+          confidence += 0.2;
+          reasons.push('capabilities match requirements');
+        }
+      }
+
+      if (confidence > 0.1) { // Minimum threshold
+        matches.push({
+          tool,
+          confidence: Math.min(confidence, 1.0),
+          reasoning: reasons.join('; ') || 'general relevance'
+        });
+      }
+    }
+
+    // Sort by confidence and return top matches
+    return matches
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 10);
   }
 
   private initializeBuiltInTools(): void {

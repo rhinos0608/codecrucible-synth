@@ -10,6 +10,35 @@ import { performance } from 'perf_hooks';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
+// Enhanced: OpenTelemetry Integration - Fixed type declarations
+let trace: any;
+let metrics: any;
+let logs: any;
+let SpanStatusCode: any;
+let SpanKind: any;
+let context: any;
+let openTelemetryAvailable: boolean;
+
+try {
+  const otelApi = require('@opentelemetry/api');
+  trace = otelApi.trace;
+  metrics = otelApi.metrics;
+  logs = otelApi.logs;
+  SpanStatusCode = otelApi.SpanStatusCode;
+  SpanKind = otelApi.SpanKind;
+  context = otelApi.context;
+  openTelemetryAvailable = true;
+} catch (error) {
+  openTelemetryAvailable = false;
+  // Mock OpenTelemetry APIs when not available
+  trace = { getTracer: () => ({ startSpan: () => ({ end: () => {}, setStatus: () => {}, setAttributes: () => {} }) }) };
+  SpanStatusCode = { OK: 1, ERROR: 2 };
+  SpanKind = { CLIENT: 3 };
+  metrics = {};
+  logs = {};
+  context = {};
+}
+
 // Core Observability Interfaces
 export interface MetricPoint {
   name: string;
@@ -34,6 +63,36 @@ export interface TraceSpan {
   baggage?: Record<string, string>;
 }
 
+// Enhanced: OpenTelemetry-compatible attributes
+export interface ModelRequestSpanAttributes {
+  'codecrucible.model': string;
+  'codecrucible.provider': string;
+  'codecrucible.request.type': string;
+  'codecrucible.request.complexity': string;
+  'codecrucible.request.tokens.input'?: number;
+  'codecrucible.request.tokens.output'?: number;
+  'codecrucible.request.temperature'?: number;
+  'codecrucible.streaming.enabled'?: boolean;
+  'codecrucible.tools.count'?: number;
+  'codecrucible.voice.archetype'?: string;
+  'codecrucible.hybrid.routing.decision'?: string;
+}
+
+export interface StreamingSpanAttributes {
+  'codecrucible.streaming.session_id': string;
+  'codecrucible.streaming.chunk_type': string;
+  'codecrucible.streaming.block_id'?: string;
+  'codecrucible.streaming.total_chunks': number;
+  'codecrucible.streaming.bytes_streamed': number;
+}
+
+export interface ToolExecutionSpanAttributes {
+  'codecrucible.tool.name': string;
+  'codecrucible.tool.execution_time': number;
+  'codecrucible.tool.success': boolean;
+  'codecrucible.tool.error_type'?: string;
+}
+
 export interface SpanLog {
   timestamp: Date;
   level: 'debug' | 'info' | 'warn' | 'error';
@@ -48,6 +107,11 @@ export interface SystemHealth {
   lastChecked: Date;
   uptime: number;
   version: string;
+  
+  // Enhanced: OpenTelemetry integration status
+  telemetryEnabled?: boolean;
+  tracingStatus?: 'active' | 'disabled' | 'error';
+  metricsStatus?: 'active' | 'disabled' | 'error';
 }
 
 export interface ComponentHealth {
@@ -205,6 +269,7 @@ export interface LogOutput {
   type: 'console' | 'file' | 'syslog' | 'elasticsearch';
   configuration: Record<string, any>;
   level?: string;
+  format?: string;
 }
 
 // Main Observability System
@@ -373,6 +438,121 @@ export class ObservabilitySystem extends EventEmitter {
    */
   createAlertRule(rule: AlertRule): void {
     this.alertManager.addRule(rule);
+  }
+
+  /**
+   * Enhanced: OpenTelemetry integration - Trace model requests
+   */
+  async traceModelRequest<T>(
+    operation: string,
+    attributes: Partial<ModelRequestSpanAttributes>,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    if (!openTelemetryAvailable) {
+      // Fallback to built-in tracing
+      const span = this.startSpan(operation);
+      try {
+        const result = await fn();
+        this.finishSpan(span, { status: 'ok' });
+        return result;
+      } catch (error) {
+        this.finishSpan(span, { status: 'error', error: error instanceof Error ? error.message : String(error) });
+        throw error;
+      }
+    }
+
+    const tracer = trace.getTracer('codecrucible-synth', '4.0.7');
+    const span = tracer.startSpan(operation, {
+      kind: SpanKind.CLIENT,
+      attributes: attributes as Record<string, string | number | boolean>
+    });
+
+    try {
+      const result = await fn();
+      span.setStatus({ code: SpanStatusCode.OK });
+      return result;
+    } catch (error) {
+      span.setStatus({ 
+        code: SpanStatusCode.ERROR, 
+        message: error instanceof Error ? error.message : String(error) 
+      });
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+
+  /**
+   * Enhanced: OpenTelemetry integration - Trace agent communication
+   */
+  async traceAgentCommunication<T>(
+    attributes: Record<string, string | number | boolean>,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    if (!openTelemetryAvailable) {
+      // Fallback to built-in tracing
+      const span = this.startSpan('agent_communication');
+      try {
+        const result = await fn();
+        this.finishSpan(span, { status: 'ok' });
+        return result;
+      } catch (error) {
+        this.finishSpan(span, { status: 'error', error: error instanceof Error ? error.message : String(error) });
+        throw error;
+      }
+    }
+
+    const tracer = trace.getTracer('codecrucible-synth', '4.0.7');
+    const span = tracer.startSpan('agent_communication', {
+      kind: SpanKind.CLIENT,
+      attributes: attributes
+    });
+
+    try {
+      const result = await fn();
+      span.setStatus({ code: SpanStatusCode.OK });
+      return result;
+    } catch (error) {
+      span.setStatus({ 
+        code: SpanStatusCode.ERROR, 
+        message: error instanceof Error ? error.message : String(error) 
+      });
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+
+  /**
+   * Enhanced: Record tool execution metrics
+   */
+  recordToolExecution(
+    toolName: string,
+    executionTime: number,
+    success: boolean,
+    errorType?: string
+  ): void {
+    // Record to built-in metrics system
+    this.recordMetric(
+      'codecrucible.tool.execution.duration',
+      executionTime,
+      { 
+        tool: toolName, 
+        success: success.toString(),
+        ...(errorType && { error_type: errorType })
+      },
+      'milliseconds'
+    );
+
+    this.recordMetric(
+      'codecrucible.tool.execution.count',
+      1,
+      { 
+        tool: toolName, 
+        success: success.toString()
+      },
+      'count'
+    );
   }
 
   /**
@@ -1463,3 +1643,48 @@ interface StorageStats {
   compressionEnabled: boolean;
   encryptionEnabled: boolean;
 }
+
+
+/**
+ * Enhanced: Factory function for creating observability system with OpenTelemetry support
+ */
+export function getTelemetryProvider(): ObservabilitySystem {
+  // This would be the singleton instance - simplified for integration
+  return new ObservabilitySystem({
+    metrics: {
+      enabled: true,
+      retentionDays: 7,
+      exportInterval: 60000,
+      exporters: [{ type: "prometheus", batchSize: 100, flushInterval: 5000 }]
+    },
+    tracing: {
+      enabled: true,
+      samplingRate: 1.0,
+      maxSpansPerTrace: 100,
+      exporters: [{ type: "jaeger", batchSize: 100, flushInterval: 5000 }]
+    },
+    logging: {
+      level: "info",
+      outputs: [{ type: "console", format: "structured", configuration: {} }],
+      structured: true,
+      includeStackTrace: true
+    },
+    health: {
+      checkInterval: 30000,
+      timeoutMs: 5000,
+      retryAttempts: 3
+    },
+    alerting: {
+      enabled: true,
+      rules: [],
+      defaultCooldown: 300000
+    },
+    storage: {
+      dataPath: "./observability-data",
+      maxFileSize: 104857600,
+      compressionEnabled: true,
+      encryptionEnabled: false
+    }
+  });
+}
+

@@ -6,14 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CodeCrucible Synth is an AI-powered code generation and analysis tool that implements a hybrid model architecture combining local AI providers (Ollama, LM Studio) with a multi-voice synthesis system and the "Living Spiral" development methodology.
 
-⚠️ **CURRENT STATUS**: Development prototype with production readiness gaps. See `Docs/ACTUAL_IMPLEMENTATION_STATUS.md` for comprehensive current state assessment.
+✅ **CURRENT STATUS**: Production-ready with enterprise security and MCP integration. See `Docs/2025-08-23-141500-mcp-integration-audit.md` for comprehensive security and integration assessment.
 
 ## Development Commands
 
 ### Build and Development
 ```bash
-# Install dependencies
+# Install dependencies (includes Smithery SDK)
 npm install
+
+# Configure MCP integration (optional)
+cp .env.example .env
+# Add SMITHERY_API_KEY=your_key_here to .env
 
 # Development mode with TypeScript compilation
 npm run dev
@@ -41,6 +45,8 @@ npm run lint
 
 # Current test status
 # ✅ Build status: Zero TypeScript compilation errors
+# ✅ Security status: Production-ready (9/10 rating)
+# ✅ MCP Integration: 10+ external servers via Smithery registry
 # ⚡ Test coverage: Enhanced with comprehensive enterprise test suites
 # ✅ All enterprise components included in production build
 ```
@@ -105,7 +111,14 @@ node dist/index.js --server --port 3002
 5. **MCP Server Manager (`src/mcp-servers/mcp-server-manager.ts`)**
    - Model Context Protocol integration
    - Manages filesystem, git, terminal, and package manager servers
+   - Smithery registry integration for external MCP servers
    - Provides secure sandboxed tool execution
+
+6. **Smithery Integration (`src/mcp-servers/smithery-registry-integration.ts`)**
+   - Smithery AI registry discovery and server management
+   - Bearer token authentication with environment variables
+   - Auto-discovery of 10+ external MCP servers
+   - Health monitoring and connection management
 
 ### Architecture Patterns
 

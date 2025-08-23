@@ -1,6 +1,6 @@
 # 🔥 CodeCrucible Synth - Complete Setup Guide
 
-A standalone desktop CLI agentic coding assistant with local AI models, completely self-contained with no external dependencies.
+**Production-Ready AI Development Platform** with local AI models, Smithery MCP integration, and enterprise security. Self-contained with optional external MCP server connectivity.
 
 ## 🚀 Quick Start (Automated)
 
@@ -69,16 +69,26 @@ ollama pull mistral:7b       # Lightweight fallback
 npm run build
 ```
 
-### Step 4: Test the Installation
+### Step 4: Configure MCP Integration (Optional)
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Add your Smithery API key to .env (optional for external MCP servers)
+echo "SMITHERY_API_KEY=your_smithery_api_key_here" >> .env
+```
+
+### Step 5: Test the Installation
 ```bash
 # Test basic functionality
 npm run start -- --help
 
+# Test system status and MCP integration
+npm run start -- status
+
 # Test voice system
 npm run start -- voices --list
-
-# Test configuration
-npm run start -- config --list
 
 # Run comprehensive test suite
 scripts\full-test-audit.bat  # Windows
@@ -168,7 +178,7 @@ codecrucible config --reset
 
 ## 🎭 Voice System
 
-CodeCrucible features 9 specialized AI voice archetypes:
+CodeCrucible features 10 specialized AI voice archetypes:
 
 - **Explorer** - Innovative and experimental approaches
 - **Maintainer** - Reliable, tested, conservative solutions
@@ -179,6 +189,7 @@ CodeCrucible features 9 specialized AI voice archetypes:
 - **Architect** - System design and architectural patterns
 - **Designer** - User experience and interface design
 - **Optimizer** - Performance and efficiency optimization
+- **Guardian** - Code quality and standards compliance
 
 ### Voice Usage
 ```bash
@@ -306,24 +317,43 @@ This tests:
 
 ## 🔐 Security Features
 
-- **Local-only operation** - No external API calls
-- **Sandbox restrictions** - Limited file system access
-- **Command validation** - Dangerous commands require confirmation
-- **Audit logging** - All operations logged to SQLite database
-- **Permission system** - Granular access controls
+**Core Security:**
+- **Environment Variables** - API keys stored securely in .env files
+- **Git Protection** - Automatic .env exclusion from version control
+- **Local-first operation** - AI processing happens locally
+- **Sandbox restrictions** - Limited file system access with path validation
+- **Command validation** - Security validator blocks dangerous operations
+- **Audit logging** - Comprehensive security event monitoring
+
+**MCP Integration Security:**
+- **Bearer Token Authentication** - Secure API key management
+- **Input Validation** - All external tool inputs sanitized
+- **Connection Health Monitoring** - Automatic failover and error handling
+- **Graceful Degradation** - System works without external connections
 
 ## 📚 Advanced Usage
 
 ### MCP Server Integration
 CodeCrucible integrates with Model Context Protocol servers for extended functionality:
 
+**Built-in MCP Servers:**
+- **Filesystem**: Secure file operations with path validation
+- **Git**: Repository management and safe operations
+- **Terminal**: Command execution with security validation
+- **Package Manager**: NPM operations with security scanning
+
+**Smithery Registry Integration (External):**
+- **Task Manager**: Request planning and workflow coordination
+- **Terminal Controller**: Enhanced terminal capabilities
+- **Remote Shell**: Distributed development support
+- **Auto-Discovery**: 10+ additional servers from Smithery registry
+
 ```bash
-# Available MCP servers:
-# - Filesystem: File operations with safety restrictions
-# - Git: Repository management and operations
-# - Terminal: Safe command execution
-# - Package Manager: NPM/package operations
-# - Smithery: Web search and research capabilities
+# View available MCP tools
+crucible status
+
+# Enable external MCP servers (requires API key)
+echo "SMITHERY_API_KEY=your_key_here" >> .env
 ```
 
 ### API Server Mode

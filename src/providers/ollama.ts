@@ -111,6 +111,11 @@ export class OllamaProvider {
         model: this.model,
         prompt: request.prompt,
         stream: false,
+        // ADD: Tool support for function calling
+        ...(request.tools && request.tools.length > 0 && {
+          tools: request.tools,
+          tool_choice: 'auto'
+        }),
         options: {
           temperature: request.temperature || 0.1,
           num_predict: request.maxTokens || 2048,

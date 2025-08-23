@@ -6,6 +6,7 @@ import chalk from 'chalk';
 import { readFile, writeFile, access, stat, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import axios from 'axios';
+import { SmitheryMCPServer, SmitheryMCPConfig } from './smithery-mcp-server.js';
 import {
   AdvancedSecurityValidator,
   ValidationResult,
@@ -36,8 +37,8 @@ export interface MCPServerConfig {
   smithery?: {
     enabled: boolean;
     apiKey?: string;
-    profile?: string;
-    baseUrl?: string;
+    enabledServers?: string[];
+    autoDiscovery?: boolean;
   };
 }
 
@@ -94,6 +95,7 @@ export interface PerformanceMetrics {
 export class MCPServerManager {
   private config: MCPServerConfig;
   private servers: Map<string, MCPServer>;
+  private smitheryServer?: SmitheryMCPServer;
   private isInitialized = false;
   private securityValidator: AdvancedSecurityValidator;
 
@@ -311,10 +313,40 @@ export class MCPServerManager {
    * Initialize Smithery MCP server functionality
    */
   private async initializeSmitheryServer(): Promise<void> {
-    if (this.config.smithery?.apiKey && this.config.smithery?.profile) {
-      logger.info('Smithery: API key and profile configured');
-    } else {
-      logger.warn('Smithery: API key and profile not configured');
+    if (!this.config.smithery?.apiKey) {
+      logger.warn('Smithery: API key not configured, skipping initialization');
+      return;
+    }
+
+    try {
+      const smitheryConfig: SmitheryMCPConfig = {
+        apiKey: this.config.smithery.apiKey,
+        enabledServers: this.config.smithery.enabledServers || [],
+        autoDiscovery: this.config.smithery.autoDiscovery ?? true,
+      };
+
+      this.smitheryServer = new SmitheryMCPServer(smitheryConfig);
+      await this.smitheryServer.getServer(); // Initialize the server
+      
+      logger.info('Smithery: MCP server initialized successfully');
+      
+      // Log discovered servers for debugging
+      const availableServers = this.smitheryServer.getAvailableServers();
+      const availableTools = this.smitheryServer.getAvailableTools();
+      
+      logger.info(`Smithery: Discovered ${availableServers.length} servers with ${availableTools.length} tools`);
+      
+      if (availableServers.length > 0) {
+        logger.debug('Smithery servers:', availableServers.map(s => s.qualifiedName));
+      }
+      
+      if (availableTools.length > 0) {
+        logger.debug('Smithery tools:', availableTools.map(t => t.name));
+      }
+      
+    } catch (error) {
+      logger.error('Failed to initialize Smithery server:', error);
+      throw error;
     }
   }
 
@@ -706,36 +738,54 @@ export class MCPServerManager {
   }
 
   /**
-   * Smithery web search
+   * Get Smithery registry health and available tools
    */
-  async smitheryWebSearch(query: string, numResults: number = 10): Promise<any> {
-    if (!this.config.smithery?.enabled) {
-      throw new Error('Smithery server not enabled');
-    }
-
-    if (!this.config.smithery?.apiKey || !this.config.smithery?.profile) {
-      throw new Error('Smithery API key and profile not configured');
+  async getSmitheryStatus(): Promise<any> {
+    if (!this.smitheryServer) {
+      return {
+        enabled: false,
+        error: 'Smithery server not initialized'
+      };
     }
 
     try {
-      const response = await axios.get(`${this.config.smithery.baseUrl}/exa/mcp`, {
-        params: {
-          api_key: this.config.smithery.apiKey,
-          profile: this.config.smithery.profile,
-        },
-        headers: {
-          Accept: 'application/json',
-        },
-      });
-
+      const health = await this.smitheryServer.getRegistryHealth();
+      const servers = this.smitheryServer.getAvailableServers();
+      const tools = this.smitheryServer.getAvailableTools();
+      
       return {
-        query,
-        results: response.data,
-        numResults,
+        enabled: true,
+        health,
+        servers: servers.length,
+        tools: tools.length,
+        serversList: servers.map(s => ({
+          name: s.qualifiedName,
+          displayName: s.displayName,
+          toolCount: s.tools?.length || 0
+        })),
+        toolsList: tools.map(t => ({
+          name: t.name,
+          description: t.description
+        }))
       };
-    } catch (error: any) {
-      throw new Error(`Smithery web search failed: ${error.message || 'Unknown error'}`);
+    } catch (error) {
+      return {
+        enabled: true,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
+  }
+
+  /**
+   * Refresh Smithery servers and tools
+   */
+  async refreshSmitheryServers(): Promise<void> {
+    if (!this.smitheryServer) {
+      throw new Error('Smithery server not initialized');
+    }
+    
+    await this.smitheryServer.refreshServers();
+    logger.info('Smithery servers refreshed');
   }
 
   // Security and validation methods
@@ -984,11 +1034,14 @@ export class MCPServerManager {
         break;
 
       case 'smithery':
-        tools.push({
-          name: 'web_search',
-          description: 'Search the web using Smithery',
-          inputSchema: { query: 'string', numResults: 'number' },
-        });
+        if (this.smitheryServer) {
+          const smitheryTools = this.smitheryServer.getAvailableTools();
+          tools.push(...smitheryTools.map(tool => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema || {}
+          })));
+        }
         break;
     }
 

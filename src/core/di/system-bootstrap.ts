@@ -244,9 +244,10 @@ export class SystemBootstrap {
       CACHE_COORDINATOR_TOKEN,
       async () => {
         const { CacheCoordinator } = await import('../caching/cache-coordinator.js');
-        return new CacheCoordinator();
+        const coordinator = new CacheCoordinator();
+        return coordinator;
       },
-      { lifecycle: 'singleton', lazy: true }
+      { lifecycle: 'singleton' }
     );
   }
 
@@ -345,14 +346,14 @@ export class SystemBootstrap {
         // Import client class dynamically to avoid circular imports
         const { UnifiedModelClient } = await import('../client.js');
 
-        // Resolve all dependencies
+        // Resolve all dependencies (await async ones properly)
         const config = container.resolve(CLIENT_CONFIG_TOKEN);
-        const providerRepository = container.resolve(PROVIDER_REPOSITORY_TOKEN);
-        const hybridRouter = container.resolve(HYBRID_ROUTER_TOKEN);
-        const cacheCoordinator = container.resolve(CACHE_COORDINATOR_TOKEN);
-        const securityValidator = container.resolve(SECURITY_VALIDATOR_TOKEN);
-        const streamingManager = container.resolve(STREAMING_MANAGER_TOKEN);
-        const performanceMonitor = container.resolve(PERFORMANCE_MONITOR_TOKEN);
+        const providerRepository = await container.resolveAsync(PROVIDER_REPOSITORY_TOKEN);
+        const hybridRouter = await container.resolveAsync(HYBRID_ROUTER_TOKEN);
+        const cacheCoordinator = await container.resolveAsync(CACHE_COORDINATOR_TOKEN);
+        const securityValidator = await container.resolveAsync(SECURITY_VALIDATOR_TOKEN);
+        const streamingManager = await container.resolveAsync(STREAMING_MANAGER_TOKEN);
+        const performanceMonitor = await container.resolveAsync(PERFORMANCE_MONITOR_TOKEN);
 
         // Create client with all dependencies injected using new DI constructor
         const client = new UnifiedModelClient(config, {

@@ -259,14 +259,6 @@ export class CLI {
       // Parse command and options
       const { command, remainingArgs } = CLIParser.extractCommand(args);
       const options = CLIParser.parseOptions(args);
-      console.log(
-        '🔧 DEBUG: Parsed command:',
-        command,
-        'remainingArgs:',
-        remainingArgs,
-        'options:',
-        options
-      );
 
       // Initialize if needed
       if (!this.initialized && !options.skipInit) {
@@ -368,12 +360,6 @@ export class CLI {
           const fullPrompt = [command, ...args].filter(Boolean).join(' ');
           logger.debug('About to call processPrompt', { fullPrompt });
           const result = await this.processPrompt(fullPrompt, options);
-          console.log(
-            '🔧 DEBUG: processPrompt returned:',
-            typeof result,
-            result?.length || 'no length',
-            !!result
-          );
           if (result && typeof result === 'string') {
             logger.debug('About to display result');
             console.log(result);

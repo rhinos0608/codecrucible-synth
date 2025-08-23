@@ -1,115 +1,131 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../core/logger.js';
-import axios from 'axios';
+import { SmitheryRegistryIntegration, SmitheryConfig } from './smithery-registry-integration.js';
 
 export interface SmitheryMCPConfig {
-  apiKey?: string;
-  profile?: string;
-  baseUrl: string;
+  apiKey: string;
+  enabledServers?: string[]; // List of qualified server names to enable
+  autoDiscovery?: boolean; // Whether to auto-discover popular servers
 }
 
 export class SmitheryMCPServer {
   private server: Server;
   private config: SmitheryMCPConfig;
+  private registryIntegration: SmitheryRegistryIntegration;
+  private availableServers: Map<string, any> = new Map();
+  private availableTools: Map<string, any> = new Map();
+  private initialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor(config: SmitheryMCPConfig) {
     this.config = config;
 
     this.server = new Server(
-      { name: 'smithery-ai-exa', version: '1.0.0' },
+      { name: 'smithery-registry', version: '1.0.0' },
       { capabilities: { tools: {} } }
     );
 
-    this.initializeServer();
+    // Initialize Smithery registry integration
+    const smitheryConfig: SmitheryConfig = {
+      apiKey: config.apiKey,
+    };
+    this.registryIntegration = new SmitheryRegistryIntegration(smitheryConfig);
+
+    // Don't call async initialization in constructor
+    // It will be called when getServer() is called
   }
 
-  private initializeServer(): void {
-    // Register tool handlers
-    this.server.setRequestHandler(CallToolRequestSchema, async request => {
-      const { name, arguments: args } = request.params;
-
-      switch (name) {
-        case 'web_search_exa':
-          return await this.handleWebSearchExa(args);
-
-        default:
-          throw new Error(`Unknown tool: ${name}`);
-      }
-    });
-
-    // Register available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
-        {
-          name: 'web_search_exa',
-          description: 'Search the web using Exa API through Smithery AI',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              query: { type: 'string', description: 'Search query' },
-              numResults: {
-                type: 'number',
-                description: 'Number of results to return',
-                default: 10,
-              },
-            },
-            required: ['query'],
-          },
-        },
-      ],
-    }));
-
-    logger.debug('Smithery MCP server initialized');
-  }
-
-  private async handleWebSearchExa(args: any): Promise<any> {
-    // If no API key is configured, return an error
-    if (!this.config.apiKey || !this.config.profile) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Smithery API key and profile are not configured. Please set them in your configuration.',
-          },
-        ],
-        isError: true,
-      };
-    }
-
+  private async initializeServer(): Promise<void> {
     try {
-      const { query, numResults = 10 } = args;
+      // Discover available MCP servers from registry
+      await this.discoverServers();
 
-      // Make request to Smithery AI Exa MCP API
-      const response = await axios.get(`${this.config.baseUrl}/exa/mcp`, {
-        params: {
-          api_key: this.config.apiKey,
-          profile: this.config.profile,
-        },
-        headers: {
-          Accept: 'application/json',
-        },
+      // Register tool handlers
+      this.server.setRequestHandler(CallToolRequestSchema, async request => {
+        const { name, arguments: args } = request.params;
+        return await this.handleToolCall(name, args);
       });
 
+      // Register available tools dynamically from discovered servers
+      this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+        const tools = Array.from(this.availableTools.values());
+        logger.info(`Providing ${tools.length} tools from Smithery registry`);
+        return { tools };
+      });
+
+      logger.info('Smithery MCP server initialized successfully');
+    } catch (error) {
+      logger.error('Error initializing Smithery MCP server:', error);
+      throw error;
+    }
+  }
+
+  private async discoverServers(): Promise<void> {
+    try {
+      let servers = [];
+      
+      if (this.config.enabledServers && this.config.enabledServers.length > 0) {
+        // Load specific servers
+        for (const serverName of this.config.enabledServers) {
+          const server = await this.registryIntegration.getServerDetails(serverName);
+          if (server) {
+            servers.push(server);
+          }
+        }
+      } else if (this.config.autoDiscovery !== false) {
+        // Auto-discover popular servers
+        servers = await this.registryIntegration.getPopularServers(10);
+      }
+
+      // Register tools from discovered servers
+      for (const server of servers) {
+        this.availableServers.set(server.qualifiedName, server);
+        
+        for (const tool of server.tools) {
+          const toolName = `${server.qualifiedName.replace('/', '_')}_${tool.name}`;
+          this.availableTools.set(toolName, {
+            name: toolName,
+            description: `${tool.description} (from ${server.displayName})`,
+            inputSchema: tool.inputSchema,
+            serverName: server.qualifiedName,
+            originalName: tool.name,
+          });
+        }
+      }
+
+      logger.info(`Discovered ${servers.length} servers with ${this.availableTools.size} tools`);
+    } catch (error) {
+      logger.error('Error discovering Smithery servers:', error);
+      // Continue with empty tools if discovery fails
+    }
+  }
+
+  private async handleToolCall(name: string, args: any): Promise<any> {
+    try {
+      const tool = this.availableTools.get(name);
+      if (!tool) {
+        throw new Error(`Unknown tool: ${name}`);
+      }
+
+      // This is a placeholder - in a full implementation, we would
+      // need to establish connections to the actual MCP servers
+      // and proxy the tool calls through them
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
-              query,
-              results: response.data,
-              numResults,
-            }),
+            text: `Tool ${name} would be executed with args: ${JSON.stringify(args)}\n\nNote: This is a registry integration preview. Full tool execution requires establishing connections to individual MCP servers.`,
           },
         ],
       };
     } catch (error: any) {
-      logger.error('Smithery web search error:', error);
+      logger.error(`Tool execution error for ${name}:`, error);
       return {
         content: [
           {
             type: 'text',
-            text: `Web search error: ${error.message || 'Unknown error'}`,
+            text: `Tool execution error: ${error.message || 'Unknown error'}`,
           },
         ],
         isError: true,
@@ -117,7 +133,42 @@ export class SmitheryMCPServer {
     }
   }
 
-  getServer(): Server {
+  async getServer(): Promise<Server> {
+    await this.ensureInitialized();
     return this.server;
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.initializationPromise = this.initializeServer();
+    await this.initializationPromise;
+    this.initialized = true;
+  }
+
+  async getRegistryHealth(): Promise<any> {
+    await this.ensureInitialized();
+    return await this.registryIntegration.healthCheck();
+  }
+
+  getAvailableServers(): Array<any> {
+    return Array.from(this.availableServers.values());
+  }
+
+  getAvailableTools(): Array<any> {
+    return Array.from(this.availableTools.values());
+  }
+
+  async refreshServers(): Promise<void> {
+    await this.ensureInitialized();
+    this.availableServers.clear();
+    this.availableTools.clear();
+    await this.discoverServers();
   }
 }

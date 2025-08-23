@@ -1672,6 +1672,13 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     const selectedProvider = request.provider || 'ollama';
 
     try {
+      // Ensure providers are initialized before attempting to use them
+      const availableProviders = this.providerRepository.getAvailableProviders();
+      if (availableProviders.size === 0) {
+        logger.warn('No providers available, attempting to initialize');
+        await this.initializeProvidersAsync();
+      }
+      
       // Get the appropriate provider
       const provider = this.providerRepository.getProvider(selectedProvider);
       if (!provider) {
@@ -2298,6 +2305,38 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         conditions,
       },
     };
+  }
+
+  /**
+   * Check health status of the client and providers
+   */
+  async checkHealth(): Promise<{ status: string; details: any }> {
+    try {
+      const providerHealth = await this.healthCheck();
+      const availableProviders = Object.values(providerHealth).filter(Boolean).length;
+      const totalProviders = Object.keys(providerHealth).length;
+      
+      const status = this.initialized && availableProviders > 0 ? 'healthy' : 
+                     this.initialized ? 'degraded' : 'initializing';
+      
+      return {
+        status,
+        details: {
+          initialized: this.initialized,
+          providersAvailable: availableProviders,
+          totalProviders,
+          providers: providerHealth
+        }
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        details: {
+          initialized: this.initialized,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      };
+    }
   }
 
   /**

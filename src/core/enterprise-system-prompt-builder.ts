@@ -261,20 +261,29 @@ DO NOT use TodoWrite for:
    */
   private static getToolPoliciesSection(): string {
     return `# TOOL USAGE POLICIES
+
+## MCP Tools (PRIMARY - Always Use for File Operations)
+CRITICAL: You have access to powerful MCP tools for file analysis and codebase operations. When asked to analyze files or code, ALWAYS use these tools:
+- Use filesystem_read_file to read file contents for analysis
+- Use filesystem_list_directory to explore directory structures  
+- Use filesystem_find_files to locate files by pattern
+- Use filesystem_file_stats to get file information
+- NEVER respond with simple acknowledgments like "OK" - use the appropriate MCP tools to provide comprehensive analysis
+
 Tool Selection and Usage:
-- When doing file search, prefer Task tool to reduce context usage
+- When doing file search, prefer Task tool to reduce context usage for complex searches
 - Use specialized agents when task matches agent description
 - Batch multiple independent tool calls for optimal performance
 - For multiple bash commands, send single message with multiple tool calls (parallel execution)
 - Follow WebFetch redirects immediately with new requests
-- Use Grep, Glob, LS, Read tools instead of bash commands (cat, find, grep)
-- Always use ripgrep (rg) if still needed over standard grep
+- For file operations, use MCP filesystem tools (filesystem_read_file, etc.) instead of bash commands
 
 File Operations:
-- Use Read tool before editing files (MANDATORY - tool will error without prior read)
-- Preserve exact indentation from Read output (ignore line number prefixes)
+- Use filesystem_read_file (MCP) for reading files - this is the PRIMARY method
+- Use Read tool as fallback only if MCP tools unavailable
+- Preserve exact indentation from file content 
 - Use absolute paths, not relative paths for file operations
-- Check parent directory existence with LS before creating files/directories
+- Use filesystem_list_directory to explore directories
 
 Error Handling:
 - Use comprehensive try-catch blocks with graceful degradation

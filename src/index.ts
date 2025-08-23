@@ -9,6 +9,8 @@ import { logger } from './core/logger.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { initializeGlobalToolIntegration, getGlobalToolIntegration } from './core/tools/tool-integration.js';
+import { initializeGlobalEnhancedToolIntegration, getGlobalEnhancedToolIntegration } from './core/tools/enhanced-tool-integration.js';
 
 // Proper EventEmitter management instead of band-aid fix
 const eventManager = {
@@ -65,27 +67,45 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
     // Get the injected client from DI container (cast to concrete type for CLI compatibility)
     const client = bootResult.client as UnifiedModelClient;
     
-    // DEBUG: Check if client has expected methods
-    console.log('🔧 DEBUG: Client instance type check:');
-    console.log('  - generateText available:', typeof client.generateText === 'function');
-    console.log('  - synthesize available:', typeof client.synthesize === 'function');
-    console.log('  - processRequest available:', typeof client.processRequest === 'function');
-    console.log('  - healthCheck available:', typeof client.healthCheck === 'function');
-    console.log('  - Client constructor name:', client.constructor.name);
-    console.log('  - Is Promise:', client instanceof Promise);
-    console.log('  - Client type:', typeof client);
-
     // Initialize voice system with DI-enabled client
     const voiceSystem = new VoiceArchetypeSystem(client);
 
-    // Minimal MCP manager setup for fast startup
-    const mcpManager = {
-      startServers: async () => {
-        console.log('ℹ️ MCP servers will be started when needed');
+    // Initialize MCP server manager with proper configuration including Smithery
+    const mcpConfig = {
+      filesystem: { enabled: true, restrictedPaths: [], allowedPaths: [] },
+      git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
+      terminal: { enabled: true, allowedCommands: ['npm', 'node', 'git', 'ls', 'cat'], blockedCommands: [] },
+      packageManager: { enabled: true, autoInstall: false, securityScan: true },
+      smithery: {
+        enabled: true,
+        apiKey: '894c8f05-44bb-490d-bf7b-a7d6fb238a87',
+        autoDiscovery: true,
       },
-      stopServers: async () => {},
-      getServerStatus: () => ({ filesystem: { status: 'lazy-loaded' } }),
-    } as any;
+    };
+
+    const mcpManager = new MCPServerManager(mcpConfig);
+    await mcpManager.startServers();
+    
+    // Initialize global tool integration - CRITICAL for MCP tools to work
+    initializeGlobalToolIntegration(mcpManager);
+    
+    // Initialize enhanced tool integration for advanced features
+    initializeGlobalEnhancedToolIntegration(mcpManager);
+    const enhancedIntegration = getGlobalEnhancedToolIntegration();
+    if (enhancedIntegration) {
+      await enhancedIntegration.initialize();
+    }
+    
+    // Verify tool integration is working
+    const toolIntegration = getGlobalToolIntegration();
+    if (toolIntegration) {
+      logger.info('✅ MCP tool integration initialized successfully', {
+        availableTools: toolIntegration.getAvailableToolNames(),
+        llmFunctions: toolIntegration.getLLMFunctions().length
+      });
+    } else {
+      logger.warn('⚠️ MCP tool integration failed to initialize');
+    }
 
     // Load configuration
     const configManager = new ConfigManager();

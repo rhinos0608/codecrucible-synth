@@ -1,12 +1,15 @@
 import { EnhancedMCPClientManager } from '../../mcp-servers/enhanced-mcp-client-manager.js';
+import { LocalMCPServerManager } from '../../mcp-servers/local-mcp-server-manager.js';
 import { MCPSecurityValidator } from '../../mcp-servers/mcp-security-validator.js';
 import { logger } from '../logger.js';
 
 export class EnhancedExternalMCPTools {
   private mcpManager: EnhancedMCPClientManager;
+  private localMcpManager: LocalMCPServerManager;
 
-  constructor(mcpManager: EnhancedMCPClientManager) {
+  constructor(mcpManager: EnhancedMCPClientManager, localMcpManager?: LocalMCPServerManager) {
     this.mcpManager = mcpManager;
+    this.localMcpManager = localMcpManager || new LocalMCPServerManager();
   }
 
   /**
@@ -24,7 +27,18 @@ export class EnhancedExternalMCPTools {
     }
 
     try {
-      // Try external MCP terminal-controller first
+      // Try local MCP terminal server first (most reliable)
+      if (this.localMcpManager.isServerAvailable('local-terminal')) {
+        logger.debug('Using local terminal MCP server for command execution');
+        return await this.localMcpManager.executeToolCall('local-terminal', 'execute_command', {
+          command,
+          timeout: timeout || 30000,
+        });
+      } else {
+        logger.warn('Local terminal MCP server not available, trying external');
+      }
+
+      // Fallback to external MCP terminal-controller (less reliable due to Smithery issues)
       return await this.mcpManager.executeToolCall('terminal-controller', 'execute_command', {
         command,
         timeout: timeout || 30000,

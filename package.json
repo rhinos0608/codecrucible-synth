@@ -1,6 +1,6 @@
 {
   "name": "codecrucible-synth",
-  "version": "4.1.1",
+  "version": "4.2.0",
   "description": "Production-Ready AI Development Platform with Multi-Voice Synthesis, Smithery MCP Integration, Enterprise Security, and Zero-Timeout Reliability",
   "main": "dist/index.js",
   "type": "module",

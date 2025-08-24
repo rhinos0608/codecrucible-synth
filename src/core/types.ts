@@ -1,4 +1,11 @@
 // Core Type Definitions for CodeCrucible Synth
+
+export interface REPLInterface {
+  showStatus(): void;
+  listModels(): void;
+  executePromptProcessing(prompt: string, options?: any): Promise<any>;
+}
+
 export interface UnifiedClientConfig {
   endpoint?: string;
   providers: Array<{

@@ -17,6 +17,10 @@ export interface ServerOptions {
   };
 }
 
+export interface ServerModeInterface {
+  startServerMode(context: CLIContext, options: ServerOptions): Promise<void>;
+}
+
 /**
  * Server Mode for IDE Integration
  *
@@ -549,6 +553,7 @@ ${refactorPrompt}`,
       resolve();
     });
   });
+  }
 }
 
 /**

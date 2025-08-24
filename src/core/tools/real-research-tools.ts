@@ -139,7 +139,7 @@ export class RefReadUrlTool extends BaseTool {
         const response = await axios.get(params.url, {
           timeout: 10000,
           headers: {
-            'User-Agent': 'CodeCrucible-Research-Bot/1.0',
+            'User-Agent': 'CodeCrucible-Research-Bot',
           },
         });
 

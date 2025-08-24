@@ -503,7 +503,7 @@ export class HuggingFaceTool {
 
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      'User-Agent': 'CodeCrucible-Synth/2.0.0',
+      'User-Agent': 'CodeCrucible-Synth',
     };
 
     if (this.config.apiKey) {

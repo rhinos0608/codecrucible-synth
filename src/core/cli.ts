@@ -96,8 +96,8 @@ export class CLI implements REPLInterface {
         destroyTimeoutMillis: 5000,
         idleTimeoutMillis: 30000,
         reapIntervalMillis: 1000,
-        createRetryIntervalMillis: 200
-      }
+        createRetryIntervalMillis: 200,
+      },
     };
     const databaseManager = new ProductionDatabaseManager(databaseConfig);
     this.rbacSystem = new RBACSystem(databaseManager, this.secretsManager);
@@ -144,7 +144,7 @@ export class CLI implements REPLInterface {
       isGitRepo,
       platform: process.platform,
       currentBranch,
-      modelId: 'CodeCrucible Synth v4.0.5',
+      modelId: 'CodeCrucible Synth',
       knowledgeCutoff: 'January 2025',
     };
   }
@@ -161,7 +161,7 @@ export class CLI implements REPLInterface {
       });
     } catch (error) {
       logger.warn('Failed to build system prompt, using fallback', error);
-      return `You are CodeCrucible Synth v4.0.4, an AI-powered code generation and analysis tool. Use available tools to assist with software engineering tasks.`;
+      return `You are CodeCrucible Synth, an AI-powered code generation and analysis tool. Use available tools to assist with software engineering tasks.`;
     }
   }
 
@@ -491,29 +491,31 @@ export class CLI implements REPLInterface {
     // Modern security system with user consent (Claude Code pattern)
     const isTestEnvironment =
       process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
-    
+
     let sanitizationResult: any;
-    
+
     try {
       const { ModernInputSanitizer } = await import('./security/modern-input-sanitizer.js');
       sanitizationResult = await ModernInputSanitizer.sanitizePrompt(prompt, {
         operation: 'cli_prompt_processing',
-        workingDirectory: process.cwd()
+        workingDirectory: process.cwd(),
       });
 
       // Handle consent requirement with actual user interaction
       if (sanitizationResult.requiresConsent && !isTestEnvironment) {
         logger.info('Security review required for input', {
           reason: sanitizationResult.securityDecision?.reason,
-          riskLevel: sanitizationResult.securityDecision?.riskLevel
+          riskLevel: sanitizationResult.securityDecision?.riskLevel,
         });
-        
+
         // Show security notice and get user consent
         console.log(`\n⚠️  Security Review Required`);
         console.log(`   Operation: ${sanitizationResult.securityDecision?.reason}`);
-        console.log(`   Risk Level: ${sanitizationResult.securityDecision?.riskLevel?.toUpperCase()}`);
+        console.log(
+          `   Risk Level: ${sanitizationResult.securityDecision?.riskLevel?.toUpperCase()}`
+        );
         console.log(`   Input: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
-        
+
         // In CLI mode, we'll proceed but make it clear this needs user confirmation
         // A full GUI implementation would show an interactive dialog here
         console.log(`\n   ✓ Proceeding with operation (security policy allows with notice)`);
@@ -539,7 +541,7 @@ export class CLI implements REPLInterface {
       // Fallback to old system if new one fails to load
       logger.warn('Failed to load modern security system, using fallback', importError);
       sanitizationResult = InputSanitizer.sanitizePrompt(prompt);
-      
+
       if (!sanitizationResult.isValid && !isTestEnvironment) {
         const securityError = InputSanitizer.createSecurityError(
           sanitizationResult,
@@ -557,7 +559,7 @@ export class CLI implements REPLInterface {
     if (sanitizationResult && !sanitizationResult.isValid && isTestEnvironment) {
       logger.warn('Test environment: Security validation bypassed for development', {
         violations: sanitizationResult.violations,
-        prompt: prompt.substring(0, 100) + '...',
+        prompt: `${prompt.substring(0, 100)}...`,
       });
     }
 
@@ -566,10 +568,10 @@ export class CLI implements REPLInterface {
     try {
       // ALWAYS use the AI agent for all requests - no hardcoded shortcuts
       console.log(chalk.cyan('🤖 Processing with AI agent...'));
-      
+
       if (options.noStream || options.batch) {
         const response = await this.executePromptProcessing(sanitizedPrompt, options);
-        console.log('\n' + chalk.cyan('🤖 Response:'));
+        console.log(`\n${chalk.cyan('🤖 Response:')}`);
         console.log(response);
         return response;
       } else {
@@ -585,7 +587,6 @@ export class CLI implements REPLInterface {
   /**
    * Execute prompt processing with voice system
    */
-  
 
   // Removed isAnalysisRequest - AI agent now handles all requests
 
@@ -594,57 +595,46 @@ export class CLI implements REPLInterface {
   /**
    * Legacy analysis method (kept for backward compatibility)
    */
-  
 
   /**
    * Analyze project structure and metadata
    */
-  
 
   /**
    * Analyze code metrics and lines of code
    */
-  
 
   /**
    * Analyze dependencies from package.json
    */
-  
 
   /**
    * Analyze configuration files
    */
-  
 
   /**
    * Analyze test coverage and test files
    */
-  
 
   /**
    * Discover project components by analyzing file structure
    */
-  
 
   /**
    * Discover architecture components by analyzing imports and exports
    */
-  
 
   /**
    * Detect real issues in the codebase
    */
-  
 
   /**
    * Assess security configuration
    */
-  
 
   /**
    * Analyze performance characteristics
    */
-  
 
   /**
    * Generate recommendations based on analysis
@@ -663,9 +653,9 @@ export class CLI implements REPLInterface {
 
     if (testAnalysis.estimatedCoverage < 50) {
       recommendations.push(
-        '2. **High Priority**: Expand test coverage to 70%+ (currently ~' +
-          testAnalysis.estimatedCoverage +
-          '%)'
+        `2. **High Priority**: Expand test coverage to 70%+ (currently ~${
+          testAnalysis.estimatedCoverage
+        }%)`
       );
     }
 
@@ -727,38 +717,31 @@ export class CLI implements REPLInterface {
   /**
    * Analyze the task type from the prompt
    */
-  
 
   /**
    * Execute in Auditor mode (LM Studio optimized for fast analysis)
    */
-  
 
   /**
    * Execute in Writer mode (Ollama optimized for quality generation)
    */
-  
 
   /**
    * Execute in Auto mode (intelligent routing)
    */
-  
 
   /**
    * Configure the model client to use the selected model
    */
-  
 
   /**
    * Format the response based on execution mode
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  
 
   /**
    * Display streaming response using enhanced streaming client
    */
-  
 
   /**
    * Start interactive mode
@@ -820,7 +803,7 @@ export class CLI implements REPLInterface {
       case 'exit':
         console.log(chalk.yellow('👋 Goodbye!'));
         process.exit(0);
-        break;
+      // break; // Removed - unreachable after process.exit()
       default:
         // Check if it's a model switch command
         if (cmd.startsWith('model:')) {
@@ -1059,7 +1042,6 @@ export class CLI implements REPLInterface {
   }
 
   // Delegate methods to command handlers
-  
 
   /**
    * Handle role switching via slash commands
@@ -1116,22 +1098,18 @@ export class CLI implements REPLInterface {
   /**
    * Handle model switching
    */
-  
 
   /**
    * Handle model listing
    */
-  
 
   /**
    * Handle model reload
    */
-  
 
   /**
    * Show slash command help
    */
-  
 
   /**
    * Handle Sequential Dual Agent Review
@@ -1167,25 +1145,23 @@ export class CLI implements REPLInterface {
       if (!options.silent) {
         console.log(chalk.blue('🔄 Processing prompt...'));
       }
-      
+
       // Use the voice system to process the prompt
       let response: string;
-      
+
       if (options.voices && Array.isArray(options.voices) && options.voices.length > 0) {
         // Multi-voice processing
         const solutions = await this.context.voiceSystem.generateMultiVoiceSolutions(
           options.voices,
           prompt,
-          { 
+          {
             workingDirectory: process.cwd(),
-            parallel: true 
+            parallel: true,
           }
         );
-        
+
         // Combine the solutions into a coherent response
-        response = solutions.map((sol: any) => 
-          `**${sol.voice}**: ${sol.content}`
-        ).join('\n\n');
+        response = solutions.map((sol: any) => `**${sol.voice}**: ${sol.content}`).join('\n\n');
       } else {
         // Single voice processing using default voice
         const voiceResponse = await this.context.voiceSystem.generateSingleVoiceResponse(
@@ -1193,14 +1169,14 @@ export class CLI implements REPLInterface {
           prompt,
           this.context.modelClient // Pass the actual client, not options
         );
-        
+
         response = voiceResponse.content || 'No response generated';
       }
-      
+
       if (!options.silent) {
         console.log(chalk.green('✅ Processing complete'));
       }
-      
+
       return response;
     } catch (error) {
       if (!options.silent) {
@@ -1230,7 +1206,7 @@ export class CLI implements REPLInterface {
       '/audit - Switch to auditor mode',
       '/write - Switch to writer mode',
       '/auto - Switch to auto mode',
-      '/help - Show this help'
+      '/help - Show this help',
     ].join('\n');
     console.log(chalk.cyan(helpText));
     return helpText;

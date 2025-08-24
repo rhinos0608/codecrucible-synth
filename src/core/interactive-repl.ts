@@ -57,7 +57,7 @@ export class InteractiveREPL {
    */
   private showBanner(): void {
     console.log(chalk.blue('\n╔══════════════════════════════════════════════════════════════╗'));
-    console.log(chalk.blue('║               CodeCrucible Synth v3.8.5                     ║'));
+    console.log(chalk.blue('║                CodeCrucible Synth                        ║'));
     console.log(chalk.blue('║          Interactive AI Coding Assistant                     ║'));
     console.log(chalk.blue('║                                                              ║'));
     console.log(chalk.blue('║  Type "help" for commands, "exit" to quit                   ║'));

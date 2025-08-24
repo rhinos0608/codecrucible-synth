@@ -9,8 +9,14 @@ import { logger } from './core/logger.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { initializeGlobalToolIntegration, getGlobalToolIntegration } from './core/tools/tool-integration.js';
-import { initializeGlobalEnhancedToolIntegration, getGlobalEnhancedToolIntegration } from './core/tools/enhanced-tool-integration.js';
+import {
+  initializeGlobalToolIntegration,
+  getGlobalToolIntegration,
+} from './core/tools/tool-integration.js';
+import {
+  initializeGlobalEnhancedToolIntegration,
+  getGlobalEnhancedToolIntegration,
+} from './core/tools/enhanced-tool-integration.js';
 
 // Proper EventEmitter management instead of band-aid fix
 const eventManager = {
@@ -66,7 +72,7 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
 
     // Get the injected client from DI container (cast to concrete type for CLI compatibility)
     const client = bootResult.client as UnifiedModelClient;
-    
+
     // Initialize voice system with DI-enabled client
     const voiceSystem = new VoiceArchetypeSystem(client);
 
@@ -74,7 +80,11 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
     const mcpConfig = {
       filesystem: { enabled: true, restrictedPaths: [], allowedPaths: [] },
       git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
-      terminal: { enabled: true, allowedCommands: ['npm', 'node', 'git', 'ls', 'cat'], blockedCommands: [] },
+      terminal: {
+        enabled: true,
+        allowedCommands: ['npm', 'node', 'git', 'ls', 'cat'],
+        blockedCommands: [],
+      },
       packageManager: { enabled: true, autoInstall: false, securityScan: true },
       smithery: {
         enabled: !!process.env.SMITHERY_API_KEY,
@@ -85,23 +95,23 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
 
     const mcpManager = new MCPServerManager(mcpConfig);
     await mcpManager.startServers();
-    
+
     // Initialize global tool integration - CRITICAL for MCP tools to work
     initializeGlobalToolIntegration(mcpManager);
-    
+
     // Initialize enhanced tool integration for advanced features
     initializeGlobalEnhancedToolIntegration(mcpManager);
     const enhancedIntegration = getGlobalEnhancedToolIntegration();
     if (enhancedIntegration) {
       await enhancedIntegration.initialize();
     }
-    
+
     // Verify tool integration is working
     const toolIntegration = getGlobalToolIntegration();
     if (toolIntegration) {
       logger.info('✅ MCP tool integration initialized successfully', {
         availableTools: toolIntegration.getAvailableToolNames(),
-        llmFunctions: toolIntegration.getLLMFunctions().length
+        llmFunctions: toolIntegration.getLLMFunctions().length,
       });
     } else {
       logger.warn('⚠️ MCP tool integration failed to initialize');
@@ -219,7 +229,9 @@ export async function main() {
   try {
     // Handle basic commands immediately without full initialization
     const args = process.argv.slice(2);
-
+    
+    // FAST PATH: Exit early for simple commands before any heavy imports
+    
     // Fast commands that don't need AI models or full initialization
     if (args.includes('--help') || args.includes('-h')) {
       showBasicHelp();
@@ -434,13 +446,16 @@ async function showAvailableModels() {
 
 export default initializeCLIContext;
 
-// Auto-run main when executed directly
+// Auto-run with fast path check first
 // Fix: More robust check for direct execution
 if (
   process.argv[1] &&
   (process.argv[1].includes('index.js') || process.argv[1].endsWith('index.ts'))
 ) {
-  main().catch(error => {
+  // Use fast CLI for simple commands, then fall back to main for complex ones
+  import('./fast-cli.js').then(({ fastMain }) => {
+    return fastMain();
+  }).catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
   });

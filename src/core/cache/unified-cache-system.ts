@@ -561,5 +561,19 @@ export const defaultUnifiedCacheConfig: UnifiedCacheConfig = {
   },
 };
 
-// Export singleton instance
-export const unifiedCache = new UnifiedCacheSystem(defaultUnifiedCacheConfig);
+// Export lazy-loaded singleton instance to prevent performance issues
+let _unifiedCache: UnifiedCacheSystem | null = null;
+
+export function getUnifiedCache(): UnifiedCacheSystem {
+  if (!_unifiedCache) {
+    _unifiedCache = new UnifiedCacheSystem(defaultUnifiedCacheConfig);
+  }
+  return _unifiedCache;
+}
+
+// Legacy export for backward compatibility - but now lazy-loaded
+export const unifiedCache = new Proxy({} as UnifiedCacheSystem, {
+  get(target, prop) {
+    return getUnifiedCache()[prop as keyof UnifiedCacheSystem];
+  }
+});

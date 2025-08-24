@@ -392,6 +392,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
 
     // Only block or request consent for truly dangerous patterns
     const dangerousPatterns = [
+      // System commands
       {
         pattern: /rm\s+-rf\s+[\/\\]\*?/,
         reason: 'Recursive file deletion detected',
@@ -409,6 +410,33 @@ export class ClaudeCodeSecurity extends EventEmitter {
         reason: 'System device manipulation detected',
         risk: 'high',
       },
+      
+      // AI-specific prompt injection patterns (2024 threats)
+      {
+        pattern: /ignore\s+(?:all\s+)?(?:previous|above)\s+instructions?/i,
+        reason: 'Prompt injection attempt detected',
+        risk: 'high',
+      },
+      {
+        pattern: /forget\s+(everything|all|previous)(?:\s+(?:and\s+)?(?:start\s+over|instructions?|prompts?))?/i,
+        reason: 'Memory manipulation attempt detected',
+        risk: 'high',
+      },
+      {
+        pattern: /new\s+(instructions?|system\s+prompt|role):\s*/i,
+        reason: 'Role hijacking attempt detected',
+        risk: 'high',
+      },
+      {
+        pattern: /system\s*:\s*you\s+(are\s+now|must\s+now)/i,
+        reason: 'System override attempt detected',
+        risk: 'high',
+      },
+      {
+        pattern: /override\s+security/i,
+        reason: 'Security bypass attempt detected',
+        risk: 'critical',
+      },
     ];
 
     for (const { pattern, reason, risk } of dangerousPatterns) {
@@ -423,7 +451,18 @@ export class ClaudeCodeSecurity extends EventEmitter {
       }
     }
 
-    // Handle development contexts appropriately
+    // Handle file modification requests FIRST (higher priority than development context)
+    if (this.isFileModificationRequest(content)) {
+      return {
+        action: 'askUser',
+        reason: 'File modification requested - requires confirmation',
+        riskLevel: 'medium',
+        requiresConsent: true,
+        suggestedActions: ['Allow file changes', 'Review changes first', 'Deny'],
+      };
+    }
+
+    // Handle development contexts appropriately (only for non-file operations)
     if (
       isDevelopmentContext &&
       (foundKeywords.sql.length > 0 || foundKeywords.development.length > 0)
@@ -433,17 +472,6 @@ export class ClaudeCodeSecurity extends EventEmitter {
         action: 'allow',
         reason: 'Development operation in appropriate context',
         riskLevel: 'low',
-      };
-    }
-
-    // Handle file modification requests
-    if (this.isFileModificationRequest(content)) {
-      return {
-        action: 'askUser',
-        reason: 'File modification requested - requires confirmation',
-        riskLevel: 'medium',
-        requiresConsent: true,
-        suggestedActions: ['Allow file changes', 'Review changes first', 'Deny'],
       };
     }
 

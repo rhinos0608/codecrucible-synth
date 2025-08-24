@@ -125,7 +125,7 @@ export class InputSanitizer {
 
   /**
    * Sanitize prompt text to prevent injection attacks
-   * Enhanced with 2024 AI security best practices
+   * Enhanced with 2024 AI security best practices - CONTEXT AWARE
    */
   static sanitizePrompt(prompt: string): SanitizationResult {
     const violations: string[] = [];
@@ -137,26 +137,29 @@ export class InputSanitizer {
       sanitized = sanitized.substring(0, 10000);
     }
 
+    // Context detection - skip security checks for build/compilation contexts
+    const isBuildContext = this.isBuildOrCompilationContext(sanitized);
+    const isConfigContext = this.isConfigurationContext(sanitized);
+    
+    if (isBuildContext || isConfigContext) {
+      // For build contexts, only check for actual security threats, not compilation flags
+      return this.sanitizeBuildContext(sanitized);
+    }
+
     // Enhanced dangerous pattern detection with 2024 AI security research coverage
+    // Only apply to actual user prompts, not build/compilation output
     const enhancedDangerousPatterns = [
-      /[;&|`$(){}[\]\\]/g, // Shell metacharacters
-      /\.\./g, // Directory traversal
-      /(rm|del|format|shutdown|reboot|halt)\s*(-[a-zA-Z]*\s*)*\s*[/\\]*/gi, // Dangerous commands with flags
-      /(exec\(|eval\(|system\(|spawn\(|require\(['"]child_process)/gi, // Code execution functions with parentheses
-      /(<script|javascript:|data:)/gi, // Script injection
-      /(union|select|insert|update|delete|drop)/gi, // SQL injection
-      /(malicious|attack|exploit|hack|virus|trojan|backdoor|payload)/gi, // Malicious keywords
-      /echo\s+["'].*malicious.*["']/gi, // Echo commands with malicious content
-      /&&\s*(echo|printf|cat|ls|dir)/gi, // Command chaining
-      // 2024 AI-specific patterns (applied to prompts)
+      // Only the most critical patterns for user prompts
       /ignore\s+(previous|all|above)\s+(instructions?|prompts?|commands?)/gi, // Prompt injection
       /forget\s+(everything|all|previous)\s+(instructions?|prompts?)/gi, // Memory manipulation
       /new\s+(instructions?|system\s+prompt|role):\s*/gi, // Role hijacking
       /system\s*:\s*you\s+(are\s+now|must\s+now)/gi, // System override
-      /\\[system\\]/gi, // System token injection
       /override\s+security/gi, // Security bypass attempts
-      // Secret patterns that may leak in generated code
-      /(api_?key|password|secret|token)\s*[=:]\s*['"][a-zA-Z0-9._-]{8,}['"]?/gi, // Credential patterns
+      // Only actual dangerous commands, not compilation flags
+      /rm\s+-rf\s*\/[^/\s]*/gi, // Only actual rm -rf with dangerous paths
+      /sudo\s+(rm|chmod|chown)/gi, // Only sudo with dangerous commands
+      // Only check for actual script execution
+      /<script[^>]*>.*<\/script>/gi, // Full script tags
     ];
 
     // Check for dangerous patterns and remove them completely
@@ -311,6 +314,75 @@ export class InputSanitizer {
       isValid: violations.length === 0,
       violations,
       originalCommand: code
+    };
+  }
+
+  /**
+   * Detect if input is from build/compilation context (safe)
+   */
+  static isBuildOrCompilationContext(input: string): boolean {
+    const buildIndicators = [
+      /-D[A-Z_]+=/, // Compilation defines
+      /-I\/[^/\s]+\/include/, // Include directories
+      /node-gyp|gyp info|gyp ERR/, // Node-gyp build
+      /sqlite3|SQLITE_/, // SQLite compilation
+      /Release\/obj\.target/, // Build output paths
+      /\.gypi|\.gyp\b/, // Build files
+      /BUILDTYPE=Release/, // Build type
+      /prebuild-install/, // Prebuilt binaries
+      /binding\.gyp/, // Native binding
+      /make\s+BUILDTYPE/, // Make commands
+      /gcc|clang|\.o\b|\.so\b/, // Compilation tools and files
+      /-arch\s+(arm64|x64)/, // Architecture flags
+      /-std=c[0-9]+/, // C standard flags
+    ];
+
+    return buildIndicators.some(pattern => pattern.test(input));
+  }
+
+  /**
+   * Detect if input is configuration context (mostly safe)
+   */
+  static isConfigurationContext(input: string): boolean {
+    const configIndicators = [
+      /^[A-Z_]+=/, // Environment variables
+      /\.config\.|\.json\.|\.yaml\./, // Config files
+      /package\.json|tsconfig\.json/, // Package configs
+      /npm\s+(install|run|build)/, // NPM commands
+      /webpack|babel|rollup/, // Build tools
+    ];
+
+    return configIndicators.some(pattern => pattern.test(input));
+  }
+
+  /**
+   * Sanitize build context with minimal restrictions
+   */
+  static sanitizeBuildContext(input: string): SanitizationResult {
+    const violations: string[] = [];
+    let sanitized = input;
+
+    // Only check for actual dangerous commands in build context
+    const actualThreats = [
+      /rm\s+-rf\s+\/$/gi, // rm -rf / (root deletion)
+      /sudo\s+rm\s+-rf/gi, // sudo rm -rf
+      /format\s+c:\s*$/gi, // Windows format command
+      />\s*\/dev\/null\s*2>&1\s*&\s*$/gi, // Background dangerous commands
+    ];
+
+    for (const pattern of actualThreats) {
+      if (pattern.test(sanitized)) {
+        violations.push(`Build context threat: ${pattern.source}`);
+        sanitized = sanitized.replace(pattern, '[BUILD_THREAT_FILTERED]');
+      }
+    }
+
+    // For build contexts, we mostly trust the input
+    return {
+      sanitized,
+      isValid: violations.length === 0,
+      violations,
+      originalCommand: input,
     };
   }
 

@@ -21,6 +21,7 @@ import { CLIOptions, CLIContext, CLIDisplay, CLIParser, CLICommands } from './cl
 import { AuthMiddleware, AuthenticatedRequest } from './middleware/auth-middleware.js';
 import { RBACSystem } from './security/production-rbac-system.js';
 import { SecretsManager } from './security/secrets-manager.js';
+import { ProductionDatabaseManager } from '../database/production-database-manager.js';
 import {
   SecurityAuditLogger,
   AuditEventType,
@@ -84,7 +85,22 @@ export class CLI implements REPLInterface {
 
     // Initialize security systems
     this.secretsManager = new SecretsManager();
-    this.rbacSystem = new RBACSystem(this.secretsManager);
+    const databaseConfig = {
+      type: 'sqlite' as const,
+      database: ':memory:',
+      pool: {
+        min: 2,
+        max: 10,
+        acquireTimeoutMillis: 60000,
+        createTimeoutMillis: 30000,
+        destroyTimeoutMillis: 5000,
+        idleTimeoutMillis: 30000,
+        reapIntervalMillis: 1000,
+        createRetryIntervalMillis: 200
+      }
+    };
+    const databaseManager = new ProductionDatabaseManager(databaseConfig);
+    this.rbacSystem = new RBACSystem(databaseManager, this.secretsManager);
     this.auditLogger = new SecurityAuditLogger(this.secretsManager);
     this.authMiddleware = new AuthMiddleware(this.rbacSystem, this.secretsManager);
 
@@ -293,7 +309,7 @@ export class CLI implements REPLInterface {
     // Handle sequential review
     if (options.sequentialReview) {
       const promptText = args.join(' ') || command || 'Generate code';
-      await this.handleSequentialReview(promptText, options);
+      await this.handleSequentialReview(promptText);
       return;
     }
 
@@ -377,7 +393,10 @@ export class CLI implements REPLInterface {
 
     // Handle special flags
     if (options.server) {
-      await this.commands.startServer(options);
+      // Import serverMode dynamically to avoid circular dependency
+      const { ServerMode } = await import('../server/server-mode.js');
+      const serverMode = new ServerMode();
+      await this.commands.startServer(options, serverMode);
     }
   }
 
@@ -545,22 +564,9 @@ export class CLI implements REPLInterface {
     const sanitizedPrompt = sanitizationResult?.sanitized || prompt;
 
     try {
-      // Check if this is an analysis request that we can handle directly
-      if (this.isAnalysisRequest(sanitizedPrompt)) {
-        console.log(chalk.cyan('🔍 Performing direct codebase analysis...'));
-        const analysis = await this.performDirectCodebaseAnalysis();
-
-        if (options.noStream || options.batch) {
-          return analysis;
-        } else {
-          // Stream the analysis for better user experience
-          await this.streamAnalysisResult(analysis);
-          return 'Analysis streaming completed';
-        }
-      }
-
-      // For non-analysis requests, use standard processing
-      // Use non-streaming mode for better compatibility
+      // ALWAYS use the AI agent for all requests - no hardcoded shortcuts
+      console.log(chalk.cyan('🤖 Processing with AI agent...'));
+      
       if (options.noStream || options.batch) {
         const response = await this.executePromptProcessing(sanitizedPrompt, options);
         console.log('\n' + chalk.cyan('🤖 Response:'));
@@ -581,68 +587,9 @@ export class CLI implements REPLInterface {
    */
   
 
-  /**
-   * Check if the prompt is requesting analysis that we can handle directly
-   */
-  private isAnalysisRequest(prompt: string): boolean {
-    const lowerPrompt = prompt.toLowerCase();
-    const analysisKeywords = [
-      'analyz',
-      'audit',
-      'codebase',
-      'review',
-      'inspect',
-      'examine',
-      'assess',
-      'evaluate',
-      'check',
-      'scan',
-      'investigate',
-      'insights',
-    ];
+  // Removed isAnalysisRequest - AI agent now handles all requests
 
-    return analysisKeywords.some(keyword => lowerPrompt.includes(keyword));
-  }
-
-  /**
-   * Stream analysis result for better user experience
-   */
-  private async streamAnalysisResult(analysis: string): Promise<void> {
-    console.log(chalk.green('\n📝 Streaming Analysis Results:'));
-
-    // Split analysis into lines and stream them
-    const lines = analysis.split('\n');
-    const delay = Math.max(10, Math.min(50, 2000 / lines.length)); // Dynamic delay based on content length
-
-    for (const line of lines) {
-      if (line.trim()) {
-        process.stdout.write(line + '\n');
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        process.stdout.write('\n');
-      }
-    }
-
-    console.log(chalk.gray('\n   Analysis streaming completed'));
-  }
-
-  /**
-   * Perform real dynamic codebase analysis without model client
-   */
-  async performDirectCodebaseAnalysis(): Promise<string> {
-    console.log('📊 Analyzing project structure...');
-
-    try {
-      // Use the shared analyzer
-      const { CodebaseAnalyzer } = await import('./analysis/codebase-analyzer.js');
-      const analyzer = new CodebaseAnalyzer(this.workingDirectory);
-      return await analyzer.performAnalysis();
-    } catch (error) {
-      logger.debug('Shared analyzer failed, using direct implementation');
-      // Fallback to direct implementation
-      return await this.performDirectCodebaseAnalysis();
-    }
-  }
+  // Removed hardcoded analysis methods - AI agent now handles all requests dynamically
 
   /**
    * Legacy analysis method (kept for backward compatibility)
@@ -1085,7 +1032,7 @@ export class CLI implements REPLInterface {
   async checkOllamaStatus(): Promise<boolean> {
     try {
       const result = await this.context.modelClient.checkHealth();
-      return result.status === 'healthy';
+      return Object.values(result).some(status => status === true);
     } catch {
       return false;
     }
@@ -1197,7 +1144,7 @@ export class CLI implements REPLInterface {
   /**
    * Show system status
    */
-  public showStatus(): void {
+  public async showStatus(): Promise<void> {
     console.log(chalk.cyan('📊 CodeCrucible Synth Status'));
     console.log(chalk.green('✅ System initialized'));
     console.log(`Current directory: ${this.workingDirectory}`);
@@ -1217,11 +1164,38 @@ export class CLI implements REPLInterface {
    */
   public async executePromptProcessing(prompt: string, options: any = {}): Promise<any> {
     try {
-      // Basic processing implementation
-      console.log(chalk.blue('🔄 Processing prompt...'));
+      if (!options.silent) {
+        console.log(chalk.blue('🔄 Processing prompt...'));
+      }
       
-      // For now, return a simple response
-      const response = `Processed: ${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}`;
+      // Use the voice system to process the prompt
+      let response: string;
+      
+      if (options.voices && Array.isArray(options.voices) && options.voices.length > 0) {
+        // Multi-voice processing
+        const solutions = await this.context.voiceSystem.generateMultiVoiceSolutions(
+          options.voices,
+          prompt,
+          { 
+            workingDirectory: process.cwd(),
+            parallel: true 
+          }
+        );
+        
+        // Combine the solutions into a coherent response
+        response = solutions.map((sol: any) => 
+          `**${sol.voice}**: ${sol.content}`
+        ).join('\n\n');
+      } else {
+        // Single voice processing using default voice
+        const voiceResponse = await this.context.voiceSystem.generateSingleVoiceResponse(
+          'explorer', // Default voice
+          prompt,
+          this.context.modelClient // Pass the actual client, not options
+        );
+        
+        response = voiceResponse.content || 'No response generated';
+      }
       
       if (!options.silent) {
         console.log(chalk.green('✅ Processing complete'));
@@ -1229,7 +1203,10 @@ export class CLI implements REPLInterface {
       
       return response;
     } catch (error) {
-      console.error(chalk.red('❌ Processing failed:'), error);
+      if (!options.silent) {
+        console.error(chalk.red('❌ Processing failed:'), error);
+      }
+      logger.error('Prompt processing failed in CLI:', error);
       throw error;
     }
   }
@@ -1247,12 +1224,16 @@ export class CLI implements REPLInterface {
   /**
    * Show slash command help
    */
-  private showSlashHelp(): void {
-    console.log(chalk.cyan('🔧 Available Slash Commands:'));
-    console.log('/audit - Switch to auditor mode');
-    console.log('/write - Switch to writer mode'); 
-    console.log('/auto - Switch to auto mode');
-    console.log('/help - Show this help');
+  private showSlashHelp(): string {
+    const helpText = [
+      '🔧 Available Slash Commands:',
+      '/audit - Switch to auditor mode',
+      '/write - Switch to writer mode',
+      '/auto - Switch to auto mode',
+      '/help - Show this help'
+    ].join('\n');
+    console.log(chalk.cyan(helpText));
+    return helpText;
   }
 
   /**

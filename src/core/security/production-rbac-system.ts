@@ -896,12 +896,72 @@ export class ProductionRBACSystem extends EventEmitter {
       this.roleCache.clear();
     }, 60 * 60 * 1000);
   }
+
+  /**
+   * Check if user has specific permission
+   */
+  async hasPermission(userId: string, permission: string, resource?: string): Promise<boolean> {
+    try {
+      const userPermissions = await this.getUserPermissions(userId);
+      return userPermissions.includes(permission) || userPermissions.includes('*');
+    } catch (error) {
+      console.error('Error checking permission:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all users
+   */
+  async getUsers(): Promise<User[]> {
+    try {
+      const query = 'SELECT * FROM users WHERE status != \'deleted\' ORDER BY username';
+      const results = await this.db.query(query);
+      return results.rows.map(row => this.mapDatabaseUser(row));
+    } catch (error) {
+      console.error('Error getting users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Create new user
+   */
+  async createUser(userData: { username: string; email: string; password?: string }): Promise<User> {
+    const hashedPassword = userData.password ? 
+      await bcrypt.hash(userData.password, this.saltRounds) : null;
+    
+    const query = `
+      INSERT INTO users (username, email, password_hash, status, roles, metadata, created_at, updated_at)
+      VALUES ($1, $2, $3, 'active', '["user"]', '{}', NOW(), NOW())
+      RETURNING *
+    `;
+    
+    const result = await this.db.query(query, [
+      userData.username,
+      userData.email,
+      hashedPassword
+    ]);
+    
+    return this.mapDatabaseUser(result.rows[0]);
+  }
+
+  async assignRoleToUser(userId: string, role: string): Promise<void> {
+    const query = `
+      INSERT INTO user_roles (user_id, role)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id, role) DO NOTHING
+    `;
+    
+    await this.db.query(query, [userId, role]);
+    logger.info('Role assigned to user', { userId, role });
+  }
 }
 
 export default ProductionRBACSystem;
 export { ProductionRBACSystem as RBACSystem };
 
-// Type aliases for backward compatibility with old RBAC system imports
+// Type aliases for backward compatibility
 export interface Session {
   id: string;
   userId: string;

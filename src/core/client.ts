@@ -8,6 +8,7 @@ export {
 } from '../refactor/unified-model-client.js';
 
 // Use the local UnifiedClientConfig from types.ts
+import type { UnifiedClientConfig } from './types.js';
 export type { UnifiedClientConfig } from './types.js';
 
 // Export a default config creator function

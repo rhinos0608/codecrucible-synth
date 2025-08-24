@@ -8,6 +8,7 @@ import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice
 import { getErrorMessage } from '../utils/error-utils.js';
 import { accessSync } from 'fs';
 import { execSync } from 'child_process';
+import { LivingSpiralCoordinator } from '../core/living-spiral-coordinator.js';
 
 interface Voice {
   id: string;
@@ -939,5 +940,26 @@ Focus on the ${phase} aspect of this task. Provide detailed ${phase} considerati
 
     const candidates = phaseVoices[phase] || ['explorer', 'developer', 'maintainer'];
     return candidates.slice(0, count);
+  }
+
+  /**
+   * Get a voice perspective for council sessions
+   */
+  async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
+    const voice = this.getVoice(voiceId);
+    if (!voice) {
+      throw new Error(`Voice ${voiceId} not found`);
+    }
+
+    // Simple perspective generation - in real implementation would use the model
+    return {
+      voiceId,
+      position: `${voice.name} perspective on: ${prompt}`,
+      confidence: 0.8,
+      reasoning: `Analysis from ${voice.name} viewpoint`,
+      supportingEvidence: [],
+      concerns: [],
+      alternatives: []
+    };
   }
 }

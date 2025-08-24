@@ -9,6 +9,11 @@ export class ProviderManager {
         this.providerRepository = new ProviderRepository();
     }
 
+    async initialize(): Promise<void> {
+        // Initialize with empty providers array if none specified
+        await this.initializeProviders([]);
+    }
+
     async initializeProviders(providers: ProviderConfig[]): Promise<void> {
         logger.info('Starting background provider initialization');
         const startTime = Date.now();
@@ -137,5 +142,9 @@ export class ProviderManager {
 
     public getProviders(): Map<string, any> {
         return this.providerRepository.getAvailableProviders();
+    }
+
+    public getProviderRepository(): IProviderRepository {
+        return this.providerRepository;
     }
 }

@@ -325,7 +325,7 @@ export class AWSProvider {
     try {
       const command = new AWS.RunInstancesCommand({
         ImageId: await this.getLatestAMI(),
-        InstanceType: instanceType,
+        InstanceType: instanceType as any,
         MinCount: count,
         MaxCount: count,
         KeyName: process.env.AWS_KEY_PAIR_NAME,

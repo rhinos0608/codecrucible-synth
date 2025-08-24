@@ -188,10 +188,10 @@ Break it down into:
 Provide a clear, structured breakdown that eliminates unnecessary complexity.
 `;
 
-    const output = await this.modelClient.generate(collapsePrompt);
+    const response = await this.modelClient.generate({ prompt: collapsePrompt });
 
     return {
-      output,
+      output: response.content,
       voices: ['explorer'],
     };
   }
@@ -270,10 +270,10 @@ Your synthesis should:
 Deliver a comprehensive synthesis that represents the collective wisdom of the council.
 `;
 
-    const output = await this.modelClient.generate(synthesisPrompt);
+    const response = await this.modelClient.generate({ prompt: synthesisPrompt });
 
     return {
-      output,
+      output: response.content,
       voices: [...council.voices, 'architect'],
     };
   }
@@ -303,10 +303,10 @@ Provide:
 Focus on practical, executable solutions that can be immediately implemented.
 `;
 
-    const output = await this.modelClient.generate(rebirthPrompt);
+    const response = await this.modelClient.generate({ prompt: rebirthPrompt });
 
     return {
-      output,
+      output: response.content,
       voices: [...synthesis.voices, 'implementor'],
     };
   }
@@ -345,7 +345,7 @@ Provide critical reflection on:
 Be honest about quality and provide specific guidance for next steps.
 `;
 
-    const reflectionContent = await this.modelClient.generate(reflectionPrompt);
+    const reflectionContent = await this.modelClient.generate({ prompt: reflectionPrompt });
 
     // Combine rebirth output with reflection insights
     const finalOutput = `

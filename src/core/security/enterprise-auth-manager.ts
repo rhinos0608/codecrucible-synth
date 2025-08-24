@@ -154,7 +154,8 @@ export class EnterpriseAuthManager {
         };
       }
 
-      const { session, user } = authResult;
+      const { user } = authResult;
+      const session = this.createSession(user, request.ipAddress);
 
       // MFA check if required
       if (this.config.requireMFA && !request.mfaCode) {
@@ -166,7 +167,7 @@ export class EnterpriseAuthManager {
       }
 
       if (this.config.requireMFA && request.mfaCode) {
-        const mfaValid = await this.validateMFA(user.id, request.mfaCode);
+        const mfaValid = await this.validateMFA(user?.id!, request.mfaCode);
         if (!mfaValid) {
           this.recordFailedAttempt(rateLimitKey);
           return {
@@ -177,10 +178,10 @@ export class EnterpriseAuthManager {
       }
 
       // Session management
-      await this.manageUserSessions(user.id, session.id);
+      await this.manageUserSessions(user?.id!, session.id);
 
       // Generate JWT tokens
-      const accessToken = this.generateAccessToken(user, session);
+      const accessToken = this.generateAccessToken(user!, session);
       const refreshToken = this.generateRefreshToken(session);
 
       // Store session
@@ -190,8 +191,8 @@ export class EnterpriseAuthManager {
       this.rateLimitTracker.delete(rateLimitKey);
 
       logger.info('User authenticated successfully', {
-        userId: user.id,
-        username: user.username,
+        userId: user?.id!,
+        username: user?.username!,
         sessionId: session.id,
         ipAddress: request.ipAddress,
       });
@@ -250,8 +251,8 @@ export class EnterpriseAuthManager {
 
       // Get user info
       const users = this.rbac.getUsers();
-      const user = users.find(u => u.id === session.userId);
-      if (!user || user.status !== 'active') {
+      const user = (await users).find(u => u.id === session.userId);
+      if (!user || user?.status !== 'active') {
         return {
           valid: false,
           error: 'User not found or inactive',
@@ -263,7 +264,7 @@ export class EnterpriseAuthManager {
 
       return {
         valid: true,
-        user: user as User,
+        user: user!,
         session,
         permissions: session.permissions,
       };
@@ -292,8 +293,8 @@ export class EnterpriseAuthManager {
       }
 
       const users = this.rbac.getUsers();
-      const user = users.find(u => u.id === session.userId);
-      if (!user || user.status !== 'active') {
+      const user = (await users).find(u => u.id === session.userId);
+      if (!user || user?.status !== 'active') {
         return {
           success: false,
           error: 'User not found or inactive',
@@ -301,7 +302,7 @@ export class EnterpriseAuthManager {
       }
 
       // Generate new access token
-      const newAccessToken = this.generateAccessToken(user as User, session);
+      const newAccessToken = this.generateAccessToken(user!, session);
 
       // Optionally rotate refresh token
       const newRefreshToken = this.generateRefreshToken(session);
@@ -309,7 +310,7 @@ export class EnterpriseAuthManager {
 
       return {
         success: true,
-        user: user as User,
+        user: user!,
         session,
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
@@ -532,8 +533,8 @@ export class EnterpriseAuthManager {
   private generateAccessToken(user: User, session: Session): string {
     try {
       const payload = {
-        userId: user.id,
-        username: user.username,
+        userId: user?.id!,
+        username: user?.username!,
         sessionId: session.id,
         permissions: session.permissions,
         roles: session.roles,
@@ -703,17 +704,39 @@ export class EnterpriseAuthManager {
   /**
    * Get authentication statistics
    */
-  getAuthStats(): {
+  async getAuthStats(): Promise<{
     activeSessions: number;
     activeAPIKeys: number;
     rateLimitedIPs: number;
     totalUsers: number;
-  } {
+  }> {
     return {
       activeSessions: this.activeSessions.size,
       activeAPIKeys: this.apiKeys.size,
       rateLimitedIPs: this.rateLimitTracker.size,
-      totalUsers: this.rbac.getUsers().length,
+      totalUsers: (await this.rbac.getUsers()).length,
+    };
+  }
+
+  /**
+   * Create a new session for authenticated user
+   */
+  private createSession(user: User | undefined, ipAddress?: string): Session {
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+    
+    return {
+      id: sessionId,
+      userId: user?.id || '',
+      ipAddress: ipAddress || '',
+      createdAt: now,
+      lastActivity: now,
+      expiresAt,
+      isActive: true,
+      permissions: [],
+      roles: [],
+      refreshToken: crypto.randomBytes(32).toString('hex'),
     };
   }
 

@@ -303,8 +303,8 @@ export class ProcessManagementTool extends BaseTool {
       const { SecurityAuditLogger } = await import('../security/security-audit-logger.js');
       const { SecretsManager } = await import('../security/secrets-manager.js');
       const secretsManager = new SecretsManager();
-      const rbacSystem = new RBACSystem(secretsManager);
-      const auditLogger = new SecurityAuditLogger(secretsManager);
+      const rbacSystem = new RBACSystem(null as any, secretsManager);
+      const auditLogger = new SecurityAuditLogger(secretsManager, './audit-logs');
       const secureToolFactory = new SecureToolFactory(rbacSystem, auditLogger);
       const terminalTool = secureToolFactory.createTerminalTool(this.agentContext);
 
@@ -607,8 +607,8 @@ export class PackageManagerTool extends BaseTool {
       const { SecurityAuditLogger } = await import('../security/security-audit-logger.js');
       const { SecretsManager } = await import('../security/secrets-manager.js');
       const secretsManager = new SecretsManager();
-      const rbacSystem = new RBACSystem(secretsManager);
-      const auditLogger = new SecurityAuditLogger(secretsManager);
+      const rbacSystem = new RBACSystem(null as any, secretsManager);
+      const auditLogger = new SecurityAuditLogger(secretsManager, './audit-logs');
       const secureToolFactory = new SecureToolFactory(rbacSystem, auditLogger);
       const terminalTool = secureToolFactory.createTerminalTool(this.agentContext);
       const result = await terminalTool.execute({

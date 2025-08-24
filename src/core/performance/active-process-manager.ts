@@ -6,6 +6,7 @@
 import { Logger } from '../logger.js';
 import { EventEmitter } from 'events';
 import { HardwareAwareModelSelector } from './hardware-aware-model-selector.js';
+import { UserWarningSystem } from '../monitoring/user-warning-system.js';
 import * as os from 'os';
 
 export interface ActiveProcess {
@@ -41,6 +42,7 @@ export interface ProcessTerminationEvent {
 export class ActiveProcessManager extends EventEmitter {
   private logger: Logger;
   private hardwareSelector: HardwareAwareModelSelector;
+  private userWarningSystem: UserWarningSystem;
   private activeProcesses: Map<string, ActiveProcess> = new Map();
   private resourceMonitorInterval: NodeJS.Timeout | null = null;
   private thresholds: ResourceThresholds;
@@ -53,13 +55,18 @@ export class ActiveProcessManager extends EventEmitter {
     super();
     this.logger = new Logger('ActiveProcessManager');
     this.hardwareSelector = hardwareSelector;
+    this.userWarningSystem = new UserWarningSystem({
+      memoryWarningThreshold: 0.85, // Warn at 85% memory (industry standard)
+      repetitiveToolThreshold: 15,   // Warn after 15 uses of same tool  
+      longRunningWarningInterval: 1800000, // 30 minute intervals
+    });
 
     this.thresholds = {
-      memoryWarning: 0.8, // 80% - early warning (less aggressive)
-      memoryCritical: 0.9, // 90% - start optimizing
-      memoryEmergency: 0.95, // 95% - emergency model switch
-      cpuWarning: 0.75, // 75%
-      cpuCritical: 0.85, // 85%
+      memoryWarning: 0.99, // 99% - only warn at extreme usage 
+      memoryCritical: 0.995, // 99.5% - only critical at extreme usage
+      memoryEmergency: 0.999, // 99.9% - virtually never trigger (AI-friendly)
+      cpuWarning: 0.95, // 95%
+      cpuCritical: 0.98, // 98%
     };
 
     this.startResourceMonitoring();
@@ -92,8 +99,8 @@ export class ActiveProcessManager extends EventEmitter {
       }
     );
 
-    // Check if we should immediately terminate due to current resource pressure
-    this.checkResourcePressure();
+    // DISABLED: Immediate resource pressure check disabled to allow AI requests to start
+    // this.checkResourcePressure();
 
     return activeProcess;
   }
@@ -119,7 +126,7 @@ export class ActiveProcessManager extends EventEmitter {
       } catch (error) {
         console.error('Resource monitoring error:', error);
       }
-    }, 2000); // Check every 2 seconds for responsive memory management
+    }, 60000); // Check every 60 seconds (reduced frequency to allow AI requests to complete)
 
     // Prevent the interval from keeping the process alive
     if (this.resourceMonitorInterval.unref) {
@@ -128,7 +135,7 @@ export class ActiveProcessManager extends EventEmitter {
   }
 
   /**
-   * Check current resource usage and take action if needed
+   * Check current resource usage and warn user if needed (NEVER TERMINATE)
    */
   private checkResourcePressure(): void {
     if (this.isTerminating) return;
@@ -140,18 +147,16 @@ export class ActiveProcessManager extends EventEmitter {
       `Resource usage: Memory ${(memoryUsage * 100).toFixed(1)}%, CPU ${(cpuUsage * 100).toFixed(1)}%`
     );
 
-    // Memory pressure handling
-    if (memoryUsage >= this.thresholds.memoryEmergency) {
-      this.handleEmergencyMemoryPressure(memoryUsage);
-    } else if (memoryUsage >= this.thresholds.memoryCritical) {
-      this.handleCriticalMemoryPressure(memoryUsage);
-    } else if (memoryUsage >= this.thresholds.memoryWarning) {
-      this.handleMemoryWarning(memoryUsage);
+    // INDUSTRY STANDARD: Only warn users, never terminate processes
+    this.userWarningSystem.checkMemoryUsage(memoryUsage);
+    
+    // Log for debugging but don't take any termination actions
+    if (memoryUsage >= 0.90) {
+      this.logger.info(`High memory usage: ${(memoryUsage * 100).toFixed(1)}% - continuing normally`);
     }
-
-    // CPU pressure handling
-    if (cpuUsage >= this.thresholds.cpuCritical) {
-      this.handleCriticalCpuPressure(cpuUsage);
+    
+    if (cpuUsage >= 0.90) {
+      this.logger.info(`High CPU usage: ${(cpuUsage * 100).toFixed(1)}% - continuing normally`);
     }
   }
 

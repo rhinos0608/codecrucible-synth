@@ -417,11 +417,6 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   private async detectRealIssues(): Promise<string> {
     const issues: string[] = [];
 
-    // Check for the hanging generateText issue we discovered
-    issues.push(
-      '🔴 **Critical**: Text generation method hanging - blocks CLI execution'
-    );
-
     // Check for TypeScript strict mode
     const fs = await import('fs');
     const path = await import('path');
@@ -444,9 +439,73 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
       issues.push(
         '🟡 **Warning**: Limited test coverage - tests directory structure needs expansion'
       );
+    } else {
+      // Count actual test files
+      try {
+        const { execSync } = await import('child_process');
+        const testFileCount = execSync('find tests -name "*.test.ts" -o -name "*.spec.ts" | wc -l', {
+          cwd: this.workingDirectory,
+          encoding: 'utf-8'
+        }).trim();
+        
+        if (parseInt(testFileCount) < 10) {
+          issues.push(`🟡 **Warning**: Only ${testFileCount} test files found - consider expanding test coverage`);
+        }
+      } catch (error) {
+        // Silently continue
+      }
     }
 
-    return issues.join('\n');
+    // Check for missing environment variables
+    const envExamplePath = path.join(this.workingDirectory, '.env.example');
+    const envPath = path.join(this.workingDirectory, '.env');
+    if (fs.existsSync(envExamplePath) && !fs.existsSync(envPath)) {
+      issues.push('🟠 **Configuration**: No .env file found - some features may be limited');
+    }
+
+    // Check package.json for outdated patterns
+    const packagePath = path.join(this.workingDirectory, 'package.json');
+    if (fs.existsSync(packagePath)) {
+      try {
+        const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
+        
+        // Check for missing scripts
+        const scripts = packageJson.scripts || {};
+        if (!scripts.test) {
+          issues.push('🟡 **Warning**: No test script defined in package.json');
+        }
+        if (!scripts.lint) {
+          issues.push('🟡 **Warning**: No lint script defined in package.json');
+        }
+        
+        // Check Node version requirements
+        if (!packageJson.engines?.node) {
+          issues.push('🟠 **Compatibility**: No Node.js version requirement specified');
+        }
+      } catch (error) {
+        // Continue
+      }
+    }
+
+    // Check for large files that might impact performance
+    try {
+      const { execSync } = await import('child_process');
+      const largeFiles = execSync('find . -type f -size +1M -not -path "./node_modules/*" -not -path "./.git/*" | head -5', {
+        cwd: this.workingDirectory,
+        encoding: 'utf-8'
+      }).trim();
+      
+      if (largeFiles) {
+        const fileCount = largeFiles.split('\n').filter(f => f).length;
+        if (fileCount > 0) {
+          issues.push(`🟠 **Performance**: ${fileCount} large files (>1MB) detected - consider optimization`);
+        }
+      }
+    } catch (error) {
+      // Silently continue
+    }
+
+    return issues.length > 0 ? issues.join('\n') : '✅ No critical issues detected';
   }
 
   /**
@@ -520,17 +579,12 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     dependencyAnalysis: any
   ): Promise<string> {
     const recommendations: string[] = [];
+    let priority = 1;
 
-    // Critical recommendations based on real analysis
-    recommendations.push(
-      '1. **URGENT**: Fix text generation method hanging issue to restore full functionality'
-    );
-
+    // Recommendations based on actual analysis
     if (testAnalysis.estimatedCoverage < 50) {
       recommendations.push(
-        '2. **High Priority**: Expand test coverage to 70%+ (currently ~' +
-          testAnalysis.estimatedCoverage +
-          '%)'
+        `${priority++}. **High Priority**: Expand test coverage to 70%+ (currently ~${testAnalysis.estimatedCoverage}%)`
       );
     }
 
@@ -545,13 +599,13 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
           const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
           if (tsconfig.compilerOptions?.strict !== true) {
             recommendations.push(
-              '3. **Medium Priority**: Enable TypeScript strict mode for better type safety'
+              `${priority++}. **Medium Priority**: Enable TypeScript strict mode for better type safety`
             );
           }
         } catch (error) {
           // If we can't parse tsconfig, suggest enabling strict mode as a precaution
           recommendations.push(
-            '3. **Medium Priority**: Verify TypeScript strict mode configuration'
+            `${priority++}. **Medium Priority**: Verify TypeScript strict mode configuration`
           );
         }
       }
@@ -559,13 +613,29 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     if (dependencyAnalysis.devDeps > dependencyAnalysis.prodDeps * 2) {
       recommendations.push(
-        '4. **Low Priority**: Review development dependencies - high dev/prod ratio'
+        `${priority++}. **Low Priority**: Review development dependencies - high dev/prod ratio`
       );
     }
 
-    recommendations.push(
-      '5. **Enhancement**: Implement automated code quality gates in CI/CD pipeline'
-    );
+    // Add general enhancement recommendations
+    if (priority <= 3) {
+      recommendations.push(
+        `${priority++}. **Enhancement**: Implement automated code quality gates in CI/CD pipeline`
+      );
+    }
+    
+    // Add more dynamic recommendations based on actual findings
+    if (codeMetrics.totalLines > 100000) {
+      recommendations.push(
+        `${priority++}. **Architecture**: Consider modularization - codebase exceeds 100K lines`
+      );
+    }
+    
+    if (dependencyAnalysis.prodDeps > 100) {
+      recommendations.push(
+        `${priority++}. **Dependencies**: Review production dependencies (${dependencyAnalysis.prodDeps} packages) for optimization opportunities`
+      );
+    }
 
     return recommendations.join('\n');
   }

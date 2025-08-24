@@ -422,7 +422,7 @@ export class SecureCouncilDecisionEngine extends CouncilDecisionEngine {
     }
 
     // Calculate consensus
-    const consensusReached = this.calculateConsensus(safePerspectives, config.requireConsensus);
+    const consensusReached = this.calculateConsensusBoolean(safePerspectives, config.requireConsensus);
 
     // Synthesize final decision
     const synthesizedDecision = await this.synthesizeFromPerspectives(safePerspectives);
@@ -443,7 +443,7 @@ export class SecureCouncilDecisionEngine extends CouncilDecisionEngine {
       participants: [], // Will be set by caller
       perspectives: safePerspectives,
       synthesizedDecision,
-      consensusReached,
+      consensusReached: this.calculateConsensusInternal(safePerspectives) > 0.7,
       confidence: this.calculateOverallConfidence(safePerspectives),
       securityValidation,
       executionMetrics,
@@ -515,7 +515,14 @@ export class SecureCouncilDecisionEngine extends CouncilDecisionEngine {
     };
   }
 
-  private calculateConsensus(perspectives: VoicePerspective[], requireConsensus: boolean): boolean {
+  // Implement our own consensus calculation since base method is private
+  private calculateConsensusInternal(perspectives: any[]): number {
+    if (perspectives.length === 0) return 0;
+    const avgConfidence = perspectives.reduce((sum, p) => sum + (p.confidence || 0), 0) / perspectives.length;
+    return Math.min(avgConfidence, 1.0);
+  }
+  
+  private calculateConsensusBoolean(perspectives: VoicePerspective[], requireConsensus: boolean): boolean {
     if (!requireConsensus) return true;
 
     // Simple consensus calculation based on similarity of responses

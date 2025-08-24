@@ -433,7 +433,7 @@ export class AuthMiddleware {
    */
   private async ensureDefaultAdminUser(): Promise<void> {
     try {
-      const users = this.rbacSystem.getUsers();
+      const users = await this.rbacSystem.getUsers();
       const adminExists = users.some(
         user => user.roles.includes('admin') || user.username === 'admin'
       );
@@ -441,12 +441,15 @@ export class AuthMiddleware {
       if (!adminExists) {
         const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'Admin123!@#';
 
-        const adminUserId = await this.rbacSystem.createUser({
+        const adminUser = await this.rbacSystem.createUser({
           username: 'admin',
           email: 'admin@codecrucible.local',
-          roles: ['admin', 'developer'],
-          status: 'active',
+          password: defaultPassword
         });
+
+        // Assign admin roles separately
+        await this.rbacSystem.assignRoleToUser(adminUser.id, 'admin');
+        await this.rbacSystem.assignRoleToUser(adminUser.id, 'developer');
 
         logger.warn('Default admin user created', {
           username: 'admin',

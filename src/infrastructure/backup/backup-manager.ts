@@ -3,7 +3,7 @@
  * Integrates with existing DatabaseManager for comprehensive data protection
  */
 
-import { DatabaseManager } from '../../database/database-manager.js';
+import { ProductionDatabaseManager as DatabaseManager } from '../../database/production-database-manager.js';
 import { logger } from '../../core/logger.js';
 import { join, dirname } from 'path';
 import { promises as fs, existsSync } from 'fs';
@@ -573,14 +573,18 @@ export class BackupManager {
     
     try {
       // Create backup manifest
-      const manifest = {
-        id: backupId,
-        timestamp: new Date().toISOString(),
-        files: sourcePaths.map(path => ({
+      const fileStats = await Promise.all(
+        sourcePaths.map(async (path) => ({
           originalPath: path,
           fileName: path.split('/').pop(),
           size: (await fs.stat(path)).size,
-        })),
+        }))
+      );
+      
+      const manifest = {
+        id: backupId,
+        timestamp: new Date().toISOString(),
+        files: fileStats,
         version: '3.8.10',
         encrypted: this.config.encryptionEnabled,
         compressed: this.config.compressionEnabled,
@@ -611,8 +615,8 @@ export class BackupManager {
       await archive.finalize();
       
       // Wait for archive to complete
-      await new Promise((resolve, reject) => {
-        output.on('close', resolve);
+      await new Promise<void>((resolve, reject) => {
+        output.on('close', () => resolve());
         output.on('error', reject);
         archive.on('error', reject);
       });
@@ -716,29 +720,6 @@ export class BackupManager {
     return hash.digest('hex');
   }
 
-  /**
-   * Store backup to all configured destinations
-   */
-  private async storeBackupToDestinations(
-    sourcePath: string,
-    metadata: BackupMetadata
-  ): Promise<void> {
-    for (const destination of this.config.destinations) {
-      if (!destination.enabled) continue;
-
-      try {
-        switch (destination.type) {
-          case 'local':
-            await this.storeBackupLocal(sourcePath, destination, metadata);
-            break;
-          default:
-            logger.warn(`Unsupported backup destination type: ${destination.type}`);
-        }
-      } catch (error) {
-        logger.error(`Failed to store backup to ${destination.type}:`, error);
-      }
-    }
-  }
 
   /**
    * Store backup to all configured destinations
@@ -946,10 +927,11 @@ export class BackupManager {
     
     // Extract tar.gz archive
     try {
+      // Use node-tar extract API
       await tar.extract({
         file: backupPath,
         cwd: extractDir,
-        gzip: backup.compressed,
+        ...(backup.compressed && { gzip: true })
       });
       
       logger.info(`Backup extracted to: ${extractDir}`);

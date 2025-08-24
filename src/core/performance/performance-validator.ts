@@ -161,8 +161,8 @@ export class PerformanceValidator {
         try {
           await this.hybridClient?.generate({
             prompt: task,
-            taskType: 'template',
-            complexity: 'simple',
+            taskType: 'generation',
+            // complexity: 'simple', // TODO: Add complexity to ModelRequest interface
           });
         } catch (error) {
           // Use estimated time if service unavailable
@@ -492,8 +492,8 @@ export class PerformanceValidator {
       try {
         const result = await this.hybridClient?.generate({
           prompt: testCase.prompt,
-          taskType: this.extractTaskType(testCase.prompt),
-          complexity: testCase.complexity as any,
+          taskType: this.extractTaskType(testCase.prompt) as any,
+          // complexity: testCase.complexity as any, // TODO: Add complexity to ModelRequest interface
         });
 
         if (result) {
@@ -561,7 +561,7 @@ export class PerformanceValidator {
       const beforeMemory = process.memoryUsage();
 
       try {
-        await this.hybridClient?.generate(task);
+        await this.hybridClient?.generate({ prompt: task });
       } catch (error) {
         // Continue measuring even if generation fails
       }

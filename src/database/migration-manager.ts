@@ -3,7 +3,7 @@
  * Extends existing database-manager.ts with migration capabilities
  */
 
-import { DatabaseManager } from './database-manager.js';
+import { ProductionDatabaseManager as DatabaseManager } from './production-database-manager.js';
 import { logger } from '../core/logger.js';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';

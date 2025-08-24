@@ -243,10 +243,10 @@ export async function main() {
       return;
     }
 
-    // For other commands, do full initialization
+    // For other commands, do full initialization with DI system
     console.log('🚀 Initializing CodeCrucible Synth...');
     const startTime = Date.now();
-    const { cli, context } = await initializeCLIContext();
+    const { cli, context } = await initializeCLIContextWithDI();
     const initTime = Date.now() - startTime;
     console.log(`✅ Initialized in ${initTime}ms`);
 

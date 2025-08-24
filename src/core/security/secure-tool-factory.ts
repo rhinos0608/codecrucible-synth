@@ -370,9 +370,11 @@ class SecureE2BCodeExecutionTool implements BaseTool {
         sessionId: this.agentContext.sessionId,
         resource: 'ai_model',
         action: 'execute',
-        data: { tool: 'code_execution', language: args.language },
-        ipAddress: this.agentContext.ipAddress,
-        userAgent: this.agentContext.userAgent,
+        context: {
+          data: { tool: 'code_execution', language: args.language },
+          ipAddress: this.agentContext.ipAddress,
+          userAgent: this.agentContext.userAgent,
+        },
       });
 
       if (!authResult.granted) {
@@ -542,9 +544,11 @@ class SecureE2BTerminalTool implements BaseTool {
         sessionId: this.agentContext.sessionId,
         resource: 'system',
         action: 'execute',
-        data: { tool: 'terminal', command: args.command },
-        ipAddress: this.agentContext.ipAddress,
-        userAgent: this.agentContext.userAgent,
+        context: {
+          data: { tool: 'terminal', command: args.command },
+          ipAddress: this.agentContext.ipAddress,
+          userAgent: this.agentContext.userAgent,
+        },
       });
 
       if (!authResult.granted) {

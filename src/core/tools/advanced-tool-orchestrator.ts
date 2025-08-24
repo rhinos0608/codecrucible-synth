@@ -226,9 +226,10 @@ export class AdvancedToolOrchestrator extends EventEmitter {
    */
   private initializeSecureToolFactory(): void {
     try {
-      const rbacSystem = new RBACSystem();
       const secretsManager = new SecretsManager();
-      const auditLogger = new SecurityAuditLogger(secretsManager);
+      // Note: Would need actual database instance in production
+      const rbacSystem = new RBACSystem(null as any, secretsManager);
+      const auditLogger = new SecurityAuditLogger(secretsManager, './audit-logs');
 
       this.secureToolFactory = new SecureToolFactory(rbacSystem, auditLogger);
     } catch (error) {

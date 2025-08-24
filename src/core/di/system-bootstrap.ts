@@ -178,8 +178,8 @@ export class SystemBootstrap {
         // Return default configuration without importing client.ts
         return {
           providers: [
-            { type: 'ollama', endpoint: 'http://localhost:11434' },
-            { type: 'lm-studio', endpoint: 'http://localhost:1234' },
+            { type: 'ollama', endpoint: 'http://localhost:11434', timeout: 7200000 }, // 2 hour timeout - industry standard
+            { type: 'lm-studio', endpoint: 'http://localhost:1234', timeout: 7200000 }, // 2 hour timeout - industry standard
           ],
           executionMode: 'auto',
           fallbackChain: ['ollama', 'lm-studio'],
@@ -259,11 +259,21 @@ export class SystemBootstrap {
 
     this.container.register(
       PROVIDER_REPOSITORY_TOKEN,
-      async () => {
+      async container => {
         const { ProviderRepository } = await import('../providers/provider-repository.js');
-        return new ProviderRepository();
+        const config = container.resolve(CLIENT_CONFIG_TOKEN);
+        const providerRepository = new ProviderRepository();
+        
+        // Initialize with provider configurations from CLIENT_CONFIG
+        await providerRepository.initialize(config.providers || []);
+        
+        return providerRepository;
       },
-      { lifecycle: 'singleton', lazy: true }
+      { 
+        lifecycle: 'singleton', 
+        lazy: true,
+        dependencies: [CLIENT_CONFIG_TOKEN.name]
+      }
     );
   }
 

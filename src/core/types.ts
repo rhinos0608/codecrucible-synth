@@ -1,5 +1,13 @@
 // Core Type Definitions for CodeCrucible Synth
 
+export interface StreamToken {
+  content: string;
+  finished?: boolean;
+  index: number;
+  timestamp: number;
+  metadata?: Record<string, any>;
+}
+
 export interface REPLInterface {
   showStatus(): void;
   listModels(): void;
@@ -29,6 +37,13 @@ export interface UnifiedClientConfig {
     maxInputLength: number;
     allowedCommands: string[];
   };
+  streaming?: {
+    enabled?: boolean;
+    bufferSize?: number;
+    flushInterval?: number;
+    chunkSize?: number;
+    timeout?: number;
+  };
 }
 
 export interface ModelRequest {
@@ -54,16 +69,23 @@ export interface ModelRequest {
   // Properties used for complexity analysis
   context?: Record<string, JsonValue>;
   files?: string[];
+  taskType?: 'analysis' | 'generation' | 'refactoring' | 'debug' | 'documentation' | 'testing';
 }
 
 export interface ModelResponse {
   content: string;
   model: string;
   provider?: string;
+  error?: string;
+  toolCalls?: any[];
   metadata?: {
     tokens: number;
     latency: number;
     quality?: number;
+    hybridRouting?: any;
+    selectedProvider?: string;
+    toolExecuted?: boolean;
+    toolResults?: any[];
   };
   tokens_used?: number;
   usage?: {
@@ -74,6 +96,7 @@ export interface ModelResponse {
   cached?: boolean;
   streamed?: boolean;
   processingTime?: number;
+  llmUsed?: string;
 }
 
 export interface ProjectContext {

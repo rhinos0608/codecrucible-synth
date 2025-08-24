@@ -3,8 +3,8 @@
  * Replaces the SQLite-based DatabaseManager with enterprise-grade database support
  */
 
-import { Pool, PoolClient, QueryResult } from 'pg';
-import { Knex, knex } from 'knex';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import knex, { Knex } from 'knex';
 import Redis from 'redis';
 import { logger } from '../core/logger.js';
 import { performance } from 'perf_hooks';
@@ -20,10 +20,9 @@ export interface ProductionDatabaseConfig {
   pool?: {
     min: number;
     max: number;
-    acquireTimeoutMillis: number;
+    idleTimeoutMillis: number;
     createTimeoutMillis: number;
     destroyTimeoutMillis: number;
-    idleTimeoutMillis: number;
     reapIntervalMillis: number;
     createRetryIntervalMillis: number;
   };
@@ -48,7 +47,7 @@ export interface ProductionDatabaseConfig {
 }
 
 export interface DatabaseTransaction {
-  query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>>;
+  query<T extends QueryResultRow = QueryResultRow>(sql: string, params?: any[]): Promise<QueryResult<T>>;
   commit(): Promise<void>;
   rollback(): Promise<void>;
 }
@@ -74,10 +73,9 @@ export class ProductionDatabaseManager {
       pool: {
         min: 2,
         max: 20,
-        acquireTimeoutMillis: 60000,
+        idleTimeoutMillis: 60000,
         createTimeoutMillis: 30000,
         destroyTimeoutMillis: 5000,
-        idleTimeoutMillis: 30000,
         reapIntervalMillis: 1000,
         createRetryIntervalMillis: 200,
       },
@@ -126,12 +124,7 @@ export class ProductionDatabaseManager {
         ssl: this.config.ssl,
         min: this.config.pool?.min || 2,
         max: this.config.pool?.max || 20,
-        acquireTimeoutMillis: this.config.pool?.acquireTimeoutMillis || 60000,
-        createTimeoutMillis: this.config.pool?.createTimeoutMillis || 30000,
-        destroyTimeoutMillis: this.config.pool?.destroyTimeoutMillis || 5000,
-        idleTimeoutMillis: this.config.pool?.idleTimeoutMillis || 30000,
-        reapIntervalMillis: this.config.pool?.reapIntervalMillis || 1000,
-        createRetryIntervalMillis: this.config.pool?.createRetryIntervalMillis || 200,
+        idleTimeoutMillis: this.config.pool?.idleTimeoutMillis || 60000,
       });
 
       // Test connection
@@ -157,7 +150,7 @@ export class ProductionDatabaseManager {
       },
       pool: this.config.pool,
       migrations: this.config.migrations,
-      acquireConnectionTimeout: this.config.pool?.acquireTimeoutMillis || 60000,
+      acquireConnectionTimeout: this.config.pool?.idleTimeoutMillis || 60000,
     });
   }
 
@@ -242,7 +235,7 @@ export class ProductionDatabaseManager {
   /**
    * Execute query with performance tracking and caching
    */
-  async query<T = any>(
+  async query<T extends QueryResultRow = QueryResultRow>(
     sql: string, 
     params: any[] = [], 
     options: QueryOptions = {}
@@ -318,7 +311,7 @@ export class ProductionDatabaseManager {
     await client.query('BEGIN');
 
     return {
-      query: async <T = any>(sql: string, params: any[] = []) => {
+      query: async <T extends QueryResultRow = QueryResultRow>(sql: string, params: any[] = []) => {
         return client.query<T>(sql, params);
       },
       commit: async () => {
@@ -674,6 +667,33 @@ export class ProductionDatabaseManager {
     ]);
 
     logger.info('All database connections closed');
+  }
+
+  /**
+   * Check if database manager is initialized
+   */
+  isInitialized(): boolean {
+    return this.masterPool !== null;
+  }
+
+  /**
+   * Get raw database instance for migrations
+   * Returns knex instance for raw SQL operations
+   */
+  getRawDb(): any {
+    if (!this.knexInstance) {
+      throw new Error('Database not initialized');
+    }
+    return this.knexInstance;
+  }
+
+  /**
+   * Backup database (stub for backup manager)
+   */
+  async backup(options?: any): Promise<string> {
+    // This is a stub - implement actual backup logic
+    logger.info('Database backup requested');
+    return 'backup-placeholder-path';
   }
 }
 

@@ -37,18 +37,12 @@ export interface IResourceCleanupManager {
   /**
    * Wait for active operations to complete
    */
-  waitForActiveOperations(
-    checkActive: () => number,
-    timeoutMs?: number
-  ): Promise<boolean>;
+  waitForActiveOperations(checkActive: () => number, timeoutMs?: number): Promise<boolean>;
 
   /**
    * Clear request queue with error messages
    */
-  clearRequestQueue(
-    queue: Array<{ reject: (error: Error) => void }>,
-    message?: string
-  ): void;
+  clearRequestQueue(queue: Array<{ reject: (error: Error) => void }>, message?: string): void;
 
   /**
    * Check if shutdown is in progress
@@ -64,7 +58,7 @@ export class ResourceCleanupManager extends EventEmitter implements IResourceCle
 
   constructor(config?: Partial<CleanupConfig>) {
     super();
-    
+
     this.config = {
       shutdownTimeoutMs: 10000, // 10 seconds default
       gracefulShutdown: true,
@@ -86,11 +80,11 @@ export class ResourceCleanupManager extends EventEmitter implements IResourceCle
     this.resources.push(resource);
     // Sort by priority (lower number = higher priority)
     this.resources.sort((a, b) => (a.priority || 99) - (b.priority || 99));
-    
-    logger.debug('Resource registered for cleanup', { 
-      name: resource.name, 
+
+    logger.debug('Resource registered for cleanup', {
+      name: resource.name,
       priority: resource.priority || 99,
-      totalResources: this.resources.length 
+      totalResources: this.resources.length,
     });
   }
 
@@ -114,30 +108,30 @@ export class ResourceCleanupManager extends EventEmitter implements IResourceCle
     for (const resource of this.resources) {
       try {
         logger.debug(`Shutting down ${resource.name}...`);
-        
+
         const cleanupPromise = Promise.resolve(resource.cleanup());
         const timeoutPromise = new Promise<void>((_, reject) => {
           setTimeout(() => reject(new Error('Cleanup timeout')), 5000);
         });
 
         await Promise.race([cleanupPromise, timeoutPromise]);
-        
+
         logger.debug(`✅ ${resource.name} shutdown complete`);
         this.emit('resource-shutdown', { name: resource.name, success: true });
       } catch (error) {
         const errorMessage = getErrorMessage(error);
         logger.error(`Failed to shutdown ${resource.name}:`, errorMessage);
         errors.push({ resource: resource.name, error: errorMessage });
-        this.emit('resource-shutdown', { 
-          name: resource.name, 
-          success: false, 
-          error: errorMessage 
+        this.emit('resource-shutdown', {
+          name: resource.name,
+          success: false,
+          error: errorMessage,
         });
       }
     }
 
     const duration = Date.now() - startTime;
-    
+
     if (errors.length > 0) {
       logger.warn(`Shutdown completed with ${errors.length} errors in ${duration}ms`, { errors });
       this.emit('shutdown-completed', { success: false, duration, errors });
@@ -175,7 +169,7 @@ export class ResourceCleanupManager extends EventEmitter implements IResourceCle
           logger.error(`Failed to destroy ${resource.name}:`, getErrorMessage(error));
         }
       })();
-      
+
       cleanupPromises.push(cleanupPromise);
     }
 
@@ -185,7 +179,7 @@ export class ResourceCleanupManager extends EventEmitter implements IResourceCle
         Promise.all(cleanupPromises),
         new Promise<void>((_, reject) => {
           setTimeout(() => reject(new Error('Destroy timeout')), this.config.shutdownTimeoutMs);
-        })
+        }),
       ]);
     } catch (error) {
       logger.error('Some resources failed to clean up:', getErrorMessage(error));
@@ -193,32 +187,29 @@ export class ResourceCleanupManager extends EventEmitter implements IResourceCle
 
     const duration = Date.now() - startTime;
     logger.info(`Emergency cleanup completed in ${duration}ms`);
-    
+
     // Clear resources and remove listeners
     this.resources = [];
     this.removeAllListeners();
-    
+
     this.emit('destroy-completed', { duration });
   }
 
   /**
    * Wait for active operations to complete
    */
-  async waitForActiveOperations(
-    checkActive: () => number,
-    timeoutMs?: number
-  ): Promise<boolean> {
+  async waitForActiveOperations(checkActive: () => number, timeoutMs?: number): Promise<boolean> {
     const timeout = timeoutMs || this.config.shutdownTimeoutMs;
     const startTime = Date.now();
-    
+
     logger.debug('Waiting for active operations to complete...');
-    
+
     while (checkActive() > 0 && Date.now() - startTime < timeout) {
       const remaining = checkActive();
       logger.debug(`Waiting for ${remaining} active operations...`);
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    
+
     const activeCount = checkActive();
     if (activeCount === 0) {
       logger.debug('All active operations completed');
@@ -237,20 +228,20 @@ export class ResourceCleanupManager extends EventEmitter implements IResourceCle
     message: string = 'System shutting down'
   ): void {
     const queueLength = queue.length;
-    
+
     if (queueLength === 0) {
       return;
     }
-    
+
     logger.info(`Clearing ${queueLength} queued requests`);
-    
+
     const error = new Error(message);
     for (const item of queue) {
       item.reject(error);
     }
-    
+
     queue.length = 0; // Clear the array
-    
+
     this.emit('queue-cleared', { count: queueLength, reason: message });
   }
 

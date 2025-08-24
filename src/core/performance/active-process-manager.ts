@@ -7,6 +7,7 @@ import { Logger } from '../logger.js';
 import { EventEmitter } from 'events';
 import { HardwareAwareModelSelector } from './hardware-aware-model-selector.js';
 import { UserWarningSystem } from '../monitoring/user-warning-system.js';
+import { resourceManager } from './resource-cleanup-manager.js';
 import * as os from 'os';
 
 export interface ActiveProcess {
@@ -44,7 +45,7 @@ export class ActiveProcessManager extends EventEmitter {
   private hardwareSelector: HardwareAwareModelSelector;
   private userWarningSystem: UserWarningSystem;
   private activeProcesses: Map<string, ActiveProcess> = new Map();
-  private resourceMonitorInterval: NodeJS.Timeout | null = null;
+  private resourceMonitorIntervalId: string | null = null;
   private thresholds: ResourceThresholds;
   private isTerminating = false;
   private modelSwitchInProgress = false;
@@ -57,12 +58,12 @@ export class ActiveProcessManager extends EventEmitter {
     this.hardwareSelector = hardwareSelector;
     this.userWarningSystem = new UserWarningSystem({
       memoryWarningThreshold: 0.85, // Warn at 85% memory (industry standard)
-      repetitiveToolThreshold: 15,   // Warn after 15 uses of same tool  
+      repetitiveToolThreshold: 15, // Warn after 15 uses of same tool
       longRunningWarningInterval: 1800000, // 30 minute intervals
     });
 
     this.thresholds = {
-      memoryWarning: 0.99, // 99% - only warn at extreme usage 
+      memoryWarning: 0.99, // 99% - only warn at extreme usage
       memoryCritical: 0.995, // 99.5% - only critical at extreme usage
       memoryEmergency: 0.999, // 99.9% - virtually never trigger (AI-friendly)
       cpuWarning: 0.95, // 95%
@@ -120,7 +121,7 @@ export class ActiveProcessManager extends EventEmitter {
    * Start monitoring system resources
    */
   private startResourceMonitoring(): void {
-    this.resourceMonitorInterval = setInterval(() => {
+    const monitorInterval = setInterval(() => {
       try {
         this.checkResourcePressure();
       } catch (error) {
@@ -129,9 +130,16 @@ export class ActiveProcessManager extends EventEmitter {
     }, 60000); // Check every 60 seconds (reduced frequency to allow AI requests to complete)
 
     // Prevent the interval from keeping the process alive
-    if (this.resourceMonitorInterval.unref) {
-      this.resourceMonitorInterval.unref();
+    if (monitorInterval.unref) {
+      monitorInterval.unref();
     }
+
+    // Register with resource cleanup manager for proper cleanup
+    this.resourceMonitorIntervalId = resourceManager.registerInterval(
+      monitorInterval,
+      'ActiveProcessManager',
+      'resource monitoring'
+    );
   }
 
   /**
@@ -149,13 +157,15 @@ export class ActiveProcessManager extends EventEmitter {
 
     // INDUSTRY STANDARD: Only warn users, never terminate processes
     this.userWarningSystem.checkMemoryUsage(memoryUsage);
-    
+
     // Log for debugging but don't take any termination actions
-    if (memoryUsage >= 0.90) {
-      this.logger.info(`High memory usage: ${(memoryUsage * 100).toFixed(1)}% - continuing normally`);
+    if (memoryUsage >= 0.9) {
+      this.logger.info(
+        `High memory usage: ${(memoryUsage * 100).toFixed(1)}% - continuing normally`
+      );
     }
-    
-    if (cpuUsage >= 0.90) {
+
+    if (cpuUsage >= 0.9) {
       this.logger.info(`High CPU usage: ${(cpuUsage * 100).toFixed(1)}% - continuing normally`);
     }
   }
@@ -434,9 +444,10 @@ export class ActiveProcessManager extends EventEmitter {
   destroy(): void {
     this.logger.info('Destroying ActiveProcessManager');
 
-    if (this.resourceMonitorInterval) {
-      clearInterval(this.resourceMonitorInterval);
-      this.resourceMonitorInterval = null;
+    // Cleanup resource monitoring interval using resource manager
+    if (this.resourceMonitorIntervalId) {
+      resourceManager.cleanup(this.resourceMonitorIntervalId);
+      this.resourceMonitorIntervalId = null;
     }
 
     // Emergency terminate all processes

@@ -1,6 +1,5 @@
-
-import { ModelRequest, ModelResponse, ProjectContext, StreamToken } from "../core/types.js";
-import { UnifiedModelClient } from "../core/client.js";
+import { ModelRequest, ModelResponse, ProjectContext, StreamToken } from '../core/types.js';
+import { UnifiedModelClient } from '../core/client.js';
 import { logger } from '../core/logger.js';
 import { getGlobalEnhancedToolIntegration } from '../core/tools/enhanced-tool-integration.js';
 import { getGlobalToolIntegration } from '../core/tools/tool-integration.js';
@@ -9,27 +8,27 @@ import { createHash } from 'crypto';
 import { getErrorMessage } from '../utils/error-utils.js';
 
 export class RequestHandler {
-    private client: UnifiedModelClient;
+  private client: UnifiedModelClient;
 
-    constructor(client: UnifiedModelClient) {
-        this.client = client;
-    }
+  constructor(client: UnifiedModelClient) {
+    this.client = client;
+  }
 
-    async makeRequest(request: any): Promise<any> {
-        return this.processRequest(request);
-    }
+  async makeRequest(request: any): Promise<any> {
+    return this.processRequest(request);
+  }
 
-    async synthesize(request: ModelRequest): Promise<ModelResponse> {
+  async synthesize(request: ModelRequest): Promise<ModelResponse> {
     // INTELLIGENT CACHING: Check cache with content-aware key generation
     const cacheKey = this.client.getCacheCoordinator().generateIntelligentCacheKey(request);
     const cached = await this.client.getCacheCoordinator().get(cacheKey);
     if (cached && this.client.getCacheCoordinator().shouldUseIntelligentCache(request)) {
       logger.debug('Returning cached response');
-      return { 
-        ...cached, 
+      return {
+        ...cached,
         cached: true,
         model: cached.model || 'unknown',
-        provider: cached.provider || 'unknown'
+        provider: cached.provider || 'unknown',
       } as ModelResponse;
     }
 
@@ -42,11 +41,9 @@ export class RequestHandler {
         const taskType = this.client.inferTaskType(request.prompt || '');
         const complexity = this.client.analyzeComplexity(request);
 
-        routingDecision = await this.client.getHybridRouter().routeTask(
-          taskType,
-          request.prompt || '',
-          this.client.convertToTaskMetrics(complexity)
-        );
+        routingDecision = await this.client
+          .getHybridRouter()
+          .routeTask(taskType, request.prompt || '', this.client.convertToTaskMetrics(complexity));
         selectedProvider = routingDecision.selectedLLM === 'lm-studio' ? 'lm-studio' : 'ollama';
 
         logger.info(
@@ -62,21 +59,28 @@ export class RequestHandler {
     // Try enhanced tool integration first, fallback to local tools
     const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
     const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
-    const supportsTools = this.client.modelSupportsTools((selectedProvider || 'ollama') as ProviderType);
+    const supportsTools = this.client.modelSupportsTools(
+      (selectedProvider || 'ollama') as ProviderType
+    );
     const tools = supportsTools && toolIntegration ? toolIntegration.getLLMFunctions() : [];
 
     // DEBUG: Log tool integration status
-    logger.debug('Tool debug info', {
+    logger.info('🔧 TOOL DEBUG: Tool integration status', {
       provider: selectedProvider,
       model: request.model,
       supportsTools,
-    });
-    logger.debug('Tool integration status', {
+      hasEnhanced: !!enhancedToolIntegration,
+      hasBasic: !!getGlobalToolIntegration(),
       hasIntegration: !!toolIntegration,
       toolCount: tools.length,
     });
     if (tools.length > 0) {
-      logger.debug('Available tools', { tools: tools.map(t => t.function.name) });
+      logger.info('🔧 TOOL DEBUG: Available tools for request', { 
+        toolNames: tools.map(t => t.function.name),
+        firstTool: tools[0]
+      });
+    } else {
+      logger.warn('🔧 TOOL DEBUG: No tools available for request!');
     }
 
     const modelRequest: ModelRequest = {
@@ -128,7 +132,7 @@ export class RequestHandler {
     return result;
   }
 
-    async processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
+  async processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
     logger.debug('processRequest started');
 
     // PERFORMANCE: Temporarily bypass semantic cache to fix hanging
@@ -141,7 +145,7 @@ export class RequestHandler {
     logger.debug('Cache bypass complete');
     const requestId = this.client.generateRequestId();
     logger.info(`📨 Processing request ${requestId}`, {
-      prompt: request.prompt.substring(0, 100) + '...',
+      prompt: `${request.prompt.substring(0, 100)}...`,
     });
 
     // CRITICAL SECURITY: ALWAYS validate input - cannot be bypassed
@@ -166,7 +170,11 @@ export class RequestHandler {
     // Register process with active process manager
     const estimatedMemory = this.client.estimateMemoryUsage(request);
     const process = this.client.getProcessManager().registerProcess({
-      type: this.client.getProcessType(request) as "analysis" | "generation" | "streaming" | "model_inference",
+      type: this.client.getProcessType(request) as
+        | 'analysis'
+        | 'generation'
+        | 'streaming'
+        | 'model_inference',
       modelName: this.client.getCurrentModel() || 'unknown',
       estimatedMemoryUsage: estimatedMemory,
       priority: this.client.getRequestPriority(request),
@@ -205,14 +213,14 @@ export class RequestHandler {
     }
   }
 
-    async streamRequest(
+  async streamRequest(
     request: ModelRequest,
     onToken: (token: StreamToken) => void,
     context?: ProjectContext
   ): Promise<ModelResponse> {
     const requestId = this.client.generateRequestId();
     logger.info(`🌊 Streaming request ${requestId}`, {
-      prompt: request.prompt.substring(0, 100) + '...',
+      prompt: `${request.prompt.substring(0, 100)}...`,
     });
 
     // CRITICAL SECURITY: ALWAYS validate input - cannot be bypassed
@@ -237,7 +245,9 @@ export class RequestHandler {
       });
 
       // Stream cached response progressively using StreamingManager
-      await this.client.getStreamingManager().startStream(cachedResponse.value, onToken, this.client.getDefaultConfig().streaming);
+      await this.client
+        .getStreamingManager()
+        .startStream(cachedResponse.value, onToken, this.client.getDefaultConfig().streaming);
 
       return {
         content: cachedResponse.value,
@@ -250,7 +260,9 @@ export class RequestHandler {
 
     // Determine execution strategy for streaming
     const strategy = this.client.determineExecutionStrategy(request);
-    logger.info(`🌊 Streaming strategy: ${(strategy as any).mode} with provider: ${(strategy as any).provider}`);
+    logger.info(
+      `🌊 Streaming strategy: ${(strategy as any).mode} with provider: ${(strategy as any).provider}`
+    );
 
     // Register process with active process manager
     const estimatedMemory = this.client.estimateMemoryUsage(request);
@@ -274,14 +286,12 @@ export class RequestHandler {
         if (!this.client.getHybridRouter()) {
           throw new Error('Hybrid router not initialized');
         }
-        const routingDecision = await this.client.getHybridRouter().routeTask(
-          'code_generation',
-          request.prompt,
-          {
+        const routingDecision = await this.client
+          .getHybridRouter()
+          .routeTask('code_generation', request.prompt, {
             requiresDeepAnalysis: false,
             estimatedProcessingTime: 10000,
-          }
-        );
+          });
         const providerResponse = await this.processRequestWithHybrid(request, routingDecision);
         responseContent = providerResponse.content || '';
 
@@ -295,7 +305,9 @@ export class RequestHandler {
         const fallbackProviderType = availableProviders.keys().next().value;
 
         if (fallbackProviderType) {
-          const fallbackProvider = this.client.getProviderManager().selectProvider(fallbackProviderType);
+          const fallbackProvider = this.client
+            .getProviderManager()
+            .selectProvider(fallbackProviderType);
           if (fallbackProvider) {
             // Fallback to basic response - actual provider processing would go through the client
             responseContent = `Processing request with ${fallbackProviderType} provider: ${request.prompt.substring(0, 100)}...`;
@@ -353,36 +365,29 @@ export class RequestHandler {
     }
   }
 
-    
   async executeWithFallback(
     requestId: string,
     request: ModelRequest,
     context: ProjectContext | undefined,
-    strategy: { mode: any; provider: any; timeout: any; complexity: any; },
+    strategy: { mode: any; provider: any; timeout: any; complexity: any },
     abortSignal?: AbortSignal
   ): Promise<ModelResponse> {
-    return this.client.getRequestExecutionManager().executeWithFallback(
-      requestId,
-      request,
-      context,
-      strategy,
-      abortSignal
-    );
+    return this.client
+      .getRequestExecutionManager()
+      .executeWithFallback(requestId, request, context, strategy, abortSignal);
   }
 
-
-    
   async queueRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse> {
-    return this.client.getRequestProcessingCoreManager().queueRequest(
-      request,
-      this.client.getActiveRequests().size,
-      (req, ctx) => this.processRequest(req, ctx),
-      context
-    );
+    return this.client
+      .getRequestProcessingCoreManager()
+      .queueRequest(
+        request,
+        this.client.getActiveRequests().size,
+        async (req, ctx) => this.processRequest(req, ctx),
+        context
+      );
   }
 
-
-    
   async processRequestWithHybrid(request: any, routingDecision: any): Promise<any> {
     const selectedProvider = request.provider || 'ollama';
 
@@ -393,7 +398,7 @@ export class RequestHandler {
         logger.warn('No providers available, attempting to initialize');
         await this.client.initializeProvidersAsync();
       }
-      
+
       // Get the appropriate provider
       const provider = this.client.getProviderManager().selectProvider(selectedProvider);
       if (!provider) {
@@ -416,25 +421,73 @@ export class RequestHandler {
         if (request.abortSignal?.aborted) {
           throw new Error('Request was aborted');
         }
-        // Process through actual provider system - simplified for now
-        return { content: `Processing: ${request.prompt.substring(0, 100)}...`, model: 'default' };
+
+        // CRITICAL FIX: Actually call the AI provider instead of returning stub response
+        // Get the actual provider instance from the provider manager
+        const actualProvider = this.client
+          .getProviderManager()
+          .getProviderRepository()
+          .getProvider(selectedProvider);
+        if (!actualProvider) {
+          throw new Error(`Provider ${selectedProvider} not available`);
+        }
+
+        const providerResponse = await actualProvider.generateText(request.prompt, {
+          model: request.model,
+          temperature: request.temperature || 0.7,
+          maxTokens: request.maxTokens || 4096,
+          stream: false, // For non-streaming requests
+          tools: request.tools,
+        });
+
+        if (!providerResponse) {
+          throw new Error('Provider returned empty response');
+        }
+
+        // Handle both string and object responses
+        const content =
+          typeof providerResponse === 'string'
+            ? providerResponse
+            : providerResponse.content ||
+              providerResponse.text ||
+              providerResponse.response ||
+              String(providerResponse);
+
+        return {
+          content,
+          model: request.model || 'unknown',
+          provider: selectedProvider,
+        };
       };
 
-      // Add timeout protection at provider level
+      // Add timeout protection at provider level with actual timeout
+      const timeoutMs =
+        request.timeout || this.client.getConfig()?.performanceThresholds?.timeoutMs || 30000;
       const response = await Promise.race([
         processRequest(),
         new Promise((_, reject) => {
+          const timeoutId = setTimeout(() => {
+            reject(new Error(`Request timed out after ${timeoutMs}ms`));
+          }, timeoutMs);
+
+          // Also handle abort signal if provided
           if (request.abortSignal) {
             request.abortSignal.addEventListener('abort', () => {
-              reject(new Error('Request timed out'));
+              clearTimeout(timeoutId);
+              reject(new Error('Request was aborted'));
             });
           }
-        })
+        }),
       ]);
 
       // Check if response contains tool calls that need to be executed
-      if ((response as ModelResponse).toolCalls && (response as ModelResponse).toolCalls!.length > 0) {
-        logger.debug('Tool execution: Found tool calls', { count: (response as ModelResponse).toolCalls!.length });
+      if (
+        (response as ModelResponse).toolCalls &&
+        (response as ModelResponse).toolCalls!.length > 0
+      ) {
+        logger.debug('Tool execution: Found tool calls', {
+          count: (response as ModelResponse).toolCalls!.length,
+        });
 
         const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
         const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
@@ -482,7 +535,8 @@ export class RequestHandler {
                   })),
                 };
               } else {
-                (response as ModelResponse).content = `Tool execution failed: ${firstResult.error || 'Unknown error'}`;
+                (response as ModelResponse).content =
+                  `Tool execution failed: ${firstResult.error || 'Unknown error'}`;
               }
             }
           } catch (error: unknown) {
@@ -513,10 +567,10 @@ export class RequestHandler {
       if (fallback) {
         logger.info(`Falling back to ${fallbackProvider}`);
         // Fallback processing - simplified for now
-        const fallbackResponse: ModelResponse = { 
-          content: `Fallback processing: ${request.prompt.substring(0, 100)}...`, 
+        const fallbackResponse: ModelResponse = {
+          content: `Fallback processing: ${request.prompt.substring(0, 100)}...`,
           model: 'fallback',
-          metadata: { tokens: 0, latency: 0 }
+          metadata: { tokens: 0, latency: 0 },
         };
 
         fallbackResponse.metadata!.hybridRouting = {
@@ -532,5 +586,4 @@ export class RequestHandler {
       throw error;
     }
   }
-
 }

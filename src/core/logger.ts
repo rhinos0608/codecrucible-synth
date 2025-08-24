@@ -3,6 +3,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import chalk from 'chalk';
 import * as api from '@opentelemetry/api';
+import winston from 'winston';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -29,15 +30,18 @@ export interface LoggerConfig {
 }
 
 /**
- * Enhanced Logger with file and console output
+ * Enterprise Logger with Winston - 2025 Best Practices
  *
- * Provides structured logging with different levels, file rotation,
- * and pretty console output with colors
+ * Features:
+ * - Structured JSON logging for observability
+ * - High-performance async operations
+ * - OpenTelemetry integration
+ * - Production-grade error handling
+ * - Multiple transport support
  */
 class Logger {
   private config: LoggerConfig;
-  private logQueue: LogEntry[] = [];
-  private isWriting = false;
+  private winstonLogger!: winston.Logger; // Definite assignment assertion
   private logDirectory: string;
   private name?: string;
 
@@ -65,7 +69,126 @@ class Logger {
     }
 
     this.logDirectory = this.config.logDirectory || join(homedir(), '.codecrucible', 'logs');
+    this.setupWinstonLogger();
     this.ensureLogDirectory();
+  }
+
+  /**
+   * Setup Winston logger with structured JSON format - 2025 Best Practice
+   */
+  private setupWinstonLogger(): void {
+    // Custom JSON formatter for structured logging
+    const jsonFormat = winston.format.combine(
+      winston.format.timestamp(),
+      winston.format.errors({ stack: true }),
+      winston.format.json(),
+      winston.format.printf(
+        ({
+          timestamp,
+          level,
+          message,
+          traceId,
+          spanId,
+          correlationId,
+          userId,
+          sessionId,
+          ...meta
+        }) => {
+          const logEntry = {
+            '@timestamp': timestamp,
+            level: level.toUpperCase(),
+            message,
+            service: this.name || 'codecrucible-synth',
+            ...(traceId ? { traceId } : {}),
+            ...(spanId ? { spanId } : {}),
+            ...(correlationId ? { correlationId } : {}),
+            ...(userId ? { userId } : {}),
+            ...(sessionId ? { sessionId } : {}),
+            ...meta,
+          };
+          return JSON.stringify(logEntry);
+        }
+      )
+    );
+
+    // Console formatter with colors for development
+    const consoleFormat = winston.format.combine(
+      winston.format.colorize(),
+      winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+      winston.format.errors({ stack: true }),
+      winston.format.printf(({ timestamp, level, message, traceId, ...meta }) => {
+        let output = `${timestamp}  ${level} ${message}`;
+        if (Object.keys(meta).length > 0 && !meta.stack) {
+          output += `\n${JSON.stringify(meta, null, 2)}`;
+        }
+        if (meta.stack) {
+          output += `\n${meta.stack}`;
+        }
+        return output;
+      })
+    );
+
+    const transports: winston.transport[] = [];
+
+    if (this.config.toConsole) {
+      transports.push(
+        new winston.transports.Console({
+          level: this.config.level,
+          format: consoleFormat,
+        })
+      );
+    }
+
+    if (this.config.toFile) {
+      transports.push(
+        new winston.transports.File({
+          filename: join(this.logDirectory, 'codecrucible.log'),
+          level: this.config.level,
+          format: jsonFormat,
+          maxsize: this.parseFileSize(this.config.maxFileSize),
+          maxFiles: this.config.maxFiles,
+          tailable: true,
+        })
+      );
+
+      // Separate error log file for high-priority issues
+      transports.push(
+        new winston.transports.File({
+          filename: join(this.logDirectory, 'error.log'),
+          level: 'error',
+          format: jsonFormat,
+          maxsize: this.parseFileSize(this.config.maxFileSize),
+          maxFiles: this.config.maxFiles,
+          tailable: true,
+        })
+      );
+    }
+
+    this.winstonLogger = winston.createLogger({
+      level: this.config.level,
+      levels: winston.config.npm.levels,
+      transports,
+      exitOnError: false,
+      handleExceptions: true,
+      handleRejections: true,
+    });
+  }
+
+  /**
+   * Parse file size string to bytes
+   */
+  private parseFileSize(sizeStr: string): number {
+    const size = parseInt(sizeStr.match(/\d+/)?.[0] || '10');
+    const unit = sizeStr.match(/[a-zA-Z]+/)?.[0]?.toLowerCase() || 'mb';
+
+    const multipliers: Record<string, number> = {
+      b: 1,
+      kb: 1024,
+      mb: 1024 * 1024,
+      gb: 1024 * 1024 * 1024,
+    };
+
+    return size * (multipliers[unit] || multipliers.mb);
   }
 
   /**
@@ -168,7 +291,7 @@ class Logger {
   }
 
   /**
-   * Log a message with specified level
+   * Log a message with specified level - 2025 Winston Implementation
    */
   private async log(level: LogLevel, message: string, data?: any, error?: Error): Promise<void> {
     if (!this.shouldLog(level)) {
@@ -179,71 +302,21 @@ class Logger {
     const span = api.trace.getActiveSpan();
     const spanContext = span?.spanContext();
 
-    const entry: LogEntry = {
-      timestamp: new Date(),
-      level,
-      message,
-      data,
-      error,
-      traceId: spanContext?.traceId,
-      spanId: spanContext?.spanId,
-      correlationId: data?.correlationId,
-      userId: data?.userId,
-      sessionId: data?.sessionId,
-    };
+    // Prepare metadata for Winston
+    const metadata: any = {};
+    if (data) metadata.data = data;
+    if (error) metadata.error = error;
+    if (spanContext?.traceId) metadata.traceId = spanContext.traceId;
+    if (spanContext?.spanId) metadata.spanId = spanContext.spanId;
+    if (data?.correlationId) metadata.correlationId = data.correlationId;
+    if (data?.userId) metadata.userId = data.userId;
+    if (data?.sessionId) metadata.sessionId = data.sessionId;
 
-    // Console output
-    if (this.config.toConsole) {
-      console.log(this.formatConsoleMessage(entry));
-    }
-
-    // File output
-    if (this.config.toFile) {
-      this.logQueue.push(entry);
-      this.processLogQueue();
-    }
+    // Use Winston for structured logging - handles both console and file automatically
+    this.winstonLogger.log(level, message, metadata);
   }
 
-  /**
-   * Process log queue and write to file
-   */
-  private async processLogQueue(): Promise<void> {
-    if (this.isWriting || this.logQueue.length === 0) {
-      return;
-    }
-
-    this.isWriting = true;
-
-    try {
-      const entries = this.logQueue.splice(0, 100); // Process in batches
-      const logContent = entries.map(entry => this.formatFileMessage(entry)).join('\\n') + '\\n';
-
-      const logFile = join(this.logDirectory, `codecrucible-${this.getCurrentDateString()}.log`);
-
-      await writeFile(logFile, logContent, { flag: 'a' });
-    } catch (error) {
-      // Fallback to console if file writing fails
-      console.error('Failed to write to log file:', error);
-    } finally {
-      this.isWriting = false;
-
-      // Process remaining queue if any
-      if (this.logQueue.length > 0) {
-        setTimeout(() => this.processLogQueue(), 100);
-      }
-    }
-  }
-
-  /**
-   * Get current date string for log file naming
-   */
-  private getCurrentDateString(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
+  // Note: Winston handles file operations automatically - legacy queue methods removed
 
   /**
    * Debug level logging
@@ -293,12 +366,11 @@ class Logger {
   }
 
   /**
-   * Flush pending logs to file
+   * Flush pending logs (Winston handles automatically)
    */
   async flush(): Promise<void> {
-    while (this.logQueue.length > 0 || this.isWriting) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
+    // Winston handles flushing automatically
+    return Promise.resolve();
   }
 
   /**
@@ -309,7 +381,7 @@ class Logger {
 
     // Override log method to include context
     const originalLog = childLogger.log.bind(childLogger);
-    childLogger.log = (level: LogLevel, message: string, data?: any, error?: Error) => {
+    childLogger.log = async (level: LogLevel, message: string, data?: any, error?: Error) => {
       return originalLog(level, `[${context}] ${message}`, data, error);
     };
 

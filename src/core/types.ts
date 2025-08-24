@@ -86,6 +86,8 @@ export interface ModelResponse {
     selectedProvider?: string;
     toolExecuted?: boolean;
     toolResults?: any[];
+    fromBatch?: boolean;
+    cacheHit?: boolean;
   };
   tokens_used?: number;
   usage?: {
@@ -558,9 +560,9 @@ export interface ComplexityAnalysis {
   estimatedTime: string;
 }
 
-export type TaskType = 
+export type TaskType =
   | 'analysis'
-  | 'generation' 
+  | 'generation'
   | 'refactoring'
   | 'debug'
   | 'documentation'

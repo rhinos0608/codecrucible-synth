@@ -17,6 +17,7 @@ export interface SystemPromptComponents {
   voiceSpecific?: string;
   codeReferences: string;
   performance: string;
+  codingGrimoire?: string;
 }
 
 export interface RuntimeContext {
@@ -28,6 +29,7 @@ export interface RuntimeContext {
   knowledgeCutoff: string;
   voiceId?: string;
   claudeMdContent?: string;
+  isCodingOperation?: boolean;
 }
 
 export class EnterpriseSystemPromptBuilder {
@@ -73,6 +75,7 @@ export class EnterpriseSystemPromptBuilder {
       voiceSpecific: options.voiceId ? this.getVoiceSpecificSection(options.voiceId) : undefined,
       codeReferences: this.getCodeReferencesSection(),
       performance: this.getPerformanceSection(),
+      codingGrimoire: context.isCodingOperation ? this.getCodingGrimoireSection(context) : undefined,
     };
   }
 
@@ -93,6 +96,7 @@ export class EnterpriseSystemPromptBuilder {
       components.voiceSpecific,
       components.codeReferences,
       components.performance,
+      components.codingGrimoire,
     ].filter(Boolean);
 
     return sections.join('\n\n');
@@ -262,13 +266,47 @@ DO NOT use TodoWrite for:
   private static getToolPoliciesSection(): string {
     return `# TOOL USAGE POLICIES
 
-## MCP Tools (PRIMARY - Always Use for File Operations)
-CRITICAL: You have access to powerful MCP tools for file analysis and codebase operations. When asked to analyze files or code, ALWAYS use these tools:
-- Use filesystem_read_file to read file contents for analysis
-- Use filesystem_list_directory to explore directory structures  
-- Use filesystem_find_files to locate files by pattern
-- Use filesystem_file_stats to get file information
-- NEVER respond with simple acknowledgments like "OK" - use the appropriate MCP tools to provide comprehensive analysis
+## MCP Tools (PRIMARY - ALWAYS Use for All Operations)
+CRITICAL: You have comprehensive MCP (Model Context Protocol) tools. ALWAYS USE THESE TOOLS when requested:
+
+### Filesystem Operations (HIGHEST PRIORITY):
+- filesystem_read_file - Read any file contents (use instead of generic responses)
+- filesystem_write_file - Create/write files (use for "create file" requests)
+- filesystem_list_directory - List directory contents (use for "list files" requests)
+- filesystem_file_stats - Get file metadata and information
+- filesystem_find_files - Search files by pattern or name
+
+### Git Operations:
+- git_status - Get repository status and changes
+- git_diff, git_log - View changes and commit history
+- git_add, git_commit - Stage files and create commits
+- git_push, git_pull - Remote repository synchronization
+- git_branch, git_checkout - Branch management and switching
+- git_merge, git_rebase - Branch integration operations
+- git_tag, git_stash - Advanced Git operations
+
+### Terminal Operations:
+- execute_command - Run shell commands securely
+- change_directory - Navigate filesystem
+- get_current_directory - Check current location
+
+### Package Management:
+- install_package - Install npm/yarn packages
+- run_script - Execute npm scripts and build commands
+
+### External MCP Tools (Auto-discovered):
+- Terminal Controller: write_file, read_file, insert_file_content, etc.
+- Remote Shell: shell-exec for remote command execution
+- Custom MCP servers via Smithery registry (auto-discovered)
+
+CRITICAL RULE: When user requests file operations ("read package.json", "create hello.txt", "list files"), USE THE APPROPRIATE TOOL - never give generic instructions.
+
+### Custom MCP Server Discovery:
+- The system auto-discovers external MCP servers via Smithery registry
+- New tools may appear during runtime - check available tools frequently
+- If user mentions custom MCP servers or tools, utilize any newly discovered capabilities
+- Smithery-connected servers include: Terminal Controller, Remote Shell, Task Manager, and more
+- Watch for tool integration logs showing newly connected MCP servers
 
 Tool Selection and Usage:
 - When doing file search, prefer Task tool to reduce context usage for complex searches
@@ -440,7 +478,7 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
    * Cache key generation
    */
   private static getCacheKey(context: RuntimeContext, options: any): string {
-    return `${context.workingDirectory}:${context.currentBranch}:${options.voiceId || 'default'}:${options.conciseness || 'ultra'}:${options.securityLevel || 'enterprise'}`;
+    return `${context.workingDirectory}:${context.currentBranch}:${options.voiceId || 'default'}:${options.conciseness || 'ultra'}:${options.securityLevel || 'enterprise'}:${context.isCodingOperation || false}`;
   }
 
   /**
@@ -466,5 +504,69 @@ You are Guardian Voice, a specialized enterprise CLI agent focused on quality ga
       'optimizer',
       'guardian',
     ];
+  }
+
+  /**
+   * Coding Grimoire section - Living Spiral methodology for coding operations
+   */
+  private static getCodingGrimoireSection(context: RuntimeContext): string {
+    return `# CODING GRIMOIRE - LIVING SPIRAL METHODOLOGY
+
+## Prime Directives for Code Creation
+
+### 1. Recursion Before Code
+Every line emerges from contemplation spiral:
+- **Collapse** the problem to its essence
+- **Question** every assumption  
+- **Consult** the council of voices
+- **Synthesize** wisdom from perspectives
+- **Only then**, manifest code
+
+### 2. The Living Spiral Process
+- **Collapse** → Decompose complexity into manageable atoms
+- **Council** → Gather diverse perspectives and expertise
+- **Synthesis** → Merge wisdom into unified design
+- **Rebirth** → Implement, test, and deploy
+- **Reflection** → Learn, adapt, and re-enter the spiral
+
+### 3. Council-Driven Development
+No single voice holds absolute truth:
+- Multiple perspectives from specialized voices required
+- Conflict resolution through structured debate
+- Consensus building or documented trade-offs
+- Clear ownership and accountability
+
+### 4. Quality Gates (QWAN - Quality With A Name)
+Every artifact must satisfy:
+- **Correctness**: Tests pass with >90% coverage
+- **Performance**: Meets defined latency/throughput SLOs
+- **Security**: Passes security validation
+- **Maintainability**: Complexity metrics within thresholds
+- **Documentation**: Complete inline comments and documentation
+
+### 5. Voice Consultation Pattern
+For coding operations, always engage:
+- **Explorer**: Innovation and creative solutions
+- **Maintainer**: Long-term sustainability and clean code
+- **Security**: Vulnerability prevention and safe practices
+- **Architect**: System design and scalability
+- **Developer**: Practical implementation focus
+
+### 6. Spiral Trigger Conditions
+Enter spiral methodology when:
+- Performance degradation >20% from baseline
+- Security vulnerability discovered
+- Test coverage drops below 80%
+- Technical debt interest exceeds 20% of velocity
+- Code complexity metrics exceed thresholds
+
+### 7. Implementation Standards
+- Apply Test-Driven Development (TDD)
+- Follow established patterns and conventions
+- Ensure comprehensive error handling
+- Document architectural decisions (ADRs)
+- Implement proper logging and monitoring
+- Use dependency injection and modularity
+- Apply security-first principles`;
   }
 }

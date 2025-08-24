@@ -539,7 +539,7 @@ export class CodeAnalysisTool extends BaseTool {
       '**/*.cpp',
       '**/*.c',
     ];
-    const patterns = Array.isArray(args.includePatterns) 
+    const patterns = Array.isArray(args.includePatterns)
       ? args.includePatterns.filter((p): p is string => typeof p === 'string')
       : defaultPatterns;
 
@@ -600,28 +600,37 @@ export class CodeAnalysisTool extends BaseTool {
     }
 
     const totalComplexity = validResults.reduce(
-      (sum, r) => sum + (
-        (r.metrics && typeof r.metrics === 'object' && 'cyclomaticComplexity' in r.metrics && typeof r.metrics.cyclomaticComplexity === 'number')
+      (sum, r) =>
+        sum +
+        (r.metrics &&
+        typeof r.metrics === 'object' &&
+        'cyclomaticComplexity' in r.metrics &&
+        typeof r.metrics.cyclomaticComplexity === 'number'
           ? r.metrics.cyclomaticComplexity
-          : 0
-      ),
+          : 0),
       0
     );
     const avgComplexity = totalComplexity / validResults.length;
-    const maxComplexity = Math.max(...validResults.map(r => 
-      (r.metrics && typeof r.metrics === 'object' && 'cyclomaticComplexity' in r.metrics && typeof r.metrics.cyclomaticComplexity === 'number')
-        ? r.metrics.cyclomaticComplexity
-        : 0
-    ));
+    const maxComplexity = Math.max(
+      ...validResults.map(r =>
+        r.metrics &&
+        typeof r.metrics === 'object' &&
+        'cyclomaticComplexity' in r.metrics &&
+        typeof r.metrics.cyclomaticComplexity === 'number'
+          ? r.metrics.cyclomaticComplexity
+          : 0
+      )
+    );
 
     return {
       filesAnalyzed: validResults.length,
       averageComplexity: Math.round(avgComplexity * 100) / 100,
       maxComplexity,
       overallScore: Math.round(
-        validResults.reduce((sum, r) => sum + (
-          (r.score && typeof r.score === 'number') ? r.score : 0
-        ), 0) / validResults.length
+        validResults.reduce(
+          (sum, r) => sum + (r.score && typeof r.score === 'number' ? r.score : 0),
+          0
+        ) / validResults.length
       ),
     };
   }

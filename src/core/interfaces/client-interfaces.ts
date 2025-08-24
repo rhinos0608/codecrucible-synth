@@ -27,7 +27,11 @@ export interface StreamToken {
 export interface IModelClient {
   // Core processing
   processRequest(request: ModelRequest, context?: ProjectContext): Promise<ModelResponse>;
-  streamRequest(request: ModelRequest, onToken: (token: StreamToken) => void, context?: ProjectContext): Promise<ModelResponse>;
+  streamRequest(
+    request: ModelRequest,
+    onToken: (token: StreamToken) => void,
+    context?: ProjectContext
+  ): Promise<ModelResponse>;
   generateText(prompt: string, options?: any): Promise<string>;
   synthesize(request: ModelRequest): Promise<ModelResponse>;
 

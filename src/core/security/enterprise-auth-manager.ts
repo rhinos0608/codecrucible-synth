@@ -725,7 +725,7 @@ export class EnterpriseAuthManager {
     const sessionId = crypto.randomBytes(32).toString('hex');
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
-    
+
     return {
       id: sessionId,
       userId: user?.id || '',

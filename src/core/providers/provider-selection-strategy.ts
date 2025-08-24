@@ -118,7 +118,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
       provider: selectedProvider,
       reason,
       confidence,
-      fallbackChain
+      fallbackChain,
     };
 
     this.emit('providerSelected', result);
@@ -131,14 +131,13 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
    * Create fallback chain prioritizing the selected provider
    */
   createFallbackChain(primaryProvider: ProviderType, context: SelectionContext): ProviderType[] {
-    const fallbackChain = primaryProvider === 'auto'
-      ? [...this.config.fallbackChain]
-      : [primaryProvider, ...this.config.fallbackChain.filter(p => p !== primaryProvider)];
+    const fallbackChain =
+      primaryProvider === 'auto'
+        ? [...this.config.fallbackChain]
+        : [primaryProvider, ...this.config.fallbackChain.filter(p => p !== primaryProvider)];
 
     // Filter out providers that don't support the required context
-    return fallbackChain.filter(provider => 
-      this.validateProviderForContext(provider, context)
-    );
+    return fallbackChain.filter(provider => this.validateProviderForContext(provider, context));
   }
 
   /**
@@ -195,13 +194,17 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
   /**
    * Adaptive provider selection based on context
    */
-  private selectAdaptiveProvider(context: SelectionContext): { provider: ProviderType; reason: string; confidence: number } {
+  private selectAdaptiveProvider(context: SelectionContext): {
+    provider: ProviderType;
+    reason: string;
+    confidence: number;
+  } {
     // High complexity tasks -> most capable
     if (context.complexity === 'complex') {
       return {
         provider: this.selectMostCapableProvider(),
         reason: 'Complex task requires most capable provider',
-        confidence: 0.9
+        confidence: 0.9,
       };
     }
 
@@ -210,7 +213,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
       return {
         provider: this.selectFastestProvider(),
         reason: 'Speed prioritized or simple task',
-        confidence: 0.85
+        confidence: 0.85,
       };
     }
 
@@ -218,7 +221,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
     return {
       provider: this.selectBalancedProvider(),
       reason: 'Balanced selection for medium complexity',
-      confidence: 0.8
+      confidence: 0.8,
     };
   }
 
@@ -246,7 +249,9 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
     if (provider === 'ollama') {
       // If no specific model provided, assume auto-selection will pick a supported model
       if (!model) {
-        logger.debug('No specific model provided, assuming auto-selection will pick supported model');
+        logger.debug(
+          'No specific model provided, assuming auto-selection will pick supported model'
+        );
         return true; // Trust that auto-selection picks qwen2.5-coder which supports tools
       }
 
@@ -254,7 +259,7 @@ export class ProviderSelectionStrategy extends EventEmitter implements IProvider
       const model_name = model.toLowerCase();
       const supportedModels = [
         'llama3',
-        'llama3.1', 
+        'llama3.1',
         'llama3.2',
         'qwen2.5',
         'qwq',

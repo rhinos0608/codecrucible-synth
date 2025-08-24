@@ -390,7 +390,7 @@ ${reflectionContent}
    */
   private async calculateQuality(output: string): Promise<number> {
     // Basic quality metrics
-    const hasCode = /```/.test(output);
+    const hasCode = output.includes('```');
     const hasStructure = /#{1,3}/.test(output) || /\d+\./.test(output);
     const hasDetail = output.length > 500;
     const hasActionable = /step|implement|create|build|deploy/.test(output.toLowerCase());

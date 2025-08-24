@@ -30,14 +30,14 @@ export class UserWarningSystem {
   constructor(config?: Partial<WarningConfig>) {
     this.config = {
       memoryWarningThreshold: 0.85, // 85% memory usage
-      repetitiveToolThreshold: 10,   // Warn after 10 uses of same tool
+      repetitiveToolThreshold: 10, // Warn after 10 uses of same tool
       longRunningWarningInterval: 1800000, // 30 minutes
-      maxWarningsPerHour: 2,         // Max 2 warnings per hour per type
-      ...config
+      maxWarningsPerHour: 2, // Max 2 warnings per hour per type
+      ...config,
     };
-    
+
     this.sessionStartTime = new Date();
-    
+
     // Set up periodic long-running session warnings
     this.startLongRunningWarnings();
   }
@@ -47,12 +47,13 @@ export class UserWarningSystem {
    */
   checkMemoryUsage(currentUsage: number): void {
     if (currentUsage < this.config.memoryWarningThreshold) return;
-    
+
     if (!this.shouldWarn('memory', 3600000)) return; // Max 1 memory warning per hour
-    
+
     const percentage = (currentUsage * 100).toFixed(1);
-    
-    console.log(chalk.yellow(`
+
+    console.log(
+      chalk.yellow(`
 ⚠️  Memory Usage Warning
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Current memory usage: ${percentage}%
@@ -65,8 +66,9 @@ Current memory usage: ${percentage}%
 
 This is just a helpful notice - your session will continue.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`));
-    
+`)
+    );
+
     logger.info(`User warned about memory usage: ${percentage}%`);
     this.recordWarning('memory');
   }
@@ -77,7 +79,7 @@ This is just a helpful notice - your session will continue.
   trackToolUsage(toolName: string): void {
     const now = new Date();
     const existing = this.toolUsageMap.get(toolName);
-    
+
     if (existing) {
       existing.count++;
       existing.lastUsed = now;
@@ -86,10 +88,10 @@ This is just a helpful notice - your session will continue.
         toolName,
         count: 1,
         lastUsed: now,
-        firstUsed: now
+        firstUsed: now,
       });
     }
-    
+
     this.checkRepetitiveUsage(toolName);
   }
 
@@ -99,12 +101,13 @@ This is just a helpful notice - your session will continue.
   private checkRepetitiveUsage(toolName: string): void {
     const usage = this.toolUsageMap.get(toolName);
     if (!usage || usage.count < this.config.repetitiveToolThreshold) return;
-    
+
     if (!this.shouldWarn(`repetitive-${toolName}`, 1800000)) return; // Max 1 warning per 30min per tool
-    
+
     const duration = Math.round((usage.lastUsed.getTime() - usage.firstUsed.getTime()) / 1000 / 60);
-    
-    console.log(chalk.yellow(`
+
+    console.log(
+      chalk.yellow(`
 🔄 Repetitive Tool Usage Notice
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Tool: ${toolName}
@@ -117,8 +120,9 @@ Used: ${usage.count} times in ${duration} minutes
    • Your session will continue normally
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`));
-    
+`)
+    );
+
     logger.info(`User warned about repetitive tool usage: ${toolName} (${usage.count} times)`);
     this.recordWarning(`repetitive-${toolName}`);
   }
@@ -137,10 +141,11 @@ Used: ${usage.count} times in ${duration} minutes
    */
   private checkLongRunningSession(): void {
     if (!this.shouldWarn('long-running', this.config.longRunningWarningInterval * 2)) return;
-    
+
     const runtime = Math.round((Date.now() - this.sessionStartTime.getTime()) / 1000 / 60);
-    
-    console.log(chalk.blue(`
+
+    console.log(
+      chalk.blue(`
 ⏰ Long-Running Session Notice
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Session runtime: ${runtime} minutes
@@ -152,8 +157,9 @@ Session runtime: ${runtime} minutes
    • You can exit anytime with Ctrl+C
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`));
-    
+`)
+    );
+
     logger.info(`Long-running session notice: ${runtime} minutes`);
     this.recordWarning('long-running');
   }
@@ -164,8 +170,8 @@ Session runtime: ${runtime} minutes
   private shouldWarn(warningType: string, cooldownMs: number): boolean {
     const lastWarning = this.lastWarningTimes.get(warningType);
     if (!lastWarning) return true;
-    
-    return (Date.now() - lastWarning) > cooldownMs;
+
+    return Date.now() - lastWarning > cooldownMs;
   }
 
   /**
@@ -182,14 +188,14 @@ Session runtime: ${runtime} minutes
     const runtime = Math.round((Date.now() - this.sessionStartTime.getTime()) / 1000 / 60);
     const toolsUsed = Array.from(this.toolUsageMap.values());
     const totalToolUsage = toolsUsed.reduce((sum, tool) => sum + tool.count, 0);
-    
+
     return `
 📊 Session Statistics
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Runtime: ${runtime} minutes
 Tools used: ${toolsUsed.length} different tools
 Total tool calls: ${totalToolUsage}
-Most used tool: ${toolsUsed.length > 0 ? toolsUsed.reduce((max, tool) => tool.count > max.count ? tool : max).toolName : 'none'}
+Most used tool: ${toolsUsed.length > 0 ? toolsUsed.reduce((max, tool) => (tool.count > max.count ? tool : max)).toolName : 'none'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
   }

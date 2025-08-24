@@ -42,7 +42,7 @@ export class AWSProvider {
 
   constructor(config: AWSDeploymentConfig) {
     this.config = config;
-    
+
     const awsConfig = {
       region: config.region,
       credentials: this.loadCredentials(),
@@ -95,12 +95,12 @@ export class AWSProvider {
 
       const command = new CloudFormation.CreateStackCommand(params);
       const response = await this.cfClient.send(command);
-      
+
       logger.info(`CloudFormation stack creation initiated: ${response.StackId}`);
-      
+
       // Wait for stack creation to complete
       await this.waitForStackComplete(stackName);
-      
+
       return response.StackId!;
     } catch (error) {
       logger.error('Failed to deploy CloudFormation stack:', error);
@@ -119,29 +119,29 @@ export class AWSProvider {
       const command = new CloudFormation.DescribeStacksCommand({
         StackName: stackName,
       });
-      
+
       const response = await this.cfClient.send(command);
       const stack = response.Stacks?.[0];
-      
+
       if (!stack) {
         throw new Error(`Stack ${stackName} not found`);
       }
 
       const status = stack.StackStatus;
-      
+
       if (status?.includes('COMPLETE') && !status.includes('CLEANUP')) {
         logger.info(`Stack ${stackName} completed with status: ${status}`);
         return;
       }
-      
+
       if (status?.includes('FAILED') || status?.includes('ROLLBACK')) {
         throw new Error(`Stack ${stackName} failed with status: ${status}`);
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, 15000)); // Wait 15 seconds
       attempts++;
     }
-    
+
     throw new Error(`Stack ${stackName} creation timed out`);
   }
 
@@ -187,7 +187,7 @@ export class AWSProvider {
       });
 
       const taskDefResponse = await this.ecsClient.send(registerCommand);
-      
+
       // Create or update service
       const serviceCommand = new ECS.CreateServiceCommand({
         cluster: this.config.ecsClusterName,
@@ -209,7 +209,7 @@ export class AWSProvider {
       });
 
       const serviceResponse = await this.ecsClient.send(serviceCommand);
-      
+
       logger.info(`ECS service deployed: ${serviceResponse.service?.serviceArn}`);
       return serviceResponse.service?.serviceArn || '';
     } catch (error: any) {
@@ -262,7 +262,7 @@ export class AWSProvider {
   ): Promise<void> {
     // This would use kubectl or Kubernetes API client
     // For production, use @kubernetes/client-node
-    
+
     const k8sManifest = {
       apiVersion: 'apps/v1',
       kind: 'Deployment',
@@ -347,16 +347,17 @@ export class AWSProvider {
       });
 
       const response = await this.ec2Client.send(command);
-      
-      const instances: AWSInstance[] = response.Instances?.map(instance => ({
-        instanceId: instance.InstanceId!,
-        instanceType: instance.InstanceType!,
-        state: instance.State?.Name || 'pending',
-        publicIp: instance.PublicIpAddress,
-        privateIp: instance.PrivateIpAddress!,
-        launchTime: instance.LaunchTime!,
-        tags: this.parseTags(instance.Tags),
-      })) || [];
+
+      const instances: AWSInstance[] =
+        response.Instances?.map(instance => ({
+          instanceId: instance.InstanceId!,
+          instanceType: instance.InstanceType!,
+          state: instance.State?.Name || 'pending',
+          publicIp: instance.PublicIpAddress,
+          privateIp: instance.PrivateIpAddress!,
+          launchTime: instance.LaunchTime!,
+          tags: this.parseTags(instance.Tags),
+        })) || [];
 
       logger.info(`Launched ${instances.length} EC2 instances`);
       return instances;
@@ -386,12 +387,12 @@ export class AWSProvider {
 
     const response = await this.ec2Client.send(command);
     const images = response.Images || [];
-    
+
     // Sort by creation date and get the latest
-    images.sort((a, b) => 
-      new Date(b.CreationDate || 0).getTime() - new Date(a.CreationDate || 0).getTime()
+    images.sort(
+      (a, b) => new Date(b.CreationDate || 0).getTime() - new Date(a.CreationDate || 0).getTime()
     );
-    
+
     return images[0]?.ImageId || 'ami-0c55b159cbfafe1f0'; // Fallback AMI
   }
 
@@ -420,7 +421,7 @@ export class AWSProvider {
       });
 
       const templateResponse = await this.ec2Client.send(launchTemplateCommand);
-      
+
       // Create auto-scaling group
       const asgCommand = new AutoScaling.CreateAutoScalingGroupCommand({
         AutoScalingGroupName: groupName,
@@ -555,7 +556,7 @@ docker run -d -p 80:3000 --name codecrucible --restart=always \\
 
     const response = await this.ec2Client.send(command);
     const vpcId = response.Vpc?.VpcId!;
-    
+
     logger.info(`Created VPC: ${vpcId}`);
     return vpcId;
   }

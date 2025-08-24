@@ -78,11 +78,11 @@ export class HealthStatusManager extends EventEmitter implements IHealthStatusMa
     config?: Partial<HealthCheckConfig>
   ) {
     super();
-    
+
     this.providerRepository = providerRepository;
     this.cacheCoordinator = cacheCoordinator;
     this.performanceMonitor = performanceMonitor;
-    
+
     this.config = {
       healthCheckTimeoutMs: 5000, // 5 seconds per provider
       overallTimeoutMs: 15000, // 15 seconds total
@@ -98,7 +98,7 @@ export class HealthStatusManager extends EventEmitter implements IHealthStatusMa
    */
   async healthCheck(): Promise<HealthStatus> {
     const health: HealthStatus = {};
-    
+
     // Check if we have cached results that are still valid
     if (this.shouldUseCachedHealth()) {
       logger.debug('Using cached health status');
@@ -107,7 +107,10 @@ export class HealthStatusManager extends EventEmitter implements IHealthStatusMa
 
     // Overall timeout for entire health check (prevent CLI hanging)
     const timeoutPromise = new Promise<HealthStatus>((_, reject) => {
-      setTimeout(() => reject(new Error('Health check overall timeout')), this.config.overallTimeoutMs);
+      setTimeout(
+        () => reject(new Error('Health check overall timeout')),
+        this.config.overallTimeoutMs
+      );
     });
 
     const healthCheckPromise = this.performHealthChecks();
@@ -149,18 +152,21 @@ export class HealthStatusManager extends EventEmitter implements IHealthStatusMa
         const healthCheckPromise = provider.healthCheck?.() ?? Promise.resolve();
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(
-            () => reject(new Error(`Health check timeout for ${type}`)), 
+            () => reject(new Error(`Health check timeout for ${type}`)),
             this.config.healthCheckTimeoutMs
           );
         });
-        
+
         await Promise.race([healthCheckPromise, timeoutPromise]);
         health[type] = true;
         this.cacheCoordinator.setHealthCheck(cacheKey, true);
         logger.debug(`Health check passed for ${type}`);
       } catch (error) {
         // Log timeout/connection errors but continue with other providers
-        logger.debug(`Health check failed for ${type}:`, error instanceof Error ? error.message : error);
+        logger.debug(
+          `Health check failed for ${type}:`,
+          error instanceof Error ? error.message : error
+        );
         health[type] = false;
         this.cacheCoordinator.setHealthCheck(cacheKey, false);
       }
@@ -189,12 +195,12 @@ export class HealthStatusManager extends EventEmitter implements IHealthStatusMa
     if (this.cachedHealthStatus) {
       const healthyProviders = Object.values(this.cachedHealthStatus).filter(Boolean).length;
       const totalProviders = Object.keys(this.cachedHealthStatus).length;
-      
+
       // Ensure metadata object exists
       if (!metrics.metadata) {
         metrics.metadata = {};
       }
-      
+
       metrics.metadata.health = {
         healthyProviders,
         totalProviders,
@@ -215,10 +221,14 @@ export class HealthStatusManager extends EventEmitter implements IHealthStatusMa
       const providerHealth = await this.healthCheck();
       const availableProviders = Object.values(providerHealth).filter(Boolean).length;
       const totalProviders = Object.keys(providerHealth).length;
-      
-      const status = initialized && availableProviders > 0 ? 'healthy' : 
-                     initialized ? 'degraded' : 'initializing';
-      
+
+      const status =
+        initialized && availableProviders > 0
+          ? 'healthy'
+          : initialized
+            ? 'degraded'
+            : 'initializing';
+
       const summary: SystemHealthSummary = {
         status,
         details: {
@@ -274,7 +284,7 @@ export class HealthStatusManager extends EventEmitter implements IHealthStatusMa
     }
 
     const now = Date.now();
-    return (now - this.lastHealthCheckTime) < this.config.cacheTtlMs;
+    return now - this.lastHealthCheckTime < this.config.cacheTtlMs;
   }
 
   /**
@@ -283,9 +293,9 @@ export class HealthStatusManager extends EventEmitter implements IHealthStatusMa
   private updateHealthCache(health: HealthStatus): void {
     this.cachedHealthStatus = health;
     this.lastHealthCheckTime = Date.now();
-    logger.debug('Health cache updated', { 
-      providers: Object.keys(health), 
-      healthy: Object.values(health).filter(Boolean).length 
+    logger.debug('Health cache updated', {
+      providers: Object.keys(health),
+      healthy: Object.values(health).filter(Boolean).length,
     });
   }
 

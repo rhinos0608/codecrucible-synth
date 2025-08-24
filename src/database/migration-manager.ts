@@ -147,9 +147,9 @@ export class MigrationManager {
           } else if (trimmed === '-- Down') {
             section = 'down';
           } else if (section === 'up' && !trimmed.startsWith('--')) {
-            up += line + '\n';
+            up += `${line}\n`;
           } else if (section === 'down' && !trimmed.startsWith('--')) {
-            down += line + '\n';
+            down += `${line}\n`;
           }
         }
 

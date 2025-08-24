@@ -63,8 +63,7 @@ export const SECURITY_UTILS_TOKEN = createServiceToken<any>('security-utils');
 export const STREAMING_MANAGER_TOKEN = createServiceToken<any>('streaming-manager');
 
 // Performance monitoring - using concrete type for DI compatibility
-export const PERFORMANCE_MONITOR_TOKEN =
-  createServiceToken<any>('performance-monitor');
+export const PERFORMANCE_MONITOR_TOKEN = createServiceToken<any>('performance-monitor');
 
 // =============================================================================
 // ADVANCED SERVICE TOKENS

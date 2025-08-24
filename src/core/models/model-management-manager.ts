@@ -93,14 +93,14 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
     generateTest: (request: any) => Promise<any>
   ) {
     super();
-    
+
     this.config = config;
     this.makeRequest = makeRequest;
     this.generateTest = generateTest;
 
-    logger.debug('ModelManagementManager initialized', { 
+    logger.debug('ModelManagementManager initialized', {
       endpoint: config.endpoint,
-      defaultModel: config.defaultModel 
+      defaultModel: config.defaultModel,
     });
   }
 
@@ -112,14 +112,14 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
       const response = await this.makeRequest('GET', '/api/tags');
       const data = await response.json();
       const models = data.models || [];
-      
+
       this.emit('models-fetched', { count: models.length, models });
       logger.debug('Retrieved available models', { count: models.length });
-      
+
       return models;
     } catch (error) {
-      logger.warn('Failed to retrieve available models', { 
-        error: getErrorMessage(error) 
+      logger.warn('Failed to retrieve available models', {
+        error: getErrorMessage(error),
       });
       this.emit('models-fetch-failed', { error: getErrorMessage(error) });
       return [];
@@ -139,10 +139,10 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
   async getBestAvailableModel(): Promise<string> {
     const models = await this.getAvailableModels();
     const bestModel = models.length > 0 ? models[0].name : this.config.defaultModel;
-    
+
     logger.debug('Selected best available model', { model: bestModel });
     this.emit('best-model-selected', { model: bestModel, available: models.length });
-    
+
     return bestModel;
   }
 
@@ -153,25 +153,25 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
     try {
       logger.info('Starting model pull', { model: modelName });
       this.emit('model-pull-started', { model: modelName });
-      
+
       await this.makeRequest('POST', '/api/pull', { name: modelName });
-      
+
       logger.info('Model pull completed', { model: modelName });
       this.emit('model-pull-completed', { model: modelName, success: true });
-      
+
       return true;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      logger.error('Model pull failed', { 
-        model: modelName, 
-        error: errorMessage 
+      logger.error('Model pull failed', {
+        model: modelName,
+        error: errorMessage,
       });
-      this.emit('model-pull-completed', { 
-        model: modelName, 
-        success: false, 
-        error: errorMessage 
+      this.emit('model-pull-completed', {
+        model: modelName,
+        success: false,
+        error: errorMessage,
       });
-      
+
       return false;
     }
   }
@@ -183,39 +183,39 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
     try {
       logger.debug('Testing model', { model: modelName });
       this.emit('model-test-started', { model: modelName });
-      
+
       const response = await this.generateTest({
         prompt: 'Hello',
         model: modelName,
       });
-      
+
       const success = !!response.content;
-      logger.debug('Model test completed', { 
-        model: modelName, 
+      logger.debug('Model test completed', {
+        model: modelName,
         success,
-        hasContent: !!response.content 
+        hasContent: !!response.content,
       });
-      
-      this.emit('model-test-completed', { 
-        model: modelName, 
+
+      this.emit('model-test-completed', {
+        model: modelName,
         success,
-        response: response.content?.substring(0, 100)
+        response: response.content?.substring(0, 100),
       });
-      
+
       return success;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      logger.warn('Model test failed', { 
-        model: modelName, 
-        error: errorMessage 
+      logger.warn('Model test failed', {
+        model: modelName,
+        error: errorMessage,
       });
-      
-      this.emit('model-test-completed', { 
-        model: modelName, 
-        success: false, 
-        error: errorMessage 
+
+      this.emit('model-test-completed', {
+        model: modelName,
+        success: false,
+        error: errorMessage,
       });
-      
+
       return false;
     }
   }
@@ -227,26 +227,26 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
     try {
       logger.info('Starting model removal', { model: modelName });
       this.emit('model-removal-started', { model: modelName });
-      
+
       await this.makeRequest('DELETE', '/api/delete', { name: modelName });
-      
+
       logger.info('Model removal completed', { model: modelName });
       this.emit('model-removal-completed', { model: modelName, success: true });
-      
+
       return true;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      logger.error('Model removal failed', { 
-        model: modelName, 
-        error: errorMessage 
+      logger.error('Model removal failed', {
+        model: modelName,
+        error: errorMessage,
       });
-      
-      this.emit('model-removal-completed', { 
-        model: modelName, 
-        success: false, 
-        error: errorMessage 
+
+      this.emit('model-removal-completed', {
+        model: modelName,
+        success: false,
+        error: errorMessage,
       });
-      
+
       return false;
     }
   }
@@ -285,7 +285,7 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
   async autoSetup(force: boolean = false): Promise<{ success: boolean; message: string }> {
     logger.info('Starting auto-setup', { force });
     this.emit('auto-setup-started', { force });
-    
+
     try {
       // Check if provider is available
       const providerAvailable = await this.checkProviderStatus();
@@ -309,7 +309,7 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
       const message = 'Auto setup completed successfully';
       logger.info(message);
       this.emit('auto-setup-completed', { success: true, message });
-      
+
       return { success: true, message };
     } catch (error) {
       const message = `Auto-setup failed: ${getErrorMessage(error)}`;
@@ -326,7 +326,7 @@ export class ModelManagementManager extends EventEmitter implements IModelManage
     try {
       const response = await this.makeRequest('GET', '/api/tags');
       const success = response.ok;
-      
+
       this.emit('provider-status-checked', { available: success });
       return success;
     } catch (error) {

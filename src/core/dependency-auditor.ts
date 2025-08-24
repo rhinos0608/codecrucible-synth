@@ -456,7 +456,7 @@ export class DependencyAuditor {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
   /**
@@ -491,7 +491,7 @@ OVERVIEW:
 
     if (this.issues.length > 0) {
       report += 'ISSUES FOUND:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       for (const [type, issues] of typeGroups) {
         const icon =
@@ -530,7 +530,7 @@ OVERVIEW:
 
     if (largestDeps.length > 0) {
       report += '📏 LARGEST DEPENDENCIES:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       for (const dep of largestDeps) {
         const used = dep.isUsed ? '✅' : '❌';
@@ -543,7 +543,7 @@ OVERVIEW:
     const securityIssues = this.issues.filter(i => i.type === 'security');
     if (securityIssues.length > 0) {
       report += '🔐 SECURITY SUMMARY:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       const criticalSecurity = securityIssues.filter(i => i.severity === 'critical').length;
       const highSecurity = securityIssues.filter(i => i.severity === 'high').length;

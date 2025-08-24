@@ -39,25 +39,31 @@ export class StreamProcessingManager extends EventEmitter implements IStreamProc
   private readonly securityValidator: ISecurityValidator;
   private readonly cacheCoordinator: ICacheCoordinator;
   private readonly streamingManager: IStreamingManager;
-  private readonly processRequestDelegate: (request: ModelRequest, context?: ProjectContext) => Promise<ModelResponse>;
+  private readonly processRequestDelegate: (
+    request: ModelRequest,
+    context?: ProjectContext
+  ) => Promise<ModelResponse>;
   private readonly generateRequestId: () => string;
 
   constructor(
     securityValidator: ISecurityValidator,
     cacheCoordinator: ICacheCoordinator,
     streamingManager: IStreamingManager,
-    processRequestDelegate: (request: ModelRequest, context?: ProjectContext) => Promise<ModelResponse>,
+    processRequestDelegate: (
+      request: ModelRequest,
+      context?: ProjectContext
+    ) => Promise<ModelResponse>,
     generateRequestId: () => string,
     config?: Partial<StreamProcessingConfig>
   ) {
     super();
-    
+
     this.securityValidator = securityValidator;
     this.cacheCoordinator = cacheCoordinator;
     this.streamingManager = streamingManager;
     this.processRequestDelegate = processRequestDelegate;
     this.generateRequestId = generateRequestId;
-    
+
     this.config = {
       validateSecurity: true,
       enableCaching: true,
@@ -112,13 +118,13 @@ export class StreamProcessingManager extends EventEmitter implements IStreamProc
 
           // Simulate streaming from cached response
           await this.simulateStreamFromCache(cachedResponse.response, onToken);
-          
-          this.emit('stream-request-completed', { 
-            requestId, 
+
+          this.emit('stream-request-completed', {
+            requestId,
             fromCache: true,
-            source: cachedResponse.source 
+            source: cachedResponse.source,
           });
-          
+
           return cachedResponse.response;
         }
       }
@@ -133,10 +139,10 @@ export class StreamProcessingManager extends EventEmitter implements IStreamProc
       // Fallback to regular processing since streamProcess not available
       const response = await this.processRequestDelegate(request, context);
 
-      this.emit('stream-request-completed', { 
-        requestId, 
+      this.emit('stream-request-completed', {
+        requestId,
         fromCache: false,
-        responseLength: response.content?.length 
+        responseLength: response.content?.length,
       });
 
       return response;
@@ -161,7 +167,7 @@ export class StreamProcessingManager extends EventEmitter implements IStreamProc
 
     const content = response.content;
     const chunkSize = 10; // Characters per chunk
-    
+
     for (let i = 0; i < content.length; i += chunkSize) {
       const chunk = content.slice(i, i + chunkSize);
       onToken({
@@ -171,7 +177,7 @@ export class StreamProcessingManager extends EventEmitter implements IStreamProc
         finished: i + chunkSize >= content.length,
         metadata: { source: 'cache-simulation', position: i },
       });
-      
+
       // Small delay to simulate streaming
       await new Promise(resolve => setTimeout(resolve, 10));
     }

@@ -221,7 +221,7 @@ export class GitMCPServer extends BaseMCPServer {
       const operation: Operation = {
         type: 'git-operation',
         target: all ? 'all files' : files.join(', '),
-        description: `Add ${all ? 'all files' : files.length + ' file(s)'} to staging area`,
+        description: `Add ${all ? 'all files' : `${files.length} file(s)`} to staging area`,
       };
 
       const context: OperationContext = {
@@ -1052,7 +1052,7 @@ export class GitMCPServer extends BaseMCPServer {
       const statusCode = line.substring(0, 2);
       const filename = line.substring(3);
 
-      if (statusCode[0] !== ' ' && statusCode[0] !== '?') {
+      if (!statusCode.startsWith(' ') && !statusCode.startsWith('?')) {
         staged.push(filename);
       }
       if (statusCode[1] !== ' ') {
@@ -1114,11 +1114,11 @@ export class GitMCPServer extends BaseMCPServer {
         }
 
         currentFile = line.split(' ')[2].substring(2); // Remove 'a/' prefix
-        currentPatch = line + '\n';
+        currentPatch = `${line}\n`;
         additions = 0;
         deletions = 0;
       } else {
-        currentPatch += line + '\n';
+        currentPatch += `${line}\n`;
 
         if (line.startsWith('+') && !line.startsWith('+++')) {
           additions++;

@@ -118,7 +118,10 @@ export interface IRequestProcessingCoreManager {
   cleanup(): Promise<void>;
 }
 
-export class RequestProcessingCoreManager extends EventEmitter implements IRequestProcessingCoreManager {
+export class RequestProcessingCoreManager
+  extends EventEmitter
+  implements IRequestProcessingCoreManager
+{
   private readonly config: RequestProcessingConfig;
   private requestQueue: QueuedRequest[] = [];
   private isProcessingQueue = false;
@@ -126,7 +129,7 @@ export class RequestProcessingCoreManager extends EventEmitter implements IReque
 
   constructor(config?: Partial<RequestProcessingConfig>) {
     super();
-    
+
     this.config = {
       maxConcurrentRequests: 3,
       defaultTimeoutMs: 180000,
@@ -169,10 +172,10 @@ export class RequestProcessingCoreManager extends EventEmitter implements IReque
     }
 
     const finalEstimate = Math.round(estimatedMemory);
-    logger.debug('Memory estimation', { 
-      promptLength, 
-      baseMemory, 
-      estimatedMemory: finalEstimate 
+    logger.debug('Memory estimation', {
+      promptLength,
+      baseMemory,
+      estimatedMemory: finalEstimate,
     });
 
     return finalEstimate;
@@ -287,9 +290,12 @@ export class RequestProcessingCoreManager extends EventEmitter implements IReque
     }
 
     const strategy: ExecutionStrategy = { mode, provider, timeout, complexity };
-    
+
     logger.debug('Execution strategy determined', strategy);
-    this.emit('strategy-determined', { request: { prompt: request.prompt?.substring(0, 50) }, strategy });
+    this.emit('strategy-determined', {
+      request: { prompt: request.prompt?.substring(0, 50) },
+      strategy,
+    });
 
     return strategy;
   }
@@ -327,22 +333,25 @@ export class RequestProcessingCoreManager extends EventEmitter implements IReque
       };
 
       this.requestQueue.push(queuedRequest);
-      this.emit('request-queued', { 
-        requestId: queuedRequest.id, 
-        queueLength: this.requestQueue.length 
+      this.emit('request-queued', {
+        requestId: queuedRequest.id,
+        queueLength: this.requestQueue.length,
       });
 
-      logger.debug('Request queued', { 
-        requestId: queuedRequest.id, 
+      logger.debug('Request queued', {
+        requestId: queuedRequest.id,
         queueLength: this.requestQueue.length,
-        activeRequests: activeRequestsCount 
+        activeRequests: activeRequestsCount,
       });
 
       // Attempt to process queue
-      this.processQueue(activeRequestsCount, this.config.maxConcurrentRequests, processRequest)
-        .catch(error => {
-          logger.error('Queue processing failed', error);
-        });
+      this.processQueue(
+        activeRequestsCount,
+        this.config.maxConcurrentRequests,
+        processRequest
+      ).catch(error => {
+        logger.error('Queue processing failed', error);
+      });
     });
   }
 
@@ -359,15 +368,12 @@ export class RequestProcessingCoreManager extends EventEmitter implements IReque
     }
 
     this.isProcessingQueue = true;
-    logger.debug('Started processing request queue', { 
-      queueLength: this.requestQueue.length, 
-      activeRequests: activeRequestsCount 
+    logger.debug('Started processing request queue', {
+      queueLength: this.requestQueue.length,
+      activeRequests: activeRequestsCount,
     });
 
-    while (
-      this.requestQueue.length > 0 &&
-      activeRequestsCount < maxConcurrent
-    ) {
+    while (this.requestQueue.length > 0 && activeRequestsCount < maxConcurrent) {
       const queuedRequest = this.requestQueue.shift();
       if (!queuedRequest) break;
 
@@ -376,30 +382,30 @@ export class RequestProcessingCoreManager extends EventEmitter implements IReque
         const response = await processRequest(queuedRequest.request);
         queuedRequest.resolve(response);
         this.totalProcessed++;
-        
-        this.emit('request-processed', { 
-          requestId: queuedRequest.id, 
+
+        this.emit('request-processed', {
+          requestId: queuedRequest.id,
           success: true,
-          totalProcessed: this.totalProcessed 
+          totalProcessed: this.totalProcessed,
         });
       } catch (error) {
-        logger.error('Queued request failed', { 
-          requestId: queuedRequest.id, 
-          error: error instanceof Error ? error.message : error 
+        logger.error('Queued request failed', {
+          requestId: queuedRequest.id,
+          error: error instanceof Error ? error.message : error,
         });
         queuedRequest.reject(toError(error));
-        
-        this.emit('request-processed', { 
-          requestId: queuedRequest.id, 
+
+        this.emit('request-processed', {
+          requestId: queuedRequest.id,
           success: false,
-          error: error instanceof Error ? error.message : error 
+          error: error instanceof Error ? error.message : error,
         });
       }
     }
 
     this.isProcessingQueue = false;
-    logger.debug('Finished processing request queue', { 
-      remainingQueue: this.requestQueue.length 
+    logger.debug('Finished processing request queue', {
+      remainingQueue: this.requestQueue.length,
     });
   }
 
@@ -423,15 +429,15 @@ export class RequestProcessingCoreManager extends EventEmitter implements IReque
    */
   clearQueue(): void {
     const queuedCount = this.requestQueue.length;
-    
+
     // Reject all queued requests
     this.requestQueue.forEach(queuedRequest => {
       queuedRequest.reject(new Error('System shutdown - request cancelled'));
     });
-    
+
     this.requestQueue = [];
     this.isProcessingQueue = false;
-    
+
     if (queuedCount > 0) {
       logger.info(`Cleared ${queuedCount} queued requests during shutdown`);
       this.emit('queue-cleared', { clearedCount: queuedCount });

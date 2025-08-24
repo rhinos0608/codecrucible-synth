@@ -244,7 +244,7 @@ SUMMARY:
                 ? '🟡'
                 : '🔵';
         report += `${icon} ${severity.toUpperCase()} ISSUES (${severityIssues.length}):\n`;
-        report += '─'.repeat(50) + '\n';
+        report += `${'─'.repeat(50)}\n`;
 
         for (const issue of severityIssues) {
           report += `📁 File: ${issue.file}:${issue.line}\n`;

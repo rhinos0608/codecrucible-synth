@@ -1,7 +1,7 @@
 /**
  * Agent Communication Protocol - Semantic Kernel & AutoGen Inspired
  * Implements modern agent-to-agent communication patterns for CodeCrucible Synth
- * 
+ *
  * Features:
  * - Agent lifecycle management and discovery
  * - Message passing and subscription patterns
@@ -24,16 +24,16 @@ export interface Agent {
   capabilities: AgentCapability[];
   metadata: AgentMetadata;
   status: AgentStatus;
-  
+
   // Core methods
   invoke(messages: Message[]): Promise<AgentResponse>;
   canHandle(task: AgentTask): boolean;
-  
+
   // Communication methods
   subscribe(eventType: string, handler: MessageHandler): void;
   unsubscribe(eventType: string, handler: MessageHandler): void;
   publishMessage(targetAgentId: string, message: Message): Promise<void>;
-  
+
   // Lifecycle methods
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
@@ -72,9 +72,9 @@ export interface Message {
   conversationId?: string;
 }
 
-export type MessageType = 
+export type MessageType =
   | 'task-request'
-  | 'task-response' 
+  | 'task-response'
   | 'task-delegation'
   | 'capability-inquiry'
   | 'capability-response'
@@ -132,13 +132,13 @@ export interface AgentTask {
   priority: number;
 }
 
-export type TaskType = 
-  | 'code-analysis' 
-  | 'code-generation' 
-  | 'security-audit' 
+export type TaskType =
+  | 'code-analysis'
+  | 'code-generation'
+  | 'security-audit'
   | 'performance-optimization'
-  | 'testing' 
-  | 'documentation' 
+  | 'testing'
+  | 'documentation'
   | 'coordination'
   | 'validation';
 
@@ -221,7 +221,7 @@ export interface ConversationManager {
   addMessage(conversationId: string, message: Message): Promise<void>;
   getConversationHistory(conversationId: string): Promise<Message[]>;
   endConversation(conversationId: string): Promise<void>;
-  
+
   // Advanced features
   summarizeConversation(conversationId: string): Promise<ConversationSummary>;
   extractKeyDecisions(conversationId: string): Promise<Decision[]>;
@@ -274,17 +274,14 @@ export class AgentCommunicationProtocol extends EventEmitter {
   private messageQueue: Message[];
   private telemetry = getTelemetryProvider();
 
-  constructor(
-    registry: IAgentRegistry,
-    conversationManager: ConversationManager
-  ) {
+  constructor(registry: IAgentRegistry, conversationManager: ConversationManager) {
     super();
     this.registry = registry;
     this.conversationManager = conversationManager;
     this.orchestrationStrategies = new Map();
     this.activeConversations = new Map();
     this.messageQueue = [];
-    
+
     this.initializeOrchestrationStrategies();
     this.setupEventHandlers();
   }
@@ -295,21 +292,21 @@ export class AgentCommunicationProtocol extends EventEmitter {
   private initializeOrchestrationStrategies(): void {
     // Sequential strategy
     this.orchestrationStrategies.set('sequential', new SequentialOrchestrationStrategy());
-    
-    // Parallel strategy  
+
+    // Parallel strategy
     this.orchestrationStrategies.set('parallel', new ParallelOrchestrationStrategy());
-    
+
     // Democratic strategy
     this.orchestrationStrategies.set('democratic', new DemocraticOrchestrationStrategy());
-    
+
     // Hierarchical strategy
     this.orchestrationStrategies.set('hierarchical', new HierarchicalOrchestrationStrategy());
-    
+
     // Consensus strategy
     this.orchestrationStrategies.set('consensus', new ConsensusOrchestrationStrategy());
-    
+
     logger.info('🤝 Orchestration strategies initialized', {
-      strategies: Array.from(this.orchestrationStrategies.keys())
+      strategies: Array.from(this.orchestrationStrategies.keys()),
     });
   }
 
@@ -322,7 +319,7 @@ export class AgentCommunicationProtocol extends EventEmitter {
         messageId: message.id,
         sender: message.sender,
         recipient: message.recipient,
-        type: message.type
+        type: message.type,
       });
     });
 
@@ -334,7 +331,7 @@ export class AgentCommunicationProtocol extends EventEmitter {
       logger.info('Orchestration completed', {
         success: result.success,
         agentCount: result.results.length,
-        totalTime: result.totalTime
+        totalTime: result.totalTime,
       });
     });
   }
@@ -352,17 +349,17 @@ export class AgentCommunicationProtocol extends EventEmitter {
         'codecrucible.agent.source_id': 'orchestrator',
         'codecrucible.agent.target_id': 'multiple',
         'codecrucible.agent.message_type': 'orchestration',
-        'codecrucible.agent.orchestration_strategy': strategyName
+        'codecrucible.agent.orchestration_strategy': strategyName,
       },
       async () => {
         logger.info('Starting task orchestration', {
           taskId: task.id,
           taskType: task.type,
-          strategy: strategyName
+          strategy: strategyName,
         });
 
         // Find suitable agents
-        const agents = agentCriteria 
+        const agents = agentCriteria
           ? await this.registry.findAgents(agentCriteria)
           : await this.registry.findAgents({ capabilities: [task.type] });
 
@@ -380,9 +377,9 @@ export class AgentCommunicationProtocol extends EventEmitter {
 
         // Execute orchestration
         const result = await strategy.orchestrate(agents, task);
-        
+
         this.emit('orchestration-completed', result);
-        
+
         return result;
       }
     );
@@ -407,19 +404,19 @@ export class AgentCommunicationProtocol extends EventEmitter {
       metadata: {
         priority: 'medium',
         expectsResponse: true,
-        ...metadata
+        ...metadata,
       },
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     // Add to message queue for processing
     this.messageQueue.push(message);
-    
+
     // Process message immediately (could be async queue in production)
     await this.processMessage(message);
-    
+
     this.emit('message-sent', message);
-    
+
     return message;
   }
 
@@ -432,7 +429,7 @@ export class AgentCommunicationProtocol extends EventEmitter {
     orchestrationStrategy: string = 'democratic'
   ): Promise<string> {
     const conversationId = await this.conversationManager.startConversation(participants, topic);
-    
+
     const context: ConversationContext = {
       id: conversationId,
       participants,
@@ -440,18 +437,18 @@ export class AgentCommunicationProtocol extends EventEmitter {
       strategy: orchestrationStrategy,
       startTime: new Date(),
       active: true,
-      messageCount: 0
+      messageCount: 0,
     };
-    
+
     this.activeConversations.set(conversationId, context);
-    
+
     logger.info('Multi-agent conversation started', {
       conversationId,
       participants: participants.length,
       topic,
-      strategy: orchestrationStrategy
+      strategy: orchestrationStrategy,
     });
-    
+
     return conversationId;
   }
 
@@ -463,39 +460,39 @@ export class AgentCommunicationProtocol extends EventEmitter {
     candidateAgents: string[]
   ): Promise<CapabilityNegotiationResult> {
     const negotiations: CapabilityNegotiation[] = [];
-    
+
     for (const agentId of candidateAgents) {
       const agent = await this.registry.getAgent(agentId);
       if (!agent) continue;
-      
+
       const canHandle = agent.canHandle(task);
-      const relevantCapabilities = agent.capabilities.filter(cap => 
+      const relevantCapabilities = agent.capabilities.filter(cap =>
         task.requirements.some(req => req.value === cap.name)
       );
-      
+
       negotiations.push({
         agentId,
         canHandle,
         capabilities: relevantCapabilities,
         confidence: this.calculateCapabilityConfidence(relevantCapabilities, task),
         estimatedTime: agent.metadata.averageResponseTime,
-        resourceRequirements: this.estimateResourceRequirements(task, agent)
+        resourceRequirements: this.estimateResourceRequirements(task, agent),
       });
     }
-    
+
     // Sort by capability match and confidence
     negotiations.sort((a, b) => {
       if (a.canHandle && !b.canHandle) return -1;
       if (!a.canHandle && b.canHandle) return 1;
       return b.confidence - a.confidence;
     });
-    
+
     return {
       task,
       negotiations,
       bestMatch: negotiations[0] || null,
       alternatives: negotiations.slice(1),
-      totalCandidates: candidateAgents.length
+      totalCandidates: candidateAgents.length,
     };
   }
 
@@ -520,9 +517,9 @@ export class AgentCommunicationProtocol extends EventEmitter {
     try {
       const recipient = await this.registry.getAgent(message.recipient);
       if (!recipient) {
-        logger.warn('Recipient agent not found', { 
-          messageId: message.id, 
-          recipient: message.recipient 
+        logger.warn('Recipient agent not found', {
+          messageId: message.id,
+          recipient: message.recipient,
         });
         return;
       }
@@ -541,11 +538,10 @@ export class AgentCommunicationProtocol extends EventEmitter {
         default:
           logger.debug('Unhandled message type', { type: message.type });
       }
-      
     } catch (error) {
       logger.error('Error processing message', {
         messageId: message.id,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -557,30 +553,25 @@ export class AgentCommunicationProtocol extends EventEmitter {
     if (recipient.status !== 'active' && recipient.status !== 'idle') {
       logger.warn('Agent not available for task', {
         agentId: recipient.id,
-        status: recipient.status
+        status: recipient.status,
       });
       return;
     }
 
     try {
       const response = await recipient.invoke([message]);
-      
+
       // Send response back to sender if expected
       if (message.metadata.expectsResponse) {
-        await this.sendMessage(
-          recipient.id,
-          message.sender,
-          response,
-          'task-response',
-          { expectsResponse: false }
-        );
+        await this.sendMessage(recipient.id, message.sender, response, 'task-response', {
+          expectsResponse: false,
+        });
       }
-      
     } catch (error) {
       logger.error('Task execution failed', {
         agentId: recipient.id,
         taskId: message.id,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -592,16 +583,12 @@ export class AgentCommunicationProtocol extends EventEmitter {
     const capabilities = {
       capabilities: recipient.capabilities,
       status: recipient.status,
-      metadata: recipient.metadata
+      metadata: recipient.metadata,
     };
-    
-    await this.sendMessage(
-      recipient.id,
-      message.sender,
-      capabilities,
-      'capability-response',
-      { expectsResponse: false }
-    );
+
+    await this.sendMessage(recipient.id, message.sender, capabilities, 'capability-response', {
+      expectsResponse: false,
+    });
   }
 
   /**
@@ -612,28 +599,26 @@ export class AgentCommunicationProtocol extends EventEmitter {
     logger.debug('Coordination request received', {
       from: message.sender,
       to: recipient.id,
-      content: message.content
+      content: message.content,
     });
   }
 
   /**
    * Calculate capability confidence for a task
    */
-  private calculateCapabilityConfidence(
-    capabilities: AgentCapability[], 
-    task: AgentTask
-  ): number {
+  private calculateCapabilityConfidence(capabilities: AgentCapability[], task: AgentTask): number {
     if (capabilities.length === 0) return 0;
-    
+
     const relevantCaps = capabilities.filter(cap =>
       task.requirements.some(req => req.value === cap.name)
     );
-    
+
     if (relevantCaps.length === 0) return 0;
-    
-    const avgConfidence = relevantCaps.reduce((sum, cap) => sum + cap.confidence, 0) / relevantCaps.length;
+
+    const avgConfidence =
+      relevantCaps.reduce((sum, cap) => sum + cap.confidence, 0) / relevantCaps.length;
     const coverageRatio = relevantCaps.length / task.requirements.length;
-    
+
     return avgConfidence * coverageRatio;
   }
 
@@ -644,15 +629,15 @@ export class AgentCommunicationProtocol extends EventEmitter {
     // Simplified estimation - would be more sophisticated in production
     const baseMemory = 50;
     const baseCpu = 30;
-    
+
     const complexity = task.constraints.length + task.requirements.length;
     const multiplier = Math.min(complexity / 5, 3);
-    
+
     return {
       memory: baseMemory * multiplier,
       cpu: baseCpu * multiplier,
       network: 10,
-      tokens: task.description.length * 4 // Rough token estimate
+      tokens: task.description.length * 4, // Rough token estimate
     };
   }
 
@@ -709,24 +694,25 @@ class SequentialOrchestrationStrategy implements OrchestrationStrategy {
         step: i + 1,
         agentId: agent.id,
         task,
-        startTime: new Date()
+        startTime: new Date(),
       };
 
       try {
-        const response = await agent.invoke([{
-          id: `task_${Date.now()}`,
-          type: 'task-request',
-          sender: 'orchestrator',
-          recipient: agent.id,
-          content: task,
-          metadata: { priority: 'medium', expectsResponse: true },
-          timestamp: new Date()
-        }]);
+        const response = await agent.invoke([
+          {
+            id: `task_${Date.now()}`,
+            type: 'task-request',
+            sender: 'orchestrator',
+            recipient: agent.id,
+            content: task,
+            metadata: { priority: 'medium', expectsResponse: true },
+            timestamp: new Date(),
+          },
+        ]);
 
         step.endTime = new Date();
         step.result = response;
         results.push(response);
-        
       } catch (error) {
         errors.push(`Agent ${agent.id}: ${error instanceof Error ? error.message : String(error)}`);
         step.endTime = new Date();
@@ -740,7 +726,7 @@ class SequentialOrchestrationStrategy implements OrchestrationStrategy {
       results,
       executionPlan,
       totalTime: Date.now() - startTime,
-      errors
+      errors,
     };
   }
 }
@@ -760,24 +746,25 @@ class ParallelOrchestrationStrategy implements OrchestrationStrategy {
         step: index + 1,
         agentId: agent.id,
         task,
-        startTime: new Date()
+        startTime: new Date(),
       };
 
       try {
-        const response = await agent.invoke([{
-          id: `task_${Date.now()}_${index}`,
-          type: 'task-request',
-          sender: 'orchestrator',
-          recipient: agent.id,
-          content: task,
-          metadata: { priority: 'medium', expectsResponse: true },
-          timestamp: new Date()
-        }]);
+        const response = await agent.invoke([
+          {
+            id: `task_${Date.now()}_${index}`,
+            type: 'task-request',
+            sender: 'orchestrator',
+            recipient: agent.id,
+            content: task,
+            metadata: { priority: 'medium', expectsResponse: true },
+            timestamp: new Date(),
+          },
+        ]);
 
         step.endTime = new Date();
         step.result = response;
         return { step, response, error: null };
-        
       } catch (error) {
         const errorMsg = `Agent ${agent.id}: ${error instanceof Error ? error.message : String(error)}`;
         step.endTime = new Date();
@@ -808,7 +795,7 @@ class ParallelOrchestrationStrategy implements OrchestrationStrategy {
       results,
       executionPlan,
       totalTime: Date.now() - startTime,
-      errors
+      errors,
     };
   }
 }
@@ -824,9 +811,9 @@ class DemocraticOrchestrationStrategy implements OrchestrationStrategy {
 
     // Simple democratic consensus - average confidence scores
     if (parallelResult.results.length > 0) {
-      const averageConfidence = parallelResult.results.reduce(
-        (sum, result) => sum + result.metadata.confidence, 0
-      ) / parallelResult.results.length;
+      const averageConfidence =
+        parallelResult.results.reduce((sum, result) => sum + result.metadata.confidence, 0) /
+        parallelResult.results.length;
 
       const consensus: ConsensusResult = {
         agreement: averageConfidence > 0.7,
@@ -837,14 +824,14 @@ class DemocraticOrchestrationStrategy implements OrchestrationStrategy {
         finalDecision: parallelResult.results[0].content,
         votingResults: parallelResult.results.map((result, i) => ({
           agentId: agents[i].id,
-          vote: result.metadata.confidence > 0.5 ? 'yes' as const : 'no' as const,
-          confidence: result.metadata.confidence
-        }))
+          vote: result.metadata.confidence > 0.5 ? ('yes' as const) : ('no' as const),
+          confidence: result.metadata.confidence,
+        })),
       };
 
       return {
         ...parallelResult,
-        consensus
+        consensus,
       };
     }
 
@@ -873,8 +860,8 @@ class HierarchicalOrchestrationStrategy implements OrchestrationStrategy {
     const relevantCaps = agent.capabilities.filter(cap =>
       task.requirements.some(req => req.value === cap.name)
     );
-    
-    return relevantCaps.length > 0 
+
+    return relevantCaps.length > 0
       ? relevantCaps.reduce((sum, cap) => sum + cap.confidence, 0) / relevantCaps.length
       : 0;
   }
@@ -888,20 +875,20 @@ class ConsensusOrchestrationStrategy implements OrchestrationStrategy {
     const startTime = Date.now();
     const maxRounds = 3;
     let round = 0;
-    
+
     const results: AgentResponse[] = [];
     const executionPlan: ExecutionStep[] = [];
     const errors: string[] = [];
-    
+
     // Multi-round consensus building
     while (round < maxRounds) {
       round++;
-      
+
       // Get responses from all agents
       const roundResults = await this.executeRound(agents, task, round, executionPlan);
       results.push(...roundResults.responses);
       errors.push(...roundResults.errors);
-      
+
       // Check for consensus
       const consensus = this.evaluateConsensus(roundResults.responses);
       if (consensus.agreement) {
@@ -911,35 +898,35 @@ class ConsensusOrchestrationStrategy implements OrchestrationStrategy {
           consensus,
           executionPlan,
           totalTime: Date.now() - startTime,
-          errors
+          errors,
         };
       }
-      
+
       // If not final round, adjust task based on feedback
       if (round < maxRounds) {
         task = this.refineTaskBasedOnFeedback(task, roundResults.responses);
       }
     }
-    
+
     // Final consensus attempt
     const finalConsensus = this.evaluateConsensus(results);
-    
+
     return {
       success: finalConsensus.agreement,
       results,
       consensus: finalConsensus,
       executionPlan,
       totalTime: Date.now() - startTime,
-      errors
+      errors,
     };
   }
 
   private async executeRound(
-    agents: Agent[], 
-    task: AgentTask, 
+    agents: Agent[],
+    task: AgentTask,
     round: number,
     executionPlan: ExecutionStep[]
-  ): Promise<{ responses: AgentResponse[], errors: string[] }> {
+  ): Promise<{ responses: AgentResponse[]; errors: string[] }> {
     const responses: AgentResponse[] = [];
     const errors: string[] = [];
 
@@ -949,26 +936,29 @@ class ConsensusOrchestrationStrategy implements OrchestrationStrategy {
         step: executionPlan.length + 1,
         agentId: agent.id,
         task: { ...task, description: `${task.description} (Consensus Round ${round})` },
-        startTime: new Date()
+        startTime: new Date(),
       };
 
       try {
-        const response = await agent.invoke([{
-          id: `consensus_${round}_${Date.now()}_${i}`,
-          type: 'task-request',
-          sender: 'consensus-orchestrator',
-          recipient: agent.id,
-          content: step.task,
-          metadata: { priority: 'high', expectsResponse: true },
-          timestamp: new Date()
-        }]);
+        const response = await agent.invoke([
+          {
+            id: `consensus_${round}_${Date.now()}_${i}`,
+            type: 'task-request',
+            sender: 'consensus-orchestrator',
+            recipient: agent.id,
+            content: step.task,
+            metadata: { priority: 'high', expectsResponse: true },
+            timestamp: new Date(),
+          },
+        ]);
 
         step.endTime = new Date();
         step.result = response;
         responses.push(response);
-        
       } catch (error) {
-        errors.push(`Round ${round} Agent ${agent.id}: ${error instanceof Error ? error.message : String(error)}`);
+        errors.push(
+          `Round ${round} Agent ${agent.id}: ${error instanceof Error ? error.message : String(error)}`
+        );
         step.endTime = new Date();
       }
 
@@ -985,11 +975,12 @@ class ConsensusOrchestrationStrategy implements OrchestrationStrategy {
         confidence: 0,
         dissenting: [],
         finalDecision: null,
-        votingResults: []
+        votingResults: [],
       };
     }
 
-    const avgConfidence = responses.reduce((sum, r) => sum + r.metadata.confidence, 0) / responses.length;
+    const avgConfidence =
+      responses.reduce((sum, r) => sum + r.metadata.confidence, 0) / responses.length;
     const highConfidenceResponses = responses.filter(r => r.metadata.confidence > 0.7);
     const agreement = highConfidenceResponses.length / responses.length > 0.6;
 
@@ -1003,24 +994,24 @@ class ConsensusOrchestrationStrategy implements OrchestrationStrategy {
       finalDecision: agreement ? highConfidenceResponses[0].content : null,
       votingResults: responses.map((response, i) => ({
         agentId: `agent_${i}`,
-        vote: response.metadata.confidence > 0.5 ? 'yes' as const : 'no' as const,
-        confidence: response.metadata.confidence
-      }))
+        vote: response.metadata.confidence > 0.5 ? ('yes' as const) : ('no' as const),
+        confidence: response.metadata.confidence,
+      })),
     };
   }
 
   private refineTaskBasedOnFeedback(task: AgentTask, responses: AgentResponse[]): AgentTask {
     // Simple refinement - in practice would be more sophisticated
     const lowConfidenceCount = responses.filter(r => r.metadata.confidence < 0.5).length;
-    
+
     if (lowConfidenceCount > responses.length / 2) {
       return {
         ...task,
         description: `${task.description} (Please provide more specific guidance)`,
-        priority: Math.min(task.priority + 1, 10)
+        priority: Math.min(task.priority + 1, 10),
       };
     }
-    
+
     return task;
   }
 }

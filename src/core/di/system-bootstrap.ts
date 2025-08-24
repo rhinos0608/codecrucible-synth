@@ -26,6 +26,7 @@ import {
 } from './service-tokens.js';
 import { logger } from '../logger.js';
 import { IModelClient } from '../interfaces/client-interfaces.js';
+import { startupOptimizer } from '../performance/startup-optimizer.js';
 
 /**
  * Bootstrap configuration
@@ -81,7 +82,15 @@ export class SystemBootstrap {
     this.initializationStartTime = Date.now();
 
     try {
-      logger.info('🚀 Starting system bootstrap...');
+      logger.info('🚀 Starting optimized system bootstrap...');
+
+      // Register startup optimization tasks
+      startupOptimizer.reset();
+      this.registerStartupTasks();
+
+      // Execute optimized startup
+      const startupResult = await startupOptimizer.executeOptimizedStartup();
+      logger.info(`🚀 Startup optimization completed: ${startupResult.successCount}/${startupResult.totalTime}ms`);
 
       // Phase 1: Core infrastructure (no dependencies)
       await this.initializeCoreInfrastructure();
@@ -122,6 +131,15 @@ export class SystemBootstrap {
       const initializationTime = Date.now() - this.initializationStartTime;
 
       logger.info(`✅ System bootstrap completed in ${initializationTime}ms`);
+      
+      // Generate startup performance report
+      const startupAnalytics = startupOptimizer.getStartupAnalytics();
+      const recommendations = startupOptimizer.getOptimizationRecommendations();
+      
+      if (recommendations.length > 0) {
+        logger.info('📊 Startup optimization recommendations:');
+        recommendations.forEach(rec => logger.info(`   - ${rec}`));
+      }
 
       return {
         container: this.container,
@@ -263,16 +281,16 @@ export class SystemBootstrap {
         const { ProviderRepository } = await import('../providers/provider-repository.js');
         const config = container.resolve(CLIENT_CONFIG_TOKEN);
         const providerRepository = new ProviderRepository();
-        
+
         // Initialize with provider configurations from CLIENT_CONFIG
         await providerRepository.initialize(config.providers || []);
-        
+
         return providerRepository;
       },
-      { 
-        lifecycle: 'singleton', 
+      {
+        lifecycle: 'singleton',
         lazy: true,
-        dependencies: [CLIENT_CONFIG_TOKEN.name]
+        dependencies: [CLIENT_CONFIG_TOKEN.name],
       }
     );
   }
@@ -454,6 +472,124 @@ export class SystemBootstrap {
    */
   getContainer(): DependencyContainer {
     return this.container;
+  }
+
+  /**
+   * Register startup optimization tasks
+   */
+  private registerStartupTasks(): void {
+    // Critical path tasks
+    startupOptimizer.registerTask({
+      name: 'core_infrastructure',
+      priority: 'critical',
+      timeout: 1000,
+      task: async () => {
+        await this.initializeCoreInfrastructure();
+        return true;
+      }
+    });
+
+    startupOptimizer.registerTask({
+      name: 'configuration',
+      priority: 'critical', 
+      timeout: 1000,
+      task: async () => {
+        await this.initializeConfiguration();
+        return true;
+      },
+      dependencies: ['core_infrastructure']
+    });
+
+    // High priority parallel tasks
+    startupOptimizer.registerTask({
+      name: 'security_services',
+      priority: 'high',
+      timeout: 2000,
+      task: async () => {
+        await this.initializeSecurity();
+        return true;
+      },
+      dependencies: ['configuration']
+    });
+
+    startupOptimizer.registerTask({
+      name: 'cache_services',
+      priority: 'high',
+      timeout: 2000,
+      task: async () => {
+        await this.initializeCache();
+        return true;
+      },
+      dependencies: ['configuration']
+    });
+
+    startupOptimizer.registerTask({
+      name: 'monitoring_services',
+      priority: 'high',
+      timeout: 2000,
+      task: async () => {
+        await this.initializeMonitoring();
+        return true;
+      },
+      dependencies: ['configuration']
+    });
+
+    // Medium priority tasks
+    startupOptimizer.registerTask({
+      name: 'provider_services',
+      priority: 'medium',
+      timeout: 3000,
+      task: async () => {
+        await this.initializeProviders();
+        return true;
+      },
+      dependencies: ['configuration', 'cache_services']
+    });
+
+    startupOptimizer.registerTask({
+      name: 'routing_services',
+      priority: 'medium',
+      timeout: 3000,
+      task: async () => {
+        await this.initializeRouting();
+        return true;
+      },
+      dependencies: ['configuration', 'provider_services']
+    });
+
+    startupOptimizer.registerTask({
+      name: 'streaming_services',
+      priority: 'medium',
+      timeout: 2000,
+      task: async () => {
+        await this.initializeStreaming();
+        return true;
+      },
+      dependencies: ['configuration']
+    });
+
+    // Low priority (can fail without blocking)
+    startupOptimizer.registerTask({
+      name: 'client_initialization',
+      priority: 'low',
+      timeout: 5000,
+      task: async () => {
+        await this.initializeClient();
+        return true;
+      },
+      dependencies: ['provider_services', 'routing_services', 'streaming_services', 'security_services', 'monitoring_services']
+    });
+
+    startupOptimizer.registerTask({
+      name: 'synthesis_coordinator',
+      priority: 'low',
+      timeout: 3000,
+      task: async () => {
+        await this.initializeSynthesisCoordinator();
+        return true;
+      },
+      dependencies: ['client_initialization']
+    });
   }
 
   /**

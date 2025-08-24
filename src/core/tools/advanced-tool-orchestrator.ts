@@ -16,8 +16,21 @@ import { getTelemetryProvider } from '../observability/observability-system.js';
 
 // AI SDK v5.0 Streaming Interfaces
 export interface StreamChunk {
-  type: 'stream-start' | 'text-start' | 'text-delta' | 'text-end' | 'reasoning-start' | 'reasoning-delta' | 'reasoning-end' 
-       | 'tool-input-start' | 'tool-input-delta' | 'tool-input-end' | 'tool-call' | 'tool-result' | 'finish' | 'error';
+  type:
+    | 'stream-start'
+    | 'text-start'
+    | 'text-delta'
+    | 'text-end'
+    | 'reasoning-start'
+    | 'reasoning-delta'
+    | 'reasoning-end'
+    | 'tool-input-start'
+    | 'tool-input-delta'
+    | 'tool-input-end'
+    | 'tool-call'
+    | 'tool-result'
+    | 'finish'
+    | 'error';
   id?: string;
   toolName?: string;
   toolCallId?: string;
@@ -46,7 +59,7 @@ export interface Tool {
   outputSchema: JSONSchema;
   execute: (input: any, context: ToolContext) => Promise<ToolResult>;
   metadata: ToolMetadata;
-  
+
   // Enhanced: Streaming support for modern tool execution patterns
   stream?: (input: any, context: ToolContext) => AsyncGenerator<ToolExecutionDelta>;
   validate?: (input: any) => { valid: boolean; errors: string[]; normalizedInput?: any };
@@ -206,7 +219,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     this.costOptimizer = new CostOptimizer();
     this.performanceMonitor = new PerformanceMonitor();
     this.errorRecovery = new ErrorRecoveryManager();
-    
+
     // Enhanced: Initialize telemetry provider for observability
     try {
       this.telemetryProvider = getTelemetryProvider();
@@ -249,14 +262,14 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   ): Promise<ToolResult> {
     const startTime = Date.now();
     const tool = this.toolRegistry.getTool(toolCall.toolId);
-    
+
     if (!tool) {
       const error = `Tool ${toolCall.toolId} not found`;
       onChunk({
         type: 'error',
         timestamp: Date.now(),
         error,
-        errorCode: 'TOOL_NOT_FOUND'
+        errorCode: 'TOOL_NOT_FOUND',
       });
       throw new Error(error);
     }
@@ -267,20 +280,20 @@ export class AdvancedToolOrchestrator extends EventEmitter {
         type: 'tool-input-start',
         id: toolCall.id,
         toolName: tool.name,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       // Stream tool input parameters if they exist
       if (toolCall.input && typeof toolCall.input === 'object') {
         const inputString = JSON.stringify(toolCall.input, null, 2);
         const chunks = this.tokenizeForStreaming(inputString, 50);
-        
+
         for (const chunk of chunks) {
           onChunk({
             type: 'tool-input-delta',
             id: toolCall.id,
             delta: chunk,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
           await this.delay(10); // Small delay for realistic streaming
         }
@@ -290,7 +303,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
       onChunk({
         type: 'tool-input-end',
         id: toolCall.id,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       // Validate input if tool supports validation
@@ -302,7 +315,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
             type: 'error',
             timestamp: Date.now(),
             error,
-            errorCode: 'VALIDATION_ERROR'
+            errorCode: 'VALIDATION_ERROR',
           });
           throw new Error(error);
         }
@@ -314,16 +327,16 @@ export class AdvancedToolOrchestrator extends EventEmitter {
         toolCallId: toolCall.id,
         toolName: tool.name,
         args: toolCall.input,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       // Execute tool with streaming if supported
       let result: ToolResult;
-      
+
       if (tool.stream) {
         // Use streaming execution
         const outputParts: string[] = [];
-        
+
         for await (const delta of tool.stream(toolCall.input, context)) {
           if (delta.type === 'output') {
             outputParts.push(delta.content);
@@ -331,11 +344,11 @@ export class AdvancedToolOrchestrator extends EventEmitter {
               type: 'text-delta',
               id: `${toolCall.id}_output`,
               delta: delta.content,
-              timestamp: Date.now()
+              timestamp: Date.now(),
             });
           }
         }
-        
+
         result = {
           toolId: tool.id,
           success: true,
@@ -344,8 +357,8 @@ export class AdvancedToolOrchestrator extends EventEmitter {
             executionTime: Date.now() - startTime,
             memoryUsed: 0,
             cost: tool.metadata.cost,
-            version: tool.metadata.version
-          }
+            version: tool.metadata.version,
+          },
         };
       } else {
         // Use regular execution
@@ -358,7 +371,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
         type: 'tool-result',
         toolCallId: toolCall.id,
         result: result.output,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       // Record telemetry if available
@@ -371,16 +384,15 @@ export class AdvancedToolOrchestrator extends EventEmitter {
       }
 
       return result;
-
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       onChunk({
         type: 'error',
         timestamp: Date.now(),
         error: errorMsg,
-        errorCode: 'EXECUTION_ERROR'
+        errorCode: 'EXECUTION_ERROR',
       });
-      
+
       if (this.telemetryProvider) {
         this.telemetryProvider.recordToolExecution(
           tool.name,
@@ -389,7 +401,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
           errorMsg
         );
       }
-      
+
       throw error;
     }
   }
@@ -816,7 +828,7 @@ Please provide a clear, helpful response based on these tool results. If there w
    * Enhanced: Find tools suitable for a given task with modern matching
    */
   async findToolsForTask(
-    task: string, 
+    task: string,
     requirements?: {
       categories?: ToolCategory[];
       capabilities?: string[];
@@ -832,11 +844,11 @@ Please provide a clear, helpful response based on these tool results. If there w
       if (requirements?.categories && !requirements.categories.includes(tool.category)) {
         continue;
       }
-      
+
       if (requirements?.maxCost && tool.metadata.cost > requirements.maxCost) {
         continue;
       }
-      
+
       if (requirements?.maxLatency && tool.metadata.latency > requirements.maxLatency) {
         continue;
       }
@@ -846,7 +858,10 @@ Please provide a clear, helpful response based on these tool results. If there w
       const reasons: string[] = [];
 
       // Name match (highest priority)
-      if (tool.name.toLowerCase().includes(taskLower) || taskLower.includes(tool.name.toLowerCase())) {
+      if (
+        tool.name.toLowerCase().includes(taskLower) ||
+        taskLower.includes(tool.name.toLowerCase())
+      ) {
         confidence += 0.4;
         reasons.push('tool name matches');
       }
@@ -858,8 +873,8 @@ Please provide a clear, helpful response based on these tool results. If there w
       }
 
       // Tag matches
-      const matchingTags = tool.metadata.tags.filter(tag =>
-        tag.toLowerCase().includes(taskLower) || taskLower.includes(tag.toLowerCase())
+      const matchingTags = tool.metadata.tags.filter(
+        tag => tag.toLowerCase().includes(taskLower) || taskLower.includes(tag.toLowerCase())
       );
       if (matchingTags.length > 0) {
         confidence += matchingTags.length * 0.1;
@@ -869,8 +884,8 @@ Please provide a clear, helpful response based on these tool results. If there w
       // Capability matches
       if (requirements?.capabilities) {
         const hasRequiredCaps = requirements.capabilities.some(reqCap =>
-          tool.metadata.capabilities.some(toolCap => 
-            toolCap.type.includes(reqCap) || toolCap.scope.includes(reqCap)
+          tool.metadata.capabilities.some(
+            toolCap => toolCap.type.includes(reqCap) || toolCap.scope.includes(reqCap)
           )
         );
         if (hasRequiredCaps) {
@@ -879,19 +894,18 @@ Please provide a clear, helpful response based on these tool results. If there w
         }
       }
 
-      if (confidence > 0.1) { // Minimum threshold
+      if (confidence > 0.1) {
+        // Minimum threshold
         matches.push({
           tool,
           confidence: Math.min(confidence, 1.0),
-          reasoning: reasons.join('; ') || 'general relevance'
+          reasoning: reasons.join('; ') || 'general relevance',
         });
       }
     }
 
     // Sort by confidence and return top matches
-    return matches
-      .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, 10);
+    return matches.sort((a, b) => b.confidence - a.confidence).slice(0, 10);
   }
 
   private initializeBuiltInTools(): void {

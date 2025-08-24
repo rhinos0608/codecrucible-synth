@@ -241,9 +241,9 @@ export class DependencyContainer extends EventEmitter {
       case 'scoped':
         if (context.scope) {
           const result = context.scope.resolve(tokenName);
-          return (result && typeof (result as any).then === 'function') 
-            ? await (result as any) 
-            : result as T;
+          return result && typeof (result as any).then === 'function'
+            ? await (result as any)
+            : (result as T);
         }
         // Fall through to transient if no scope provided
         return await this.resolveTransient(registration, context);
@@ -445,12 +445,13 @@ export class DependencyContainer extends EventEmitter {
 
     try {
       const instance = registration.factory(this);
-      
+
       // FIX: Properly await async factories that return Promises
-      const resolvedInstance = instance && typeof (instance as any).then === 'function' 
-        ? await (instance as any)
-        : instance;
-        
+      const resolvedInstance =
+        instance && typeof (instance as any).then === 'function'
+          ? await (instance as any)
+          : instance;
+
       registration.initialized = true;
 
       this.emit('serviceResolved', {

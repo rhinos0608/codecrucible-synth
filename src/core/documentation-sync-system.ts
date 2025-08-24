@@ -855,7 +855,7 @@ OVERVIEW:
 
     if (this.issues.length > 0) {
       report += 'ISSUES FOUND:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       for (const [type, issues] of issueTypes) {
         const icon =
@@ -899,7 +899,7 @@ OVERVIEW:
     }
 
     report += 'DOCUMENTATION BREAKDOWN:\n';
-    report += '─'.repeat(50) + '\n';
+    report += `${'─'.repeat(50)}\n`;
     for (const [type, count] of docsByType) {
       const icon =
         type === 'readme'

@@ -684,7 +684,7 @@ MEMORY USAGE:
     // Memory leaks
     if (leaks.length > 0) {
       report += `🚨 MEMORY LEAKS DETECTED (${leaks.length}):\n`;
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       const leakTypes = new Map<string, MemoryLeak[]>();
       for (const leak of leaks) {
@@ -732,7 +732,7 @@ MEMORY USAGE:
     // Performance bottlenecks
     if (bottlenecks.length > 0) {
       report += `⚡ PERFORMANCE BOTTLENECKS (${bottlenecks.length}):\n`;
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       const bottleneckTypes = new Map<string, PerformanceBottleneck[]>();
       for (const bottleneck of bottlenecks) {
@@ -780,7 +780,7 @@ MEMORY USAGE:
     // Recommendations
     if (recommendations.length > 0) {
       report += '📋 RECOMMENDATIONS:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       for (const rec of recommendations) {
         report += `${rec}\n`;
@@ -801,7 +801,7 @@ MEMORY USAGE:
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
   /**

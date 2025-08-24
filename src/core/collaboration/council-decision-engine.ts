@@ -74,15 +74,15 @@ export class CouncilDecisionEngine extends EventEmitter {
    * Conduct a council session with multiple voices
    */
   async conductCouncilSession(
-    prompt: string, 
-    voices: string[], 
+    prompt: string,
+    voices: string[],
     config: CouncilConfig
   ): Promise<CouncilDecision> {
     const sessionId = this.generateSessionId();
     logger.info(`Starting council session ${sessionId} with ${voices.length} voices`);
-    
+
     const perspectives: VoicePerspective[] = [];
-    
+
     // Collect perspectives from each voice
     for (const voiceId of voices) {
       try {
@@ -92,7 +92,7 @@ export class CouncilDecisionEngine extends EventEmitter {
         logger.warn(`Failed to get perspective from voice ${voiceId}:`, error);
       }
     }
-    
+
     return {
       finalDecision: this.synthesizeDecision(perspectives),
       consensusLevel: this.calculateConsensus(perspectives),
@@ -100,7 +100,7 @@ export class CouncilDecisionEngine extends EventEmitter {
       perspectives,
       conflictsResolved: [],
       decisionRationale: 'Multi-voice synthesis decision',
-      dissent: []
+      dissent: [],
     };
   }
 
@@ -111,7 +111,8 @@ export class CouncilDecisionEngine extends EventEmitter {
 
   private calculateConsensus(perspectives: VoicePerspective[]): number {
     if (perspectives.length === 0) return 0;
-    const avgConfidence = perspectives.reduce((sum, p) => sum + p.confidence, 0) / perspectives.length;
+    const avgConfidence =
+      perspectives.reduce((sum, p) => sum + p.confidence, 0) / perspectives.length;
     return Math.min(avgConfidence, 1.0);
   }
 

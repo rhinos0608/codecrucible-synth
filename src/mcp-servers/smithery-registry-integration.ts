@@ -40,7 +40,7 @@ export class SmitheryRegistryIntegration {
 
   constructor(config: SmitheryConfig) {
     this.config = config;
-    
+
     // Initialize Smithery registry with bearer authentication
     this.registry = new SmitheryRegistry({
       bearerAuth: config.apiKey,
@@ -71,17 +71,17 @@ export class SmitheryRegistryIntegration {
       });
 
       const servers: SmitheryServer[] = [];
-      
+
       // Process first page of results
       for await (const page of result) {
         if (servers.length >= limit) break;
-        
+
         // Check if page has result property
         const pageServers = (page as any).result?.servers || (page as any).servers || [];
-        
+
         for (const server of pageServers) {
           if (servers.length >= limit) break;
-          
+
           const serverDetails: SmitheryServer = {
             qualifiedName: server.qualifiedName,
             displayName: server.displayName,
@@ -90,7 +90,7 @@ export class SmitheryRegistryIntegration {
             useCount: server.useCount || 0,
             tools: [], // Will be populated by getServerDetails
           };
-          
+
           servers.push(serverDetails);
           this.cachedServers.set(server.qualifiedName, serverDetails);
         }
@@ -137,8 +137,10 @@ export class SmitheryRegistryIntegration {
       };
 
       this.cachedServers.set(qualifiedName, serverDetails);
-      logger.info(`Retrieved details for ${qualifiedName} with ${serverDetails.tools.length} tools`);
-      
+      logger.info(
+        `Retrieved details for ${qualifiedName} with ${serverDetails.tools.length} tools`
+      );
+
       return serverDetails;
     } catch (error) {
       logger.error(`Error getting server details for ${qualifiedName}:`, error);

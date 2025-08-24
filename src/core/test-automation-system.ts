@@ -181,7 +181,7 @@ export class TestAutomationSystem {
     for (const [id, count] of Object.entries(coverage.s)) {
       if (count === 0) {
         const statement = coverage.statementMap[id];
-        if (statement && statement.start) {
+        if (statement?.start) {
           uncovered.push(statement.start.line);
         }
       }
@@ -795,7 +795,7 @@ OVERVIEW:
     ];
 
     report += 'COVERAGE DISTRIBUTION:\n';
-    report += '─'.repeat(50) + '\n';
+    report += `${'─'.repeat(50)}\n`;
 
     for (const range of coverageRanges) {
       const count = this.coverage.filter(c => c.lines >= range.min && c.lines <= range.max).length;
@@ -807,7 +807,7 @@ OVERVIEW:
     // Test gaps
     if (this.gaps.length > 0) {
       report += '\n🚨 TEST GAPS IDENTIFIED:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       const gapTypes = new Map<string, TestGap[]>();
       for (const gap of this.gaps) {
@@ -853,7 +853,7 @@ OVERVIEW:
 
     if (lowestCoverage.length > 0) {
       report += '📉 LOWEST COVERAGE FILES:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       for (const file of lowestCoverage) {
         report += `${file.lines}% - ${file.file}\n`;
@@ -871,7 +871,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   testSystem
     .analyzeCoverage()
-    .then(result => {
+    .then(async result => {
       console.log(testSystem.generateReport());
 
       if (result.gaps.length > 0) {

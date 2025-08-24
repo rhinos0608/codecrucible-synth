@@ -322,7 +322,7 @@ export class AutonomousTaskManager extends EventEmitter {
       },
     ];
 
-    const results = await Promise.all(validations.map(v => v()));
+    const results = await Promise.all(validations.map(async v => v()));
     const passCount = results.filter(r => r).length;
 
     console.log(chalk.blue(`  Validation: ${passCount}/${results.length} checks passed`));

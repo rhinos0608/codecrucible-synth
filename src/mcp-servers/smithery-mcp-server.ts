@@ -64,7 +64,7 @@ export class SmitheryMCPServer {
   private async discoverServers(): Promise<void> {
     try {
       let servers: any[] = [];
-      
+
       if (this.config.enabledServers && this.config.enabledServers.length > 0) {
         // Load specific servers
         for (const serverName of this.config.enabledServers) {
@@ -81,7 +81,7 @@ export class SmitheryMCPServer {
       // Register tools from discovered servers
       for (const server of servers) {
         this.availableServers.set(server.qualifiedName, server);
-        
+
         for (const tool of server.tools) {
           const toolName = `${server.qualifiedName.replace('/', '_')}_${tool.name}`;
           this.availableTools.set(toolName, {

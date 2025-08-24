@@ -1,7 +1,7 @@
 /**
  * Claude Code-inspired Security System
  * Based on research of Claude Code security patterns (2024-2025)
- * 
+ *
  * Key principles from Claude Code:
  * 1. User consent for potentially dangerous operations
  * 2. Path validation and CWD restrictions
@@ -51,17 +51,17 @@ export interface SecurityPolicy {
   allowedPaths: string[];
   blockedPaths: string[];
   requireConsentForPaths: string[];
-  
+
   // Command restrictions (Claude Code pattern)
   whitelistedCommands: string[];
   dangerousCommands: string[];
   requireConsentForCommands: string[];
-  
+
   // File operation restrictions
   allowedFileExtensions: string[];
   dangerousFileExtensions: string[];
   requireConsentForExtensions: string[];
-  
+
   // Developer-friendly patterns (not blocked, but logged)
   developmentKeywords: string[];
   sqlKeywords: string[];
@@ -94,71 +94,129 @@ export class ClaudeCodeSecurity extends EventEmitter {
         './dist/**',
         './docs/**',
         './config/**',
-        './tests/**'
+        './tests/**',
       ],
-      
-      blockedPaths: [
-        '/etc/**',
-        '/sys/**',
-        '/proc/**',
-        'C:\\Windows\\System32\\**',
-        '/usr/bin/**'
-      ],
-      
+
+      blockedPaths: ['/etc/**', '/sys/**', '/proc/**', 'C:\\Windows\\System32\\**', '/usr/bin/**'],
+
       requireConsentForPaths: [
         '../**', // Outside project directory
         '/tmp/**',
-        'C:\\Users\\**\\AppData\\**'
+        'C:\\Users\\**\\AppData\\**',
       ],
 
       // Command security (Claude Code pattern)
       whitelistedCommands: [
-        'ls', 'dir', 'cat', 'type', 'echo', 'pwd', 'cd',
-        'git', 'npm', 'node', 'python', 'pip',
-        'grep', 'find', 'sort', 'head', 'tail',
-        'mkdir', 'touch'
+        'ls',
+        'dir',
+        'cat',
+        'type',
+        'echo',
+        'pwd',
+        'cd',
+        'git',
+        'npm',
+        'node',
+        'python',
+        'pip',
+        'grep',
+        'find',
+        'sort',
+        'head',
+        'tail',
+        'mkdir',
+        'touch',
       ],
-      
+
       dangerousCommands: [
-        'rm -rf', 'del /s', 'format', 'shutdown', 'reboot', 'halt',
-        'dd', 'fdisk', 'mkfs', 'chmod 777'
+        'rm -rf',
+        'del /s',
+        'format',
+        'shutdown',
+        'reboot',
+        'halt',
+        'dd',
+        'fdisk',
+        'mkfs',
+        'chmod 777',
       ],
-      
+
       requireConsentForCommands: [
-        'rm', 'del', 'move', 'mv', 'cp', 'copy',
-        'chmod', 'chown', 'sudo', 'su',
-        'curl', 'wget', 'ssh', 'scp'
+        'rm',
+        'del',
+        'move',
+        'mv',
+        'cp',
+        'copy',
+        'chmod',
+        'chown',
+        'sudo',
+        'su',
+        'curl',
+        'wget',
+        'ssh',
+        'scp',
       ],
 
       // File extension security
       allowedFileExtensions: [
-        '.js', '.ts', '.json', '.md', '.txt', '.yaml', '.yml',
-        '.css', '.html', '.jsx', '.tsx', '.py', '.java',
-        '.c', '.cpp', '.h', '.go', '.rs', '.php'
+        '.js',
+        '.ts',
+        '.json',
+        '.md',
+        '.txt',
+        '.yaml',
+        '.yml',
+        '.css',
+        '.html',
+        '.jsx',
+        '.tsx',
+        '.py',
+        '.java',
+        '.c',
+        '.cpp',
+        '.h',
+        '.go',
+        '.rs',
+        '.php',
       ],
-      
-      dangerousFileExtensions: [
-        '.exe', '.bat', '.cmd', '.ps1', '.sh', '.com', '.scr'
-      ],
-      
-      requireConsentForExtensions: [
-        '.env', '.key', '.pem', '.p12', '.jks'
-      ],
+
+      dangerousFileExtensions: ['.exe', '.bat', '.cmd', '.ps1', '.sh', '.com', '.scr'],
+
+      requireConsentForExtensions: ['.env', '.key', '.pem', '.p12', '.jks'],
 
       // Developer-friendly keywords (allowed but logged)
       developmentKeywords: [
-        'refactor', 'update', 'modify', 'change', 'fix', 'implement',
-        'create', 'generate', 'build', 'compile', 'test', 'debug'
+        'refactor',
+        'update',
+        'modify',
+        'change',
+        'fix',
+        'implement',
+        'create',
+        'generate',
+        'build',
+        'compile',
+        'test',
+        'debug',
       ],
-      
+
       sqlKeywords: [
-        'select', 'insert', 'update', 'delete', 'create', 'drop',
-        'alter', 'union', 'join', 'where', 'group', 'order'
+        'select',
+        'insert',
+        'update',
+        'delete',
+        'create',
+        'drop',
+        'alter',
+        'union',
+        'join',
+        'where',
+        'group',
+        'order',
       ],
-      
-      systemCommands: [
-        'process', 'system', 'exec', 'spawn', 'fork', 'kill'
-      ]
+
+      systemCommands: ['process', 'system', 'exec', 'spawn', 'fork', 'kill'],
     };
   }
 
@@ -202,20 +260,20 @@ export class ClaudeCodeSecurity extends EventEmitter {
     return {
       action: 'allow',
       reason: 'Operation within security policy',
-      riskLevel: 'low'
+      riskLevel: 'low',
     };
   }
 
   private evaluatePathSecurity(filePath: string): SecurityDecision {
     const resolvedPath = path.resolve(filePath);
-    
+
     // Check blocked paths first
     for (const blockedPattern of this.policy.blockedPaths) {
       if (this.matchesPattern(resolvedPath, blockedPattern)) {
         return {
           action: 'block',
           reason: `Access to blocked path: ${blockedPattern}`,
-          riskLevel: 'high'
+          riskLevel: 'high',
         };
       }
     }
@@ -228,11 +286,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
           reason: `Access outside working directory requires consent`,
           riskLevel: 'medium',
           requiresConsent: true,
-          suggestedActions: [
-            'Allow once',
-            'Allow for this session',
-            'Deny'
-          ]
+          suggestedActions: ['Allow once', 'Allow for this session', 'Deny'],
         };
       }
     }
@@ -243,7 +297,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
         return {
           action: 'allow',
           reason: 'Path within allowed directory',
-          riskLevel: 'low'
+          riskLevel: 'low',
         };
       }
     }
@@ -253,20 +307,20 @@ export class ClaudeCodeSecurity extends EventEmitter {
       action: 'askUser',
       reason: 'Path not in predefined allowed list',
       riskLevel: 'medium',
-      requiresConsent: true
+      requiresConsent: true,
     };
   }
 
   private evaluateCommandSecurity(command: string): SecurityDecision {
     const cmdLower = command.toLowerCase().trim();
-    
+
     // Check dangerous commands
     for (const dangerous of this.policy.dangerousCommands) {
       if (cmdLower.includes(dangerous.toLowerCase())) {
         return {
           action: 'block',
           reason: `Dangerous command detected: ${dangerous}`,
-          riskLevel: 'critical'
+          riskLevel: 'critical',
         };
       }
     }
@@ -279,11 +333,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
           reason: `Command '${consentCmd}' requires user consent`,
           riskLevel: 'medium',
           requiresConsent: true,
-          suggestedActions: [
-            'Allow this command',
-            'Modify command',
-            'Deny'
-          ]
+          suggestedActions: ['Allow this command', 'Modify command', 'Deny'],
         };
       }
     }
@@ -294,7 +344,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
         return {
           action: 'allow',
           reason: `Whitelisted command: ${allowed}`,
-          riskLevel: 'low'
+          riskLevel: 'low',
         };
       }
     }
@@ -304,18 +354,20 @@ export class ClaudeCodeSecurity extends EventEmitter {
       action: 'askUser',
       reason: 'Command not in whitelist',
       riskLevel: 'medium',
-      requiresConsent: true
+      requiresConsent: true,
     };
   }
 
   private evaluateContentSecurity(content: string): SecurityDecision {
     const contentLower = content.toLowerCase();
-    
+
     // Check for development keywords (allow but note)
     const foundKeywords = {
       sql: this.policy.sqlKeywords.filter(kw => contentLower.includes(kw.toLowerCase())),
-      development: this.policy.developmentKeywords.filter(kw => contentLower.includes(kw.toLowerCase())),
-      system: this.policy.systemCommands.filter(kw => contentLower.includes(kw.toLowerCase()))
+      development: this.policy.developmentKeywords.filter(kw =>
+        contentLower.includes(kw.toLowerCase())
+      ),
+      system: this.policy.systemCommands.filter(kw => contentLower.includes(kw.toLowerCase())),
     };
 
     // Contextual analysis - this is the key improvement over keyword blocking
@@ -324,23 +376,39 @@ export class ClaudeCodeSecurity extends EventEmitter {
     const isSystemContext = this.isSystemContext(content, foundKeywords);
 
     // Log for audit but don't block development work
-    if (foundKeywords.sql.length > 0 || foundKeywords.system.length > 0 || foundKeywords.development.length > 0) {
+    if (
+      foundKeywords.sql.length > 0 ||
+      foundKeywords.system.length > 0 ||
+      foundKeywords.development.length > 0
+    ) {
       this.emit('keywordDetected', {
         sql: foundKeywords.sql,
         development: foundKeywords.development,
         system: foundKeywords.system,
         context: { isDevelopmentContext, isSQLContext, isSystemContext },
-        content: content.substring(0, 200) + '...'
+        content: content.substring(0, 200) + '...',
       });
     }
 
     // Only block or request consent for truly dangerous patterns
     const dangerousPatterns = [
-      { pattern: /rm\s+-rf\s+[\/\\]\*?/, reason: 'Recursive file deletion detected', risk: 'critical' },
+      {
+        pattern: /rm\s+-rf\s+[\/\\]\*?/,
+        reason: 'Recursive file deletion detected',
+        risk: 'critical',
+      },
       { pattern: /format\s+[cC]:/i, reason: 'Disk format command detected', risk: 'critical' },
       { pattern: /shutdown\s+-[rf]/i, reason: 'System shutdown command detected', risk: 'high' },
-      { pattern: /del\s+[\/\\].*\*.*[\/\\]s/i, reason: 'Recursive delete command detected', risk: 'critical' },
-      { pattern: /echo\s+.*>\s*\/dev\/(null|zero|random)/i, reason: 'System device manipulation detected', risk: 'high' }
+      {
+        pattern: /del\s+[\/\\].*\*.*[\/\\]s/i,
+        reason: 'Recursive delete command detected',
+        risk: 'critical',
+      },
+      {
+        pattern: /echo\s+.*>\s*\/dev\/(null|zero|random)/i,
+        reason: 'System device manipulation detected',
+        risk: 'high',
+      },
     ];
 
     for (const { pattern, reason, risk } of dangerousPatterns) {
@@ -350,18 +418,21 @@ export class ClaudeCodeSecurity extends EventEmitter {
           reason,
           riskLevel: risk as 'high' | 'critical',
           requiresConsent: true,
-          suggestedActions: ['Review and confirm', 'Modify operation', 'Cancel']
+          suggestedActions: ['Review and confirm', 'Modify operation', 'Cancel'],
         };
       }
     }
 
     // Handle development contexts appropriately
-    if (isDevelopmentContext && (foundKeywords.sql.length > 0 || foundKeywords.development.length > 0)) {
+    if (
+      isDevelopmentContext &&
+      (foundKeywords.sql.length > 0 || foundKeywords.development.length > 0)
+    ) {
       // This is legitimate development work - allow with low risk
       return {
         action: 'allow',
         reason: 'Development operation in appropriate context',
-        riskLevel: 'low'
+        riskLevel: 'low',
       };
     }
 
@@ -372,14 +443,14 @@ export class ClaudeCodeSecurity extends EventEmitter {
         reason: 'File modification requested - requires confirmation',
         riskLevel: 'medium',
         requiresConsent: true,
-        suggestedActions: ['Allow file changes', 'Review changes first', 'Deny']
+        suggestedActions: ['Allow file changes', 'Review changes first', 'Deny'],
       };
     }
 
     return {
       action: 'allow',
       reason: 'Content passed contextual security analysis',
-      riskLevel: 'low'
+      riskLevel: 'low',
     };
   }
 
@@ -388,16 +459,31 @@ export class ClaudeCodeSecurity extends EventEmitter {
    */
   private isDevelopmentContext(content: string, keywords: any): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Look for development indicators
     const devIndicators = [
-      'refactor', 'implement', 'create function', 'modify code', 'update code',
-      'code review', 'test', 'debug', 'file.js', 'file.ts', 'component',
-      'database', 'query', 'migration', 'schema', 'table'
+      'refactor',
+      'implement',
+      'create function',
+      'modify code',
+      'update code',
+      'code review',
+      'test',
+      'debug',
+      'file.js',
+      'file.ts',
+      'component',
+      'database',
+      'query',
+      'migration',
+      'schema',
+      'table',
     ];
-    
-    return devIndicators.some(indicator => contentLower.includes(indicator)) ||
-           keywords.development.length > 0;
+
+    return (
+      devIndicators.some(indicator => contentLower.includes(indicator)) ||
+      keywords.development.length > 0
+    );
   }
 
   /**
@@ -405,12 +491,13 @@ export class ClaudeCodeSecurity extends EventEmitter {
    */
   private isSQLContext(content: string, keywords: any): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Look for SQL/database context indicators
     const sqlIndicators = ['database', 'table', 'query', 'migration', 'schema', 'sql'];
-    
-    return sqlIndicators.some(indicator => contentLower.includes(indicator)) ||
-           keywords.sql.length >= 2; // Multiple SQL keywords suggest SQL context
+
+    return (
+      sqlIndicators.some(indicator => contentLower.includes(indicator)) || keywords.sql.length >= 2
+    ); // Multiple SQL keywords suggest SQL context
   }
 
   /**
@@ -418,12 +505,14 @@ export class ClaudeCodeSecurity extends EventEmitter {
    */
   private isSystemContext(content: string, keywords: any): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Look for system administration context
     const sysIndicators = ['server', 'deploy', 'production', 'system', 'process'];
-    
-    return sysIndicators.some(indicator => contentLower.includes(indicator)) ||
-           keywords.system.length > 0;
+
+    return (
+      sysIndicators.some(indicator => contentLower.includes(indicator)) ||
+      keywords.system.length > 0
+    );
   }
 
   /**
@@ -431,27 +520,29 @@ export class ClaudeCodeSecurity extends EventEmitter {
    */
   private isFileModificationRequest(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     const fileModificationPatterns = [
       /write\s+to\s+file/,
       /modify\s+.*\.js/,
       /change\s+.*\.ts/,
       /update\s+.*file/,
       /edit\s+.*\.json/,
-      /create\s+.*\.js/
+      /create\s+.*\.js/,
     ];
-    
-    return fileModificationPatterns.some(pattern => pattern.test(contentLower)) ||
-           (contentLower.includes('file') && (contentLower.includes('write') || contentLower.includes('modify') || contentLower.includes('change')));
+
+    return (
+      fileModificationPatterns.some(pattern => pattern.test(contentLower)) ||
+      (contentLower.includes('file') &&
+        (contentLower.includes('write') ||
+          contentLower.includes('modify') ||
+          contentLower.includes('change')))
+    );
   }
 
   private matchesPattern(path: string, pattern: string): boolean {
     // Simple glob-like pattern matching
     const regex = new RegExp(
-      pattern
-        .replace(/\*\*/g, '.*')
-        .replace(/\*/g, '[^/\\\\]*')
-        .replace(/\?/g, '.')
+      pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/\\\\]*').replace(/\?/g, '.')
     );
     return regex.test(path);
   }
@@ -459,20 +550,23 @@ export class ClaudeCodeSecurity extends EventEmitter {
   /**
    * Create user consent request (Claude Code pattern)
    */
-  async requestUserConsent(context: SecurityContext, decision: SecurityDecision): Promise<UserConsentRequest> {
+  async requestUserConsent(
+    context: SecurityContext,
+    decision: SecurityDecision
+  ): Promise<UserConsentRequest> {
     const requestId = `consent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const request: UserConsentRequest = {
       id: requestId,
       context,
       decision,
       message: this.formatConsentMessage(context, decision),
-      options: this.createConsentOptions(decision)
+      options: this.createConsentOptions(decision),
     };
 
     this.pendingConsentRequests.set(requestId, request);
     this.emit('consentRequired', request);
-    
+
     return request;
   }
 
@@ -481,17 +575,17 @@ export class ClaudeCodeSecurity extends EventEmitter {
     message += `Operation: ${context.operation}\n`;
     message += `Risk Level: ${decision.riskLevel.toUpperCase()}\n`;
     message += `Reason: ${decision.reason}\n\n`;
-    
+
     if (context.filePath) {
       message += `File: ${context.filePath}\n`;
     }
     if (context.command) {
       message += `Command: ${context.command}\n`;
     }
-    
+
     message += `\nInput: ${context.userInput.substring(0, 200)}${context.userInput.length > 200 ? '...' : ''}\n\n`;
     message += `Would you like to proceed?`;
-    
+
     return message;
   }
 
@@ -501,14 +595,14 @@ export class ClaudeCodeSecurity extends EventEmitter {
         id: 'allow',
         label: 'Allow',
         description: 'Proceed with this operation',
-        action: 'allow'
+        action: 'allow',
       },
       {
         id: 'deny',
         label: 'Deny',
         description: 'Block this operation',
-        action: 'deny'
-      }
+        action: 'deny',
+      },
     ];
 
     if (decision.suggestedActions?.includes('Modify')) {
@@ -516,7 +610,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
         id: 'modify',
         label: 'Modify',
         description: 'Suggest a safer alternative',
-        action: 'modify'
+        action: 'modify',
       });
     }
 

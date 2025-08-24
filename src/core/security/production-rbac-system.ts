@@ -99,13 +99,13 @@ export class ProductionRBACSystem extends EventEmitter {
   private accessTokenExpiryMs: number = 15 * 60 * 1000; // 15 minutes
   private refreshTokenExpiryMs: number = 7 * 24 * 60 * 60 * 1000; // 7 days
   private revokedTokens: Set<string> = new Set();
-  
+
   // Cache for frequently accessed permissions and roles
   private permissionCache: Map<string, Permission> = new Map();
   private roleCache: Map<string, Role> = new Map();
   private userPermissionCache: Map<string, string[]> = new Map();
   private cacheExpiryMs: number = 5 * 60 * 1000; // 5 minutes
-  
+
   constructor(db: ProductionDatabaseManager, secretsManager: SecretsManager) {
     super();
     this.db = db;
@@ -122,7 +122,7 @@ export class ProductionRBACSystem extends EventEmitter {
       await this.loadJWTSecrets();
       await this.ensureSystemRoles();
       await this.startCacheCleanup();
-      
+
       logger.info('Production RBAC system initialized');
     } catch (error) {
       logger.error('Failed to initialize RBAC system:', error);
@@ -135,11 +135,13 @@ export class ProductionRBACSystem extends EventEmitter {
    */
   private async loadJWTSecrets(): Promise<void> {
     try {
-      this.jwtSecret = await this.secretsManager.getSecret('jwt_access_secret') || 
-        await this.generateAndStoreSecret('jwt_access_secret');
-      
-      this.jwtRefreshSecret = await this.secretsManager.getSecret('jwt_refresh_secret') || 
-        await this.generateAndStoreSecret('jwt_refresh_secret');
+      this.jwtSecret =
+        (await this.secretsManager.getSecret('jwt_access_secret')) ||
+        (await this.generateAndStoreSecret('jwt_access_secret'));
+
+      this.jwtRefreshSecret =
+        (await this.secretsManager.getSecret('jwt_refresh_secret')) ||
+        (await this.generateAndStoreSecret('jwt_refresh_secret'));
     } catch (error) {
       logger.error('Failed to load JWT secrets:', error);
       throw error;
@@ -171,25 +173,25 @@ export class ProductionRBACSystem extends EventEmitter {
     try {
       // Validate password strength
       this.validatePasswordStrength(userData.password);
-      
+
       // Check if username already exists
       const existingUser = await this.db.query(
         'SELECT id FROM users WHERE username = $1 OR email = $2',
         [userData.username, userData.email]
       );
-      
+
       if (existingUser.rows.length > 0) {
         throw new Error('Username or email already exists');
       }
-      
+
       // Generate salt and hash password
       const salt = await bcrypt.genSalt(this.saltRounds);
       const passwordHash = await bcrypt.hash(userData.password, salt);
-      
+
       // Validate roles exist
       const roles = userData.roles || ['user'];
       await this.validateRoles(roles);
-      
+
       // Insert user
       const result = await this.db.query(
         `INSERT INTO users (username, email, password_hash, salt, roles, metadata)
@@ -201,12 +203,12 @@ export class ProductionRBACSystem extends EventEmitter {
           passwordHash,
           salt,
           JSON.stringify(roles),
-          JSON.stringify(userData.metadata || {})
+          JSON.stringify(userData.metadata || {}),
         ]
       );
-      
+
       const userId = result.rows[0].id;
-      
+
       // Log security event
       await this.logSecurityEvent({
         userId,
@@ -215,7 +217,7 @@ export class ProductionRBACSystem extends EventEmitter {
         outcome: 'success',
         description: `User ${userData.username} registered`,
       });
-      
+
       logger.info(`User registered: ${userData.username}`, { userId });
       return userId;
     } catch (error: any) {
@@ -238,11 +240,8 @@ export class ProductionRBACSystem extends EventEmitter {
   ): Promise<AuthenticationResult> {
     try {
       // Get user from database
-      const userResult = await this.db.query(
-        'SELECT * FROM users WHERE username = $1',
-        [username]
-      );
-      
+      const userResult = await this.db.query('SELECT * FROM users WHERE username = $1', [username]);
+
       if (userResult.rows.length === 0) {
         await this.logSecurityEvent({
           eventType: 'login_failure',
@@ -251,15 +250,15 @@ export class ProductionRBACSystem extends EventEmitter {
           sourceIp: context.ipAddress,
           description: `Login attempt for non-existent user: ${username}`,
         });
-        
+
         // Simulate password verification to prevent timing attacks
         await bcrypt.hash('dummy', this.saltRounds);
-        
+
         return { success: false, error: 'Invalid credentials' };
       }
-      
+
       const user = this.mapDatabaseUser(userResult.rows[0]);
-      
+
       // Check account status
       if (user.status !== 'active') {
         await this.logSecurityEvent({
@@ -270,14 +269,14 @@ export class ProductionRBACSystem extends EventEmitter {
           sourceIp: context.ipAddress,
           description: `Login attempt for ${user.status} account: ${username}`,
         });
-        
+
         return { success: false, error: 'Account not active' };
       }
-      
+
       // Check account lockout
       if (user.accountLocked && user.lockoutExpires && user.lockoutExpires > new Date()) {
         const remainingMs = user.lockoutExpires.getTime() - Date.now();
-        
+
         await this.logSecurityEvent({
           userId: user.id,
           eventType: 'login_failure',
@@ -286,21 +285,21 @@ export class ProductionRBACSystem extends EventEmitter {
           sourceIp: context.ipAddress,
           description: `Login attempt for locked account: ${username}`,
         });
-        
-        return { 
-          success: false, 
-          error: `Account locked. Try again in ${Math.ceil(remainingMs / 60000)} minutes` 
+
+        return {
+          success: false,
+          error: `Account locked. Try again in ${Math.ceil(remainingMs / 60000)} minutes`,
         };
       }
-      
+
       // Verify password
       const passwordValid = await bcrypt.compare(password, user.passwordHash);
-      
+
       if (!passwordValid) {
         await this.handleFailedLogin(user, context);
         return { success: false, error: 'Invalid credentials' };
       }
-      
+
       // Reset failed login attempts on successful authentication
       if (user.failedLoginAttempts > 0) {
         await this.db.query(
@@ -308,11 +307,11 @@ export class ProductionRBACSystem extends EventEmitter {
           [user.id]
         );
       }
-      
+
       // Create session and tokens
       const sessionId = crypto.randomUUID();
       const userPermissions = await this.getUserPermissions(user.id);
-      
+
       const accessToken = this.generateAccessToken({
         sub: user.id,
         username: user.username,
@@ -320,12 +319,12 @@ export class ProductionRBACSystem extends EventEmitter {
         permissions: userPermissions,
         sessionId,
       });
-      
+
       const refreshToken = this.generateRefreshToken({
         sub: user.id,
         sessionId,
       });
-      
+
       // Store session in database
       await this.db.query(
         `INSERT INTO user_sessions 
@@ -340,16 +339,13 @@ export class ProductionRBACSystem extends EventEmitter {
           context.ipAddress,
           context.userAgent,
           JSON.stringify(userPermissions),
-          JSON.stringify(user.roles)
+          JSON.stringify(user.roles),
         ]
       );
-      
+
       // Update last login
-      await this.db.query(
-        'UPDATE users SET last_login = NOW() WHERE id = $1',
-        [user.id]
-      );
-      
+      await this.db.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+
       // Log successful login
       await this.logSecurityEvent({
         userId: user.id,
@@ -359,9 +355,9 @@ export class ProductionRBACSystem extends EventEmitter {
         sourceIp: context.ipAddress,
         description: `Successful login: ${username}`,
       });
-      
+
       this.emit('user:authenticated', { user, sessionId, context });
-      
+
       return {
         success: true,
         user,
@@ -382,30 +378,26 @@ export class ProductionRBACSystem extends EventEmitter {
     try {
       // Get user permissions from cache or database
       const userPermissions = await this.getUserPermissions(request.userId);
-      
+
       // Find required permissions for this resource/action
       const requiredPermissions = await this.getRequiredPermissions(
-        request.resource, 
+        request.resource,
         request.action
       );
-      
+
       // Check if user has required permissions
       const hasAllPermissions = requiredPermissions.every(required =>
         userPermissions.some(userPerm => this.permissionMatches(userPerm, required))
       );
-      
+
       // Calculate risk score based on context
       const riskScore = this.calculateRiskScore(request);
-      
+
       // Apply dynamic constraints
-      const constraintCheck = await this.evaluateConstraints(
-        userPermissions,
-        request,
-        riskScore
-      );
-      
+      const constraintCheck = await this.evaluateConstraints(userPermissions, request, riskScore);
+
       const granted = hasAllPermissions && constraintCheck.allowed && riskScore < 0.8;
-      
+
       // Log authorization decision
       await this.logSecurityEvent({
         userId: request.userId,
@@ -422,20 +414,22 @@ export class ProductionRBACSystem extends EventEmitter {
           riskScore,
         },
       });
-      
+
       if (granted) {
         this.emit('authorization:granted', request);
       } else {
         this.emit('authorization:denied', request);
       }
-      
+
       return {
         granted,
-        reason: !granted ? (
-          !hasAllPermissions ? 'Insufficient permissions' :
-          !constraintCheck.allowed ? constraintCheck.reason :
-          'High risk score detected'
-        ) : undefined,
+        reason: !granted
+          ? !hasAllPermissions
+            ? 'Insufficient permissions'
+            : !constraintCheck.allowed
+              ? constraintCheck.reason
+              : 'High risk score detected'
+          : undefined,
         requiredPermissions,
         userPermissions,
         riskScore,
@@ -443,7 +437,7 @@ export class ProductionRBACSystem extends EventEmitter {
       };
     } catch (error: any) {
       logger.error('Authorization error:', error);
-      
+
       // Fail secure - deny access on error
       return {
         granted: false,
@@ -461,39 +455,39 @@ export class ProductionRBACSystem extends EventEmitter {
     try {
       // Verify refresh token
       const payload = jwt.verify(refreshToken, this.jwtRefreshSecret) as any;
-      
+
       if (this.revokedTokens.has(payload.jti)) {
         return { success: false, error: 'Token revoked' };
       }
-      
+
       // Get session from database
       const sessionResult = await this.db.query(
         'SELECT * FROM user_sessions WHERE id = $1 AND refresh_token = $2',
         [payload.sessionId, refreshToken]
       );
-      
+
       if (sessionResult.rows.length === 0) {
         return { success: false, error: 'Invalid session' };
       }
-      
+
       const session = sessionResult.rows[0];
-      
+
       if (new Date() > session.expires_at) {
         // Clean up expired session
         await this.db.query('DELETE FROM user_sessions WHERE id = $1', [session.id]);
         return { success: false, error: 'Session expired' };
       }
-      
+
       // Get fresh user data and permissions
       const userResult = await this.db.query('SELECT * FROM users WHERE id = $1', [payload.sub]);
-      
+
       if (userResult.rows.length === 0 || userResult.rows[0].status !== 'active') {
         return { success: false, error: 'User not active' };
       }
-      
+
       const user = this.mapDatabaseUser(userResult.rows[0]);
       const userPermissions = await this.getUserPermissions(user.id);
-      
+
       // Generate new access token
       const newAccessToken = this.generateAccessToken({
         sub: user.id,
@@ -502,13 +496,13 @@ export class ProductionRBACSystem extends EventEmitter {
         permissions: userPermissions,
         sessionId: session.id,
       });
-      
+
       // Update session
       await this.db.query(
         'UPDATE user_sessions SET session_token = $1, last_activity = NOW() WHERE id = $2',
         [newAccessToken, session.id]
       );
-      
+
       return {
         success: true,
         user,
@@ -531,16 +525,16 @@ export class ProductionRBACSystem extends EventEmitter {
         'DELETE FROM user_sessions WHERE id = $1 RETURNING session_token',
         [sessionId]
       );
-      
+
       if (result.rows.length > 0) {
         // Add token to revocation list
         const token = result.rows[0].session_token;
         this.revokedTokens.add(this.extractJTI(token));
-        
+
         logger.info(`Session revoked: ${sessionId}`);
         return true;
       }
-      
+
       return false;
     } catch (error) {
       logger.error('Session revocation failed:', error);
@@ -554,22 +548,21 @@ export class ProductionRBACSystem extends EventEmitter {
   async verifyToken(token: string): Promise<JWTPayload | null> {
     try {
       const payload = jwt.verify(token, this.jwtSecret) as JWTPayload;
-      
+
       if (this.revokedTokens.has(payload.jti)) {
         return null;
       }
-      
+
       // Verify session still exists
       const sessionResult = await this.db.query(
         'SELECT expires_at FROM user_sessions WHERE id = $1',
         [payload.sessionId]
       );
-      
-      if (sessionResult.rows.length === 0 || 
-          new Date() > sessionResult.rows[0].expires_at) {
+
+      if (sessionResult.rows.length === 0 || new Date() > sessionResult.rows[0].expires_at) {
         return null;
       }
-      
+
       return payload;
     } catch (error) {
       return null;
@@ -584,65 +577,62 @@ export class ProductionRBACSystem extends EventEmitter {
     if (this.userPermissionCache.has(userId)) {
       return this.userPermissionCache.get(userId)!;
     }
-    
+
     // Get user roles
-    const userResult = await this.db.query(
-      'SELECT roles FROM users WHERE id = $1',
-      [userId]
-    );
-    
+    const userResult = await this.db.query('SELECT roles FROM users WHERE id = $1', [userId]);
+
     if (userResult.rows.length === 0) {
       return [];
     }
-    
+
     const roles = JSON.parse(userResult.rows[0].roles || '[]');
     const allPermissions = new Set<string>();
-    
+
     // Recursively collect permissions from roles and inherited roles
     const processedRoles = new Set<string>();
-    
+
     const collectPermissions = async (roleNames: string[]) => {
       for (const roleName of roleNames) {
         if (processedRoles.has(roleName)) continue;
         processedRoles.add(roleName);
-        
+
         const roleResult = await this.db.query(
           'SELECT permission_ids, inherited_role_ids FROM roles WHERE name = $1',
           [roleName]
         );
-        
+
         if (roleResult.rows.length === 0) continue;
-        
+
         const role = roleResult.rows[0];
         const permissionIds = JSON.parse(role.permission_ids || '[]');
         const inheritedRoleIds = JSON.parse(role.inherited_role_ids || '[]');
-        
+
         // Add direct permissions
         permissionIds.forEach((id: string) => allPermissions.add(id));
-        
+
         // Process inherited roles
         if (inheritedRoleIds.length > 0) {
           const inheritedRoleResult = await this.db.query(
             'SELECT name FROM roles WHERE id = ANY($1)',
             [inheritedRoleIds]
           );
-          
+
           const inheritedRoleNames = inheritedRoleResult.rows.map(r => r.name);
           await collectPermissions(inheritedRoleNames);
         }
       }
     };
-    
+
     await collectPermissions(roles);
-    
+
     const permissions = Array.from(allPermissions);
-    
+
     // Cache for 5 minutes
     this.userPermissionCache.set(userId, permissions);
     setTimeout(() => {
       this.userPermissionCache.delete(userId);
     }, this.cacheExpiryMs);
-    
+
     return permissions;
   }
 
@@ -652,7 +642,7 @@ export class ProductionRBACSystem extends EventEmitter {
   private generateAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp' | 'jti'>): string {
     const jti = crypto.randomUUID();
     const now = Math.floor(Date.now() / 1000);
-    
+
     return jwt.sign(
       {
         ...payload,
@@ -668,7 +658,7 @@ export class ProductionRBACSystem extends EventEmitter {
   private generateRefreshToken(payload: { sub: string; sessionId: string }): string {
     const jti = crypto.randomUUID();
     const now = Math.floor(Date.now() / 1000);
-    
+
     return jwt.sign(
       {
         ...payload,
@@ -694,21 +684,18 @@ export class ProductionRBACSystem extends EventEmitter {
     if (password.length < 8) {
       throw new Error('Password must be at least 8 characters long');
     }
-    
+
     if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password)) {
       throw new Error('Password must contain uppercase, lowercase, number, and special character');
     }
   }
 
   private async validateRoles(roles: string[]): Promise<void> {
-    const result = await this.db.query(
-      'SELECT name FROM roles WHERE name = ANY($1)',
-      [roles]
-    );
-    
+    const result = await this.db.query('SELECT name FROM roles WHERE name = ANY($1)', [roles]);
+
     const validRoles = result.rows.map(r => r.name);
     const invalidRoles = roles.filter(role => !validRoles.includes(role));
-    
+
     if (invalidRoles.length > 0) {
       throw new Error(`Invalid roles: ${invalidRoles.join(', ')}`);
     }
@@ -720,7 +707,7 @@ export class ProductionRBACSystem extends EventEmitter {
   ): Promise<void> {
     const newAttempts = user.failedLoginAttempts + 1;
     const shouldLock = newAttempts >= this.maxLoginAttempts;
-    
+
     await this.db.query(
       `UPDATE users 
        SET failed_login_attempts = $1, 
@@ -731,17 +718,17 @@ export class ProductionRBACSystem extends EventEmitter {
         newAttempts,
         shouldLock,
         shouldLock ? new Date(Date.now() + this.lockoutDurationMs) : null,
-        user.id
+        user.id,
       ]
     );
-    
+
     await this.logSecurityEvent({
       userId: user.id,
       eventType: 'login_failure',
       severity: shouldLock ? 'high' : 'medium',
       outcome: 'failure',
       sourceIp: context.ipAddress,
-      description: shouldLock 
+      description: shouldLock
         ? `Account locked after ${this.maxLoginAttempts} failed attempts: ${user.username}`
         : `Failed login attempt ${newAttempts}/${this.maxLoginAttempts}: ${user.username}`,
     });
@@ -768,10 +755,10 @@ export class ProductionRBACSystem extends EventEmitter {
 
   private async getRequiredPermissions(resource: string, action: string): Promise<string[]> {
     const result = await this.db.query(
-      'SELECT id FROM permissions WHERE resource = $1 AND (action = $2 OR action = \'*\')',
+      "SELECT id FROM permissions WHERE resource = $1 AND (action = $2 OR action = '*')",
       [resource, action]
     );
-    
+
     return result.rows.map(r => r.id);
   }
 
@@ -781,28 +768,30 @@ export class ProductionRBACSystem extends EventEmitter {
 
   private calculateRiskScore(request: AuthorizationRequest): number {
     let risk = 0;
-    
+
     // IP-based risk (simplified)
     if (request.context?.ipAddress) {
-      if (request.context.ipAddress.startsWith('10.') || 
-          request.context.ipAddress.startsWith('192.168.')) {
+      if (
+        request.context.ipAddress.startsWith('10.') ||
+        request.context.ipAddress.startsWith('192.168.')
+      ) {
         risk += 0.1; // Internal network
       } else {
         risk += 0.3; // External network
       }
     }
-    
+
     // Time-based risk
     const hour = new Date().getHours();
     if (hour < 6 || hour > 22) {
       risk += 0.2; // Off-hours access
     }
-    
+
     // Action-based risk
     if (request.action === 'delete' || request.action === 'admin') {
       risk += 0.3;
     }
-    
+
     return Math.min(risk, 1.0);
   }
 
@@ -817,7 +806,7 @@ export class ProductionRBACSystem extends EventEmitter {
   }> {
     // Simplified constraint evaluation
     // In production, this would be much more sophisticated
-    
+
     if (riskScore > 0.7) {
       return {
         allowed: false,
@@ -825,7 +814,7 @@ export class ProductionRBACSystem extends EventEmitter {
         appliedConstraints: { riskScore },
       };
     }
-    
+
     return { allowed: true };
   }
 
@@ -856,7 +845,7 @@ export class ProductionRBACSystem extends EventEmitter {
           event.userAgent || null,
           event.resource || null,
           event.description,
-          JSON.stringify(event.details || {})
+          JSON.stringify(event.details || {}),
         ]
       );
     } catch (error) {
@@ -871,13 +860,10 @@ export class ProductionRBACSystem extends EventEmitter {
       { name: 'user', description: 'Standard user' },
       { name: 'viewer', description: 'Read-only access' },
     ];
-    
+
     for (const role of systemRoles) {
-      const exists = await this.db.query(
-        'SELECT id FROM roles WHERE name = $1',
-        [role.name]
-      );
-      
+      const exists = await this.db.query('SELECT id FROM roles WHERE name = $1', [role.name]);
+
       if (exists.rows.length === 0) {
         await this.db.query(
           'INSERT INTO roles (name, description, is_system) VALUES ($1, $2, true)',
@@ -889,12 +875,15 @@ export class ProductionRBACSystem extends EventEmitter {
 
   private startCacheCleanup(): void {
     // Clean up revoked tokens every hour
-    setInterval(() => {
-      this.revokedTokens.clear();
-      this.userPermissionCache.clear();
-      this.permissionCache.clear();
-      this.roleCache.clear();
-    }, 60 * 60 * 1000);
+    setInterval(
+      () => {
+        this.revokedTokens.clear();
+        this.userPermissionCache.clear();
+        this.permissionCache.clear();
+        this.roleCache.clear();
+      },
+      60 * 60 * 1000
+    );
   }
 
   /**
@@ -915,7 +904,7 @@ export class ProductionRBACSystem extends EventEmitter {
    */
   async getUsers(): Promise<User[]> {
     try {
-      const query = 'SELECT * FROM users WHERE status != \'deleted\' ORDER BY username';
+      const query = "SELECT * FROM users WHERE status != 'deleted' ORDER BY username";
       const results = await this.db.query(query);
       return results.rows.map(row => this.mapDatabaseUser(row));
     } catch (error) {
@@ -927,22 +916,23 @@ export class ProductionRBACSystem extends EventEmitter {
   /**
    * Create new user
    */
-  async createUser(userData: { username: string; email: string; password?: string }): Promise<User> {
-    const hashedPassword = userData.password ? 
-      await bcrypt.hash(userData.password, this.saltRounds) : null;
-    
+  async createUser(userData: {
+    username: string;
+    email: string;
+    password?: string;
+  }): Promise<User> {
+    const hashedPassword = userData.password
+      ? await bcrypt.hash(userData.password, this.saltRounds)
+      : null;
+
     const query = `
       INSERT INTO users (username, email, password_hash, status, roles, metadata, created_at, updated_at)
       VALUES ($1, $2, $3, 'active', '["user"]', '{}', NOW(), NOW())
       RETURNING *
     `;
-    
-    const result = await this.db.query(query, [
-      userData.username,
-      userData.email,
-      hashedPassword
-    ]);
-    
+
+    const result = await this.db.query(query, [userData.username, userData.email, hashedPassword]);
+
     return this.mapDatabaseUser(result.rows[0]);
   }
 
@@ -952,7 +942,7 @@ export class ProductionRBACSystem extends EventEmitter {
       VALUES ($1, $2)
       ON CONFLICT (user_id, role) DO NOTHING
     `;
-    
+
     await this.db.query(query, [userId, role]);
     logger.info('Role assigned to user', { userId, role });
   }

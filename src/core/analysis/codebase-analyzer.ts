@@ -443,13 +443,18 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
       // Count actual test files
       try {
         const { execSync } = await import('child_process');
-        const testFileCount = execSync('find tests -name "*.test.ts" -o -name "*.spec.ts" | wc -l', {
-          cwd: this.workingDirectory,
-          encoding: 'utf-8'
-        }).trim();
-        
+        const testFileCount = execSync(
+          'find tests -name "*.test.ts" -o -name "*.spec.ts" | wc -l',
+          {
+            cwd: this.workingDirectory,
+            encoding: 'utf-8',
+          }
+        ).trim();
+
         if (parseInt(testFileCount) < 10) {
-          issues.push(`🟡 **Warning**: Only ${testFileCount} test files found - consider expanding test coverage`);
+          issues.push(
+            `🟡 **Warning**: Only ${testFileCount} test files found - consider expanding test coverage`
+          );
         }
       } catch (error) {
         // Silently continue
@@ -468,7 +473,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     if (fs.existsSync(packagePath)) {
       try {
         const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
-        
+
         // Check for missing scripts
         const scripts = packageJson.scripts || {};
         if (!scripts.test) {
@@ -477,7 +482,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         if (!scripts.lint) {
           issues.push('🟡 **Warning**: No lint script defined in package.json');
         }
-        
+
         // Check Node version requirements
         if (!packageJson.engines?.node) {
           issues.push('🟠 **Compatibility**: No Node.js version requirement specified');
@@ -490,15 +495,20 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     // Check for large files that might impact performance
     try {
       const { execSync } = await import('child_process');
-      const largeFiles = execSync('find . -type f -size +1M -not -path "./node_modules/*" -not -path "./.git/*" | head -5', {
-        cwd: this.workingDirectory,
-        encoding: 'utf-8'
-      }).trim();
-      
+      const largeFiles = execSync(
+        'find . -type f -size +1M -not -path "./node_modules/*" -not -path "./.git/*" | head -5',
+        {
+          cwd: this.workingDirectory,
+          encoding: 'utf-8',
+        }
+      ).trim();
+
       if (largeFiles) {
         const fileCount = largeFiles.split('\n').filter(f => f).length;
         if (fileCount > 0) {
-          issues.push(`🟠 **Performance**: ${fileCount} large files (>1MB) detected - consider optimization`);
+          issues.push(
+            `🟠 **Performance**: ${fileCount} large files (>1MB) detected - consider optimization`
+          );
         }
       }
     } catch (error) {
@@ -623,14 +633,14 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
         `${priority++}. **Enhancement**: Implement automated code quality gates in CI/CD pipeline`
       );
     }
-    
+
     // Add more dynamic recommendations based on actual findings
     if (codeMetrics.totalLines > 100000) {
       recommendations.push(
         `${priority++}. **Architecture**: Consider modularization - codebase exceeds 100K lines`
       );
     }
-    
+
     if (dependencyAnalysis.prodDeps > 100) {
       recommendations.push(
         `${priority++}. **Dependencies**: Review production dependencies (${dependencyAnalysis.prodDeps} packages) for optimization opportunities`

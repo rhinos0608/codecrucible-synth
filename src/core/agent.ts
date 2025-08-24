@@ -379,7 +379,7 @@ export class UnifiedAgent extends EventEmitter {
       // Parallel execution with concurrency limit
       const chunks = this.chunkArray(workflow.tasks, maxConcurrency);
       for (const chunk of chunks) {
-        const chunkResults = await Promise.all(chunk.map(task => this.executeTask(task)));
+        const chunkResults = await Promise.all(chunk.map(async task => this.executeTask(task)));
         results.push(...chunkResults);
 
         for (let i = 0; i < chunk.length; i++) {
@@ -424,8 +424,6 @@ export class UnifiedAgent extends EventEmitter {
       };
     }
   }
-
-  
 
   /**
    * Utility methods

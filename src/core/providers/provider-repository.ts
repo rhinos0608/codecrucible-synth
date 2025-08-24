@@ -143,7 +143,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
   }
 
   /**
-   * Initialize a single provider
+   * Initialize a single provider with timeout optimization
    */
   private async initializeProvider(config: ProviderConfig): Promise<ProviderInitResult> {
     const startTime = Date.now();
@@ -154,11 +154,22 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
       // Store configuration
       this.configs.set(config.type, config);
 
-      // Create provider instance
-      const provider = await this.createProvider(config);
+      // Create provider instance with timeout
+      const provider = await Promise.race([
+        this.createProvider(config),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Provider ${config.type} initialization timeout`)), 
+                    config.timeout || this.PROVIDER_TIMEOUT)
+        )
+      ]);
 
-      // Test provider health
-      const isHealthy = await this.testProviderHealth(provider, config);
+      // Test provider health with timeout
+      const isHealthy = await Promise.race([
+        this.testProviderHealth(provider, config),
+        new Promise<boolean>((resolve) => 
+          setTimeout(() => resolve(false), 3000) // 3s health check timeout
+        )
+      ]);
 
       if (isHealthy) {
         this.providers.set(config.type, provider);

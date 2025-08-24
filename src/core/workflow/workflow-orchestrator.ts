@@ -27,7 +27,7 @@ function modelResponseToJsonValue(response: any): JsonValue {
   if (!response || typeof response !== 'object') {
     return response;
   }
-  
+
   // Convert ModelResponse to plain JsonObject
   const jsonObject: JsonObject = {
     content: response.content || '',
@@ -38,9 +38,9 @@ function modelResponseToJsonValue(response: any): JsonValue {
     usage: response.usage || {},
     cached: response.cached || false,
     streamed: response.streamed || false,
-    processingTime: response.processingTime || 0
+    processingTime: response.processingTime || 0,
   };
-  
+
   return jsonObject;
 }
 

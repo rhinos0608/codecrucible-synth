@@ -1,47 +1,72 @@
 {
   "compilerOptions": {
+    // 2025 Best Practices - Modern Target & Modules
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "node", // Keep as "node" for compatibility during migration
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "allowJs": false,
+    
+    // Strict Type Checking - 2025 Enterprise Standards
     "strict": true,
-    "skipLibCheck": true,
-    "noEmitOnError": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "sourceMap": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "exactOptionalPropertyTypes": false,
-    "noUncheckedIndexedAccess": false,
-    "noPropertyAccessFromIndexSignature": false,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false, // TODO: Enable after fixing optional properties
+    "noUncheckedIndexedAccess": false,   // TODO: Enable after fixing array access
+    "noPropertyAccessFromIndexSignature": false, // TODO: Enable after fixing index signatures
+    
+    // Additional Checks - 2025 Standards (Gradual Migration)
+    "noUnusedLocals": false,     // TODO: Enable after cleanup
+    "noUnusedParameters": false, // TODO: Enable after cleanup
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "forceConsistentCasingInFileNames": true,
+    
+    // Module Resolution & Imports
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "verbatimModuleSyntax": false,
+    "skipLibCheck": true,
+    
+    // Emit Options
+    "declaration": true,
+    "declarationMap": true, // Added for better debugging
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "removeComments": false, // Keep comments in production build
+    "noEmitOnError": true,
+    "preserveConstEnums": true,
+    
+    // Decorator Support (if needed)
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    
+    // Library Inclusions
     "lib": [
       "ES2022",
       "DOM"
     ],
     "types": [
-      "@types/node"
+      "@types/node",
+      "jest" // Added for test support
     ],
+    
+    // Path Mapping
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@/config/*": ["config/*"]
+      "@/config/*": ["config/*"],
+      "@/types/*": ["src/types/*"],
+      "@/utils/*": ["src/utils/*"]
     }
   },
   "include": [

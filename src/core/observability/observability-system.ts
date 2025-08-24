@@ -31,7 +31,11 @@ try {
 } catch (error) {
   openTelemetryAvailable = false;
   // Mock OpenTelemetry APIs when not available
-  trace = { getTracer: () => ({ startSpan: () => ({ end: () => {}, setStatus: () => {}, setAttributes: () => {} }) }) };
+  trace = {
+    getTracer: () => ({
+      startSpan: () => ({ end: () => {}, setStatus: () => {}, setAttributes: () => {} }),
+    }),
+  };
   SpanStatusCode = { OK: 1, ERROR: 2 };
   SpanKind = { CLIENT: 3 };
   metrics = {};
@@ -107,7 +111,7 @@ export interface SystemHealth {
   lastChecked: Date;
   uptime: number;
   version: string;
-  
+
   // Enhanced: OpenTelemetry integration status
   telemetryEnabled?: boolean;
   tracingStatus?: 'active' | 'disabled' | 'error';
@@ -456,7 +460,10 @@ export class ObservabilitySystem extends EventEmitter {
         this.finishSpan(span, { status: 'ok' });
         return result;
       } catch (error) {
-        this.finishSpan(span, { status: 'error', error: error instanceof Error ? error.message : String(error) });
+        this.finishSpan(span, {
+          status: 'error',
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw error;
       }
     }
@@ -464,7 +471,7 @@ export class ObservabilitySystem extends EventEmitter {
     const tracer = trace.getTracer('codecrucible-synth', '4.0.7');
     const span = tracer.startSpan(operation, {
       kind: SpanKind.CLIENT,
-      attributes: attributes as Record<string, string | number | boolean>
+      attributes: attributes as Record<string, string | number | boolean>,
     });
 
     try {
@@ -472,9 +479,9 @@ export class ObservabilitySystem extends EventEmitter {
       span.setStatus({ code: SpanStatusCode.OK });
       return result;
     } catch (error) {
-      span.setStatus({ 
-        code: SpanStatusCode.ERROR, 
-        message: error instanceof Error ? error.message : String(error) 
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error instanceof Error ? error.message : String(error),
       });
       throw error;
     } finally {
@@ -497,7 +504,10 @@ export class ObservabilitySystem extends EventEmitter {
         this.finishSpan(span, { status: 'ok' });
         return result;
       } catch (error) {
-        this.finishSpan(span, { status: 'error', error: error instanceof Error ? error.message : String(error) });
+        this.finishSpan(span, {
+          status: 'error',
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw error;
       }
     }
@@ -505,7 +515,7 @@ export class ObservabilitySystem extends EventEmitter {
     const tracer = trace.getTracer('codecrucible-synth', '4.0.7');
     const span = tracer.startSpan('agent_communication', {
       kind: SpanKind.CLIENT,
-      attributes: attributes
+      attributes: attributes,
     });
 
     try {
@@ -513,9 +523,9 @@ export class ObservabilitySystem extends EventEmitter {
       span.setStatus({ code: SpanStatusCode.OK });
       return result;
     } catch (error) {
-      span.setStatus({ 
-        code: SpanStatusCode.ERROR, 
-        message: error instanceof Error ? error.message : String(error) 
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error instanceof Error ? error.message : String(error),
       });
       throw error;
     } finally {
@@ -536,10 +546,10 @@ export class ObservabilitySystem extends EventEmitter {
     this.recordMetric(
       'codecrucible.tool.execution.duration',
       executionTime,
-      { 
-        tool: toolName, 
+      {
+        tool: toolName,
         success: success.toString(),
-        ...(errorType && { error_type: errorType })
+        ...(errorType && { error_type: errorType }),
       },
       'milliseconds'
     );
@@ -547,9 +557,9 @@ export class ObservabilitySystem extends EventEmitter {
     this.recordMetric(
       'codecrucible.tool.execution.count',
       1,
-      { 
-        tool: toolName, 
-        success: success.toString()
+      {
+        tool: toolName,
+        success: success.toString(),
       },
       'count'
     );
@@ -1644,7 +1654,6 @@ interface StorageStats {
   encryptionEnabled: boolean;
 }
 
-
 /**
  * Enhanced: Factory function for creating observability system with OpenTelemetry support
  */
@@ -1655,36 +1664,35 @@ export function getTelemetryProvider(): ObservabilitySystem {
       enabled: true,
       retentionDays: 7,
       exportInterval: 60000,
-      exporters: [{ type: "prometheus", batchSize: 100, flushInterval: 5000 }]
+      exporters: [{ type: 'prometheus', batchSize: 100, flushInterval: 5000 }],
     },
     tracing: {
       enabled: true,
       samplingRate: 1.0,
       maxSpansPerTrace: 100,
-      exporters: [{ type: "jaeger", batchSize: 100, flushInterval: 5000 }]
+      exporters: [{ type: 'jaeger', batchSize: 100, flushInterval: 5000 }],
     },
     logging: {
-      level: "info",
-      outputs: [{ type: "console", format: "structured", configuration: {} }],
+      level: 'info',
+      outputs: [{ type: 'console', format: 'structured', configuration: {} }],
       structured: true,
-      includeStackTrace: true
+      includeStackTrace: true,
     },
     health: {
       checkInterval: 30000,
       timeoutMs: 5000,
-      retryAttempts: 3
+      retryAttempts: 3,
     },
     alerting: {
       enabled: true,
       rules: [],
-      defaultCooldown: 300000
+      defaultCooldown: 300000,
     },
     storage: {
-      dataPath: "./observability-data",
+      dataPath: './observability-data',
       maxFileSize: 104857600,
       compressionEnabled: true,
-      encryptionEnabled: false
-    }
+      encryptionEnabled: false,
+    },
   });
 }
-

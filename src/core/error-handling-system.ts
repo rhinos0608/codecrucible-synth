@@ -628,7 +628,7 @@ ERROR BREAKDOWN:
     // Recent errors
     if (activeErrors.length > 0) {
       report += '\n🔥 RECENT ACTIVE ERRORS:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       for (const error of activeErrors.slice(0, 10)) {
         const icon =
@@ -653,7 +653,7 @@ ERROR BREAKDOWN:
     // Circuit breaker status
     if (Object.keys(metrics.circuitBreakerStatus).length > 0) {
       report += '⚡ CIRCUIT BREAKER STATUS:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       for (const [component, status] of Object.entries(metrics.circuitBreakerStatus)) {
         const icon = status === 'open' ? '🔴' : status === 'half_open' ? '🟡' : '🟢';

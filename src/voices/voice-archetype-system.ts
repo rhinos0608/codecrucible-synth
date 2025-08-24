@@ -5,6 +5,7 @@ import {
   CouncilConfig,
 } from '../core/collaboration/council-decision-engine.js';
 import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice-prompts.js';
+import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-builder.js';
 import { getErrorMessage } from '../utils/error-utils.js';
 import { accessSync } from 'fs';
 import { execSync } from 'child_process';
@@ -75,13 +76,14 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
       knowledgeCutoff: 'January 2025',
     };
 
+    // 2025 Best Practice: Lightweight prompt building with performance focus
     this.voices.set('explorer', {
       id: 'explorer',
       name: 'Explorer',
       style: 'experimental',
-      systemPrompt: EnterpriseVoicePromptBuilder.buildPrompt('explorer', context),
-      prompt: EnterpriseVoicePromptBuilder.buildPrompt('explorer', context),
-      temperature: 0.9,
+      systemPrompt: this.buildLightweightPrompt('explorer', false),
+      prompt: this.buildLightweightPrompt('explorer', false),
+      temperature: 0.7, // Reduced for better performance
     });
 
     this.voices.set('maintainer', {
@@ -232,6 +234,133 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
     return Array.from(this.voices.values());
   }
 
+  /**
+   * Detect if a prompt is requesting coding operations
+   */
+  private detectCodingOperation(prompt: string): boolean {
+    const codingKeywords = [
+      'write code', 'implement', 'create function', 'build class',
+      'refactor', 'debug', 'fix error', 'optimize code',
+      'add feature', 'create component', 'write test',
+      'generate code', 'code review', 'programming',
+      'algorithm', 'data structure', 'API', 'function',
+      'class', 'method', 'variable', 'loop', 'condition',
+      'typescript', 'javascript', 'python', 'java', 'react',
+      'node.js', 'express', 'database', 'sql', 'html', 'css',
+      'framework', 'library', 'package', 'module', 'import',
+      'export', 'async', 'await', 'promise', 'callback'
+    ];
+    
+    const lowerPrompt = prompt.toLowerCase();
+    return codingKeywords.some(keyword => lowerPrompt.includes(keyword));
+  }
+
+  /**
+   * 2025 Best Practice: Lightweight prompt building for performance
+   */
+  private buildLightweightPrompt(voiceId: string, isCoding: boolean): string {
+    const voiceIdentities: Record<string, string> = {
+      explorer: 'You are Explorer Voice, focused on innovative discovery and creative problem-solving.',
+      maintainer: 'You are Maintainer Voice, focused on code stability and long-term sustainability.',
+      developer: 'You are Developer Voice, focused on practical development and pragmatic solutions.',
+      architect: 'You are Architect Voice, focused on scalable architecture and system design.',
+      analyzer: 'You are Analyzer Voice, focused on performance analysis and optimization.',
+      implementor: 'You are Implementor Voice, focused on practical execution and delivery.',
+      security: 'You are Security Voice, focused on secure coding and vulnerability prevention.',
+      designer: 'You are Designer Voice, focused on user experience and interface design.',
+      optimizer: 'You are Optimizer Voice, focused on performance optimization and efficiency.',
+      guardian: 'You are Guardian Voice, focused on quality gates and system reliability.',
+    };
+
+    const basePrompt = voiceIdentities[voiceId] || voiceIdentities.developer;
+    
+    if (isCoding) {
+      return `${basePrompt}
+
+## Coding Guidelines
+- Follow Living Spiral: Collapse → Council → Synthesis → Rebirth → Reflection
+- Apply TDD and security-first principles
+- Write clean, maintainable code
+- Provide concise, practical solutions
+- Consider performance and scalability
+- Document key decisions
+
+## Tool Usage - CRITICAL: Always Use Available Tools
+You have access to comprehensive MCP (Model Context Protocol) tools. ALWAYS USE THESE TOOLS when the user requests file operations, git operations, terminal commands, or analysis tasks.
+
+### Filesystem Operations:
+- filesystem_read_file - Read file contents
+- filesystem_write_file - Write/create files  
+- filesystem_list_directory - List directory contents
+- filesystem_file_stats - Get file metadata
+- filesystem_find_files - Search for files
+
+### Git Operations:
+- git_status - Repository status
+- git_diff, git_log - View changes/history
+- git_add, git_commit - Stage and commit
+- git_push, git_pull - Remote operations
+- git_branch, git_checkout - Branch management
+- git_merge, git_rebase - Integration
+- git_tag, git_stash - Advanced operations
+
+### Terminal Operations:
+- execute_command - Run shell commands
+- change_directory - Navigate filesystem
+- get_current_directory - Check location
+
+### Package Management:
+- install_package - Install npm packages
+- run_script - Execute npm scripts
+
+### External MCP Tools (available if connected):
+- Terminal Controller tools (write_file, read_file, insert_file_content, etc.)
+- Remote Shell execution
+- Custom MCP servers (auto-discovered via Smithery registry)
+
+IMPORTANT: When user asks to "read a file", "create a file", "list files", "check git status", etc., USE THE APPROPRIATE TOOL instead of giving generic explanations. Execute the actual operation.`;
+    }
+    
+    return `${basePrompt}
+
+## Tool Usage - CRITICAL: Always Use Available Tools
+You have access to comprehensive MCP (Model Context Protocol) tools. ALWAYS USE THESE TOOLS when the user requests file operations, git operations, terminal commands, or analysis tasks.
+
+### Filesystem Operations:
+- filesystem_read_file - Read file contents
+- filesystem_write_file - Write/create files  
+- filesystem_list_directory - List directory contents
+- filesystem_file_stats - Get file metadata
+- filesystem_find_files - Search for files
+
+### Git Operations:
+- git_status - Repository status
+- git_diff, git_log - View changes/history
+- git_add, git_commit - Stage and commit
+- git_push, git_pull - Remote operations
+- git_branch, git_checkout - Branch management
+- git_merge, git_rebase - Integration
+- git_tag, git_stash - Advanced operations
+
+### Terminal Operations:
+- execute_command - Run shell commands
+- change_directory - Navigate filesystem
+- get_current_directory - Check location
+
+### Package Management:
+- install_package - Install npm packages
+- run_script - Execute npm scripts
+
+### External MCP Tools (available if connected):
+- Terminal Controller tools (write_file, read_file, insert_file_content, etc.)
+- Remote Shell execution
+- Custom MCP servers (auto-discovered via Smithery registry)
+
+IMPORTANT: When user asks to "read a file", "create a file", "list files", "check git status", etc., USE THE APPROPRIATE TOOL instead of giving generic explanations. Execute the actual operation.
+
+Provide helpful, concise responses with practical value.`;
+  }
+
   getDefaultVoices(): string[] {
     return this.config.voices.default;
   }
@@ -367,9 +496,13 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
 
   async generateSingleVoiceResponse(voice: string, prompt: string, client: any) {
     const voiceConfig = this.getVoice(voice);
-    if (!voiceConfig) throw new Error('Voice not found: ' + voice);
+    if (!voiceConfig) throw new Error(`Voice not found: ${voice}`);
 
-    const enhancedPrompt = voiceConfig.prompt + '\n\n' + prompt;
+    // 2025 Best Practice: Lightweight detection and routing
+    const isCodingOperation = this.detectCodingOperation(prompt);
+    const lightweightPrompt = this.buildLightweightPrompt(voice, isCodingOperation);
+    const enhancedPrompt = `${lightweightPrompt}\n\n${prompt}`;
+    
     return await client.processRequest({
       prompt: enhancedPrompt,
       temperature: voiceConfig.temperature,
@@ -378,7 +511,7 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
 
   async generateMultiVoiceSolutions(voices: string[], prompt: string, context?: any) {
     // Check if the model client supports the new multi-voice API
-    if (this.modelClient && this.modelClient.generateMultiVoiceResponses) {
+    if (this.modelClient?.generateMultiVoiceResponses) {
       try {
         // Use the new optimized multi-voice API
         const result = await this.modelClient.generateMultiVoiceResponses(voices, prompt, {
@@ -421,7 +554,7 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
       const batch = voices.slice(i, i + batchSize);
 
       // Create parallel promises for this batch
-      const batchPromises = batch.map(voiceId =>
+      const batchPromises = batch.map(async voiceId =>
         this.generateSingleVoiceResponseSafe(voiceId, prompt, timeout)
       );
 
@@ -505,20 +638,23 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
    * Generate response for a single voice (core implementation)
    */
   private async generateSingleVoiceResponseInternal(voiceId: string, prompt: string, voice: any) {
-    const enhancedPrompt = voice.systemPrompt + '\n\n' + prompt;
+    // 2025 Best Practice: Lightweight prompt building for performance
+    const isCodingOperation = this.detectCodingOperation(prompt);
+    const lightweightPrompt = this.buildLightweightPrompt(voiceId, isCodingOperation);
+    const enhancedPrompt = `${lightweightPrompt}\n\n${prompt}`;
 
     // Use different client methods based on what's available
     let response;
-    if (this.modelClient && this.modelClient.generateVoiceResponse) {
+    if (this.modelClient?.generateVoiceResponse) {
       response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
         temperature: voice.temperature,
       });
-    } else if (this.modelClient && this.modelClient.processRequest) {
+    } else if (this.modelClient?.processRequest) {
       response = await this.modelClient.processRequest({
         prompt: enhancedPrompt,
         temperature: voice.temperature,
       });
-    } else if (this.modelClient && this.modelClient.generateText) {
+    } else if (this.modelClient?.generateText) {
       // Fallback to basic generateText method
       const textResponse = await this.modelClient.generateText(enhancedPrompt, {
         temperature: voice.temperature,
@@ -625,7 +761,7 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
 
     for (let i = 0; i < maxIterations; i++) {
       // Writer generates/improves code
-      const writerPrompt = i === 0 ? prompt : prompt + '\n\nImprove this code:\n' + currentCode;
+      const writerPrompt = i === 0 ? prompt : `${prompt}\n\nImprove this code:\n${currentCode}`;
       const writerResult = await this.generateSingleVoiceResponse(
         writerVoice,
         writerPrompt,
@@ -633,8 +769,7 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
       );
 
       // Auditor reviews code
-      const auditorPrompt =
-        'Review this code for quality and suggest improvements:\n' + writerResult.content;
+      const auditorPrompt = `Review this code for quality and suggest improvements:\n${writerResult.content}`;
       const auditorResult = await this.generateSingleVoiceResponse(
         auditorVoice,
         auditorPrompt,
@@ -959,7 +1094,7 @@ Focus on the ${phase} aspect of this task. Provide detailed ${phase} considerati
       reasoning: `Analysis from ${voice.name} viewpoint`,
       supportingEvidence: [],
       concerns: [],
-      alternatives: []
+      alternatives: [],
     };
   }
 }

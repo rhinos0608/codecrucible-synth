@@ -1,4 +1,3 @@
-
 import { EventEmitter } from 'events';
 import { logger } from '../core/logger.js';
 import {
@@ -14,9 +13,7 @@ import { IModelClient, StreamToken } from '../core/interfaces/client-interfaces.
 import { SecurityValidator, ISecurityValidator } from '../core/security/security-validator.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 
-import {
-  IntegratedCodeCrucibleSystem,
-} from './integrated-system.js';
+import { IntegratedCodeCrucibleSystem } from './integrated-system.js';
 
 import { HardwareAwareModelSelector } from '../core/performance/hardware-aware-model-selector.js';
 import { getGlobalToolIntegration } from '../core/tools/tool-integration.js';
@@ -27,15 +24,40 @@ import { getErrorMessage, toError } from '../utils/error-utils.js';
 import { createHash } from 'crypto';
 import { StreamingManager, IStreamingManager } from '../core/streaming/streaming-manager.js';
 import { CacheCoordinator, ICacheCoordinator } from '../core/caching/cache-coordinator.js';
-import { VoiceSynthesisManager, IVoiceSynthesisManager } from '../core/voice-system/voice-synthesis-manager.js';
-import { ProviderSelectionStrategy, IProviderSelectionStrategy, ExecutionMode as StrategyExecutionMode } from '../core/providers/provider-selection-strategy.js';
-import { RequestExecutionManager, IRequestExecutionManager } from '../core/execution/request-execution-manager.js';
+import {
+  VoiceSynthesisManager,
+  IVoiceSynthesisManager,
+} from '../core/voice-system/voice-synthesis-manager.js';
+import {
+  ProviderSelectionStrategy,
+  IProviderSelectionStrategy,
+  ExecutionMode as StrategyExecutionMode,
+} from '../core/providers/provider-selection-strategy.js';
+import {
+  RequestExecutionManager,
+  IRequestExecutionManager,
+} from '../core/execution/request-execution-manager.js';
 import { HealthStatusManager, IHealthStatusManager } from '../core/health/health-status-manager.js';
-import { ConfigurationManager, IConfigurationManager } from '../core/config/configuration-manager.js';
-import { RequestProcessingCoreManager, IRequestProcessingCoreManager } from '../core/processing/request-processing-core-manager.js';
-import { ModelManagementManager, IModelManagementManager } from '../core/models/model-management-manager.js';
-import { ResourceCleanupManager, IResourceCleanupManager } from '../core/cleanup/resource-cleanup-manager.js';
-import { StreamProcessingManager, IStreamProcessingManager } from '../core/streaming/stream-processing-manager.js';
+import {
+  ConfigurationManager,
+  IConfigurationManager,
+} from '../core/config/configuration-manager.js';
+import {
+  RequestProcessingCoreManager,
+  IRequestProcessingCoreManager,
+} from '../core/processing/request-processing-core-manager.js';
+import {
+  ModelManagementManager,
+  IModelManagementManager,
+} from '../core/models/model-management-manager.js';
+import {
+  ResourceCleanupManager,
+  IResourceCleanupManager,
+} from '../core/cleanup/resource-cleanup-manager.js';
+import {
+  StreamProcessingManager,
+  IStreamProcessingManager,
+} from '../core/streaming/stream-processing-manager.js';
 import { RequestHandler } from './request-handler.js';
 
 export class UnifiedModelClient extends EventEmitter implements IModelClient {
@@ -73,7 +95,8 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     super();
     this.setMaxListeners(50);
     this.abortController = new AbortController();
-    this.configurationManager = injectedDependencies?.configurationManager || new ConfigurationManager();
+    this.configurationManager =
+      injectedDependencies?.configurationManager || new ConfigurationManager();
     this.config = {
       endpoint: 'http://localhost:11434',
       ...this.getDefaultConfig(),
@@ -90,7 +113,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.processManager = new ActiveProcessManager(this.hardwareSelector);
     this.streamingManager =
       injectedDependencies?.streamingManager || new StreamingManager(config.streaming);
-    
+
     // Use injected provider repository or create new ProviderManager
     if (injectedDependencies?.providerRepository) {
       // Create a wrapper ProviderManager that uses the injected repository
@@ -98,89 +121,104 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         getProviderRepository: () => injectedDependencies.providerRepository,
         getProviders: () => injectedDependencies.providerRepository.getAvailableProviders(),
         initialize: async () => {}, // Already initialized in DI system
-        createProvider: async (config: any) => { throw new Error('Provider creation not supported with injected repository'); }, // Not needed when using injected repository
-        getProvider: (type: string) => injectedDependencies.providerRepository.getProvider(type)
+        createProvider: async (config: any) => {
+          throw new Error('Provider creation not supported with injected repository');
+        }, // Not needed when using injected repository
+        getProvider: (type: string) => injectedDependencies.providerRepository.getProvider(type),
       } as any; // TypeScript workaround for partial interface implementation
     } else {
       this.providerManager = new ProviderManager();
     }
-    
+
     this.cacheCoordinator = injectedDependencies?.cacheCoordinator || new CacheCoordinator();
-    this.voiceSynthesisManager = injectedDependencies?.voiceSynthesisManager || new VoiceSynthesisManager(
-      undefined, 
-      (request: any) => this.processRequest(request)
-    );
-    this.providerSelectionStrategy = injectedDependencies?.providerSelectionStrategy || new ProviderSelectionStrategy(
-      {
-        fallbackChain: this.config.fallbackChain,
-        selectionStrategy: 'balanced',
-        timeoutMs: this.config.performanceThresholds?.timeoutMs || 30000,
-        maxRetries: 3,
-      },
-      this.performanceMonitor
-    );
-    this.requestExecutionManager = injectedDependencies?.requestExecutionManager || new RequestExecutionManager(
-      {
+    this.voiceSynthesisManager =
+      injectedDependencies?.voiceSynthesisManager ||
+      new VoiceSynthesisManager(undefined, async (request: any) => this.processRequest(request));
+    this.providerSelectionStrategy =
+      injectedDependencies?.providerSelectionStrategy ||
+      new ProviderSelectionStrategy(
+        {
+          fallbackChain: this.config.fallbackChain,
+          selectionStrategy: 'balanced',
+          timeoutMs: this.config.performanceThresholds?.timeoutMs || 30000,
+          maxRetries: 3,
+        },
+        this.performanceMonitor
+      );
+    this.requestExecutionManager =
+      injectedDependencies?.requestExecutionManager ||
+      new RequestExecutionManager(
+        {
+          maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 3,
+          defaultTimeout: this.config.performanceThresholds?.timeoutMs || 30000,
+          complexityTimeouts: {
+            simple: 1800000, // 30 minutes - industry standard
+            medium: 3600000, // 1 hour - industry standard
+            complex: 7200000, // 2 hours - industry standard
+          },
+          memoryThresholds: {
+            low: 100,
+            medium: 500,
+            high: 1000,
+          },
+        },
+        this.processManager,
+        this.providerManager.getProviderRepository()
+      );
+    this.healthStatusManager =
+      injectedDependencies?.healthStatusManager ||
+      new HealthStatusManager(
+        this.providerManager.getProviderRepository(),
+        this.cacheCoordinator,
+        this.performanceMonitor,
+        {
+          healthCheckTimeoutMs: 5000,
+          overallTimeoutMs: 15000,
+          cacheTtlMs: 30000,
+        }
+      );
+    this.requestProcessingCoreManager =
+      injectedDependencies?.requestProcessingCoreManager ||
+      new RequestProcessingCoreManager({
         maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 3,
-        defaultTimeout: this.config.performanceThresholds?.timeoutMs || 30000,
-        complexityTimeouts: {
-          simple: 1800000,  // 30 minutes - industry standard
-          medium: 3600000,  // 1 hour - industry standard  
-          complex: 7200000, // 2 hours - industry standard
-        },
+        defaultTimeoutMs: this.config.performanceThresholds?.timeoutMs || 180000,
         memoryThresholds: {
-          low: 100,
-          medium: 500,
-          high: 1000,
+          base: 50,
+          lengthMultiplier: 0.01,
+          complexityMultiplier: 30,
         },
-      },
-      this.processManager,
-      this.providerManager.getProviderRepository()
-    );
-    this.healthStatusManager = injectedDependencies?.healthStatusManager || new HealthStatusManager(
-      this.providerManager.getProviderRepository(),
-      this.cacheCoordinator,
-      this.performanceMonitor,
-      {
-        healthCheckTimeoutMs: 5000,
-        overallTimeoutMs: 15000,
-        cacheTtlMs: 30000,
-      }
-    );
-    this.requestProcessingCoreManager = injectedDependencies?.requestProcessingCoreManager || new RequestProcessingCoreManager({
-      maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 3,
-      defaultTimeoutMs: this.config.performanceThresholds?.timeoutMs || 180000,
-      memoryThresholds: {
-        base: 50,
-        lengthMultiplier: 0.01,
-        complexityMultiplier: 30,
-      },
-    });
-    this.modelManagementManager = injectedDependencies?.modelManagementManager || new ModelManagementManager(
-      {
-        endpoint: this.config.endpoint || 'http://localhost:11434',
-        defaultModel: 'llama2',
-        requestTimeoutMs: this.config.performanceThresholds?.timeoutMs || 30000,
-      },
-      this.makeRequest.bind(this),
-      this.generate.bind(this)
-    );
-    this.resourceCleanupManager = injectedDependencies?.resourceCleanupManager || new ResourceCleanupManager({
-      shutdownTimeoutMs: 10000,
-      gracefulShutdown: true,
-    });
-    this.streamProcessingManager = injectedDependencies?.streamProcessingManager || new StreamProcessingManager(
-      this.securityValidator,
-      this.cacheCoordinator,
-      this.streamingManager,
-      (request, context) => this.processRequest(request, context),
-      () => this.generateRequestId(),
-      {
-        validateSecurity: true,
-        enableCaching: true,
-        requestTimeoutMs: 30000,
-      }
-    );
+      });
+    this.modelManagementManager =
+      injectedDependencies?.modelManagementManager ||
+      new ModelManagementManager(
+        {
+          endpoint: this.config.endpoint || 'http://localhost:11434',
+          defaultModel: 'llama2',
+          requestTimeoutMs: this.config.performanceThresholds?.timeoutMs || 30000,
+        },
+        this.makeRequest.bind(this),
+        this.generate.bind(this)
+      );
+    this.resourceCleanupManager =
+      injectedDependencies?.resourceCleanupManager ||
+      new ResourceCleanupManager({
+        shutdownTimeoutMs: 10000,
+        gracefulShutdown: true,
+      });
+    this.streamProcessingManager =
+      injectedDependencies?.streamProcessingManager ||
+      new StreamProcessingManager(
+        this.securityValidator,
+        this.cacheCoordinator,
+        this.streamingManager,
+        async (request, context) => this.processRequest(request, context),
+        () => this.generateRequestId(),
+        {
+          validateSecurity: true,
+          enableCaching: true,
+          requestTimeoutMs: 30000,
+        }
+      );
     this.requestHandler = new RequestHandler(this);
     this.registerCleanupResources();
     if (injectedDependencies?.hybridRouter) {
@@ -197,7 +235,11 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return this.requestHandler.processRequest(request, context);
   }
 
-  async streamRequest(request: ModelRequest, onToken: (token: StreamToken) => void, context?: ProjectContext): Promise<ModelResponse> {
+  async streamRequest(
+    request: ModelRequest,
+    onToken: (token: StreamToken) => void,
+    context?: ProjectContext
+  ): Promise<ModelResponse> {
     return this.streamProcessingManager.processStreamRequest(request, onToken, context);
   }
 
@@ -214,11 +256,13 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     // Use voice synthesis to generate a response using multiple perspectives
     const voices = ['explorer', 'developer', 'architect']; // Default voices
     const perspectiveResult = await this.voiceSynthesisManager.synthesizeVoicePerspectives(
-      voices, 
-      request.prompt, 
-      { /* temperature: request.temperature */ }
+      voices,
+      request.prompt,
+      {
+        /* temperature: request.temperature */
+      }
     );
-    
+
     return {
       content: perspectiveResult.content,
       model: request.model || 'multi-voice',
@@ -227,7 +271,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         tokens: perspectiveResult.content.length / 4, // Rough token estimate
         latency: 0,
         // voices: perspectiveResult.voices // Remove invalid property
-      }
+      },
     };
   }
 
@@ -299,7 +343,10 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
 
   generateRequestId(): string {
-    return createHash('sha256').update(`${Date.now()}-${Math.random()}`).digest('hex').substring(0, 16);
+    return createHash('sha256')
+      .update(`${Date.now()}-${Math.random()}`)
+      .digest('hex')
+      .substring(0, 16);
   }
 
   // Missing methods that RequestHandler and other components expect
@@ -334,13 +381,18 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   analyzeComplexity(request: ModelRequest): any {
     const complexity = {
       score: Math.min(request.prompt.length / 100, 10),
-      level: request.prompt.length < 200 ? 'simple' : request.prompt.length < 1000 ? 'medium' : 'complex',
+      level:
+        request.prompt.length < 200
+          ? 'simple'
+          : request.prompt.length < 1000
+            ? 'medium'
+            : 'complex',
       factors: {
         promptLength: request.prompt.length,
         hasContext: !!request.context,
         hasFiles: !!request.files?.length,
-        fileCount: request.files?.length || 0
-      }
+        fileCount: request.files?.length || 0,
+      },
     };
     return complexity;
   }
@@ -349,7 +401,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return {
       complexity: this.analyzeComplexity(request),
       taskType: this.inferTaskType(request.prompt),
-      estimatedTokens: Math.ceil(request.prompt.length / 4)
+      estimatedTokens: Math.ceil(request.prompt.length / 4),
     };
   }
 
@@ -367,15 +419,15 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
   determineExecutionStrategy(request: ModelRequest): any {
     const complexity = this.analyzeComplexity(request);
-    
+
     // Create proper ExecutionStrategy object
-    let strategy = {
+    const strategy = {
       mode: 'balanced',
       provider: 'ollama',
       timeout: 30000,
-      complexity: complexity.level
+      complexity: complexity.level,
     };
-    
+
     // Industry-standard timeouts for CLI AI agents (30min - 2 hours)
     if (complexity.level === 'simple') {
       strategy.mode = 'fast';
@@ -386,18 +438,18 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     } else {
       strategy.timeout = 3600000; // 1 hour - industry standard for balanced tasks
     }
-    
+
     // Adjust based on request characteristics (but keep long-running)
     if (request.stream) {
       strategy.mode = 'fast';
       strategy.timeout = Math.max(strategy.timeout, 1800000); // Minimum 30 minutes
     }
-    
+
     if (request.tools && request.tools.length > 0) {
       strategy.provider = 'lm-studio';
       strategy.timeout = Math.max(strategy.timeout, 3600000); // Minimum 1 hour for tool usage
     }
-    
+
     return strategy;
   }
 
@@ -421,11 +473,12 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     try {
       const { readdir, stat } = await import('fs/promises');
       const { join } = await import('path');
-      
+
       const items = await readdir(projectRoot);
       const structure = [];
-      
-      for (const item of items.slice(0, 20)) { // Limit to first 20 items
+
+      for (const item of items.slice(0, 20)) {
+        // Limit to first 20 items
         try {
           const itemPath = join(projectRoot, item);
           const stats = await stat(itemPath);
@@ -435,7 +488,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
           // Skip items we can't read
         }
       }
-      
+
       return `Project structure for ${projectRoot}:\n${structure.join('\n')}`;
     } catch (error) {
       return `Unable to read project structure: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -456,7 +509,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         {
           type: 'auto',
           endpoint: 'http://localhost:11434',
-        }
+        },
       ],
       executionMode: 'auto' as const,
       fallbackChain: ['ollama', 'lm-studio', 'auto'] as const,
@@ -473,15 +526,15 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     };
   }
 
-  // Property getters for backward compatibility  
+  // Property getters for backward compatibility
   get providerRepository(): any {
     return this.providerManager;
   }
 
   private registerCleanupResources(): void {
     // Setup cleanup handlers
-    process.on('SIGINT', () => this.shutdown());
-    process.on('SIGTERM', () => this.shutdown());
+    process.on('SIGINT', async () => this.shutdown());
+    process.on('SIGTERM', async () => this.shutdown());
   }
 
   private initializeHybridRouter(): void {

@@ -1,4 +1,3 @@
-
 export interface LivingSpiralCoordinatorInterface {
-    executeSpiralProcess(initialPrompt: string): Promise<any>;
+  executeSpiralProcess(initialPrompt: string): Promise<any>;
 }

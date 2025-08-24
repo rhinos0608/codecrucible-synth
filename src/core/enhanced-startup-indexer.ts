@@ -501,7 +501,7 @@ export class EnhancedStartupIndexer {
         codeBlocks.push(currentBlock);
         currentBlock = null;
       } else if (inCodeBlock && currentBlock) {
-        currentBlock.code += line + '\n';
+        currentBlock.code += `${line}\n`;
       }
     }
 
@@ -859,7 +859,7 @@ export class EnhancedStartupIndexer {
 
       // Try index files
       for (const ext of extensions) {
-        const indexFile = join(resolved, 'index' + ext);
+        const indexFile = join(resolved, `index${ext}`);
         if (files[indexFile]) return indexFile;
       }
     }
@@ -868,7 +868,7 @@ export class EnhancedStartupIndexer {
   }
 
   private getRelativePath(absolutePath: string): string {
-    return absolutePath.replace(this.rootPath + '/', '');
+    return absolutePath.replace(`${this.rootPath}/`, '');
   }
 
   private loadGitignore(): ReturnType<typeof ignore> {

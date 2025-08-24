@@ -37,7 +37,10 @@ export class ModernInputSanitizer {
   /**
    * Sanitize prompt with contextual security analysis
    */
-  static async sanitizePrompt(prompt: string, context: Partial<SecurityContext> = {}): Promise<SanitizationResult> {
+  static async sanitizePrompt(
+    prompt: string,
+    context: Partial<SecurityContext> = {}
+  ): Promise<SanitizationResult> {
     const violations: string[] = [];
     let sanitized = prompt.trim();
 
@@ -45,7 +48,8 @@ export class ModernInputSanitizer {
     sanitized = this.basicCleanup(sanitized);
 
     // Length validation
-    if (sanitized.length > 50000) { // Increased from 10k to 50k for enterprise use
+    if (sanitized.length > 50000) {
+      // Increased from 10k to 50k for enterprise use
       violations.push('Prompt too long (max 50000 characters)');
       sanitized = sanitized.substring(0, 50000);
     }
@@ -57,7 +61,7 @@ export class ModernInputSanitizer {
       command: context.command,
       userInput: prompt,
       workingDirectory: context.workingDirectory || process.cwd(),
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     // Evaluate security using Claude Code patterns
@@ -71,7 +75,7 @@ export class ModernInputSanitizer {
           isValid: true,
           violations,
           originalCommand: prompt,
-          securityDecision
+          securityDecision,
         };
 
       case 'block':
@@ -81,7 +85,7 @@ export class ModernInputSanitizer {
           isValid: false,
           violations,
           originalCommand: prompt,
-          securityDecision
+          securityDecision,
         };
 
       case 'askUser':
@@ -93,7 +97,7 @@ export class ModernInputSanitizer {
           violations: [], // No violations - just requires consent
           originalCommand: prompt,
           securityDecision,
-          requiresConsent: true
+          requiresConsent: true,
         };
 
       default:
@@ -102,7 +106,7 @@ export class ModernInputSanitizer {
           isValid: true,
           violations,
           originalCommand: prompt,
-          securityDecision
+          securityDecision,
         };
     }
   }
@@ -110,9 +114,12 @@ export class ModernInputSanitizer {
   /**
    * Sanitize with user consent handling
    */
-  static async sanitizeWithConsent(prompt: string, context: Partial<SecurityContext> = {}): Promise<SanitizationResult> {
+  static async sanitizeWithConsent(
+    prompt: string,
+    context: Partial<SecurityContext> = {}
+  ): Promise<SanitizationResult> {
     const result = await this.sanitizePrompt(prompt, context);
-    
+
     if (result.requiresConsent && this.consentManager) {
       try {
         const consentRequest = await this.securitySystem.requestUserConsent(
@@ -122,7 +129,7 @@ export class ModernInputSanitizer {
             command: context.command,
             userInput: prompt,
             workingDirectory: context.workingDirectory || process.cwd(),
-            timestamp: new Date()
+            timestamp: new Date(),
           },
           result.securityDecision!
         );
@@ -176,7 +183,7 @@ export class ModernInputSanitizer {
       filePath: sanitized,
       userInput: filePath,
       workingDirectory: process.cwd(),
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     const securityDecision = await this.securitySystem.evaluateSecurity(context);
@@ -187,7 +194,7 @@ export class ModernInputSanitizer {
       violations: securityDecision.action === 'block' ? [securityDecision.reason] : [],
       originalCommand: filePath,
       securityDecision,
-      requiresConsent: securityDecision.action === 'askUser'
+      requiresConsent: securityDecision.action === 'askUser',
     };
   }
 
@@ -220,8 +227,18 @@ export class ModernInputSanitizer {
     let sanitized = command.trim();
 
     const ALLOWED_SLASH_COMMANDS = new Set([
-      '/help', '/voices', '/voice', '/mode', '/todo', '/plan',
-      '/dual', '/dualagent', '/stream', '/audit', '/autoconfig', '/config'
+      '/help',
+      '/voices',
+      '/voice',
+      '/mode',
+      '/todo',
+      '/plan',
+      '/dual',
+      '/dualagent',
+      '/stream',
+      '/audit',
+      '/autoconfig',
+      '/config',
     ]);
 
     // Extract command and arguments
@@ -258,7 +275,9 @@ export class ModernInputSanitizer {
    * Create security error for audit logging
    */
   static createSecurityError(result: SanitizationResult, context: string): Error {
-    const error = new Error(`Security review required for ${context}: ${result.violations.join(', ')}`);
+    const error = new Error(
+      `Security review required for ${context}: ${result.violations.join(', ')}`
+    );
 
     // Add metadata for security logging
     (error as any).securityContext = {

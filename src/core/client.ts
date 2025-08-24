@@ -3,9 +3,7 @@
  * This file bridges the old import structure with the new refactored system
  */
 
-export {
-  UnifiedModelClient,
-} from '../refactor/unified-model-client.js';
+export { UnifiedModelClient } from '../refactor/unified-model-client.js';
 
 // Use the local UnifiedClientConfig from types.ts
 import type { UnifiedClientConfig } from './types.js';
@@ -18,7 +16,7 @@ export function createDefaultUnifiedClientConfig(): UnifiedClientConfig {
       {
         type: 'auto',
         endpoint: 'http://localhost:11434',
-      }
+      },
     ],
     executionMode: 'auto' as const,
     fallbackChain: ['ollama', 'lm-studio', 'auto'] as const,

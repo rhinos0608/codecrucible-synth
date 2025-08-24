@@ -340,7 +340,7 @@ export class ExaSearchTool {
 
     // Truncate if too long
     if (cleaned.length > 1000) {
-      cleaned = cleaned.substring(0, 1000) + '...';
+      cleaned = `${cleaned.substring(0, 1000)}...`;
     }
 
     return cleaned;

@@ -1,4 +1,3 @@
-
 import { EventEmitter } from 'events';
 import { Logger } from '../core/logger.js';
 
@@ -8,7 +7,10 @@ import { WorkflowOrchestrator } from '../core/workflow/workflow-orchestrator.js'
 import { AdvancedToolOrchestrator } from '../core/tools/advanced-tool-orchestrator.js';
 import { VectorRAGSystem, RAGConfig } from '../core/rag/vector-rag-system.js';
 import { IntelligentModelRouter, RouterConfig } from '../core/routing/intelligent-model-router.js';
-import { ObservabilitySystem, ObservabilityConfig } from '../core/observability/observability-system.js';
+import {
+  ObservabilitySystem,
+  ObservabilityConfig,
+} from '../core/observability/observability-system.js';
 import { UnifiedCacheSystem, UnifiedCacheConfig } from '../core/cache/unified-cache-system.js';
 import {
   AgentEcosystem,
@@ -98,5 +100,4 @@ export class IntegratedCodeCrucibleSystem extends EventEmitter {
     // System cleanup
     this.logger.info('System cleanup completed');
   }
-
 }

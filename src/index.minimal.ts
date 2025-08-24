@@ -89,7 +89,6 @@ async function main() {
       .description('Show system status')
       .action(async () => {
         await cli.showStatus();
-        console.log(JSON.stringify(status, null, 2));
       });
 
     program
@@ -99,7 +98,7 @@ async function main() {
       .option('--interactive', 'Interactive mode')
       .action(async (prompt, options) => {
         if (!prompt && !options.interactive) {
-          program.help();
+          program.outputHelp();
           return;
         }
 

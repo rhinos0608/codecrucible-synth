@@ -14,13 +14,13 @@ import { logger } from '../logger.js';
 
 // Enhanced: AI SDK v5.0 Compatible Streaming Interfaces
 export interface StreamChunk {
-  type: 
+  type:
     | 'stream-start'
-    | 'text-start' 
+    | 'text-start'
     | 'text-delta'
     | 'text-end'
     | 'reasoning-start'
-    | 'reasoning-delta' 
+    | 'reasoning-delta'
     | 'reasoning-end'
     | 'tool-input-start'
     | 'tool-input-delta'
@@ -29,34 +29,34 @@ export interface StreamChunk {
     | 'tool-result'
     | 'finish'
     | 'error';
-  
+
   // Common properties
   id?: string;
   timestamp: number;
-  
+
   // Stream start properties
   warnings?: StreamWarning[];
-  
+
   // Text streaming properties
   delta?: string;
-  
+
   // Tool properties
   toolCallId?: string;
   toolName?: string;
   args?: unknown;
   result?: unknown;
-  
+
   // Finish properties
   usage?: StreamUsage;
   finishReason?: 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error';
-  
+
   // Error properties
   error?: string;
   errorCode?: string;
-  
+
   // Provider metadata
   providerMetadata?: Record<string, unknown>;
-  
+
   // Legacy compatibility
   content?: string;
   finished?: boolean;
@@ -101,7 +101,7 @@ export interface StreamConfig {
   enableBackpressure?: boolean;
   timeout?: number;
   encoding?: BufferEncoding;
-  
+
   // Enhanced: Modern streaming features
   enableReasoningStream?: boolean;
   enableToolStreaming?: boolean;
@@ -136,14 +136,14 @@ export interface IStreamingManager {
     onToken: (token: StreamToken) => void,
     config?: StreamConfig
   ): Promise<string>;
-  
+
   // Enhanced: Modern streaming with AI SDK v5.0 patterns
   startModernStream(
     content: string,
     onChunk: (chunk: StreamChunk) => void,
     config?: StreamConfig
   ): Promise<string>;
-  
+
   // Enhanced: Tool streaming support
   streamToolExecution(
     toolName: string,
@@ -182,7 +182,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     enableBackpressure: true,
     timeout: 30000,
     encoding: 'utf8',
-    
+
     // Enhanced: Modern streaming defaults
     enableReasoningStream: true,
     enableToolStreaming: true,
@@ -204,16 +204,16 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     this.on('session-created', (sessionId: string) => {
       logger.debug('Stream session created', { sessionId });
     });
-    
+
     // Enhanced: Modern streaming events
     this.on('stream-start', (chunk: StreamChunk) => {
       logger.debug('Modern stream started', { id: chunk.id });
     });
-    
+
     this.on('text-block-start', (chunk: StreamChunk) => {
       logger.debug('Text block started', { id: chunk.id });
     });
-    
+
     this.on('tool-call', (chunk: StreamChunk) => {
       logger.debug('Tool call received', { toolName: chunk.toolName, id: chunk.toolCallId });
     });
@@ -249,7 +249,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
         type: 'stream-start',
         id: streamId,
         timestamp: Date.now(),
-        warnings: []
+        warnings: [],
       };
       session.chunks.push(streamStartChunk);
       onChunk(streamStartChunk);
@@ -260,7 +260,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       const textStartChunk: StreamChunk = {
         type: 'text-start',
         id: textBlockId,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       session.chunks.push(textStartChunk);
       onChunk(textStartChunk);
@@ -271,7 +271,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
         id: textBlockId,
         type: 'text',
         startTime: Date.now(),
-        content: []
+        content: [],
       };
       session.activeBlocks.set(textBlockId, textBlock);
 
@@ -288,7 +288,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
           type: 'text-delta',
           id: textBlockId,
           delta: tokens[i],
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
 
         textBlock.content.push(tokens[i]);
@@ -305,7 +305,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       const textEndChunk: StreamChunk = {
         type: 'text-end',
         id: textBlockId,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       session.chunks.push(textEndChunk);
       onChunk(textEndChunk);
@@ -319,8 +319,8 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
         usage: {
           inputTokens: content.length,
           outputTokens: streamedContent.length,
-          totalTokens: content.length + streamedContent.length
-        }
+          totalTokens: content.length + streamedContent.length,
+        },
       };
       session.chunks.push(finishChunk);
       onChunk(finishChunk);
@@ -335,34 +335,33 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
         sessionId,
         streamId,
         chunksGenerated: session.chunks.length,
-        contentLength: streamedContent.length
+        contentLength: streamedContent.length,
       });
 
       return streamedContent;
-
     } catch (error) {
       const session = this.sessions.get(sessionId);
       if (session) {
         session.status = 'error';
-        
+
         const errorChunk: StreamChunk = {
           type: 'error',
           timestamp: Date.now(),
           error: error instanceof Error ? error.message : String(error),
-          errorCode: 'STREAM_ERROR'
+          errorCode: 'STREAM_ERROR',
         };
         session.chunks.push(errorChunk);
         onChunk(errorChunk);
       }
-      
+
       this.activeStreams.delete(sessionId);
       this.destroySession(sessionId);
-      
+
       logger.error('Modern stream session failed', {
         sessionId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
-      
+
       throw error;
     }
   }
@@ -376,7 +375,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     onChunk: (chunk: StreamChunk) => void
   ): Promise<unknown> {
     const toolCallId = this.generateBlockId();
-    
+
     try {
       // Send tool-call chunk
       const toolCallChunk: StreamChunk = {
@@ -384,34 +383,33 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
         toolCallId,
         toolName,
         args,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       onChunk(toolCallChunk);
       this.emit('tool-call', toolCallChunk);
-      
+
       // Simulate tool execution (in real implementation, this would call actual tools)
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       const result = { success: true, output: `Tool ${toolName} executed successfully` };
-      
+
       // Send tool-result chunk
       const toolResultChunk: StreamChunk = {
         type: 'tool-result',
         toolCallId,
         result,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       onChunk(toolResultChunk);
       this.emit('tool-result', toolResultChunk);
-      
+
       return result;
-      
     } catch (error) {
       const errorChunk: StreamChunk = {
         type: 'error',
         timestamp: Date.now(),
         error: error instanceof Error ? error.message : String(error),
-        errorCode: 'TOOL_ERROR'
+        errorCode: 'TOOL_ERROR',
       };
       onChunk(errorChunk);
       throw error;

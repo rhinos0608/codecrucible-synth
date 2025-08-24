@@ -1,14 +1,14 @@
 /**
  * SynthesisCoordinator - Application Layer Implementation
  * Replaces integrated-system.ts with proper DI-based architecture
- * 
+ *
  * Living Spiral Applied:
  * - COLLAPSE: Centralized request coordination without tight coupling
  * - COUNCIL: Multiple service orchestration through interfaces
  * - SYNTHESIS: Unified response formation from multiple sources
  * - REBIRTH: Clean execution with proper error handling
  * - REFLECTION: Performance monitoring and quality assessment
- * 
+ *
  * Council Perspectives:
  * - Architect: Clean separation between application and infrastructure layers
  * - Maintainer: Testable, mockable dependencies through DI
@@ -102,10 +102,10 @@ export class SynthesisCoordinator extends EventEmitter {
     super();
     this.container = container;
     this.startTime = Date.now();
-    
+
     // Increase max listeners for complex synthesis operations
     this.setMaxListeners(100);
-    
+
     logger.info('SynthesisCoordinator initialized with DI container');
   }
 
@@ -119,13 +119,13 @@ export class SynthesisCoordinator extends EventEmitter {
 
     try {
       logger.info('Initializing SynthesisCoordinator...');
-      
+
       // Verify all required services are available
       await this.verifyDependencies();
-      
+
       this.initialized = true;
       this.emit('initialized');
-      
+
       logger.info('SynthesisCoordinator initialization complete');
     } catch (error) {
       logger.error('SynthesisCoordinator initialization failed', error);
@@ -144,7 +144,10 @@ export class SynthesisCoordinator extends EventEmitter {
     const requestId = request.id || this.generateRequestId();
     const startTime = Date.now();
 
-    logger.info('Processing synthesis request', { requestId, prompt: request.prompt.substring(0, 100) });
+    logger.info('Processing synthesis request', {
+      requestId,
+      prompt: request.prompt.substring(0, 100),
+    });
 
     try {
       // Phase 1: Security validation
@@ -173,16 +176,15 @@ export class SynthesisCoordinator extends EventEmitter {
       // Phase 4: Performance recording
       await this.recordPerformance(requestId, synthesisResponse);
 
-      logger.info('Synthesis request completed', { 
-        requestId, 
-        processingTime: Date.now() - startTime 
+      logger.info('Synthesis request completed', {
+        requestId,
+        processingTime: Date.now() - startTime,
       });
 
       return synthesisResponse;
-
     } catch (error) {
       logger.error('Synthesis request failed', error, { requestId });
-      
+
       // Return error response in expected format
       return this.createErrorResponse(requestId, error, startTime);
     }
@@ -192,7 +194,7 @@ export class SynthesisCoordinator extends EventEmitter {
    * Synthesize enhanced response from basic model response
    */
   private async synthesizeResponse(
-    request: ApplicationRequest, 
+    request: ApplicationRequest,
     modelResponse: ModelResponse,
     startTime: number
   ): Promise<ApplicationResponse> {
@@ -207,11 +209,11 @@ export class SynthesisCoordinator extends EventEmitter {
         mode: 'single', // TODO: Implement multi-voice when voice system is integrated
         voices: [],
         conflicts: [],
-        consensus: { 
-          agreement: 1, 
-          convergence: 1, 
-          stability: 1, 
-          diversity: 0 
+        consensus: {
+          agreement: 1,
+          convergence: 1,
+          stability: 1,
+          diversity: 0,
         },
         finalDecision: {
           method: 'direct',
@@ -254,8 +256,8 @@ export class SynthesisCoordinator extends EventEmitter {
    * Create error response in standard format
    */
   private createErrorResponse(
-    requestId: string, 
-    error: any, 
+    requestId: string,
+    error: any,
     startTime: number
   ): ApplicationResponse {
     const processingTime = Date.now() - startTime;
@@ -325,7 +327,9 @@ export class SynthesisCoordinator extends EventEmitter {
       try {
         const service = this.container.resolve(token);
         if (!service) {
-          logger.warn(`Service ${token.name} not available, continuing with degraded functionality`);
+          logger.warn(
+            `Service ${token.name} not available, continuing with degraded functionality`
+          );
         }
       } catch (error) {
         if (token === CLIENT_TOKEN || token === SECURITY_VALIDATOR_TOKEN) {
@@ -394,7 +398,7 @@ export class SynthesisCoordinator extends EventEmitter {
     dependencies: Record<string, boolean>;
   }> {
     const dependencies: Record<string, boolean> = {};
-    
+
     const services = [
       CLIENT_TOKEN,
       SECURITY_VALIDATOR_TOKEN,

@@ -175,14 +175,14 @@ class RedisCache {
   private async initializeRedis(): Promise<void> {
     try {
       const { createClient } = await import('redis');
-      
+
       const redisUrl = `redis://${this.config.host || 'localhost'}:${this.config.port || 6379}`;
-      
+
       this.client = createClient({
         url: redisUrl,
         socket: {
           connectTimeout: 5000,
-        }
+        },
       });
 
       this.client.on('error', (err: Error) => {
@@ -205,7 +205,7 @@ class RedisCache {
 
   async get(key: string): Promise<string | null> {
     const fullKey = `${this.config.keyPrefix}${key}`;
-    
+
     if (this.useRealRedis && this.isConnected && this.client) {
       try {
         return await this.client.get(fullKey);
@@ -214,14 +214,14 @@ class RedisCache {
         this.useRealRedis = false;
       }
     }
-    
+
     // Fallback to in-memory storage
     return this.mockStorage.get(fullKey) || null;
   }
 
   async set(key: string, value: string, ttl?: number): Promise<void> {
     const fullKey = `${this.config.keyPrefix}${key}`;
-    
+
     if (this.useRealRedis && this.isConnected && this.client) {
       try {
         if (ttl) {
@@ -235,7 +235,7 @@ class RedisCache {
         this.useRealRedis = false;
       }
     }
-    
+
     // Fallback to in-memory storage
     this.mockStorage.set(fullKey, value);
     if (ttl) {
@@ -247,7 +247,7 @@ class RedisCache {
 
   async delete(key: string): Promise<boolean> {
     const fullKey = `${this.config.keyPrefix}${key}`;
-    
+
     if (this.useRealRedis && this.isConnected && this.client) {
       try {
         const result = await this.client.del(fullKey);
@@ -257,7 +257,7 @@ class RedisCache {
         this.useRealRedis = false;
       }
     }
-    
+
     // Fallback to in-memory storage
     return this.mockStorage.delete(fullKey);
   }
@@ -275,7 +275,7 @@ class RedisCache {
         this.useRealRedis = false;
       }
     }
-    
+
     // Fallback to in-memory storage
     this.mockStorage.clear();
   }
@@ -290,7 +290,7 @@ class RedisCache {
         this.useRealRedis = false;
       }
     }
-    
+
     // Fallback to in-memory storage
     const regex = new RegExp(pattern.replace('*', '.*'));
     return Array.from(this.mockStorage.keys()).filter(key => regex.test(key));

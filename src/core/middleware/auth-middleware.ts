@@ -444,7 +444,7 @@ export class AuthMiddleware {
         const adminUser = await this.rbacSystem.createUser({
           username: 'admin',
           email: 'admin@codecrucible.local',
-          password: defaultPassword
+          password: defaultPassword,
         });
 
         // Assign admin roles separately

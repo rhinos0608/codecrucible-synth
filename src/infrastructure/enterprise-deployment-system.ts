@@ -11,7 +11,7 @@ import {
   AuditSeverity,
   AuditOutcome,
 } from '../core/security/security-audit-logger.js';
-import { PerformanceMonitor } from '../core/performance/performance-monitor.js';
+import { PerformanceMonitor } from '../utils/performance.js';
 import { AWSProvider } from './cloud-providers/aws-provider.js';
 import { AzureProvider } from './cloud-providers/azure-provider.js';
 import { exec } from 'child_process';
@@ -236,7 +236,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
         subnetIds: this.config.awsConfig.subnetIds,
       });
     }
-    
+
     if (this.config.cloudProvider === 'azure' && this.config.azureConfig) {
       this.azureProvider = new AzureProvider({
         subscriptionId: this.config.azureConfig.subscriptionId,
@@ -244,7 +244,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
         location: this.config.azureConfig.location,
       });
     }
-    
+
     // Initialize load balancer
     this.loadBalancer = new LoadBalancer({
       instances: Array.from(this.instances.values()),
@@ -448,7 +448,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
    */
   private async executeRealCommand(step: DeploymentStep, plan: DeploymentPlan): Promise<void> {
     const { cloudProvider } = this.config;
-    
+
     if (cloudProvider === 'aws' && this.awsProvider) {
       return this.executeAWSCommand(step, plan);
     } else if (cloudProvider === 'azure' && this.azureProvider) {
@@ -464,7 +464,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
    */
   private async executeAWSCommand(step: DeploymentStep, plan: DeploymentPlan): Promise<void> {
     if (!this.awsProvider) throw new Error('AWS provider not initialized');
-    
+
     switch (step.type) {
       case 'provision':
         await this.awsProvider.launchInstances('t3.medium', 2);
@@ -479,7 +479,9 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
       case 'configure':
         await this.awsProvider.createAutoScalingGroup(
           `codecrucible-asg-${plan.environment}`,
-          1, 10, 2
+          1,
+          10,
+          2
         );
         break;
       default:
@@ -488,16 +490,14 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
   }
 
   /**
-   * Execute Azure-specific deployment command  
+   * Execute Azure-specific deployment command
    */
   private async executeAzureCommand(step: DeploymentStep, plan: DeploymentPlan): Promise<void> {
     if (!this.azureProvider) throw new Error('Azure provider not initialized');
-    
+
     switch (step.type) {
       case 'provision':
-        await this.azureProvider.createVirtualMachine(
-          `codecrucible-vm-${plan.environment}`
-        );
+        await this.azureProvider.createVirtualMachine(`codecrucible-vm-${plan.environment}`);
         break;
       case 'deploy':
         await this.azureProvider.deployContainerInstance(
@@ -506,10 +506,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
         );
         break;
       case 'configure':
-        await this.azureProvider.createVMScaleSet(
-          `codecrucible-vmss-${plan.environment}`,
-          3
-        );
+        await this.azureProvider.createVMScaleSet(`codecrucible-vmss-${plan.environment}`, 3);
         break;
       default:
         await this.executeLocalCommand(step.command, step.timeout);
@@ -525,7 +522,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
         timeout: timeout,
         env: { ...process.env, NODE_ENV: this.config.environment },
       });
-      
+
       if (stdout) logger.debug(`Command output: ${stdout}`);
       if (stderr) logger.warn(`Command stderr: ${stderr}`);
     } catch (error: any) {
@@ -590,7 +587,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
    * Perform health checks on all instances
    */
   private async performHealthChecks(): Promise<void> {
-    const promises = Array.from(this.instances.values()).map(instance =>
+    const promises = Array.from(this.instances.values()).map(async instance =>
       this.checkInstanceHealth(instance)
     );
 

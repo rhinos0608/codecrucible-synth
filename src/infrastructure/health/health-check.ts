@@ -554,10 +554,10 @@ export class HealthMonitor extends EventEmitter {
     } catch (error) {
       // Fallback calculation based on system performance
     }
-    
+
     // Calculate estimated hit rate based on system load
     const loadAverage = os.loadavg()[0];
-    const estimatedHitRate = Math.max(0.3, Math.min(0.98, 0.9 - (loadAverage * 0.1)));
+    const estimatedHitRate = Math.max(0.3, Math.min(0.98, 0.9 - loadAverage * 0.1));
     return Math.round(estimatedHitRate * 100) / 100;
   }
 
@@ -566,7 +566,7 @@ export class HealthMonitor extends EventEmitter {
       // Get real memory usage in MB
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / (1024 * 1024));
-      
+
       // Estimate cache portion (typically 10-20% of heap)
       const estimatedCacheUsage = Math.round(heapUsedMB * 0.15);
       return estimatedCacheUsage;
@@ -576,7 +576,7 @@ export class HealthMonitor extends EventEmitter {
       const freeMem = os.freemem();
       const usedMem = totalMem - freeMem;
       const usedMemMB = Math.round(usedMem / (1024 * 1024));
-      
+
       // Estimate cache as small portion of used memory
       return Math.round(usedMemMB * 0.05);
     }

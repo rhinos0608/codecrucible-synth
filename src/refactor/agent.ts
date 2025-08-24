@@ -1,15 +1,14 @@
-
-import { Task, ExecutionResult } from "../core/types.js";
-import { UnifiedModelClient } from "../core/client.js";
+import { Task, ExecutionResult } from '../core/types.js';
+import { UnifiedModelClient } from '../core/client.js';
 
 export class Agent {
-    private client: UnifiedModelClient;
+  private client: UnifiedModelClient;
 
-    constructor(client: UnifiedModelClient) {
-        this.client = client;
-    }
+  constructor(client: UnifiedModelClient) {
+    this.client = client;
+  }
 
-    async handleCodeAnalysis(task: Task): Promise<ExecutionResult> {
+  async handleCodeAnalysis(task: Task): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -19,7 +18,7 @@ export class Agent {
       // Check if this is a project/directory analysis request
       const taskInput = task.input || '';
       const inputLower = (typeof taskInput === 'string' ? taskInput : '').toLowerCase();
-      const isProjectAnalysis = 
+      const isProjectAnalysis =
         inputLower.includes('project structure') ||
         inputLower.includes('analyze the project') ||
         inputLower.includes('codebase') ||
@@ -132,7 +131,7 @@ export class Agent {
     }
   }
 
-    async handleCodeGeneration(task: Task): Promise<ExecutionResult> {
+  async handleCodeGeneration(task: Task): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -170,7 +169,7 @@ export class Agent {
     }
   }
 
-    async handleDocumentation(task: Task): Promise<ExecutionResult> {
+  async handleDocumentation(task: Task): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -208,7 +207,7 @@ export class Agent {
     }
   }
 
-    async handleTesting(task: Task): Promise<ExecutionResult> {
+  async handleTesting(task: Task): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -246,7 +245,7 @@ export class Agent {
     }
   }
 
-    async handleRefactoring(task: Task): Promise<ExecutionResult> {
+  async handleRefactoring(task: Task): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -284,7 +283,7 @@ export class Agent {
     }
   }
 
-    async handleBugFixing(task: Task): Promise<ExecutionResult> {
+  async handleBugFixing(task: Task): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -322,7 +321,7 @@ export class Agent {
     }
   }
 
-    async handlePerformanceOptimization(task: Task): Promise<ExecutionResult> {
+  async handlePerformanceOptimization(task: Task): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -360,7 +359,7 @@ export class Agent {
     }
   }
 
-    async handleSecurityAnalysis(task: Task): Promise<ExecutionResult> {
+  async handleSecurityAnalysis(task: Task): Promise<ExecutionResult> {
     const startTime = Date.now();
 
     try {

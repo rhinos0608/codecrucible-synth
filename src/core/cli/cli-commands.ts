@@ -326,7 +326,7 @@ export class CLICommands {
             voices,
             maxFiles: 50, // Limit files to prevent memory overload
           },
-          timeout: options.timeout || 30000, // 30 seconds timeout
+          timeout: options.timeout || 300000, // 5 minutes timeout for complex analysis
         };
 
         // Execute analysis in worker thread
@@ -338,7 +338,7 @@ export class CLICommands {
             fallbackChain: ['ollama' as const],
             performanceThresholds: {
               fastModeMaxTokens: 2048,
-              timeoutMs: 30000,
+              timeoutMs: 300000, // 5 minutes for complex operations
               maxConcurrentRequests: 2,
             },
             security: {

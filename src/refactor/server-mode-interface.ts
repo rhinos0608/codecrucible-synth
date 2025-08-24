@@ -1,4 +1,3 @@
-
 export interface ServerModeInterface {
-    startServerMode(context: any, options: any): Promise<void>;
+  startServerMode(context: any, options: any): Promise<void>;
 }

@@ -47,7 +47,10 @@ export interface ProductionDatabaseConfig {
 }
 
 export interface DatabaseTransaction {
-  query<T extends QueryResultRow = QueryResultRow>(sql: string, params?: any[]): Promise<QueryResult<T>>;
+  query<T extends QueryResultRow = QueryResultRow>(
+    sql: string,
+    params?: any[]
+  ): Promise<QueryResult<T>>;
   commit(): Promise<void>;
   rollback(): Promise<void>;
 }
@@ -97,7 +100,7 @@ export class ProductionDatabaseManager {
       await this.initializeRedisCache();
       await this.runMigrations();
       this.startHealthChecks();
-      
+
       logger.info('Production database manager initialized', {
         type: this.config.type,
         replicas: this.replicaPools.length,
@@ -131,7 +134,7 @@ export class ProductionDatabaseManager {
       const client = await this.masterPool.connect();
       const result = await client.query('SELECT NOW()');
       client.release();
-      
+
       logger.info('PostgreSQL primary connection established', {
         serverTime: result.rows[0].now,
       });
@@ -203,7 +206,7 @@ export class ProductionDatabaseManager {
 
       await this.redisClient.connect();
       await this.redisClient.ping();
-      
+
       logger.info('Redis cache connected');
     } catch (error) {
       logger.error('Redis connection failed:', error);
@@ -236,13 +239,13 @@ export class ProductionDatabaseManager {
    * Execute query with performance tracking and caching
    */
   async query<T extends QueryResultRow = QueryResultRow>(
-    sql: string, 
-    params: any[] = [], 
+    sql: string,
+    params: any[] = [],
     options: QueryOptions = {}
   ): Promise<QueryResult<T>> {
     const startTime = performance.now();
     const queryId = this.generateQueryId(sql);
-    
+
     try {
       // Check cache first
       if (options.cache && this.redisClient) {
@@ -254,9 +257,10 @@ export class ProductionDatabaseManager {
       }
 
       // Choose connection pool
-      const pool = options.readReplica && this.replicaPools.length > 0
-        ? this.getRandomReplica()
-        : this.masterPool;
+      const pool =
+        options.readReplica && this.replicaPools.length > 0
+          ? this.getRandomReplica()
+          : this.masterPool;
 
       if (!pool) {
         throw new Error('No database connection available');
@@ -264,7 +268,7 @@ export class ProductionDatabaseManager {
 
       // Execute query
       const client = await pool.connect();
-      
+
       try {
         if (options.timeout) {
           // Set statement timeout
@@ -272,15 +276,10 @@ export class ProductionDatabaseManager {
         }
 
         const result = await client.query<T>(sql, params);
-        
+
         // Cache result if caching is enabled
         if (options.cache && this.redisClient) {
-          await this.setCachedResult(
-            queryId, 
-            params, 
-            result, 
-            options.cacheTTL || 300
-          );
+          await this.setCachedResult(queryId, params, result, options.cacheTTL || 300);
         }
 
         this.trackQueryMetrics(queryId, performance.now() - startTime, false);
@@ -334,11 +333,9 @@ export class ProductionDatabaseManager {
   /**
    * Execute multiple queries in a transaction
    */
-  async transaction<T>(
-    callback: (trx: DatabaseTransaction) => Promise<T>
-  ): Promise<T> {
+  async transaction<T>(callback: (trx: DatabaseTransaction) => Promise<T>): Promise<T> {
     const trx = await this.beginTransaction();
-    
+
     try {
       const result = await callback(trx);
       await trx.commit();
@@ -376,7 +373,7 @@ export class ProductionDatabaseManager {
       VALUES ($1, $2, $3, $4, $5, $6, NOW())
       RETURNING id
     `;
-    
+
     const result = await this.query(query, [
       interaction.sessionId,
       interaction.voiceName,
@@ -405,7 +402,7 @@ export class ProductionDatabaseManager {
       VALUES ($1, $2, $3, $4, $5, NOW())
       RETURNING id
     `;
-    
+
     const result = await this.query(query, [
       analysis.projectId,
       analysis.filePath,
@@ -421,8 +418,8 @@ export class ProductionDatabaseManager {
    * Get session history with pagination
    */
   async getSessionHistory(
-    sessionId: string, 
-    limit: number = 50, 
+    sessionId: string,
+    limit: number = 50,
     offset: number = 0
   ): Promise<any[]> {
     const query = `
@@ -476,11 +473,13 @@ export class ProductionDatabaseManager {
     const batches = this.createBatches(data, batchSize);
 
     for (const batch of batches) {
-      const placeholders = batch.map((_, i) => {
-        const start = i * columns.length + 1;
-        const end = start + columns.length - 1;
-        return `(${Array.from({ length: columns.length }, (_, j) => `$${start + j}`).join(', ')})`;
-      }).join(', ');
+      const placeholders = batch
+        .map((_, i) => {
+          const start = i * columns.length + 1;
+          const end = start + columns.length - 1;
+          return `(${Array.from({ length: columns.length }, (_, j) => `$${start + j}`).join(', ')})`;
+        })
+        .join(', ');
 
       const query = `
         INSERT INTO ${table} (${columns.join(', ')})
@@ -551,11 +550,13 @@ export class ProductionDatabaseManager {
    */
   getPoolStatus(): any {
     return {
-      master: this.masterPool ? {
-        totalCount: this.masterPool.totalCount,
-        idleCount: this.masterPool.idleCount,
-        waitingCount: this.masterPool.waitingCount,
-      } : null,
+      master: this.masterPool
+        ? {
+            totalCount: this.masterPool.totalCount,
+            idleCount: this.masterPool.idleCount,
+            waitingCount: this.masterPool.waitingCount,
+          }
+        : null,
       replicas: this.replicaPools.map(pool => ({
         totalCount: pool.totalCount,
         idleCount: pool.idleCount,
@@ -590,9 +591,9 @@ export class ProductionDatabaseManager {
   }
 
   private async setCachedResult(
-    queryId: string, 
-    params: any[], 
-    result: any, 
+    queryId: string,
+    params: any[],
+    result: any,
     ttl: number
   ): Promise<void> {
     if (!this.redisClient) return;
@@ -606,9 +607,9 @@ export class ProductionDatabaseManager {
   }
 
   private trackQueryMetrics(
-    queryId: string, 
-    duration: number, 
-    fromCache: boolean = false, 
+    queryId: string,
+    duration: number,
+    fromCache: boolean = false,
     error: boolean = false
   ): void {
     if (!this.queryMetrics.has(queryId)) {
@@ -661,7 +662,7 @@ export class ProductionDatabaseManager {
 
     await Promise.all([
       this.masterPool?.end(),
-      ...this.replicaPools.map(pool => pool.end()),
+      ...this.replicaPools.map(async pool => pool.end()),
       this.knexInstance?.destroy(),
       this.redisClient?.disconnect(),
     ]);

@@ -137,7 +137,7 @@ export class MCPServerManager {
   }
 
   /**
-   * Start all enabled MCP servers
+   * Start all enabled MCP servers with timeout optimization
    */
   async startServers(): Promise<void> {
     if (this.isInitialized) {
@@ -145,17 +145,43 @@ export class MCPServerManager {
       return;
     }
 
-    console.log(chalk.blue('🔧 Starting MCP servers...'));
+    console.log(chalk.blue('🔧 Starting MCP servers with timeout optimization...'));
+    const startTime = Date.now();
 
-    const startPromises = Array.from(this.servers.values())
-      .filter(server => server.enabled)
-      .map(server => this.startServer(server.name));
+    // Create timeout-optimized promises for each server
+    const enabledServers = Array.from(this.servers.values()).filter(server => server.enabled);
+    const serverPromises = enabledServers.map(async server => {
+      const serverStartTime = Date.now();
+      
+      try {
+        // Race between server startup and timeout
+        await Promise.race([
+          this.startServer(server.name),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`Server ${server.name} startup timeout`)), 5000)
+          )
+        ]);
+        const duration = Date.now() - serverStartTime;
+        logger.info(`MCP server ${server.name} started in ${duration}ms`);
+      } catch (error) {
+        const duration = Date.now() - serverStartTime;
+        logger.warn(`MCP server ${server.name} failed or timed out after ${duration}ms:`, error);
+        server.status = 'error';
+        server.lastError = error instanceof Error ? error.message : 'Startup timeout';
+      }
+    });
 
-    await Promise.allSettled(startPromises);
+    await Promise.allSettled(serverPromises);
     this.isInitialized = true;
 
+    const totalTime = Date.now() - startTime;
     const runningServers = Array.from(this.servers.values()).filter(s => s.status === 'running');
-    console.log(chalk.green(`✅ Started ${runningServers.length} MCP servers`));
+    const failedServers = Array.from(this.servers.values()).filter(s => s.status === 'error');
+    
+    console.log(chalk.green(`✅ Started ${runningServers.length} MCP servers in ${totalTime}ms`));
+    if (failedServers.length > 0) {
+      console.log(chalk.yellow(`⚠️  ${failedServers.length} servers failed or timed out`));
+    }
   }
 
   /**

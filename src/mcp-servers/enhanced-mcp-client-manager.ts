@@ -31,7 +31,7 @@ export class EnhancedMCPClientManager {
   async initializeServers(): Promise<void> {
     const initPromises = this.config
       .filter(server => server.enabled)
-      .map(server => this.connectToServer(server));
+      .map(async server => this.connectToServer(server));
 
     await Promise.allSettled(initPromises);
   }

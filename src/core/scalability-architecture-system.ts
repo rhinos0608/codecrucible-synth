@@ -1081,7 +1081,7 @@ SCALABILITY METRICS:
 
     if (this.issues.length > 0) {
       report += 'SCALABILITY ISSUES:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
 
       for (const [severity, issues] of issuesBySeverity) {
         const icon =
@@ -1121,7 +1121,7 @@ SCALABILITY METRICS:
     }
 
     report += 'ARCHITECTURAL RECOMMENDATIONS:\n';
-    report += '─'.repeat(50) + '\n';
+    report += `${'─'.repeat(50)}\n`;
 
     for (const [category, recs] of recsByCategory) {
       const icon =
@@ -1162,7 +1162,7 @@ SCALABILITY METRICS:
 
     if (criticalIssues > 0 || highIssues > 0) {
       report += '⚡ PERFORMANCE IMPACT:\n';
-      report += '─'.repeat(50) + '\n';
+      report += `${'─'.repeat(50)}\n`;
       report += `• Current architecture can handle ~${this.estimateUserCapacity()} concurrent users\n`;
       report += `• After optimization: ~${this.estimateOptimizedCapacity()} concurrent users\n`;
       report += `• Expected improvement: ${Math.round((this.estimateOptimizedCapacity() / this.estimateUserCapacity() - 1) * 100)}%\n\n`;

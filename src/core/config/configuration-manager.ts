@@ -110,9 +110,9 @@ export class ConfigurationManager implements IConfigurationManager {
       executionMode: this.defaults.executionMode,
       fallbackChain: [...this.defaults.fallbackChain], // Clone array
       performanceThresholds: { ...this.defaults.performanceThresholds }, // Clone object
-      security: { 
+      security: {
         ...this.defaults.security,
-        allowedCommands: [...this.defaults.security.allowedCommands] // Clone array
+        allowedCommands: [...this.defaults.security.allowedCommands], // Clone array
       },
       streaming: { ...this.defaults.streaming }, // Clone object
     };
@@ -129,10 +129,12 @@ export class ConfigurationManager implements IConfigurationManager {
   /**
    * Create default unified client configuration with overrides
    */
-  createDefaultUnifiedClientConfig(overrides: Partial<UnifiedClientConfig> = {}): UnifiedClientConfig {
+  createDefaultUnifiedClientConfig(
+    overrides: Partial<UnifiedClientConfig> = {}
+  ): UnifiedClientConfig {
     const baseConfig = this.getDefaultConfig();
     const mergedConfig = this.mergeConfigurationWithDefaults(overrides, baseConfig);
-    
+
     logger.debug('Created unified client configuration', {
       hasOverrides: Object.keys(overrides).length > 0,
       overrideKeys: Object.keys(overrides),
@@ -178,7 +180,10 @@ export class ConfigurationManager implements IConfigurationManager {
       if (perf.timeoutMs && (perf.timeoutMs < 5000 || perf.timeoutMs > 600000)) {
         warnings.push('TimeoutMs should be between 5 seconds and 10 minutes');
       }
-      if (perf.maxConcurrentRequests && (perf.maxConcurrentRequests < 1 || perf.maxConcurrentRequests > 10)) {
+      if (
+        perf.maxConcurrentRequests &&
+        (perf.maxConcurrentRequests < 1 || perf.maxConcurrentRequests > 10)
+      ) {
         warnings.push('MaxConcurrentRequests should be between 1 and 10');
       }
     }
@@ -206,7 +211,7 @@ export class ConfigurationManager implements IConfigurationManager {
     }
 
     const isValid = errors.length === 0;
-    
+
     if (!isValid) {
       logger.warn('Configuration validation failed', { errors, warnings });
     } else if (warnings.length > 0) {
@@ -217,7 +222,7 @@ export class ConfigurationManager implements IConfigurationManager {
       isValid,
       errors,
       warnings,
-      sanitized: isValid ? config as UnifiedClientConfig : undefined,
+      sanitized: isValid ? (config as UnifiedClientConfig) : undefined,
     };
   }
 
@@ -229,7 +234,7 @@ export class ConfigurationManager implements IConfigurationManager {
     baseConfig?: UnifiedClientConfig
   ): UnifiedClientConfig {
     const base = baseConfig || this.getDefaultConfig();
-    
+
     // Deep merge configuration with defaults
     const merged: UnifiedClientConfig = {
       ...base,

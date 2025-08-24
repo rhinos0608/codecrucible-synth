@@ -1,3 +1,5 @@
+// Legacy ESLintRC - migrating to flat config (eslint.config.js)
+// This file is kept for compatibility during migration
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
@@ -17,30 +19,44 @@ module.exports = {
     sourceType: 'module',
   },
   rules: {
-    // Allow any types temporarily while fixing
-    '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unused-vars': ['warn', { 
+    // 2025 Best Practices - Stricter Rules
+    '@typescript-eslint/no-explicit-any': 'error', // Upgraded from warn
+    '@typescript-eslint/no-unused-vars': ['error', { 
       'vars': 'all',
       'args': 'after-used',
       'ignoreRestSiblings': false,
       'argsIgnorePattern': '^_',
       'varsIgnorePattern': '^_'
     }],
-    '@typescript-eslint/no-non-null-assertion': 'warn',
+    '@typescript-eslint/no-non-null-assertion': 'error', // Upgraded from warn
+    '@typescript-eslint/prefer-nullish-coalescing': 'error',
+    '@typescript-eslint/prefer-optional-chain': 'error',
+    '@typescript-eslint/no-floating-promises': 'error',
+    '@typescript-eslint/no-misused-promises': 'error',
     
-    // Disable problematic rules for now
-    '@typescript-eslint/ban-ts-comment': 'off',
-    '@typescript-eslint/no-var-requires': 'off',
+    // Security & Best Practices
+    'no-eval': 'error',
+    'no-implied-eval': 'error',
+    'no-new-func': 'error',
+    'no-script-url': 'error',
     
-    // Code style
+    // Modern JavaScript
     'prefer-const': 'error',
     'no-var': 'error',
-    'no-console': 'warn',
+    'prefer-arrow-callback': 'error',
+    'prefer-template': 'error',
+    
+    // Code quality
+    'no-console': 'warn', // Keep as warn for CLI app
+    'no-debugger': 'error',
+    'no-alert': 'error',
   },
   ignorePatterns: [
     'dist/',
     'node_modules/',
     'coverage/',
+    'build/',
+    'temp-dist/',
     '*.d.ts'
   ]
 };

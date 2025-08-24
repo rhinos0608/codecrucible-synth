@@ -1215,24 +1215,137 @@ export class CLI implements REPLInterface {
   /**
    * Handle model switch
    */
-  private handleModelSwitch(model: string): string {
-    console.log(chalk.green(`🔄 Switching to model: ${model}`));
-    return `Switched to ${model}`;
+  private async handleModelSwitch(model: string): Promise<void> {
+    try {
+      console.log(chalk.blue(`🔄 Attempting to switch to model: ${model}`));
+      
+      // Get the Ollama provider from the provider repository
+      const provider = this.context.modelClient.providerRepository.getProvider('ollama');
+      if (!provider || !provider.setModel) {
+        console.log(chalk.red('❌ Model switching not supported for current provider'));
+        return;
+      }
+
+      const success = await provider.setModel(model);
+      if (success) {
+        const modelInfo = provider.getCurrentModelInfo();
+        console.log(chalk.green(`✅ Successfully switched to: ${modelInfo.name}`));
+        console.log(chalk.gray(`   Type: ${modelInfo.type}`));
+        console.log(chalk.gray(`   Function Calling: ${modelInfo.supportsFunctionCalling ? '✅ Yes' : '❌ No'}`));
+      } else {
+        console.log(chalk.red(`❌ Failed to switch to model: ${model}`));
+        console.log(chalk.gray('   Use /models to see available models'));
+      }
+    } catch (error) {
+      console.log(chalk.red(`❌ Error switching model: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
   }
 
   /**
    * Handle model list
    */
-  private handleModelList(): void {
-    this.listModels();
+  private async handleModelList(): Promise<void> {
+    try {
+      console.log(chalk.blue('📋 Available Models with Capabilities:'));
+      console.log(chalk.gray('━'.repeat(60)));
+      
+      // Get the Ollama provider
+      const provider = this.context.modelClient.providerRepository.getProvider('ollama');
+      if (!provider || !provider.listModels) {
+        console.log(chalk.red('❌ Model listing not supported for current provider'));
+        return;
+      }
+
+      const models = await provider.listModels();
+      if (models.length === 0) {
+        console.log(chalk.yellow('📭 No models available. Install models with: ollama pull <model>'));
+        return;
+      }
+
+      // Group models by capability
+      const functionCallingModels = provider.detectFunctionCallingModels(models);
+      const codingModels = provider.detectCodingModels(models);
+      const currentModel = provider.getCurrentModelInfo();
+
+      // Show current model
+      console.log(chalk.green(`🎯 Current: ${currentModel.name}`));
+      console.log(chalk.gray(`   Type: ${currentModel.type} | Function Calling: ${currentModel.supportsFunctionCalling ? '✅' : '❌'}`));
+      console.log();
+
+      // Show function-calling models
+      if (functionCallingModels.length > 0) {
+        console.log(chalk.cyan('🛠️ Function-Calling Capable Models (Recommended):'));
+        functionCallingModels.forEach((model: string) => {
+          const current = model === currentModel.name ? ' 👈 current' : '';
+          const size = provider.extractModelSize(model);
+          console.log(chalk.green(`  ✅ ${model} (${size}B)${current}`));
+        });
+        console.log();
+      }
+
+      // Show coding models
+      if (codingModels.length > 0) {
+        console.log(chalk.blue('💻 Coding Models (Limited Tool Support):'));
+        codingModels.forEach((model: string) => {
+          if (!functionCallingModels.includes(model)) {
+            const current = model === currentModel.name ? ' 👈 current' : '';
+            const size = provider.extractModelSize(model);
+            console.log(chalk.yellow(`  ⚠️ ${model} (${size}B)${current}`));
+          }
+        });
+        console.log();
+      }
+
+      // Show other models
+      const otherModels = models.filter((m: string) => 
+        !functionCallingModels.includes(m) && !codingModels.includes(m)
+      );
+      if (otherModels.length > 0) {
+        console.log(chalk.gray('🤖 Other Models (No Tool Support):'));
+        otherModels.forEach((model: string) => {
+          const current = model === currentModel.name ? ' 👈 current' : '';
+          const size = provider.extractModelSize(model);
+          console.log(chalk.gray(`  ❌ ${model} (${size}B)${current}`));
+        });
+        console.log();
+      }
+
+      console.log(chalk.gray('💡 Switch models with: /model:modelname'));
+      console.log(chalk.gray('   Example: /model:llama3.1:8b'));
+
+    } catch (error) {
+      console.log(chalk.red(`❌ Error listing models: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
   }
 
   /**
    * Handle model reload
    */
-  private handleModelReload(): string {
-    console.log(chalk.blue('🔄 Reloading models...'));
-    return 'Models reloaded';
+  private async handleModelReload(): Promise<void> {
+    try {
+      console.log(chalk.blue('🔄 Reloading models and re-detecting capabilities...'));
+      
+      // Get the Ollama provider
+      const provider = this.context.modelClient.providerRepository.getProvider('ollama');
+      if (!provider || !provider.checkStatus) {
+        console.log(chalk.red('❌ Model reloading not supported for current provider'));
+        return;
+      }
+
+      // Re-initialize the provider to detect models
+      await provider.checkStatus();
+      console.log(chalk.green('✅ Models reloaded and capabilities updated'));
+      
+      // Show current model info
+      const modelInfo = provider.getCurrentModelInfo();
+      console.log(chalk.gray(`Current model: ${modelInfo.name} (${modelInfo.type})`));
+      
+      // Suggest listing models
+      console.log(chalk.gray('💡 Use /ml to see all available models with capabilities'));
+      
+    } catch (error) {
+      console.log(chalk.red(`❌ Error reloading models: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
   }
 }
 

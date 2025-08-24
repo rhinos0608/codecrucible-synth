@@ -78,12 +78,12 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
 
     // Initialize MCP server manager with proper configuration including Smithery
     const mcpConfig = {
-      filesystem: { enabled: true, restrictedPaths: [], allowedPaths: [] },
+      filesystem: { enabled: true, restrictedPaths: [], allowedPaths: [process.cwd(), '~/'] },
       git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
       terminal: {
         enabled: true,
-        allowedCommands: ['npm', 'node', 'git', 'ls', 'cat'],
-        blockedCommands: [],
+        allowedCommands: ['npm', 'node', 'git', 'ls', 'cat', 'head', 'tail', 'grep', 'find', 'pwd', 'echo', 'wc', 'sort', 'uniq', 'cut', 'awk', 'sed'],
+        blockedCommands: ['rm', 'rmdir', 'mv', 'sudo', 'su', 'chmod +x', 'chown'],
       },
       packageManager: { enabled: true, autoInstall: false, securityScan: true },
       smithery: {

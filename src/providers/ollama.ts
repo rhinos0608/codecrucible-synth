@@ -595,6 +595,26 @@ export class OllamaProvider {
     logger.info('Model is ready', { model: this.model });
   }
 
+  async generateText(prompt: string, options: any = {}): Promise<string> {
+    logger.debug('OllamaProvider.generateText called', { 
+      promptLength: prompt.length,
+      options: { model: options.model, temperature: options.temperature } 
+    });
+
+    const response = await this.processRequest({
+      prompt,
+      model: options.model || this.model,
+      temperature: options.temperature || 0.7,
+      maxTokens: options.maxTokens || 4096,
+      stream: options.stream || false,
+      tools: options.tools || []
+    });
+
+    const content = response?.content || response?.text || response?.response || '';
+    logger.debug('OllamaProvider.generateText completed', { contentLength: content.length });
+    return content;
+  }
+
   private getGPUConfig(): any {
     return {
       num_gpu: 0,

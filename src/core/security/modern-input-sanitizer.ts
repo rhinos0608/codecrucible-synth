@@ -168,11 +168,30 @@ export class ModernInputSanitizer {
   }
 
   /**
-   * Validate file path using Claude Code CWD pattern
+   * Validate file path using Claude Code CWD pattern with AI preprocessing
    */
   static async validateFilePath(filePath: string): Promise<SanitizationResult> {
     const violations: string[] = [];
     let sanitized = filePath.trim();
+
+    // CRITICAL: Preprocess AI-generated placeholder paths BEFORE security validation
+    const originalPath = sanitized;
+    
+    // Handle placeholder paths like "/path/to/filename.ext"
+    if (sanitized.includes('/path/to/') || sanitized.startsWith('/path/')) {
+      sanitized = sanitized.split('/').pop() || sanitized;
+      console.log(`🔧 MODERN-SECURITY: Converting AI placeholder path "${originalPath}" to filename "${sanitized}"`);
+    }
+    // Handle simple absolute paths like "/README.md"
+    else if (sanitized.startsWith('/') && !sanitized.includes('/', 1)) {
+      sanitized = sanitized.substring(1);
+      console.log(`🔧 MODERN-SECURITY: Converting AI-generated absolute path "${originalPath}" to relative "${sanitized}"`);
+    }
+    // Handle any other absolute-looking paths by extracting filename
+    else if (sanitized.startsWith('/') && sanitized.split('/').length > 2) {
+      sanitized = sanitized.split('/').pop() || sanitized;
+      console.log(`🔧 MODERN-SECURITY: Converting complex absolute path "${originalPath}" to filename "${sanitized}"`);
+    }
 
     // Basic path cleanup
     sanitized = sanitized.replace(/\\/g, '/'); // Normalize separators

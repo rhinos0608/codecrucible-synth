@@ -249,6 +249,14 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         // Add tool integration before calling provider
         const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
         const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
+        
+        // DEBUG: Log which tool integration is being used
+        logger.info('🔥 REQUEST-EXECUTION-MANAGER: Tool integration selection', {
+          hasEnhanced: !!enhancedToolIntegration,
+          hasBase: !!getGlobalToolIntegration(),
+          usingEnhanced: toolIntegration === enhancedToolIntegration,
+          toolIntegrationType: toolIntegration?.constructor?.name
+        });
         const supportsTools = this.modelSupportsTools(
           providerType as ProviderType,
           provider.getModelName?.()
@@ -332,6 +340,8 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                   },
                 };
 
+                logger.info(`🔥 REQUEST-EXECUTION-MANAGER: About to call executeToolCall for ${formattedToolCall.function.name}`);
+                logger.info(`🔥 REQUEST-EXECUTION-MANAGER: toolIntegration type: ${toolIntegration?.constructor?.name}`);
                 const result = await toolIntegration.executeToolCall(formattedToolCall);
                 logger.debug('Tool execution result in request execution', { result });
                 toolResults.push(result);

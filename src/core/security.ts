@@ -557,6 +557,26 @@ export class SecurityUtils {
       /file analysis/gi,
       /src\/.*\.ts/gi, // Source file paths
       /dist\/.*\.js/gi, // Distribution file paths
+      
+      // CRITICAL: AI Generation Request Patterns
+      /You are .* Voice/gi, // Any voice archetype prompt
+      /Explorer Voice.*focused on.*discovery/gi, // Explorer voice specifically
+      /Tool Usage.*CRITICAL.*Always Use Available Tools/gi, // Tool usage instructions
+      /Filesystem Operations/gi, // Tool descriptions
+      /mcp.*tools.*available/gi, // MCP tool references
+      /README\.md/gi, // File references
+      /tell me what.*says/gi, // User file reading requests
+      /what.*README.*says/gi, // Specific README requests
+      /innovative discovery and creative problem-solving/gi, // Voice descriptions
+      /Model Context Protocol/gi, // MCP references
+      /filesystem_read_file/gi, // Tool names
+      /terminal.*commands/gi, // Terminal operations
+      /working directory/gi, // Directory context
+      
+      // CRITICAL: Placeholder path patterns (AI often generates these)
+      /\/path\/to\//gi, // Common placeholder paths
+      /\/path\/to\/.*\.md/gi, // Placeholder markdown files
+      /filePath.*\/path\/to/gi, // Tool arguments with placeholders
     ];
 
     // Check for legitimate code patterns

@@ -55,7 +55,10 @@ export class EnhancedToolIntegration extends ToolIntegration {
       id: 'mcp_read_file',
       name: 'Read File (External MCP)',
       description: 'Read file contents using external MCP Terminal Controller',
-      execute: async (args: any) => this.externalMcpTools.readFile(args.filePath),
+      execute: async (args: any) => {
+        logger.info(`🔥 CRITICAL: mcp_read_file tool called with args:`, args);
+        return await this.externalMcpTools.readFile(args.filePath);
+      },
       inputSchema: {
         properties: {
           filePath: { type: 'string', description: 'Path to file to read' },
@@ -197,6 +200,50 @@ export class EnhancedToolIntegration extends ToolIntegration {
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       };
+    }
+  }
+
+  /**
+   * Override executeToolCall to provide enhanced execution with proper logging
+   */
+  override async executeToolCall(toolCall: any): Promise<any> {
+    try {
+      const functionName = toolCall.function.name;
+      const args = JSON.parse(toolCall.function.arguments);
+
+      logger.info(`Executing tool: ${functionName} with args:`, args);
+      logger.info(`🔥 ENHANCED TOOL INTEGRATION: Executing ${functionName}`);
+
+      // Check if it's an enhanced tool first
+      const enhancedTool = this.availableTools.get(functionName);
+      if (enhancedTool) {
+        logger.info(`🔥 ENHANCED TOOL INTEGRATION: Found enhanced tool ${functionName}, executing...`);
+        
+        const context = {
+          startTime: Date.now(),
+          userId: 'system',
+          requestId: `tool_${Date.now()}`,
+        };
+
+        const result = await enhancedTool.execute(args, context);
+        
+        logger.info(`🔥 ENHANCED TOOL INTEGRATION: Enhanced tool ${functionName} completed successfully`);
+        return {
+          success: true,
+          output: result,
+          metadata: {
+            executionTime: Date.now() - context.startTime,
+            source: 'enhanced-tool-integration'
+          },
+        };
+      } else {
+        // Fall back to base class for non-enhanced tools
+        logger.info(`🔥 ENHANCED TOOL INTEGRATION: Tool ${functionName} not found in enhanced tools, falling back to base class`);
+        return await super.executeToolCall(toolCall);
+      }
+    } catch (error) {
+      logger.error(`🔥 ENHANCED TOOL INTEGRATION: Tool execution failed:`, error);
+      throw error;
     }
   }
 

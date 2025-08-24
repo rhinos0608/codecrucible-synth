@@ -10,6 +10,7 @@ import { getErrorMessage } from '../utils/error-utils.js';
 import { accessSync } from 'fs';
 import { execSync } from 'child_process';
 import { LivingSpiralCoordinator } from '../core/living-spiral-coordinator.js';
+import { logger } from '../core/logger.js';
 
 interface Voice {
   id: string;
@@ -327,11 +328,20 @@ IMPORTANT: When user asks to "read a file", "create a file", "list files", "chec
 You have access to comprehensive MCP (Model Context Protocol) tools. ALWAYS USE THESE TOOLS when the user requests file operations, git operations, terminal commands, or analysis tasks.
 
 ### Filesystem Operations:
-- filesystem_read_file - Read file contents
-- filesystem_write_file - Write/create files  
+- filesystem_read_file - Read file contents (use EXACT filename like "README.md", NEVER "/path/to/README.md")
+- filesystem_write_file - Write/create files (use EXACT filename)
 - filesystem_list_directory - List directory contents
 - filesystem_file_stats - Get file metadata
 - filesystem_find_files - Search for files
+
+🚨 CRITICAL FILE PATH RULES:
+- When user asks "read README.md" → use "README.md" exactly (NO leading slash!)
+- When user asks "read package.json" → use "package.json" exactly  
+- NEVER use paths starting with "/" like "/README.md" ❌
+- NEVER use placeholder paths like "/path/to/file.md" ❌
+- NEVER use absolute paths like "/Users/name/project/README.md" ❌
+- ALWAYS use relative paths: "README.md" ✅, "src/index.ts" ✅
+- The working directory is already correct - just use the filename directly!
 
 ### Git Operations:
 - git_status - Repository status
@@ -498,15 +508,14 @@ Provide helpful, concise responses with practical value.`;
     const voiceConfig = this.getVoice(voice);
     if (!voiceConfig) throw new Error(`Voice not found: ${voice}`);
 
-    // 2025 Best Practice: Lightweight detection and routing
-    const isCodingOperation = this.detectCodingOperation(prompt);
-    const lightweightPrompt = this.buildLightweightPrompt(voice, isCodingOperation);
-    const enhancedPrompt = `${lightweightPrompt}\n\n${prompt}`;
-    
-    return await client.processRequest({
-      prompt: enhancedPrompt,
-      temperature: voiceConfig.temperature,
+    logger.info('🔥 VOICE DEBUG: generateSingleVoiceResponse called', {
+      voice,
+      promptLength: prompt.length,
+      hasClient: !!client
     });
+
+    // Use the internal method that has all our debug logging and proper pipeline
+    return await this.generateSingleVoiceResponseInternal(voice, prompt, voiceConfig);
   }
 
   async generateMultiVoiceSolutions(voices: string[], prompt: string, context?: any) {
@@ -644,18 +653,29 @@ Provide helpful, concise responses with practical value.`;
     const enhancedPrompt = `${lightweightPrompt}\n\n${prompt}`;
 
     // Use different client methods based on what's available
+    logger.info('🔥 VOICE DEBUG: About to generate response', {
+      voiceId,
+      promptLength: enhancedPrompt.length,
+      hasGenerateVoiceResponse: !!this.modelClient?.generateVoiceResponse,
+      hasProcessRequest: !!this.modelClient?.processRequest,
+      hasGenerateText: !!this.modelClient?.generateText
+    });
+
     let response;
     if (this.modelClient?.generateVoiceResponse) {
+      logger.info('🔥 VOICE DEBUG: Using generateVoiceResponse method');
       response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
         temperature: voice.temperature,
       });
     } else if (this.modelClient?.processRequest) {
+      logger.info('🔥 VOICE DEBUG: Using processRequest method');
       response = await this.modelClient.processRequest({
         prompt: enhancedPrompt,
         temperature: voice.temperature,
       });
     } else if (this.modelClient?.generateText) {
       // Fallback to basic generateText method
+      logger.info('🔥 VOICE DEBUG: Using generateText method');
       const textResponse = await this.modelClient.generateText(enhancedPrompt, {
         temperature: voice.temperature,
       });

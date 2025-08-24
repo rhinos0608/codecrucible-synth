@@ -149,10 +149,21 @@ export class RequestHandler {
     });
 
     // CRITICAL SECURITY: ALWAYS validate input - cannot be bypassed
-    logger.debug('Starting security validation');
+    logger.info('🔥 CRITICAL DEBUG: Starting security validation for request', {
+      promptLength: request.prompt?.length || 0,
+      hasPrompt: !!request.prompt
+    });
     const validation = await this.client.getSecurityValidator().validateRequest(request);
-    logger.debug('Security validation complete');
+    logger.info('🔥 CRITICAL DEBUG: Security validation result', {
+      isValid: validation.isValid,
+      reason: validation.reason,
+      riskLevel: validation.riskLevel
+    });
     if (!validation.isValid) {
+      logger.error('🚨 Security validation BLOCKED the request', { 
+        reason: validation.reason,
+        riskLevel: validation.riskLevel 
+      });
       throw new Error(`Security validation failed: ${validation.reason}`);
     }
 
@@ -432,12 +443,25 @@ export class RequestHandler {
           throw new Error(`Provider ${selectedProvider} not available`);
         }
 
+        logger.info('🔥 CRITICAL DEBUG: About to call actualProvider.generateText', {
+          provider: selectedProvider,
+          promptLength: request.prompt?.length || 0,
+          hasProvider: !!actualProvider,
+          hasGenerateTextMethod: typeof actualProvider.generateText === 'function'
+        });
+
         const providerResponse = await actualProvider.generateText(request.prompt, {
           model: request.model,
           temperature: request.temperature || 0.7,
           maxTokens: request.maxTokens || 4096,
           stream: false, // For non-streaming requests
           tools: request.tools,
+        });
+
+        logger.info('🔥 CRITICAL DEBUG: Provider generateText returned', {
+          hasResponse: !!providerResponse,
+          responseType: typeof providerResponse,
+          responseLength: typeof providerResponse === 'string' ? providerResponse.length : (providerResponse?.content?.length || 0)
         });
 
         if (!providerResponse) {

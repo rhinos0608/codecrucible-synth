@@ -252,6 +252,29 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return response.content;
   }
 
+  async generateVoiceResponse(prompt: string, voiceId: string, options: any): Promise<any> {
+    logger.debug('UnifiedModelClient.generateVoiceResponse called', {
+      promptLength: prompt.length,
+      voiceId,
+      options: { temperature: options.temperature, model: options.model }
+    });
+
+    const request: ModelRequest = {
+      prompt,
+      model: options.model,
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      ...options
+    };
+    
+    const response = await this.processRequest(request);
+    logger.debug('UnifiedModelClient.generateVoiceResponse completed', {
+      contentLength: response?.content?.length || 0
+    });
+    
+    return response;
+  }
+
   async synthesize(request: ModelRequest): Promise<ModelResponse> {
     // Use voice synthesis to generate a response using multiple perspectives
     const voices = ['explorer', 'developer', 'architect']; // Default voices

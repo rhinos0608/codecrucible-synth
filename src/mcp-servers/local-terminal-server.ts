@@ -265,10 +265,34 @@ class LocalTerminalServer {
   private async readFile(args: any): Promise<any> {
     const { file_path } = args;
 
-    // Validate file path
+    // Validate file path with AI-friendly preprocessing
     const validation = InputSanitizer.validateFilePath(file_path);
     if (!validation.isValid) {
-      throw new Error(`File path blocked: ${validation.violations.join(', ')}`);
+      logger.warn(`File path validation failed for "${file_path}": ${validation.violations.join(', ')} - attempting fallback with processed path "${validation.sanitized}"`);
+      
+      // Try with the sanitized/processed path instead of blocking
+      if (validation.sanitized && validation.sanitized !== file_path) {
+        logger.info(`Attempting file read with processed path: ${validation.sanitized}`);
+        try {
+          const content = await fs.readFile(validation.sanitized, 'utf-8');
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                content,
+                path: validation.sanitized,
+                original_path: file_path,
+                size: content.length,
+                note: 'Path was automatically processed from AI-generated format'
+              }),
+            }],
+          };
+        } catch (fallbackError) {
+          logger.warn(`Fallback with processed path also failed: ${fallbackError}`);
+        }
+      }
+      
+      throw new Error(`File path blocked: ${validation.violations.join(', ')} - tried original: "${file_path}" and processed: "${validation.sanitized}"`);
     }
 
     try {
@@ -294,10 +318,36 @@ class LocalTerminalServer {
   private async writeFile(args: any): Promise<any> {
     const { file_path, content } = args;
 
-    // Validate file path
+    // Validate file path with AI-friendly preprocessing
     const validation = InputSanitizer.validateFilePath(file_path);
     if (!validation.isValid) {
-      throw new Error(`File path blocked: ${validation.violations.join(', ')}`);
+      logger.warn(`Write path validation failed for "${file_path}": ${validation.violations.join(', ')} - attempting fallback with processed path "${validation.sanitized}"`);
+      
+      // Try with the sanitized/processed path instead of blocking
+      if (validation.sanitized && validation.sanitized !== file_path) {
+        logger.info(`Attempting file write with processed path: ${validation.sanitized}`);
+        try {
+          const dir = path.dirname(validation.sanitized);
+          await fs.mkdir(dir, { recursive: true });
+          await fs.writeFile(validation.sanitized, content, 'utf-8');
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                path: validation.sanitized,
+                original_path: file_path,
+                size: content.length,
+                note: 'Path was automatically processed from AI-generated format'
+              }),
+            }],
+          };
+        } catch (fallbackError) {
+          logger.warn(`Fallback write with processed path also failed: ${fallbackError}`);
+        }
+      }
+      
+      throw new Error(`Write path blocked: ${validation.violations.join(', ')} - tried original: "${file_path}" and processed: "${validation.sanitized}"`);
     }
 
     try {

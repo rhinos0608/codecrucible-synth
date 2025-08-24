@@ -83,6 +83,12 @@ export class ToolIntegration {
       const args = JSON.parse(toolCall.function.arguments);
 
       logger.info(`Executing tool: ${functionName} with args:`, args);
+      try {
+        const availableToolsList = this.availableTools ? Array.from(this.availableTools.keys()).join(', ') : 'NO TOOLS';
+        logger.info(`🔥 BASE TOOL INTEGRATION: Executing ${functionName}, available tools: ${availableToolsList}`);
+      } catch (e) {
+        logger.error(`🔥 BASE TOOL INTEGRATION: Error listing tools:`, e);
+      }
 
       const tool = this.availableTools.get(functionName);
       if (!tool) {

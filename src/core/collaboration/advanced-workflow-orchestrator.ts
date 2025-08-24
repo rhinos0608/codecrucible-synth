@@ -629,6 +629,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
    */
   private startOrchestrationLoop(): void {
     setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.processTaskQueue();
       this.rebalanceAgentLoads();
       this.monitorWorkflowHealth();

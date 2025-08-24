@@ -495,6 +495,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
    */
   private setupHealthMonitoring(): void {
     this.healthCheckInterval = setInterval(async () => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       if (!this.isInitialized) return;
 
       for (const type of this.providers.keys()) {

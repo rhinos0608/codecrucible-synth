@@ -35,6 +35,7 @@ interface MemoryLeak {
 
 export class MemoryUsageOptimizer {
   private static instance: MemoryUsageOptimizer | null = null;
+  private static isTestMode = false;
   private config: MemoryConfig = {
     maxHeapSize: 512,          // 512MB default
     gcThreshold: 0.8,          // Trigger at 80% usage
@@ -52,7 +53,9 @@ export class MemoryUsageOptimizer {
   private gcCount = 0;
 
   private constructor() {
-    this.startMemoryMonitoring();
+    if (!MemoryUsageOptimizer.isTestMode) {
+      this.startMemoryMonitoring();
+    }
     
     // Hook into process events for memory management
     if (typeof process !== 'undefined') {
@@ -72,11 +75,23 @@ export class MemoryUsageOptimizer {
     return MemoryUsageOptimizer.instance;
   }
 
+  static setTestMode(enabled: boolean): void {
+    MemoryUsageOptimizer.isTestMode = enabled;
+  }
+
+  static resetInstance(): void {
+    if (MemoryUsageOptimizer.instance) {
+      MemoryUsageOptimizer.instance.shutdown();
+      MemoryUsageOptimizer.instance = null;
+    }
+  }
+
   /**
    * Start continuous memory monitoring
    */
   private startMemoryMonitoring(): void {
     const monitoringInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.performMemoryCheck();
     }, this.config.monitoringInterval);
 

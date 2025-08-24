@@ -281,6 +281,7 @@ export class RequestTimeoutOptimizer {
    */
   private startTimeoutMonitoring(): void {
     const monitoringInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.monitorHungRequests();
     }, 10000); // Check every 10 seconds
 

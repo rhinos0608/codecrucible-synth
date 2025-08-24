@@ -117,6 +117,7 @@ export class MemoryLeakDetector extends EventEmitter {
     this.isMonitoring = true;
 
     const interval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       const usage = process.memoryUsage();
       this.memoryHistory.push(usage);
 
@@ -818,7 +819,7 @@ MEMORY USAGE:
 }
 
 // CLI usage
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (typeof require !== 'undefined' && require.main === module) {
   const detector = new MemoryLeakDetector();
 
   detector

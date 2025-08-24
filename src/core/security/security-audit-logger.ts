@@ -139,6 +139,7 @@ export class SecurityAuditLogger {
 
       // Start log rotation timer
       setInterval(() => this.rotateLogFiles(), this.rotationInterval);
+      // TODO: Store interval ID and call clearInterval in cleanup
 
       logger.info('Security audit logging initialized', {
         auditLogPath: this.auditLogPath,

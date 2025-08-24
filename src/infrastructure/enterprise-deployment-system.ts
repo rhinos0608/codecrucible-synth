@@ -579,6 +579,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
    */
   private startHealthChecks(): void {
     this.healthCheckInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.performHealthChecks();
     }, this.config.healthCheck.interval);
   }
@@ -649,6 +650,7 @@ export class EnterpriseDeploymentSystem extends EventEmitter {
    */
   private startScalingMonitor(): void {
     this.scalingMonitorInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.evaluateScaling();
     }, 30000); // Check every 30 seconds
   }

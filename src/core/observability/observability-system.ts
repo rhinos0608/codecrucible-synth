@@ -638,6 +638,7 @@ export class ObservabilitySystem extends EventEmitter {
   private startSystemMonitoring(): void {
     // Monitor system metrics every 30 seconds
     setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       if (!this.isRunning) return;
 
       this.collectSystemMetrics();
@@ -645,6 +646,7 @@ export class ObservabilitySystem extends EventEmitter {
 
     // Perform health checks every minute
     setInterval(async () => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       if (!this.isRunning) return;
 
       try {
@@ -656,6 +658,7 @@ export class ObservabilitySystem extends EventEmitter {
 
     // Check alerts every 30 seconds
     setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       if (!this.isRunning) return;
 
       this.alertManager.evaluateRules();

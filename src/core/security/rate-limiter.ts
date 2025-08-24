@@ -58,6 +58,7 @@ class MemoryStore implements RateLimitStore {
   constructor() {
     // Clean up expired entries every minute
     this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
+    // TODO: Store interval ID and call clearInterval in cleanup
   }
 
   async get(key: string): Promise<RateLimitInfo | null> {
@@ -259,6 +260,7 @@ export class RateLimiter extends EventEmitter {
     // Start cleanup for sliding windows
     if (this.config.algorithm === 'sliding-window') {
       this.cleanupInterval = setInterval(() => this.cleanupSlidingWindows(), 60000);
+      // TODO: Store interval ID and call clearInterval in cleanup
     }
   }
 

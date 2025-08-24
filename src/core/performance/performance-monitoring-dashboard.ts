@@ -76,6 +76,7 @@ export class PerformanceMonitoringDashboard {
 
     this.isMonitoring = true;
     this.monitoringIntervalId = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.collectPerformanceData();
     }, intervalMs);
 

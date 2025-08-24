@@ -506,6 +506,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private startPerformanceMonitoring(): void {
     this.monitoringInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       try {
         this.updateHardwareProfile();
       } catch (error) {

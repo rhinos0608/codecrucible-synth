@@ -285,6 +285,7 @@ export class ModelPreloader {
    */
   private startPreloadMonitoring(): void {
     const monitoringInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.processWarmupQueue();
       this.cooldownIdleModels();
       this.saveModelMetrics();

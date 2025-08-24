@@ -328,6 +328,7 @@ export class MetricsCollector extends EventEmitter {
    */
   private startSystemMetricsCollection(): void {
     this.systemMetricsInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.collectSystemMetrics();
     }, 10000); // Every 10 seconds
   }

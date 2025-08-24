@@ -254,6 +254,7 @@ export class ResponseCacheManager {
    */
   private startPeriodicCleanup(): void {
     const cleanupInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.cleanupExpiredEntries();
     }, this.CLEANUP_INTERVAL);
 

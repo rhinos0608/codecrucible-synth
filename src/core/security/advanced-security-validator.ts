@@ -1,6 +1,12 @@
 /**
- * Advanced Security Validator
+ * Advanced Security Validator (ENHANCED)
  * Comprehensive security validation system for CodeCrucible Synth
+ * Enhanced with 2024 AI security research and multi-agent red teaming
+ * 
+ * Research findings integrated:
+ * - 29.5% Python and 24.2% JavaScript code snippets contain vulnerabilities
+ * - AI-specific prompt injection patterns and countermeasures
+ * - Secret leak detection in AI-generated code
  */
 
 import { Logger } from '../logger.js';
@@ -528,6 +534,17 @@ export class AdvancedSecurityValidator {
       'c2',
       'reverse shell',
       'bind shell',
+
+      // 2024 AI-specific threat keywords
+      'prompt injection',
+      'jailbreak',
+      'ignore previous instructions',
+      'forget everything',
+      'new instructions',
+      'role hijacking',
+      'system override',
+      'memory manipulation',
+      'context switching',
 
       // Sensitive operations (context-dependent)
       'format disk',

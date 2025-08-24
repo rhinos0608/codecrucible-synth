@@ -368,6 +368,7 @@ export class HealthChecker extends EventEmitter {
     // Start interval if specified
     if (check.interval) {
       const intervalHandle = setInterval(async () => {
+      // TODO: Store interval ID and call clearInterval in cleanup
         await this.runSingleCheck(check.name);
       }, check.interval);
 
@@ -552,6 +553,7 @@ export class HealthChecker extends EventEmitter {
 
     // Set up periodic checks
     setInterval(async () => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       await this.runAllChecks();
     }, this.config.checkInterval);
   }

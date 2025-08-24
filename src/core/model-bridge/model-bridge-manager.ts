@@ -553,6 +553,7 @@ export class ModelBridgeManager {
   private async startPeriodicSync(): Promise<void> {
     // Sync every 5 minutes
     this.syncInterval = setInterval(
+    // TODO: Store interval ID and call clearInterval in cleanup
       async () => {
         try {
           await this.synchronizeModels();

@@ -81,6 +81,7 @@ export class PerformanceMonitor extends EventEmitter {
 
     // Update system metrics every 30 seconds
     this.monitoringInterval = setInterval(async () => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       try {
         await this.updateSystemMetrics();
       } catch (error) {

@@ -132,6 +132,7 @@ Used: ${usage.count} times in ${duration} minutes
    */
   private startLongRunningWarnings(): void {
     setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.checkLongRunningSession();
     }, this.config.longRunningWarningInterval);
   }

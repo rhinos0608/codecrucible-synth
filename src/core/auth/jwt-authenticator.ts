@@ -31,6 +31,7 @@ export class JWTAuthenticator {
 
     // Start cleanup interval for expired sessions
     setInterval(() => this.cleanupExpiredSessions(), 60000); // Every minute
+    // TODO: Store interval ID and call clearInterval in cleanup
   }
 
   /**

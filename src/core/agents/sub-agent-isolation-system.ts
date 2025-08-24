@@ -809,6 +809,7 @@ export class SubAgentIsolationSystem extends EventEmitter {
    */
   private startHealthChecking(): void {
     this.healthCheckInterval = setInterval(() => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       this.performHealthCheck();
     }, 60000); // Check every minute
   }

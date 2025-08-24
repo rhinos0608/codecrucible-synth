@@ -58,6 +58,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
 
     // Cleanup timer to prevent memory leaks
     this.cleanupInterval = setInterval(() => this.cleanupCache(), 300000); // 5 minutes
+    // TODO: Store interval ID and call clearInterval in cleanup
   }
 
   /**

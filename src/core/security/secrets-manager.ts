@@ -729,6 +729,7 @@ export class SecretsManager {
     const intervalMs = this.config.keyRotation.intervalDays * 24 * 60 * 60 * 1000;
 
     this.keyRotationTimer = setInterval(async () => {
+    // TODO: Store interval ID and call clearInterval in cleanup
       try {
         logger.info('Starting automatic key rotation');
         await this.rotateMasterKey();

@@ -61,6 +61,7 @@ export class SystemBootstrap {
   private initializationStartTime: number = 0;
   private warnings: string[] = [];
   private errors: string[] = [];
+  private isBootstrapped: boolean = false;
 
   constructor(config: BootstrapConfig = {}) {
     this.config = {
@@ -79,6 +80,18 @@ export class SystemBootstrap {
    * Bootstrap the entire system
    */
   async bootstrap(): Promise<BootstrapResult> {
+    if (this.isBootstrapped) {
+      logger.debug('System already bootstrapped, skipping...');
+      return {
+        container: this.container,
+        client: await this.container.resolveAsync<IModelClient>(CLIENT_TOKEN),
+        initializationTime: 0,
+        servicesInitialized: this.container.getRegisteredServices(),
+        warnings: this.warnings,
+        errors: this.errors,
+      };
+    }
+
     this.initializationStartTime = Date.now();
 
     try {
@@ -131,6 +144,9 @@ export class SystemBootstrap {
       const initializationTime = Date.now() - this.initializationStartTime;
 
       logger.info(`✅ System bootstrap completed in ${initializationTime}ms`);
+      
+      // Mark as successfully bootstrapped
+      this.isBootstrapped = true;
       
       // Generate startup performance report
       const startupAnalytics = startupOptimizer.getStartupAnalytics();

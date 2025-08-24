@@ -10,7 +10,7 @@ export class EnhancedExternalMCPTools {
   }
 
   /**
-   * Terminal Controller Tools
+   * Terminal Controller Tools with Fallback
    */
   async executeCommand(command: string, timeout?: number): Promise<any> {
     const isValid = await MCPSecurityValidator.validateToolCall(
@@ -23,10 +23,48 @@ export class EnhancedExternalMCPTools {
       throw new Error('Command blocked by security validation');
     }
 
-    return await this.mcpManager.executeToolCall('terminal-controller', 'execute_command', {
-      command,
-      timeout: timeout || 30000,
-    });
+    try {
+      // Try external MCP terminal-controller first
+      return await this.mcpManager.executeToolCall('terminal-controller', 'execute_command', {
+        command,
+        timeout: timeout || 30000,
+      });
+    } catch (error) {
+      logger.warn(`External MCP terminal-controller failed, falling back to built-in terminal: ${error}`);
+      
+      // Fallback to built-in terminal server
+      try {
+        return await this.mcpManager.executeToolCall('terminal', 'terminal_exec', {
+          command,
+          timeout: timeout || 30000,
+        });
+      } catch (fallbackError) {
+        logger.warn(`Built-in terminal also failed, using Node.js child_process fallback: ${fallbackError}`);
+        
+        // Final fallback - use Node.js child_process directly
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+        
+        try {
+          const result = await execAsync(command, { 
+            timeout: timeout || 30000,
+            maxBuffer: 1024 * 1024 // 1MB buffer
+          });
+          return {
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: 0
+          };
+        } catch (nodeError: any) {
+          return {
+            stdout: nodeError.stdout || '',
+            stderr: nodeError.stderr || nodeError.message,
+            exitCode: nodeError.code || 1
+          };
+        }
+      }
+    }
   }
 
   async readFile(filePath: string): Promise<any> {
@@ -40,9 +78,32 @@ export class EnhancedExternalMCPTools {
       throw new Error('File path blocked by security validation');
     }
 
-    return await this.mcpManager.executeToolCall('terminal-controller', 'read_file', {
-      file_path: filePath,
-    });
+    try {
+      // Try external MCP terminal-controller first
+      return await this.mcpManager.executeToolCall('terminal-controller', 'read_file', {
+        file_path: filePath,
+      });
+    } catch (error) {
+      logger.warn(`External MCP terminal-controller read failed, falling back to built-in filesystem: ${error}`);
+      
+      // Fallback to built-in filesystem server
+      try {
+        return await this.mcpManager.executeToolCall('filesystem', 'read_file', {
+          filePath,
+        });
+      } catch (fallbackError) {
+        logger.warn(`Built-in filesystem also failed, using Node.js fs fallback: ${fallbackError}`);
+        
+        // Final fallback - use Node.js fs directly
+        const fs = await import('fs/promises');
+        try {
+          const content = await fs.readFile(filePath, 'utf-8');
+          return { content };
+        } catch (nodeError: any) {
+          throw new Error(`Failed to read file: ${nodeError.message}`);
+        }
+      }
+    }
   }
 
   async writeFile(filePath: string, content: string): Promise<any> {
@@ -56,10 +117,40 @@ export class EnhancedExternalMCPTools {
       throw new Error('Write operation blocked by security validation');
     }
 
-    return await this.mcpManager.executeToolCall('terminal-controller', 'write_file', {
-      file_path: filePath,
-      content,
-    });
+    try {
+      // Try external MCP terminal-controller first
+      return await this.mcpManager.executeToolCall('terminal-controller', 'write_file', {
+        file_path: filePath,
+        content,
+      });
+    } catch (error) {
+      logger.warn(`External MCP terminal-controller write failed, falling back to built-in filesystem: ${error}`);
+      
+      // Fallback to built-in filesystem server
+      try {
+        return await this.mcpManager.executeToolCall('filesystem', 'write_file', {
+          filePath,
+          content,
+        });
+      } catch (fallbackError) {
+        logger.warn(`Built-in filesystem also failed, using Node.js fs fallback: ${fallbackError}`);
+        
+        // Final fallback - use Node.js fs directly
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        
+        try {
+          // Ensure directory exists
+          const dir = path.dirname(filePath);
+          await fs.mkdir(dir, { recursive: true });
+          
+          await fs.writeFile(filePath, content, 'utf-8');
+          return { success: true, path: filePath };
+        } catch (nodeError: any) {
+          throw new Error(`Failed to write file: ${nodeError.message}`);
+        }
+      }
+    }
   }
 
   async getCurrentDirectory(): Promise<any> {

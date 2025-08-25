@@ -251,7 +251,7 @@ export class InputSanitizer {
    */
   static validateMCPToken(token: string): SanitizationResult {
     const violations: string[] = [];
-    let sanitized = token;
+    const sanitized = token;
 
     // Check token format (should be JWT-like or opaque token)
     if (!token || typeof token !== 'string') {

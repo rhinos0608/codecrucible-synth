@@ -79,12 +79,12 @@ export class EncryptedConfig {
       }
 
       // Check schema for default value
-      if (this.schema && this.schema[key] && this.schema[key].default !== undefined) {
+      if (this.schema?.[key] && this.schema[key].default !== undefined) {
         return this.schema[key].default as T;
       }
 
       // Try to load from secrets (for sensitive values)
-      if (this.schema && this.schema[key] && this.schema[key].sensitive) {
+      if (this.schema?.[key] && this.schema[key].sensitive) {
         const secretValue = await this.secretsManager.getSecret(this.getSecretKey(key));
         if (secretValue !== null) {
           const parsedValue = this.parseValue(secretValue, this.schema[key].type);
@@ -99,7 +99,7 @@ export class EncryptedConfig {
       }
 
       // Check if required in schema
-      if (this.schema && this.schema[key] && this.schema[key].required) {
+      if (this.schema?.[key] && this.schema[key].required) {
         throw new Error(`Required configuration key '${key}' not found`);
       }
 
@@ -116,14 +116,14 @@ export class EncryptedConfig {
   async set(key: string, value: any): Promise<void> {
     try {
       // Validate against schema if available
-      if (this.schema && this.schema[key]) {
+      if (this.schema?.[key]) {
         this.validateValue(key, value, this.schema[key]);
       }
 
       const oldValue = this.config[key];
 
       // Store sensitive values in secrets manager
-      if (this.schema && this.schema[key] && this.schema[key].sensitive) {
+      if (this.schema?.[key] && this.schema[key].sensitive) {
         const secretKey = this.getSecretKey(key);
         const stringValue = this.stringifyValue(value);
         await this.secretsManager.storeSecret(secretKey, stringValue, {
@@ -200,7 +200,7 @@ export class EncryptedConfig {
       let removed = false;
 
       // Remove from secrets if sensitive
-      if (this.schema && this.schema[key] && this.schema[key].sensitive) {
+      if (this.schema?.[key] && this.schema[key].sensitive) {
         const secretKey = this.getSecretKey(key);
         removed = await this.secretsManager.deleteSecret(secretKey);
       }

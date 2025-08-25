@@ -402,8 +402,8 @@ export class HardwareAwareModelSelector extends EventEmitter {
         from: originalModel,
         metrics: {
           responseTime: metrics.responseTime,
-          memoryUsage: (metrics.memoryUsage * 100).toFixed(1) + '%',
-          errorRate: (metrics.errorRate * 100).toFixed(1) + '%',
+          memoryUsage: `${(metrics.memoryUsage * 100).toFixed(1)  }%`,
+          errorRate: `${(metrics.errorRate * 100).toFixed(1)  }%`,
           consecutiveErrors: metrics.consecutiveErrors,
         },
       });

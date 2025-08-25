@@ -117,7 +117,7 @@ export class SandboxManager {
    * Cleanup all active sandboxes
    */
   async cleanupAll(): Promise<void> {
-    const cleanupPromises = Array.from(this.activeSandboxes.values()).map(sandbox =>
+    const cleanupPromises = Array.from(this.activeSandboxes.values()).map(async sandbox =>
       sandbox.cleanup()
     );
 

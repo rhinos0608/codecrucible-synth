@@ -107,7 +107,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
       providers: configs.map(c => c.type),
     });
 
-    const initPromises = configs.map(config => this.initializeProvider(config));
+    const initPromises = configs.map(async config => this.initializeProvider(config));
     const results = await Promise.allSettled(initPromises);
 
     // Process initialization results

@@ -10,8 +10,8 @@
     "codecrucible": "./dist/bin/crucible.js"
   },
   "scripts": {
-    "build": "tsc && npm run copy-assets",
-    "build:all": "tsc && npm run copy-assets",
+    "build": "set NODE_OPTIONS=--max-old-space-size=4096 && tsc && npm run copy-assets",
+    "build:all": "set NODE_OPTIONS=--max-old-space-size=4096 && tsc && npm run copy-assets",
     "copy-assets": "node scripts/copy-assets.js",
     "dev": "tsx src/index.ts",
     "test": "node node_modules/jest/bin/jest.js",

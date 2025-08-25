@@ -195,7 +195,7 @@ export class VoiceSynthesisManager extends EventEmitter implements IVoiceSynthes
       const processVoices = async () => {
         if (parallel && voices.length <= maxConcurrent) {
           // Process voices with circuit breaker pattern
-          const promises = voices.map(voiceId =>
+          const promises = voices.map(async voiceId =>
             Promise.race([
               this.generateVoiceResponse(prompt, voiceId, { ...options, timeout: 15000 }), // Reduced timeout
               new Promise((_, reject) =>

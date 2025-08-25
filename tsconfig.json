@@ -36,15 +36,17 @@
     "verbatimModuleSyntax": false,
     "skipLibCheck": true,
     
-    // Emit Options
+    // Emit Options - Optimized for memory efficiency
     "declaration": true,
-    "declarationMap": true, // Added for better debugging
-    "sourceMap": true,
+    "declarationMap": false, // Disabled to reduce memory usage during build
+    "sourceMap": false,      // Disabled to reduce memory usage during build
     "outDir": "./dist",
     "rootDir": "./src",
-    "removeComments": false, // Keep comments in production build
+    "removeComments": true,  // Remove comments to reduce memory usage
     "noEmitOnError": true,
-    "preserveConstEnums": true,
+    "preserveConstEnums": true, // Required when isolatedModules is enabled
+    "incremental": true,         // Enable incremental compilation for faster rebuilds
+    "tsBuildInfoFile": "./dist/.tsbuildinfo", // Store build info for incremental builds
     
     // Decorator Support (if needed)
     "experimentalDecorators": true,

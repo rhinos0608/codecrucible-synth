@@ -74,7 +74,7 @@ export class EnhancedContextManager {
     this.startPeriodicPersistence();
 
     // Register for shutdown
-    registerShutdownHandler(() => this.cleanup());
+    registerShutdownHandler(async () => this.cleanup());
   }
 
   /**
@@ -695,7 +695,7 @@ export class EnhancedContextManager {
       // Keep first and last parts, summarize middle
       const start = compressed.substring(0, 2000);
       const end = compressed.substring(compressed.length - 2000);
-      compressed = start + '\n\n[... content compressed ...]\n\n' + end;
+      compressed = `${start  }\n\n[... content compressed ...]\n\n${  end}`;
     }
 
     return compressed;

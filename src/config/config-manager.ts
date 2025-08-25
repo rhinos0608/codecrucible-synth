@@ -256,7 +256,7 @@ export class ConfigManager {
             model: 'auto',
             maxTokens: 4096,
             temperature: 0.7,
-            timeout: 30000,
+            timeout: 110000, // Optimized for Ollama 2-minute hard limit
             enabled: true,
           },
           'openai-gpt4': {

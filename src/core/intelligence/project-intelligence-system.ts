@@ -1039,9 +1039,9 @@ export class ProjectIntelligenceSystem extends EventEmitter {
 
   private updateDirectoryFileCounts(directories: DirectoryNode[], files: FileNode[]): void {
     for (const dir of directories) {
-      dir.fileCount = files.filter(file => file.path.startsWith(dir.path + '/')).length;
+      dir.fileCount = files.filter(file => file.path.startsWith(`${dir.path  }/`)).length;
       dir.childDirectories = directories
-        .filter(d => d.path.startsWith(dir.path + '/') && d.depth === dir.depth + 1)
+        .filter(d => d.path.startsWith(`${dir.path  }/`) && d.depth === dir.depth + 1)
         .map(d => d.path);
     }
   }

@@ -138,7 +138,7 @@ export class SecurityAuditLogger {
       await this.setupDefaultAlertRules();
 
       // Start log rotation timer
-      setInterval(() => this.rotateLogFiles(), this.rotationInterval);
+      setInterval(async () => this.rotateLogFiles(), this.rotationInterval);
       // TODO: Store interval ID and call clearInterval in cleanup
 
       logger.info('Security audit logging initialized', {
@@ -358,7 +358,7 @@ export class SecurityAuditLogger {
       endpoint,
       `API access ${outcome}: ${method} ${endpoint}`,
       context,
-      { apiKeyId: apiKey.substring(0, 8) + '...', method, ...details }
+      { apiKeyId: `${apiKey.substring(0, 8)  }...`, method, ...details }
     );
   }
 
@@ -633,7 +633,7 @@ export class SecurityAuditLogger {
         `audit-${new Date().toISOString().slice(0, 10)}.log`
       );
 
-      const logEntry = JSON.stringify(event) + '\n';
+      const logEntry = `${JSON.stringify(event)  }\n`;
       await fs.appendFile(logFile, logEntry);
     } catch (error) {
       logger.error('Failed to persist audit event', error as Error, { eventId: event.id });
@@ -988,7 +988,7 @@ export class SecurityAuditLogger {
       }
       // Truncate very long strings
       if (value.length > 1000) {
-        return value.substring(0, 1000) + '...[TRUNCATED]';
+        return `${value.substring(0, 1000)  }...[TRUNCATED]`;
       }
     }
     return value;

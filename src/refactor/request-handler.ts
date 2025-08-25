@@ -6,12 +6,19 @@ import { getGlobalToolIntegration } from '../core/tools/tool-integration.js';
 import { ProviderType } from '../core/providers/provider-repository.js';
 import { createHash } from 'crypto';
 import { getErrorMessage } from '../utils/error-utils.js';
+import { ResponseNormalizer } from '../core/response-normalizer.js';
+import { DomainAwareToolOrchestrator } from '../core/tools/domain-aware-tool-orchestrator.js';
+import { SequentialToolExecutor } from '../core/tools/sequential-tool-executor.js';
 
 export class RequestHandler {
   private client: UnifiedModelClient;
+  private domainOrchestrator: DomainAwareToolOrchestrator;
+  private sequentialExecutor: SequentialToolExecutor;
 
   constructor(client: UnifiedModelClient) {
     this.client = client;
+    this.domainOrchestrator = new DomainAwareToolOrchestrator();
+    this.sequentialExecutor = new SequentialToolExecutor();
   }
 
   async makeRequest(request: any): Promise<any> {
@@ -62,25 +69,87 @@ export class RequestHandler {
     const supportsTools = this.client.modelSupportsTools(
       (selectedProvider || 'ollama') as ProviderType
     );
-    const tools = supportsTools && toolIntegration ? toolIntegration.getLLMFunctions() : [];
+    
+    // DOMAIN-AWARE TOOL SELECTION: Smart tool filtering based on prompt analysis
+    let tools: any[] = [];
+    let domainAnalysis: any = null;
+    let toolSelectionReasoning = '';
+    
+    if (supportsTools && toolIntegration) {
+      const rawTools = toolIntegration.getLLMFunctions();
+      
+      // Step 1: Standardize all available tools
+      const standardizedTools = rawTools.map(tool => {
+        const standardTool: any = {
+          type: 'function',
+          function: {
+            name: tool.function?.name || tool.name,
+            description: tool.function?.description || tool.description || `Execute ${tool.function?.name || tool.name}`,
+            parameters: {
+              type: 'object',
+              properties: tool.function?.parameters?.properties || tool.parameters?.properties || {},
+              required: tool.function?.parameters?.required || tool.parameters?.required || []
+            }
+          }
+        };
 
-    // DEBUG: Log tool integration status
-    logger.info('🔧 TOOL DEBUG: Tool integration status', {
+        // Apply provider-specific formatting
+        if (selectedProvider === 'ollama') {
+          standardTool.function.strict = false; // Ollama compatibility
+        } else if (selectedProvider === 'lm-studio') {
+          standardTool.function.schema_version = '2024-10'; // LM Studio compatibility
+        }
+
+        return standardTool;
+      });
+
+      // Step 2: Domain-aware tool selection (CRITICAL: reduces payload from 21 to ~3-7 tools)
+      const domainResult = this.domainOrchestrator.getToolsForPrompt(
+        request.prompt || '', 
+        standardizedTools
+      );
+      
+      tools = domainResult.tools;
+      domainAnalysis = domainResult.analysis;
+      toolSelectionReasoning = domainResult.reasoning;
+
+      logger.info('🎯 DOMAIN-AWARE TOOL SELECTION', {
+        prompt: `${request.prompt?.substring(0, 100)  }...`,
+        primaryDomain: domainAnalysis.primaryDomain,
+        confidence: `${(domainAnalysis.confidence * 100).toFixed(1)  }%`,
+        originalToolCount: standardizedTools.length,
+        selectedToolCount: tools.length,
+        toolNames: tools.map(t => t.function.name),
+        reasoning: toolSelectionReasoning
+      });
+    }
+
+    // ENHANCED DEBUG: Show domain-aware tool selection results
+    logger.info('🔧 ENHANCED TOOL DEBUG: Domain-aware integration status', {
       provider: selectedProvider,
       model: request.model,
       supportsTools,
       hasEnhanced: !!enhancedToolIntegration,
       hasBasic: !!getGlobalToolIntegration(),
       hasIntegration: !!toolIntegration,
-      toolCount: tools.length,
+      selectedToolCount: tools.length,
+      domain: domainAnalysis?.primaryDomain || 'unknown',
+      domainConfidence: domainAnalysis?.confidence || 0
     });
+    
     if (tools.length > 0) {
-      logger.info('🔧 TOOL DEBUG: Available tools for request', { 
+      logger.info('🎯 DOMAIN-SELECTED TOOLS for request', { 
+        domain: domainAnalysis.primaryDomain,
+        confidence: `${(domainAnalysis.confidence * 100).toFixed(1)}%`,
         toolNames: tools.map(t => t.function.name),
-        firstTool: tools[0]
+        reasoning: toolSelectionReasoning,
+        sampleTool: tools[0]
       });
     } else {
-      logger.warn('🔧 TOOL DEBUG: No tools available for request!');
+      logger.warn('⚠️ NO DOMAIN TOOLS SELECTED: Check domain analysis', {
+        domain: domainAnalysis?.primaryDomain,
+        detectedKeywords: domainAnalysis?.detectedKeywords?.slice(0, 5)
+      });
     }
 
     const modelRequest: ModelRequest = {
@@ -505,12 +574,84 @@ export class RequestHandler {
       ]);
 
       // Check if response contains tool calls that need to be executed
+      // CRITICAL FIX 1: Support both OpenAI-style toolCalls and local LLM JSON content
+      let detectedToolCalls: any[] = [];
+      
+      // Method 1: OpenAI-style toolCalls property (for compatible providers)
       if (
         (response as ModelResponse).toolCalls &&
         (response as ModelResponse).toolCalls!.length > 0
       ) {
+        detectedToolCalls = (response as ModelResponse).toolCalls!;
+        logger.debug('Tool execution: Found OpenAI-style tool calls', {
+          count: detectedToolCalls.length,
+        });
+      } 
+      // Method 2: Parse JSON tool calls from content (for local LLMs like Ollama)
+      else if ((response as ModelResponse).content) {
+        const content = (response as ModelResponse).content.trim();
+        
+        // Try to parse JSON tool calls from various formats
+        const jsonPatterns = [
+          // Standard JSON object: {"name": "tool", "arguments": {...}}
+          /^\s*\{\s*"name"\s*:\s*"[^"]+"\s*,\s*"arguments"\s*:\s*\{[^}]*\}\s*\}\s*$/,
+          // Function call format: {"function": {"name": "tool", "arguments": {...}}}
+          /^\s*\{\s*"function"\s*:\s*\{[^}]+\}\s*\}\s*$/,
+          // Multiple formats with brackets
+          /^\s*```json\s*(\{[^}]+\})\s*```\s*$/,
+        ];
+        
+        let parsedToolCall = null;
+        for (const pattern of jsonPatterns) {
+          if (pattern.test(content)) {
+            try {
+              // Remove markdown code blocks if present
+              const cleanContent = content.replace(/```json\s*|\s*```/g, '');
+              parsedToolCall = JSON.parse(cleanContent);
+              break;
+            } catch (error) {
+              logger.debug('Failed to parse potential tool call JSON', { content, error });
+            }
+          }
+        }
+        
+        // Also try direct JSON parsing for simple cases
+        if (!parsedToolCall) {
+          try {
+            const parsed = JSON.parse(content);
+            if (parsed.name || parsed.function) {
+              parsedToolCall = parsed;
+            }
+          } catch (error) {
+            // Not JSON, continue normally
+            logger.debug('Content is not JSON tool call, processing as text response');
+          }
+        }
+        
+        if (parsedToolCall) {
+          // Normalize to consistent format
+          const normalizedToolCall = {
+            name: parsedToolCall.name || parsedToolCall.function?.name,
+            arguments: parsedToolCall.arguments || parsedToolCall.function?.arguments || {},
+            function: parsedToolCall.function || {
+              name: parsedToolCall.name,
+              arguments: parsedToolCall.arguments || {}
+            }
+          };
+          
+          detectedToolCalls = [normalizedToolCall];
+          logger.debug('Tool execution: Parsed local LLM tool call from content', {
+            originalContent: `${content.substring(0, 200)  }...`,
+            parsedToolCall: normalizedToolCall,
+            count: 1
+          });
+        }
+      }
+      
+      // Execute detected tool calls
+      if (detectedToolCalls.length > 0) {
         logger.debug('Tool execution: Found tool calls', {
-          count: (response as ModelResponse).toolCalls!.length,
+          count: detectedToolCalls.length,
         });
 
         const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
@@ -520,7 +661,7 @@ export class RequestHandler {
             const toolResults = [];
 
             // Execute each tool call
-            for (const toolCall of (response as ModelResponse).toolCalls!) {
+            for (const toolCall of detectedToolCalls) {
               logger.debug('Executing tool', {
                 toolName: toolCall.name || toolCall.function?.name,
               });
@@ -545,9 +686,22 @@ export class RequestHandler {
               const firstResult = toolResults[0];
 
               if (firstResult.success && firstResult.output) {
-                // Return the actual tool result as the content
-                const content = firstResult.output.content || firstResult.output;
-                (response as ModelResponse).content = content;
+                // CRITICAL FIX: Normalize tool output to prevent buffer display issues
+                const rawContent = firstResult.output.content || firstResult.output;
+                const normalizedContent = ResponseNormalizer.normalizeToolResult(rawContent);
+                
+                // Validate normalization succeeded
+                if (ResponseNormalizer.validateNormalization(rawContent, normalizedContent)) {
+                  (response as ModelResponse).content = normalizedContent;
+                } else {
+                  // Fallback if normalization fails
+                  (response as ModelResponse).content = `Tool executed but result normalization failed. Raw result type: ${typeof rawContent}`;
+                  logger.error('Tool result normalization failed', { 
+                    rawContentType: typeof rawContent,
+                    toolName: firstResult.toolName || 'unknown' 
+                  });
+                }
+                
                 (response as ModelResponse).metadata = {
                   tokens: 0,
                   latency: 0,
@@ -556,11 +710,13 @@ export class RequestHandler {
                   toolResults: toolResults.map(r => ({
                     success: r.success,
                     executionTime: r.metadata?.executionTime,
+                    toolName: r.toolName || 'unknown'
                   })),
                 };
               } else {
-                (response as ModelResponse).content =
-                  `Tool execution failed: ${firstResult.error || 'Unknown error'}`;
+                // Normalize error messages too
+                const errorMsg = firstResult.error || 'Unknown error';
+                (response as ModelResponse).content = `Tool execution failed: ${ResponseNormalizer.normalizeToString(errorMsg)}`;
               }
             }
           } catch (error: unknown) {

@@ -23,6 +23,7 @@ import {
 import { ActiveProcess, ActiveProcessManager } from '../performance/active-process-manager.js';
 import { getGlobalEnhancedToolIntegration } from '../tools/enhanced-tool-integration.js';
 import { getGlobalToolIntegration } from '../tools/tool-integration.js';
+import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestrator.js';
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
@@ -86,6 +87,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   }> = [];
   private processManager: ActiveProcessManager;
   private providerRepository: any;
+  private domainOrchestrator: DomainAwareToolOrchestrator;
   private isShuttingDown = false;
   private queueProcessor: NodeJS.Timeout | null = null;
 
@@ -98,13 +100,14 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     this.config = config;
     this.processManager = processManager;
     this.providerRepository = providerRepository;
+    this.domainOrchestrator = new DomainAwareToolOrchestrator();
 
     // Start event-driven queue processor instead of infinite loop
     this.scheduleQueueProcessor();
     
     // Handle shutdown gracefully
-    process.once('SIGTERM', () => this.shutdown());
-    process.once('SIGINT', () => this.shutdown());
+    process.once('SIGTERM', async () => this.shutdown());
+    process.once('SIGINT', async () => this.shutdown());
   }
 
   /**
@@ -261,26 +264,56 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           providerType as ProviderType,
           provider.getModelName?.()
         );
-        const tools = supportsTools && toolIntegration ? toolIntegration.getLLMFunctions() : [];
 
-        // DEBUG: Log tool integration status
-        logger.info('🔧 TOOL DEBUG: Request execution tool integration status', {
+        // DOMAIN-AWARE TOOL SELECTION: Smart filtering based on request analysis
+        let tools: any[] = [];
+        let domainInfo = '';
+        
+        if (supportsTools && toolIntegration) {
+          const allTools = toolIntegration.getLLMFunctions();
+          
+          // Use domain orchestrator to select relevant tools only
+          const domainResult = this.domainOrchestrator.getToolsForPrompt(
+            request.prompt || '',
+            allTools
+          );
+          
+          tools = domainResult.tools;
+          domainInfo = `${domainResult.analysis.primaryDomain} (${(domainResult.analysis.confidence * 100).toFixed(1)}%)`;
+          
+          logger.info('🎯 REQUEST-EXECUTION-MANAGER: Domain-aware tool selection', {
+            prompt: `${request.prompt?.substring(0, 80)  }...`,
+            primaryDomain: domainResult.analysis.primaryDomain,
+            confidence: domainResult.analysis.confidence.toFixed(2),
+            originalToolCount: allTools.length,
+            selectedToolCount: tools.length,
+            toolNames: tools.map(t => t.function?.name || t.name),
+            reasoning: domainResult.reasoning
+          });
+        }
+
+        // ENHANCED DEBUG: Show domain-aware tool selection results
+        logger.info('🔧 ENHANCED TOOL DEBUG: Domain-aware request execution status', {
           provider: providerType,
           model: provider.getModelName?.() || 'unknown',
           supportsTools,
           hasEnhanced: !!enhancedToolIntegration,
           hasBasic: !!getGlobalToolIntegration(),
           hasIntegration: !!toolIntegration,
-          toolCount: tools.length,
+          selectedToolCount: tools.length,
+          domainInfo
         });
         
         if (tools.length > 0) {
-          logger.info('🔧 TOOL DEBUG: Available tools for request execution', { 
-            toolNames: tools.map(t => t.function.name),
-            firstTool: tools[0]
+          logger.info('🎯 DOMAIN-SELECTED TOOLS for request execution', {
+            toolNames: tools.map(t => t.function?.name || t.name),
+            domain: domainInfo,
+            sampleTool: tools[0]
           });
         } else {
-          logger.warn('🔧 TOOL DEBUG: No tools available for request execution!');
+          logger.warn('⚠️ NO DOMAIN TOOLS SELECTED for request execution', {
+            domain: domainInfo
+          });
         }
 
         // Add tools to request before calling provider
@@ -427,7 +460,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     const complexity = this.assessComplexityFast(prompt);
 
     // Default strategy
-    let strategy: ExecutionStrategy = {
+    const strategy: ExecutionStrategy = {
       mode: 'balanced',
       provider: 'auto',
       timeout: this.config.complexityTimeouts.medium,
@@ -460,7 +493,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     }
 
     // Consider context if available (could be enhanced with more context analysis)
-    if (context && context.files && context.files.length > 10) {
+    if (context?.files && context.files.length > 10) {
       // Large project context might need more time
       strategy.timeout = Math.max(strategy.timeout, this.config.complexityTimeouts.complex);
     }
@@ -532,7 +565,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   /**
    * Create timeout promise for race conditions
    */
-  private createTimeoutPromise(timeoutMs: number): Promise<never> {
+  private async createTimeoutPromise(timeoutMs: number): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
         reject(new Error(`Request timed out after ${timeoutMs}ms`));
@@ -543,7 +576,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   /**
    * Create optimized timeout promise with abort controller
    */
-  private createOptimizedTimeoutPromise(timeoutMs: number, abortController: AbortController): Promise<never> {
+  private async createOptimizedTimeoutPromise(timeoutMs: number, abortController: AbortController): Promise<never> {
     return new Promise((_, reject) => {
       const timeoutId = setTimeout(() => {
         abortController.abort();

@@ -550,7 +550,7 @@ export class CacheManager extends EventEmitter {
           if (value) {
             try {
               const entry = JSON.parse(value);
-              if (entry.tags && entry.tags.some((tag: string) => tags.includes(tag))) {
+              if (entry.tags?.some((tag: string) => tags.includes(tag))) {
                 await this.redisCache.delete(key);
                 deletedCount++;
               }
@@ -649,7 +649,7 @@ export class CacheManager extends EventEmitter {
    */
   async warmUp(data: Array<{ key: string; value: any; options?: CacheOptions }>): Promise<void> {
     try {
-      const promises = data.map(({ key, value, options }) => this.set(key, value, options));
+      const promises = data.map(async ({ key, value, options }) => this.set(key, value, options));
 
       await Promise.allSettled(promises);
 

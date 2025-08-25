@@ -7,6 +7,7 @@
 import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
 import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+import { DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
 import { SecureToolFactory } from '../security/secure-tool-factory.js';
 import { RBACSystem } from '../security/production-rbac-system.js';
 import { SecurityAuditLogger } from '../security/security-audit-logger.js';
@@ -207,6 +208,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   private errorRecovery: ErrorRecoveryManager;
   private secureToolFactory!: SecureToolFactory;
   private telemetryProvider: any; // Enhanced: Telemetry integration for modern observability
+  private domainOrchestrator: DomainAwareToolOrchestrator; // DOMAIN-AWARE TOOL SELECTION
 
   constructor(modelClient: UnifiedModelClient) {
     super();
@@ -219,6 +221,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     this.costOptimizer = new CostOptimizer();
     this.performanceMonitor = new PerformanceMonitor();
     this.errorRecovery = new ErrorRecoveryManager();
+    this.domainOrchestrator = new DomainAwareToolOrchestrator(); // Initialize domain-aware selection
 
     // Enhanced: Initialize telemetry provider for observability
     try {
@@ -477,7 +480,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     runtimeContext?: any
   ): Promise<string> {
     try {
-      this.logger.info('Processing prompt with tools:', prompt.slice(0, 100) + '...');
+      this.logger.info('Processing prompt with tools:', `${prompt.slice(0, 100)  }...`);
 
       // Create enhanced context with system prompt and runtime information
       const context: ToolContext = {
@@ -572,7 +575,144 @@ Please provide a clear, helpful response based on these tool results. If there w
   ): Promise<ToolCall[]> {
     this.logger.info(`Selecting tools for objective: ${objective}`);
 
-    // Use AI to analyze objective and suggest tools
+    // CRITICAL FIX: Get MCP-compatible tools and use domain-aware selection
+    try {
+      // Get MCP tools that are actually integrated and working
+      const mcpTools = await this.getMCPCompatibleTools();
+      
+      if (mcpTools.length === 0) {
+        this.logger.warn('No MCP tools available, falling back to legacy tool registry');
+        return this.legacyToolSelection(objective, context, constraints);
+      }
+
+      // Use domain-aware orchestrator to select relevant tools
+      const domainResult = this.domainOrchestrator.getToolsForPrompt(objective, mcpTools);
+      
+      this.logger.info('🎯 ADVANCED-ORCHESTRATOR: Domain-aware tool selection', {
+        objective: `${objective.substring(0, 80)  }...`,
+        primaryDomain: domainResult.analysis.primaryDomain,
+        confidence: domainResult.analysis.confidence.toFixed(2),
+        originalToolCount: mcpTools.length,
+        selectedToolCount: domainResult.tools.length,
+        toolNames: domainResult.tools.map(t => t.function?.name || t.name)
+      });
+
+      // Convert domain-selected tools to ToolCall format for this orchestrator
+      const toolCalls: ToolCall[] = domainResult.tools.map(tool => ({
+        id: `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        toolId: tool.function?.name || tool.name,
+        input: this.inferParametersFromObjective(objective, tool),
+        priority: 1,
+        retryPolicy: {
+          maxAttempts: 3,
+          backoffStrategy: 'exponential' as const,
+          initialDelay: 1000,
+          maxDelay: 10000,
+          retryableErrors: ['TIMEOUT', 'NETWORK_ERROR', 'RATE_LIMITED']
+        },
+        fallbackTools: [],
+        timeout: 30000,
+        dependsOn: []
+      }));
+
+      this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Converted to ToolCall format', {
+        toolCallCount: toolCalls.length,
+        sampleCall: toolCalls[0]
+      });
+
+      return toolCalls;
+
+    } catch (error) {
+      this.logger.error('Domain-aware tool selection failed, using fallback', error);
+      return this.legacyToolSelection(objective, context, constraints);
+    }
+  }
+
+  /**
+   * Get MCP-compatible tools that actually work
+   */
+  private async getMCPCompatibleTools(): Promise<any[]> {
+    try {
+      // CRITICAL FIX 4: Enhanced tool orchestrator MCP integration
+      // Try to get tools from the enhanced tool integration (our working MCP tools)
+      const { getGlobalEnhancedToolIntegration } = await import('./enhanced-tool-integration.js');
+      const toolIntegration = getGlobalEnhancedToolIntegration();
+      
+      if (toolIntegration) {
+        const mcpTools = toolIntegration.getLLMFunctions();
+        this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Retrieved MCP tools from enhanced integration', {
+          toolCount: mcpTools.length,
+          toolNames: mcpTools.map(t => t.function?.name || t.name).slice(0, 5),
+          hasToolIntegration: !!toolIntegration,
+          toolIntegrationType: toolIntegration.constructor.name
+        });
+        return mcpTools;
+      } else {
+        this.logger.warn('🔧 ADVANCED-ORCHESTRATOR: Enhanced tool integration not initialized');
+      }
+      
+      // Fallback: Try to get from basic tool integration
+      const { getGlobalToolIntegration } = await import('./tool-integration.js');
+      const basicToolIntegration = getGlobalToolIntegration();
+      
+      if (basicToolIntegration && typeof basicToolIntegration.getLLMFunctions === 'function') {
+        const basicTools = basicToolIntegration.getLLMFunctions();
+        this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Retrieved tools from basic integration', {
+          toolCount: basicTools.length,
+          toolNames: basicTools.map((t: any) => t.function?.name || t.name).slice(0, 5)
+        });
+        return basicTools;
+      }
+      
+      this.logger.warn('🔧 ADVANCED-ORCHESTRATOR: No tool integration available');
+      return [];
+    } catch (error) {
+      this.logger.error('🔧 ADVANCED-ORCHESTRATOR: Failed to get MCP tools', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Infer tool parameters from objective (simple heuristics)
+   */
+  private inferParametersFromObjective(objective: string, tool: any): any {
+    const toolName = tool.function?.name || tool.name;
+    const objectiveLower = objective.toLowerCase();
+    
+    // Simple parameter inference based on common patterns
+    if (toolName === 'filesystem_read_file') {
+      // Look for file mentions in objective
+      if (objectiveLower.includes('readme')) return { filePath: 'README.md' };
+      if (objectiveLower.includes('package.json')) return { filePath: 'package.json' };
+      if (objectiveLower.includes('.ts')) return { filePath: objective.match(/\w+\.ts/)?.[0] || 'index.ts' };
+      return { filePath: 'README.md' }; // Default
+    }
+    
+    if (toolName === 'filesystem_list_directory') {
+      return { path: '.' }; // Default to current directory
+    }
+
+    if (toolName === 'mcp_execute_command') {
+      if (objectiveLower.includes('ls') || objectiveLower.includes('list')) return { command: 'ls -la' };
+      if (objectiveLower.includes('git')) return { command: 'git status' };
+      return { command: 'pwd' }; // Safe default
+    }
+
+    // Return empty object for tools we don't have specific logic for
+    return {};
+  }
+
+  /**
+   * Fallback to legacy tool selection (original method)
+   */
+  private async legacyToolSelection(
+    objective: string,
+    context: ToolContext, 
+    constraints?: ToolConstraints
+  ): Promise<ToolCall[]> {
     const analysisPrompt = `
       Analyze this objective and suggest the best tools to accomplish it:
       Objective: ${objective}
@@ -587,15 +727,11 @@ Please provide a clear, helpful response based on these tool results. If there w
       maxTokens: 2000,
     });
 
-    // Parse AI response and validate
     const suggestedCalls = this.parseToolSuggestions(response.content);
-
-    // Apply constraint filtering
     const filteredCalls = constraints
       ? this.filterByConstraints(suggestedCalls, constraints)
       : suggestedCalls;
 
-    // Optimize selection
     return this.optimizeToolSelection(filteredCalls, context);
   }
 
@@ -1031,7 +1167,7 @@ class ExecutionEngine {
 
     for (const batch of plan.executionOrder) {
       // Execute batch in parallel
-      const batchPromises = batch.map(callId =>
+      const batchPromises = batch.map(async callId =>
         this.executeToolCall(callId, plan, context, results)
       );
 

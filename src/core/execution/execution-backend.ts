@@ -1364,7 +1364,7 @@ export class ExecutionManager {
   async cleanup(): Promise<void> {
     logger.info('Cleaning up all execution backends');
 
-    await Promise.all(Array.from(this.backends.values()).map(backend => backend.cleanup()));
+    await Promise.all(Array.from(this.backends.values()).map(async backend => backend.cleanup()));
   }
 
   getStatus(): Record<string, any> {

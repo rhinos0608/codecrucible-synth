@@ -124,7 +124,7 @@ export class ConversationStore {
     const topics = this.extractTopics(prompt, response.synthesis || '');
 
     // Generate embedding for semantic search (simplified for now)
-    const embedding = await this.generateEmbedding(prompt + ' ' + response.synthesis);
+    const embedding = await this.generateEmbedding(`${prompt  } ${  response.synthesis}`);
 
     const interaction: StoredInteraction = {
       id,
@@ -658,7 +658,7 @@ export class ConversationStore {
     return interactions.map(interaction => {
       if (!interaction.embedding || interaction.embedding.length === 0) {
         // Fallback to text similarity
-        return this.calculateTextSimilarity(query, interaction.prompt + ' ' + interaction.response);
+        return this.calculateTextSimilarity(query, `${interaction.prompt  } ${  interaction.response}`);
       }
 
       // Calculate cosine similarity

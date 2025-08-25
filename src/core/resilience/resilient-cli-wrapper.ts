@@ -372,7 +372,7 @@ export class ResilientCLIWrapper extends EventEmitter {
   /**
    * Create timeout promise with cleanup
    */
-  private createTimeoutPromise(timeoutMs: number, operationName: string): Promise<never> {
+  private async createTimeoutPromise(timeoutMs: number, operationName: string): Promise<never> {
     return new Promise((_, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error(`Operation '${operationName}' timed out after ${timeoutMs}ms`));
@@ -436,7 +436,7 @@ export class ResilientCLIWrapper extends EventEmitter {
   /**
    * Utility sleep function
    */
-  private sleep(ms: number): Promise<void> {
+  private async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 

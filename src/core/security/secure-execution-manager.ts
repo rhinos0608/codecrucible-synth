@@ -281,7 +281,7 @@ export class SecureExecutionManager {
       if (this.config.allowedCommands.length > 0) {
         const firstWord = request.command.trim().split(/\s+/)[0];
         const isAllowed = this.config.allowedCommands.some(
-          allowed => firstWord === allowed || firstWord.startsWith(allowed + '.')
+          allowed => firstWord === allowed || firstWord.startsWith(`${allowed  }.`)
         );
 
         if (!isAllowed) {

@@ -753,7 +753,7 @@ export class StructuredOutputManager extends EventEmitter implements IStructured
 
   private extractTitleFromDescription(description: string): string {
     const firstSentence = description.split('.')[0];
-    return firstSentence.length > 50 ? firstSentence.substring(0, 47) + '...' : firstSentence;
+    return firstSentence.length > 50 ? `${firstSentence.substring(0, 47)  }...` : firstSentence;
   }
 
   private mergeSchemas(base: JsonSchema, inferred: JsonSchema): JsonSchema {
@@ -1682,14 +1682,14 @@ export class StructuredOutputManager extends EventEmitter implements IStructured
   private toCsv(data: any): string {
     if (Array.isArray(data) && data.length > 0) {
       const headers = Object.keys(data[0]);
-      let csv = headers.join(',') + '\n';
+      let csv = `${headers.join(',')  }\n`;
 
       for (const row of data) {
         const values = headers.map(header => {
           const value = row[header];
           return typeof value === 'string' && value.includes(',') ? `"${value}"` : String(value);
         });
-        csv += values.join(',') + '\n';
+        csv += `${values.join(',')  }\n`;
       }
 
       return csv;

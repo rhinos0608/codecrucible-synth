@@ -586,8 +586,8 @@ export class SubAgentIsolationSystem extends EventEmitter {
     this.maxAgents = config.maxAgents || 10;
     this.defaultPermissions = {
       fileAccess: {
-        read: [process.cwd() + '/src', process.cwd() + '/tests', process.cwd() + '/docs'],
-        write: [process.cwd() + '/dist', process.cwd() + '/tmp'],
+        read: [`${process.cwd()  }/src`, `${process.cwd()  }/tests`, `${process.cwd()  }/docs`],
+        write: [`${process.cwd()  }/dist`, `${process.cwd()  }/tmp`],
         execute: [],
       },
       networkAccess: {

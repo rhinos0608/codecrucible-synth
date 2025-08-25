@@ -638,7 +638,7 @@ export class CodeAnalysisTool extends BaseTool {
   private getDependencyRecommendations(packageInfo: any, importAnalysis: any): string[] {
     const recommendations: string[] = [];
 
-    if (packageInfo && packageInfo.dependencies) {
+    if (packageInfo?.dependencies) {
       const depCount = Object.keys(packageInfo.dependencies).length;
       if (depCount > 50) {
         recommendations.push('Consider reducing the number of dependencies');

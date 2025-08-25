@@ -333,7 +333,7 @@ export class ModelBridgeManager {
    * Create metadata file for model
    */
   private async createModelMetadataFile(symlinkPath: string, model: ModelInfo): Promise<void> {
-    const metadataPath = symlinkPath + '.metadata.json';
+    const metadataPath = `${symlinkPath  }.metadata.json`;
     const metadata = {
       model: {
         id: model.id,

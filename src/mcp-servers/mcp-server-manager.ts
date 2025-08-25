@@ -244,7 +244,7 @@ export class MCPServerManager {
 
     const stopPromises = Array.from(this.servers.values())
       .filter(server => server.status === 'running')
-      .map(server => this.stopServer(server.name));
+      .map(async server => this.stopServer(server.name));
 
     await Promise.allSettled(stopPromises);
     this.isInitialized = false;
@@ -481,7 +481,7 @@ export class MCPServerManager {
   async executeCommandSecure(command: string, args: string[] = []): Promise<string> {
     // Input validation and sanitization
     const sanitizedCommand = await this.sanitizeCommandInput(command);
-    const sanitizedArgs = await Promise.all(args.map(arg => this.sanitizeCommandInput(arg)));
+    const sanitizedArgs = await Promise.all(args.map(async arg => this.sanitizeCommandInput(arg)));
 
     if (!this.isCommandAllowed(sanitizedCommand)) {
       throw new Error(`Command not allowed: ${sanitizedCommand}`);
@@ -563,7 +563,7 @@ export class MCPServerManager {
 
     if (!validationResult.isValid || validationResult.riskLevel === 'critical') {
       logger.warn('Command blocked due to security violations:', {
-        input: input.substring(0, 100) + '...',
+        input: `${input.substring(0, 100)  }...`,
         violations: validationResult.violations,
         riskLevel: validationResult.riskLevel,
       });
@@ -574,7 +574,7 @@ export class MCPServerManager {
 
     if (validationResult.riskLevel === 'high') {
       logger.warn('High-risk command detected but allowed:', {
-        input: input.substring(0, 100) + '...',
+        input: `${input.substring(0, 100)  }...`,
         violations: validationResult.violations,
       });
     }
@@ -656,7 +656,7 @@ export class MCPServerManager {
       if (pattern.test(fullCommand)) {
         logger.error('SECURITY VIOLATION: Dangerous command blocked', {
           command: command,
-          args: args.map(arg => (arg.length > 50 ? arg.substring(0, 50) + '...' : arg)),
+          args: args.map(arg => (arg.length > 50 ? `${arg.substring(0, 50)  }...` : arg)),
           pattern: pattern.source,
           timestamp: new Date().toISOString(),
         });
@@ -872,7 +872,7 @@ export class MCPServerManager {
       // Check allowed paths if they exist
       if (this.config.filesystem.allowedPaths.length > 0) {
         for (const allowedPath of this.config.filesystem.allowedPaths) {
-          const expandedPath = allowedPath.replace('~/', (process.env.HOME || '') + '/');
+          const expandedPath = allowedPath.replace('~/', `${process.env.HOME || ''  }/`);
           const resolvedAllowed = path.resolve(expandedPath);
           if (normalizedPath.startsWith(resolvedAllowed)) {
             return true;
@@ -935,7 +935,7 @@ export class MCPServerManager {
     // Check blocked commands (config + defaults)
     const allBlockedCommands = [...this.config.terminal.blockedCommands, ...defaultBlockedCommands];
     for (const blockedCommand of allBlockedCommands) {
-      if (command === blockedCommand || command.startsWith(blockedCommand + ' ')) {
+      if (command === blockedCommand || command.startsWith(`${blockedCommand  } `)) {
         return false;
       }
     }
@@ -943,7 +943,7 @@ export class MCPServerManager {
     // Check allowed commands - use whitelist approach for security
     if (this.config.terminal.allowedCommands.length > 0) {
       return this.config.terminal.allowedCommands.some(
-        allowedCommand => command === allowedCommand || command.startsWith(allowedCommand + ' ')
+        allowedCommand => command === allowedCommand || command.startsWith(`${allowedCommand  } `)
       );
     }
 
@@ -971,7 +971,7 @@ export class MCPServerManager {
     ];
 
     return defaultSafeCommands.some(
-      safeCommand => command === safeCommand || command.startsWith(safeCommand + ' ')
+      safeCommand => command === safeCommand || command.startsWith(`${safeCommand  } `)
     );
   }
 

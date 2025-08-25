@@ -525,7 +525,7 @@ export class AdvancedLogger {
     try {
       const entries = this.logQueue.splice(0, 50); // Process in batches
 
-      await Promise.all(this.config.outputs.map(output => this.processOutput(output, entries)));
+      await Promise.all(this.config.outputs.map(async output => this.processOutput(output, entries)));
     } catch (error) {
       console.error('Failed to process log queue:', error);
     } finally {
@@ -533,7 +533,7 @@ export class AdvancedLogger {
 
       // Process remaining queue if any
       if (this.logQueue.length > 0) {
-        setTimeout(() => this.processLogQueue(), 10);
+        setTimeout(async () => this.processLogQueue(), 10);
       }
     }
   }
@@ -576,8 +576,8 @@ export class AdvancedLogger {
 
       const logFile = join(path, filename);
       const content =
-        entries.map(entry => output.formatter?.format(entry) || JSON.stringify(entry)).join('\n') +
-        '\n';
+        `${entries.map(entry => output.formatter?.format(entry) || JSON.stringify(entry)).join('\n') 
+        }\n`;
 
       await writeFile(logFile, content, { flag: 'a' });
 

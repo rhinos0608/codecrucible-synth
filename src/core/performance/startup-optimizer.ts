@@ -178,7 +178,7 @@ export class StartupOptimizer {
 
       // Execute ready tasks in parallel (up to concurrency limit)
       const tasksToExecute = readyTasks.slice(0, maxConcurrency);
-      const promises = tasksToExecute.map(task => this.executeTask(task));
+      const promises = tasksToExecute.map(async task => this.executeTask(task));
       
       await Promise.allSettled(promises);
       

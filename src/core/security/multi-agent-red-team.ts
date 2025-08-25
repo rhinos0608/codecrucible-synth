@@ -125,7 +125,7 @@ export class MultiAgentRedTeam extends EventEmitter {
 
     // Run all agents in parallel for better performance
     const agentAnalyses = await Promise.all(
-      this.agents.map(agent => this.runAgentAnalysis(agent, input, context))
+      this.agents.map(async agent => this.runAgentAnalysis(agent, input, context))
     );
 
     // Collaborative decision making

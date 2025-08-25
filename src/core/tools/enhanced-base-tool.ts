@@ -227,7 +227,7 @@ export abstract class EnhancedBaseTool extends BaseTool {
   ): Promise<any> {
     if (this.config.retryable && this.config.maxRetries! > 1) {
       const result = await ErrorHandler.retryWithBackoff(
-        () => this.executeWithTimeout(params, context),
+        async () => this.executeWithTimeout(params, context),
         this.config.maxRetries!,
         1000,
         { tool: this.config.name, requestId: context.requestId }

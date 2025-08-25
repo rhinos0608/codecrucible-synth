@@ -275,8 +275,100 @@ export class EnhancedExternalMCPTools {
   }
 
   async listDirectory(path?: string): Promise<any> {
-    const args = path ? { path } : {};
-    return await this.mcpManager.executeToolCall('terminal-controller', 'list_directory', args);
+    const targetPath = path || process.cwd();
+    
+    // First attempt: Use terminal-controller MCP server
+    try {
+      const args = path ? { path } : {};
+      return await this.mcpManager.executeToolCall('terminal-controller', 'list_directory', args);
+    } catch (error: any) {
+      logger.warn('Terminal controller list_directory failed, trying filesystem server', { error: error.message, path: targetPath });
+      
+      // Second attempt: Use filesystem MCP server
+      try {
+        return await this.mcpManager.executeToolCall('filesystem', 'list_directory', { path: targetPath });
+      } catch (fsError: any) {
+        logger.warn('Filesystem MCP list_directory failed, trying Node.js fallback', { error: fsError.message, path: targetPath });
+        
+        // Third attempt: Direct Node.js fs
+        try {
+          const fs = await import('fs/promises');
+          const path_module = await import('path');
+          
+          const resolvedPath = path_module.resolve(targetPath);
+          
+          // Check if directory exists, if not offer to create it
+          try {
+            const stats = await fs.stat(resolvedPath);
+            if (!stats.isDirectory()) {
+              throw new Error(`Path exists but is not a directory: ${resolvedPath}`);
+            }
+          } catch (statError: any) {
+            if (statError.code === 'ENOENT') {
+              // Directory doesn't exist - offer helpful suggestion
+              return {
+                success: false,
+                error: `Directory does not exist: ${resolvedPath}`,
+                suggestion: `Would you like me to create the directory '${targetPath}'?`,
+                canCreate: true,
+                path: resolvedPath
+              };
+            }
+            throw statError;
+          }
+          
+          // List the directory contents
+          const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
+          const formattedEntries = entries.map(entry => {
+            return entry.isDirectory() ? `[DIR] ${entry.name}` : entry.name;
+          });
+          
+          return {
+            success: true,
+            files: formattedEntries,
+            path: resolvedPath
+          };
+          
+        } catch (nodeError: any) {
+          // Final fallback failed
+          throw new Error(`Failed to list directory: ${nodeError.message}`);
+        }
+      }
+    }
+  }
+
+  async createDirectory(path: string): Promise<any> {
+    // First attempt: Use terminal-controller MCP server
+    try {
+      return await this.mcpManager.executeToolCall('terminal-controller', 'create_directory', { path });
+    } catch (error: any) {
+      logger.warn('Terminal controller create_directory failed, trying filesystem server', { error: error.message, path });
+      
+      // Second attempt: Use filesystem MCP server
+      try {
+        return await this.mcpManager.executeToolCall('filesystem', 'create_directory', { path });
+      } catch (fsError: any) {
+        logger.warn('Filesystem MCP create_directory failed, trying Node.js fallback', { error: fsError.message, path });
+        
+        // Third attempt: Direct Node.js fs
+        try {
+          const fs = await import('fs/promises');
+          const path_module = await import('path');
+          
+          const resolvedPath = path_module.resolve(path);
+          await fs.mkdir(resolvedPath, { recursive: true });
+          
+          return {
+            success: true,
+            path: resolvedPath,
+            message: `Directory created successfully: ${resolvedPath}`
+          };
+          
+        } catch (nodeError: any) {
+          throw new Error(`Failed to create directory: ${nodeError.message}`);
+        }
+      }
+    }
   }
 
   async getCommandHistory(): Promise<any> {

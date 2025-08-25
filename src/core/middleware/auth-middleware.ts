@@ -122,7 +122,7 @@ export class AuthMiddleware {
       }
 
       // Try token authentication first
-      if (headers && headers[this.config.tokenHeader!]) {
+      if (headers?.[this.config.tokenHeader!]) {
         const tokenResult = await this.authenticateWithToken(
           headers[this.config.tokenHeader!],
           ipAddress
@@ -134,7 +134,7 @@ export class AuthMiddleware {
       }
 
       // Try API key authentication
-      if (headers && headers[this.config.apiKeyHeader!]) {
+      if (headers?.[this.config.apiKeyHeader!]) {
         const apiKeyResult = await this.authenticateWithAPIKey(headers[this.config.apiKeyHeader!]);
 
         if (apiKeyResult.authenticated) {
@@ -469,7 +469,7 @@ export class AuthMiddleware {
   /**
    * Get authentication statistics
    */
-  getAuthStats() {
+  async getAuthStats() {
     return this.authManager.getAuthStats();
   }
 

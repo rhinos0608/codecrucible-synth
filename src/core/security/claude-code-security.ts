@@ -386,7 +386,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
         development: foundKeywords.development,
         system: foundKeywords.system,
         context: { isDevelopmentContext, isSQLContext, isSystemContext },
-        content: content.substring(0, 200) + '...',
+        content: `${content.substring(0, 200)  }...`,
       });
     }
 

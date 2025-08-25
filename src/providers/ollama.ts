@@ -13,6 +13,12 @@ export interface OllamaConfig {
   endpoint?: string;
   model?: string;
   timeout?: number;
+  timeouts?: {
+    connection: number;
+    coldStart: number;
+    generation: number;
+    healthCheck: number;
+  };
 }
 
 export class OllamaProvider {
@@ -27,7 +33,13 @@ export class OllamaProvider {
     this.config = {
       endpoint: config.endpoint || 'http://localhost:11434',
       model: config.model, // Will be set by autonomous detection
-      timeout: config.timeout || 110000, // 110s - optimized for Ollama 2-minute hard limit with 10s buffer
+      timeout: config.timeout || 110000, // 110s - legacy timeout for backwards compatibility
+      timeouts: config.timeouts || {
+        connection: 5000,      // 5s for connection establishment
+        coldStart: 60000,      // 60s for cold model loading with function calling
+        generation: 120000,    // 2 minutes for complex generation
+        healthCheck: 3000      // 3s for quick health checks
+      }
     };
 
     this.model = this.config.model || 'auto-detect'; // Mark for autonomous detection
@@ -52,7 +64,7 @@ export class OllamaProvider {
 
     this.httpClient = axios.create({
       baseURL: this.config.endpoint,
-      timeout: this.config.timeout,
+      // Remove global timeout - use per-request timeouts instead to avoid conflicts
       httpAgent, // Connection pooling for HTTP
       httpsAgent, // Connection pooling for HTTPS
       headers: {
@@ -60,6 +72,52 @@ export class OllamaProvider {
         Connection: 'keep-alive', // Explicitly request keep-alive
       },
     });
+    
+    // CRITICAL DEBUG: Add axios interceptors to trace actual network calls
+    this.httpClient.interceptors.request.use(
+      (config) => {
+        logger.info('🌐 AXIOS REQUEST INTERCEPTOR: About to make REAL network call', {
+          url: config.url,
+          baseURL: config.baseURL,
+          method: config.method,
+          fullURL: `${config.baseURL}${config.url}`,
+          hasAdapter: !!config.adapter,
+          adapterType: config.adapter ? config.adapter.constructor.name : 'default',
+          timeout: config.timeout
+        });
+        return config;
+      },
+      (error) => {
+        logger.error('🌐 AXIOS REQUEST ERROR INTERCEPTOR', error);
+        return Promise.reject(error);
+      }
+    );
+    
+    this.httpClient.interceptors.response.use(
+      (response) => {
+        logger.info('🌐 AXIOS RESPONSE INTERCEPTOR: Received REAL network response', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.config.url,
+          fullURL: `${response.config.baseURL}${response.config.url}`,
+          responseTime: 'calculated_after_request',
+          hasData: !!response.data,
+          dataKeys: response.data ? Object.keys(response.data) : []
+        });
+        return response;
+      },
+      (error) => {
+        logger.error('🌐 AXIOS RESPONSE ERROR INTERCEPTOR', {
+          message: error.message,
+          code: error.code,
+          status: error.response?.status,
+          url: error.config?.url,
+          isNetworkError: !error.response,
+          isTimeout: error.code === 'ECONNABORTED'
+        });
+        return Promise.reject(error);
+      }
+    );
 
     logger.debug('Ollama HTTP connection pooling configured', { maxSockets: 10, keepAlive: '30s' });
   }
@@ -193,10 +251,10 @@ export class OllamaProvider {
           stream: false,
           options: {
             temperature: request.temperature || 0.1,
-            num_predict: request.maxTokens || 2048,
+            num_predict: Math.min(request.maxTokens || 2048, 1024),
+            // Simplified options to prevent ollama timeouts
             top_p: 0.9,
-            top_k: 40,
-            ...this.getGPUConfig(),
+            top_k: 40
           }
         };
         
@@ -214,10 +272,10 @@ export class OllamaProvider {
           stream: false,
           options: {
             temperature: request.temperature || 0.1,
-            num_predict: request.maxTokens || 2048,
+            num_predict: Math.min(request.maxTokens || 2048, 1024),
+            // Simplified options to prevent ollama timeouts
             top_p: 0.9,
-            top_k: 40,
-            ...this.getGPUConfig(),
+            top_k: 40
           },
         };
         
@@ -228,13 +286,44 @@ export class OllamaProvider {
         });
       }
 
-      const response = await this.httpClient.post(endpoint, requestBody, {
-        signal: effectiveAbortSignal,
-        timeout: this.config.timeout,
+      // Use tiered timeout based on request type and model state
+      const isModelWarmed = modelPreloader.isModelWarmed(this.model, 'ollama');
+      const timeoutToUse = isModelWarmed ? 
+        (this.config.timeouts?.generation || this.config.timeout || 120000) : 
+        (this.config.timeouts?.coldStart || 30000);
+      
+      logger.debug('Using tiered timeout strategy', {
+        isModelWarmed,
+        timeoutUsed: timeoutToUse,
+        coldStartTimeout: this.config.timeouts?.coldStart || 30000,
+        generationTimeout: this.config.timeouts?.generation || 120000
       });
+      
+      logger.info('🔥 CRITICAL DEBUG: About to make HTTP request to ollama', {
+        endpoint,
+        url: `${this.config.endpoint}${endpoint}`,
+        timeoutUsed: timeoutToUse,
+        model: this.model,
+        hasTools: hasTools,
+        requestBodyKeys: Object.keys(requestBody)
+      });
+      
+      // Add metadata for request timing in interceptors
+      const startTime = Date.now();
+      const requestConfig = {
+        signal: effectiveAbortSignal,
+        timeout: timeoutToUse
+      };
+      
+      const response = await this.httpClient.post(endpoint, requestBody, requestConfig);
 
       // Timeout cleanup removed - axios handles timeout cleanup automatically
-      logger.debug('Received response from Ollama API');
+      logger.info('🔥 CRITICAL DEBUG: Received response from Ollama API', {
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data,
+        responseDataKeys: response.data ? Object.keys(response.data) : []
+      });
 
       const responseData = response.data;
 
@@ -441,18 +530,33 @@ export class OllamaProvider {
       
       return finalResponse;
     } catch (error: unknown) {
-      // Timeout cleanup removed - axios handles timeout cleanup automatically
-      logger.error('Ollama API error', error);
+      // Enhanced error handling with specific timeout and connection error messages
+      const responseTime = Date.now() - startTime;
+      const errorMessage = getErrorMessage(error);
+      
+      logger.error('Ollama API error', {
+        error: errorMessage,
+        responseTime,
+        model: this.model,
+        endpoint: this.config.endpoint
+      });
       
       // Record failed request metrics
-      const responseTime = Date.now() - startTime;
       modelPreloader.recordModelUsage(this.model, 'ollama', responseTime, false);
 
-      if ((error as any)?.name === 'AbortError') {
-        throw new Error('Ollama API request timed out');
+      // Enhanced timeout error handling
+      if ((error as any)?.name === 'AbortError' || (error as any)?.code === 'ECONNABORTED') {
+        const isModelWarmed = modelPreloader.isModelWarmed(this.model, 'ollama');
+        const timeoutUsed = isModelWarmed ? (this.config.timeouts?.generation || 120000) : (this.config.timeouts?.coldStart || 30000);
+        
+        throw new Error(
+          `Ollama API request timed out after ${timeoutUsed}ms. ` +
+          `${isModelWarmed ? 'Model was warmed' : 'Cold start detected - this is normal for first requests'}. ` +
+          `Try increasing ${isModelWarmed ? 'generation' : 'coldStart'} timeout in configuration.`
+        );
       }
 
-      // Fallback response for debugging
+      // Connection error with retry suggestion
       if ((error as any)?.code === 'ECONNREFUSED') {
         logger.warn('Ollama not available, using fallback response');
         return {
@@ -475,12 +579,12 @@ export class OllamaProvider {
     const timeoutId = setTimeout(() => {
       logger.debug('Status check timeout, aborting');
       abortController.abort();
-    }, 5000); // Shorter timeout for status checks
+    }, this.config.timeouts?.healthCheck || 5000); // Use health check timeout for status checks
 
     try {
       const response = await this.httpClient.get('/api/tags', {
         signal: abortController.signal,
-        timeout: 5000,
+        timeout: this.config.timeouts?.healthCheck || 5000,
       });
 
       clearTimeout(timeoutId);
@@ -518,12 +622,12 @@ export class OllamaProvider {
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => {
       abortController.abort();
-    }, 5000);
+    }, this.config.timeouts?.healthCheck || 5000);
 
     try {
       const response = await this.httpClient.get('/api/tags', {
         signal: abortController.signal,
-        timeout: 5000,
+        timeout: this.config.timeouts?.healthCheck || 5000,
       });
 
       clearTimeout(timeoutId);
@@ -820,11 +924,11 @@ export class OllamaProvider {
     try {
       // Quick health check with minimal timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for health check
+      const timeoutId = setTimeout(() => controller.abort(), this.config.timeouts?.healthCheck || 3000);
 
       const response = await this.httpClient.get('/api/tags', {
         signal: controller.signal,
-        timeout: 2000,
+        timeout: this.config.timeouts?.healthCheck || 5000,
       });
 
       clearTimeout(timeoutId);
@@ -861,7 +965,7 @@ export class OllamaProvider {
 
     this.httpClient = axios.create({
       baseURL: this.config.endpoint,
-      timeout: this.config.timeout,
+      // Remove global timeout - use per-request timeouts instead to avoid conflicts
       httpAgent,
       headers: {
         'Content-Type': 'application/json',

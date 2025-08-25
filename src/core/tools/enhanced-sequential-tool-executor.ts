@@ -1245,6 +1245,12 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
     let currentStepIndex = 0;
     const gatheredEvidence: string[] = [];
     
+    logger.info('🎯 WORKFLOW-GUIDED ANALYSIS: Starting with evidence collection enabled', {
+      workflowName: workflowTemplate.name,
+      initialEvidenceCount: gatheredEvidence.length,
+      availableToolsCount: availableTools.length
+    });
+    
     // CRITICAL FIX: Store original tool results for direct access in bypass system
     const originalToolResults: any[] = [];
     
@@ -1312,6 +1318,16 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
             stepTools
           );
 
+          // CRITICAL FIX: Store tool result for evidence collection
+          originalToolResults.push(toolResult);
+          
+          logger.info('🎯 WORKFLOW TOOL RESULT STORED:', {
+            toolName: reasoningResult.selectedTool.function?.name || reasoningResult.selectedTool.name,
+            toolResultSuccess: toolResult.success,
+            hasResult: !!toolResult.result,
+            originalToolResultsCount: originalToolResults.length
+          });
+
           const observationStep: ReasoningStep = {
             step: currentStepIndex + 2.5,
             type: 'observation',
@@ -1347,13 +1363,39 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
           await this.streamReasoningStep(observationStep);
 
           // Store complete evidence for synthesis (FIXED: No longer truncate to 200 chars)
-          if (toolResult.success) {
-            // CRITICAL FIX: Extract content safely from tool results to prevent type errors
-            const completeResult = this.extractStringContentFromToolResult(toolResult);
-            const toolName = reasoningResult.selectedTool.function?.name || reasoningResult.selectedTool.name;
+          logger.info('🔍 EVIDENCE COLLECTION CHECK:', {
+            hasToolResult: !!toolResult,
+            toolResultSuccess: toolResult?.success,
+            toolResultSuccessType: typeof toolResult?.success,
+            toolResultSuccessExact: toolResult?.success === true,
+            toolResultSuccessLoose: !!toolResult?.success,
+            toolResultKeys: toolResult ? Object.keys(toolResult) : null,
+            toolResultType: typeof toolResult
+          });
+          
+          // CRITICAL FIX: Ensure evidence collection regardless of success flag
+          const toolName = reasoningResult.selectedTool.function?.name || reasoningResult.selectedTool.name;
+          const completeResult = this.extractStringContentFromToolResult(toolResult);
+          
+          logger.info('🔍 EVIDENCE EXTRACTION ATTEMPT:', {
+            toolName,
+            hasCompleteResult: !!completeResult,
+            completeResultLength: completeResult ? completeResult.length : 0,
+            completeResultPreview: completeResult ? completeResult.substring(0, 200) : 'No content'
+          });
+          
+          // If we have actual content, collect it as evidence regardless of success flag
+          if (completeResult && completeResult.length > 0 && completeResult.trim().length > 0) {
+            logger.info('🎯 FORCING EVIDENCE COLLECTION: Content detected, collecting evidence');
             
             // Validate content extraction
-            this.validateContentExtraction(toolResult, completeResult);
+            const validationResult = this.validateContentExtraction(toolResult, completeResult);
+            
+            logger.info('🔍 EVIDENCE VALIDATION:', {
+              validationResult,
+              completeResultLength: completeResult.length,
+              completeResultPreview: completeResult.substring(0, 200)
+            });
             
             // CRITICAL FIX: Store original tool result for bypass system
             originalToolResults.push(toolResult);
@@ -1368,16 +1410,69 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
             
             gatheredEvidence.push(formattedEvidence);
             
-            logger.debug('Evidence collected', {
+            logger.info('🎉 EVIDENCE COLLECTED!', {
               stepIndex: currentStepIndex + 1,
               toolName,
               resultLength: completeResult.length,
-              action: workflowStep.action
+              action: workflowStep.action,
+              gatheredEvidenceCount: gatheredEvidence.length,
+              formattedEvidenceLength: formattedEvidence.length
+            });
+          } else if (toolResult.success) {
+            // Fallback to original success-based logic if no content detected
+            logger.warn('⚠️ Tool marked as successful but no content extracted', {
+              toolResult,
+              reasoningResult: reasoningResult.selectedTool
+            });
+          } else {
+            logger.error('❌ EVIDENCE COLLECTION FAILED: Tool result not successful and no content', {
+              toolResult,
+              reasoningResult: reasoningResult.selectedTool
             });
           }
         }
 
         currentStepIndex++;
+      }
+
+      logger.info('🎯 WORKFLOW-GUIDED ANALYSIS: All steps completed, checking evidence', {
+        workflowName: workflowTemplate.name,
+        completedSteps: currentStepIndex,
+        gatheredEvidenceCount: gatheredEvidence.length,
+        originalToolResultsCount: originalToolResults.length,
+        evidencePreview: gatheredEvidence.length > 0 ? gatheredEvidence[0].substring(0, 100) : 'No evidence'
+      });
+      
+      // CRITICAL FIX: Ensure evidence is collected from successful tool results
+      if (gatheredEvidence.length === 0 && originalToolResults.length > 0) {
+        logger.info('🔥 EMERGENCY EVIDENCE RECOVERY: No evidence in array but tool results exist');
+        
+        for (let i = 0; i < originalToolResults.length; i++) {
+          const toolResult = originalToolResults[i];
+          const content = this.extractStringContentFromToolResult(toolResult);
+          
+          if (content && content.length > 0) {
+            const emergencyEvidence = this.formatToolEvidence(
+              'recovered_tool_result',
+              `Emergency recovery of tool result ${i + 1}`,
+              content,
+              i + 1
+            );
+            
+            gatheredEvidence.push(emergencyEvidence);
+            
+            logger.info('🎉 EMERGENCY EVIDENCE RECOVERED!', {
+              toolResultIndex: i,
+              contentLength: content.length,
+              evidenceCount: gatheredEvidence.length
+            });
+          }
+        }
+        
+        logger.info('🔥 EMERGENCY RECOVERY COMPLETE:', {
+          finalEvidenceCount: gatheredEvidence.length,
+          recoveredFromToolResults: originalToolResults.length
+        });
       }
 
       // Final synthesis step using all gathered evidence
@@ -1589,7 +1684,21 @@ ${formattedContent}
         return toolResult.result;
       }
       
-      // CRITICAL: Handle filesystem tool output format (output.content)
+      // CRITICAL: Handle nested tool result structure from executeToolWithMCP
+      // First check if result contains the actual tool result
+      if (toolResult.result && typeof toolResult.result === 'object') {
+        if (toolResult.result.output && typeof toolResult.result.output === 'object') {
+          if (typeof toolResult.result.output.content === 'string') {
+            // Found content in nested structure: toolResult.result.output.content
+            return toolResult.result.output.content;
+          }
+        }
+        if (typeof toolResult.result.content === 'string') {
+          return toolResult.result.content;
+        }
+      }
+      
+      // CRITICAL: Handle filesystem tool output format (output.content) - direct structure
       if (toolResult.output && typeof toolResult.output === 'object') {
         if (typeof toolResult.output.content === 'string') {
           // For filesystem tools, the content might be JSON-encoded string - try to parse it

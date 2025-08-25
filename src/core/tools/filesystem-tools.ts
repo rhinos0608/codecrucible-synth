@@ -62,6 +62,14 @@ export class FilesystemTools {
       },
       execute: async (input: any, context: ToolContext): Promise<ToolResult> => {
         try {
+          // CRITICAL FIX: Input validation to prevent undefined errors
+          if (!input || typeof input !== 'object') {
+            throw new Error(`Invalid input object: ${JSON.stringify(input)}`);
+          }
+          if (!input.filePath) {
+            throw new Error(`Missing required parameter 'filePath' in input: ${JSON.stringify(input)}`);
+          }
+
           const absolutePath = this.resolvePath(input.filePath);
           const content = await this.mcpManager.readFileSecure(absolutePath);
 
@@ -360,6 +368,13 @@ export class FilesystemTools {
   }
 
   private resolvePath(inputPath: string): string {
+    // CRITICAL FIX: Input validation to prevent undefined errors
+    if (!inputPath || typeof inputPath !== 'string') {
+      const error = `Invalid file path: ${inputPath} (type: ${typeof inputPath})`;
+      logger.error(`❌ FILESYSTEM TOOLS: ${error}`);
+      throw new Error(error);
+    }
+
     // Resolve relative to current working directory
     if (inputPath.startsWith('./') || inputPath.startsWith('../') || !inputPath.startsWith('/')) {
       return resolve(process.cwd(), inputPath);

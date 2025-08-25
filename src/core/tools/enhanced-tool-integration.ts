@@ -209,15 +209,49 @@ export class EnhancedToolIntegration extends ToolIntegration {
   override async executeToolCall(toolCall: any): Promise<any> {
     try {
       const functionName = toolCall.function.name;
-      const args = JSON.parse(toolCall.function.arguments);
+      
+      // CRITICAL FIX: Robust parameter parsing with validation
+      let args: any = {};
+      try {
+        if (toolCall.function.arguments) {
+          if (typeof toolCall.function.arguments === 'string') {
+            args = JSON.parse(toolCall.function.arguments);
+          } else {
+            args = toolCall.function.arguments; // Already an object
+          }
+        } else {
+          logger.warn(`⚠️ Tool ${functionName} called with no arguments, using empty object`);
+        }
+      } catch (parseError) {
+        logger.error(`❌ Failed to parse tool arguments for ${functionName}:`, {
+          arguments: toolCall.function.arguments,
+          error: parseError
+        });
+        throw new Error(`Invalid tool arguments for ${functionName}: ${parseError}`);
+      }
 
       logger.info(`Executing tool: ${functionName} with args:`, args);
       logger.info(`🔥 ENHANCED TOOL INTEGRATION: Executing ${functionName}`);
 
-      // Check if it's an enhanced tool first
-      const enhancedTool = this.availableTools.get(functionName);
+      // CRITICAL FIX: Add tool ID mapping for AI compatibility
+      const toolAliases: Record<string, string> = {
+        'filesystem_read_file': 'mcp_read_file',
+        'filesystem_write_file': 'mcp_write_file', 
+        'filesystem_list_directory': 'mcp_list_directory',
+        'filesystem_file_stats': 'mcp_file_stats',
+        'filesystem_find_files': 'mcp_find_files'
+      };
+      
+      const actualToolName = toolAliases[functionName] || functionName;
+      
+      if (actualToolName !== functionName) {
+        logger.info(`🔧 TOOL ALIAS: Mapping ${functionName} → ${actualToolName}`);
+      }
+
+      // Check if it's an enhanced tool first (using mapped name)
+      const enhancedTool = this.availableTools.get(actualToolName);
       if (enhancedTool) {
-        logger.info(`🔥 ENHANCED TOOL INTEGRATION: Found enhanced tool ${functionName}, executing...`);
+        logger.info(`🔥 ENHANCED TOOL INTEGRATION: Found enhanced tool ${actualToolName}, executing...`);
         
         const context = {
           startTime: Date.now(),
@@ -225,10 +259,28 @@ export class EnhancedToolIntegration extends ToolIntegration {
           requestId: `tool_${Date.now()}`,
         };
 
-        const result = await enhancedTool.execute(args, context);
+        // CRITICAL FIX: Extract parameters from ARGS wrapper if present
+        let finalArgs = args;
+        if (args.ARGS && typeof args.ARGS === 'object') {
+          finalArgs = args.ARGS;
+          logger.info(`🔧 PARAMETER EXTRACTION: Extracted args from ARGS wrapper`, {
+            original: args,
+            extracted: finalArgs
+          });
+        } else if (args.args && typeof args.args === 'object') {
+          // CRITICAL FIX: Extract from lowercase 'args' property (ollama response format)
+          finalArgs = args.args;
+          logger.info(`🔧 PARAMETER EXTRACTION: Extracted args from 'args' property`, {
+            original: args,
+            extracted: finalArgs
+          });
+        }
+
+        const result = await enhancedTool.execute(finalArgs, context);
         
-        logger.info(`🔥 ENHANCED TOOL INTEGRATION: Enhanced tool ${functionName} completed successfully`);
-        return {
+        logger.info(`🔥 ENHANCED TOOL INTEGRATION: Enhanced tool ${actualToolName} completed successfully`);
+        
+        const toolResult = {
           success: true,
           output: result,
           metadata: {
@@ -236,6 +288,17 @@ export class EnhancedToolIntegration extends ToolIntegration {
             source: 'enhanced-tool-integration'
           },
         };
+        
+        logger.info('🔍 ENHANCED TOOL INTEGRATION: Returning tool result structure:', {
+          hasSuccess: 'success' in toolResult,
+          successValue: toolResult.success,
+          hasOutput: 'output' in toolResult,
+          outputType: typeof toolResult.output,
+          toolResultKeys: Object.keys(toolResult),
+          resultPreview: result && result.output && result.output.content ? result.output.content.substring(0, 200) : 'No content preview available'
+        });
+        
+        return toolResult;
       } else {
         // Fall back to base class for non-enhanced tools
         logger.info(`🔥 ENHANCED TOOL INTEGRATION: Tool ${functionName} not found in enhanced tools, falling back to base class`);

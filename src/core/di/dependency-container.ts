@@ -73,11 +73,18 @@ export class DependencyScope {
   }
 
   dispose(): void {
-    // Dispose all scoped instances that have dispose methods
+    // Dispose all scoped instances that have cleanup methods
     for (const [tokenName, instance] of this.scopedInstances) {
-      if (instance && typeof instance.dispose === 'function') {
+      if (instance) {
         try {
-          instance.dispose();
+          // Try different cleanup method names in order of preference
+          if (typeof instance.dispose === 'function') {
+            instance.dispose();
+          } else if (typeof instance.shutdown === 'function') {
+            instance.shutdown();
+          } else if (typeof instance.destroy === 'function') {
+            instance.destroy();
+          }
         } catch (error) {
           logger.warn(`Error disposing service ${tokenName}:`, error);
         }
@@ -325,9 +332,16 @@ export class DependencyContainer extends EventEmitter {
     for (const token of disposalOrder) {
       const registration = this.services.get(token);
 
-      if (registration?.instance && typeof registration.instance.dispose === 'function') {
+      if (registration?.instance) {
         try {
-          await registration.instance.dispose();
+          // Try different cleanup method names in order of preference
+          if (typeof registration.instance.dispose === 'function') {
+            await registration.instance.dispose();
+          } else if (typeof registration.instance.shutdown === 'function') {
+            await registration.instance.shutdown();
+          } else if (typeof registration.instance.destroy === 'function') {
+            await registration.instance.destroy();
+          }
         } catch (error) {
           logger.warn(`Error disposing service ${token}:`, error);
         }

@@ -48,7 +48,6 @@ const optimalOllamaConfig = {
     temperature: 0.7,
     top_p: 0.9,
     repeat_penalty: 1.1,
-    context_length: 4096,  // Sweet spot for performance vs capability
     num_predict: 512       // Reasonable response length
   },
   
@@ -136,7 +135,6 @@ class ModernLMStudioProvider {
   // Advanced model management
   async optimizedModelLoading() {
     const model = await this.client.llm.load("deepseek-coder:8b", {
-      contextLength: 8192,
       gpuOffload: -1,           // Full GPU offload
       speculativeDecoding: true, // 2025 performance feature
       flashAttention: true       // Memory optimization

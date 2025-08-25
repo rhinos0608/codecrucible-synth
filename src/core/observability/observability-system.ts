@@ -288,6 +288,7 @@ export class ObservabilitySystem extends EventEmitter {
   private dataStorage: ObservabilityStorage;
   private isRunning: boolean = false;
   private systemStartTime: Date = new Date();
+  private monitoringIntervals: NodeJS.Timeout[] = [];
 
   constructor(config: ObservabilityConfig) {
     super();
@@ -621,12 +622,21 @@ export class ObservabilitySystem extends EventEmitter {
 
     this.isRunning = false;
 
+    // Clear all monitoring intervals
+    this.monitoringIntervals.forEach(interval => {
+      clearInterval(interval);
+    });
+    this.monitoringIntervals = [];
+
     // Shutdown components
     await this.metricsCollector.shutdown();
     await this.tracingSystem.shutdown();
     await this.healthMonitor.shutdown();
     await this.alertManager.shutdown();
     await this.dataStorage.shutdown();
+
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
 
     this.logger.info('Observability system shutdown completed');
   }
@@ -637,16 +647,16 @@ export class ObservabilitySystem extends EventEmitter {
 
   private startSystemMonitoring(): void {
     // Monitor system metrics every 30 seconds
-    setInterval(() => {
+    const metricsInterval = setInterval(() => {
     // TODO: Store interval ID and call clearInterval in cleanup
       if (!this.isRunning) return;
 
       this.collectSystemMetrics();
     }, 30000);
+    this.monitoringIntervals.push(metricsInterval);
 
     // Perform health checks every minute
-    setInterval(async () => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+    const healthInterval = setInterval(async () => {
       if (!this.isRunning) return;
 
       try {
@@ -655,14 +665,15 @@ export class ObservabilitySystem extends EventEmitter {
         this.logger.error('Health check failed:', error);
       }
     }, 60000);
+    this.monitoringIntervals.push(healthInterval);
 
     // Check alerts every 30 seconds
-    setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+    const alertsInterval = setInterval(() => {
       if (!this.isRunning) return;
 
       this.alertManager.evaluateRules();
     }, 30000);
+    this.monitoringIntervals.push(alertsInterval);
   }
 
   private collectSystemMetrics(): void {

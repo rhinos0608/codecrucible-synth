@@ -47,10 +47,17 @@ export interface MCPServer {
   name: string;
   process?: ChildProcess;
   enabled: boolean;
-  status: 'stopped' | 'starting' | 'running' | 'error';
+  status: 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting';
   lastError?: string;
   capabilities?: ServerCapabilities;
   performance?: PerformanceMetrics;
+  lastHealthCheck?: Date;
+  retryCount?: number;
+  circuitBreakerState?: 'closed' | 'open' | 'half-open';
+  lastFailureTime?: Date;
+  consecutiveFailures?: number;
+  healthCheckInterval?: NodeJS.Timeout;
+  reconnectTimeout?: NodeJS.Timeout;
 }
 
 export interface ServerCapabilities {
@@ -98,6 +105,13 @@ export class MCPServerManager {
   private smitheryServer?: SmitheryMCPServer;
   private isInitialized = false;
   private securityValidator: AdvancedSecurityValidator;
+  
+  // Enhanced resilience configuration
+  private readonly CIRCUIT_BREAKER_THRESHOLD = 5;
+  private readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
+  private readonly HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+  private readonly MAX_RECONNECT_ATTEMPTS = 3;
+  private readonly RECONNECT_DELAY = 5000; // 5 seconds
 
   constructor(config: MCPServerConfig) {
     this.config = config;
@@ -211,8 +225,8 @@ export class MCPServerManager {
       console.log(chalk.yellow(`   • ${failedServers.length} servers in degraded mode`));
     }
 
-    // Emit status for monitoring
-    this.emit('servers-initialized', {
+    // Log status for monitoring
+    logger.info('🔧 MCP servers initialization completed', {
       running: runningServers.length,
       failed: failedServers.length,
       totalTime
@@ -1166,8 +1180,7 @@ export class MCPServerManager {
 
       try {
         // Perform health check based on server type
-        await this.performHealthCheck(server);
-        isHealthy = true;
+        isHealthy = await this.performHealthCheck(server.id);
       } catch (error) {
         // Health check failed
       }
@@ -1212,27 +1225,228 @@ export class MCPServerManager {
     return health;
   }
 
-  private async performHealthCheck(server: MCPServer): Promise<void> {
-    // Simple health check - in production would be more sophisticated
-    if (server.status !== 'running') {
-      throw new Error('Server not running');
+
+  /**
+   * Enhanced MCP Connection Resilience Methods
+   * Implements circuit breaker pattern and automatic reconnection
+   */
+
+  /**
+   * Circuit breaker pattern implementation for MCP servers
+   */
+  private isCircuitBreakerOpen(server: MCPServer): boolean {
+    if (!server.circuitBreakerState) {
+      server.circuitBreakerState = 'closed';
+      server.consecutiveFailures = 0;
     }
 
-    // Server-specific health checks could be added here
-    switch (server.id) {
-      case 'filesystem':
-        // Check if we can access current directory
-        await this.listDirectorySecure('.');
-        break;
-      case 'git':
-        // Check if git is available (if in a git repo)
-        try {
-          await this.gitStatus();
-        } catch (error) {
-          // Git might not be available, which is OK
-        }
-        break;
-      // Add other server-specific health checks as needed
+    if (server.circuitBreakerState === 'open') {
+      // Check if timeout has passed to attempt half-open
+      if (server.lastFailureTime && 
+          Date.now() - server.lastFailureTime.getTime() > this.CIRCUIT_BREAKER_TIMEOUT) {
+        server.circuitBreakerState = 'half-open';
+        logger.info(`Circuit breaker half-open for server ${server.name}`);
+        return false;
+      }
+      return true;
     }
+
+    return false;
+  }
+
+  /**
+   * Record server failure for circuit breaker
+   */
+  private recordServerFailure(server: MCPServer, error: Error): void {
+    server.consecutiveFailures = (server.consecutiveFailures || 0) + 1;
+    server.lastFailureTime = new Date();
+    server.lastError = error.message;
+
+    if (server.consecutiveFailures >= this.CIRCUIT_BREAKER_THRESHOLD) {
+      server.circuitBreakerState = 'open';
+      logger.warn(`Circuit breaker opened for server ${server.name} after ${server.consecutiveFailures} failures`);
+      
+      // Schedule circuit breaker reset
+      setTimeout(() => {
+        if (server.circuitBreakerState === 'open') {
+          server.circuitBreakerState = 'half-open';
+          logger.info(`Circuit breaker attempting half-open for server ${server.name}`);
+        }
+      }, this.CIRCUIT_BREAKER_TIMEOUT);
+    }
+  }
+
+  /**
+   * Record server success for circuit breaker
+   */
+  private recordServerSuccess(server: MCPServer): void {
+    server.consecutiveFailures = 0;
+    server.circuitBreakerState = 'closed';
+    server.lastFailureTime = undefined;
+  }
+
+  /**
+   * Enhanced server startup with circuit breaker and exponential backoff
+   */
+  async startServerResilient(serverName: string): Promise<boolean> {
+    const server = this.servers.get(serverName);
+    if (!server || !server.enabled) {
+      return false;
+    }
+
+    // Check circuit breaker
+    if (this.isCircuitBreakerOpen(server)) {
+      logger.debug(`Skipping server ${serverName} - circuit breaker open`);
+      return false;
+    }
+
+    try {
+      await this.startServer(serverName);
+      this.recordServerSuccess(server);
+      this.startHealthMonitoring(server);
+      return true;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.recordServerFailure(server, err);
+      
+      // Schedule automatic reconnection if circuit breaker isn't open
+      if (!this.isCircuitBreakerOpen(server)) {
+        this.scheduleReconnection(server);
+      }
+      
+      return false;
+    }
+  }
+
+  /**
+   * Schedule automatic reconnection with exponential backoff
+   */
+  private scheduleReconnection(server: MCPServer): void {
+    if (server.reconnectTimeout) {
+      clearTimeout(server.reconnectTimeout);
+    }
+
+    const retryCount = (server.retryCount || 0) + 1;
+    const delay = this.RECONNECT_DELAY * Math.pow(2, Math.min(retryCount - 1, 5)); // Cap at 5 for reasonable delays
+
+    if (retryCount <= this.MAX_RECONNECT_ATTEMPTS) {
+      server.retryCount = retryCount;
+      server.status = 'reconnecting';
+
+      logger.info(`Scheduling reconnection for ${server.name} in ${delay}ms (attempt ${retryCount}/${this.MAX_RECONNECT_ATTEMPTS})`);
+
+      server.reconnectTimeout = setTimeout(async () => {
+        logger.info(`Attempting to reconnect ${server.name} (attempt ${retryCount})`);
+        
+        const success = await this.startServerResilient(server.name);
+        if (success) {
+          server.retryCount = 0;
+          logger.info(`Successfully reconnected ${server.name}`);
+        } else if (retryCount < this.MAX_RECONNECT_ATTEMPTS) {
+          this.scheduleReconnection(server);
+        } else {
+          logger.error(`Failed to reconnect ${server.name} after ${this.MAX_RECONNECT_ATTEMPTS} attempts`);
+          server.status = 'error';
+        }
+      }, delay);
+    } else {
+      logger.error(`Max reconnection attempts exceeded for ${server.name}`);
+      server.status = 'error';
+    }
+  }
+
+  /**
+   * Start health monitoring for a server
+   */
+  private startHealthMonitoring(server: MCPServer): void {
+    if (server.healthCheckInterval) {
+      clearInterval(server.healthCheckInterval);
+    }
+
+    server.healthCheckInterval = setInterval(async () => {
+      try {
+        const isHealthy = await this.performHealthCheck(server.name);
+        if (!isHealthy) {
+          logger.warn(`Health check failed for ${server.name}`);
+          this.recordServerFailure(server, new Error('Health check failed'));
+          
+          // Attempt restart if circuit breaker allows
+          if (!this.isCircuitBreakerOpen(server)) {
+            await this.startServerResilient(server.name);
+          }
+        } else {
+          this.recordServerSuccess(server);
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        this.recordServerFailure(server, err);
+      }
+    }, this.HEALTH_CHECK_INTERVAL);
+  }
+
+  /**
+   * Perform health check for a specific server
+   */
+  private async performHealthCheck(serverName: string): Promise<boolean> {
+    const server = this.servers.get(serverName);
+    if (!server || server.status !== 'running') {
+      return false;
+    }
+
+    try {
+      // Basic health check - attempt a simple operation
+      switch (serverName) {
+        case 'filesystem':
+          await this.isPathAllowed('./');
+          break;
+        case 'git':
+          // Check if still in a git repository
+          try {
+            await this.gitStatus();
+          } catch {
+            // If not in git repo, that's still "healthy" for the server
+          }
+          break;
+        case 'terminal':
+          // Check if can execute safe command
+          await this.executeCommandSecure('echo', ['health-check']);
+          break;
+        case 'packageManager':
+          await this.isPathAllowed('./package.json');
+          break;
+        default:
+          return true; // Unknown server type, assume healthy
+      }
+      
+      server.lastHealthCheck = new Date();
+      return true;
+    } catch (error) {
+      logger.debug(`Health check failed for ${serverName}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Enhanced shutdown with cleanup of resilience timers
+   */
+  async shutdownResilient(): Promise<void> {
+    logger.info('Shutting down MCP servers with enhanced cleanup...');
+
+    // Clear all health monitoring and reconnection timers
+    for (const server of this.servers.values()) {
+      if (server.healthCheckInterval) {
+        clearInterval(server.healthCheckInterval);
+        server.healthCheckInterval = undefined;
+      }
+      
+      if (server.reconnectTimeout) {
+        clearTimeout(server.reconnectTimeout);
+        server.reconnectTimeout = undefined;
+      }
+    }
+
+    // Perform standard shutdown
+    await this.stopServers();
+    logger.info('Enhanced MCP shutdown completed');
   }
 }

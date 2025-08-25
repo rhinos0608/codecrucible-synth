@@ -639,10 +639,10 @@ Please provide a clear, helpful response based on these tool results. If there w
       const toolIntegration = getGlobalEnhancedToolIntegration();
       
       if (toolIntegration) {
-        const mcpTools = toolIntegration.getLLMFunctions();
+        const mcpTools = await toolIntegration.getLLMFunctions();
         this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Retrieved MCP tools from enhanced integration', {
           toolCount: mcpTools.length,
-          toolNames: mcpTools.map(t => t.function?.name || t.name).slice(0, 5),
+          toolNames: mcpTools.map((t: any) => t.function?.name || t.name).slice(0, 5),
           hasToolIntegration: !!toolIntegration,
           toolIntegrationType: toolIntegration.constructor.name
         });
@@ -656,7 +656,7 @@ Please provide a clear, helpful response based on these tool results. If there w
       const basicToolIntegration = getGlobalToolIntegration();
       
       if (basicToolIntegration && typeof basicToolIntegration.getLLMFunctions === 'function') {
-        const basicTools = basicToolIntegration.getLLMFunctions();
+        const basicTools = await basicToolIntegration.getLLMFunctions();
         this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Retrieved tools from basic integration', {
           toolCount: basicTools.length,
           toolNames: basicTools.map((t: any) => t.function?.name || t.name).slice(0, 5)

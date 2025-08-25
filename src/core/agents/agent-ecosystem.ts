@@ -569,6 +569,12 @@ export class AgentEcosystem extends EventEmitter {
     await this.collaborationManager.shutdown();
     this.performanceMonitor.stop();
 
+    // Clear agents map
+    this.agents.clear();
+
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+
     this.logger.info('Agent ecosystem shutdown completed');
   }
 
@@ -986,6 +992,9 @@ abstract class BaseAgent implements Agent {
     this.logger.info(`Shutting down agent: ${this.name}`);
     this.status.state = 'offline';
     await this.customShutdown();
+    
+    // Cleanup agent resources (BaseAgent doesn't use EventEmitter)
+    // Event listener cleanup is handled by higher-level coordinators
   }
 
   protected abstract customInitialization(): Promise<void>;
@@ -2177,6 +2186,11 @@ class CollaborationManager {
   }
 
   async shutdown(): Promise<void> {
+    // Clear active tasks
+    this.activeTasks.clear();
+    
+    // CollaborationManager cleanup completed (no EventEmitter to clean)
+    
     this.logger.info('Collaboration manager shutdown completed');
   }
 

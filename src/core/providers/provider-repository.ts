@@ -46,7 +46,8 @@ export interface ProviderInitResult {
 
 export interface IProviderRepository {
   // Lifecycle management
-  initialize(configs: ProviderConfig[]): Promise<void>;
+  initialize(configs?: ProviderConfig[]): Promise<void>;
+  setDeferredConfig(configs: ProviderConfig[]): void;
   shutdown(): Promise<void>;
 
   // Provider access
@@ -83,6 +84,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
   private statuses: Map<ProviderType, ProviderStatus> = new Map();
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private isInitialized = false;
+  private deferredConfigs: ProviderConfig[] | null = null;
 
   private readonly HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
   private readonly MAX_ERROR_COUNT = 5;
@@ -94,20 +96,39 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
   }
 
   /**
+   * Set deferred configuration for lazy initialization
+   */
+  setDeferredConfig(configs: ProviderConfig[]): void {
+    this.deferredConfigs = configs;
+    logger.debug('Provider configurations deferred for lazy initialization', {
+      configCount: configs.length,
+      types: configs.map(c => c.type)
+    });
+  }
+
+  /**
    * Initialize all providers from configuration
    */
-  async initialize(configs: ProviderConfig[]): Promise<void> {
+  async initialize(configs?: ProviderConfig[]): Promise<void> {
     if (this.isInitialized) {
       logger.warn('ProviderRepository already initialized');
       return;
     }
 
+    // Use deferred configs if no configs provided
+    const actualConfigs = configs || this.deferredConfigs || [];
+    if (actualConfigs.length === 0) {
+      logger.warn('No provider configurations available for initialization');
+      return;
+    }
+
     logger.info('Initializing provider repository', {
-      providerCount: configs.length,
-      providers: configs.map(c => c.type),
+      providerCount: actualConfigs.length,
+      providers: actualConfigs.map(c => c.type),
+      deferred: !configs && !!this.deferredConfigs
     });
 
-    const initPromises = configs.map(async config => this.initializeProvider(config));
+    const initPromises = actualConfigs.map(async config => this.initializeProvider(config));
     const results = await Promise.allSettled(initPromises);
 
     // Process initialization results
@@ -116,7 +137,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
-      const config = configs[i];
+      const config = actualConfigs[i];
 
       if (result.status === 'fulfilled') {
         successCount++;
@@ -138,7 +159,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
     logger.info('Provider repository initialization complete', {
       successCount,
       failureCount,
-      totalProviders: configs.length,
+      totalProviders: actualConfigs.length,
     });
   }
 

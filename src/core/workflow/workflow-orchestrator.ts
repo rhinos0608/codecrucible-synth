@@ -2107,15 +2107,6 @@ interface Memory {
 
 class MemoryStore {
   private memories: Map<string, Memory> = new Map();
-  private cleanupInterval: NodeJS.Timeout | null = null;
-  private isDisposed: boolean = false;
-  private executionHistory: any[] = [];
-  private activeWorkflows: Map<string, any> = new Map();
-  private patternHandlers: Map<string, any> = new Map();
-  private readonly MAX_HISTORY_SIZE = 1000;
-  private readonly MAX_ACTIVE_WORKFLOWS = 100;
-  private memoryStore: any = null;
-  private logger: any = { info: console.log, warn: console.warn, error: console.error };
 
   store(memory: Memory): void {
     this.memories.set(memory.id, memory);
@@ -2190,11 +2181,6 @@ class MemoryStore {
   }
 
   dispose(): void {
-    this.isDisposed = true;
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
     this.memories.clear();
   }
 

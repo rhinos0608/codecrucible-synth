@@ -330,7 +330,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         let domainInfo = '';
         
         if (supportsTools && toolIntegration) {
-          const allTools = toolIntegration.getLLMFunctions();
+          const allTools = await toolIntegration.getLLMFunctions();
           
           // Use domain orchestrator to select relevant tools only
           const domainResult = this.domainOrchestrator.getToolsForPrompt(

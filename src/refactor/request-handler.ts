@@ -76,10 +76,10 @@ export class RequestHandler {
     let toolSelectionReasoning = '';
     
     if (supportsTools && toolIntegration) {
-      const rawTools = toolIntegration.getLLMFunctions();
+      const rawTools = await toolIntegration.getLLMFunctions();
       
       // Step 1: Standardize all available tools
-      const standardizedTools = rawTools.map(tool => {
+      const standardizedTools = rawTools.map((tool: any) => {
         const standardTool: any = {
           type: 'function',
           function: {

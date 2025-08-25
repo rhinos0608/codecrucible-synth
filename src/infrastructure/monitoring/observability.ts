@@ -162,6 +162,15 @@ export const logging = {
       });
     }
   },
+  warn: (message: string) => {
+    console.warn(message);
+    observabilitySystem.recordMetric({
+      name: 'warn_log_count',
+      value: 1,
+      timestamp: new Date(),
+      tags: { level: 'warn', message },
+    });
+  },
   info: (message: string) => {
     console.info(message);
     observabilitySystem.recordMetric({

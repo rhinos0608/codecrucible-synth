@@ -511,4 +511,36 @@ export class VoiceSynthesisManager extends EventEmitter implements IVoiceSynthes
       },
     };
   }
+
+  /**
+   * Graceful shutdown of voice synthesis manager
+   */
+  async shutdown(): Promise<void> {
+    logger.info('Shutting down voice synthesis manager...');
+    
+    // Clear any references
+    this.voiceArchetypeSystem = null;
+    this.processRequest = undefined;
+    
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+    
+    logger.info('Voice synthesis manager shutdown completed');
+  }
+
+  /**
+   * Emergency cleanup of all resources
+   */
+  async destroy(): Promise<void> {
+    logger.warn('Emergency cleanup of voice synthesis manager...');
+    
+    // Force clear all references
+    this.voiceArchetypeSystem = null;
+    this.processRequest = undefined;
+    
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+    
+    logger.info('Voice synthesis manager destroyed');
+  }
 }

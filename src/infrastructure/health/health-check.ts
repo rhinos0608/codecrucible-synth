@@ -581,6 +581,42 @@ export class HealthMonitor extends EventEmitter {
       return Math.round(usedMemMB * 0.05);
     }
   }
+
+  /**
+   * Shutdown health monitor
+   */
+  shutdown(): void {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+
+    this.checks.clear();
+    this.lastHealthStatus = null;
+
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+
+    logging.info('Health monitor shutdown completed');
+  }
+
+  /**
+   * Emergency cleanup of health monitor
+   */
+  destroy(): void {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+
+    this.checks.clear();
+    this.lastHealthStatus = null;
+
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+
+    logging.warn('Health monitor destroyed');
+  }
 }
 
 // Export singleton instance

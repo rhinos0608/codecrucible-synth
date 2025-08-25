@@ -111,4 +111,43 @@ export class MCPServerManager extends EventEmitter {
       failed,
     };
   }
+
+  /**
+   * Graceful shutdown of all MCP servers
+   */
+  public async shutdown(): Promise<void> {
+    logger.info('Shutting down MCP server manager...');
+    
+    // Disconnect all servers
+    const disconnectionPromises = Array.from(this.servers.keys()).map(id => 
+      this.disconnectServer(id)
+    );
+    
+    await Promise.allSettled(disconnectionPromises);
+    
+    // Clear data structures
+    this.servers.clear();
+    this.configs.clear();
+    
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+    
+    logger.info('MCP server manager shutdown completed');
+  }
+
+  /**
+   * Emergency cleanup of all resources
+   */
+  public async destroy(): Promise<void> {
+    logger.warn('Emergency cleanup of MCP server manager...');
+    
+    // Force clear all data structures
+    this.servers.clear();
+    this.configs.clear();
+    
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+    
+    logger.info('MCP server manager destroyed');
+  }
 }

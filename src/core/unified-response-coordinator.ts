@@ -352,6 +352,33 @@ export class UnifiedResponseCoordinator extends EventEmitter {
   private generateRequestId(): string {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
   }
+
+  /**
+   * Graceful shutdown of response coordinator
+   */
+  async shutdown(): Promise<void> {
+    this.logger.info('Shutting down unified response coordinator...');
+    
+    // Clear any active requests or state
+    // (This class appears to be stateless, so mainly cleanup listeners)
+    
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+    
+    this.logger.info('Unified response coordinator shutdown completed');
+  }
+
+  /**
+   * Emergency cleanup of response coordinator
+   */
+  async destroy(): Promise<void> {
+    this.logger.info('Emergency cleanup of unified response coordinator...');
+    
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+    
+    this.logger.info('Unified response coordinator destroyed');
+  }
 }
 
 export default UnifiedResponseCoordinator;

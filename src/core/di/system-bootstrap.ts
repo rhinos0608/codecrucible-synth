@@ -135,9 +135,11 @@ export class SystemBootstrap {
       // Phase 10: Application layer services (depends on client)
       await this.initializeSynthesisCoordinator();
 
-      // Phase 11: Validation and health checks
-      if (!this.config.skipValidation) {
+      // Phase 11: Validation and health checks (deferred for faster startup)
+      if (!this.config.skipValidation && this.config.environment !== 'development') {
         await this.validateSystemHealth();
+      } else {
+        logger.debug('Skipping system validation for faster startup');
       }
 
       const client = await this.container.resolveAsync<IModelClient>(CLIENT_TOKEN);
@@ -298,8 +300,9 @@ export class SystemBootstrap {
         const config = container.resolve(CLIENT_CONFIG_TOKEN);
         const providerRepository = new ProviderRepository();
 
-        // Initialize with provider configurations from CLIENT_CONFIG
-        await providerRepository.initialize(config.providers || []);
+        // Defer provider initialization until first use for faster startup
+        // The repository will initialize providers on-demand
+        providerRepository.setDeferredConfig(config.providers || []);
 
         return providerRepository;
       },

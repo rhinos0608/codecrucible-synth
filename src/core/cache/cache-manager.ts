@@ -917,7 +917,9 @@ export class CacheManager extends EventEmitter {
 
     await this.clear();
 
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
+
     logger.info('Cache manager stopped');
-    this.emit('cache-stop');
   }
 }

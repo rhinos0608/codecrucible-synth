@@ -107,7 +107,6 @@ const ollamaConfig = {
     temperature: 0.7,
     top_p: 0.9,
     repeat_penalty: 1.1,
-    context_length: 4096     // Optimized for performance
   },
   timeout: 120000,           // 2 minutes for complex requests
   concurrent_limit: 1,       // Ollama best practice

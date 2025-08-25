@@ -98,7 +98,8 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
     const bootResult = await createSystem({
       skipValidation: true, // Skip validation for faster startup
       enablePerformanceMonitoring: false, // Defer monitoring to avoid startup overhead
-      logLevel: 'warn', // Reduce logging noise during startup
+      logLevel: 'error', // Further reduce logging noise during startup
+      initializationTimeout: 15000, // Reduced timeout for faster startup
       environment: 'development',
     });
 
@@ -153,9 +154,10 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
     // Verify tool integration is working
     const toolIntegration = getGlobalToolIntegration();
     if (toolIntegration) {
+      const llmFunctions = await toolIntegration.getLLMFunctions();
       logger.info('✅ MCP tool integration initialized successfully', {
         availableTools: toolIntegration.getAvailableToolNames(),
-        llmFunctions: toolIntegration.getLLMFunctions().length,
+        llmFunctions: llmFunctions.length,
       });
     } else {
       logger.warn('⚠️ MCP tool integration failed to initialize');
@@ -299,7 +301,19 @@ export async function main() {
       return;
     }
 
-    // For other commands, do full initialization with DI system
+    // Fast path for more commands that don't need full AI initialization
+    if (args[0] === 'analyze' && args[1] && !args[1].includes('--voices')) {
+      await handleFastAnalyze(args[1]);
+      return;
+    }
+
+    // Check for simple queries without AI model requirements
+    if (args.length === 1 && args[0].length < 50 && !args[0].includes('--voices')) {
+      await handleSimpleQuery(args[0]);
+      return;
+    }
+
+    // For complex commands, do full initialization with optimized DI system
     console.log('🚀 Initializing CodeCrucible Synth...');
     const startTime = Date.now();
     const { cli, context } = await initializeCLIContextWithDI();
@@ -486,6 +500,57 @@ async function showAvailableModels() {
   console.log('');
   console.log('━'.repeat(40));
   console.log('💡 Use "crucible status" for full system status');
+}
+
+async function handleFastAnalyze(filePath: string) {
+  try {
+    const { readFile } = await import('fs/promises');
+    const { extname } = await import('path');
+    
+    console.log(`📁 Fast analysis of: ${filePath}`);
+    
+    const content = await readFile(filePath, 'utf-8');
+    const ext = extname(filePath);
+    const lines = content.split('\n');
+    
+    console.log(`📊 Basic Analysis:`);
+    console.log(`  • File type: ${ext || 'unknown'}`);
+    console.log(`  • Lines: ${lines.length}`);
+    console.log(`  • Size: ${content.length} characters`);
+    
+    // Basic code analysis without AI
+    if (['.js', '.ts', '.tsx', '.jsx'].includes(ext)) {
+      const functions = content.match(/(?:function|const|let|var)\s+\w+/g) || [];
+      const imports = content.match(/import.*from/g) || [];
+      console.log(`  • Functions/Variables: ${functions.length}`);
+      console.log(`  • Imports: ${imports.length}`);
+    }
+    
+    console.log('💡 Use --voices for AI-powered analysis');
+  } catch (error) {
+    console.error('❌ Analysis failed:', error);
+  }
+}
+
+async function handleSimpleQuery(query: string) {
+  // Handle common queries without AI initialization
+  const lowerQuery = query.toLowerCase();
+  
+  if (lowerQuery.includes('help') || lowerQuery === 'h') {
+    showBasicHelp();
+    return;
+  }
+  
+  if (lowerQuery.includes('version') || lowerQuery === 'v') {
+    console.log(`CodeCrucible Synth v${await getPackageVersion()}`);
+    return;
+  }
+  
+  // For other simple queries, suggest using full mode
+  console.log('💡 For AI-powered responses, use:');
+  console.log(`  crucible "${query}" --voices`);
+  console.log('💡 Or start interactive mode:');
+  console.log('  crucible -i');
 }
 
 export default initializeCLIContext;

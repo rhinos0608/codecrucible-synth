@@ -154,8 +154,8 @@ export class EnhancedToolIntegration extends ToolIntegration {
   /**
    * Enhanced getLLMFunctions to include external MCP tools
    */
-  override getLLMFunctions(): any[] {
-    const baseFunctions = super.getLLMFunctions();
+  override async getLLMFunctions(): Promise<any[]> {
+    const baseFunctions = await super.getLLMFunctions();
     const externalMcpFunctions = Array.from(this.availableTools.values())
       .filter(tool => tool.id.startsWith('mcp_'))
       .map(tool => ({
@@ -182,7 +182,8 @@ export class EnhancedToolIntegration extends ToolIntegration {
    * Health check for all systems
    */
   async healthCheck(): Promise<any> {
-    const baseHealth = { local: { status: 'running', tools: this.getAvailableToolNames().length } };
+    const availableToolNames = await this.getAvailableToolNames();
+    const baseHealth = { local: { status: 'running', tools: availableToolNames.length } };
 
     try {
       const externalMcpHealth = await this.externalMcpTools.healthCheck();

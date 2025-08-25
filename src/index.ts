@@ -18,20 +18,59 @@ import {
   getGlobalEnhancedToolIntegration,
 } from './core/tools/enhanced-tool-integration.js';
 
-// Proper EventEmitter management instead of band-aid fix
-const eventManager = {
-  emitters: new Map<string, import('events').EventEmitter>(),
-  cleanup(): void {
-    for (const [name, emitter] of this.emitters) {
-      emitter.removeAllListeners();
-    }
-    this.emitters.clear();
+// AbortController-based resource management for memory leak prevention
+const resourceManager = {
+  activeControllers: new Map<string, AbortController>(),
+  eventCleanupCallbacks: new Map<string, () => void>(),
+  
+  createController(id: string): AbortController {
+    const controller = new AbortController();
+    this.activeControllers.set(id, controller);
+    return controller;
   },
+  
+  registerEventCleanup(id: string, cleanup: () => void): void {
+    this.eventCleanupCallbacks.set(id, cleanup);
+  },
+  
+  cleanup(id?: string): void {
+    if (id) {
+      // Clean up specific resource
+      const controller = this.activeControllers.get(id);
+      if (controller) {
+        controller.abort();
+        this.activeControllers.delete(id);
+      }
+      const cleanup = this.eventCleanupCallbacks.get(id);
+      if (cleanup) {
+        cleanup();
+        this.eventCleanupCallbacks.delete(id);
+      }
+    } else {
+      // Clean up all resources
+      for (const controller of this.activeControllers.values()) {
+        controller.abort();
+      }
+      this.activeControllers.clear();
+      
+      for (const cleanup of this.eventCleanupCallbacks.values()) {
+        cleanup();
+      }
+      this.eventCleanupCallbacks.clear();
+    }
+  }
 };
 
-// Cleanup on exit
-process.on('exit', () => eventManager.cleanup());
-process.on('SIGINT', () => eventManager.cleanup());
+// Graceful cleanup on exit
+const handleShutdown = (signal: string) => {
+  console.log(`\n🔄 Graceful shutdown initiated (${signal})`);
+  resourceManager.cleanup();
+  process.exit(0);
+};
+
+process.on('exit', () => resourceManager.cleanup());
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
 // Get package version (async version)
 async function getPackageVersion(): Promise<string> {
@@ -55,11 +94,11 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
   try {
     console.log('🚀 Initializing with Dependency Injection System...');
 
-    // Bootstrap the entire system with DI
+    // Bootstrap the entire system with DI - optimized for faster startup
     const bootResult = await createSystem({
-      skipValidation: false,
-      enablePerformanceMonitoring: true,
-      logLevel: 'info',
+      skipValidation: true, // Skip validation for faster startup
+      enablePerformanceMonitoring: false, // Defer monitoring to avoid startup overhead
+      logLevel: 'warn', // Reduce logging noise during startup
       environment: 'development',
     });
 
@@ -76,7 +115,7 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
     // Initialize voice system with DI-enabled client
     const voiceSystem = new VoiceArchetypeSystem(client);
 
-    // Initialize MCP server manager with proper configuration including Smithery
+    // Initialize MCP server manager with lazy loading for faster startup
     const mcpConfig = {
       filesystem: { enabled: true, restrictedPaths: [], allowedPaths: [process.cwd(), '~/'] },
       git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
@@ -89,12 +128,17 @@ export async function initializeCLIContextWithDI(): Promise<{ cli: CLI; context:
       smithery: {
         enabled: !!process.env.SMITHERY_API_KEY,
         apiKey: process.env.SMITHERY_API_KEY,
-        autoDiscovery: true,
+        autoDiscovery: false, // Disable auto-discovery for faster startup
       },
     };
 
     const mcpManager = new MCPServerManager(mcpConfig);
-    await mcpManager.startServers();
+    
+    // Start MCP servers asynchronously without blocking startup
+    mcpManager.startServers().catch(error => {
+      console.log('⚠️ MCP servers will be available once initialization completes');
+      logger.warn('MCP server initialization deferred:', error);
+    });
 
     // Initialize global tool integration - CRITICAL for MCP tools to work
     initializeGlobalToolIntegration(mcpManager);

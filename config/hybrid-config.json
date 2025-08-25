@@ -11,11 +11,14 @@
       ],
       "maxConcurrent": 2,
       "streamingEnabled": true,
+      "contextLength": 128000,
       "taskTypes": [
         "template",
         "edit",
         "format",
-        "boilerplate"
+        "boilerplate",
+        "codebase-analysis",
+        "large-file-processing"
       ],
       "performance": {
         "modelTtl": 900,

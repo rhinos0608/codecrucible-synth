@@ -4,9 +4,13 @@
 model:
   endpoint: "http://localhost:11434"  # Ollama default endpoint
   name: "llama3.2:latest"             # Use llama3.2 as default
-  timeout: 60000                      # 60 seconds for large model
-  maxTokens: 128000                   # Industry standard 128K context window
+  timeout: 300000                     # 5 minutes for large codebase processing
+  maxTokens: 128000                   # Dynamic 32-128K based on task complexity
+  minTokens: 32000                    # Minimum context for simple tasks
   temperature: 0.7
+  contextWindow: "adaptive"           # adaptive scaling 32K-128K based on complexity
+  streamingEnabled: true              # Enable streaming for large responses
+  keepAlive: "15m"                    # Keep models loaded for better performance
 
 voices:
   default: ["explorer", "maintainer"]
@@ -94,9 +98,17 @@ performance:
     batchSize: 2
   
   contextManagement:
-    maxContextLength: 200000          # tokens (industry standard)
-    compressionThreshold: 150000      # tokens
-    retentionStrategy: "sliding"      # sliding, summary, hierarchical
+    maxContextLength: 128000          # Dynamic 32-128K for local models
+    minContextLength: 32000           # Minimum context for simple tasks
+    compressionThreshold: 96000       # 75% of max before compression
+    retentionStrategy: "hierarchical" # hierarchical for codebase context
+    contextWindowStrategy: "adaptive" # dynamic scaling based on task complexity
+    chunkOverlap: 2000                # Overlap tokens for context continuity
+    indexingEnabled: true             # Enable semantic indexing of codebases
+    taskComplexityThresholds:         # Define when to scale context
+      simple: 32000                   # Single file edits
+      moderate: 64000                 # Multi-file analysis
+      complex: 128000                 # Large codebase operations
 
 # E2B Code Interpreter Configuration - SECURITY CRITICAL
 e2b:

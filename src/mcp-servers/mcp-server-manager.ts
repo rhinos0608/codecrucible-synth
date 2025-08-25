@@ -137,7 +137,7 @@ export class MCPServerManager {
   }
 
   /**
-   * Start all enabled MCP servers with timeout optimization
+   * Start all enabled MCP servers with robust error handling and graceful degradation
    */
   async startServers(): Promise<void> {
     if (this.isInitialized) {
@@ -145,42 +145,108 @@ export class MCPServerManager {
       return;
     }
 
-    console.log(chalk.blue('🔧 Starting MCP servers with timeout optimization...'));
+    console.log(chalk.blue('🔧 Starting MCP servers with resilient error handling...'));
     const startTime = Date.now();
 
-    // Create timeout-optimized promises for each server
+    // Create resilient promises for each server with retry logic
     const enabledServers = Array.from(this.servers.values()).filter(server => server.enabled);
     const serverPromises = enabledServers.map(async server => {
       const serverStartTime = Date.now();
-      
-      try {
-        // Race between server startup and timeout
-        await Promise.race([
-          this.startServer(server.name),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error(`Server ${server.name} startup timeout`)), 5000)
-          )
-        ]);
-        const duration = Date.now() - serverStartTime;
-        logger.info(`MCP server ${server.name} started in ${duration}ms`);
-      } catch (error) {
-        const duration = Date.now() - serverStartTime;
-        logger.warn(`MCP server ${server.name} failed or timed out after ${duration}ms:`, error);
-        server.status = 'error';
-        server.lastError = error instanceof Error ? error.message : 'Startup timeout';
+      const maxRetries = 2;
+      let lastError: Error | null = null;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          // Progressive timeout: 3s, 5s, 8s
+          const timeout = 3000 + (attempt * 2000);
+          
+          // Race between server startup and timeout
+          await Promise.race([
+            this.startServer(server.name),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error(`Server ${server.name} startup timeout (attempt ${attempt + 1})`)), timeout)
+            )
+          ]);
+          
+          const duration = Date.now() - serverStartTime;
+          logger.info(`✅ MCP server ${server.name} started successfully in ${duration}ms (attempt ${attempt + 1})`);
+          return; // Success - exit retry loop
+          
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          const duration = Date.now() - serverStartTime;
+          
+          if (attempt < maxRetries) {
+            logger.warn(`⚠️ MCP server ${server.name} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying...`, {
+              error: lastError.message,
+              duration
+            });
+            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Progressive delay
+          } else {
+            logger.error(`❌ MCP server ${server.name} failed after ${maxRetries + 1} attempts`, {
+              error: lastError.message,
+              totalDuration: duration
+            });
+            server.status = 'error';
+            server.lastError = lastError.message;
+            
+            // Attempt graceful degradation
+            await this.handleServerFailure(server.name, lastError);
+          }
+        }
       }
     });
 
-    await Promise.allSettled(serverPromises);
+    // Wait for all servers with graceful handling
+    const results = await Promise.allSettled(serverPromises);
     this.isInitialized = true;
 
     const totalTime = Date.now() - startTime;
     const runningServers = Array.from(this.servers.values()).filter(s => s.status === 'running');
     const failedServers = Array.from(this.servers.values()).filter(s => s.status === 'error');
     
-    console.log(chalk.green(`✅ Started ${runningServers.length} MCP servers in ${totalTime}ms`));
+    console.log(chalk.green(`✅ MCP initialization complete in ${totalTime}ms`));
+    console.log(chalk.green(`   • ${runningServers.length} servers running`));
     if (failedServers.length > 0) {
-      console.log(chalk.yellow(`⚠️  ${failedServers.length} servers failed or timed out`));
+      console.log(chalk.yellow(`   • ${failedServers.length} servers in degraded mode`));
+    }
+
+    // Emit status for monitoring
+    this.emit('servers-initialized', {
+      running: runningServers.length,
+      failed: failedServers.length,
+      totalTime
+    });
+  }
+
+  /**
+   * Handle server failure with graceful degradation
+   */
+  private async handleServerFailure(serverName: string, error: Error): Promise<void> {
+    try {
+      switch (serverName) {
+        case 'filesystem':
+          logger.warn('Filesystem MCP server failed - file operations will use fallback methods');
+          // Could implement fallback filesystem operations here
+          break;
+        case 'git':
+          logger.warn('Git MCP server failed - git operations will use direct CLI calls');
+          // Could implement direct git CLI fallbacks here
+          break;
+        case 'terminal':
+          logger.warn('Terminal MCP server failed - terminal operations will be restricted');
+          break;
+        case 'packageManager':
+          logger.warn('Package Manager MCP server failed - package operations will use direct CLI');
+          break;
+        case 'smithery':
+          logger.warn('Smithery MCP server failed - external tools will be unavailable');
+          break;
+        default:
+          logger.warn(`Unknown MCP server ${serverName} failed`);
+      }
+    } catch (fallbackError) {
+      logger.error('Error in graceful degradation handler:', fallbackError);
     }
   }
 

@@ -592,7 +592,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   }
 
   /**
-   * Cleanup all sessions and resources
+   * Cleanup all sessions and resources with AbortController integration
    */
   async cleanup(): Promise<void> {
     logger.info('Cleaning up streaming manager', {
@@ -600,17 +600,80 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
       activeStreams: this.activeStreams.size,
     });
 
-    // Stop all active streams
-    for (const sessionId of this.activeStreams) {
-      this.destroySession(sessionId);
+    // Create cleanup timeout to prevent hanging
+    const cleanupTimeout = new Promise((resolve) => {
+      setTimeout(() => {
+        logger.warn('Streaming cleanup timeout reached, force cleanup initiated');
+        resolve(undefined);
+      }, 5000); // 5 second timeout
+    });
+
+    // Cleanup promise
+    const cleanupPromise = (async () => {
+      // Stop all active streams gracefully
+      const cleanupPromises: Promise<void>[] = [];
+      
+      for (const sessionId of this.activeStreams) {
+        cleanupPromises.push(this.gracefullyTerminateSession(sessionId));
+      }
+
+      // Wait for all sessions to clean up gracefully (with timeout)
+      await Promise.allSettled(cleanupPromises);
+
+      // Force cleanup any remaining sessions
+      for (const sessionId of this.activeStreams) {
+        this.destroySession(sessionId);
+      }
+
+      // Clear all data structures
+      this.sessions.clear();
+      this.activeStreams.clear();
+
+      // Remove all listeners to prevent memory leaks
+      this.removeAllListeners();
+    })();
+
+    // Race between cleanup and timeout
+    await Promise.race([cleanupPromise, cleanupTimeout]);
+  }
+
+  /**
+   * Gracefully terminate a streaming session with proper resource cleanup
+   */
+  private async gracefullyTerminateSession(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    try {
+      // Set session as terminating
+      session.status = 'cancelled';
+      session.isActive = false;
+
+      // Clean up any active blocks
+      for (const [blockId, block] of session.activeBlocks) {
+        if (!block.endTime) {
+          block.endTime = Date.now();
+          logger.debug('Force-closed streaming block during cleanup', { blockId, sessionId });
+        }
+      }
+      session.activeBlocks.clear();
+
+      // Remove from active streams
+      this.activeStreams.delete(sessionId);
+
+      // Give a brief moment for any pending operations to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+    } catch (error) {
+      logger.warn('Error during graceful session termination', {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    } finally {
+      // Ensure session is removed even if cleanup fails
+      this.sessions.delete(sessionId);
+      this.emit('session-destroyed', sessionId);
     }
-
-    // Clear all data structures
-    this.sessions.clear();
-    this.activeStreams.clear();
-
-    // Remove all listeners
-    this.removeAllListeners();
   }
 
   /**
@@ -631,7 +694,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
   }
 
   /**
-   * Private: Handle backpressure by introducing controlled delays
+   * Private: Handle backpressure by introducing controlled delays and buffer management
    */
   private async handleBackpressure(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
@@ -643,8 +706,31 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     // Emit backpressure event
     this.emit('backpressure', sessionId);
 
-    // Small delay to prevent overwhelming downstream consumers
-    await new Promise(resolve => setTimeout(resolve, 5));
+    // Calculate adaptive delay based on throughput
+    const bufferUtilization = session.tokens.length / (this.config.bufferSize || 1024);
+    const baseDelay = 5; // Base 5ms delay
+    const adaptiveDelay = Math.min(baseDelay * (1 + bufferUtilization), 100); // Cap at 100ms
+
+    // Apply backpressure delay
+    await new Promise(resolve => setTimeout(resolve, adaptiveDelay));
+
+    // If buffer is getting full, trigger aggressive cleanup
+    if (bufferUtilization > 0.8) {
+      logger.warn('High buffer utilization detected, triggering token cleanup', {
+        sessionId,
+        bufferUtilization: Math.round(bufferUtilization * 100) + '%',
+        tokenCount: session.tokens.length
+      });
+
+      // Keep only the last 50% of tokens to free memory
+      const keepCount = Math.floor(session.tokens.length * 0.5);
+      session.tokens = session.tokens.slice(-keepCount);
+
+      // Also clean up old chunks if we have too many
+      if (session.chunks.length > 200) {
+        session.chunks = session.chunks.slice(-100); // Keep last 100 chunks
+      }
+    }
   }
 
   /**

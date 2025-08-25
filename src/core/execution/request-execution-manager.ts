@@ -28,6 +28,66 @@ import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
 
+// EVIDENCE COLLECTION BRIDGE - Global system to capture tool results for evidence collection
+class GlobalEvidenceCollector {
+  private static instance: GlobalEvidenceCollector;
+  private toolResults: any[] = [];
+  private evidenceCollectors: Set<(toolResult: any) => void> = new Set();
+
+  static getInstance(): GlobalEvidenceCollector {
+    if (!GlobalEvidenceCollector.instance) {
+      GlobalEvidenceCollector.instance = new GlobalEvidenceCollector();
+    }
+    return GlobalEvidenceCollector.instance;
+  }
+
+  addToolResult(toolResult: any): void {
+    console.log('🚨 DEBUG: addToolResult called! Collectors:', this.evidenceCollectors.size);
+    logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Tool result captured', {
+      hasResult: !!toolResult,
+      success: toolResult?.success,
+      hasOutput: !!toolResult?.output,
+      collectorCount: this.evidenceCollectors.size
+    });
+    
+    this.toolResults.push(toolResult);
+    
+    // Notify all registered evidence collectors
+    this.evidenceCollectors.forEach(collector => {
+      try {
+        console.log('🚨 DEBUG: Calling collector callback');
+        collector(toolResult);
+      } catch (error) {
+        console.error('🚨 ERROR: Evidence collector callback failed:', error);
+        logger.warn('Evidence collector callback failed:', error);
+      }
+    });
+  }
+
+  registerEvidenceCollector(callback: (toolResult: any) => void): void {
+    console.log('🚨 DEBUG: registerEvidenceCollector called!');
+    this.evidenceCollectors.add(callback);
+    logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Evidence collector registered', {
+      totalCollectors: this.evidenceCollectors.size
+    });
+  }
+
+  unregisterEvidenceCollector(callback: (toolResult: any) => void): void {
+    this.evidenceCollectors.delete(callback);
+  }
+
+  getToolResults(): any[] {
+    return [...this.toolResults];
+  }
+
+  clearToolResults(): void {
+    this.toolResults = [];
+  }
+}
+
+// Export the GlobalEvidenceCollector for use by other modules
+export { GlobalEvidenceCollector };
+
 export type ExecutionMode = 'fast' | 'quality' | 'balanced';
 export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'auto';
 
@@ -378,6 +438,10 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                 const result = await toolIntegration.executeToolCall(formattedToolCall);
                 logger.debug('Tool execution result in request execution', { result });
                 toolResults.push(result);
+                
+                // CRITICAL FIX: Bridge tool results to evidence collection system
+                const globalCollector = GlobalEvidenceCollector.getInstance();
+                globalCollector.addToolResult(result);
               }
 
               // If we have tool results, format them into a readable response

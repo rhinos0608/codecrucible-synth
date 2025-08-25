@@ -161,14 +161,14 @@ export async function initializeCLIContextLegacy(): Promise<{ cli: CLI; context:
           type: 'ollama',
           endpoint: config.model?.endpoint || 'http://localhost:11434',
           model: undefined, // Lazy model detection
-          timeout: 15000, // Reduced timeout for faster failure
+          timeout: 10000, // 10s timeout for startup operations
         },
       ],
       executionMode: 'auto',
       fallbackChain: ['ollama'], // Simplified fallback
       performanceThresholds: {
         fastModeMaxTokens: 4096, // Reduced for faster startup
-        timeoutMs: 15000, // Reduced timeout
+        timeoutMs: 10000, // 10s timeout for startup
         maxConcurrentRequests: 1, // Single request for startup
       },
       security: {

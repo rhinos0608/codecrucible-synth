@@ -126,9 +126,9 @@ export class MemoryUsageOptimizer {
 
     this.memoryHistory.push(snapshot);
 
-    // Keep only last 100 snapshots (about 8 minutes at 5s intervals)
-    if (this.memoryHistory.length > 100) {
-      this.memoryHistory = this.memoryHistory.slice(-50);
+    // Keep only last 10 snapshots (about 50s at 5s intervals) - optimized for memory efficiency
+    if (this.memoryHistory.length > 10) {
+      this.memoryHistory = this.memoryHistory.slice(-5);
     }
 
     // Check for memory pressure
@@ -252,11 +252,11 @@ export class MemoryUsageOptimizer {
     // Clear component memory trackers
     this.componentMemoryMap.clear();
 
-    // Limit memory history
-    this.memoryHistory = this.memoryHistory.slice(-20);
+    // Limit memory history - keep minimal for efficiency
+    this.memoryHistory = this.memoryHistory.slice(-5);
 
-    // Clear old leak detection data
-    this.detectedLeaks = this.detectedLeaks.slice(-5);
+    // Clear old leak detection data - keep minimal
+    this.detectedLeaks = this.detectedLeaks.slice(-2);
 
     // Trigger setImmediate to allow other cleanup
     setImmediate(() => {
@@ -270,8 +270,8 @@ export class MemoryUsageOptimizer {
   private detectMemoryLeaks(): void {
     if (this.memoryHistory.length < 10) return;
 
-    const recent = this.memoryHistory.slice(-10);
-    const older = this.memoryHistory.slice(-20, -10);
+    const recent = this.memoryHistory.slice(-5);
+    const older = this.memoryHistory.slice(-10, -5);
 
     if (older.length === 0) return;
 
@@ -381,12 +381,12 @@ export class MemoryUsageOptimizer {
     // Determine trend
     let memoryTrend: 'increasing' | 'decreasing' | 'stable' = 'stable';
     if (this.memoryHistory.length >= 5) {
-      const recent5 = this.memoryHistory.slice(-5);
-      const older5 = this.memoryHistory.slice(-10, -5);
+      const recent3 = this.memoryHistory.slice(-3);
+      const older3 = this.memoryHistory.slice(-6, -3);
       
-      if (older5.length > 0) {
-        const recentAvg = recent5.reduce((sum, s) => sum + s.heapUsed, 0) / recent5.length;
-        const olderAvg = older5.reduce((sum, s) => sum + s.heapUsed, 0) / older5.length;
+      if (older3.length > 0) {
+        const recentAvg = recent3.reduce((sum, s) => sum + s.heapUsed, 0) / recent3.length;
+        const olderAvg = older3.reduce((sum: number, s: any) => sum + s.heapUsed, 0) / older3.length;
         
         if (recentAvg > olderAvg * 1.1) {
           memoryTrend = 'increasing';

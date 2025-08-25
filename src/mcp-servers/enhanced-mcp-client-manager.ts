@@ -86,6 +86,7 @@ export class EnhancedMCPClientManager {
   async executeToolCall(serverId: string, toolName: string, args: any): Promise<any> {
     const clientInstance = this.clients.get(serverId);
     if (!clientInstance || clientInstance.status !== 'connected') {
+      logger.warn(`MCP server ${serverId} not available, falling back to built-in filesystem`);
       throw new Error(`MCP server ${serverId} not available`);
     }
 

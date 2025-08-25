@@ -770,6 +770,17 @@ Provide helpful, concise responses with practical value.`;
       // Synthesize based on mode
       let synthesizedContent = '';
 
+      // Debug responses before synthesis
+      logger.info('🔍 SYNTHESIS DEBUG: Responses received', {
+        responseCount: responses.length,
+        responses: responses.map((r: any, i: number) => ({
+          index: i,
+          hasContent: !!(r.content || r.text || r.response),
+          contentType: typeof (r.content || r.text || r.response),
+          contentPreview: (r.content || r.text || r.response || '').substring(0, 100)
+        }))
+      });
+
       if (mode === 'competitive') {
         // Choose the best response
         const best = responses.reduce((prev: any, curr: any) =>
@@ -791,6 +802,35 @@ Provide helpful, concise responses with practical value.`;
           synthesizedContent = allResponses[0]; // Use first valid response for now
         }
       }
+
+      // Additional content extraction attempts if synthesis failed
+      if (!synthesizedContent && responses.length > 0) {
+        logger.warn('🚨 SYNTHESIS FALLBACK: Primary synthesis failed, attempting fallback extraction');
+        
+        for (const response of responses) {
+          const fallbackContent = (
+            response.content ||
+            response.text ||
+            response.response ||
+            response.message ||
+            response.output ||
+            (typeof response === 'string' ? response : '')
+          );
+          
+          if (fallbackContent && fallbackContent.trim()) {
+            synthesizedContent = fallbackContent;
+            logger.info('✅ SYNTHESIS FALLBACK: Found content via fallback extraction');
+            break;
+          }
+        }
+      }
+
+      // Final validation and logging
+      logger.info('🔍 SYNTHESIS RESULT', {
+        hasSynthesizedContent: !!synthesizedContent,
+        synthesizedContentLength: synthesizedContent.length,
+        synthesizedContentPreview: synthesizedContent.substring(0, 200)
+      });
 
       return {
         content: synthesizedContent || 'No response generated',

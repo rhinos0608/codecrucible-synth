@@ -212,8 +212,8 @@ export class SystemBootstrap {
         // Return default configuration without importing client.ts
         return {
           providers: [
-            { type: 'ollama', endpoint: 'http://localhost:11434', timeout: 7200000 }, // 2 hour timeout - industry standard
-            { type: 'lm-studio', endpoint: 'http://localhost:1234', timeout: 7200000 }, // 2 hour timeout - industry standard
+            { type: 'ollama', endpoint: 'http://localhost:11434', timeout: 30000 }, // 30s timeout - appropriate for local operations
+            { type: 'lm-studio', endpoint: 'http://localhost:1234', timeout: 30000 }, // 30s timeout - appropriate for local operations
           ],
           executionMode: 'auto',
           fallbackChain: ['ollama', 'lm-studio'],

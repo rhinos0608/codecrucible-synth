@@ -1266,6 +1266,41 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
     // CRITICAL FIX: Store original tool results for direct access in bypass system
     const originalToolResults: any[] = [];
     
+    // CRITICAL FIX: Bridge to global evidence collector to capture tool results from request-execution-manager
+    const { GlobalEvidenceCollector } = await import('../execution/request-execution-manager.js');
+    const globalCollector = GlobalEvidenceCollector.getInstance();
+    
+    const evidenceCollectorCallback = (toolResult: any) => {
+      logger.info('🔥 SEQUENTIAL EXECUTOR: Received tool result from global collector', {
+        hasResult: !!toolResult,
+        success: toolResult?.success,
+        hasOutput: !!toolResult?.output
+      });
+      
+      // Add to our local arrays for evidence processing
+      originalToolResults.push(toolResult);
+      
+      // Extract content and add to evidence
+      const completeResult = this.extractStringContentFromToolResult(toolResult);
+      if (completeResult && completeResult.length > 0 && completeResult.trim().length > 0) {
+        const formattedEvidence = this.formatToolEvidence(
+          'bridged_tool_result',
+          'Tool result captured via global evidence bridge',
+          completeResult,
+          originalToolResults.length
+        );
+        gatheredEvidence.push(formattedEvidence);
+        
+        logger.info('🎉 GLOBAL BRIDGE EVIDENCE COLLECTED!', {
+          contentLength: completeResult.length,
+          evidenceCount: gatheredEvidence.length,
+          originalToolResultsCount: originalToolResults.length
+        });
+      }
+    };
+    
+    globalCollector.registerEvidenceCollector(evidenceCollectorCallback);
+    
     await this.streamProgress(`🎯 Starting ${workflowTemplate.name} workflow (${workflowTemplate.steps.length} steps)`, 1, maxSteps);
 
     try {
@@ -1568,6 +1603,9 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
         executionTime
       });
 
+      // CLEANUP: Unregister evidence collector
+      globalCollector.unregisterEvidenceCollector(evidenceCollectorCallback);
+      
       return {
         success: true,
         finalResult: finalSynthesis,
@@ -1592,6 +1630,9 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
         currentStep: currentStepIndex,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+
+      // CLEANUP: Unregister evidence collector
+      globalCollector.unregisterEvidenceCollector(evidenceCollectorCallback);
 
       return {
         success: false,
@@ -1760,19 +1801,42 @@ ${formattedContent}
             }
         ];
         
-        for (const extractor of extractionPaths) {
+        for (let i = 0; i < extractionPaths.length; i++) {
+            const extractor = extractionPaths[i];
             const result = extractor();
+            console.log(`🔍 EXTRACTION PATH ${i + 1}/${extractionPaths.length}:`, {
+                extractorIndex: i,
+                resultType: typeof result,
+                resultLength: result ? result.length : 0,
+                resultPreview: result ? result.substring(0, 100) : 'null/undefined',
+                isValidString: typeof result === 'string' && result.trim().length > 0
+            });
+            
             if (typeof result === 'string' && result.trim().length > 0) {
-                console.log('✅ CONTENT EXTRACTED via path:', extractor.toString());
+                console.log(`✅ CONTENT EXTRACTED via path ${i + 1}:`, extractor.toString());
                 return result;
             }
         }
         
-        // Fallback to JSON stringification
+        // Fallback to JSON stringification - check both result and output structures
         if (toolResult.result && typeof toolResult.result === 'object') {
+            console.log('🔧 FALLBACK: Using toolResult.result JSON stringification');
             return JSON.stringify(toolResult.result, null, 2);
         }
         
+        // CRITICAL FIX: Also check toolResult.output for enhanced tool integration
+        if (toolResult.output && typeof toolResult.output === 'object') {
+            console.log('🔧 FALLBACK: Using toolResult.output JSON stringification');
+            return JSON.stringify(toolResult.output, null, 2);
+        }
+        
+        // Final fallback - return the entire toolResult as JSON if it has any content
+        if (toolResult && typeof toolResult === 'object') {
+            console.log('🔧 EMERGENCY FALLBACK: Using entire toolResult JSON stringification');
+            return JSON.stringify(toolResult, null, 2);
+        }
+        
+        console.log('❌ EXTRACTION COMPLETELY FAILED: No usable content found');
         return '';
         
     } catch (error) {

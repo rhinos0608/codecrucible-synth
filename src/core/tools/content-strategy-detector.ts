@@ -348,61 +348,91 @@ Request: ${originalPrompt}`;
   }
 }
 
+/**
+ * Intent parsing system that understands user goals through context and meaning
+ */
+export class UserIntentParser {
+  /**
+   * Parse user intent to understand what they actually want
+   */
+  static parseIntent(prompt: string): UserIntent {
+    const lowerPrompt = prompt.toLowerCase().trim();
+    
+    // Analyze the structure and context of the request
+    const hasQuestionWords = /\b(what|how|why|when|where|which)\b/.test(lowerPrompt);
+    const hasAnalysisVerbs = /\b(analyze|explain|summarize|describe|tell me about|help me understand)\b/.test(lowerPrompt);
+    const hasActionWords = /\b(create|build|make|generate|write|implement)\b/.test(lowerPrompt);
+    const hasFileReference = /\b(file|document|readme|config|package\.json)\b/.test(lowerPrompt);
+    
+    // Determine primary intent based on linguistic patterns
+    let primaryIntent: 'understand' | 'analyze' | 'create' | 'retrieve' | 'interact';
+    let confidence = 0.5;
+    
+    if (hasQuestionWords || hasAnalysisVerbs) {
+      primaryIntent = 'understand';
+      confidence = 0.8;
+    } else if (hasActionWords) {
+      primaryIntent = 'create'; 
+      confidence = 0.8;
+    } else if (/\b(read|show|display|get|view)\b/.test(lowerPrompt) && hasFileReference) {
+      // Even "read" requests usually want understanding, not raw content
+      primaryIntent = 'understand';
+      confidence = 0.7;
+    } else {
+      primaryIntent = 'interact';
+      confidence = 0.6;
+    }
+    
+    // Determine expected response format
+    const expectsRawData = /\b(raw|exact|full|complete) (content|text|data)\b/.test(lowerPrompt);
+    const expectsAnalysis = !expectsRawData; // Default to analysis unless explicitly asking for raw data
+    
+    return {
+      primaryIntent,
+      confidence,
+      expectsAnalysis,
+      expectsRawData,
+      hasFileReference,
+      originalPrompt: prompt,
+      reasoning: `Detected ${primaryIntent} intent (${(confidence * 100).toFixed(0)}% confidence) - User wants ${expectsAnalysis ? 'intelligent analysis' : 'raw data'}`
+    };
+  }
+}
+
+export interface UserIntent {
+  primaryIntent: 'understand' | 'analyze' | 'create' | 'retrieve' | 'interact';
+  confidence: number;
+  expectsAnalysis: boolean;
+  expectsRawData: boolean;
+  hasFileReference: boolean;
+  originalPrompt: string;
+  reasoning: string;
+}
+
+/**
+ * Enhanced decision engine that uses intent parsing instead of keyword matching
+ */
 export class WorkflowDecisionEngine {
   static shouldBypassLLM(
     originalPrompt: string,
     workflowTemplate: { name: string; description: string },
     gatheredEvidence: string[]
   ): boolean {
-    
-    // File content requests should bypass LLM
-    const isContentRequest = [
-      'read', 'show', 'display', 'open', 'view', 'cat', 'get', 'contents'
-    ].some(keyword => originalPrompt.toLowerCase().includes(keyword));
-    
-    // Has actual content evidence (match actual evidence format)
-    const hasContentEvidence = gatheredEvidence.some(evidence =>
-      evidence.includes('📊 EVIDENCE GATHERED: SUCCESS') ||
-      evidence.includes('filesystem_read_file') ||
-      evidence.includes('File Content:') ||
-      evidence.includes('📄 Content:') ||
-      evidence.includes('filesystem_list_directory') ||
-      evidence.includes('SUCCESS') ||
-      // CRITICAL: Match the actual evidence format we saw in debug
-      evidence.includes('Read file content') ||
-      evidence.includes('JSON Content') ||
-      evidence.includes('Content Summar') ||
-      evidence.includes('Step 1:') ||
-      evidence.includes('**Step') ||
-      // Any evidence that suggests file reading happened
-      (evidence.includes('Step') && evidence.includes('content'))
-    );
-    
-    // Simple file operations should be direct (more inclusive)
-    const isSimpleFileOp = workflowTemplate.name.includes('file_reading') ||
-                          workflowTemplate.name.includes('universal_file_reading') ||
-                          workflowTemplate.name.includes('readme_reading') ||
-                          workflowTemplate.name.includes('directory_analysis') ||
-                          // CRITICAL: Also check for workflow patterns that read files
-                          gatheredEvidence.some(e => e.includes('filesystem_read_file'));
-    
-    // Analysis requests should NOT bypass LLM
-    const isAnalysisRequest = [
-      'analyze', 'explain', 'summarize', 'what does', 'how does', 'why does'
-    ].some(keyword => originalPrompt.toLowerCase().includes(keyword));
+    // REASONING-FIRST APPROACH: Always use AI reasoning for intelligent responses
+    // Parse user intent to understand what they actually want
+    const userIntent = UserIntentParser.parseIntent(originalPrompt);
     
     // Debug logging for decision making
-    console.log('🚨 BYPASS DECISION DEBUG:', {
+    console.log('🧠 INTENT PARSING DEBUG:', {
       originalPrompt,
+      userIntent,
       workflowName: workflowTemplate.name,
-      isContentRequest,
-      hasContentEvidence,
-      isSimpleFileOp,
-      isAnalysisRequest,
-      evidenceTypes: gatheredEvidence.map(e => e.substring(0, 50)),
-      finalDecision: isContentRequest && hasContentEvidence && isSimpleFileOp && !isAnalysisRequest
+      evidenceCount: gatheredEvidence.length,
+      decision: 'Always use AI reasoning'
     });
     
-    return isContentRequest && hasContentEvidence && isSimpleFileOp && !isAnalysisRequest;
+    // NEVER bypass LLM - always provide intelligent analysis
+    // Users deserve thoughtful responses, not raw data dumps
+    return false;
   }
 }

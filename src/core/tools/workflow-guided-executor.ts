@@ -402,14 +402,29 @@ ${gatheredEvidence.map((evidence, i) => `${i + 1}. ${evidence}`).join('\n')}
 
 ⚠️ IMPORTANT: This is the FINAL STEP of the workflow. You must now provide a comprehensive analysis based on the evidence gathered above. DO NOT make any more tool calls or function calls.
 
-REQUIRED OUTPUT FORMAT:
-1. **Executive Summary**: Brief overview of findings
-2. **Detailed Analysis**: Comprehensive examination of the evidence 
-3. **Key Insights**: Important discoveries and patterns identified
-4. **Conclusions**: Final assessment addressing the original request
-5. **Evidence References**: Cite specific evidence points that support your conclusions
+REQUIRED OUTPUT FORMAT WITH CHAIN-OF-THOUGHT REASONING:
+1. **🧠 My Reasoning Process**: Show your thinking about the user's request and the evidence
+   - What is the user really asking for?
+   - What are the most important pieces of evidence?
+   - How do these connect to answer their question?
+   
+2. **📊 Evidence Analysis**: Examine the gathered data
+   - Identify key content and patterns
+   - Extract the most relevant information
+   - Note any important details or structure
+   
+3. **💡 Key Insights**: What I discovered from the evidence
+   - Important findings and patterns
+   - Connections between different pieces of information
+   - Relevant details that address the user's needs
+   
+4. **✅ Final Answer**: Clear, actionable response to the original request
+   - Direct answer to what the user asked
+   - Summary of the most important information
+   - Any recommendations or next steps
 
 SYNTHESIS REQUIREMENTS:
+- SHOW YOUR THINKING: Explain your reasoning process step by step
 - Use ONLY the evidence data provided above - no additional tool calls needed
 - Reference specific files, directories, configurations, and code findings from the evidence
 - Provide concrete details from the actual data collected (file contents, structure, configurations)

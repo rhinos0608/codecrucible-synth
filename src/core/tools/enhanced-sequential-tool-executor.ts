@@ -11,13 +11,14 @@
  */
 
 import { EventEmitter } from 'events';
+import chalk from 'chalk';
 import { logger } from '../logger.js';
 import { ResponseNormalizer } from '../response-normalizer.js';
 import { DomainAwareToolOrchestrator, DomainAnalysis } from './domain-aware-tool-orchestrator.js';
 import { getGlobalEnhancedToolIntegration } from './enhanced-tool-integration.js';
 import { getGlobalToolIntegration } from './tool-integration.js';
 import { WorkflowGuidedExecutor, WorkflowTemplate, WorkflowStep } from './workflow-guided-executor.js';
-import { ContentTypeDetector, EvidenceBasedResponseGenerator, WorkflowDecisionEngine } from './content-strategy-detector.js';
+import { ContentTypeDetector, EvidenceBasedResponseGenerator, WorkflowDecisionEngine, UserIntentParser } from './content-strategy-detector.js';
 
 export interface ReasoningStep {
   step: number;
@@ -2543,23 +2544,23 @@ ${result}
       return `Unable to complete analysis - no evidence was successfully gathered during the ${workflowTemplate.name} workflow.`;
     }
 
-    // CRITICAL FIX: Decision engine to determine synthesis approach
-    const shouldBypassLLM = WorkflowDecisionEngine.shouldBypassLLM(
-      originalPrompt, workflowTemplate, gatheredEvidence
-    );
+    // REASONING-FIRST APPROACH: Always use AI for intelligent synthesis
+    // NOTE: Removed shouldBypassLLM anti-pattern that was short-circuiting reasoning
     
-    // DEBUG: Log decision engine result
-    logger.info('🚨 CRITICAL DEBUG: WorkflowDecisionEngine result', {
-      shouldBypassLLM,
+    // DEBUG: Log synthesis decision
+    logger.info('🧠 REASONING-FIRST: Using AI synthesis for intelligent response', {
       originalPrompt,
       workflowTemplateName: workflowTemplate.name,
       evidenceCount: gatheredEvidence.length,
       evidenceTypes: gatheredEvidence.map(e => e.substring(0, 50))
     });
     
-    if (shouldBypassLLM) {
-      // Use direct evidence-based response (bypasses LLM entirely)
-      logger.info('🎯 BYPASS TRIGGERED: Using direct evidence-based response');
+    // ALWAYS use AI reasoning - no bypass logic
+    const useAiReasoning = true;
+    
+    if (!useAiReasoning) {
+      // This branch is now disabled - always use AI reasoning
+      logger.info('🎯 DIRECT RESPONSE: Using evidence-based response (DISABLED)');
       
       // CRITICAL FIX: Use original tool results if available
       if (originalToolResults && originalToolResults.length > 0) {
@@ -2714,17 +2715,35 @@ All requested operations have been completed successfully.`;
     }
 
     try {
+      // CHAIN-OF-THOUGHT: Show reasoning process to user
+      logger.info('📊 Progress: 🧠 Starting AI reasoning and synthesis... (7/8)');
+      console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      console.log(chalk.cyan('🤖 AI REASONING PROCESS'));
+      console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      console.log(chalk.yellow('🧠 Analyzing user request and gathered evidence...'));
+      
+      // Show intent analysis to user
+      const userIntent = UserIntentParser.parseIntent(originalPrompt);
+      console.log(chalk.blue(`💭 Intent: ${userIntent.reasoning}`));
+      console.log(chalk.blue(`📊 Evidence gathered: ${gatheredEvidence.length} data points`));
+      
       const conclusionPrompt = this.workflowExecutor.buildConclusionPrompt(
         originalPrompt,
         workflowTemplate,
         gatheredEvidence
       );
 
+      console.log(chalk.yellow('🔄 Synthesizing intelligent response...'));
+      logger.info('📊 Progress: 🤖 AI processing evidence and formulating response... (8/8)');
+
       const response = await modelClient.generateText(conclusionPrompt, {
         temperature: 0.3,
         maxTokens: 2500, // Increased for comprehensive structured analysis
         tools: [] // Explicitly no tools - final synthesis only
       });
+
+      console.log(chalk.green('✅ AI reasoning complete - presenting analysis'));
+      console.log(chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
 
       return ResponseNormalizer.normalizeToString(response);
 

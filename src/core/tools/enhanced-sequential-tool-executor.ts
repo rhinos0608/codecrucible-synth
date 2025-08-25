@@ -747,6 +747,18 @@ REMEMBER: Assumptions and generic responses are NOT acceptable. Use tools to pro
       // Execute the tool call through MCP integration
       const result = await toolIntegration.executeToolCall(formattedToolCall);
       
+      // ADD COMPREHENSIVE TOOL RESULT STRUCTURE LOGGING - Fix #4
+      console.log('🔍 COMPLETE TOOL RESULT STRUCTURE:', {
+        success: result.success,
+        hasOutput: !!result.output,
+        hasResult: !!result.result,
+        outputType: typeof result.output,
+        resultType: typeof result.result,
+        outputKeys: result.output && typeof result.output === 'object' ? Object.keys(result.output) : null,
+        resultKeys: result.result && typeof result.result === 'object' ? Object.keys(result.result) : null,
+        fullStructure: JSON.stringify(result, null, 2)
+      });
+
       logger.info('✅ MCP tool execution completed', {
         toolName,
         success: result.success,
@@ -1376,6 +1388,16 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
           // CRITICAL FIX: Ensure evidence collection regardless of success flag
           const toolName = reasoningResult.selectedTool.function?.name || reasoningResult.selectedTool.name;
           const completeResult = this.extractStringContentFromToolResult(toolResult);
+
+          // ADD CRITICAL EVIDENCE DEBUG BLOCK - Fix #1
+          console.log('🔍 CRITICAL EVIDENCE DEBUG:', {
+            hasCompleteResult: !!completeResult,
+            completeResultType: typeof completeResult,
+            completeResultLength: completeResult ? completeResult.length : 0,
+            completeResultTrimmedLength: completeResult ? completeResult.trim().length : 0,
+            completeResultRaw: completeResult,
+            toolResultStructure: JSON.stringify(toolResult, null, 2)
+          });
           
           logger.info('🔍 EVIDENCE EXTRACTION ATTEMPT:', {
             toolName,
@@ -1418,17 +1440,51 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
               gatheredEvidenceCount: gatheredEvidence.length,
               formattedEvidenceLength: formattedEvidence.length
             });
-          } else if (toolResult.success) {
-            // Fallback to original success-based logic if no content detected
-            logger.warn('⚠️ Tool marked as successful but no content extracted', {
-              toolResult,
-              reasoningResult: reasoningResult.selectedTool
-            });
           } else {
-            logger.error('❌ EVIDENCE COLLECTION FAILED: Tool result not successful and no content', {
-              toolResult,
-              reasoningResult: reasoningResult.selectedTool
+            // ADD FALLBACK DEBUG - Fix #1 continuation
+            console.error('🚨 EVIDENCE COLLECTION FAILED - CONDITION CHECK:', {
+                completeResult,
+                hasCompleteResult: !!completeResult,
+                lengthCheck: completeResult ? completeResult.length > 0 : false,
+                trimCheck: completeResult ? completeResult.trim().length > 0 : false,
+                toolResultSuccess: toolResult.success
             });
+
+            if (toolResult.success) {
+              // Fallback to original success-based logic if no content detected
+              logger.warn('⚠️ Tool marked as successful but no content extracted', {
+                toolResult,
+                reasoningResult: reasoningResult.selectedTool
+              });
+            } else {
+              logger.error('❌ EVIDENCE COLLECTION FAILED: Tool result not successful and no content', {
+                toolResult,
+                reasoningResult: reasoningResult.selectedTool
+              });
+            }
+
+            // NEW: Failsafe evidence collection - Fix #3
+            console.log('🔥 FAILSAFE EVIDENCE COLLECTION: Main condition failed, using emergency collection');
+            
+            // Try to extract ANY usable content from the tool result
+            const emergencyContent = JSON.stringify(toolResult, null, 2);
+            if (emergencyContent && emergencyContent.length > 10) { // Basic sanity check
+                const failsafeEvidence = this.formatToolEvidence(
+                    toolName,
+                    workflowStep.action,
+                    emergencyContent,
+                    currentStepIndex + 1
+                );
+                
+                gatheredEvidence.push(failsafeEvidence);
+                
+                console.log('🚨 FAILSAFE EVIDENCE COLLECTED:', {
+                    contentLength: emergencyContent.length,
+                    evidenceCount: gatheredEvidence.length,
+                    stepIndex: currentStepIndex + 1,
+                    toolName
+                });
+            }
           }
         }
 
@@ -1666,107 +1722,64 @@ ${formattedContent}
    * Handles various tool result formats to prevent type errors
    */
   private extractStringContentFromToolResult(toolResult: any): string {
-    // DEBUG: Log the tool result structure
     console.log('🚨 EXTRACTING FROM TOOL RESULT:', {
-      toolId: toolResult?.toolId,
-      hasOutput: !!toolResult?.output,
-      hasResult: !!toolResult?.result,
-      outputKeys: toolResult?.output ? Object.keys(toolResult.output) : null,
-      resultKeys: toolResult?.result ? Object.keys(toolResult.result) : null,
-      outputContentType: typeof toolResult?.output?.content,
-      outputContentLength: toolResult?.output?.content ? String(toolResult.output.content).length : 0,
-      outputContentStart: toolResult?.output?.content ? String(toolResult.output.content).substring(0, 100) : null
+        toolId: toolResult?.toolId,
+        hasOutput: !!toolResult?.output,
+        hasResult: !!toolResult?.result,
+        outputKeys: toolResult?.output ? Object.keys(toolResult.output) : null,
+        resultKeys: toolResult?.result ? Object.keys(toolResult.result) : null,
     });
     
     try {
-      // Handle direct string results
-      if (typeof toolResult.result === 'string') {
-        return toolResult.result;
-      }
-      
-      // CRITICAL: Handle nested tool result structure from executeToolWithMCP
-      // First check if result contains the actual tool result
-      if (toolResult.result && typeof toolResult.result === 'object') {
-        if (toolResult.result.output && typeof toolResult.result.output === 'object') {
-          if (typeof toolResult.result.output.content === 'string') {
-            // Found content in nested structure: toolResult.result.output.content
-            return toolResult.result.output.content;
-          }
-        }
-        if (typeof toolResult.result.content === 'string') {
-          return toolResult.result.content;
-        }
-      }
-      
-      // CRITICAL: Handle filesystem tool output format (output.content) - direct structure
-      if (toolResult.output && typeof toolResult.output === 'object') {
-        if (typeof toolResult.output.content === 'string') {
-          // For filesystem tools, the content might be JSON-encoded string - try to parse it
-          if (toolResult.toolId === 'filesystem_read_file' || 
-              (toolResult.output.filePath && toolResult.output.content.startsWith('{'))) {
-            try {
-              // Try to parse if it looks like encoded JSON
-              const parsed = JSON.parse(toolResult.output.content);
-              return typeof parsed === 'string' ? parsed : toolResult.output.content;
-            } catch (e) {
-              // If parsing fails, return as-is
-              return toolResult.output.content;
-            }
-          }
-          return toolResult.output.content;
-        }
-        if (typeof toolResult.output.data === 'string') {
-          return toolResult.output.data;
-        }
-        if (typeof toolResult.output.text === 'string') {
-          return toolResult.output.text;
-        }
-      }
-      
-      // Handle object results with content property (result.content)
-      if (toolResult.result && typeof toolResult.result === 'object') {
-        // Check for common content properties
-        if (typeof toolResult.result.content === 'string') {
-          return toolResult.result.content;
-        }
-        if (typeof toolResult.result.data === 'string') {
-          return toolResult.result.data;
-        }
-        if (typeof toolResult.result.output === 'string') {
-          return toolResult.result.output;
-        }
-        if (typeof toolResult.result.text === 'string') {
-          return toolResult.result.text;
+        // Handle direct string results
+        if (typeof toolResult.result === 'string' && toolResult.result.trim().length > 0) {
+            return toolResult.result;
         }
         
-        // Fallback to JSON stringification for objects
-        return JSON.stringify(toolResult.result, null, 2);
-      }
-      
-      // Handle cases where the entire toolResult is the content
-      if (typeof toolResult === 'string') {
-        return toolResult;
-      }
-      
-      // Last resort: stringify whatever we have
-      return JSON.stringify(toolResult, null, 2);
-      
+        // ENHANCED: Try multiple extraction paths
+        const extractionPaths = [
+            () => toolResult.result?.output?.content,
+            () => toolResult.result?.content,
+            () => toolResult.output?.content,
+            () => toolResult.output?.data,
+            () => toolResult.result?.data,
+            () => toolResult.content,
+            () => toolResult.data,
+            // NEW: Try JSON parsing if content looks like escaped JSON
+            () => {
+                if (typeof toolResult.output?.content === 'string' && 
+                    toolResult.output.content.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(toolResult.output.content);
+                        return typeof parsed === 'string' ? parsed : toolResult.output.content;
+                    } catch {
+                        return toolResult.output.content;
+                    }
+                }
+                return null;
+            }
+        ];
+        
+        for (const extractor of extractionPaths) {
+            const result = extractor();
+            if (typeof result === 'string' && result.trim().length > 0) {
+                console.log('✅ CONTENT EXTRACTED via path:', extractor.toString());
+                return result;
+            }
+        }
+        
+        // Fallback to JSON stringification
+        if (toolResult.result && typeof toolResult.result === 'object') {
+            return JSON.stringify(toolResult.result, null, 2);
+        }
+        
+        return '';
+        
     } catch (error) {
-      // Log the exact structure for debugging
-      console.error('🚨 CONTENT EXTRACTION ERROR:', {
-        toolResultStructure: Object.keys(toolResult || {}),
-        outputStructure: toolResult?.output ? Object.keys(toolResult.output) : null,
-        resultStructure: toolResult?.result ? Object.keys(toolResult.result) : null,
-        toolId: toolResult?.toolId,
-        outputContentType: typeof toolResult?.output?.content,
-        outputContentPreview: toolResult?.output?.content ? String(toolResult.output.content).substring(0, 200) : null,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      
-      // Safety fallback for any serialization errors
-      return `Tool result extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error('🚨 CONTENT EXTRACTION ERROR:', error);
+        return '';
     }
-  }
+}
 
   /**
    * Validate that content extraction worked properly

@@ -1,11 +1,29 @@
 import { z } from "zod";
 
 // DATABASE_URL and REDIS_URL are required except in 'test' environment.
+// First, parse NODE_ENV to determine environment
+const NodeEnvSchema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+});
+
+const nodeEnvParsed = NodeEnvSchema.safeParse(process.env as Record<string, string | undefined>);
+if (!nodeEnvParsed.success) {
+  console.error("Invalid NODE_ENV configuration:", nodeEnvParsed.error.format());
+  process.exit(1);
+}
+
+const NODE_ENV = nodeEnvParsed.data.NODE_ENV;
+
+// Build the rest of the schema based on NODE_ENV
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(3000),
-  DATABASE_URL: z.string().url().optional(),
-  REDIS_URL: z.string().url().optional(),
+  DATABASE_URL: NODE_ENV === "production"
+    ? z.string().url({ message: "DATABASE_URL must be a valid URL in production" })
+    : z.string().url().optional(),
+  REDIS_URL: NODE_ENV === "production"
+    ? z.string().url({ message: "REDIS_URL must be a valid URL in production" })
+    : z.string().url().optional(),
   LOG_LEVEL: z.enum(["trace","debug","info","warn","error"]).default("info"),
 }).superRefine((env, ctx) => {
   if (env.NODE_ENV !== "test") {

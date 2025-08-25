@@ -63,19 +63,19 @@ export class HealthMonitor extends EventEmitter {
    */
   private registerDefaultChecks(): void {
     // System checks
-    this.registerCheck('cpu', () => this.checkCPU());
-    this.registerCheck('memory', () => this.checkMemory());
-    this.registerCheck('disk', () => this.checkDisk());
+    this.registerCheck('cpu', async () => this.checkCPU());
+    this.registerCheck('memory', async () => this.checkMemory());
+    this.registerCheck('disk', async () => this.checkDisk());
 
     // Service checks
-    this.registerCheck('database', () => this.checkDatabase());
-    this.registerCheck('cache', () => this.checkCache());
-    this.registerCheck('mcp_servers', () => this.checkMCPServers());
+    this.registerCheck('database', async () => this.checkDatabase());
+    this.registerCheck('cache', async () => this.checkCache());
+    this.registerCheck('mcp_servers', async () => this.checkMCPServers());
 
     // Application checks
-    this.registerCheck('voice_system', () => this.checkVoiceSystem());
-    this.registerCheck('council_engine', () => this.checkCouncilEngine());
-    this.registerCheck('security_framework', () => this.checkSecurityFramework());
+    this.registerCheck('voice_system', async () => this.checkVoiceSystem());
+    this.registerCheck('council_engine', async () => this.checkCouncilEngine());
+    this.registerCheck('security_framework', async () => this.checkSecurityFramework());
   }
 
   /**

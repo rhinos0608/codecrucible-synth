@@ -246,7 +246,7 @@ export class HybridLLMRouter extends EventEmitter {
         return {
           ...decision,
           selectedLLM: 'ollama',
-          reasoning: decision.reasoning + ' (LM Studio overloaded, using Ollama)',
+          reasoning: `${decision.reasoning  } (LM Studio overloaded, using Ollama)`,
           confidence: Math.max(decision.confidence - 0.2, 0.3),
         };
       }
@@ -255,7 +255,7 @@ export class HybridLLMRouter extends EventEmitter {
         return {
           ...decision,
           selectedLLM: 'lm-studio',
-          reasoning: decision.reasoning + ' (Ollama overloaded, using LM Studio)',
+          reasoning: `${decision.reasoning  } (Ollama overloaded, using LM Studio)`,
           confidence: Math.max(decision.confidence - 0.2, 0.3),
         };
       }
@@ -430,7 +430,7 @@ export class HybridLLMRouter extends EventEmitter {
     metrics?: TaskComplexityMetrics
   ): string {
     const metricHash = metrics ? JSON.stringify(metrics) : '';
-    const promptHash = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
+    const promptHash = prompt.length > 100 ? `${prompt.substring(0, 100)  }...` : prompt;
     return `${taskType}:${promptHash}:${metricHash}`.replace(/[^a-zA-Z0-9:]/g, '_');
   }
 

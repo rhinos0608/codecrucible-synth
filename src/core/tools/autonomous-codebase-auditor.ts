@@ -293,7 +293,7 @@ export class AutonomousCodebaseAnalyzer {
         const stats = fs.statSync(path.join(this.workingDirectory, file));
         if (stats.size > 100000) {
           // > 100KB
-          optimizations.push('Large file detected: ' + file);
+          optimizations.push(`Large file detected: ${  file}`);
         }
       } catch (error) {
         // Skip problematic files

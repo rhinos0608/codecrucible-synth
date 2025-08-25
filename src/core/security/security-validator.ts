@@ -102,7 +102,7 @@ export class SecurityValidator implements ISecurityValidator {
           logger.error('🚨 SECURITY VIOLATION: Input validation failed', {
             reason: validation.reason,
             riskLevel: validation.riskLevel,
-            prompt: input.substring(0, 100) + '...',
+            prompt: `${input.substring(0, 100)  }...`,
           });
         }
 
@@ -333,10 +333,10 @@ export class SecurityValidator implements ISecurityValidator {
       ...this.validationStats,
       violationRate:
         this.validationStats.totalValidations > 0
-          ? (
+          ? `${(
               (this.validationStats.violations / this.validationStats.totalValidations) *
               100
-            ).toFixed(2) + '%'
+            ).toFixed(2)  }%`
           : '0%',
     };
   }

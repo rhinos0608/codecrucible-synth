@@ -10,6 +10,7 @@ import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../config/config-manager.js';
 import { logger } from './logger.js';
 import { getErrorMessage } from '../utils/error-utils.js';
+import { ResponseNormalizer } from './response-normalizer.js';
 import { ContextAwareCLIIntegration } from './intelligence/context-aware-cli-integration.js';
 import { AutoConfigurator } from './model-management/auto-configurator.js';
 import { InteractiveREPL } from './interactive-repl.js';
@@ -30,6 +31,8 @@ import {
 } from './security/security-audit-logger.js';
 import { DynamicModelRouter } from './dynamic-model-router.js';
 import { AdvancedToolOrchestrator } from './tools/advanced-tool-orchestrator.js';
+import { EnhancedSequentialToolExecutor } from './tools/enhanced-sequential-tool-executor.js';
+import { StreamingReasoningInterface } from './tools/streaming-reasoning-interface.js';
 import {
   EnterpriseSystemPromptBuilder,
   RuntimeContext,
@@ -60,6 +63,8 @@ export class CLI implements REPLInterface {
   private auditLogger: SecurityAuditLogger;
   private dynamicModelRouter: DynamicModelRouter;
   private toolOrchestrator: AdvancedToolOrchestrator;
+  private sequentialExecutor: EnhancedSequentialToolExecutor;
+  private streamingInterface: StreamingReasoningInterface;
   private static globalListenersRegistered = false;
 
   // PERFORMANCE FIX: AbortController pattern for cleanup
@@ -109,6 +114,18 @@ export class CLI implements REPLInterface {
 
     // Initialize tool orchestrator for autonomous operations
     this.toolOrchestrator = new AdvancedToolOrchestrator(modelClient);
+
+    // Initialize enhanced sequential executor for chain-of-thought reasoning
+    this.sequentialExecutor = new EnhancedSequentialToolExecutor();
+
+    // Initialize streaming interface for real-time reasoning display
+    this.streamingInterface = new StreamingReasoningInterface({
+      mode: 'verbose',
+      showProgress: true,
+      showConfidence: true,
+      animateThinking: true,
+      computationDelay: 1500
+    });
 
     // Initialize subsystems with simplified constructors
     this.contextAwareCLI = new ContextAwareCLIIntegration();
@@ -1139,6 +1156,7 @@ export class CLI implements REPLInterface {
 
   /**
    * Execute prompt processing (REPLInterface method)
+   * Enhanced with sequential tool execution and chain-of-thought reasoning
    */
   public async executePromptProcessing(prompt: string, options: any = {}): Promise<any> {
     try {
@@ -1146,7 +1164,22 @@ export class CLI implements REPLInterface {
         console.log(chalk.blue('🔄 Processing prompt...'));
       }
 
-      // Use the voice system to process the prompt
+      // ENHANCED: Check if this prompt should use sequential tool execution with reasoning
+      const shouldUseSequentialExecution = this.shouldUseSequentialToolExecution(prompt);
+      
+      logger.info('🔍 Sequential execution decision', {
+        shouldUseSequentialExecution,
+        disableTools: options.disableTools,
+        prompt: prompt.substring(0, 100)
+      });
+      
+      if (shouldUseSequentialExecution && !options.disableTools) {
+        logger.info('✅ Using enhanced sequential tool execution');
+        return await this.executeWithSequentialReasoning(prompt, options);
+      }
+
+      logger.info('⚠️ Falling back to traditional voice system processing');
+      // Fallback to traditional voice system processing
       let response: string;
 
       if (options.voices && Array.isArray(options.voices) && options.voices.length > 0) {
@@ -1170,7 +1203,39 @@ export class CLI implements REPLInterface {
           this.context.modelClient // Pass the actual client, not options
         );
 
-        response = voiceResponse.content || 'No response generated';
+        // DEBUG: Log response type and content preview for troubleshooting
+        logger.debug('🔥 CLI RESPONSE DEBUG', {
+          responseType: typeof voiceResponse.content,
+          isBuffer: Buffer.isBuffer(voiceResponse.content),
+          contentPreview: String(voiceResponse.content).substring(0, 100),
+          contentLength: voiceResponse.content?.length,
+          voiceName: voiceResponse.voice
+        });
+
+        // CRITICAL FIX: Final safety check - normalize response before display
+        const rawResponse = voiceResponse.content || 'No response generated';
+        const normalizedResponse = ResponseNormalizer.normalizeToString(rawResponse);
+        
+        // Validate final normalization
+        if (ResponseNormalizer.validateNormalization(rawResponse, normalizedResponse)) {
+          response = normalizedResponse;
+        } else {
+          // Ultimate fallback if all normalization fails
+          response = 'Response processing completed but display normalization failed. Please check logs.';
+          logger.error('CLI final response normalization failed', {
+            rawType: typeof rawResponse,
+            rawPreview: String(rawResponse).substring(0, 100),
+            voiceName: voiceResponse.voice
+          });
+        }
+        
+        // Enhanced debugging with normalization info
+        logger.debug('🔥 CLI RESPONSE DEBUG - AFTER NORMALIZATION', {
+          originalType: typeof rawResponse,
+          normalizedLength: normalizedResponse.length,
+          normalizationSuccess: normalizedResponse !== rawResponse,
+          finalResponsePreview: response.substring(0, 100)
+        });
       }
 
       if (!options.silent) {
@@ -1184,6 +1249,166 @@ export class CLI implements REPLInterface {
       }
       logger.error('Prompt processing failed in CLI:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Execute prompt with enhanced sequential reasoning and tool execution
+   */
+  private async executeWithSequentialReasoning(prompt: string, options: any = {}): Promise<string> {
+    logger.info('🚀 Using Enhanced Sequential Tool Execution with Chain-of-Thought Reasoning');
+
+    try {
+      // Get available tools from the tool orchestrator
+      const availableTools = this.toolOrchestrator.getAvailableTools();
+      
+      // Convert tools to MCP-compatible format
+      const mcpTools = await this.getMCPCompatibleTools();
+      const toolsToUse = mcpTools.length > 0 ? mcpTools : availableTools;
+
+      logger.debug('🔧 Tools available for sequential execution', {
+        mcpToolCount: mcpTools.length,
+        localToolCount: availableTools.length,
+        usingMcp: mcpTools.length > 0
+      });
+
+      if (toolsToUse.length === 0) {
+        logger.warn('⚠️ No tools available for sequential execution, falling back to voice system');
+        return await this.fallbackToVoiceSystem(prompt, options);
+      }
+
+      // Setup streaming interface
+      const streamingCallbacks = options.noStream ? undefined : 
+        this.streamingInterface.createCallbacks();
+
+      // Initialize streaming display
+      if (!options.noStream && streamingCallbacks) {
+        await this.streamingInterface.initialize(options.maxSteps || 8);
+      }
+
+      // Execute with enhanced sequential reasoning
+      const result = await this.sequentialExecutor.executeWithStreamingReasoning(
+        prompt,
+        toolsToUse,
+        this.context.modelClient,
+        options.maxSteps || 8,
+        streamingCallbacks
+      );
+
+      // Display completion message
+      if (!options.noStream && streamingCallbacks) {
+        await this.streamingInterface.displayCompletion(
+          result.success,
+          result.finalResult,
+          result.executionTime || 0
+        );
+      }
+
+      if (result.success) {
+        logger.info('✅ Sequential execution completed successfully', {
+          totalSteps: result.totalSteps,
+          executionTime: result.executionTime,
+          toolsUsed: result.reasoningChain.filter(s => s.type === 'action').length
+        });
+        return result.finalResult;
+      } else {
+        logger.warn('⚠️ Sequential execution failed, attempting fallback', {
+          error: result.finalResult,
+          completedSteps: result.totalSteps
+        });
+        // Fallback to voice system if sequential execution fails
+        return await this.fallbackToVoiceSystem(prompt, options);
+      }
+
+    } catch (error) {
+      logger.error('❌ Enhanced sequential execution error:', error);
+      // Fallback to voice system on error
+      return await this.fallbackToVoiceSystem(prompt, options);
+    }
+  }
+
+  /**
+   * Determine if prompt should use sequential tool execution
+   */
+  private shouldUseSequentialToolExecution(prompt: string): boolean {
+    const toolKeywords = [
+      'read', 'analyze', 'file', 'directory', 'project', 'code', 'structure',
+      'write', 'create', 'generate', 'build', 'compile', 'test', 'run',
+      'search', 'find', 'list', 'show', 'display', 'check', 'scan',
+      'execute', 'process', 'handle', 'manage', 'review'
+    ];
+
+    const promptLower = prompt.toLowerCase();
+    const hasToolKeywords = toolKeywords.some(keyword => promptLower.includes(keyword));
+
+    // Additional heuristics
+    const hasActionWords = /\b(analyze|examine|review|process|execute|run|create|build|generate|fix|update|modify|change|improve|optimize)\b/i.test(prompt);
+    const hasFileReferences = /\b(\.md|\.js|\.ts|\.json|\.yaml|\.txt|README|package\.json|src\/|config\/)\b/i.test(prompt);
+    const isQuestion = prompt.trim().endsWith('?');
+    
+    // Use sequential execution if:
+    // 1. Has tool keywords (especially "read", "write", "list", etc.)
+    // 2. OR has action words AND file references
+    // 3. Always use for explicit file operations
+    const shouldUse = hasToolKeywords || 
+                      (hasActionWords && hasFileReferences) ||
+                      hasFileReferences;  // Always use for file references
+
+    logger.debug('Sequential execution decision', {
+      prompt: `${prompt.substring(0, 100)  }...`,
+      hasToolKeywords,
+      hasActionWords,
+      hasFileReferences,
+      isQuestion,
+      shouldUse
+    });
+
+    return shouldUse;
+  }
+
+  /**
+   * Get MCP-compatible tools for sequential execution
+   */
+  private async getMCPCompatibleTools(): Promise<any[]> {
+    try {
+      // Import tool integration dynamically
+      const { getGlobalEnhancedToolIntegration } = await import('./tools/enhanced-tool-integration.js');
+      const { getGlobalToolIntegration } = await import('./tools/tool-integration.js');
+      
+      const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
+      const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
+      
+      if (toolIntegration && typeof toolIntegration.getLLMFunctions === 'function') {
+        return toolIntegration.getLLMFunctions();
+      }
+      
+      return [];
+    } catch (error) {
+      logger.warn('Failed to get MCP tools for sequential execution', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fallback to traditional voice system processing
+   */
+  private async fallbackToVoiceSystem(prompt: string, options: any): Promise<string> {
+    logger.debug('Using fallback voice system processing');
+    
+    const voiceResponse = await this.context.voiceSystem.generateSingleVoiceResponse(
+      'explorer',
+      prompt,
+      this.context.modelClient
+    );
+
+    const rawResponse = voiceResponse.content || 'No response generated';
+    const normalizedResponse = ResponseNormalizer.normalizeToString(rawResponse);
+    
+    if (ResponseNormalizer.validateNormalization(rawResponse, normalizedResponse)) {
+      return normalizedResponse;
+    } else {
+      logger.error('Voice system fallback normalization failed');
+      return 'Processing completed but result normalization failed. Please check logs.';
     }
   }
 
@@ -1221,7 +1446,7 @@ export class CLI implements REPLInterface {
       
       // Get the Ollama provider from the provider repository
       const provider = this.context.modelClient.providerRepository.getProvider('ollama');
-      if (!provider || !provider.setModel) {
+      if (!provider?.setModel) {
         console.log(chalk.red('❌ Model switching not supported for current provider'));
         return;
       }
@@ -1251,7 +1476,7 @@ export class CLI implements REPLInterface {
       
       // Get the Ollama provider
       const provider = this.context.modelClient.providerRepository.getProvider('ollama');
-      if (!provider || !provider.listModels) {
+      if (!provider?.listModels) {
         console.log(chalk.red('❌ Model listing not supported for current provider'));
         return;
       }
@@ -1327,7 +1552,7 @@ export class CLI implements REPLInterface {
       
       // Get the Ollama provider
       const provider = this.context.modelClient.providerRepository.getProvider('ollama');
-      if (!provider || !provider.checkStatus) {
+      if (!provider?.checkStatus) {
         console.log(chalk.red('❌ Model reloading not supported for current provider'));
         return;
       }

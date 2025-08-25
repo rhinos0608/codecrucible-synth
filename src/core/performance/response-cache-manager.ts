@@ -357,7 +357,7 @@ export class ResponseCacheManager {
     const now = Date.now();
     return Array.from(this.cache.values()).map(entry => ({
       key: entry.key.substring(0, 8),
-      prompt: entry.request.prompt.substring(0, 50) + '...',
+      prompt: `${entry.request.prompt.substring(0, 50)  }...`,
       model: entry.request.model,
       provider: entry.request.provider,
       hitCount: entry.metadata.hitCount,
@@ -388,8 +388,8 @@ export class ResponseCacheManager {
     const stats = this.getStats();
     logger.info('🔄 ResponseCacheManager shutting down', {
       totalEntries: stats.totalEntries,
-      hitRate: (stats.hitRate * 100).toFixed(1) + '%',
-      memoryUsage: stats.memoryUsage + 'KB'
+      hitRate: `${(stats.hitRate * 100).toFixed(1)  }%`,
+      memoryUsage: `${stats.memoryUsage  }KB`
     });
     
     this.cache.clear();

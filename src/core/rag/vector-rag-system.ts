@@ -11,6 +11,8 @@ import { Worker } from 'worker_threads';
 import chokidar from 'chokidar';
 import { Logger } from '../logger.js';
 import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+import { HybridSearchCoordinator, HybridSearchConfig } from '../search/hybrid-search-coordinator.js';
+import { CommandLineSearchEngine } from '../search/command-line-search-engine.js';
 
 // Core RAG Interfaces
 export interface VectorDocument {
@@ -177,8 +179,9 @@ export class VectorRAGSystem extends EventEmitter {
   private indexingQueue: Set<string> = new Set();
   private isIndexing: boolean = false;
   private performanceMetrics: RAGMetrics;
+  private hybridCoordinator?: HybridSearchCoordinator;
 
-  constructor(config: RAGConfig, modelClient: UnifiedModelClient) {
+  constructor(config: RAGConfig, modelClient: UnifiedModelClient, hybridConfig?: HybridSearchConfig) {
     super();
     this.logger = new Logger('VectorRAGSystem');
     this.config = config;
@@ -187,6 +190,11 @@ export class VectorRAGSystem extends EventEmitter {
 
     // Initialize components based on config
     this.initializeComponents();
+    
+    // Initialize hybrid search coordinator if enabled
+    if (hybridConfig?.featureFlags?.enableHybridRouting) {
+      this.initializeHybridSearch(hybridConfig);
+    }
   }
 
   /**
@@ -388,6 +396,20 @@ export class VectorRAGSystem extends EventEmitter {
     this.codeChunker = new ASTBasedCodeChunker(this.config.chunking);
   }
 
+  private initializeHybridSearch(hybridConfig: HybridSearchConfig): void {
+    try {
+      const commandSearch = new CommandLineSearchEngine(process.cwd());
+      this.hybridCoordinator = new HybridSearchCoordinator(
+        commandSearch,
+        hybridConfig,
+        this
+      );
+      this.logger.info('🔄 Hybrid search coordinator initialized');
+    } catch (error) {
+      this.logger.warn('Failed to initialize hybrid search coordinator:', error);
+    }
+  }
+
   private async startFileWatching(): Promise<void> {
     if (this.fileWatcher) {
       await this.fileWatcher.close();
@@ -407,7 +429,7 @@ export class VectorRAGSystem extends EventEmitter {
     this.fileWatcher
       .on('add', debouncedIndex)
       .on('change', debouncedIndex)
-      .on('unlink', filePath => this.vectorStore.deleteDocument(filePath));
+      .on('unlink', async filePath => this.vectorStore.deleteDocument(filePath));
 
     this.logger.info(`Watching ${this.config.indexing.watchPaths.length} paths for changes`);
   }
@@ -525,10 +547,30 @@ export class VectorRAGSystem extends EventEmitter {
   }
 
   private async exactSearch(query: string, ragQuery: RAGQuery): Promise<ScoredDocument[]> {
-    // Implement exact text matching
-    const results: ScoredDocument[] = [];
-    // Implementation would search for exact text matches
-    return results;
+    // Use hybrid coordinator if available, otherwise fall back to basic text matching
+    if (this.hybridCoordinator) {
+      try {
+        const hybridResult = await this.hybridCoordinator.search(ragQuery);
+        return hybridResult.documents;
+      } catch (error) {
+        this.logger.warn('Hybrid search failed, falling back to basic exact search:', error);
+      }
+    }
+
+    // Fallback: basic exact text matching using vector store
+    this.logger.info('Using basic exact search fallback');
+    try {
+      // Use vector store's text search capabilities if available
+      if (this.vectorStore.hybridSearch) {
+        const queryEmbedding = await this.embeddingModel.embed(query);
+        return await this.vectorStore.hybridSearch(query, queryEmbedding, ragQuery.filters);
+      }
+    } catch (error) {
+      this.logger.warn('Vector store hybrid search failed:', error);
+    }
+
+    // Last resort: return empty results
+    return [];
   }
 
   private async rerankResults(query: string, results: ScoredDocument[]): Promise<ScoredDocument[]> {
@@ -594,7 +636,7 @@ export class VectorRAGSystem extends EventEmitter {
     this.indexingQueue.clear();
 
     try {
-      await Promise.all(batch.map(filePath => this.updateDocument(filePath)));
+      await Promise.all(batch.map(async filePath => this.updateDocument(filePath)));
     } catch (error) {
       this.logger.error('Batch indexing failed:', error);
     } finally {
@@ -602,7 +644,7 @@ export class VectorRAGSystem extends EventEmitter {
 
       // Process any new items that were added
       if (this.indexingQueue.size > 0) {
-        setTimeout(() => this.processIndexingQueue(), 100);
+        setTimeout(async () => this.processIndexingQueue(), 100);
       }
     }
   }
@@ -671,6 +713,10 @@ export class VectorRAGSystem extends EventEmitter {
       await this.fileWatcher.close();
     }
 
+    if (this.hybridCoordinator) {
+      await this.hybridCoordinator.shutdown();
+    }
+
     await this.vectorStore.close();
     this.embeddingCache.clear();
 
@@ -685,6 +731,36 @@ export class VectorRAGSystem extends EventEmitter {
   async clearCache(): Promise<void> {
     this.embeddingCache.clear();
     this.logger.info('Embedding cache cleared');
+  }
+
+  /**
+   * Enable or configure hybrid search functionality
+   */
+  enableHybridSearch(hybridConfig: HybridSearchConfig): void {
+    if (!this.hybridCoordinator) {
+      this.initializeHybridSearch(hybridConfig);
+    } else {
+      this.hybridCoordinator.updateConfig(hybridConfig);
+      this.logger.info('🔄 Hybrid search configuration updated');
+    }
+  }
+
+  /**
+   * Disable hybrid search functionality
+   */
+  disableHybridSearch(): void {
+    if (this.hybridCoordinator) {
+      this.hybridCoordinator.shutdown();
+      this.hybridCoordinator = undefined;
+      this.logger.info('🔄 Hybrid search disabled');
+    }
+  }
+
+  /**
+   * Get hybrid search metrics if available
+   */
+  getHybridMetrics() {
+    return this.hybridCoordinator?.getMetrics();
   }
 }
 
@@ -913,7 +989,7 @@ class TransformersJSEmbedding implements EmbeddingModel {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    return Promise.all(texts.map(text => this.embed(text)));
+    return Promise.all(texts.map(async text => this.embed(text)));
   }
 }
 
@@ -933,7 +1009,7 @@ class OllamaEmbedding implements EmbeddingModel {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    return Promise.all(texts.map(text => this.embed(text)));
+    return Promise.all(texts.map(async text => this.embed(text)));
   }
 }
 
@@ -950,7 +1026,7 @@ class LocalEmbedding implements EmbeddingModel {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    return Promise.all(texts.map(text => this.embed(text)));
+    return Promise.all(texts.map(async text => this.embed(text)));
   }
 }
 

@@ -624,7 +624,7 @@ class MCPSecurityValidator extends EventEmitter {
       // Check for data exfiltration attempts
       if (typeof result === 'string' && result.length > 100000) {
         violations.push('Result size exceeds safety limits');
-        sanitizedResult = result.substring(0, 100000) + '...[truncated]';
+        sanitizedResult = `${result.substring(0, 100000)  }...[truncated]`;
       }
 
       // Scan for secrets in the output

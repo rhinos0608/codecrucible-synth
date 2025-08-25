@@ -616,7 +616,7 @@ Generate the improved code with all issues resolved:`;
    * Display final summary
    */
   private displayFinalSummary(result: SequentialResult): void {
-    console.log(chalk.blue('\n' + '='.repeat(60)));
+    console.log(chalk.blue(`\n${  '='.repeat(60)}`));
     console.log(chalk.blue('📋 Sequential Review Summary'));
     console.log(chalk.blue('='.repeat(60)));
 

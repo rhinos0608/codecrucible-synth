@@ -279,7 +279,7 @@ export class ApprovalManager {
   ): Promise<ApprovalResult> {
     /* eslint-disable no-console */
     // User interface output - console.log is intentional for approval prompts
-    console.log('\n' + '='.repeat(60));
+    console.log(`\n${  '='.repeat(60)}`);
     console.log('🔐 OPERATION APPROVAL REQUIRED');
     console.log('='.repeat(60));
     console.log(`Operation: ${operation.type}`);
@@ -388,7 +388,7 @@ export class ApprovalManager {
   ): void {
     /* eslint-disable no-console */
     // User interface output - console.log is intentional for detailed information display
-    console.log('\n' + '='.repeat(60));
+    console.log(`\n${  '='.repeat(60)}`);
     console.log('📊 DETAILED OPERATION ANALYSIS');
     console.log('='.repeat(60));
 

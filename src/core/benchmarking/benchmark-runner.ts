@@ -375,7 +375,7 @@ Function signature and implementation:`;
       if (pyLines.length > 1 && !pyLines[1].startsWith('    ')) {
         // Add indentation
         const indentedLines = pyLines.map((line, i) =>
-          i === 0 ? line : line.trim() ? '    ' + line : line
+          i === 0 ? line : line.trim() ? `    ${  line}` : line
         );
         code = indentedLines.join('\n');
       }

@@ -282,7 +282,7 @@ export async function main() {
 
       if (inputData.trim()) {
         logger.debug('Processing piped input', {
-          inputPreview: inputData.trim().substring(0, 50) + '...',
+          inputPreview: `${inputData.trim().substring(0, 50)  }...`,
         });
         // Process through CLI to get system prompt injection and tool orchestration
         try {
@@ -446,16 +446,16 @@ async function showAvailableModels() {
 
 export default initializeCLIContext;
 
-// Auto-run with fast path check first
-// Fix: More robust check for direct execution
+// Auto-run only when directly executed (not when imported by cc.js or crucible.js)
+// This prevents circular delegation issues
 if (
   process.argv[1] &&
-  (process.argv[1].includes('index.js') || process.argv[1].endsWith('index.ts'))
+  (process.argv[1].includes('index.js') || process.argv[1].endsWith('index.ts')) &&
+  !process.argv[1].includes('bin/cc') &&
+  !process.argv[1].includes('bin/crucible')
 ) {
-  // Use fast CLI for simple commands, then fall back to main for complex ones
-  import('./fast-cli.js').then(({ fastMain }) => {
-    return fastMain();
-  }).catch(error => {
+  // Direct execution - run main directly without fast-cli delegation
+  main().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
   });

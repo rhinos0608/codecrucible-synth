@@ -432,7 +432,7 @@ except Exception as e:
     }
 
     // Destroy all active sandboxes
-    const destroyPromises = Array.from(this.sandboxPool.keys()).map(sessionId =>
+    const destroyPromises = Array.from(this.sandboxPool.keys()).map(async sessionId =>
       this.destroySandbox(sessionId)
     );
 

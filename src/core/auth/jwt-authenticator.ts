@@ -88,7 +88,7 @@ export class JWTAuthenticator {
           exp: now + this.config.expiry * 7, // Refresh tokens last 7x longer
         };
 
-        refreshToken = jwt.sign(refreshPayload, this.config.secret + '_refresh', {
+        refreshToken = jwt.sign(refreshPayload, `${this.config.secret  }_refresh`, {
           algorithm: this.config.algorithms[0] as jwt.Algorithm,
           expiresIn: this.config.expiry * 7,
         });
@@ -182,7 +182,7 @@ export class JWTAuthenticator {
     try {
       const payload = jwt.verify(
         refreshToken,
-        this.config.secret + '_refresh'
+        `${this.config.secret  }_refresh`
       ) as RefreshTokenPayload;
 
       // Verify refresh token exists and is valid

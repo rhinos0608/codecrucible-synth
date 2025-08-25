@@ -235,7 +235,7 @@ export class EnterpriseMCPOrchestrator {
 
       for (const group of parallelGroups) {
         const groupResults = await Promise.allSettled(
-          group.map(step => this.executeStep(step, currentContext))
+          group.map(async step => this.executeStep(step, currentContext))
         );
 
         groupResults.forEach((result, index) => {

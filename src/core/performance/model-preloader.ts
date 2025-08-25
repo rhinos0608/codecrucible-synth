@@ -150,7 +150,7 @@ export class ModelPreloader {
       const response = await providerInstance.generate(request);
       const warmupTime = Date.now() - startTime;
       
-      if (response && response.content) {
+      if (response?.content) {
         // Update metrics to mark as warmed
         const metrics = this.modelMetrics.get(modelKey);
         if (metrics) {

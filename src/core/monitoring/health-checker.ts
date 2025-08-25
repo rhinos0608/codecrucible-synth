@@ -402,7 +402,7 @@ export class HealthChecker extends EventEmitter {
    * Run all health checks
    */
   async runAllChecks(): Promise<SystemHealth> {
-    const checkPromises = Array.from(this.checks.keys()).map(name => this.runSingleCheck(name));
+    const checkPromises = Array.from(this.checks.keys()).map(async name => this.runSingleCheck(name));
 
     await Promise.allSettled(checkPromises);
     return this.getSystemHealth();
@@ -549,7 +549,7 @@ export class HealthChecker extends EventEmitter {
    */
   private startPeriodicChecks(): void {
     // Run initial check
-    setTimeout(() => this.runAllChecks(), 1000);
+    setTimeout(async () => this.runAllChecks(), 1000);
 
     // Set up periodic checks
     setInterval(async () => {
@@ -601,7 +601,7 @@ export class HealthChecker extends EventEmitter {
   /**
    * Utility delay function
    */
-  private delay(ms: number): Promise<void> {
+  private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 

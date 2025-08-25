@@ -25,7 +25,7 @@ export class ReadFileTool extends BaseTool {
 
   async execute(args: z.infer<typeof ReadFileSchema>): Promise<string> {
     // Validate input parameters
-    if (!args || !args.path || args.path.trim() === '') {
+    if (!args?.path || args.path.trim() === '') {
       return `Error: Path parameter is required for readFile tool. Received: ${JSON.stringify(args)}`;
     }
 

@@ -183,7 +183,7 @@ export class SystemBootstrap {
     this.container.registerValue(LOGGER_TOKEN, logger);
 
     // Basic utilities
-    this.container.register('error-utils', () => import('../../utils/error-utils.js'), {
+    this.container.register('error-utils', async () => import('../../utils/error-utils.js'), {
       lifecycle: 'singleton',
       lazy: true,
     });

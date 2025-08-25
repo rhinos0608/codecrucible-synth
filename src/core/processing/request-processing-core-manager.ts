@@ -303,7 +303,7 @@ export class RequestProcessingCoreManager
   /**
    * Create timeout promise for request handling
    */
-  createTimeoutPromise(timeoutMs: number): Promise<never> {
+  async createTimeoutPromise(timeoutMs: number): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
         reject(new Error(`Request timeout after ${timeoutMs}ms`));

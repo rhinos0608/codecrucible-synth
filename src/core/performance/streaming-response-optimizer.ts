@@ -122,7 +122,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
           start(controller) {
             logger.debug('WebStreams ReadableStream started with 2024 optimizations');
           },
-          pull(controller) {
+          async pull(controller) {
             // 2024: Optimized pulling strategy for better throughput
             if (config.enableBackpressure && controller.desiredSize !== null && controller.desiredSize <= 0) {
               return Promise.resolve(); // Wait for backpressure to clear
@@ -144,7 +144,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
           start(controller) {
             logger.debug('WebStreams WritableStream started with 2024 optimizations');
           },
-          write(chunk, controller) {
+          async write(chunk, controller) {
             // 2024: Optimized write handling with memory management
             if (config.enableBackpressure && typeof chunk === 'object') {
               // Use structured clone for better V8 memory optimization
@@ -171,7 +171,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
           start(controller) {
             logger.debug('WebStreams TransformStream started with 2024 optimizations');
           },
-          transform(chunk, controller) {
+          async transform(chunk, controller) {
             // 2024: Enhanced transform with predictive processing
             const optimized = chunk; // Simplified for TypeScript compatibility
             controller.enqueue(optimized);
@@ -563,7 +563,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
     // 2024: V8 memory optimization techniques
     try {
       // Hint V8 to optimize for memory usage over speed in streaming scenarios
-      if (typeof global !== 'undefined' && global.gc) {
+      if (global?.gc) {
         // Force garbage collection to reclaim streaming buffers
         global.gc();
       }

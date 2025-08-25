@@ -77,7 +77,7 @@ export class IntelligentFileReaderTool extends BaseTool {
       for (let i = 0; i < filesToRead.length; i += batchSize) {
         const batch = filesToRead.slice(i, i + batchSize);
         const batchResults = await Promise.all(
-          batch.map((filePath: string) => this.readSingleFile(filePath, maxFileSize, input))
+          batch.map(async (filePath: string) => this.readSingleFile(filePath, maxFileSize, input))
         );
         results.push(...batchResults);
       }
@@ -98,7 +98,7 @@ export class IntelligentFileReaderTool extends BaseTool {
       }
 
       if (successfulReads.length === 0) {
-        return output + '❌ No files were successfully read.';
+        return `${output  }❌ No files were successfully read.`;
       }
 
       // Show summary statistics
@@ -165,7 +165,7 @@ export class IntelligentFileReaderTool extends BaseTool {
             isTruncated = true;
           }
 
-          output += '```' + (result.metadata?.language?.toLowerCase() || '') + '\n';
+          output += `\`\`\`${  result.metadata?.language?.toLowerCase() || ''  }\n`;
           output += content;
           output += '\n```\n';
 

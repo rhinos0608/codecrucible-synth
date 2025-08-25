@@ -117,7 +117,7 @@ export class E2BCodeExecutionTool extends BaseTool {
     // Add variable context if provided
     if (args.variables && Object.keys(args.variables).length > 0) {
       const variableSetup = this.generateVariableSetup(args.variables, args.language);
-      preparedCode = variableSetup + '\n' + preparedCode;
+      preparedCode = `${variableSetup  }\n${  preparedCode}`;
     }
 
     // Add safety wrappers based on language
@@ -195,7 +195,7 @@ try:
         # User code execution
 ${code
   .split('\n')
-  .map(line => '        ' + line)
+  .map(line => `        ${  line}`)
   .join('\n')}
         
         check_timeout()
@@ -254,7 +254,7 @@ except Exception as e:
 
     // Add necessary imports
     if (pythonCode.includes('math.')) {
-      pythonCode = 'import math\n' + pythonCode;
+      pythonCode = `import math\n${  pythonCode}`;
     }
 
     return pythonCode;

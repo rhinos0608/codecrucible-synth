@@ -164,7 +164,7 @@ export class AnalysisWorkerPool {
    * Cleanup all workers
    */
   async cleanup(): Promise<void> {
-    const terminatePromises = this.workers.map(worker => worker.terminate());
+    const terminatePromises = this.workers.map(async worker => worker.terminate());
     await Promise.allSettled(terminatePromises);
     this.workers = [];
     this.activeWorkers = 0;

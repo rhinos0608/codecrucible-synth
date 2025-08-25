@@ -84,7 +84,7 @@ export class StreamProcessingManager extends EventEmitter implements IStreamProc
   ): Promise<ModelResponse> {
     const requestId = this.generateRequestId();
     logger.info(`🌊 Streaming request ${requestId}`, {
-      prompt: request.prompt.substring(0, 100) + '...',
+      prompt: `${request.prompt.substring(0, 100)  }...`,
     });
 
     this.emit('stream-request-started', { requestId, prompt: request.prompt.substring(0, 100) });

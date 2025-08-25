@@ -140,7 +140,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         {
           fallbackChain: this.config.fallbackChain,
           selectionStrategy: 'balanced',
-          timeoutMs: this.config.performanceThresholds?.timeoutMs || 30000,
+          timeoutMs: this.config.performanceThresholds?.timeoutMs || 110000, // Optimized for Ollama
           maxRetries: 3,
         },
         this.performanceMonitor
@@ -149,8 +149,8 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       injectedDependencies?.requestExecutionManager ||
       new RequestExecutionManager(
         {
-          maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 3,
-          defaultTimeout: this.config.performanceThresholds?.timeoutMs || 30000,
+          maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 1, // CRITICAL: Ollama rate limiting
+          defaultTimeout: this.config.performanceThresholds?.timeoutMs || 110000, // Optimized for Ollama
           complexityTimeouts: {
             simple: 1800000, // 30 minutes - industry standard
             medium: 3600000, // 1 hour - industry standard
@@ -180,7 +180,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.requestProcessingCoreManager =
       injectedDependencies?.requestProcessingCoreManager ||
       new RequestProcessingCoreManager({
-        maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 3,
+        maxConcurrentRequests: this.config.performanceThresholds?.maxConcurrentRequests || 1, // CRITICAL: Ollama rate limiting
         defaultTimeoutMs: this.config.performanceThresholds?.timeoutMs || 180000,
         memoryThresholds: {
           base: 50,

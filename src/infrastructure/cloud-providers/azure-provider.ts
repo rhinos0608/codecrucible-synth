@@ -563,7 +563,7 @@ export class AzureProvider {
     for (let i = 0; i < 16; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    return password + 'Aa1!'; // Ensure complexity requirements
+    return `${password  }Aa1!`; // Ensure complexity requirements
   }
 
   /**

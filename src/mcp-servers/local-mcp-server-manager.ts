@@ -41,8 +41,8 @@ export class LocalMCPServerManager {
 
   constructor() {
     // Graceful shutdown handling
-    process.on('SIGINT', () => this.shutdown());
-    process.on('SIGTERM', () => this.shutdown());
+    process.on('SIGINT', async () => this.shutdown());
+    process.on('SIGTERM', async () => this.shutdown());
   }
 
   /**
@@ -74,7 +74,7 @@ export class LocalMCPServerManager {
 
     const startPromises = configs
       .filter(config => config.enabled)
-      .map(config => this.startServer(config));
+      .map(async config => this.startServer(config));
 
     await Promise.allSettled(startPromises);
 
@@ -336,7 +336,7 @@ export class LocalMCPServerManager {
     this.isShuttingDown = true;
     logger.info('Shutting down all local MCP servers...');
 
-    const shutdownPromises = Array.from(this.servers.keys()).map(serverId =>
+    const shutdownPromises = Array.from(this.servers.keys()).map(async serverId =>
       this.stopServer(serverId).catch(error => 
         logger.error(`Error stopping server ${serverId}:`, error)
       )

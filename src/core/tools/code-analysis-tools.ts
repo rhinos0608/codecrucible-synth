@@ -20,7 +20,7 @@ async function tryImportESLint(): Promise<any> {
     const eslintModule = await import('eslint');
 
     // Validate that ESLint was imported correctly
-    if (!eslintModule || !eslintModule.ESLint) {
+    if (!eslintModule?.ESLint) {
       throw new Error('ESLint module imported but ESLint class not found');
     }
 
@@ -68,7 +68,7 @@ async function tryImportTypeScript(): Promise<any> {
     const tsModule = await import('typescript');
 
     // Validate that TypeScript was imported correctly
-    if (!tsModule || !tsModule.createProgram) {
+    if (!tsModule?.createProgram) {
       throw new Error('TypeScript module imported but createProgram function not found');
     }
 
@@ -135,7 +135,7 @@ export class LintCodeTool extends BaseTool {
     // Log the received arguments for debugging
     console.log('LintCodeTool received args:', JSON.stringify(args, null, 2));
 
-    if (!args || !args.path || args.path.trim() === '') {
+    if (!args?.path || args.path.trim() === '') {
       return [
         {
           filePath: args?.path || 'undefined',
@@ -144,8 +144,8 @@ export class LintCodeTool extends BaseTool {
               ruleId: null,
               severity: 2,
               message:
-                'Path parameter is required for lintCode tool. Received args: ' +
-                JSON.stringify(args),
+                `Path parameter is required for lintCode tool. Received args: ${ 
+                JSON.stringify(args)}`,
               line: 1,
               column: 1,
             },
@@ -300,9 +300,9 @@ export class GetAstTool extends BaseTool {
     // Log the received arguments for debugging
     console.log('GetAstTool received args:', JSON.stringify(args, null, 2));
 
-    if (!args || !args.path || args.path.trim() === '') {
+    if (!args?.path || args.path.trim() === '') {
       return {
-        error: 'Path parameter is required for getAst tool. Received args: ' + JSON.stringify(args),
+        error: `Path parameter is required for getAst tool. Received args: ${  JSON.stringify(args)}`,
         fileName: args?.path || 'undefined',
         kind: 'InvalidInput',
         text: 'Invalid or missing path parameter',

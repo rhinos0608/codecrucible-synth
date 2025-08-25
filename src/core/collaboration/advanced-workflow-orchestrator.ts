@@ -493,7 +493,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
     assignments: Map<string, string[]>
   ): Promise<void> {
     const stageTasks = this.getStageTaskIds(stage);
-    const promises = stageTasks.map(taskId => this.executeTask(taskId));
+    const promises = stageTasks.map(async taskId => this.executeTask(taskId));
 
     await Promise.allSettled(promises);
   }
@@ -518,7 +518,7 @@ export class AdvancedWorkflowOrchestrator extends EventEmitter {
    */
   private async executeTask(taskId: string): Promise<TaskResult> {
     const task = this.tasks.get(taskId);
-    if (!task || !task.assignedAgent) {
+    if (!task?.assignedAgent) {
       throw new Error(`Invalid task or assignment: ${taskId}`);
     }
 

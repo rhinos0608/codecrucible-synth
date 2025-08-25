@@ -27,25 +27,27 @@ export class OllamaProvider {
     this.config = {
       endpoint: config.endpoint || 'http://localhost:11434',
       model: config.model, // Will be set by autonomous detection
-      timeout: config.timeout || 30000, // Reduced timeout for better responsiveness
+      timeout: config.timeout || 110000, // 110s - optimized for Ollama 2-minute hard limit with 10s buffer
     };
 
     this.model = this.config.model || 'auto-detect'; // Mark for autonomous detection
     logger.debug('OllamaProvider model state', { model: this.model });
 
-    // Create HTTP agents with connection pooling for performance optimization
+    // CRITICAL FIX: Removed socket timeout to prevent 472ms context canceled errors
     const httpAgent = new http.Agent({
       keepAlive: true,
-      maxSockets: 10, // Max concurrent connections
-      maxFreeSockets: 5, // Keep 5 idle connections
-      timeout: 5000, // Socket timeout
+      maxSockets: 5,      // Reduced concurrent connections for stability
+      maxFreeSockets: 2,  // Fewer idle connections to prevent stale issues
+      keepAliveMsecs: 30000, // 30s keepalive interval
+      // timeout removed - let axios handle timeouts to prevent conflicts
     });
 
     const httpsAgent = new https.Agent({
       keepAlive: true,
-      maxSockets: 10,
-      maxFreeSockets: 5,
-      timeout: 5000,
+      maxSockets: 5,
+      maxFreeSockets: 2,
+      keepAliveMsecs: 30000,
+      // timeout removed - prevents socket timeout conflicts
     });
 
     this.httpClient = axios.create({
@@ -137,17 +139,43 @@ export class OllamaProvider {
     const abortController = externalAbortSignal ? undefined : new AbortController();
     const effectiveAbortSignal = externalAbortSignal || abortController?.signal;
 
-    let timeoutId: NodeJS.Timeout | undefined;
-    if (!externalAbortSignal && abortController) {
-      timeoutId = setTimeout(() => {
-        logger.debug('Ollama request timeout, aborting');
-        abortController.abort();
-      }, this.config.timeout || 30000);
-    }
+    // CRITICAL FIX: Removed redundant timeout handling - let axios manage timeouts
+    // This prevents conflicting timeout layers that cause "context canceled" errors
 
     try {
       const hasTools = request.tools && request.tools.length > 0;
       const endpoint = hasTools ? '/api/chat' : '/api/generate';
+      
+      // CRITICAL FIX 3: Connection health validation
+      const connectionHealth = await this.validateConnectionHealth();
+      if (!connectionHealth.isHealthy) {
+        logger.warn('Connection health check failed, refreshing connection', {
+          reason: connectionHealth.reason,
+          lastSuccessfulRequest: connectionHealth.lastSuccessfulRequest
+        });
+        
+        // Force new connection by clearing any potential stale state
+        this.refreshConnection();
+      }
+
+      // CRITICAL: Context window validation to prevent 500 errors
+      if (hasTools) {
+        const contextValidation = this.validateRequestContext(request);
+        if (!contextValidation.isValid) {
+          logger.warn('Request exceeds context limits, reducing tools', {
+            originalToolCount: request.tools?.length || 0,
+            estimatedTokens: contextValidation.estimatedTokens,
+            maxContext: contextValidation.maxContext,
+            reason: contextValidation.reason
+          });
+          
+          // Progressively reduce tools to fit context
+          request.tools = this.reduceToolsForContext(request.tools || [], contextValidation.maxContext);
+          logger.info('Tools reduced for context compatibility', {
+            newToolCount: request.tools.length
+          });
+        }
+      }
       
       let requestBody: any;
       
@@ -176,7 +204,7 @@ export class OllamaProvider {
           url: `${this.config.endpoint}${endpoint}`,
           model: this.model,
           toolCount: request.tools.length,
-          messageContent: request.prompt?.substring(0, 100) + '...',
+          messageContent: `${request.prompt?.substring(0, 100)  }...`,
         });
       } else {
         // Use generate format for regular text
@@ -205,7 +233,7 @@ export class OllamaProvider {
         timeout: this.config.timeout,
       });
 
-      if (timeoutId) clearTimeout(timeoutId);
+      // Timeout cleanup removed - axios handles timeout cleanup automatically
       logger.debug('Received response from Ollama API');
 
       const responseData = response.data;
@@ -218,7 +246,7 @@ export class OllamaProvider {
           logger.debug('Ollama tool calls detected (chat format)', {
             toolCallCount: message.tool_calls.length,
             toolNames: message.tool_calls.map((call: any) => call.function?.name),
-            messageContent: message.content?.substring(0, 100) + '...'
+            messageContent: `${message.content?.substring(0, 100)  }...`
           });
           
           return {
@@ -301,9 +329,87 @@ export class OllamaProvider {
         };
       }
 
+      // CRITICAL FIX 2: Enhanced tool call detection from response content
+      // Local LLMs often return tool calls as JSON in the content instead of structured toolCalls
+      const rawContent = responseData.response || '';
+      const detectedToolCalls: any[] = [];
+      
+      // Try to parse tool calls from content using multiple patterns
+      if (rawContent && typeof rawContent === 'string') {
+        const cleanContent = rawContent.trim();
+        
+        // Pattern 1: Direct JSON object {"name": "...", "arguments": {...}}
+        if (cleanContent.startsWith('{') && cleanContent.includes('"name"') && cleanContent.includes('"arguments"')) {
+          try {
+            const parsed = JSON.parse(cleanContent);
+            if (parsed.name) {
+              detectedToolCalls.push({
+                name: parsed.name,
+                arguments: parsed.arguments || {},
+                function: {
+                  name: parsed.name,
+                  arguments: parsed.arguments || {}
+                }
+              });
+              logger.debug('Ollama: Parsed tool call from JSON content', {
+                toolName: parsed.name,
+                content: `${cleanContent.substring(0, 100)  }...`
+              });
+            }
+          } catch (error) {
+            logger.debug('Failed to parse JSON tool call from content', { content: cleanContent.substring(0, 100) });
+          }
+        }
+        
+        // Pattern 2: Markdown code block with JSON
+        const codeBlockMatch = cleanContent.match(/```json\s*(\{[^}]+\})\s*```/);
+        if (codeBlockMatch && !detectedToolCalls.length) {
+          try {
+            const parsed = JSON.parse(codeBlockMatch[1]);
+            if (parsed.name) {
+              detectedToolCalls.push({
+                name: parsed.name,
+                arguments: parsed.arguments || {},
+                function: {
+                  name: parsed.name,
+                  arguments: parsed.arguments || {}
+                }
+              });
+              logger.debug('Ollama: Parsed tool call from markdown JSON block', {
+                toolName: parsed.name
+              });
+            }
+          } catch (error) {
+            logger.debug('Failed to parse markdown JSON tool call');
+          }
+        }
+      }
+      
+      // If we detected tool calls from content, return them in the expected format
+      if (detectedToolCalls.length > 0) {
+        logger.debug('Ollama: Enhanced tool call detection successful', {
+          toolCallCount: detectedToolCalls.length,
+          toolNames: detectedToolCalls.map(call => call.name),
+          originalContent: `${rawContent.substring(0, 100)  }...`
+        });
+        
+        return {
+          content: rawContent,
+          toolCalls: detectedToolCalls,
+          usage: {
+            totalTokens: (responseData.prompt_eval_count || 0) + (responseData.eval_count || 0),
+            promptTokens: responseData.prompt_eval_count || 0,
+            completionTokens: responseData.eval_count || 0,
+          },
+          done: responseData.done || true,
+          model: this.model,
+          provider: 'ollama',
+        };
+      }
+
       // Regular generate response without tools
       const finalResponse = {
-        content: responseData.response || '',
+        content: rawContent,
         usage: {
           totalTokens: (responseData.prompt_eval_count || 0) + (responseData.eval_count || 0),
           promptTokens: responseData.prompt_eval_count || 0,
@@ -335,7 +441,7 @@ export class OllamaProvider {
       
       return finalResponse;
     } catch (error: unknown) {
-      if (timeoutId) clearTimeout(timeoutId);
+      // Timeout cleanup removed - axios handles timeout cleanup automatically
       logger.error('Ollama API error', error);
       
       // Record failed request metrics
@@ -622,5 +728,146 @@ export class OllamaProvider {
       num_batch: 64,
       num_ctx: 8192,
     };
+  }
+
+  /**
+   * CRITICAL: Validate request context to prevent Ollama 500 errors
+   * This addresses the root cause of 6.25-second failures
+   */
+  private validateRequestContext(request: any): {
+    isValid: boolean;
+    estimatedTokens: number;
+    maxContext: number;
+    reason?: string;
+  } {
+    // Model-specific context limits (conservative estimates)
+    const contextLimits: Record<string, number> = {
+      'gemma:latest': 6000,     // Conservative limit for 9B Gemma
+      'llama2:latest': 3000,    // 7B model
+      'llama3:latest': 6000,    // 8B model  
+      'qwen2.5-coder:7b': 6000, // Coding model
+      'default': 4000           // Safe default
+    };
+
+    const maxContext = contextLimits[this.model] || contextLimits['default'];
+    
+    // Estimate token usage
+    const promptTokens = Math.ceil((request.prompt || '').length / 4); // Rough 4 chars = 1 token
+    const toolTokens = (request.tools || []).length * 150; // ~150 tokens per tool definition
+    const systemTokens = 100; // System prompt overhead
+    const bufferTokens = 500; // Safety buffer for response
+    
+    const estimatedTokens = promptTokens + toolTokens + systemTokens + bufferTokens;
+    
+    if (estimatedTokens > maxContext) {
+      return {
+        isValid: false,
+        estimatedTokens,
+        maxContext,
+        reason: `Estimated ${estimatedTokens} tokens exceeds ${maxContext} limit for ${this.model}`
+      };
+    }
+
+    return {
+      isValid: true,
+      estimatedTokens,
+      maxContext
+    };
+  }
+
+  /**
+   * Progressively reduce tools to fit within context limits
+   */
+  private reduceToolsForContext(tools: any[], maxContext: number): any[] {
+    if (tools.length <= 1) return tools; // Can't reduce further
+    
+    // Prioritize essential file operations
+    const essentialTools = ['filesystem_write_file', 'filesystem_read_file', 'filesystem_list_directory'];
+    
+    const prioritizedTools = [
+      ...tools.filter(tool => {
+        const name = tool.function?.name || tool.name;
+        return essentialTools.includes(name);
+      }),
+      ...tools.filter(tool => {
+        const name = tool.function?.name || tool.name;
+        return !essentialTools.includes(name);
+      })
+    ];
+    
+    // Keep reducing until we fit in context (max 2 tools for reliability)
+    for (let i = Math.min(2, prioritizedTools.length); i >= 1; i--) {
+      const reducedTools = prioritizedTools.slice(0, i);
+      const toolTokens = reducedTools.length * 150;
+      
+      if (toolTokens + 1000 < maxContext) { // Leave room for prompt + buffer
+        return reducedTools;
+      }
+    }
+    
+    // Fallback: single most essential tool
+    return prioritizedTools.slice(0, 1);
+  }
+
+  /**
+   * CRITICAL FIX 3: Validate connection health to prevent stale connections
+   */
+  private async validateConnectionHealth(): Promise<{
+    isHealthy: boolean;
+    reason?: string;
+    lastSuccessfulRequest?: number;
+  }> {
+    try {
+      // Quick health check with minimal timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for health check
+
+      const response = await this.httpClient.get('/api/tags', {
+        signal: controller.signal,
+        timeout: 2000,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.status === 200) {
+        return { isHealthy: true };
+      }
+
+      return {
+        isHealthy: false,
+        reason: `Health check returned status ${response.status}`
+      };
+
+    } catch (error: any) {
+      return {
+        isHealthy: false,
+        reason: `Health check failed: ${error.message || 'Connection error'}`
+      };
+    }
+  }
+
+  /**
+   * CRITICAL FIX 3: Refresh connection to clear stale state
+   */
+  private refreshConnection(): void {
+    // Recreate HTTP client with fresh connection pool
+    const httpAgent = new http.Agent({
+      keepAlive: true,
+      maxSockets: 5,      // Reduced concurrent connections for stability
+      maxFreeSockets: 2,  // Fewer idle connections to prevent stale issues
+      keepAliveMsecs: 30000, // 30s keepalive interval
+      // timeout removed - let axios handle timeouts to prevent conflicts
+    });
+
+    this.httpClient = axios.create({
+      baseURL: this.config.endpoint,
+      timeout: this.config.timeout,
+      httpAgent,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    logger.debug('Connection refreshed with new HTTP client');
   }
 }

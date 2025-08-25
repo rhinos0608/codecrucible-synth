@@ -86,7 +86,7 @@ export class EnhancedReadFileTool extends BaseTool {
       allPaths = [...new Set(allPaths)].slice(0, args.maxFiles);
 
       // Read all files
-      const results = await Promise.all(allPaths.map(path => this.readSingleFile(path, args)));
+      const results = await Promise.all(allPaths.map(async path => this.readSingleFile(path, args)));
 
       // Filter out errors and organize results
       const successful = results.filter(r => !r.error);

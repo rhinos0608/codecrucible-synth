@@ -365,7 +365,7 @@ export class CLICommands {
               } else if (chunk.analysis) {
                 console.log(chalk.green(`✅ Successfully analyzed ${chunk.files.length} files`));
                 if (chunk.analysis.length > 0) {
-                  console.log(chalk.white(chunk.analysis[0].content.substring(0, 200) + '...'));
+                  console.log(chalk.white(`${chunk.analysis[0].content.substring(0, 200)  }...`));
                 }
               }
             });

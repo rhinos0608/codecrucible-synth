@@ -661,23 +661,57 @@ Provide helpful, concise responses with practical value.`;
       hasGenerateText: !!this.modelClient?.generateText
     });
 
+    // CRITICAL FIX 3: Voice system tool integration
+    // Get available tools for enhanced AI capabilities
+    let availableTools: any[] = [];
+    try {
+      // Access tools from the model client if available
+      if (this.modelClient?.getAvailableTools) {
+        availableTools = await this.modelClient.getAvailableTools();
+      } else if (this.modelClient?.tools) {
+        availableTools = this.modelClient.tools;
+      } else if (this.modelClient?.getToolIntegration) {
+        const toolIntegration = this.modelClient.getToolIntegration();
+        if (toolIntegration?.getAllLLMFunctions) {
+          availableTools = await toolIntegration.getAllLLMFunctions();
+        }
+      }
+      
+      logger.debug('Voice system: Available tools for enhanced AI capabilities', {
+        voiceId,
+        toolCount: availableTools.length,
+        hasTools: availableTools.length > 0
+      });
+    } catch (error) {
+      logger.debug('Voice system: Failed to get tools, continuing without tools', {
+        voiceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+
     let response;
     if (this.modelClient?.generateVoiceResponse) {
       logger.info('🔥 VOICE DEBUG: Using generateVoiceResponse method');
       response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
         temperature: voice.temperature,
+        tools: availableTools,
+        maxTokens: 4096
       });
     } else if (this.modelClient?.processRequest) {
       logger.info('🔥 VOICE DEBUG: Using processRequest method');
       response = await this.modelClient.processRequest({
         prompt: enhancedPrompt,
         temperature: voice.temperature,
+        tools: availableTools,
+        maxTokens: 4096
       });
     } else if (this.modelClient?.generateText) {
       // Fallback to basic generateText method
       logger.info('🔥 VOICE DEBUG: Using generateText method');
       const textResponse = await this.modelClient.generateText(enhancedPrompt, {
         temperature: voice.temperature,
+        tools: availableTools,
+        maxTokens: 4096
       });
       response = { content: textResponse };
     } else {
@@ -685,8 +719,21 @@ Provide helpful, concise responses with practical value.`;
     }
 
     // Normalize response format
+    let content = response.content || response.text || response.response || '';
+    
+    // CRITICAL FIX: Handle Buffer/ArrayBuffer responses to prevent "string 58" display issue
+    if (Buffer.isBuffer(content)) {
+      content = content.toString('utf8');
+    } else if (content instanceof ArrayBuffer) {
+      content = Buffer.from(content).toString('utf8');
+    } else if (content && typeof content === 'object' && content.constructor === Uint8Array) {
+      content = Buffer.from(content).toString('utf8');
+    } else if (typeof content !== 'string') {
+      content = String(content);
+    }
+    
     return {
-      content: response.content || response.text || response.response || '',
+      content: content,
       voice: voice.name,
       voiceId: voice.id,
       confidence: response.confidence || 0.8,

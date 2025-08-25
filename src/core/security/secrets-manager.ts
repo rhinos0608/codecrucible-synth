@@ -507,37 +507,86 @@ export class SecretsManager {
    * Decrypt a secret (internal method)
    */
   private async decryptSecretInternal(encrypted: EncryptedSecret): Promise<SecretConfig> {
-    const salt = Buffer.from(encrypted.salt, 'base64');
-    const iv = Buffer.from(encrypted.iv, 'base64');
-    const authTag = Buffer.from(encrypted.authTag, 'base64');
+    try {
+      // Validate inputs first
+      if (!this.masterKey) {
+        throw new Error('Master key not initialized');
+      }
 
-    // Derive decryption key
-    const key = crypto.pbkdf2Sync(
-      this.masterKey!,
-      salt,
-      this.config.encryption.iterations,
-      this.config.encryption.keyLength,
-      'sha256'
-    );
+      if (!encrypted.salt || !encrypted.iv || !encrypted.authTag) {
+        throw new Error('Missing required encryption components');
+      }
 
-    // Decrypt the value using GCM for authenticated decryption
-    const decipher = crypto.createDecipheriv(encrypted.algorithm, key, iv);
-    (decipher as any).setAuthTag(authTag);
-    let decrypted = decipher.update(encrypted.encryptedValue, 'base64', 'utf8');
-    decrypted += decipher.final('utf8');
+      // Enhanced buffer validation
+      let salt: Buffer, iv: Buffer, authTag: Buffer;
+      
+      try {
+        salt = Buffer.from(encrypted.salt, 'base64');
+        iv = Buffer.from(encrypted.iv, 'base64');
+        authTag = Buffer.from(encrypted.authTag, 'base64');
+      } catch (error: any) {
+        throw new Error(`Invalid base64 encoding in encrypted secret: ${error.message}`);
+      }
 
-    return {
-      name: encrypted.name,
-      value: decrypted,
-      description: encrypted.metadata.description,
-      tags: encrypted.metadata.tags || [],
-      expiresAt: encrypted.metadata.expiresAt ? new Date(encrypted.metadata.expiresAt) : undefined,
-      createdAt: new Date(encrypted.metadata.createdAt),
-      lastAccessed: encrypted.metadata.lastAccessed
-        ? new Date(encrypted.metadata.lastAccessed)
-        : undefined,
-      accessCount: encrypted.metadata.accessCount,
-    };
+      // Validate buffer lengths
+      if (salt.length !== this.config.encryption.saltLength) {
+        throw new Error(`Invalid salt length: expected ${this.config.encryption.saltLength}, got ${salt.length}`);
+      }
+      
+      if (iv.length !== this.config.encryption.ivLength) {
+        throw new Error(`Invalid IV length: expected ${this.config.encryption.ivLength}, got ${iv.length}`);
+      }
+
+      // Key derivation with error handling
+      let key: Buffer;
+      try {
+        key = crypto.pbkdf2Sync(
+          this.masterKey,
+          salt,
+          this.config.encryption.iterations,
+          this.config.encryption.keyLength,
+          'sha256'
+        );
+      } catch (error: any) {
+        throw new Error(`Key derivation failed: ${error.message}`);
+      }
+
+      // GCM decryption with enhanced error handling
+      let decrypted: string;
+      try {
+        const decipher = crypto.createDecipheriv(encrypted.algorithm, key, iv);
+        (decipher as any).setAuthTag(authTag);
+        
+        decrypted = decipher.update(encrypted.encryptedValue, 'base64', 'utf8');
+        decrypted += decipher.final('utf8');
+      } catch (error: any) {
+        if (error.message?.includes('Unsupported state or unable to authenticate data')) {
+          throw new Error(`GCM authentication failed - data may be corrupted or master key incorrect: ${error.message}`);
+        }
+        throw error;
+      }
+
+      return {
+        name: encrypted.name,
+        value: decrypted,
+        description: encrypted.metadata.description,
+        tags: encrypted.metadata.tags || [],
+        expiresAt: encrypted.metadata.expiresAt ? new Date(encrypted.metadata.expiresAt) : undefined,
+        createdAt: new Date(encrypted.metadata.createdAt),
+        lastAccessed: encrypted.metadata.lastAccessed
+          ? new Date(encrypted.metadata.lastAccessed)
+          : undefined,
+        accessCount: encrypted.metadata.accessCount,
+      };
+    } catch (error: any) {
+      logger.error('Secret decryption failed', error, {
+        secretName: encrypted.name,
+        algorithm: encrypted.algorithm,
+        hasAuthTag: !!encrypted.authTag,
+        hasMasterKey: !!this.masterKey
+      });
+      throw error;
+    }
   }
 
   /**

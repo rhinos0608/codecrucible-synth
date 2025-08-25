@@ -582,7 +582,7 @@ class ParallelHandler extends PatternHandler {
 
       await Promise.race(promises);
       promises.splice(
-        promises.findIndex(p => p),
+        promises.findIndex(async p => p),
         1
       );
     }
@@ -1459,7 +1459,7 @@ class BranchingHandler extends PatternHandler {
     } else {
       // Evaluate branches in parallel
       const evaluations = await Promise.all(
-        sortedBranches.map(branch => this.evaluateBranch(branch, context))
+        sortedBranches.map(async branch => this.evaluateBranch(branch, context))
       );
 
       evaluationResults = evaluations;
@@ -1940,21 +1940,21 @@ class MemoryHandler extends PatternHandler {
 
     switch (memoryType) {
       case 'short':
-        memoryContext = 'Recent context:\n' + memories.map(m => `- ${m.content}`).join('\n');
+        memoryContext = `Recent context:\n${  memories.map(m => `- ${m.content}`).join('\n')}`;
         break;
       case 'long':
         memoryContext =
-          'Relevant long-term knowledge:\n' +
-          memories.map(m => `[${m.importance}] ${m.content}`).join('\n');
+          `Relevant long-term knowledge:\n${ 
+          memories.map(m => `[${m.importance}] ${m.content}`).join('\n')}`;
         break;
       case 'episodic':
         memoryContext =
-          'Related episodes:\n' +
-          memories.map(m => `Episode ${m.episodeId}: ${m.content}`).join('\n');
+          `Related episodes:\n${ 
+          memories.map(m => `Episode ${m.episodeId}: ${m.content}`).join('\n')}`;
         break;
       case 'semantic':
         memoryContext =
-          'Semantic knowledge:\n' + memories.map(m => `${m.category}: ${m.content}`).join('\n');
+          `Semantic knowledge:\n${  memories.map(m => `${m.category}: ${m.content}`).join('\n')}`;
         break;
     }
 

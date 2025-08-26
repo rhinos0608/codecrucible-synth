@@ -9,30 +9,30 @@
  */
 
 // Core Domain Entities
-export { Model, ModelFactory, ModelParameters, ModelConfiguration } from './entities/model.js';
-export { Voice, VoiceConfiguration, VoiceFactory } from './entities/voice.js';
+export { Model, ModelFactory } from './entities/model.js';
+export type { ModelParameters, ModelConfiguration } from './entities/model.js';
+export { Voice, VoiceFactory } from './entities/voice.js';
+export type { VoiceConfiguration } from './entities/voice.js';
 export { ProcessingRequest } from './entities/request.js';
 
 // Execution Domain
-export { 
-  ReasoningStep, 
+export { ReasoningStep } from './entities/reasoning-step.js';
+export type { 
   ReasoningStepType, 
   ConfidenceScore, 
   ToolArguments,
   ReasoningStepConfiguration
 } from './entities/reasoning-step.js';
 
-export { 
-  ExecutionPlan, 
-  Goal, 
-  Domain, 
+export { ExecutionPlan, Goal, Domain } from './entities/execution-plan.js';
+export type { 
   StepEstimate, 
   SelectedTools,
   ExecutionPlanConfiguration
 } from './entities/execution-plan.js';
 
-export { 
-  ToolExecution, 
+export { ToolExecution } from './entities/tool-execution.js';
+export type { 
   ToolName, 
   ExecutionStatus,
   ToolResult,
@@ -40,10 +40,8 @@ export {
   ToolExecutionConfiguration
 } from './entities/tool-execution.js';
 
-export { 
-  WorkflowTemplate, 
-  WorkflowStep, 
-  WorkflowTrigger, 
+export { WorkflowTemplate, WorkflowStep, WorkflowTrigger } from './entities/workflow-template.js';
+export type { 
   RequiredTools, 
   TargetResources, 
   WorkflowStepPriority,
@@ -51,8 +49,8 @@ export {
 } from './entities/workflow-template.js';
 
 // Routing Domain
-export { 
-  RoutingDecision, 
+export { RoutingDecision } from './entities/routing-decision.js';
+export type { 
   TaskComplexity, 
   RoutingPriority, 
   ModelSelectionCriteria, 
@@ -62,7 +60,7 @@ export {
 } from './entities/routing-decision.js';
 
 // Value Objects
-export { 
+export type { 
   VoiceStyle, 
   VoiceTemperature, 
   ProviderType, 
@@ -70,7 +68,7 @@ export {
   RequestPriority 
 } from './value-objects/voice-values.js';
 
-export { 
+export type { 
   ExecutionId, 
   TaskDescription, 
   ErrorMessage, 
@@ -81,20 +79,16 @@ export {
 } from './value-objects/execution-values.js';
 
 // Repository Interfaces (Pure domain interfaces - no implementations)
-export { 
+export type { 
   IModelRepository
 } from './repositories/model-repository.js';
 
-export { 
+export type { 
   IVoiceRepository
 } from './repositories/voice-repository.js';
 
-export { 
-  ReasoningStepRepository, 
-  ExecutionPlanRepository, 
-  ToolExecutionRepository, 
-  WorkflowTemplateRepository, 
-  ExecutionQueryRepository,
+export type { ReasoningStepRepository, ExecutionPlanRepository, ToolExecutionRepository, WorkflowTemplateRepository, ExecutionQueryRepository } from './repositories/execution-repository.js';
+export type {
   ExecutionStatistics,
   PlanMetrics,
   ExecutionResults,
@@ -103,7 +97,7 @@ export {
   ExecutionInsights
 } from './repositories/execution-repository.js';
 
-export { 
+export type { 
   RoutingDecisionRepository, 
   ModelAvailabilityRepository, 
   RoutingAnalyticsRepository, 
@@ -130,8 +124,8 @@ export {
   VoiceOrchestrationService
 } from './services/voice-orchestration-service.js';
 
-export { 
-  ExecutionOrchestrationService, 
+export { ExecutionOrchestrationService } from './services/execution-orchestration-service.js';
+export type { 
   ExecutionContext, 
   ExecutionPreferences, 
   ExecutionResult,
@@ -139,15 +133,12 @@ export {
   ContinuationDecision
 } from './services/execution-orchestration-service.js';
 
-export { 
-  ModelRoutingService, 
+export { ModelRoutingService, PerformanceFirstStrategy, QualityFirstStrategy, BalancedRoutingStrategy } from './services/model-routing-service.js';
+export type { 
   RoutingRequest, 
   RequestContext, 
   ModelScoringResult, 
   RoutingStrategy, 
-  PerformanceFirstStrategy, 
-  QualityFirstStrategy, 
-  BalancedRoutingStrategy,
   RoutingEvaluation,
   StrategyOptimization
 } from './services/model-routing-service.js';

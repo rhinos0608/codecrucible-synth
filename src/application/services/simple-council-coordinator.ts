@@ -101,14 +101,15 @@ export class SimpleCouncilCoordinator {
   }
 
   private transformToProcessingRequest(request: CouncilRequest): ProcessingRequest {
-    return ProcessingRequest.create({
-      prompt: request.prompt,
-      type: 'council-decision',
-      constraints: {
+    return ProcessingRequest.create(
+      request.prompt,
+      'council-decision' as any,
+      'medium',
+      request.context || {},
+      {
         mustIncludeVoices: request.voiceIds,
-      },
-      context: request.context || {},
-    });
+      }
+    );
   }
 
   private async generateVoiceResponses(
@@ -120,15 +121,16 @@ export class SimpleCouncilCoordinator {
     
     for (const voiceId of voiceIds) {
       try {
-        const voiceRequest = ProcessingRequest.create({
-          prompt: request.prompt,
-          type: request.type,
-          constraints: { 
+        const voiceRequest = ProcessingRequest.create(
+          request.prompt,
+          request.type as any,
+          'medium',
+          request.context,
+          { 
             ...request.constraints, 
             mustIncludeVoices: [voiceId] 
-          },
-          context: request.context,
-        });
+          }
+        );
 
         const response = await model.generateResponse(voiceRequest, { id: voiceId });
         
@@ -157,7 +159,7 @@ export class SimpleCouncilCoordinator {
   }
 
   private mapSynthesisMode(mode: string): any {
-    const modeMap = {
+    const modeMap: Record<string, string> = {
       collaborative: 'COLLABORATIVE',
       competitive: 'COMPETITIVE',
       consensus: 'CONSENSUS',

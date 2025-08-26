@@ -6,7 +6,7 @@
  * Imports: Domain services only (follows ARCHITECTURE.md)
  */
 
-import { IVoiceOrchestrationService, VoiceSelectionPreferences } from '../../domain/services/voice-orchestration-service.js';
+import { IVoiceOrchestrationService, VoiceSelectionPreferences, SynthesisMode } from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
 import { Voice } from '../../domain/entities/voice.js';
@@ -108,24 +108,26 @@ export class MultiVoiceSynthesisUseCase {
   }
 
   private transformToProcessingRequest(input: MultiVoiceSynthesisInput): ProcessingRequest {
-    return ProcessingRequest.create({
-      prompt: input.prompt,
-      type: 'multi-voice-synthesis',
-      constraints: {
+    return new ProcessingRequest(
+      `request-${Date.now()}`, // id
+      input.prompt, // content
+      'multi-voice-synthesis' as any, // type
+      'medium' as any, // priority
+      input.context || {}, // context
+      {
         mustIncludeVoices: input.requiredVoices,
         excludedVoices: input.excludedVoices,
-      },
-      context: input.context || {},
-    });
+      } // constraints
+    );
   }
 
   private transformToVoicePreferences(input: MultiVoiceSynthesisInput): VoiceSelectionPreferences {
     return {
       maxVoices: input.voiceCount || 3,
       minVoices: Math.max(2, Math.min(input.voiceCount || 2, 2)), // At least 2 for multi-voice
-      synthesisMode: input.synthesisMode === 'competitive' ? 'COMPETITIVE' :
-                     input.synthesisMode === 'consensus' ? 'CONSENSUS' :
-                     input.synthesisMode === 'weighted' ? 'WEIGHTED' : 'COLLABORATIVE',
+      synthesisMode: input.synthesisMode === 'competitive' ? SynthesisMode.COMPETITIVE :
+                     input.synthesisMode === 'consensus' ? SynthesisMode.CONSENSUS :
+                     input.synthesisMode === 'weighted' ? SynthesisMode.WEIGHTED : SynthesisMode.COLLABORATIVE,
       preferredVoices: input.requiredVoices,
       diversityWeight: 0.7,
     };
@@ -185,7 +187,7 @@ export class MultiVoiceSynthesisUseCase {
         voiceName: voice?.name || 'Unknown Voice',
         content: response.content,
         confidence: response.confidence,
-        expertise: voice?.expertise || [],
+        expertise: voice?.expertise ? [...voice.expertise] : [],
       };
     });
 

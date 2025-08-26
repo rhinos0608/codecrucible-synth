@@ -16,7 +16,8 @@ import {
   FileSecurityPolicy, 
   FileAccessRequest, 
   FileOperation as SecurityFileOperation,
-  PolicyUseCase 
+  PolicyUseCase,
+  RiskLevel
 } from '../domain/services/file-security-service.js';
 
 // Application layer interfaces
@@ -118,6 +119,24 @@ export class FileOperationsAdapter extends EventEmitter {
   async initialize(): Promise<void> {
     await this.fileSystemClient.initialize();
     this.emit('initialized');
+  }
+
+  /**
+   * Helper function to compare RiskLevel enum values and return the higher risk
+   */
+  private getHigherRiskLevel(risk1: RiskLevel, risk2: RiskLevel): RiskLevel {
+    const riskLevels = {
+      [RiskLevel.MINIMAL]: 0,
+      [RiskLevel.LOW]: 1,
+      [RiskLevel.MEDIUM]: 2,
+      [RiskLevel.HIGH]: 3,
+      [RiskLevel.CRITICAL]: 4
+    };
+    
+    const score1 = riskLevels[risk1] || 0;
+    const score2 = riskLevels[risk2] || 0;
+    
+    return score1 >= score2 ? risk1 : risk2;
   }
 
   // Secure File Operations
@@ -398,7 +417,7 @@ export class FileOperationsAdapter extends EventEmitter {
         return {
           success: false,
           securityViolations: combinedViolations,
-          riskLevel: Math.max(sourceValidation.riskLevel, targetValidation.riskLevel) as any,
+          riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
           operationId,
           timestamp,
           error: 'Security validation failed',
@@ -430,7 +449,7 @@ export class FileOperationsAdapter extends EventEmitter {
       return {
         success: true,
         securityViolations: combinedViolations,
-        riskLevel: Math.max(sourceValidation.riskLevel, targetValidation.riskLevel) as any,
+        riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
         operationId,
         timestamp,
       };
@@ -486,7 +505,7 @@ export class FileOperationsAdapter extends EventEmitter {
         return {
           success: false,
           securityViolations: combinedViolations,
-          riskLevel: Math.max(sourceValidation.riskLevel, targetValidation.riskLevel) as any,
+          riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
           operationId,
           timestamp,
           error: 'Security validation failed',
@@ -518,7 +537,7 @@ export class FileOperationsAdapter extends EventEmitter {
       return {
         success: true,
         securityViolations: combinedViolations,
-        riskLevel: Math.max(sourceValidation.riskLevel, targetValidation.riskLevel) as any,
+        riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
         operationId,
         timestamp,
       };

@@ -30,6 +30,10 @@ export interface SelectionContext {
   requiresTools?: boolean;
   prioritizeSpeed?: boolean;
   model?: string;
+  // Added for intelligent routing system integration
+  selectionStrategy?: string;
+  phase?: string;
+  voiceArchetype?: string;
 }
 
 export interface SelectionResult {

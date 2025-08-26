@@ -243,7 +243,7 @@ The response maintains the voice's perspective while providing practical value.`
   private async simulateVoiceResponse(prompt: string, voice: string): Promise<string> {
     await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
     
-    const perspectives = {
+    const perspectives: Record<string, string> = {
       explorer: `From an innovative perspective: ${prompt.substring(0, 50)}... requires creative exploration and novel approaches.`,
       maintainer: `From a stability perspective: ${prompt.substring(0, 50)}... needs careful consideration of maintenance and sustainability.`,
       architect: `From a system design perspective: ${prompt.substring(0, 50)}... requires thoughtful architecture and planning.`,

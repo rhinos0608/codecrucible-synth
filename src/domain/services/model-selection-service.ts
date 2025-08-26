@@ -14,10 +14,36 @@ import { IModelRepository } from '../repositories/model-repository.js';
 import { ProviderType } from '../value-objects/voice-values.js';
 
 /**
+ * Model Selection Service Interface
+ */
+export interface IModelSelectionService {
+  selectOptimalModel(
+    request: ProcessingRequest,
+    preferences?: ModelSelectionPreferences
+  ): Promise<ModelSelection>;
+  
+  selectHybridModels(
+    request: ProcessingRequest,
+    preferences?: HybridSelectionPreferences
+  ): Promise<HybridModelSelection>;
+  
+  selectLoadBalancedModels(
+    requests: ProcessingRequest[],
+    preferences?: LoadBalancingPreferences
+  ): Promise<LoadBalancingPlan>;
+  
+  handleModelFailure(
+    failedModel: Model,
+    request: ProcessingRequest,
+    originalSelection: ModelSelection
+  ): Promise<FailoverResult>;
+}
+
+/**
  * Model Selection Service
  * Handles business logic for intelligent model selection and routing
  */
-export class ModelSelectionService {
+export class ModelSelectionService implements IModelSelectionService {
   constructor(private modelRepository: IModelRepository) {}
 
   /**
@@ -549,6 +575,7 @@ export interface ModelSelection {
   routingStrategy: RoutingStrategy;
   estimatedCost: number;
   estimatedLatency: number;
+  generateResponse?: (prompt: string) => Promise<string>;
 }
 
 export interface HybridModelSelection {

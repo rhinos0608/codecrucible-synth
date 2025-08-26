@@ -108,20 +108,22 @@ export class AnalyzeCodebaseUseCase {
   private transformToProcessingRequest(input: CodebaseAnalysisInput): ProcessingRequest {
     const analysisPrompt = this.buildAnalysisPrompt(input);
     
-    return ProcessingRequest.create({
-      prompt: analysisPrompt,
-      type: 'code-analysis',
-      constraints: {
-        focusAreas: input.focusAreas,
-      },
-      context: {
+    return ProcessingRequest.create(
+      analysisPrompt,
+      'code-analysis' as any,
+      'medium',
+      {
+        ...input.context,
         codebasePath: input.codebasePath,
         analysisType: input.analysisType,
         includeFiles: input.includeFiles,
         excludePatterns: input.excludePatterns,
-        ...input.context,
-      },
-    });
+        focusAreas: input.focusAreas,
+      } as any,
+      {
+        // No extra constraints for now
+      }
+    );
   }
 
   private async selectAnalysisVoices(analysisType: string): Promise<string[]> {
@@ -163,12 +165,13 @@ export class AnalyzeCodebaseUseCase {
     
     for (const voiceId of voices) {
       try {
-        const enhancedRequest = ProcessingRequest.create({
-          prompt: this.buildVoiceSpecificPrompt(request.prompt, voiceId, codebaseInfo),
-          type: request.type,
-          constraints: { ...request.constraints, mustIncludeVoices: [voiceId] },
-          context: request.context,
-        });
+        const enhancedRequest = ProcessingRequest.create(
+          this.buildVoiceSpecificPrompt(request.prompt, voiceId, codebaseInfo),
+          request.type as any,
+          'medium',
+          request.context,
+          { ...request.constraints, mustIncludeVoices: [voiceId] }
+        );
 
         const response = await model.generateResponse(enhancedRequest, { id: voiceId });
         
@@ -196,12 +199,13 @@ export class AnalyzeCodebaseUseCase {
       .map(r => `## ${r.voiceId.toUpperCase()} ANALYSIS:\n${r.content}`)
       .join('\n\n');
 
-    const synthesisRequest = ProcessingRequest.create({
-      prompt: this.buildSynthesisPrompt(synthesisContent),
-      type: 'analysis-synthesis',
-      constraints: { mustIncludeVoices: ['architect'] },
-      context: {},
-    });
+    const synthesisRequest = ProcessingRequest.create(
+      this.buildSynthesisPrompt(synthesisContent),
+      'analysis-synthesis' as any,
+      'medium',
+      {},
+      { mustIncludeVoices: ['architect'] }
+    );
 
     // For now, return a combined analysis (in full implementation, would synthesize)
     return {
@@ -239,7 +243,7 @@ Be thorough and specific in your analysis.`;
       guardian: 'Focus on quality gates, compliance, and risk assessment',
     };
 
-    const focus = voiceFocus[voiceId] || 'Provide general analysis';
+    const focus = (voiceFocus as any)[voiceId] || 'Provide general analysis';
 
     return `${basePrompt}
 
@@ -271,7 +275,7 @@ Create a cohesive analysis that:
       optimizer: 'performance',
       guardian: 'compliance',
     };
-    return typeMap[voiceId] || 'general';
+    return (typeMap as any)[voiceId] || 'general';
   }
 
   private transformToOutput(

@@ -231,6 +231,34 @@ export class ProcessingRequest {
     return request;
   }
 
+  /**
+   * Create a processing request with default values
+   */
+  static create(
+    content: string,
+    type: RequestType = RequestType.CODE_GENERATION,
+    priority: string = 'medium',
+    context: RequestContext = {},
+    constraints: RequestConstraints = {}
+  ): ProcessingRequest {
+    const id = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return new ProcessingRequest(
+      id,
+      content,
+      type,
+      RequestPriority.create(priority),
+      context,
+      constraints
+    );
+  }
+
+  /**
+   * Get the prompt content (alias for content)
+   */
+  get prompt(): string {
+    return this._content;
+  }
+
   // Private helper methods
 
   private clone(): ProcessingRequest {
@@ -346,6 +374,11 @@ export interface RequestContext {
   existingCode?: string;
   requirements?: string[];
   constraints?: string[];
+  // Added for intelligent routing system integration
+  iteration?: number;
+  phase?: string;
+  routingStrategy?: string;
+  previousIterations?: any[];
 }
 
 /**

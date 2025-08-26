@@ -53,10 +53,21 @@ export class ProcessAIRequestUseCase {
     const primaryVoice = voiceSelection.primaryVoice;
     
     // Generate response through model (domain operation)
-    const response = await selectedModel.generateResponse(request, primaryVoice);
+    let response;
+    if (selectedModel.generateResponse) {
+      response = await selectedModel.generateResponse(request.prompt);
+    } else {
+      // Fallback: create a placeholder response
+      // TODO: Inject UnifiedModelClient or similar service for actual response generation
+      response = {
+        content: 'Response generation not implemented yet',
+        model: selectedModel.primaryModel.name,
+        timestamp: new Date(),
+      };
+    }
     
     // Output transformation
-    return this.transformToOutput(response, selectedModel, primaryVoice);
+    return this.transformToOutput(response, selectedModel.primaryModel, primaryVoice);
   }
 
   private transformToProcessingRequest(input: AIRequestInput): ProcessingRequest {
@@ -81,7 +92,7 @@ export class ProcessAIRequestUseCase {
   ): AIRequestOutput {
     return {
       content: response.content,
-      model: model.id,
+      model: (model.name as unknown) as string,
       voice: voice.id,
       metadata: {
         tokensUsed: response.tokensUsed || 0,

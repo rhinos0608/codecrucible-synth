@@ -471,11 +471,15 @@ export class FileSystemClient extends EventEmitter {
     const searchPath = options.cwd ? this.resolveAbsolutePath(options.cwd) : this.config.rootPath;
 
     try {
-      const matches = await glob(pattern, {
+      const allMatches = await glob(pattern, {
         cwd: searchPath,
         absolute: true,
-        maxLength: options.maxResults || 1000,
       });
+      
+      // Apply maxResults limit manually
+      const matches = options.maxResults 
+        ? allMatches.slice(0, options.maxResults)
+        : allMatches;
 
       this.emit('filesFound', {
         pattern,
@@ -550,7 +554,7 @@ export class FileSystemClient extends EventEmitter {
     const absolutePath = this.resolveAbsolutePath(filePath);
 
     try {
-      const watcher = fs.watch(absolutePath, { recursive }, (eventType, filename) => {
+      const watcher = fs.watch(absolutePath, { recursive: recursive }, (eventType: string, filename: string | null) => {
         if (filename) {
           const fullPath = join(absolutePath, filename);
           this.emit('fileWatchEvent', {

@@ -224,7 +224,7 @@ export class DomainAwareToolExecutor extends EventEmitter {
     }
 
     // Synthesize final result using domain service
-    const executionTime = Date.now() - context.executionId.split('_')[1];
+    const executionTime = Date.now() - parseInt(context.executionId.split('_')[1] || '0', 10);
     const finalResult = this.orchestrationService.synthesizeFinalResult(
       reasoningChain, 
       plan, 
@@ -256,11 +256,14 @@ export class DomainAwareToolExecutor extends EventEmitter {
 
       // Execute tool using infrastructure integration
       const toolIntegration = getGlobalEnhancedToolIntegration();
-      const result = await toolIntegration.executeToolWithMCP(
+      if (!toolIntegration) {
+        throw new Error('Tool integration not available');
+      }
+      const result = await toolIntegration.executeToolWithCapabilityValidation?.(
         { name: step.toolName, args: step.toolArgs.args },
         step.toolArgs.args,
         [] // availableTools - would need to be passed properly
-      );
+      ) || { success: false, result: 'Tool execution failed' };
 
       // Complete execution with success
       const completedExecution = runningExecution.completeSuccess(result);

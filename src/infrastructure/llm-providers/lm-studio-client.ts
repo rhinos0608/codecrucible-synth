@@ -9,11 +9,14 @@
  * - No module-level mutable state
  */
 
-import { LMStudioClient as SDKClient } from '@lmstudio/sdk';
+import { LMStudioClient as SDK } from '@lmstudio/sdk';
 import { EventEmitter } from 'events';
+import { logger } from '../../core/logger.js';
 
 export interface LMStudioConnectionConfig {
   baseUrl?: string;
+  host?: string;
+  port?: number;
   timeout: number;
   retryAttempts: number;
   retryDelayMs: number;
@@ -110,7 +113,7 @@ export interface LMStudioConnectionStatus {
  * Handles only connection management and API communication
  */
 export class LMStudioClient extends EventEmitter {
-  private client: SDKClient;
+  private client: SDK;
   private config: LMStudioConnectionConfig;
   private healthCheckTimer?: NodeJS.Timeout;
   private connectionStatus: LMStudioConnectionStatus;
@@ -119,6 +122,12 @@ export class LMStudioClient extends EventEmitter {
   constructor(config: LMStudioConnectionConfig) {
     super();
     this.config = config;
+    
+    // Initialize SDK client  
+    const baseUrl = config.baseUrl || `http://${config.host || 'localhost'}:${config.port || 1234}`;
+    this.client = new SDK({
+      baseUrl
+    });
     
     // Initialize connection status
     this.connectionStatus = {
@@ -144,12 +153,12 @@ export class LMStudioClient extends EventEmitter {
   private initializeClient(): void {
     try {
       if (this.config.baseUrl) {
-        this.client = new SDKClient({
+        this.client = new SDK({
           baseUrl: this.config.baseUrl
         });
       } else {
         // Use default SDK behavior (auto-detection)
-        this.client = new SDKClient();
+        this.client = new SDK();
       }
 
       // Set up event listeners for the SDK client
@@ -163,25 +172,33 @@ export class LMStudioClient extends EventEmitter {
    * Set up event listeners for SDK client
    */
   private setupSDKEventListeners(): void {
-    // Note: LM Studio SDK may not expose all these events
-    // This is a framework for when they become available
+    // Note: LM Studio SDK may not expose these events directly
+    // These are placeholders for when they become available
     
-    this.client.onConnect?.(() => {
-      this.connectionStatus.connected = true;
-      this.connectionStatus.consecutiveFailures = 0;
-      this.emit('connected', this.connectionStatus);
-    });
+    try {
+      // Check if client has event handling capabilities
+      if (typeof (this.client as any).on === 'function') {
+        (this.client as any).on('connect', () => {
+          this.connectionStatus.connected = true;
+          this.connectionStatus.consecutiveFailures = 0;
+          this.emit('connected', this.connectionStatus);
+        });
 
-    this.client.onDisconnect?.(() => {
-      this.connectionStatus.connected = false;
-      this.emit('disconnected');
-      this.scheduleReconnect();
-    });
+        (this.client as any).on('disconnect', () => {
+          this.connectionStatus.connected = false;
+          this.emit('disconnected');
+          this.scheduleReconnect();
+        });
 
-    this.client.onError?.((error: Error) => {
-      this.connectionStatus.consecutiveFailures++;
-      this.emit('connectionError', error);
-    });
+        (this.client as any).on('error', (error: Error) => {
+          this.connectionStatus.consecutiveFailures++;
+          this.emit('connectionError', error);
+        });
+      }
+    } catch (error) {
+      // SDK doesn't support event handling, which is fine
+      logger.debug('LM Studio SDK does not support direct event handling');
+    }
   }
 
   /**
@@ -196,7 +213,7 @@ export class LMStudioClient extends EventEmitter {
 
       // Try to list models as a connection test
       const models = await this.withTimeout(
-        this.client.llm.list(),
+        this.getModelList(),
         this.config.connectionTimeout
       );
       
@@ -207,7 +224,7 @@ export class LMStudioClient extends EventEmitter {
       
       // Count loaded models
       const loadedModels = await this.withTimeout(
-        this.client.llm.listLoaded(),
+        this.getLoadedModelList(),
         this.config.connectionTimeout
       );
       this.connectionStatus.loadedModelCount = loadedModels.length;
@@ -225,18 +242,66 @@ export class LMStudioClient extends EventEmitter {
   }
 
   /**
+   * Helper method to get model list with proper error handling
+   */
+  private async getModelList(): Promise<any[]> {
+    try {
+      // Try the expected API first
+      if ((this.client as any).llm && typeof (this.client as any).llm.list === 'function') {
+        return await (this.client as any).llm.list();
+      }
+      
+      // Fallback to alternative API patterns
+      if ((this.client as any).models && typeof (this.client as any).models.list === 'function') {
+        return await this.client.models.list();
+      }
+      
+      // If no list method is available, return empty array
+      logger.warn('No model listing method available in LM Studio SDK');
+      return [];
+    } catch (error) {
+      logger.error('Error listing models from LM Studio:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Helper method to get loaded model list with proper error handling
+   */
+  private async getLoadedModelList(): Promise<any[]> {
+    try {
+      // Try the expected API first
+      if (this.client.llm && typeof this.client.llm.listLoaded === 'function') {
+        return await this.client.llm.listLoaded();
+      }
+      
+      // Fallback to alternative API patterns
+      if (this.client.llm && typeof this.client.llm.getLoadedModels === 'function') {
+        return await this.client.llm.getLoadedModels();
+      }
+      
+      // If no loaded model method is available, return empty array
+      logger.warn('No loaded model listing method available in LM Studio SDK');
+      return [];
+    } catch (error) {
+      logger.error('Error listing loaded models from LM Studio:', error);
+      return [];
+    }
+  }
+
+  /**
    * List all available models
    */
   async listAllModels(): Promise<LMStudioModelInfo[]> {
     const operation = async () => {
-      const models = await this.client.llm.list();
+      const models = await this.getModelList();
       return models.map(model => ({
-        path: model.path,
-        identifier: model.identifier || model.path,
+        path: model.path || 'unknown',
+        identifier: model.identifier || model.path || 'unknown',
         isLoaded: false, // Will be determined by listLoadedModels
-        architecture: model.architecture,
-        size: model.size,
-        quantization: model.quantization,
+        architecture: (model as any).architecture || 'unknown',
+        size: (model as any).size || 'unknown',
+        quantization: (model as any).quantization || 'unknown',
       }));
     };
 
@@ -248,7 +313,7 @@ export class LMStudioClient extends EventEmitter {
    */
   async listLoadedModels(): Promise<LMStudioModelInfo[]> {
     const operation = async () => {
-      const models = await this.client.llm.listLoaded();
+      const models = await this.getLoadedModelList();
       return models.map(model => ({
         path: model.path,
         identifier: model.identifier || model.path,
@@ -304,7 +369,6 @@ export class LMStudioClient extends EventEmitter {
       const model = await this.client.llm.model(request.modelPath);
       
       const stream = model.complete(request.prompt, {
-        stream: true,
         temperature: request.options?.temperature || 0.7,
         maxTokens: request.options?.maxTokens || 1000,
         ...request.options,
@@ -352,7 +416,6 @@ export class LMStudioClient extends EventEmitter {
       const model = await this.client.llm.model(request.modelPath);
       
       const stream = model.respond(request.messages, {
-        stream: true,
         temperature: request.options?.temperature || 0.7,
         maxTokens: request.options?.maxTokens || 1000,
         ...request.options,
@@ -392,7 +455,15 @@ export class LMStudioClient extends EventEmitter {
   async loadModel(modelPath: string): Promise<void> {
     const operation = async () => {
       const model = await this.client.llm.model(modelPath);
-      await model.load();
+      
+      // Try different load methods based on what's available
+      if (typeof (model as any).load === 'function') {
+        await (model as any).load();
+      } else if (typeof (model as any).loadModel === 'function') {
+        await (model as any).loadModel();
+      } else {
+        logger.warn(`No load method available for model: ${modelPath}`);
+      }
     };
 
     await this.executeWithRetry(operation);
@@ -470,7 +541,7 @@ export class LMStudioClient extends EventEmitter {
   // Private helper methods
 
   private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
-    let lastError: Error;
+    let lastError: Error = new Error('Operation failed with no attempts');
     
     for (let attempt = 0; attempt <= this.config.retryAttempts; attempt++) {
       try {

@@ -160,7 +160,14 @@ export class OllamaClient extends EventEmitter {
   async listModels(): Promise<OllamaModelInfo[]> {
     const operation = async () => {
       const response = await this.client.list();
-      return response.models;
+      
+      // Transform ModelResponse to OllamaModelInfo format
+      return response.models.map(model => ({
+        ...model,
+        modified_at: model.modified_at instanceof Date 
+          ? model.modified_at.toISOString() 
+          : model.modified_at
+      }));
     };
 
     return this.executeWithRetry(operation);
@@ -311,7 +318,7 @@ export class OllamaClient extends EventEmitter {
   // Private helper methods
 
   private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
-    let lastError: Error;
+    let lastError: Error = new Error('Operation failed with no attempts');
     
     for (let attempt = 0; attempt <= this.config.retryAttempts; attempt++) {
       try {

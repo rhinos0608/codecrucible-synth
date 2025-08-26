@@ -12,8 +12,8 @@ import { MultiVoiceSynthesisUseCase, MultiVoiceSynthesisInput, MultiVoiceSynthes
 import { LivingSpiralProcessUseCase, LivingSpiralInput, LivingSpiralOutput } from './use-cases/living-spiral-process-use-case.js';
 import { AnalyzeCodebaseUseCase, CodebaseAnalysisInput, CodebaseAnalysisOutput } from './use-cases/analyze-codebase-use-case.js';
 import { SimplifiedLivingSpiralCoordinator, SimplifiedSpiralInput, SimplifiedSpiralOutput } from './coordinators/simplified-living-spiral-coordinator.js';
-import { IVoiceOrchestrationService } from '../domain/services/voice-orchestration-service.js';
-import { IModelSelectionService } from '../domain/services/model-selection-service.js';
+import { VoiceOrchestrationService } from '../domain/services/voice-orchestration-service.js';
+import { ModelSelectionService } from '../domain/services/model-selection-service.js';
 
 /**
  * Application Service Facade
@@ -28,8 +28,8 @@ export class ApplicationServiceFacade {
   private simplifiedLivingSpiralCoordinator: SimplifiedLivingSpiralCoordinator;
 
   constructor(
-    voiceOrchestrationService: IVoiceOrchestrationService,
-    modelSelectionService: IModelSelectionService
+    voiceOrchestrationService: VoiceOrchestrationService,
+    modelSelectionService: ModelSelectionService
   ) {
     // Initialize use cases with domain services (no infrastructure dependencies)
     this.processAIRequestUseCase = new ProcessAIRequestUseCase(

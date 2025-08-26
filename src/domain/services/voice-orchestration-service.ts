@@ -13,10 +13,29 @@ import { ProcessingRequest } from '../entities/request.js';
 import { IVoiceRepository } from '../repositories/voice-repository.js';
 
 /**
+ * Voice Orchestration Service Interface
+ */
+export interface IVoiceOrchestrationService {
+  selectVoicesForRequest(
+    request: ProcessingRequest,
+    preferences?: VoiceSelectionPreferences
+  ): Promise<VoiceSelection>;
+  
+  synthesizeVoiceResponses(
+    responses: VoiceResponse[],
+    synthesisMode: SynthesisMode
+  ): VoiceSynthesisResult;
+  
+  detectVoiceConflicts(responses: VoiceResponse[]): VoiceConflict[];
+  
+  resolveVoiceConflicts(conflicts: VoiceConflict[], voices: Voice[]): ConflictResolution[];
+}
+
+/**
  * Voice Orchestration Service
  * Handles business logic for multi-voice synthesis and coordination
  */
-export class VoiceOrchestrationService {
+export class VoiceOrchestrationService implements IVoiceOrchestrationService {
   constructor(private voiceRepository: IVoiceRepository) {}
 
   /**

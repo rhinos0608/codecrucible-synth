@@ -711,7 +711,7 @@ export class DataAnalyticsService {
     const hitRateMultiplier = hitRate + 0.5; // 0.5 to 1.5
     const latencyMultiplier = avgLatency < 100 ? 1.5 : avgLatency < 500 ? 1.0 : 0.5;
     
-    return Math.round(baseeTTL * hitRateMultiplier * latencyMultiplier);
+    return Math.round(baseTTL * hitRateMultiplier * latencyMultiplier);
   }
 
   private extractTableName(queryType: string): string {

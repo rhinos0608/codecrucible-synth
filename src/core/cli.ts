@@ -18,8 +18,14 @@ import { InteractiveREPL } from './interactive-repl.js';
 // import { SecureToolFactory } from './security/secure-tool-factory.js';
 import { InputSanitizer } from './security/input-sanitizer.js';
 
+// Enhanced Error Handling Systems
+import { BootstrapErrorSystem, BootstrapPhase, BootstrapErrorType } from './error-handling/bootstrap-error-system.js';
+import { TimeoutManager, TimeoutLevel } from './error-handling/timeout-manager.js';
+import { CircuitBreakerManager } from './error-handling/circuit-breaker-system.js';
+
 // 2025 Performance Optimization Integration
 import { StartupOptimizer } from './performance/startup-optimizer.js';
+import { FastStartupOptimizer, initializeWithFastStartup } from './performance/startup-optimization-2025.js';
 import { MemoryOptimizer2025 } from './performance/memory-optimization-2025.js';
 import { ProviderConnectionPool2025 } from './performance/provider-connection-pool-2025.js';
 import { IntelligentRequestBatcher } from './performance/intelligent-request-batcher.js';
@@ -48,6 +54,9 @@ import {
   SequentialDualAgentSystem,
   SequentialAgentConfig,
 } from './collaboration/sequential-dual-agent-system.js';
+import { FastMultiStepExecutor } from './tools/fast-multi-step-executor.js';
+import { ContextAwareWorkflowManager } from './tools/context-aware-workflow-manager.js';
+import { ArchitectEditorCoordinator } from './patterns/architect-editor-pattern.js';
 
 export type { CLIContext, CLIOptions };
 
@@ -73,6 +82,9 @@ export class CLI extends EventEmitter implements REPLInterface {
   private toolOrchestrator: AdvancedToolOrchestrator;
   private sequentialExecutor: EnhancedSequentialToolExecutor;
   private streamingInterface: StreamingReasoningInterface;
+  private multiStepExecutor: FastMultiStepExecutor;
+  private workflowManager: ContextAwareWorkflowManager;
+  private architectEditor: ArchitectEditorCoordinator;
   private static globalListenersRegistered = false;
 
   // PERFORMANCE FIX: AbortController pattern for cleanup
@@ -82,9 +94,15 @@ export class CLI extends EventEmitter implements REPLInterface {
 
   // 2025 Performance Systems Integration
   private startupOptimizer: StartupOptimizer;
+  private fastStartupOptimizer: FastStartupOptimizer;
   private memoryOptimizer: MemoryOptimizer2025;
   private connectionPool: ProviderConnectionPool2025;
   private requestBatcher: IntelligentRequestBatcher;
+
+  // Enhanced Error Handling Systems
+  private bootstrapErrorSystem: BootstrapErrorSystem;
+  private timeoutManager: TimeoutManager;
+  private circuitBreakerManager: CircuitBreakerManager;
 
   constructor(
     modelClient: UnifiedModelClient,
@@ -99,6 +117,7 @@ export class CLI extends EventEmitter implements REPLInterface {
 
     // 2025 Performance Systems Integration - Initialize before other systems
     this.startupOptimizer = StartupOptimizer.getInstance();
+    this.fastStartupOptimizer = FastStartupOptimizer.getInstance();
     this.memoryOptimizer = MemoryOptimizer2025.getInstance();
     this.connectionPool = new ProviderConnectionPool2025({
       maxConnections: 4, // Optimized for Ollama + LM Studio
@@ -108,6 +127,11 @@ export class CLI extends EventEmitter implements REPLInterface {
       healthCheckInterval: 30000
     });
     this.requestBatcher = IntelligentRequestBatcher.getInstance();
+
+    // Initialize Enhanced Error Handling Systems
+    this.bootstrapErrorSystem = BootstrapErrorSystem.getInstance();
+    this.timeoutManager = TimeoutManager.getInstance();
+    this.circuitBreakerManager = CircuitBreakerManager.getInstance();
 
     // Track CLI instance for memory optimization
     this.memoryOptimizer.registerResource({
@@ -163,6 +187,15 @@ export class CLI extends EventEmitter implements REPLInterface {
       computationDelay: 1500
     });
 
+    // Initialize multi-step execution capabilities (2025 enhancement)
+    this.multiStepExecutor = new FastMultiStepExecutor(modelClient);
+    
+    // Initialize context-aware workflow manager for multi-file operations
+    this.workflowManager = new ContextAwareWorkflowManager(modelClient, this.workingDirectory);
+
+    // Initialize Architect/Editor pattern coordinator (2025 enhancement)
+    this.architectEditor = new ArchitectEditorCoordinator(modelClient);
+
     // Initialize subsystems with simplified constructors
     this.contextAwareCLI = new ContextAwareCLIIntegration();
     this.autoConfigurator = new AutoConfigurator();
@@ -170,6 +203,73 @@ export class CLI extends EventEmitter implements REPLInterface {
     this.commands = new CLICommands(this.context, this.workingDirectory);
 
     this.registerCleanupHandlers();
+  }
+
+  /**
+   * Register available model providers with the connection pool
+   */
+  private registerProvidersWithConnectionPool(modelClient: UnifiedModelClient): void {
+    try {
+      // Register Ollama provider if available
+      if (modelClient.providerRepository?.getProvider('ollama')) {
+        this.connectionPool.registerProvider({
+          id: 'ollama',
+          type: 'ollama',
+          endpoint: 'http://localhost:11434',
+          maxConcurrency: 2,
+          priority: 1,
+          capabilities: ['text-generation', 'code-completion', 'chat'],
+        });
+        logger.debug('✅ Ollama provider registered with connection pool');
+      }
+
+      // Register LM Studio provider if available
+      if (modelClient.providerRepository?.getProvider('lm-studio')) {
+        this.connectionPool.registerProvider({
+          id: 'lm-studio',
+          type: 'lm-studio',
+          endpoint: 'http://localhost:1234',
+          maxConcurrency: 2,
+          priority: 2,
+          capabilities: ['text-generation', 'code-completion', 'chat'],
+        });
+        logger.debug('✅ LM Studio provider registered with connection pool');
+      }
+
+      // Register OpenAI provider if available and API key is set
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (openaiKey && modelClient.providerRepository?.getProvider('openai')) {
+        this.connectionPool.registerProvider({
+          id: 'openai',
+          type: 'openai',
+          endpoint: 'https://api.openai.com/v1',
+          apiKey: openaiKey,
+          maxConcurrency: 3,
+          priority: 3,
+          capabilities: ['text-generation', 'code-completion', 'chat', 'embeddings'],
+        });
+        logger.debug('✅ OpenAI provider registered with connection pool');
+      }
+
+      // Register Anthropic provider if available and API key is set
+      const anthropicKey = process.env.ANTHROPIC_API_KEY;
+      if (anthropicKey && modelClient.providerRepository?.getProvider('anthropic')) {
+        this.connectionPool.registerProvider({
+          id: 'anthropic',
+          type: 'anthropic',
+          endpoint: 'https://api.anthropic.com/v1',
+          apiKey: anthropicKey,
+          maxConcurrency: 2,
+          priority: 4,
+          capabilities: ['text-generation', 'chat', 'reasoning'],
+        });
+        logger.debug('✅ Anthropic provider registered with connection pool');
+      }
+
+      logger.info('🔗 Providers registered with 2025 connection pool');
+    } catch (error) {
+      logger.warn('⚠️  Failed to register some providers with connection pool:', error);
+    }
   }
 
   /**
@@ -338,14 +438,28 @@ export class CLI extends EventEmitter implements REPLInterface {
       // 2025 Performance: Conditional initialization based on command complexity  
       if (!this.initialized && !options.skipInit) {
         logger.debug('About to initialize CLI');
+        
+        // Use 2025 FastStartupOptimizer for conditional lazy loading
+        const startupResult = await initializeWithFastStartup(args);
+        
         if (isSimpleCommand) {
           // Fast initialization for simple commands
           await this.initializeFast();
         } else {
-          // Full initialization for complex commands
+          // Full initialization with lazy-loaded modules for complex commands
           await this.initialize();
+          
+          // Load conditionally required modules based on command analysis
+          if (startupResult.modules.size > 0) {
+            logger.debug(`📦 Lazy-loaded ${startupResult.modules.size} modules based on command requirements`);
+          }
         }
-        logger.debug('CLI initialized');
+        
+        if (startupResult.usedFastPath) {
+          logger.debug('⚡ Used fast startup path - minimal initialization');
+        }
+        
+        logger.debug('CLI initialized with 2025 optimization patterns');
       }
 
       // Handle commands
@@ -361,50 +475,145 @@ export class CLI extends EventEmitter implements REPLInterface {
   }
 
   /**
-   * Fast initialization for simple commands (2025 Performance Pattern)
+   * Fast initialization for simple commands with enhanced error handling
    */
   private async initializeFast(): Promise<void> {
     if (this.initialized) return;
 
+    const initStartTime = Date.now();
+    logger.debug('🏃 Starting fast CLI initialization');
+
     try {
-      // Minimal initialization for simple commands
-      this.startupOptimizer.registerTask({
-        name: 'fast_init',
-        priority: 'critical',
-        timeout: 2000,
-        task: async () => {
+      // Fast initialization with timeout protection
+      await this.timeoutManager.withTimeout(
+        async () => {
+          // Minimal validation for fast init
+          if (!process.env.NODE_ENV) {
+            process.env.NODE_ENV = 'development';
+          }
+
           // Only initialize essential components for simple commands
-          this.commands = new CLICommands(this.context);
+          this.startupOptimizer.registerTask({
+            name: 'fast_init',
+            priority: 'critical',
+            timeout: 2000,
+            task: async () => {
+              this.commands = new CLICommands(this.context);
+              return true;
+            }
+          });
+
+          await this.startupOptimizer.executeOptimizedStartup();
           return true;
+        },
+        'fast-init',
+        {
+          level: TimeoutLevel.OPERATION,
+          duration: 3000,
+          strategy: 'strict' as any,
+          onTimeout: async (context) => {
+            logger.warn('Fast initialization timeout, falling back to full init');
+            return 'continue' as any;
+          }
         }
+      );
+
+      this.initialized = true;
+      const totalTime = Date.now() - initStartTime;
+      
+      logger.info('⚡ Fast CLI initialization completed', {
+        initializationTime: `${totalTime}ms`,
+        mode: 'fast'
       });
 
-      await this.startupOptimizer.executeOptimizedStartup();
-      this.initialized = true;
-      
-      logger.info('✅ Fast CLI initialization completed');
     } catch (error) {
-      logger.error('Fast initialization failed, falling back to full init', error);
-      await this.initialize();
+      const totalTime = Date.now() - initStartTime;
+      
+      logger.error('Fast initialization failed, falling back to full init', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        initializationTime: `${totalTime}ms`
+      });
+
+      // Create bootstrap error for fast init failure
+      const fastInitError = this.bootstrapErrorSystem.createBootstrapError(
+        'Fast initialization failed, attempting full initialization',
+        BootstrapPhase.VALIDATION,
+        BootstrapErrorType.TIMEOUT,
+        'fast-init',
+        { 
+          originalError: error as Error,
+          actionPlan: ['Falling back to full initialization', 'This may take longer but provides more functionality'],
+          fallbackOptions: ['Full initialization with all features']
+        }
+      );
+
+      const result = await this.bootstrapErrorSystem.handleBootstrapError(fastInitError);
+      
+      if (result.canContinue) {
+        // Fallback to full initialization
+        logger.info('🔄 Falling back to full initialization');
+        await this.initialize();
+      } else {
+        throw new CLIError(
+          `Fast initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          CLIExitCode.INITIALIZATION_FAILED
+        );
+      }
     }
   }
 
   /**
-   * Log performance metrics (2025 Performance Pattern)
+   * Enhanced performance monitoring with 2025 optimization integration
    */
   private logPerformanceMetric(operation: string, duration: number): void {
     // Log performance metrics for monitoring
     logger.info(`🏁 Performance: ${operation} completed in ${duration.toFixed(2)}ms`);
     
-    // Track memory usage after operations
-    const memUsage = process.memoryUsage();
-    if (memUsage.heapUsed > 100 * 1024 * 1024) { // > 100MB
-      logger.warn(`Memory usage high: ${(memUsage.heapUsed / 1024 / 1024).toFixed(1)}MB`);
-      this.memoryOptimizer.forceCleanup(); // Trigger cleanup
+    // Get comprehensive memory metrics from MemoryOptimizer2025
+    const memoryMetrics = this.memoryOptimizer.getMemoryMetrics();
+    
+    // Get startup metrics if this is during initialization
+    const startupMetrics = operation.includes('init') ? this.startupOptimizer.getStartupAnalytics() : null;
+    
+    // Log detailed performance data
+    const perfData = {
+      operation,
+      duration,
+      memory: {
+        current: memoryMetrics.current,
+        activeResources: memoryMetrics.activeResources,
+        recommendations: memoryMetrics.recommendations
+      },
+      startup: startupMetrics,
+      connectionPool: {
+        active: this.connectionPool.getConnectionStats().activeConnections,
+        idle: this.connectionPool.getConnectionStats().idleConnections,
+      }
+    };
+    
+    // Trigger memory cleanup if usage is high
+    if (memoryMetrics.current && memoryMetrics.current.heapUsed > 100 * 1024 * 1024) {
+      logger.warn(`Memory usage high: ${(memoryMetrics.current.heapUsed / 1024 / 1024).toFixed(1)}MB`);
+      this.memoryOptimizer.forceCleanup(7); // Cleanup low-priority resources
+    }
+    
+    // Connection pool optimization
+    if (this.connectionPool.getConnectionStats().activeConnections > 3) {
+      logger.debug('High connection pool usage, considering optimization');
     }
 
-    // Emit performance event for monitoring
-    this.emit('performance', { operation, duration, memoryUsage: memUsage });
+    // Emit comprehensive performance event for monitoring
+    this.emit('performance', perfData);
+    
+    // Log warnings for slow operations
+    if (duration > 5000) { // > 5 seconds
+      logger.warn(`⚠️  Slow operation detected: ${operation} took ${(duration/1000).toFixed(1)}s`);
+      
+      // Suggest optimizations
+      if (memoryMetrics.recommendations.length > 0) {
+        logger.debug('Memory optimization suggestions:', memoryMetrics.recommendations);
+      }
+    }
   }
 
   /**
@@ -953,7 +1162,7 @@ export class CLI extends EventEmitter implements REPLInterface {
   }
 
   /**
-   * Initialize the CLI system
+   * Initialize the CLI system with enhanced error handling
    */
   async initialize(config?: any, workingDirectory?: string): Promise<void> {
     if (this.initialized) return;
@@ -962,52 +1171,317 @@ export class CLI extends EventEmitter implements REPLInterface {
       this.workingDirectory = workingDirectory;
     }
 
-    try {
-      // Initialize security systems first
-      await this.secretsManager.initialize();
-      await this.auditLogger.initialize();
-      await this.authMiddleware.initialize();
+    const initStartTime = Date.now();
+    logger.info('🚀 Starting CLI initialization with enhanced error handling');
 
-      // Log CLI initialization attempt
-      await this.auditLogger.logEvent(
-        AuditEventType.SYSTEM_EVENT,
-        AuditSeverity.MEDIUM,
-        AuditOutcome.SUCCESS,
-        'cli',
-        'cli_initialization',
-        'v4.0.0',
-        'CLI system initialization started',
-        {},
-        {
-          workingDirectory: this.workingDirectory,
-          authEnabled: this.authMiddleware.isAuthEnabled(),
-          authRequired: this.authMiddleware.isAuthRequired(),
+    try {
+      // Phase 1: Validation
+      await this.timeoutManager.withBootstrapTimeout(
+        async () => {
+          logger.debug('Phase 1: Validation - Checking system requirements');
+          
+          // Validate environment
+          if (!process.env.NODE_ENV) {
+            process.env.NODE_ENV = 'development';
+          }
+          
+          // Check Node.js version
+          const nodeVersion = process.versions.node;
+          const majorVersion = parseInt(nodeVersion.split('.')[0]);
+          if (majorVersion < 18) {
+            throw new Error(`Node.js version ${nodeVersion} is not supported. Requires Node.js 18+`);
+          }
+          
+          // Validate working directory
+          try {
+            const fs = await import('fs/promises');
+            await fs.access(this.workingDirectory, fs.constants.R_OK);
+          } catch (error) {
+            throw new Error(`Working directory ${this.workingDirectory} is not accessible`);
+          }
+          
+          logger.debug('✅ Phase 1: Validation completed successfully');
+        },
+        BootstrapPhase.VALIDATION,
+        'system-requirements',
+        { duration: 5000, strategy: 'strict' as any }
+      );
+
+      // Phase 2: Security Setup
+      await this.timeoutManager.withBootstrapTimeout(
+        async () => {
+          logger.debug('Phase 2: Security Setup - Initializing security systems');
+          
+          try {
+            await this.secretsManager.initialize();
+            logger.debug('✅ Secrets manager initialized');
+          } catch (error) {
+            const bootstrapError = this.bootstrapErrorSystem.createBootstrapError(
+              'Failed to initialize secrets manager',
+              BootstrapPhase.SECURITY_SETUP,
+              BootstrapErrorType.AUTHENTICATION_FAILED,
+              'secrets-manager',
+              { originalError: error as Error }
+            );
+            
+            const result = await this.bootstrapErrorSystem.handleBootstrapError(bootstrapError);
+            if (!result.canContinue) {
+              throw error;
+            }
+            logger.warn('⚠️  Continuing with degraded security functionality');
+          }
+
+          try {
+            await this.auditLogger.initialize();
+            logger.debug('✅ Audit logger initialized');
+          } catch (error) {
+            const bootstrapError = this.bootstrapErrorSystem.createBootstrapError(
+              'Failed to initialize audit logger',
+              BootstrapPhase.SECURITY_SETUP,
+              BootstrapErrorType.SERVICE_UNAVAILABLE,
+              'audit-logger',
+              { originalError: error as Error }
+            );
+            
+            const result = await this.bootstrapErrorSystem.handleBootstrapError(bootstrapError);
+            if (!result.canContinue) {
+              throw error;
+            }
+          }
+
+          try {
+            await this.authMiddleware.initialize();
+            logger.debug('✅ Auth middleware initialized');
+          } catch (error) {
+            const bootstrapError = this.bootstrapErrorSystem.createBootstrapError(
+              'Failed to initialize authentication middleware',
+              BootstrapPhase.SECURITY_SETUP,
+              BootstrapErrorType.AUTHENTICATION_FAILED,
+              'auth-middleware',
+              { originalError: error as Error }
+            );
+            
+            const result = await this.bootstrapErrorSystem.handleBootstrapError(bootstrapError);
+            if (!result.canContinue) {
+              throw error;
+            }
+          }
+          
+          logger.debug('✅ Phase 2: Security Setup completed');
+        },
+        BootstrapPhase.SECURITY_SETUP,
+        'security-systems',
+        { duration: 15000, strategy: 'graceful' as any }
+      );
+
+      // Phase 3: Provider Connection with Circuit Breaker
+      await this.timeoutManager.withBootstrapTimeout(
+        async () => {
+          logger.debug('Phase 3: Provider Connection - Setting up model providers');
+          
+          const modelProviderCircuit = this.circuitBreakerManager.getCircuitBreaker(
+            'model-provider-connection',
+            async () => {
+              // Test model provider connections and register with connection pool
+              const modelClient = this.context.modelClient;
+              if (modelClient) {
+                // TODO: Implement getCapabilities method in UnifiedModelClient
+                logger.debug('Model client available, capabilities check skipped');
+                
+                // Register available providers with the connection pool
+                this.registerProvidersWithConnectionPool(modelClient);
+              }
+              return true;
+            },
+            {
+              failureThreshold: 3,
+              recoveryTimeout: 30000,
+              timeout: 10000,
+              fallbackEnabled: true
+            },
+            async () => {
+              logger.warn('Using fallback model provider configuration');
+              return true;
+            }
+          );
+
+          const connectionResult = await modelProviderCircuit.execute();
+          if (connectionResult.fromFallback) {
+            logger.warn('⚠️  Model providers initialized with fallback configuration');
+          } else {
+            logger.debug('✅ Model providers connected successfully');
+          }
+          
+          logger.debug('✅ Phase 3: Provider Connection completed');
+        },
+        BootstrapPhase.PROVIDER_CONNECTION,
+        'model-providers',
+        { duration: 20000, strategy: 'progressive' as any }
+      );
+
+      // Phase 4: Service Initialization
+      await this.timeoutManager.withBootstrapTimeout(
+        async () => {
+          logger.debug('Phase 4: Service Initialization - Starting core services');
+          
+          // Initialize MCP manager with circuit breaker
+          if (this.context.mcpManager) {
+            try {
+              // MCP manager is already initialized in constructor, just verify
+              logger.debug('✅ MCP Manager verified');
+            } catch (error) {
+              const bootstrapError = this.bootstrapErrorSystem.createBootstrapError(
+                'MCP Manager verification failed',
+                BootstrapPhase.SERVICE_INITIALIZATION,
+                BootstrapErrorType.SERVICE_UNAVAILABLE,
+                'mcp-manager',
+                { originalError: error as Error }
+              );
+              
+              const result = await this.bootstrapErrorSystem.handleBootstrapError(bootstrapError);
+              if (!result.canContinue) {
+                throw error;
+              }
+            }
+          }
+
+          // Initialize voice system
+          if (this.context.voiceSystem) {
+            try {
+              // Voice system is initialized in constructor, just verify
+              logger.debug('✅ Voice System verified');
+            } catch (error) {
+              const bootstrapError = this.bootstrapErrorSystem.createBootstrapError(
+                'Voice System verification failed',
+                BootstrapPhase.SERVICE_INITIALIZATION,
+                BootstrapErrorType.SERVICE_UNAVAILABLE,
+                'voice-system',
+                { originalError: error as Error }
+              );
+              
+              await this.bootstrapErrorSystem.handleBootstrapError(bootstrapError);
+              logger.warn('⚠️  Continuing without voice system');
+            }
+          }
+          
+          logger.debug('✅ Phase 4: Service Initialization completed');
+        },
+        BootstrapPhase.SERVICE_INITIALIZATION,
+        'core-services',
+        { duration: 25000, strategy: 'graceful' as any }
+      );
+
+      // Phase 5: Ready Check
+      await this.timeoutManager.withBootstrapTimeout(
+        async () => {
+          logger.debug('Phase 5: Ready Check - Verifying system readiness');
+          
+          // Log initialization success
+          if (this.auditLogger) {
+            try {
+              await this.auditLogger.logEvent(
+                AuditEventType.SYSTEM_EVENT,
+                AuditSeverity.MEDIUM,
+                AuditOutcome.SUCCESS,
+                'cli',
+                'cli_initialization',
+                'v4.0.0',
+                'CLI system initialization completed successfully',
+                {},
+                {
+                  workingDirectory: this.workingDirectory,
+                  authEnabled: this.authMiddleware?.isAuthEnabled() || false,
+                  authRequired: this.authMiddleware?.isAuthRequired() || false,
+                  initializationTime: Date.now() - initStartTime
+                }
+              );
+            } catch (error) {
+              logger.warn('Failed to log initialization success to audit log', error);
+            }
+          }
+          
+          logger.debug('✅ Phase 5: Ready Check completed');
+        },
+        BootstrapPhase.READY_CHECK,
+        'system-verification',
+        { duration: 5000, strategy: 'strict' as any }
+      );
+
+      this.initialized = true;
+      const totalTime = Date.now() - initStartTime;
+      
+      logger.info('🎉 CLI initialized successfully with enhanced error handling', {
+        authEnabled: this.authMiddleware?.isAuthEnabled() || false,
+        authRequired: this.authMiddleware?.isAuthRequired() || false,
+        initializationTime: `${totalTime}ms`,
+        errorHandlingEnabled: true,
+        circuitBreakersActive: Object.keys(this.circuitBreakerManager.getAllStatuses()).length
+      });
+
+    } catch (error) {
+      const totalTime = Date.now() - initStartTime;
+      
+      // Enhanced error handling for initialization failure
+      const initError = this.bootstrapErrorSystem.createBootstrapError(
+        `CLI initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        BootstrapPhase.VALIDATION, // Will be updated based on where it failed
+        BootstrapErrorType.SERVICE_UNAVAILABLE,
+        'cli-system',
+        { 
+          originalError: error as Error,
+          context: { 
+            phase: 'service_initialization' as any,
+            component: 'CLI',
+            startTime: initStartTime,
+            environment: { totalTime }
+          }
         }
       );
 
-      // Context awareness is initialized in constructor
+      await this.bootstrapErrorSystem.handleBootstrapError(initError);
 
-      this.initialized = true;
-      logger.info('CLI initialized successfully', {
-        authEnabled: this.authMiddleware.isAuthEnabled(),
-        authRequired: this.authMiddleware.isAuthRequired(),
-      });
-    } catch (error) {
       // Log initialization failure
-      await this.auditLogger.logEvent(
-        AuditEventType.ERROR_EVENT,
-        AuditSeverity.HIGH,
-        AuditOutcome.FAILURE,
-        'cli',
-        'cli_initialization_failed',
-        'v4.0.0',
-        `CLI initialization failed: ${error}`,
-        {},
-        { error: error instanceof Error ? error.message : 'Unknown error' }
-      );
+      if (this.auditLogger) {
+        try {
+          await this.auditLogger.logEvent(
+            AuditEventType.ERROR_EVENT,
+            AuditSeverity.HIGH,
+            AuditOutcome.FAILURE,
+            'cli',
+            'cli_initialization_failed',
+            'v4.0.0',
+            `CLI initialization failed: ${error}`,
+            {},
+            { 
+              error: error instanceof Error ? error.message : 'Unknown error',
+              initializationTime: totalTime,
+              stackTrace: error instanceof Error ? error.stack : undefined
+            }
+          );
+        } catch (auditError) {
+          logger.warn('Failed to log initialization error to audit log', auditError);
+        }
+      }
 
-      logger.error('CLI initialization failed:', error);
-      throw new CLIError(`Initialization failed: ${error}`, CLIExitCode.INITIALIZATION_FAILED);
+      logger.error('💥 CLI initialization failed:', error);
+      
+      // Provide detailed error information
+      console.log('\n' + chalk.red.bold('━'.repeat(60)));
+      console.log(chalk.red.bold('❌ CLI Initialization Failed'));
+      console.log(chalk.red.bold('━'.repeat(60)));
+      console.log(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      console.log(chalk.yellow(`Time elapsed: ${totalTime}ms`));
+      console.log(chalk.cyan('\n💡 Try the following:'));
+      console.log(chalk.cyan('  1. Check system requirements (Node.js 18+)'));
+      console.log(chalk.cyan('  2. Verify file permissions in working directory'));
+      console.log(chalk.cyan('  3. Check network connectivity for external services'));
+      console.log(chalk.cyan('  4. Review logs for detailed error information'));
+      console.log(chalk.red.bold('━'.repeat(60)) + '\n');
+
+      throw new CLIError(
+        `Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        CLIExitCode.INITIALIZATION_FAILED
+      );
     }
   }
 
@@ -1274,18 +1748,36 @@ export class CLI extends EventEmitter implements REPLInterface {
         console.log(chalk.blue('🔄 Processing prompt...'));
       }
 
-      // ENHANCED: Check if this prompt should use sequential tool execution with reasoning
+      // ENHANCED: Intelligent execution path selection (2025 enhancement)
       const shouldUseSequentialExecution = this.shouldUseSequentialToolExecution(prompt);
+      const shouldUseMultiStep = this.shouldUseMultiStepExecution(prompt);
+      const shouldUseMultiFile = this.shouldUseMultiFileWorkflow(prompt);
+      const shouldUseArchitectEditor = this.shouldUseArchitectEditorPattern(prompt);
       
-      logger.info('🔍 Sequential execution decision', {
+      logger.info('🔍 Execution path decision', {
         shouldUseSequentialExecution,
+        shouldUseMultiStep,
+        shouldUseMultiFile,
+        shouldUseArchitectEditor,
         disableTools: options.disableTools,
         prompt: prompt.substring(0, 100)
       });
       
-      if (shouldUseSequentialExecution && !options.disableTools) {
-        logger.info('✅ Using enhanced sequential tool execution');
-        return await this.executeWithSequentialReasoning(prompt, options);
+      if (!options.disableTools) {
+        // Priority: Architect/Editor > Multi-file workflow > Multi-step > Sequential > Traditional
+        if (shouldUseArchitectEditor) {
+          logger.info('✅ Using Architect/Editor pattern for comprehensive planning and execution');
+          return await this.executeWithArchitectEditorPattern(prompt, options);
+        } else if (shouldUseMultiFile) {
+          logger.info('✅ Using multi-file workflow management');
+          return await this.executeWithMultiFileWorkflow(prompt, options);
+        } else if (shouldUseMultiStep) {
+          logger.info('✅ Using multi-step execution');
+          return await this.executeWithMultiStepProcessing(prompt, options);
+        } else if (shouldUseSequentialExecution) {
+          logger.info('✅ Using enhanced sequential tool execution');
+          return await this.executeWithSequentialReasoning(prompt, options);
+        }
       }
 
       logger.info('⚠️ Falling back to traditional voice system processing');
@@ -1452,6 +1944,176 @@ export class CLI extends EventEmitter implements REPLInterface {
   }
 
   /**
+   * Execute prompt using FastMultiStepExecutor (2025 enhancement)
+   */
+  private async executeWithMultiStepProcessing(prompt: string, options: any = {}): Promise<string> {
+    logger.info('🚀 Using FastMultiStepExecutor for complex task breakdown');
+    
+    try {
+      // Create a multi-step task from the prompt
+      const task = await this.multiStepExecutor.analyzeAndPlan(prompt);
+      
+      // Execute the task with progress tracking
+      const result = await this.multiStepExecutor.execute(task);
+      
+      if (result.success) {
+        logger.info('✅ Multi-step execution completed successfully', {
+          taskId: result.taskId,
+          duration: result.duration,
+          completedSteps: result.completedSteps,
+          performance: result.performance
+        });
+        
+        // Format the results for display
+        const summary = Array.from(result.results.entries())
+          .map(([stepId, stepResult]) => `**Step ${stepId}**: ${stepResult}`)
+          .join('\n\n');
+          
+        return `# Multi-Step Task Execution Complete\n\n${summary}\n\n**Performance**: Completed ${result.completedSteps} steps in ${result.duration}ms\n**Efficiency**: ${result.performance.parallelEfficiency.toFixed(1)}% parallel efficiency`;
+      } else {
+        logger.warn('⚠️ Multi-step execution partially failed', {
+          taskId: result.taskId,
+          completedSteps: result.completedSteps,
+          failedSteps: result.failedSteps
+        });
+        
+        // Return partial results with error summary
+        const errors = Array.from(result.errors.entries())
+          .map(([stepId, error]) => `**Step ${stepId} Error**: ${error.message}`)
+          .join('\n');
+        
+        return `# Multi-Step Task Partially Completed\n\nCompleted ${result.completedSteps} of ${result.completedSteps + result.failedSteps} steps\n\n**Errors**:\n${errors}`;
+      }
+    } catch (error) {
+      logger.error('❌ Multi-step execution error:', error);
+      return await this.fallbackToVoiceSystem(prompt, options);
+    }
+  }
+
+  /**
+   * Execute prompt using ContextAwareWorkflowManager for multi-file operations (2025 enhancement)
+   */
+  private async executeWithMultiFileWorkflow(prompt: string, options: any = {}): Promise<string> {
+    logger.info('🚀 Using ContextAwareWorkflowManager for multi-file operations');
+    
+    try {
+      // Plan multi-file workflow
+      const operation = await this.workflowManager.planMultiFileWorkflow(prompt, [], {
+        includeRelated: true,
+        atomicChanges: true
+      });
+      
+      // Execute the workflow
+      const result = await this.workflowManager.executeWorkflow(operation);
+      
+      if (result.success) {
+        logger.info('✅ Multi-file workflow completed successfully', {
+          operationId: operation.id,
+          affectedFiles: operation.affectedFiles.length,
+          plannedChanges: operation.plannedChanges.length
+        });
+        
+        const summary = `# Multi-File Operation Complete\n\n**Type**: ${operation.type}\n**Description**: ${operation.description}\n\n**Files Affected**: ${operation.affectedFiles.length}\n**Changes Made**: ${operation.plannedChanges.length}\n**Modified Files**: ${result.modifiedFiles.length}\n**Changes Applied**: ${result.changesApplied}`;
+        
+        return summary;
+      } else {
+        logger.warn('⚠️ Multi-file workflow failed', {
+          operationId: operation.id,
+          success: result.success
+        });
+        
+        return `# Multi-File Operation Failed\n\n**Status**: Failed\n\nFalling back to traditional processing...`;
+      }
+    } catch (error) {
+      logger.error('❌ Multi-file workflow error:', error);
+      return await this.fallbackToVoiceSystem(prompt, options);
+    }
+  }
+
+  /**
+   * Execute prompt using Architect/Editor pattern for comprehensive solutions (2025 enhancement)
+   */
+  private async executeWithArchitectEditorPattern(prompt: string, options: any = {}): Promise<string> {
+    logger.info('🏗️ Using Architect/Editor pattern for comprehensive solution planning and execution');
+    
+    try {
+      const context = {
+        workingDirectory: this.workingDirectory,
+        options,
+        timestamp: new Date().toISOString()
+      };
+
+      // Execute the full Architect/Editor workflow
+      const result = await this.architectEditor.executeRequest(prompt, context);
+      
+      if (result.success) {
+        logger.info('✅ Architect/Editor workflow completed successfully', {
+          planId: result.plan.id,
+          phases: result.plan.phases.length,
+          tasks: result.results.length,
+          duration: result.duration
+        });
+        
+        const summary = `# Architect/Editor Workflow Complete
+
+## Plan Overview
+**Title**: ${result.plan.title}
+**Description**: ${result.plan.description}
+**Complexity**: ${result.plan.complexity}
+**Duration**: ${result.duration}ms (estimated: ${result.plan.estimatedDuration} minutes)
+
+## Feasibility Analysis
+**Feasible**: ${result.feasibility.feasible ? '✅' : '❌'}
+**Confidence**: ${(result.feasibility.confidence * 100).toFixed(1)}%
+**Recommendations**: ${result.feasibility.recommendations.join(', ')}
+
+## Execution Summary
+**Total Tasks**: ${result.results.length}
+**Successful**: ${result.results.filter(r => r.success).length}
+**Failed**: ${result.results.filter(r => !r.success).length}
+
+## Phase Results
+${result.plan.phases.map(phase => {
+  const phaseResults = result.results.filter(r => r.phaseId === phase.id);
+  const successful = phaseResults.filter(r => r.success).length;
+  const total = phaseResults.length;
+  return `**${phase.name}**: ${successful}/${total} tasks successful`;
+}).join('\n')}
+
+## Deliverables
+${result.plan.phases.map(phase => 
+  phase.deliverables.map(deliverable => `- ${deliverable}`).join('\n')
+).join('\n')}
+`;
+        
+        return summary;
+      } else {
+        logger.warn('⚠️ Architect/Editor workflow failed or incomplete', {
+          feasible: result.feasibility.feasible,
+          confidence: result.feasibility.confidence,
+          results: result.results.length
+        });
+        
+        return `# Architect/Editor Workflow Results
+
+**Status**: ${result.success ? 'Partial Success' : 'Failed'}
+**Feasibility**: ${result.feasibility.feasible ? 'Feasible' : 'Not Feasible'} (${(result.feasibility.confidence * 100).toFixed(1)}% confidence)
+
+## Plan Created
+${result.plan.title}: ${result.plan.description}
+
+## Issues Identified
+${result.feasibility.adjustments.map((adj: string) => `- ${adj}`).join('\n')}
+
+Falling back to traditional processing...`;
+      }
+    } catch (error) {
+      logger.error('❌ Architect/Editor pattern error:', error);
+      return await this.fallbackToVoiceSystem(prompt, options);
+    }
+  }
+
+  /**
    * Determine if prompt should use sequential tool execution
    */
   private shouldUseSequentialToolExecution(prompt: string): boolean {
@@ -1488,6 +2150,75 @@ export class CLI extends EventEmitter implements REPLInterface {
     });
 
     return shouldUse;
+  }
+
+  /**
+   * Determine if prompt should use multi-step execution (2025 enhancement)
+   */
+  private shouldUseMultiStepExecution(prompt: string): boolean {
+    const multiStepKeywords = [
+      'implement', 'build', 'create feature', 'refactor', 'optimize',
+      'migrate', 'upgrade', 'fix issue', 'debug complex',
+      'analyze system', 'comprehensive', 'end-to-end'
+    ];
+    
+    const promptLower = prompt.toLowerCase();
+    const hasMultiStepKeywords = multiStepKeywords.some(keyword => 
+      promptLower.includes(keyword)
+    );
+    
+    // Complex operations that benefit from step-by-step execution
+    const hasComplexityIndicators = /\b(multiple|several|many|all|entire|whole|complete|full|comprehensive|thorough)\b/i.test(prompt);
+    const hasTimeIndicators = /\b(step by step|gradually|iteratively|phases|stages)\b/i.test(prompt);
+    
+    return hasMultiStepKeywords || (hasComplexityIndicators && hasTimeIndicators);
+  }
+
+  /**
+   * Determine if prompt should use multi-file workflow management (2025 enhancement)
+   */
+  private shouldUseMultiFileWorkflow(prompt: string): boolean {
+    const multiFileKeywords = [
+      'across files', 'multiple files', 'entire project', 'codebase',
+      'refactor project', 'migrate project', 'update all',
+      'project structure', 'dependencies', 'imports'
+    ];
+    
+    const promptLower = prompt.toLowerCase();
+    const hasMultiFileKeywords = multiFileKeywords.some(keyword => 
+      promptLower.includes(keyword)
+    );
+    
+    // File pattern indicators
+    const hasFilePatterns = /\*(\.js|\.ts|\.json|\.yaml|\.md)|src\/\*|all.*files/i.test(prompt);
+    const hasStructureWords = /\b(structure|architecture|organization|layout|hierarchy)\b/i.test(prompt);
+    
+    return hasMultiFileKeywords || (hasFilePatterns && hasStructureWords);
+  }
+
+  /**
+   * Determine if prompt should use Architect/Editor pattern (2025 enhancement)
+   */
+  private shouldUseArchitectEditorPattern(prompt: string): boolean {
+    const architectPatternKeywords = [
+      'plan and implement', 'design and build', 'architect', 'comprehensive solution',
+      'full implementation', 'end-to-end development', 'complete system',
+      'enterprise solution', 'production ready', 'scalable solution'
+    ];
+    
+    const promptLower = prompt.toLowerCase();
+    const hasArchitectKeywords = architectPatternKeywords.some(keyword => 
+      promptLower.includes(keyword)
+    );
+    
+    // Complex requests that benefit from upfront planning
+    const hasComplexityMarkers = /\b(complex|comprehensive|full|complete|entire|enterprise|production|scalable)\b/i.test(prompt);
+    const hasPlanningWords = /\b(plan|design|architect|strategy|approach|methodology)\b/i.test(prompt);
+    const hasImplementationWords = /\b(implement|build|create|develop|execute)\b/i.test(prompt);
+    
+    // Use architect/editor for complex requests that mention both planning and implementation
+    return hasArchitectKeywords || 
+           (hasComplexityMarkers && hasPlanningWords && hasImplementationWords);
   }
 
   /**

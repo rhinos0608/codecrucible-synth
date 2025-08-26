@@ -4,6 +4,7 @@
  */
 
 import { CLIExitCode, CLIError, ModelRequest, REPLInterface } from './types.js';
+import { EventEmitter } from 'events';
 import { UnifiedModelClient } from '../refactor/unified-model-client.js';
 import { VoiceArchetypeSystem } from '../voices/voice-archetype-system.js';
 import { MCPServerManager } from '../mcp-servers/mcp-server-manager.js';
@@ -16,6 +17,12 @@ import { AutoConfigurator } from './model-management/auto-configurator.js';
 import { InteractiveREPL } from './interactive-repl.js';
 // import { SecureToolFactory } from './security/secure-tool-factory.js';
 import { InputSanitizer } from './security/input-sanitizer.js';
+
+// 2025 Performance Optimization Integration
+import { StartupOptimizer } from './performance/startup-optimizer.js';
+import { MemoryOptimizer2025 } from './performance/memory-optimization-2025.js';
+import { ProviderConnectionPool2025 } from './performance/provider-connection-pool-2025.js';
+import { IntelligentRequestBatcher } from './performance/intelligent-request-batcher.js';
 
 // Import modular CLI components
 import { CLIOptions, CLIContext, CLIDisplay, CLIParser, CLICommands } from './cli/index.js';
@@ -48,8 +55,9 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { writeFile } from 'fs/promises';
+import { performance } from 'perf_hooks';
 
-export class CLI implements REPLInterface {
+export class CLI extends EventEmitter implements REPLInterface {
   private context: CLIContext;
   private initialized = false;
   private workingDirectory = process.cwd();
@@ -72,14 +80,42 @@ export class CLI implements REPLInterface {
   private activeOperations: Set<string> = new Set();
   private isShuttingDown = false;
 
+  // 2025 Performance Systems Integration
+  private startupOptimizer: StartupOptimizer;
+  private memoryOptimizer: MemoryOptimizer2025;
+  private connectionPool: ProviderConnectionPool2025;
+  private requestBatcher: IntelligentRequestBatcher;
+
   constructor(
     modelClient: UnifiedModelClient,
     voiceSystem: VoiceArchetypeSystem,
     mcpManager: MCPServerManager,
     config: AppConfig
   ) {
+    super(); // Initialize EventEmitter
+    
     // PERFORMANCE FIX: Initialize AbortController for cleanup
     this.abortController = new AbortController();
+
+    // 2025 Performance Systems Integration - Initialize before other systems
+    this.startupOptimizer = StartupOptimizer.getInstance();
+    this.memoryOptimizer = MemoryOptimizer2025.getInstance();
+    this.connectionPool = new ProviderConnectionPool2025({
+      maxConnections: 4, // Optimized for Ollama + LM Studio
+      minIdleConnections: 2,
+      connectionTimeout: 8000,
+      circuitBreakerThreshold: 3,
+      healthCheckInterval: 30000
+    });
+    this.requestBatcher = IntelligentRequestBatcher.getInstance();
+
+    // Track CLI instance for memory optimization
+    this.memoryOptimizer.registerResource({
+      id: 'cli-instance',
+      type: 'eventemitter',
+      cleanup: () => this.shutdown(),
+      priority: 1 // High priority
+    });
 
     this.context = {
       modelClient,
@@ -282,31 +318,93 @@ export class CLI implements REPLInterface {
    */
   async run(args: string[]): Promise<void> {
     logger.debug('CLI.run() called', { args });
+    const startTime = performance.now();
+    
     try {
-      // Handle help requests
+      // 2025 Performance: Fast-path detection for simple commands
+      const { command, remainingArgs } = CLIParser.extractCommand(args);
+      const isSimpleCommand = ['help', 'version', 'status', 'models'].includes(command) || 
+                             CLIParser.isHelpRequest(args);
+      
+      // Fast path for help requests - no initialization needed
       if (CLIParser.isHelpRequest(args)) {
         CLIDisplay.showHelp();
+        this.logPerformanceMetric('help-command', performance.now() - startTime);
         return;
       }
 
-      // Parse command and options
-      const { command, remainingArgs } = CLIParser.extractCommand(args);
       const options = CLIParser.parseOptions(args);
 
-      // Initialize if needed
+      // 2025 Performance: Conditional initialization based on command complexity  
       if (!this.initialized && !options.skipInit) {
         logger.debug('About to initialize CLI');
-        await this.initialize();
+        if (isSimpleCommand) {
+          // Fast initialization for simple commands
+          await this.initializeFast();
+        } else {
+          // Full initialization for complex commands
+          await this.initialize();
+        }
         logger.debug('CLI initialized');
       }
 
       // Handle commands
       logger.debug('About to call executeCommand');
       await this.executeCommand(command, remainingArgs, options);
-      logger.debug('executeCommand completed');
+      
+      const duration = performance.now() - startTime;
+      this.logPerformanceMetric(`${command}-command`, duration);
+      logger.debug('executeCommand completed', { duration: `${duration.toFixed(2)}ms` });
     } catch (error) {
       await this.handleError(error);
     }
+  }
+
+  /**
+   * Fast initialization for simple commands (2025 Performance Pattern)
+   */
+  private async initializeFast(): Promise<void> {
+    if (this.initialized) return;
+
+    try {
+      // Minimal initialization for simple commands
+      this.startupOptimizer.registerTask({
+        name: 'fast_init',
+        priority: 'critical',
+        timeout: 2000,
+        task: async () => {
+          // Only initialize essential components for simple commands
+          this.commands = new CLICommands(this.context);
+          return true;
+        }
+      });
+
+      await this.startupOptimizer.executeOptimizedStartup();
+      this.initialized = true;
+      
+      logger.info('✅ Fast CLI initialization completed');
+    } catch (error) {
+      logger.error('Fast initialization failed, falling back to full init', error);
+      await this.initialize();
+    }
+  }
+
+  /**
+   * Log performance metrics (2025 Performance Pattern)
+   */
+  private logPerformanceMetric(operation: string, duration: number): void {
+    // Log performance metrics for monitoring
+    logger.info(`🏁 Performance: ${operation} completed in ${duration.toFixed(2)}ms`);
+    
+    // Track memory usage after operations
+    const memUsage = process.memoryUsage();
+    if (memUsage.heapUsed > 100 * 1024 * 1024) { // > 100MB
+      logger.warn(`Memory usage high: ${(memUsage.heapUsed / 1024 / 1024).toFixed(1)}MB`);
+      this.memoryOptimizer.forceCleanup(); // Trigger cleanup
+    }
+
+    // Emit performance event for monitoring
+    this.emit('performance', { operation, duration, memoryUsage: memUsage });
   }
 
   /**
@@ -1009,6 +1107,18 @@ export class CLI implements REPLInterface {
       process.exit(error.exitCode);
     } else {
       process.exit(CLIExitCode.UNEXPECTED_ERROR);
+    }
+  }
+
+  /**
+   * Simple shutdown method for resource cleanup
+   */
+  private shutdown(): void {
+    try {
+      this.abortController?.abort();
+      this.removeAllListeners();
+    } catch (error) {
+      logger.error('Error during CLI shutdown:', error);
     }
   }
 

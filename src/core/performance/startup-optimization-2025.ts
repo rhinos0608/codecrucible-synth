@@ -185,39 +185,41 @@ export class FastStartupOptimizer {
    * 2025 Pattern: Memory-Efficient Connection Pooling
    */
   createConnectionPool(maxConnections: number = 3) {
-    return {
-      active: new Set(),
-      idle: new Set(),
-      waiting: [],
+    const pool = {
+      active: new Set<any>(),
+      idle: new Set<any>(),
+      waiting: [] as Array<(connection: any) => void>,
       
       acquire: async () => {
-        if (this.idle.size > 0) {
-          const connection = this.idle.values().next().value;
-          this.idle.delete(connection);
-          this.active.add(connection);
+        if (pool.idle.size > 0) {
+          const connection = pool.idle.values().next().value;
+          pool.idle.delete(connection);
+          pool.active.add(connection);
           return connection;
         }
         
-        if (this.active.size < maxConnections) {
-          const connection = await this.createConnection();
-          this.active.add(connection);
+        if (pool.active.size < maxConnections) {
+          const connection = await pool.createConnection();
+          pool.active.add(connection);
           return connection;
         }
         
-        return new Promise((resolve) => {
-          this.waiting.push(resolve);
+        return new Promise<any>((resolve) => {
+          pool.waiting.push(resolve);
         });
       },
 
       release: (connection: any) => {
-        this.active.delete(connection);
+        pool.active.delete(connection);
         
-        if (this.waiting.length > 0) {
-          const waiter = this.waiting.shift();
-          this.active.add(connection);
-          waiter(connection);
+        if (pool.waiting.length > 0) {
+          const waiter = pool.waiting.shift();
+          if (waiter) {
+            pool.active.add(connection);
+            waiter(connection);
+          }
         } else {
-          this.idle.add(connection);
+          pool.idle.add(connection);
         }
       },
 
@@ -226,6 +228,7 @@ export class FastStartupOptimizer {
         return { id: Date.now(), created: performance.now() };
       }
     };
+    return pool;
   }
 
   /**

@@ -14,6 +14,7 @@ import { SecurityAuditLogger } from '../security/security-audit-logger.js';
 import { SecretsManager } from '../security/secrets-manager.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { getTelemetryProvider } from '../observability/observability-system.js';
+import { AIPoweredParameterGenerator, ParameterGenerationContext } from './ai-powered-parameter-generator.js';
 
 // AI SDK v5.0 Streaming Interfaces
 export interface StreamChunk {
@@ -209,6 +210,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
   private secureToolFactory!: SecureToolFactory;
   private telemetryProvider: any; // Enhanced: Telemetry integration for modern observability
   private domainOrchestrator: DomainAwareToolOrchestrator; // DOMAIN-AWARE TOOL SELECTION
+  private parameterGenerator: AIPoweredParameterGenerator; // AI-POWERED PARAMETER GENERATION
 
   constructor(modelClient: UnifiedModelClient) {
     super();
@@ -222,6 +224,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     this.performanceMonitor = new PerformanceMonitor();
     this.errorRecovery = new ErrorRecoveryManager();
     this.domainOrchestrator = new DomainAwareToolOrchestrator(); // Initialize domain-aware selection
+    this.parameterGenerator = new AIPoweredParameterGenerator(modelClient); // Initialize AI parameter generation
 
     // Enhanced: Initialize telemetry provider for observability
     try {
@@ -597,23 +600,50 @@ Please provide a clear, helpful response based on these tool results. If there w
         toolNames: domainResult.tools.map(t => t.function?.name || t.name)
       });
 
-      // Convert domain-selected tools to ToolCall format for this orchestrator
-      const toolCalls: ToolCall[] = domainResult.tools.map(tool => ({
-        id: `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-        toolId: tool.function?.name || tool.name,
-        input: this.inferParametersFromObjective(objective, tool),
-        priority: 1,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoffStrategy: 'exponential' as const,
-          initialDelay: 1000,
-          maxDelay: 10000,
-          retryableErrors: ['TIMEOUT', 'NETWORK_ERROR', 'RATE_LIMITED']
-        },
-        fallbackTools: [],
-        timeout: 30000,
-        dependsOn: []
-      }));
+      // Convert domain-selected tools to ToolCall format with AI-powered parameter generation
+      const toolCalls: ToolCall[] = [];
+      
+      for (const tool of domainResult.tools) {
+        // Build parameter generation context
+        const paramContext: ParameterGenerationContext = {
+          userPrompt: objective,
+          toolName: tool.function?.name || tool.name,
+          toolSchema: tool.function?.parameters || tool.parameters || {},
+          workingDirectory: context.environment?.workingDirectory || process.cwd(),
+          domainContext: domainResult.analysis.primaryDomain,
+          taskType: this.inferTaskType(objective, domainResult.analysis.primaryDomain),
+          fileContext: [], // TODO: Add file context from environment
+          codebaseContext: context.systemPrompt || '' // Use system prompt as codebase context
+        };
+        
+        // Generate parameters using AI-powered approach
+        const generatedParams = await this.parameterGenerator.generateParameters(paramContext);
+        
+        toolCalls.push({
+          id: `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          toolId: tool.function?.name || tool.name,
+          input: generatedParams.parameters,
+          priority: Math.round(generatedParams.confidence * 10), // Convert confidence to priority 0-10
+          retryPolicy: {
+            maxAttempts: generatedParams.confidence > 0.7 ? 3 : 2, // Fewer retries for low-confidence params
+            backoffStrategy: 'exponential' as const,
+            initialDelay: 1000,
+            maxDelay: 10000,
+            retryableErrors: ['TIMEOUT', 'NETWORK_ERROR', 'RATE_LIMITED']
+          },
+          fallbackTools: [],
+          timeout: 30000,
+          dependsOn: []
+        });
+
+        this.logger.info('🧠 AI-powered parameter generation completed', {
+          tool: tool.function?.name || tool.name,
+          confidence: generatedParams.confidence,
+          parametersCount: Object.keys(generatedParams.parameters).length,
+          reasoning: generatedParams.reasoning.substring(0, 100),
+          fallbackUsed: generatedParams.fallbackUsed
+        });
+      }
 
       this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Converted to ToolCall format', {
         toolCallCount: toolCalls.length,
@@ -676,7 +706,36 @@ Please provide a clear, helpful response based on these tool results. If there w
   }
 
   /**
-   * Infer tool parameters from objective (simple heuristics)
+   * Infer task type from objective and domain context
+   */
+  private inferTaskType(objective: string, domain: string): 'file_analysis' | 'code_generation' | 'system_operation' | 'research' | 'mixed' {
+    const objectiveLower = objective.toLowerCase();
+    
+    if (domain === 'coding') {
+      if (objectiveLower.includes('generate') || objectiveLower.includes('create') || objectiveLower.includes('build')) {
+        return 'code_generation';
+      } else if (objectiveLower.includes('read') || objectiveLower.includes('analyze') || objectiveLower.includes('show')) {
+        return 'file_analysis';
+      }
+      return 'code_generation';
+    }
+    
+    if (domain === 'system') return 'system_operation';
+    if (domain === 'research') return 'research';
+    if (domain === 'mixed') return 'mixed';
+    
+    // Default inference based on keywords
+    if (objectiveLower.includes('read') || objectiveLower.includes('analyze')) return 'file_analysis';
+    if (objectiveLower.includes('execute') || objectiveLower.includes('run') || objectiveLower.includes('command')) return 'system_operation';
+    if (objectiveLower.includes('search') || objectiveLower.includes('find') || objectiveLower.includes('research')) return 'research';
+    if (objectiveLower.includes('create') || objectiveLower.includes('generate') || objectiveLower.includes('write')) return 'code_generation';
+    
+    return 'mixed';
+  }
+
+  /**
+   * Infer tool parameters from objective (DEPRECATED - replaced by AI-powered generation)
+   * @deprecated Use AIPoweredParameterGenerator instead
    */
   private inferParametersFromObjective(objective: string, tool: any): any {
     const toolName = tool.function?.name || tool.name;

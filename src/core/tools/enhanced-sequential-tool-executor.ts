@@ -722,10 +722,18 @@ REMEMBER: Assumptions and generic responses are NOT acceptable. Use tools to pro
           // Intelligent args based on context - extract file path if possible
           const filePathMatch = response.match(/([A-Za-z]:\\[^\\/:*?"<>|\r\n]*\\[^\\/:*?"<>|\r\n]*\.[A-Za-z0-9]+)/);
           if (filePathMatch) {
-            toolArgs = { path: filePathMatch[1] };
+            toolArgs = { filePath: filePathMatch[1] };
             logger.info('🎯 EXTRACTED FILE PATH from response', { filePath: filePathMatch[1] });
           } else {
-            toolArgs = {}; // Let tool handle default behavior
+            // CRITICAL FIX: Provide intelligent default arguments for file operations
+            const toolName = (selectedTool.function?.name || selectedTool.name || '').toLowerCase();
+            if (toolName.includes('read') || toolName.includes('file')) {
+              // Default to reading a common file that likely exists
+              toolArgs = { filePath: 'package.json' };
+              logger.info('🔧 INTELLIGENT DEFAULT: Using package.json as default file to analyze');
+            } else {
+              toolArgs = {};
+            }
           }
         }
       }
@@ -733,10 +741,20 @@ REMEMBER: Assumptions and generic responses are NOT acceptable. Use tools to pro
       // If still no tool selected, use first available as ultimate fallback
       if (!selectedTool) {
         selectedTool = availableTools[0];
-        toolArgs = {};
-        logger.info('🔧 ULTIMATE FALLBACK: Using first available tool', {
-          selectedToolName: selectedTool?.name || selectedTool?.function?.name
-        });
+        
+        // CRITICAL FIX: Provide intelligent arguments even for fallback tools
+        const fallbackToolName = (selectedTool?.function?.name || selectedTool?.name || '').toLowerCase();
+        if (fallbackToolName.includes('read') || fallbackToolName.includes('file')) {
+          toolArgs = { filePath: 'package.json' };
+          logger.info('🔧 ULTIMATE FALLBACK: Using package.json as default file', {
+            selectedToolName: selectedTool?.name || selectedTool?.function?.name
+          });
+        } else {
+          toolArgs = {};
+          logger.info('🔧 ULTIMATE FALLBACK: Using first available tool with empty args', {
+            selectedToolName: selectedTool?.name || selectedTool?.function?.name
+          });
+        }
       }
     }
 

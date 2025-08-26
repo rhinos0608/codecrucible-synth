@@ -1236,6 +1236,409 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
     logger.info('Unified Orchestration Service destroyed');
   }
+
+  /**
+   * Integration method for SystemIntegrationCoordinator
+   * Synthesize integrated result from routing, voice, and MCP results
+   */
+  async synthesizeIntegratedResult(integrationData: {
+    routingDecision: any;
+    voiceResult: any;
+    mcpResult: any;
+    originalRequest: any;
+  }): Promise<any> {
+    try {
+      const startTime = Date.now();
+      
+      // Extract components from integration data
+      const { routingDecision, voiceResult, mcpResult, originalRequest } = integrationData;
+      
+      // Build synthesis context
+      const synthesisContext = {
+        requestType: originalRequest.type,
+        phase: originalRequest.context?.phase || 'synthesis',
+        priority: originalRequest.priority,
+        routingStrategy: routingDecision.routingStrategy,
+        voicesUsed: voiceResult.voicesUsed || [],
+        mcpCapabilities: mcpResult.mcpCapabilitiesUsed || [],
+        synthesisMethod: this.determineSynthesisMethod(integrationData)
+      };
+      
+      // Perform synthesis based on the method
+      let synthesizedContent;
+      switch (synthesisContext.synthesisMethod) {
+        case 'hierarchical':
+          synthesizedContent = await this.performHierarchicalSynthesis(integrationData, synthesisContext);
+          break;
+          
+        case 'collaborative':
+          synthesizedContent = await this.performCollaborativeSynthesis(integrationData, synthesisContext);
+          break;
+          
+        case 'sequential':
+          synthesizedContent = await this.performSequentialSynthesis(integrationData, synthesisContext);
+          break;
+          
+        default:
+          synthesizedContent = await this.performDefaultSynthesis(integrationData, synthesisContext);
+      }
+      
+      // Calculate synthesis quality metrics
+      const qualityMetrics = this.calculateSynthesisQuality(synthesizedContent, integrationData);
+      
+      // Build final result
+      const synthesisTime = Date.now() - startTime;
+      const result = {
+        content: synthesizedContent.content,
+        confidence: synthesizedContent.confidence || 0.8,
+        synthesisMethod: synthesisContext.synthesisMethod,
+        synthesisTime,
+        qualityMetrics,
+        componentResults: {
+          routing: this.summarizeRoutingDecision(routingDecision),
+          voice: this.summarizeVoiceResult(voiceResult),
+          mcp: this.summarizeMCPResult(mcpResult)
+        },
+        metadata: {
+          timestamp: Date.now(),
+          orchestrationId: `synthesis-${Date.now()}`,
+          requestId: originalRequest.id,
+          systemsIntegrated: this.identifyIntegratedSystems(integrationData),
+          synthesisContext
+        }
+      };
+      
+      // Record synthesis metrics
+      this.recordSynthesisMetrics(result);
+      
+      return result;
+      
+    } catch (error) {
+      logger.error('Failed to synthesize integrated result:', error);
+      
+      // Return fallback synthesis
+      return this.createFallbackSynthesis(integrationData, error);
+    }
+  }
+  
+  /**
+   * Determine the best synthesis method based on integration data
+   */
+  private determineSynthesisMethod(integrationData: any): string {
+    const { routingDecision, voiceResult, mcpResult } = integrationData;
+    
+    // Multi-voice results require collaborative synthesis
+    if (voiceResult.voicesUsed && voiceResult.voicesUsed.length > 1) {
+      return 'collaborative';
+    }
+    
+    // Complex routing with MCP capabilities requires hierarchical
+    if (routingDecision.routingStrategy === 'hybrid-quality' && mcpResult.mcpCapabilitiesUsed?.length > 0) {
+      return 'hierarchical';
+    }
+    
+    // Sequential processing for standard cases
+    if (mcpResult.mcpCapabilitiesUsed && mcpResult.mcpCapabilitiesUsed.length > 0) {
+      return 'sequential';
+    }
+    
+    return 'default';
+  }
+  
+  /**
+   * Perform hierarchical synthesis (high-quality, complex integration)
+   */
+  private async performHierarchicalSynthesis(integrationData: any, context: any): Promise<any> {
+    const { voiceResult, mcpResult } = integrationData;
+    
+    // Layer 1: Voice result as foundation
+    let synthesizedContent = voiceResult.content || voiceResult;
+    
+    // Layer 2: Integrate MCP enhancements hierarchically
+    if (mcpResult.mcpResults && mcpResult.mcpResults.length > 0) {
+      const mcpEnhancements = mcpResult.mcpResults
+        .map((result: any) => `[${result.capability || 'MCP'}] ${result.result || result}`)
+        .join('\n');
+      
+      synthesizedContent = `${synthesizedContent}\n\n=== Enhanced Analysis ===\n${mcpEnhancements}`;
+    }
+    
+    // Layer 3: Add synthesis conclusion
+    const conclusion = this.generateSynthesisConclusion(integrationData, 'hierarchical');
+    
+    return {
+      content: `${synthesizedContent}\n\n=== Synthesis ===\n${conclusion}`,
+      confidence: Math.min((voiceResult.confidence || 0.8) + 0.15, 1.0),
+      method: 'hierarchical'
+    };
+  }
+  
+  /**
+   * Perform collaborative synthesis (multi-voice coordination)
+   */
+  private async performCollaborativeSynthesis(integrationData: any, context: any): Promise<any> {
+    const { voiceResult, mcpResult } = integrationData;
+    
+    // Synthesize multiple voice perspectives
+    let collaborativeContent = '';
+    
+    if (Array.isArray(voiceResult) || voiceResult.responses) {
+      // Handle multiple voice responses
+      const responses = voiceResult.responses || [voiceResult];
+      collaborativeContent = responses
+        .map((response: any, index: number) => 
+          `Voice ${index + 1} (${response.voiceId || 'unknown'}): ${response.content || response}`
+        )
+        .join('\n\n');
+    } else {
+      collaborativeContent = voiceResult.content || voiceResult;
+    }
+    
+    // Add MCP contributions if available
+    if (mcpResult.mcpResults && mcpResult.mcpResults.length > 0) {
+      const mcpContributions = mcpResult.mcpResults
+        .map((result: any) => `MCP: ${result.result || result}`)
+        .join('\n');
+      
+      collaborativeContent += `\n\n=== Technical Analysis ===\n${mcpContributions}`;
+    }
+    
+    // Generate collaborative conclusion
+    const consensus = this.generateSynthesisConclusion(integrationData, 'collaborative');
+    
+    return {
+      content: `${collaborativeContent}\n\n=== Collaborative Synthesis ===\n${consensus}`,
+      confidence: this.calculateCollaborativeConfidence(voiceResult, mcpResult),
+      method: 'collaborative'
+    };
+  }
+  
+  /**
+   * Perform sequential synthesis (step-by-step integration)
+   */
+  private async performSequentialSynthesis(integrationData: any, context: any): Promise<any> {
+    const { voiceResult, mcpResult } = integrationData;
+    
+    let sequentialContent = '';
+    
+    // Step 1: Voice analysis
+    sequentialContent += `Step 1 - Voice Analysis:\n${voiceResult.content || voiceResult}\n\n`;
+    
+    // Step 2: MCP enhancements
+    if (mcpResult.mcpResults && mcpResult.mcpResults.length > 0) {
+      sequentialContent += `Step 2 - Technical Enhancement:\n`;
+      mcpResult.mcpResults.forEach((result: any, index: number) => {
+        sequentialContent += `${index + 1}. [${result.capability || 'MCP'}] ${result.result || result}\n`;
+      });
+      sequentialContent += '\n';
+    }
+    
+    // Step 3: Final synthesis
+    const synthesis = this.generateSynthesisConclusion(integrationData, 'sequential');
+    sequentialContent += `Step 3 - Final Synthesis:\n${synthesis}`;
+    
+    return {
+      content: sequentialContent,
+      confidence: (voiceResult.confidence || 0.7) + 0.1,
+      method: 'sequential'
+    };
+  }
+  
+  /**
+   * Perform default synthesis (simple combination)
+   */
+  private async performDefaultSynthesis(integrationData: any, context: any): Promise<any> {
+    const { voiceResult, mcpResult } = integrationData;
+    
+    let content = voiceResult.content || voiceResult;
+    
+    // Add MCP results if available
+    if (mcpResult.content && mcpResult.content !== content) {
+      content += `\n\n--- Additional Analysis ---\n${mcpResult.content}`;
+    }
+    
+    return {
+      content,
+      confidence: voiceResult.confidence || 0.7,
+      method: 'default'
+    };
+  }
+  
+  /**
+   * Generate synthesis conclusion based on all components
+   */
+  private generateSynthesisConclusion(integrationData: any, method: string): string {
+    const { routingDecision, voiceResult, mcpResult, originalRequest } = integrationData;
+    
+    const components = [];
+    
+    // Analyze voice contribution
+    if (voiceResult.voicesUsed && voiceResult.voicesUsed.length > 0) {
+      components.push(`Voice analysis by ${voiceResult.voicesUsed.join(', ')}`);
+    }
+    
+    // Analyze MCP contribution
+    if (mcpResult.mcpCapabilitiesUsed && mcpResult.mcpCapabilitiesUsed.length > 0) {
+      components.push(`Technical capabilities: ${mcpResult.mcpCapabilitiesUsed.join(', ')}`);
+    }
+    
+    // Analyze routing strategy
+    components.push(`Routing strategy: ${routingDecision.routingStrategy}`);
+    
+    return `This ${method} synthesis integrates ${components.join(', ')} to provide a comprehensive response to the ${originalRequest.type} request.`;
+  }
+  
+  /**
+   * Calculate collaborative confidence from multiple sources
+   */
+  private calculateCollaborativeConfidence(voiceResult: any, mcpResult: any): number {
+    let totalConfidence = 0;
+    let sources = 0;
+    
+    if (voiceResult.confidence) {
+      totalConfidence += voiceResult.confidence;
+      sources++;
+    }
+    
+    if (mcpResult.mcpResults) {
+      const mcpConfidences = mcpResult.mcpResults
+        .map((r: any) => r.confidence || 0.6)
+        .filter((c: number) => c > 0);
+      
+      if (mcpConfidences.length > 0) {
+        totalConfidence += mcpConfidences.reduce((sum: number, conf: number) => sum + conf, 0) / mcpConfidences.length;
+        sources++;
+      }
+    }
+    
+    return sources > 0 ? Math.min(totalConfidence / sources + 0.1, 1.0) : 0.7;
+  }
+  
+  /**
+   * Calculate synthesis quality metrics
+   */
+  private calculateSynthesisQuality(synthesizedContent: any, integrationData: any): any {
+    const contentLength = (synthesizedContent.content || '').length;
+    const componentCount = this.countIntegrationComponents(integrationData);
+    
+    return {
+      contentLength,
+      componentCount,
+      completeness: Math.min(componentCount / 3, 1.0), // Routing + Voice + MCP
+      coherence: synthesizedContent.confidence || 0.7,
+      comprehensiveness: Math.min(contentLength / 500, 1.0) // Normalize to 500 chars
+    };
+  }
+  
+  /**
+   * Count integration components
+   */
+  private countIntegrationComponents(integrationData: any): number {
+    let count = 0;
+    
+    if (integrationData.routingDecision) count++;
+    if (integrationData.voiceResult) count++;
+    if (integrationData.mcpResult && integrationData.mcpResult.mcpResults?.length > 0) count++;
+    
+    return count;
+  }
+  
+  /**
+   * Summarize routing decision for result metadata
+   */
+  private summarizeRoutingDecision(decision: any): any {
+    return {
+      strategy: decision.routingStrategy,
+      confidence: decision.confidence,
+      estimatedQuality: decision.estimatedQuality,
+      modelUsed: decision.modelSelection?.selectedModel,
+      voiceRecommended: decision.voiceSelection?.selectedVoice
+    };
+  }
+  
+  /**
+   * Summarize voice result for result metadata
+   */
+  private summarizeVoiceResult(result: any): any {
+    return {
+      voicesUsed: result.voicesUsed || [],
+      processingMode: result.processingMode || 'single',
+      confidence: result.confidence || 0.7,
+      contentLength: (result.content || '').length
+    };
+  }
+  
+  /**
+   * Summarize MCP result for result metadata
+   */
+  private summarizeMCPResult(result: any): any {
+    return {
+      capabilitiesUsed: result.mcpCapabilitiesUsed || [],
+      resultsCount: result.mcpResults?.length || 0,
+      processingTime: result.processingTime || 0,
+      fallback: result.fallback || false
+    };
+  }
+  
+  /**
+   * Identify integrated systems
+   */
+  private identifyIntegratedSystems(integrationData: any): string[] {
+    const systems = ['orchestration']; // Always includes orchestration
+    
+    if (integrationData.routingDecision) systems.push('routing');
+    if (integrationData.voiceResult) systems.push('voice');
+    if (integrationData.mcpResult && !integrationData.mcpResult.fallback) systems.push('mcp');
+    
+    return systems;
+  }
+  
+  /**
+   * Record synthesis metrics for monitoring
+   */
+  private recordSynthesisMetrics(result: any): void {
+    this.performanceStats.totalExecutions++;
+    
+    if (result.qualityMetrics?.completeness > 0.8) {
+      this.performanceStats.successfulExecutions++;
+    }
+    
+    // Update average execution time
+    const execTime = result.synthesisTime || 0;
+    this.performanceStats.avgExecutionTime = 
+      (this.performanceStats.avgExecutionTime + execTime) / 2;
+  }
+  
+  /**
+   * Create fallback synthesis when main synthesis fails
+   */
+  private createFallbackSynthesis(integrationData: any, error: any): any {
+    const { voiceResult, originalRequest } = integrationData;
+    
+    return {
+      content: voiceResult.content || voiceResult || 'Unable to synthesize result',
+      confidence: 0.5,
+      synthesisMethod: 'fallback',
+      synthesisTime: 0,
+      qualityMetrics: {
+        contentLength: 0,
+        componentCount: 1,
+        completeness: 0.3,
+        coherence: 0.5,
+        comprehensiveness: 0.3
+      },
+      error: error.message,
+      fallback: true,
+      metadata: {
+        timestamp: Date.now(),
+        requestId: originalRequest.id,
+        synthesisContext: {
+          synthesisMethod: 'fallback',
+          fallbackReason: 'Main synthesis failed'
+        }
+      }
+    };
+  }
 }
 
 // Supporting interfaces

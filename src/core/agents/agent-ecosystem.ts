@@ -8,7 +8,7 @@ import { EventEmitter } from 'events';
 import { Logger } from '../logger.js';
 // import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import { WorkflowOrchestrator } from '../workflow/workflow-orchestrator.js';
-import { AdvancedToolOrchestrator } from '../tools/advanced-tool-orchestrator.js';
+import { AdvancedToolOrchestrator } from '../../infrastructure/tools/advanced-tool-orchestrator.js';
 import { VectorRAGSystem } from '../rag/vector-rag-system.js';
 import { IntelligentModelRouter } from '../routing/intelligent-model-router.js';
 

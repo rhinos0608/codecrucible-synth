@@ -250,10 +250,12 @@ export class VoiceSystemIntegration2025 implements VoiceArchetypeSystemInterface
         
         if (modeDecision.selectedMode === 'single') {
           // Use the optimizer's voice selection if it recommends single mode
-          const selection = await this.dynamicSelector?.selectOptimalVoices(prompt, {
-            category: 'general',
+          const selection = await this.dynamicSelector?.selectOptimalVoices({
+            prompt,
+            taskType: 'generation',
+            complexity: 'moderate',
             userPreference: 'auto'
-          });
+          } as any);
           
           if (selection && selection.selectedVoices.length > 0) {
             selectedVoice = selection.selectedVoices[0];
@@ -443,7 +445,11 @@ export class VoiceSystemIntegration2025 implements VoiceArchetypeSystemInterface
     const analytics = {
       systemOverview: this.systemMetrics,
       configuration: this.config,
-      performance: {}
+      performance: {
+        costOptimization: undefined as any,
+        optimizedSystem: undefined as any,
+        coordination: undefined as any
+      }
     };
 
     // Get performance analytics if available
@@ -569,7 +575,8 @@ export class VoiceSystemIntegration2025 implements VoiceArchetypeSystemInterface
       }
     }
     
-    return activeSystem.recommendVoices(prompt, maxVoices);
+    const result = activeSystem.recommendVoices(prompt, maxVoices);
+    return Array.isArray(result) ? result : ['maintainer', 'developer', 'analyst'].slice(0, maxVoices);
   }
 
   validateVoices(voiceIds: string[]): { valid: string[]; invalid: string[] } {
@@ -586,18 +593,6 @@ export class VoiceSystemIntegration2025 implements VoiceArchetypeSystemInterface
     return this.legacySystem;
   }
 
-  private getActiveOptimizations(): string[] {
-    const active = [];
-    
-    if (this.currentSystem === 'optimized') active.push('optimized-system');
-    if (this.dynamicSelector) active.push('dynamic-selection');
-    if (this.modeOptimizer) active.push('mode-optimization');
-    if (this.voiceMemory) active.push('hierarchical-memory');
-    if (this.coordinator) active.push('advanced-coordination');
-    if (this.analytics) active.push('performance-analytics');
-    
-    return active;
-  }
 
   private determineTaskComplexity(prompt: string): 'simple' | 'moderate' | 'complex' {
     const complexKeywords = ['architecture', 'system', 'security', 'scalable', 'enterprise'];
@@ -636,6 +631,351 @@ export class VoiceSystemIntegration2025 implements VoiceArchetypeSystemInterface
     const improvement = Math.max(0, metrics.qualityScore - baselineQuality);
     this.systemMetrics.qualityImprovement = 
       (1 - alpha) * this.systemMetrics.qualityImprovement + alpha * improvement;
+  }
+
+  /**
+   * Synthesize multiple voice responses into a unified result
+   */
+  async synthesizeVoiceResponses(responses: Record<string, unknown>[]): Promise<any> {
+    if (!responses || responses.length === 0) {
+      return { content: '', confidence: 0, voicesUsed: [] };
+    }
+
+    const activeSystem = this.optimizedSystem || this.legacySystem;
+    if (activeSystem && 'synthesizeVoiceResponses' in activeSystem && typeof activeSystem.synthesizeVoiceResponses === 'function') {
+      return activeSystem.synthesizeVoiceResponses(responses);
+    }
+
+    // Fallback synthesis
+    const contents = responses.map((r: any) => r.content || '').filter(Boolean);
+    const voicesUsed = responses.map((r: any) => r.voiceId || 'unknown');
+
+    return {
+      content: contents.join('\n\n---\n\n'),
+      confidence: 0.7,
+      voicesUsed,
+      synthesizedAt: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Get a voice perspective on a given prompt
+   */
+  async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
+    try {
+      const activeSystem = this.optimizedSystem || this.legacySystem;
+      
+      if (activeSystem && 'getVoicePerspective' in activeSystem && typeof activeSystem.getVoicePerspective === 'function') {
+        return activeSystem.getVoicePerspective(voiceId, prompt, {});
+      }
+
+      // Fallback - use generateSingleVoiceResponse if available
+      if (activeSystem && 'generateSingleVoiceResponse' in activeSystem && typeof activeSystem.generateSingleVoiceResponse === 'function') {
+        const response = await activeSystem.generateSingleVoiceResponse(voiceId, prompt);
+        return {
+          voiceId,
+          perspective: response.content || response,
+          confidence: response.confidence || 0.7,
+          generatedAt: new Date().toISOString()
+        };
+      }
+
+      return {
+        error: `Cannot get perspective: no suitable method available`,
+        voiceId,
+        prompt
+      };
+
+    } catch (error) {
+      return {
+        error: `Failed to get perspective from ${voiceId}: ${(error as Error).message}`,
+        voiceId,
+        prompt
+      };
+    }
+  }
+
+  /**
+   * Integration method for SystemIntegrationCoordinator
+   * Process content with integrated routing decision
+   */
+  async processWithIntegratedRouting(
+    content: string, 
+    routingDecision: any, 
+    context: any
+  ): Promise<any> {
+    try {
+      const startTime = Date.now();
+      
+      // Extract voice selection from routing decision
+      const voiceSelection = routingDecision.voiceSelection;
+      const selectedVoices = voiceSelection.selectedVoice 
+        ? [voiceSelection.selectedVoice] 
+        : (voiceSelection.alternatives || ['maintainer']).slice(0, this.config.maxConcurrentVoices);
+      
+      // Determine processing mode based on routing strategy
+      let processingMode: 'competitive' | 'collaborative' | 'consensus' = 'collaborative';
+      if (routingDecision.routingStrategy === 'multi-voice-collaborative') {
+        processingMode = 'collaborative';
+      } else if (routingDecision.routingStrategy === 'multi-voice-competitive') {
+        processingMode = 'competitive';
+      } else if (routingDecision.routingStrategy.includes('consensus')) {
+        processingMode = 'consensus';
+      }
+      
+      // Build enhanced context from integration context and routing decision
+      const enhancedContext = {
+        ...context,
+        routingDecision,
+        mode: processingMode,
+        phase: context.phase || 'synthesis',
+        priority: context.priority || 'medium',
+        qualityTarget: routingDecision.estimatedQuality || 0.7,
+        latencyBudget: routingDecision.estimatedLatency || 30000,
+        costBudget: routingDecision.estimatedCost || 0.1
+      };
+      
+      let result;
+      
+      // Use appropriate processing method based on voice count
+      if (selectedVoices.length === 1) {
+        // Single voice processing
+        result = await this.generateSingleVoiceResponse(
+          selectedVoices[0], 
+          content, 
+          enhancedContext?.modelClient
+        );
+      } else {
+        // Multi-voice processing
+        result = await this.generateMultiVoiceSolutions(
+          selectedVoices, 
+          content, 
+          enhancedContext
+        );
+        
+        // If we got multiple results, synthesize them
+        if (Array.isArray(result) && result.length > 1) {
+          result = await this.synthesizeMultipleResults(result, processingMode);
+        } else if (Array.isArray(result) && result.length === 1) {
+          result = result[0];
+        }
+      }
+      
+      // Record integration metrics
+      const processingTime = Date.now() - startTime;
+      this.recordIntegrationMetrics({
+        content,
+        routingDecision,
+        selectedVoices,
+        processingTime,
+        processingMode,
+        success: !!result
+      });
+      
+      // Return enhanced result with integration metadata
+      return {
+        content: result?.content || result || content,
+        voicesUsed: selectedVoices,
+        routingStrategy: routingDecision.routingStrategy,
+        processingMode,
+        confidence: result?.confidence || voiceSelection.confidence || 0.7,
+        processingTime,
+        qualityScore: this.calculateQualityScore(result),
+        metadata: {
+          integrationMethod: 'processWithIntegratedRouting',
+          routingId: routingDecision.routingId,
+          systemType: this.currentSystem,
+          optimizationsUsed: this.getActiveOptimizations(),
+          timestamp: Date.now()
+        }
+      };
+      
+    } catch (error) {
+      logger.error('Failed to process with integrated routing:', error);
+      
+      // Fallback processing
+      return await this.processWithFallback(content, context);
+    }
+  }
+  
+  /**
+   * Synthesize multiple voice results based on processing mode
+   */
+  private async synthesizeMultipleResults(results: any[], mode: string): Promise<any> {
+    if (!results || results.length === 0) {
+      return null;
+    }
+    
+    if (results.length === 1) {
+      return results[0];
+    }
+    
+    switch (mode) {
+      case 'competitive':
+        // Return the highest confidence result
+        return results.reduce((best, current) => 
+          (current.confidence || 0) > (best.confidence || 0) ? current : best
+        );
+        
+      case 'consensus':
+        // Attempt to find common elements and synthesize
+        return this.synthesizeConsensus(results);
+        
+      case 'collaborative':
+      default:
+        // Synthesize all results collaboratively
+        return await this.synthesize(
+          results.map(r => r.content).join('\n\n'),
+          results.map((r, i) => r.voiceId || `voice-${i}`),
+          'collaborative'
+        );
+    }
+  }
+  
+  /**
+   * Process content with fallback method
+   */
+  private async processWithFallback(content: string, context: any): Promise<any> {
+    try {
+      // Use the legacy system or basic processing
+      const activeSystem = this.getActiveSystem();
+      
+      if (activeSystem.generateSingleVoiceResponse) {
+        return await activeSystem.generateSingleVoiceResponse(
+          'maintainer', // Safe fallback voice
+          content,
+          context?.modelClient
+        );
+      }
+      
+      // Ultimate fallback - return content with minimal processing
+      return {
+        content: `Processed: ${content}`,
+        voicesUsed: ['fallback'],
+        confidence: 0.5,
+        fallback: true,
+        processingMode: 'fallback'
+      };
+      
+    } catch (error) {
+      logger.error('Fallback processing also failed:', error);
+      
+      return {
+        content: content,
+        error: 'Processing failed',
+        voicesUsed: [],
+        confidence: 0,
+        fallback: true
+      };
+    }
+  }
+  
+  /**
+   * Record integration metrics for monitoring
+   */
+  private recordIntegrationMetrics(metrics: any): void {
+    this.systemMetrics.totalRequests++;
+    
+    if (this.analytics) {
+      // Record integration metrics using available method or store them internally
+      try {
+        if (typeof this.analytics.recordMetrics === 'function') {
+          this.analytics.recordMetrics({
+            voiceId: metrics.selectedVoices?.[0] || 'unknown',
+            timestamp: new Date(),
+            responseTime: metrics.processingTime || 0,
+            tokenUsage: 0,
+            qualityScore: 0.7,
+            confidenceLevel: 0.7,
+            taskComplexity: 'moderate',
+            success: metrics.success || false,
+            costEstimate: 0.01
+          } as any);
+        }
+      } catch (error) {
+        // Silently handle analytics errors
+        logger.debug('Failed to record integration metrics', { error: error.message });
+      }
+    }
+  }
+  
+  /**
+   * Calculate quality score for result
+   */
+  private calculateQualityScore(result: any): number {
+    if (!result) return 0;
+    
+    if (typeof result.confidence === 'number') {
+      return result.confidence;
+    }
+    
+    // Fallback quality assessment
+    const contentLength = (result.content || '').length;
+    if (contentLength > 500) return 0.8;
+    if (contentLength > 100) return 0.6;
+    return 0.4;
+  }
+  
+  /**
+   * Get active optimizations for metadata
+   */
+  private getActiveOptimizations(): string[] {
+    const optimizations: string[] = [];
+    
+    if (this.config.enableDynamicSelection && this.dynamicSelector) {
+      optimizations.push('dynamic_selection');
+    }
+    if (this.config.enableModeOptimization && this.modeOptimizer) {
+      optimizations.push('mode_optimization');
+    }
+    if (this.config.enableHierarchicalMemory && this.voiceMemory) {
+      optimizations.push('hierarchical_memory');
+    }
+    if (this.config.enableAdvancedCoordination && this.coordinator) {
+      optimizations.push('advanced_coordination');
+    }
+    
+    return optimizations;
+  }
+  
+  /**
+   * Synthesize consensus from multiple results
+   */
+  private synthesizeConsensus(results: any[]): any {
+    // Find common themes and synthesize
+    const contents = results.map(r => r.content || '').filter(c => c.length > 0);
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence || 0), 0) / results.length;
+    
+    return {
+      content: contents.join('\n\n--- CONSENSUS SYNTHESIS ---\n'),
+      confidence: avgConfidence,
+      voicesUsed: results.map((r, i) => r.voiceId || `voice-${i}`),
+      synthesisMode: 'consensus',
+      originalResults: results
+    };
+  }
+
+  /**
+   * Initialize the voice system integration
+   */
+  async initialize(): Promise<void> {
+    // Initialize optimized system if needed
+    if (!this.optimizedSystem && this.config.useOptimizedSystem) {
+      this.optimizedSystem = new OptimizedVoiceSystem2025(
+        undefined, // modelClient not available in this context
+        this.config
+      );
+    }
+
+    // Initialize analytics if enabled
+    if (this.config.enablePerformanceAnalytics && !this.analytics) {
+      this.analytics = new VoicePerformanceAnalytics2025();
+    }
+
+    // Initialize coordinator if needed
+    if (this.config.enableAdvancedCoordination && !this.coordinator) {
+      this.coordinator = new AdvancedVoiceCoordinator2025();
+    }
   }
 }
 

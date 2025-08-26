@@ -765,6 +765,98 @@ export class VectorRAGSystem extends EventEmitter {
 }
 
 // Supporting Classes and Interfaces
+/**
+ * Interface for the critique of a RAG result.
+ */
+export interface Critique {
+  critique: string;
+  is_correct: boolean;
+}
+
+/**
+ * Class for rewriting and expanding queries.
+ */
+export class QueryRewriter {
+  private modelClient: UnifiedModelClient;
+  private logger: Logger;
+
+  constructor(modelClient: UnifiedModelClient) {
+    this.modelClient = modelClient;
+    this.logger = new Logger('QueryRewriter');
+  }
+
+  async rewriteQuery(query: string): Promise<string> {
+    const prompt = `Rewrite the following query to be more specific and clear: ${query}`;
+    try {
+      const response = await this.modelClient.synthesize({
+        prompt,
+        maxTokens: 100,
+      });
+      return response.content;
+    } catch (error) {
+      this.logger.error('Failed to rewrite query:', error);
+      return query;
+    }
+  }
+}
+
+/**
+ * Class for self-correcting RAG.
+ */
+export class SelfCorrectingRAG extends VectorRAGSystem {
+  private queryRewriter: QueryRewriter;
+
+  constructor(config: RAGConfig, modelClient: UnifiedModelClient, hybridConfig?: HybridSearchConfig) {
+    super(config, modelClient, hybridConfig);
+    this.queryRewriter = new QueryRewriter(modelClient);
+  }
+
+  async query(ragQuery: RAGQuery): Promise<RAGResult> {
+    // Rewrite the query
+    ragQuery.query = await this.queryRewriter.rewriteQuery(ragQuery.query);
+
+    // Perform the initial query
+    let result = await super.query(ragQuery);
+
+    // Self-correction loop
+    for (let i = 0; i < 3; i++) {
+      const critique = await this.critiqueResult(result);
+      if (critique.is_correct) {
+        break;
+      }
+      // Correct the query and try again
+      ragQuery.query = critique.critique;
+      result = await super.query(ragQuery);
+    }
+
+    return result;
+  }
+
+  private async critiqueResult(result: RAGResult): Promise<Critique> {
+    const prompt = `Critique the following RAG result. If it is correct, respond with "CORRECT". Otherwise, provide a corrected query.
+
+    Result:
+    ${result.documents.map((doc) => doc.document.content).join('\n\n')}
+    `;
+
+    try {
+      const response = await this.modelClient.synthesize({
+        prompt,
+        maxTokens: 100,
+      });
+
+      if (response.content.trim() === 'CORRECT') {
+        return { critique: '', is_correct: true };
+      } else {
+        return { critique: response.content, is_correct: false };
+      }
+    } catch (error) {
+      this.logger.error('Failed to critique result:', error);
+      return { critique: '', is_correct: true };
+    }
+  }
+}
+
 export interface RAGSystemStats {
   vectorStore: VectorStoreStats;
   performance: PerformanceStats;
@@ -811,49 +903,135 @@ class RAGMetrics {
 
 // Placeholder implementations - these would be separate files in production
 class LanceDBVectorStore implements VectorStore {
-  constructor(private config: any) {}
+  private db: any;
+  private table: any;
+
+  constructor(private config: RAGConfig['vectorStore']) {}
+
   async initialize(): Promise<void> {
-    /* Implementation */
+    const lancedb = await import('lancedb');
+    this.db = await lancedb.connect(this.config.storagePath);
+    try {
+      this.table = await this.db.openTable(this.config.tableName);
+    } catch (e) {
+      this.table = await this.db.createTable(this.config.tableName, {
+        vector: [],
+        text: '',
+        metadata: {},
+      });
+    }
   }
+
   async addDocuments(documents: VectorDocument[]): Promise<void> {
-    /* Implementation */
+    const data = documents.map((doc) => ({
+      vector: doc.embedding,
+      text: doc.content,
+      metadata: doc.metadata,
+    }));
+    await this.table.add(data);
   }
+
   async updateDocument(document: VectorDocument): Promise<void> {
-    /* Implementation */
+    await this.table.update(
+      `id = '${document.id}'`,
+      {
+        vector: document.embedding,
+        text: document.content,
+        metadata: document.metadata,
+      }
+    );
   }
+
   async deleteDocument(id: string): Promise<void> {
-    /* Implementation */
+    await this.table.delete(`id = '${id}'`);
   }
+
   async search(
     query: number[],
     filters?: QueryFilter[],
     maxResults?: number
   ): Promise<ScoredDocument[]> {
-    return [];
+    let queryBuilder = this.table.search(query);
+    if (filters) {
+      const filterString = filters
+        .map((f: QueryFilter) => `${f.field} ${f.operator} '${f.value}`)
+        .join(' AND ');
+      queryBuilder = queryBuilder.where(filterString);
+    }
+    if (maxResults) {
+      queryBuilder = queryBuilder.limit(maxResults);
+    }
+    const results = await queryBuilder.execute();
+    return results.map((r: any) => ({
+      document: {
+        id: r.id,
+        content: r.text,
+        embedding: r.vector,
+        metadata: r.metadata,
+      },
+      score: r.score,
+    }));
   }
+
   async hybridSearch(
     query: string,
     vector: number[],
     filters?: QueryFilter[]
   ): Promise<ScoredDocument[]> {
-    return [];
+    // LanceDB doesn't have a built-in hybrid search, so we'll implement a simple version
+    // that combines a vector search with a full-text search.
+    const vectorResults = await this.search(vector, filters);
+    const textResults = await this.table.search(query).execute();
+
+    const combinedResults: ScoredDocument[] = [...vectorResults];
+    for (const textResult of textResults) {
+      if (!combinedResults.some((r) => r.document.id === textResult.id)) {
+        combinedResults.push({
+          document: {
+            id: textResult.id,
+            content: textResult.text,
+            embedding: textResult.vector,
+            metadata: textResult.metadata,
+          },
+          score: textResult.score,
+        });
+      }
+    }
+
+    return combinedResults.sort((a, b) => b.score - a.score);
   }
+
   async getDocument(id: string): Promise<VectorDocument | null> {
-    return null;
+    const result = await this.table.search(0).where(`id = '${id}'`).execute<VectorDocument>();
+    if (result.length === 0) {
+      return null;
+    }
+    return result[0];
   }
+
   async getStats(): Promise<VectorStoreStats> {
-    return {} as VectorStoreStats;
+    const count = await this.table.countRows();
+    return {
+      totalDocuments: count,
+      totalChunks: 0,
+      indexSize: 0,
+      memoryUsage: 0,
+      lastUpdated: new Date(),
+      averageDocumentSize: 0,
+    };
   }
+
   async compact(): Promise<void> {
-    /* Implementation */
+    await this.table.compact();
   }
+
   async close(): Promise<void> {
-    /* Implementation */
+    // No close method in lancedb
   }
 }
 
 class HNSWSQLiteVectorStore implements VectorStore {
-  constructor(private config: any) {}
+  constructor(private config: RAGConfig['vectorStore']) {}
   async initialize(): Promise<void> {
     /* Implementation */
   }
@@ -897,7 +1075,7 @@ class HNSWSQLiteVectorStore implements VectorStore {
 class MemoryVectorStore implements VectorStore {
   private documents: Map<string, VectorDocument> = new Map();
 
-  constructor(private config: any) {}
+  constructor(private config: RAGConfig['vectorStore']) {}
 
   async initialize(): Promise<void> {}
 
@@ -981,7 +1159,7 @@ class TransformersJSEmbedding implements EmbeddingModel {
   dimensions = 384;
   maxTokens = 512;
 
-  constructor(private config: any) {}
+  constructor(private config: RAGConfig['embedding']) {}
 
   async embed(text: string): Promise<number[]> {
     // Placeholder - would use @xenova/transformers
@@ -999,7 +1177,7 @@ class OllamaEmbedding implements EmbeddingModel {
   maxTokens = 2048;
 
   constructor(
-    private config: any,
+    private config: RAGConfig['embedding'],
     private modelClient: UnifiedModelClient
   ) {}
 
@@ -1018,7 +1196,7 @@ class LocalEmbedding implements EmbeddingModel {
   dimensions = 768;
   maxTokens = 512;
 
-  constructor(private config: any) {}
+  constructor(private config: RAGConfig['embedding']) {}
 
   async embed(text: string): Promise<number[]> {
     // Placeholder for local embedding model
@@ -1031,7 +1209,7 @@ class LocalEmbedding implements EmbeddingModel {
 }
 
 class ASTBasedCodeChunker implements CodeChunker {
-  constructor(private config: any) {}
+  constructor(private config: RAGConfig['chunking']) {}
 
   async chunkDocument(document: VectorDocument): Promise<DocumentChunk[]> {
     const chunks: DocumentChunk[] = [];
@@ -1066,7 +1244,7 @@ class ASTBasedCodeChunker implements CodeChunker {
     const lines = content.split('\n');
 
     // Simple regex-based symbol extraction
-    const patterns = {
+    const patterns: { [key: string]: RegExp } = {
       function: /function\s+(\w+)\s*\(/,
       class: /class\s+(\w+)/,
       interface: /interface\s+(\w+)/,
@@ -1079,7 +1257,7 @@ class ASTBasedCodeChunker implements CodeChunker {
         if (match) {
           symbols.push({
             name: match[1],
-            type: type as any,
+            type: type as 'function' | 'class' | 'interface' | 'variable' | 'constant',
             startLine: index + 1,
             endLine: index + 1,
             signature: line.trim(),

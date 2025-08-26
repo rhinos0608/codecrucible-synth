@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
-import { CLI } from '../../src/core/cli.js';
+import { CLI } from '../../src/core/cli';
 import { UnifiedModelClient } from '../../src/core/client.js';
 import { MCPServerManager } from '../../src/mcp-servers/mcp-server-manager.js';
-import { VoiceArchetypeSystem } from '../../src/voices/voice-archetype-system.js';
+import { VoiceArchetypeSystem } from '../../src/voices/voice-archetype-system';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';

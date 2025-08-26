@@ -60,9 +60,9 @@ interface OptimizationConfig {
 export class OptimizedVoiceSystem2025 implements VoiceArchetypeSystemInterface {
   private voices: Map<string, Voice> = new Map();
   private promptCache: LRUCache<string, string>;
-  private dynamicSelector: DynamicVoiceSelector2025;
-  private modeOptimizer: VoiceModeOptimizer2025;
-  private voiceMemory: HierarchicalVoiceMemory2025;
+  private dynamicSelector!: DynamicVoiceSelector2025;
+  private modeOptimizer!: VoiceModeOptimizer2025;
+  private voiceMemory!: HierarchicalVoiceMemory2025;
   private modelClient: any;
   private config: OptimizationConfig;
   private performanceMetrics: Map<string, VoicePerformanceStats> = new Map();
@@ -741,6 +741,63 @@ Keep responses focused and practical.`;
     }
     
     logger.info('🎭 Optimized voice system reset complete');
+  }
+
+  /**
+   * Synthesize multiple voice responses into a unified result
+   */
+  async synthesizeVoiceResponses(responses: Record<string, unknown>[]): Promise<any> {
+    if (!responses || responses.length === 0) {
+      return { content: '', confidence: 0, voicesUsed: [] };
+    }
+
+    // Basic synthesis - combine responses and calculate confidence
+    const contents = responses.map((r: any) => r.content || '').filter(Boolean);
+    const confidences = responses.map((r: any) => r.confidence || 0.5);
+    const voicesUsed = responses.map((r: any) => r.voiceId || 'unknown');
+
+    const synthesizedContent = contents.join('\n\n---\n\n');
+    const averageConfidence = confidences.reduce((a, b) => a + b, 0) / confidences.length;
+
+    return {
+      content: synthesizedContent,
+      confidence: averageConfidence,
+      voicesUsed,
+      synthesizedAt: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Get a voice perspective on a given prompt
+   */
+  async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
+    try {
+      const voice = await this.getVoice(voiceId);
+      if (!voice) {
+        return {
+          error: `Voice not found: ${voiceId}`,
+          voiceId,
+          prompt
+        };
+      }
+
+      // Generate perspective using the specific voice
+      const response = await this.generateSingleVoiceResponse(voiceId, prompt);
+      
+      return {
+        voiceId,
+        perspective: response.content || response,
+        confidence: response.confidence || 0.7,
+        generatedAt: new Date().toISOString()
+      };
+
+    } catch (error) {
+      return {
+        error: `Failed to get perspective from ${voiceId}: ${(error as Error).message}`,
+        voiceId,
+        prompt
+      };
+    }
   }
 }
 

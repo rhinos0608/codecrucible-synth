@@ -3,7 +3,7 @@
  * Implements the core Living Spiral philosophy for iterative development
  */
 
-import { logger } from '../../infrastructure/logging/logger.js';
+import { logger } from '../../infrastructure/logging/logger';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import { LivingSpiralCoordinatorInterface } from '../../refactor/living-spiral-coordinator-interface.js';

@@ -10,19 +10,19 @@ import {
   TaskType,
 } from '../core/types.js';
 import { IModelClient, StreamToken } from '../core/interfaces/client-interfaces.js';
-import { SecurityValidator, ISecurityValidator } from '../core/security/security-validator.js';
+import { SecurityValidator } from '../core/security/security-validator.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 
 import { IntegratedCodeCrucibleSystem } from './integrated-system.js';
 
-import { HardwareAwareModelSelector } from '../core/performance/hardware-aware-model-selector.js';
+import { HardwareAwareModelSelector } from '../infrastructure/performance/hardware-aware-model-selector.js';
 import { getGlobalToolIntegration } from '../core/tools/tool-integration.js';
 import { getGlobalEnhancedToolIntegration } from '../core/tools/enhanced-tool-integration.js';
 import { ActiveProcessManager, ActiveProcess } from '../core/performance/active-process-manager.js';
 import { ProviderManager } from './provider-manager.js';
 import { getErrorMessage, toError } from '../utils/error-utils.js';
 import { createHash } from 'crypto';
-import { StreamingManager, IStreamingManager } from '../core/streaming/streaming-manager.js';
+import { StreamingManager } from '../core/streaming/streaming-manager.js';
 import { CacheCoordinator, ICacheCoordinator } from '../core/caching/cache-coordinator.js';
 import {
   VoiceSynthesisManager,
@@ -57,14 +57,14 @@ import {
 import {
   StreamProcessingManager,
   IStreamProcessingManager,
-} from '../core/streaming/stream-processing-manager.js';
+} from '../infrastructure/streaming/stream-processing-manager.js';
 import { RequestHandler } from './request-handler.js';
 
 export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private config: any;
   private providerManager: ProviderManager;
   private performanceMonitor: PerformanceMonitor;
-  private securityValidator: ISecurityValidator;
+  private securityValidator: SecurityValidator;
   private activeRequests: Map<string, any> = new Map();
   private requestQueue: Array<any> = [];
   private isProcessingQueue = false;
@@ -73,7 +73,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private processManager: ActiveProcessManager;
   private currentModel: string | null = null;
   private readonly HEALTH_CACHE_TTL = 30000; // 30 seconds
-  private streamingManager: IStreamingManager;
+  private streamingManager: StreamingManager;
   private integratedSystem: IntegratedCodeCrucibleSystem | null = null;
   private hybridRouter: any | null = null;
   private lastMemoryWarningTime = 0;
@@ -88,7 +88,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private requestProcessingCoreManager: IRequestProcessingCoreManager;
   private modelManagementManager: IModelManagementManager;
   private resourceCleanupManager: IResourceCleanupManager;
-  private streamProcessingManager: IStreamProcessingManager;
+  private streamProcessingManager: StreamProcessingManager;
   private requestHandler: RequestHandler;
 
   constructor(config: any, injectedDependencies?: any) {
@@ -106,11 +106,11 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.securityValidator =
       injectedDependencies?.securityValidator ||
       new SecurityValidator({
-        enableSandbox: this.config.security?.enableSandbox,
-        maxInputLength: this.config.security?.maxInputLength,
+        allowExecutableCommands: !this.config.security?.enableSandbox,
+        maxInputLength: this.config.security?.maxInputLength || 10000,
       });
     this.hardwareSelector = new HardwareAwareModelSelector();
-    this.processManager = new ActiveProcessManager(this.hardwareSelector);
+    this.processManager = new ActiveProcessManager();
     this.streamingManager =
       injectedDependencies?.streamingManager || new StreamingManager(config.streaming);
 
@@ -381,11 +381,11 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return this.hybridRouter;
   }
 
-  getStreamingManager(): IStreamingManager {
+  getStreamingManager(): StreamingManager {
     return this.streamingManager;
   }
 
-  getSecurityValidator(): ISecurityValidator {
+  getSecurityValidator(): SecurityValidator {
     return this.securityValidator;
   }
 

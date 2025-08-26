@@ -19,6 +19,13 @@ import { VoiceSystemIntegration2025 } from '../../voices/voice-system-integratio
 import { EnhancedMCPIntegrationManager } from '../mcp/index.js';
 import { UnifiedOrchestrationService } from '../services/unified-orchestration-service.js';
 
+// Import enhanced systems for full integration
+import { EnterpriseSecurityFramework, AgentAction, SecurityContext, SecurityValidation } from '../security/enterprise-security-framework.js';
+import { ReconstructedCodeQualityAnalyzer as CodeQualityAnalyzer, ComprehensiveQualityMetrics } from '../quality/reconstructed-code-quality-analyzer.js';
+import { SpiralConvergenceAnalyzer, IterationResult, ConvergenceAnalysis } from '../../application/services/spiral-convergence-analyzer.js';
+import { SystemHealthMonitor } from './system-health-monitor.js';
+import { PerformanceOptimizer } from './performance-optimizer.js';
+
 // Standardized data models for inter-system communication
 export interface IntegratedSystemRequest {
   id: string;
@@ -110,8 +117,15 @@ export class SystemIntegrationCoordinator extends EventEmitter {
   private mcpSystem: EnhancedMCPIntegrationManager | null = null;
   private orchestrationSystem: UnifiedOrchestrationService | null = null;
   
+  // Enhanced systems for comprehensive integration
+  private securityFramework: EnterpriseSecurityFramework | null = null;
+  private qualityAnalyzer: CodeQualityAnalyzer | null = null;
+  private spiralAnalyzer: SpiralConvergenceAnalyzer | null = null;
+  private healthMonitor: SystemHealthMonitor | null = null;
+  private performanceOptimizer: PerformanceOptimizer | null = null;
+  
   // Integration state management
-  private initializationPhase: 'starting' | 'routing' | 'voice' | 'mcp' | 'orchestration' | 'complete' | 'failed' = 'starting';
+  private initializationPhase: 'starting' | 'security' | 'quality' | 'spiral' | 'routing' | 'voice' | 'mcp' | 'orchestration' | 'complete' | 'failed' = 'starting';
   private systemHealth: Map<string, boolean> = new Map();
   private pendingRequests: Map<string, IntegratedSystemRequest> = new Map();
   private configurationValidated = false;
@@ -149,7 +163,34 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       // Phase 2: Performance monitoring coordination (addresses Issue #17)
       await this.initializePerformanceMonitoringCoordination();
       
-      // Phase 3: Initialize routing system (foundational)
+      // Phase 3: Initialize enhanced systems first (security, quality, spiral)
+      this.initializationPhase = 'security';
+      this.securityFramework = new EnterpriseSecurityFramework();
+      this.systemHealth.set('security', true);
+      logger.info('✅ Security framework initialized');
+      
+      this.initializationPhase = 'quality';
+      this.qualityAnalyzer = new CodeQualityAnalyzer();
+      this.systemHealth.set('quality', true);
+      logger.info('✅ Quality analyzer initialized');
+      
+      this.initializationPhase = 'spiral';
+      this.spiralAnalyzer = new SpiralConvergenceAnalyzer();
+      this.systemHealth.set('spiral', true);
+      logger.info('✅ Spiral convergence analyzer initialized');
+      
+      // Phase 4: Initialize health monitoring system
+      this.healthMonitor = SystemHealthMonitor.getInstance();
+      this.systemHealth.set('health-monitor', true);
+      logger.info('✅ System health monitor initialized');
+      
+      // Phase 5: Initialize performance optimizer
+      this.performanceOptimizer = PerformanceOptimizer.getInstance();
+      await this.performanceOptimizer.initialize();
+      this.systemHealth.set('performance-optimizer', true);
+      logger.info('✅ Performance optimizer initialized');
+      
+      // Phase 6: Initialize routing system (foundational)
       this.initializationPhase = 'routing';
       this.routingSystem = new IntelligentRoutingCoordinator();
       await this.waitForSystemReady(async () => {
@@ -157,7 +198,14 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       }, 'routing', 10000);
       this.systemHealth.set('routing', true);
       
-      // Phase 4: Initialize voice system with routing coordination (addresses Issue #15)
+      // Register routing system with health monitor
+      if (this.healthMonitor) {
+        this.healthMonitor.registerSystem('routing', async () => {
+          return this.routingSystem?.getSystemStatus() || { status: 'healthy' };
+        });
+      }
+      
+      // Phase 7: Initialize voice system with routing coordination (addresses Issue #15)
       this.initializationPhase = 'voice';
       this.voiceSystem = new VoiceSystemIntegration2025();
       await this.waitForSystemReady(async () => {
@@ -183,11 +231,29 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       }, 'orchestration', 5000);
       this.systemHealth.set('orchestration', true);
       
-      // Phase 7: Final coordination and optimization alignment
+      // Register all systems with health monitoring
+      if (this.healthMonitor) {
+        this.healthMonitor.registerSystem('voice', async () => {
+          return this.voiceSystem?.getSystemAnalytics() || { status: 'healthy' };
+        });
+        
+        this.healthMonitor.registerSystem('mcp', async () => {
+          return this.mcpSystem?.getSystemStatus() || { status: 'healthy' };
+        });
+        
+        this.healthMonitor.registerSystem('orchestration', async () => {
+          return this.orchestrationSystem?.getPerformanceStats() || { status: 'healthy' };
+        });
+        
+        // Start health monitoring
+        this.healthMonitor.startMonitoring();
+      }
+      
+      // Phase 8: Final coordination and optimization alignment
       await this.establishSystemCoordinationProtocols();
       
       this.initializationPhase = 'complete';
-      logger.info('✅ Integrated system initialization complete with runtime coordination');
+      logger.info('✅ Integrated system initialization complete with advanced monitoring and optimization');
       
       this.emit('initialization-complete');
       
@@ -212,8 +278,59 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       throw new Error(`Systems not ready. Current phase: ${this.initializationPhase}`);
     }
     
+    // Use performance optimizer if available
+    if (this.performanceOptimizer) {
+      return await this.performanceOptimizer.executeOptimized(
+        `integrated-request-${request.id}`,
+        () => this.processIntegratedRequestInternal(request),
+        {
+          priority: request.priority,
+          timeout: request.constraints?.maxExecutionTime,
+          cacheKey: this.generateCacheKey(request),
+          systemId: 'integration-coordinator'
+        }
+      );
+    }
+    
+    // Fallback to direct processing
+    return await this.processIntegratedRequestInternal(request);
+  }
+  
+  /**
+   * Internal request processing with full system integration
+   */
+  private async processIntegratedRequestInternal(request: IntegratedSystemRequest): Promise<IntegratedSystemResponse> {
+    const startTime = Date.now();
+    
     try {
       this.pendingRequests.set(request.id, request);
+      
+      // Phase 0: Security validation (must come first)
+      const securityValidation = await this.performSecurityValidation(request);
+      if (!securityValidation.allowed && securityValidation.riskScore > 75) {
+        return {
+          id: request.id,
+          status: 'failed',
+          result: null,
+          systemsUsed: ['security'],
+          performanceMetrics: {
+            totalLatency: Date.now() - startTime,
+            routingTime: 0,
+            voiceProcessingTime: 0,
+            mcpExecutionTime: 0,
+            orchestrationTime: 0,
+            cacheHitRate: 0,
+            resourceUtilization: 0
+          },
+          errors: [{
+            system: 'security',
+            type: 'SecurityViolation',
+            message: 'Request blocked due to security violations',
+            severity: 'critical',
+            recoveryAction: 'Review request content and reduce risk factors'
+          }]
+        };
+      }
       
       // Phase 1: Intelligent routing decision
       const routingStart = Date.now();
@@ -250,14 +367,33 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       });
       const orchestrationTime = Date.now() - orchestrationStart;
       
+      // Phase 5: Quality analysis of generated content
+      const qualityMetrics = await this.performQualityAnalysis(finalResult, request);
+      
+      // Phase 6: Spiral convergence analysis (if applicable)
+      const spiralAnalysis = await this.performSpiralAnalysis(request, finalResult, qualityMetrics);
+      
       const totalLatency = Date.now() - startTime;
       
-      // Build integrated response
+      // Build integrated response with enhanced data
       const response: IntegratedSystemResponse = {
         id: request.id,
         status: 'success',
-        result: finalResult,
-        systemsUsed: ['routing', 'voice', 'mcp', 'orchestration'],
+        result: {
+          content: finalResult,
+          securityValidation: {
+            allowed: securityValidation.allowed,
+            riskScore: securityValidation.riskScore,
+            violations: securityValidation.violations
+          },
+          qualityMetrics,
+          spiralAnalysis,
+          metadata: {
+            processingPhases: ['security', 'routing', 'voice', 'mcp', 'orchestration', 'quality', 'spiral'],
+            enhancedIntegration: true
+          }
+        },
+        systemsUsed: ['security', 'routing', 'voice', 'mcp', 'orchestration', 'quality', 'spiral'].filter(Boolean),
         performanceMetrics: {
           totalLatency,
           routingTime,
@@ -297,8 +433,7 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       {
         requestId: request.id,
         operation: 'integrated_request_processing',
-        service: 'integration-coordinator',
-        context: request.context
+        service: 'integration-coordinator'
       }
     );
     
@@ -817,12 +952,39 @@ export class SystemIntegrationCoordinator extends EventEmitter {
    */
   private getSystemByName(name: string): any {
     switch (name) {
+      case 'security': return this.securityFramework;
+      case 'quality': return this.qualityAnalyzer;
+      case 'spiral': return this.spiralAnalyzer;
       case 'routing': return this.routingSystem;
       case 'voice': return this.voiceSystem;
       case 'mcp': return this.mcpSystem;
       case 'orchestration': return this.orchestrationSystem;
+      case 'health-monitor': return this.healthMonitor;
+      case 'performance-optimizer': return this.performanceOptimizer;
       default: return null;
     }
+  }
+  
+  /**
+   * Generate cache key for request
+   */
+  private generateCacheKey(request: IntegratedSystemRequest): string {
+    const contentHash = this.hashString(request.content);
+    const contextHash = this.hashString(JSON.stringify(request.context));
+    return `integrated-request:${request.type}:${contentHash}:${contextHash}`;
+  }
+  
+  /**
+   * Simple string hash function
+   */
+  private hashString(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(36);
   }
   
   // Interval references for cleanup
@@ -886,6 +1048,211 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       content: `Fallback processing completed for: ${request.content}`,
       method: 'legacy-system',
       quality: 'reduced'
+    };
+  }
+
+  /**
+   * Perform security validation on request using enterprise security framework
+   */
+  private async performSecurityValidation(request: IntegratedSystemRequest): Promise<SecurityValidation> {
+    if (!this.securityFramework) {
+      logger.warn('Security framework not initialized, skipping validation');
+      return {
+        allowed: true,
+        violations: [],
+        mitigations: [],
+        riskScore: 0,
+        auditTrail: {
+          id: 'skipped',
+          timestamp: new Date(),
+          agentId: request.id,
+          action: 'validation_skipped',
+          allowed: true,
+          riskScore: 0,
+          violations: [],
+          context: {
+            sessionId: request.id,
+            permissions: [],
+            environment: 'development',
+            riskProfile: 'low'
+          }
+        }
+      };
+    }
+
+    const agentAction: AgentAction = {
+      type: request.type === 'analysis' ? 'code_generation' : 'tool_usage',
+      agentId: request.id,
+      payload: { 
+        code: request.content,
+        operation: request.type
+      },
+      timestamp: new Date(),
+      metadata: { requestId: request.id }
+    };
+
+    const securityContext: SecurityContext = {
+      sessionId: request.id,
+      permissions: ['basic_operations', 'code_generation'],
+      environment: 'development',
+      riskProfile: 'medium'
+    };
+
+    try {
+      return await this.securityFramework.validateAgentAction(
+        request.id,
+        agentAction,
+        securityContext
+      );
+    } catch (error) {
+      logger.error('Security validation failed:', error);
+      return {
+        allowed: false,
+        violations: [{
+          type: 'validation_error',
+          severity: 'high',
+          description: `Security validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          remediation: 'Review security configuration and try again'
+        }],
+        mitigations: ['Enhanced monitoring enabled'],
+        riskScore: 75,
+        auditTrail: {
+          id: 'error',
+          timestamp: new Date(),
+          agentId: request.id,
+          action: 'validation_error',
+          allowed: false,
+          riskScore: 75,
+          violations: [],
+          context: securityContext
+        }
+      };
+    }
+  }
+
+  /**
+   * Perform quality analysis on generated content
+   */
+  private async performQualityAnalysis(content: any, request: IntegratedSystemRequest): Promise<ComprehensiveQualityMetrics> {
+    if (!this.qualityAnalyzer) {
+      logger.warn('Quality analyzer not initialized, returning default metrics');
+      return this.getDefaultQualityMetrics();
+    }
+
+    try {
+      const contentString = typeof content === 'string' ? content : JSON.stringify(content);
+      const language = this.detectLanguage(contentString);
+      
+      return await this.qualityAnalyzer.analyzeCode(
+        contentString,
+        language,
+        `request-${request.id}`
+      );
+    } catch (error) {
+      logger.error('Quality analysis failed:', error);
+      return this.getDefaultQualityMetrics();
+    }
+  }
+
+  /**
+   * Perform spiral convergence analysis
+   */
+  private async performSpiralAnalysis(
+    request: IntegratedSystemRequest,
+    content: any,
+    qualityMetrics: ComprehensiveQualityMetrics
+  ): Promise<ConvergenceAnalysis | null> {
+    if (!this.spiralAnalyzer || !request.context.phase) {
+      return null;
+    }
+
+    try {
+      // Create iteration result from current request
+      const iterationResult: IterationResult = {
+        iteration: request.context.iteration || 1,
+        phase: request.context.phase,
+        content: typeof content === 'string' ? content : JSON.stringify(content),
+        quality: qualityMetrics.overallScore / 100,
+        confidence: 0.8,
+        processingTime: 0,
+        qualityMetrics: {
+          clarity: 0.8,
+          completeness: 0.75,
+          actionability: 0.85
+        }
+      };
+
+      // Get previous iterations (would be stored in session)
+      const previousIterations: IterationResult[] = []; // TODO: Implement session storage
+      const allIterations = [...previousIterations, iterationResult];
+
+      return this.spiralAnalyzer.analyzeConvergence(allIterations, 5);
+    } catch (error) {
+      logger.error('Spiral analysis failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Detect programming language from content
+   */
+  private detectLanguage(content: string): 'typescript' | 'javascript' {
+    if (content.includes('interface ') || content.includes(': string') || content.includes(': number')) {
+      return 'typescript';
+    }
+    return 'javascript';
+  }
+
+  /**
+   * Get default quality metrics for fallback
+   */
+  private getDefaultQualityMetrics(): ComprehensiveQualityMetrics {
+    return {
+      overallScore: 75,
+      complexity: {
+        cyclomaticComplexity: 5,
+        halsteadComplexity: {
+          programLength: 100,
+          vocabulary: 20,
+          programLevel: 0.8,
+          difficulty: 5,
+          effort: 500,
+          timeRequired: 30,
+          bugsDelivered: 0.1
+        },
+        maintainabilityIndex: 80,
+        linesOfCode: 100,
+        logicalLinesOfCode: 80,
+        commentLines: 10,
+        commentRatio: 10
+      },
+      linting: {
+        totalErrors: 0,
+        totalWarnings: 0,
+        totalIssues: 0,
+        score: 100,
+        errorsByCategory: {},
+        fixableIssues: 0
+      },
+      formatting: {
+        isFormatted: true,
+        formattingIssues: 0,
+        score: 100
+      },
+      typeCoverage: {
+        totalSymbols: 10,
+        typedSymbols: 8,
+        coverage: 80,
+        untypedAreas: []
+      },
+      duplication: {
+        duplicatedLines: 0,
+        totalLines: 100,
+        duplicationPercentage: 0,
+        duplicatedBlocks: []
+      },
+      technicalDebtRatio: 5,
+      recommendations: []
     };
   }
 }

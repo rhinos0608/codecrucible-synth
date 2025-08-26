@@ -182,13 +182,18 @@ export class DockerBackend extends ExecutionBackend {
     if (!acquired) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
-          'Too many concurrent executions',
-          ErrorCategory.SYSTEM,
-          ErrorSeverity.MEDIUM,
           {
-            userMessage: 'Execution queue is full, please wait',
-            suggestedActions: ['Wait for current executions to complete'],
-            retryable: true,
+            code: 'EXECUTION_QUEUE_FULL',
+            message: 'Too many concurrent executions',
+            severity: ErrorSeverity.MEDIUM,
+            category: ErrorCategory.SYSTEM,
+            recoverable: true,
+            suggestions: ['Wait for current executions to complete']
+          },
+          {
+            operation: 'executeCode',
+            timestamp: Date.now(),
+            component: 'execution-backend'
           }
         )
       );

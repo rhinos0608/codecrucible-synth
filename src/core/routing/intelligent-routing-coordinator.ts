@@ -1241,4 +1241,155 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
       memoryUsage: process.memoryUsage(),
     };
   }
+
+  /**
+   * Initialize the routing coordinator
+   */
+  async initialize(): Promise<void> {
+    // Initialize performance monitoring
+    this.emit('coordinator:initializing');
+    
+    // Warm up routing cache with common patterns
+    await this.warmupCache();
+    
+    this.emit('coordinator:initialized');
+  }
+
+  /**
+   * Integration method for SystemIntegrationCoordinator
+   * Decides routing strategy based on content and context
+   */
+  async decideRoutingStrategy(content: string, context: any): Promise<IntelligentRoutingDecision> {
+    try {
+      // Convert parameters to internal format
+      const routingContext: RoutingContext = {
+        request: {
+          id: context.requestId || 'integration-' + Date.now(),
+          content,
+          priority: context.priority || 'medium',
+          calculateComplexity: () => this.calculateContentComplexity(content)
+        } as ProcessingRequest,
+        priority: context.priority || 'medium',
+        phase: context.phase,
+        preferences: {
+          prioritizeSpeed: context.prioritizeSpeed || false,
+          prioritizeQuality: context.prioritizeQuality || true,
+          enableHybridRouting: context.enableHybridRouting !== false,
+          enableMultiVoice: context.enableMultiVoice !== false,
+          maxLatency: context.maxLatency || 30000,
+          learningEnabled: true
+        }
+      };
+
+      // Use existing routing logic
+      return await this.route(routingContext);
+      
+    } catch (error) {
+      logger.error('Failed to decide routing strategy:', error);
+      
+      // Return fallback routing decision
+      return this.createFallbackRoutingDecision(content, context);
+    }
+  }
+
+  /**
+   * Calculate content complexity for routing decisions
+   */
+  private calculateContentComplexity(content: string): number {
+    let complexity = 0.0;
+    
+    // Length-based complexity
+    if (content.length > 5000) complexity += 0.3;
+    else if (content.length > 1000) complexity += 0.2;
+    else if (content.length > 500) complexity += 0.1;
+    
+    // Technical complexity indicators
+    const technicalTerms = [
+      'algorithm', 'architecture', 'optimization', 'performance', 
+      'security', 'database', 'api', 'framework', 'integration'
+    ];
+    const technicalScore = technicalTerms.reduce((score, term) => {
+      return score + (content.toLowerCase().includes(term) ? 0.1 : 0);
+    }, 0);
+    complexity += Math.min(technicalScore, 0.4);
+    
+    // Code-like patterns
+    if (content.includes('function') || content.includes('class') || content.includes('import')) {
+      complexity += 0.2;
+    }
+    
+    // Multiple questions or requirements
+    const questionCount = (content.match(/[?]/g) || []).length;
+    complexity += Math.min(questionCount * 0.1, 0.2);
+    
+    return Math.min(complexity, 1.0);
+  }
+
+  /**
+   * Create fallback routing decision when primary routing fails
+   */
+  private createFallbackRoutingDecision(content: string, context: any): IntelligentRoutingDecision {
+    const routingId = 'fallback-' + Date.now();
+    
+    return {
+      modelSelection: {
+        selectedModel: 'default',
+        confidence: 0.5,
+        reasoning: 'Fallback model selection',
+        alternatives: []
+      },
+      voiceSelection: {
+        selectedVoice: 'maintainer',
+        confidence: 0.5,
+        reasoning: 'Fallback to stable voice',
+        alternatives: []
+      },
+      providerSelection: {
+        selectedProvider: 'ollama',
+        confidence: 0.5,
+        reasoning: 'Fallback provider selection',
+        metrics: {},
+        fallbackChain: []
+      },
+      routingStrategy: 'single-model',
+      confidence: 0.5,
+      reasoning: 'Fallback routing due to error in primary routing',
+      estimatedCost: 0.01,
+      estimatedLatency: 5000,
+      estimatedQuality: 0.6,
+      fallbackChain: [
+        {
+          type: 'model',
+          option: 'default',
+          reason: 'Primary routing failed'
+        }
+      ],
+      routingId,
+      timestamp: Date.now(),
+      context: {
+        request: {
+          id: context.requestId || routingId,
+          content,
+          priority: 'medium',
+          calculateComplexity: () => 0.5
+        } as ProcessingRequest,
+        priority: 'medium',
+        phase: context.phase
+      }
+    };
+  }
+
+  private async warmupCache(): Promise<void> {
+    // Pre-cache common routing decisions
+    const commonPatterns = [
+      'simple_generation',
+      'complex_analysis', 
+      'multi_voice_synthesis'
+    ];
+
+    for (const pattern of commonPatterns) {
+      // Pre-calculate routing for common patterns
+      // This would use actual pattern matching in production
+    }
+  }
 }

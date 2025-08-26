@@ -3,14 +3,14 @@ import {
   CouncilDecisionEngine,
   CouncilMode,
   CouncilConfig,
-} from '../core/collaboration/council-decision-engine.js';
-import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice-prompts.js';
-import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-builder.js';
-import { getErrorMessage } from '../utils/error-utils.js';
+} from '../core/collaboration/council-decision-engine';
+import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice-prompts';
+import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-builder';
+import { getErrorMessage } from '../utils/error-utils';
 import { accessSync } from 'fs';
 import { execSync } from 'child_process';
-import { LivingSpiralCoordinator } from '../domain/services/living-spiral-coordinator.js';
-import { logger } from '../infrastructure/logging/logger.js';
+import { LivingSpiralCoordinator } from '../domain/services/living-spiral-coordinator';
+import { logger } from '../infrastructure/logging/logger';
 
 interface Voice {
   id: string;
@@ -30,7 +30,7 @@ interface VoiceConfig {
   };
 }
 
-import { VoiceArchetypeSystemInterface } from '../refactor/voice-archetype-system-interface.js';
+import { VoiceArchetypeSystemInterface } from '../refactor/voice-archetype-system-interface';
 
 export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
   private voices: Map<string, Voice> = new Map();

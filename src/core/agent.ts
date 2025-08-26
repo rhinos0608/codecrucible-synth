@@ -11,7 +11,7 @@ import { configManager, AgentConfig } from '../config/config-manager.js';
 export type { AgentConfig };
 import { PerformanceMonitor } from '../utils/performance.js';
 import { logger } from './logger.js';
-import {
+import type {
   ExecutionRequest,
   ExecutionResponse,
   Task,
@@ -19,8 +19,6 @@ import {
   ProjectContext,
   ExecutionResult,
 } from './types.js';
-
-export { ExecutionResult };
 
 export interface AgentCapability {
   name: string;

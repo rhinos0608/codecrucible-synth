@@ -23,6 +23,9 @@ import { BootstrapErrorSystem, BootstrapPhase, BootstrapErrorType } from '../../
 import { TimeoutManager, TimeoutLevel } from '../../infrastructure/error-handling/timeout-manager.js';
 import { CircuitBreakerManager } from '../../infrastructure/error-handling/circuit-breaker-system.js';
 
+// Enhanced System Integration
+import { getEnhancedSystem, createEnhancedRequest, EnhancedSystemInstance } from '../../core/integration/enhanced-system-factory.js';
+
 // 2025 Performance Optimization Integration
 import { StartupOptimizer } from '../../infrastructure/performance/startup-optimizer.js';
 import { FastStartupOptimizer, initializeWithFastStartup } from '../../infrastructure/performance/startup-optimization-2025.js';
@@ -96,6 +99,9 @@ export class CLI extends EventEmitter implements REPLInterface {
   private startupOptimizer: StartupOptimizer;
   private fastStartupOptimizer: FastStartupOptimizer;
   private memoryOptimizer: MemoryOptimizer2025;
+
+  // Enhanced System Integration - 2025 Full Integration
+  private enhancedSystem?: EnhancedSystemInstance;
   private connectionPool: ProviderConnectionPool2025;
   private requestBatcher: IntelligentRequestBatcher;
 
@@ -195,6 +201,9 @@ export class CLI extends EventEmitter implements REPLInterface {
 
     // Initialize Architect/Editor pattern coordinator (2025 enhancement)
     this.architectEditor = new ArchitectEditorCoordinator(modelClient);
+
+    // Initialize Enhanced System Integration (2025 Full Integration)
+    this.initializeEnhancedSystem(modelClient);
 
     // Initialize subsystems with simplified constructors
     this.contextAwareCLI = new ContextAwareCLIIntegration();
@@ -718,7 +727,7 @@ export class CLI extends EventEmitter implements REPLInterface {
     // Handle special flags
     if (options.server) {
       // Import serverMode dynamically to avoid circular dependency
-      const { ServerMode } = await import('../server/server-mode.js');
+      const { ServerMode } = await import('../../server/server-mode.js');
       const serverMode = new ServerMode();
       await this.commands.startServer(options, serverMode);
     }
@@ -779,7 +788,7 @@ export class CLI extends EventEmitter implements REPLInterface {
     }
 
     // Handle slash commands for role switching
-    const { CLIParser } = await import('./cli/cli-parser.js');
+    const { CLIParser } = await import('../../core/cli/cli-parser.js');
     const slashCommand = CLIParser.parseSlashCommand(prompt);
 
     if (slashCommand.command === 'role-switch' && slashCommand.role) {
@@ -819,7 +828,7 @@ export class CLI extends EventEmitter implements REPLInterface {
     let sanitizationResult: any;
 
     try {
-      const { ModernInputSanitizer } = await import('./security/modern-input-sanitizer.js');
+      const { ModernInputSanitizer } = await import('../../infrastructure/security/modern-input-sanitizer.js');
       sanitizationResult = await ModernInputSanitizer.sanitizePrompt(prompt, {
         operation: 'cli_prompt_processing',
         workingDirectory: process.cwd(),
@@ -2227,8 +2236,8 @@ Falling back to traditional processing...`;
   private async getMCPCompatibleTools(): Promise<any[]> {
     try {
       // Import tool integration dynamically
-      const { getGlobalEnhancedToolIntegration } = await import('./tools/enhanced-tool-integration.js');
-      const { getGlobalToolIntegration } = await import('./tools/tool-integration.js');
+      const { getGlobalEnhancedToolIntegration } = await import('../../infrastructure/tools/enhanced-tool-integration.js');
+      const { getGlobalToolIntegration } = await import('../../infrastructure/tools/tool-integration.js');
       
       const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
       const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
@@ -2425,6 +2434,104 @@ Falling back to traditional processing...`;
       
     } catch (error) {
       console.log(chalk.red(`❌ Error reloading models: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
+  }
+
+  /**
+   * Initialize Enhanced System Integration (2025 Full Integration)
+   * Integrates security framework, quality analyzer, and spiral convergence
+   */
+  private async initializeEnhancedSystem(modelClient: UnifiedModelClient): Promise<void> {
+    try {
+      logger.info('🚀 Initializing Enhanced System Integration');
+      
+      this.enhancedSystem = await getEnhancedSystem(modelClient, {
+        security: {
+          enabled: true,
+          riskThreshold: 75,
+          auditEnabled: true
+        },
+        quality: {
+          enabled: true,
+          enforceGates: true,
+          autoFix: false,
+          thresholds: {
+            complexity: 20,
+            maintainability: 70,
+            overall: 80
+          }
+        },
+        voice: {
+          enabled: true,
+          maxVoices: 3,
+          collaborationMode: 'sequential'
+        },
+        spiral: {
+          enabled: true,
+          maxIterations: 5,
+          convergenceThreshold: 0.85
+        }
+      });
+
+      logger.info('✅ Enhanced System Integration initialized successfully');
+    } catch (error) {
+      logger.warn('⚠️ Enhanced System Integration initialization failed, continuing without enhanced features:', error);
+      this.enhancedSystem = undefined;
+    }
+  }
+
+  /**
+   * Process request with enhanced system integration
+   * Includes security validation, quality analysis, and spiral convergence
+   */
+  async processEnhancedRequest(prompt: string, options?: {
+    type?: 'analysis' | 'generation' | 'execution' | 'orchestration';
+    phase?: 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
+    iteration?: number;
+    priority?: 'low' | 'medium' | 'high' | 'critical';
+  }): Promise<any> {
+    if (!this.enhancedSystem) {
+      // Fallback to regular processing
+      return await this.processPrompt(prompt);
+    }
+
+    try {
+      const enhancedRequest = createEnhancedRequest(prompt, options);
+      const result = await this.enhancedSystem.processRequest(enhancedRequest);
+      
+      // Log security and quality information if available
+      if (result.result?.securityValidation) {
+        const security = result.result.securityValidation;
+        if (security.riskScore > 50) {
+          logger.warn(`⚠️ Security Risk Score: ${security.riskScore}/100`);
+        }
+      }
+
+      if (result.result?.qualityMetrics) {
+        const quality = result.result.qualityMetrics;
+        logger.info(`📊 Quality Score: ${quality.overallScore.toFixed(1)}/100`);
+      }
+
+      return result.result?.content || result.result;
+    } catch (error) {
+      logger.error('Enhanced request processing failed, falling back to regular processing:', error);
+      return await this.processPrompt(prompt);
+    }
+  }
+
+  /**
+   * Get enhanced system health status
+   */
+  async getEnhancedSystemHealth(): Promise<any> {
+    if (!this.enhancedSystem) {
+      return { status: 'not_initialized' };
+    }
+
+    try {
+      return await this.enhancedSystem.getSystemHealth();
+    } catch (error) {
+      logger.error('Failed to get enhanced system health:', error);
+      return { status: 'error', error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 }

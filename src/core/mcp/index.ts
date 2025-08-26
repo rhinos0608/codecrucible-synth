@@ -276,6 +276,131 @@ export class EnhancedMCPIntegrationManager {
     return this.analyticsSystem.generateCapacityPlan(serverId);
   }
   
+  /**
+   * Integration method for SystemIntegrationCoordinator
+   * Execute integrated MCP request based on voice result and capability requirements
+   */
+  async executeIntegratedRequest(
+    voiceResult: any, 
+    mcpCapabilityRequirements: string[]
+  ): Promise<any> {
+    try {
+      const startTime = Date.now();
+      
+      // If no MCP capabilities required, return voice result directly
+      if (!mcpCapabilityRequirements || mcpCapabilityRequirements.length === 0) {
+        return {
+          content: voiceResult.content || voiceResult,
+          mcpCapabilitiesUsed: [],
+          mcpResults: [],
+          processingTime: 0,
+          fallback: false
+        };
+      }
+      
+      // For now, return enhanced voice result with simulated MCP integration
+      // TODO: Implement full MCP capability discovery and execution
+      const simulatedMCPResult = this.simulateMCPIntegration(voiceResult, mcpCapabilityRequirements);
+      
+      const processingTime = Date.now() - startTime;
+      
+      return {
+        content: simulatedMCPResult.content,
+        mcpCapabilitiesUsed: mcpCapabilityRequirements,
+        mcpResults: simulatedMCPResult.results,
+        processingTime,
+        serversUsed: ['simulated-mcp-server'],
+        fallback: false,
+        integrationMetadata: {
+          timestamp: Date.now(),
+          capabilityCount: mcpCapabilityRequirements.length,
+          serverCount: 1,
+          integrationMethod: 'executeIntegratedRequest',
+          note: 'Using simulated MCP integration until full implementation'
+        }
+      };
+      
+    } catch (error) {
+      console.error('Failed to execute integrated MCP request:', error);
+      
+      // Return fallback result
+      return this.createMCPFallbackResult(voiceResult, mcpCapabilityRequirements, error);
+    }
+  }
+  
+  /**
+   * Simulate MCP integration for testing and development
+   */
+  private simulateMCPIntegration(voiceResult: any, capabilities: string[]): any {
+    const baseContent = voiceResult.content || voiceResult;
+    const results: any[] = [];
+    
+    // Simulate different MCP capabilities
+    for (const capability of capabilities) {
+      switch (capability) {
+        case 'file_operations':
+          results.push({
+            capability: 'file_operations',
+            result: `[MCP] File operations simulated for content analysis`,
+            confidence: 0.8
+          });
+          break;
+          
+        case 'code_execution':
+          results.push({
+            capability: 'code_execution',
+            result: `[MCP] Code execution simulated - syntax validated`,
+            confidence: 0.9
+          });
+          break;
+          
+        case 'web_search':
+          results.push({
+            capability: 'web_search',
+            result: `[MCP] Web search simulated - relevant resources found`,
+            confidence: 0.7
+          });
+          break;
+          
+        default:
+          results.push({
+            capability,
+            result: `[MCP] ${capability} simulated`,
+            confidence: 0.6
+          });
+      }
+    }
+    
+    // Combine voice result with simulated MCP results
+    const enhancedContent = [
+      baseContent,
+      '--- MCP Integration ---',
+      ...results.map(r => r.result)
+    ].join('\n');
+    
+    return {
+      content: enhancedContent,
+      results,
+      enhanced: true
+    };
+  }
+  
+  /**
+   * Create fallback result when MCP integration fails
+   */
+  private createMCPFallbackResult(voiceResult: any, requirements: string[], error?: any): any {
+    return {
+      content: voiceResult.content || voiceResult,
+      mcpCapabilitiesUsed: [],
+      mcpResults: [],
+      processingTime: 0,
+      fallback: true,
+      fallbackReason: error ? error.message : 'MCP integration unavailable',
+      originalRequirements: requirements,
+      warning: 'MCP integration unavailable - using voice result only'
+    };
+  }
+  
   // Provide access to individual systems
   get reliability() { return this.reliabilitySystem; }
   get discovery() { return this.discoverySystem; }

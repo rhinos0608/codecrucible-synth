@@ -498,116 +498,47 @@ export class SystemBootstrap {
    */
   private registerStartupTasks(): void {
     // Critical path tasks
-    startupOptimizer.registerTask({
-      name: 'core_infrastructure',
-      priority: 'critical',
-      timeout: 1000,
-      task: async () => {
-        await this.initializeCoreInfrastructure();
-        return true;
-      }
+    startupOptimizer.registerTask('core_infrastructure', async () => {
+      await this.initializeCoreInfrastructure();
     });
 
-    startupOptimizer.registerTask({
-      name: 'configuration',
-      priority: 'critical', 
-      timeout: 1000,
-      task: async () => {
-        await this.initializeConfiguration();
-        return true;
-      },
-      dependencies: ['core_infrastructure']
+    startupOptimizer.registerTask('configuration', async () => {
+      await this.initializeConfiguration();
     });
 
     // High priority parallel tasks
-    startupOptimizer.registerTask({
-      name: 'security_services',
-      priority: 'high',
-      timeout: 2000,
-      task: async () => {
-        await this.initializeSecurity();
-        return true;
-      },
-      dependencies: ['configuration']
+    startupOptimizer.registerTask('security_services', async () => {
+      await this.initializeSecurity();
     });
 
-    startupOptimizer.registerTask({
-      name: 'cache_services',
-      priority: 'high',
-      timeout: 2000,
-      task: async () => {
-        await this.initializeCache();
-        return true;
-      },
-      dependencies: ['configuration']
+    startupOptimizer.registerTask('cache_services', async () => {
+      await this.initializeCache();
     });
 
-    startupOptimizer.registerTask({
-      name: 'monitoring_services',
-      priority: 'high',
-      timeout: 2000,
-      task: async () => {
-        await this.initializeMonitoring();
-        return true;
-      },
-      dependencies: ['configuration']
+    startupOptimizer.registerTask('monitoring_services', async () => {
+      await this.initializeMonitoring();
     });
 
     // Medium priority tasks
-    startupOptimizer.registerTask({
-      name: 'provider_services',
-      priority: 'medium',
-      timeout: 3000,
-      task: async () => {
-        await this.initializeProviders();
-        return true;
-      },
-      dependencies: ['configuration', 'cache_services']
+    startupOptimizer.registerTask('provider_services', async () => {
+      await this.initializeProviders();
     });
 
-    startupOptimizer.registerTask({
-      name: 'routing_services',
-      priority: 'medium',
-      timeout: 3000,
-      task: async () => {
-        await this.initializeRouting();
-        return true;
-      },
-      dependencies: ['configuration', 'provider_services']
+    startupOptimizer.registerTask('routing_services', async () => {
+      await this.initializeRouting();
     });
 
-    startupOptimizer.registerTask({
-      name: 'streaming_services',
-      priority: 'medium',
-      timeout: 2000,
-      task: async () => {
-        await this.initializeStreaming();
-        return true;
-      },
-      dependencies: ['configuration']
+    startupOptimizer.registerTask('streaming_services', async () => {
+      await this.initializeStreaming();
     });
 
     // Low priority (can fail without blocking)
-    startupOptimizer.registerTask({
-      name: 'client_initialization',
-      priority: 'low',
-      timeout: 5000,
-      task: async () => {
-        await this.initializeClient();
-        return true;
-      },
-      dependencies: ['provider_services', 'routing_services', 'streaming_services', 'security_services', 'monitoring_services']
+    startupOptimizer.registerTask('client_initialization', async () => {
+      await this.initializeClient();
     });
 
-    startupOptimizer.registerTask({
-      name: 'synthesis_coordinator',
-      priority: 'low',
-      timeout: 3000,
-      task: async () => {
-        await this.initializeSynthesisCoordinator();
-        return true;
-      },
-      dependencies: ['client_initialization']
+    startupOptimizer.registerTask('synthesis_coordinator', async () => {
+      await this.initializeSynthesisCoordinator();
     });
   }
 

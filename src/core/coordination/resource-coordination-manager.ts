@@ -107,8 +107,8 @@ export class ResourceCoordinationManager extends EventEmitter {
   private locksByRequester = new Map<string, Set<string>>();
   private deadlockDetectionEnabled = true;
   private metricsCollectionEnabled = true;
-  private cleanupInterval: NodeJS.Timeout;
-  private monitoringInterval: NodeJS.Timeout;
+  private cleanupInterval!: NodeJS.Timeout;
+  private monitoringInterval!: NodeJS.Timeout;
   
   // Configuration
   private config = {

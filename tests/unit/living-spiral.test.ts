@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import { LivingSpiralCoordinator, SpiralPhase, SpiralConfig } from '../../src/core/living-spiral-coordinator';
+import { LivingSpiralCoordinator, SpiralPhase, SpiralConfig } from '../../src/domain/services/living-spiral-coordinator';
 import { VoiceArchetypeSystem } from '../../src/voices/voice-archetype-system';
 import { MockUnifiedModelClient } from '../integration/agent-test';
 

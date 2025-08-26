@@ -13,9 +13,6 @@ export type {
 // Re-export from infrastructure security layer
 export type {
   SecurityValidation,
-  SecurityError,
-  CLIError,
-  CLIExitCode,
 } from '../../infrastructure/security/security-types.js';
 export { 
   SecurityError,
@@ -30,13 +27,4 @@ export type {
 } from '../../application/interfaces/interface-types.js';
 export {
   ResponseValidator,
-  UnifiedClientConfig,
-  ModelRequest,
-  ModelResponse,
-  ProjectContext,
-  AppConfig,
-  AgentConfig,
-  ExecutionResult,
-  SynthesisResponse,
-  ExecutionMode,
 } from '../../application/interfaces/interface-types.js';

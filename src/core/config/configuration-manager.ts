@@ -6,7 +6,7 @@
 import { logger } from '../logger.js';
 import { UnifiedClientConfig } from '../client.js';
 import { ProviderType, ProviderConfig } from '../providers/provider-repository.js';
-import { StreamConfig } from '../streaming/streaming-manager.js';
+import { StreamConfig } from '../../infrastructure/streaming/streaming-manager.js';
 
 export interface ConfigurationDefaults {
   providers: ProviderConfig[];

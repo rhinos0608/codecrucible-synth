@@ -11,7 +11,7 @@ import { Logger } from '../logger.js';
 import { OllamaProvider } from '../../providers/ollama.js';
 import { LMStudioProvider } from '../../providers/lm-studio.js';
 import { modelCoordinator } from '../model-selection-coordinator.js';
-import { CodeQualityAnalyzer, ComprehensiveQualityMetrics, QualityRecommendation } from '../quality/code-quality-analyzer.js';
+import { CodeQualityAnalyzer, ComprehensiveQualityMetrics, QualityRecommendation } from '../quality/quality-analyzer-integration-adapter.js';
 import chalk from 'chalk';
 
 export interface SequentialAgentConfig {

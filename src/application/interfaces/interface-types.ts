@@ -18,13 +18,18 @@ export const ResponseValidator = {
   validate: (response: Record<string, unknown>) => ({ isValid: true, errors: [] }),
 };
 
-// Export empty objects for compatibility
-export const UnifiedClientConfig = {} as Record<string, unknown>;
-export const ModelRequest = {} as Record<string, unknown>;
-export const ModelResponse = {} as Record<string, unknown>;
-export const ProjectContext = {} as Record<string, unknown>;
-export const AppConfig = {} as Record<string, unknown>;
-export const AgentConfig = {} as Record<string, unknown>;
-export const ExecutionResult = {} as Record<string, unknown>;
-export const SynthesisResponse = {} as Record<string, unknown>;
-export const ExecutionMode = {} as Record<string, unknown>;
+// Re-export types from domain layer
+export type {
+  ModelRequest,
+  ModelResponse,
+  ProjectContext,
+  ExecutionResult,
+  SynthesisResponse,
+  ExecutionMode,
+} from '../../domain/types/core-types.js';
+
+export type {
+  UnifiedClientConfig,
+  AppConfig,
+  AgentConfig,
+} from '../../infrastructure/config/config-types.js';

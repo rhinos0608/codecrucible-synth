@@ -537,7 +537,7 @@ export async function serviceWithCaching<T>(
   const cacheService = await resolveService(SERVICE_TOKENS.CACHE_SERVICE);
   
   // Try cache first
-  const cached = await cacheService.get<T>(cacheKey);
+  const cached = await cacheService.get(cacheKey) as T | null;
   if (cached !== null) {
     return cached;
   }

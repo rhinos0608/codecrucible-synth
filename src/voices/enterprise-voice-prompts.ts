@@ -4,7 +4,7 @@
  * Enhanced with Claude Code's 4,000+ word modular architecture and ultra-conciseness requirements
  */
 
-import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-builder.js';
+import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-builder';
 
 export interface EnterpriseVoicePrompt {
   identity: string;

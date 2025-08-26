@@ -4,7 +4,7 @@
  * Created: August 26, 2025
  */
 
-import { CodeQualityAnalyzer } from '../src/core/quality/code-quality-analyzer.js';
+import { ReconstructedCodeQualityAnalyzer as CodeQualityAnalyzer } from '../src/core/quality/reconstructed-code-quality-analyzer.js';
 import { SequentialDualAgentSystem } from '../src/core/collaboration/sequential-dual-agent-system.js';
 
 async function demonstrateQualityMetrics() {

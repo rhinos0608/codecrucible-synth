@@ -171,7 +171,7 @@ export class VoicePerformanceAnalytics2025 {
     const currentMetrics = this.calculateCurrentMetrics(voiceId, period);
     const trends = await this.calculateTrends(voiceId, period);
     const effectiveness = await this.calculateEffectiveness(voiceId);
-    const recommendations = this.generateRecommendations(voiceId, currentMetrics, trends, effectiveness);
+    const recommendations = this.getSystemRecommendations();
 
     return {
       currentMetrics,
@@ -370,7 +370,7 @@ export class VoicePerformanceAnalytics2025 {
   /**
    * Calculate performance trends for a voice
    */
-  private async calculateTrends(voiceId: string, period: string): Promise<PerformanceTrend> {
+  private async calculateTrends(voiceId: string, period: 'hour' | 'day' | 'week' | 'month'): Promise<PerformanceTrend> {
     const cacheKey = `${voiceId}_${period}`;
     const cachedTrend = this.trendsCache.get(cacheKey);
     

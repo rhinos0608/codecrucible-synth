@@ -751,12 +751,14 @@ export class EnterpriseSecurityFramework {
 // AST-based Security Analysis System
 class ASTSecurityAnalyzer {
   private securityRules: ASTSecurityRule[];
+  private config: SecurityConfiguration;
 
-  constructor() {
+  constructor(config: SecurityConfiguration) {
+    this.config = config;
     this.securityRules = this.initializeSecurityRules();
   }
 
-  async analyzeCode(code: string, language: 'typescript' | 'javascript'): Promise<ASTAnalysisResult> {
+  async analyzeCode(code: string, language: 'typescript' | 'javascript' | 'python'): Promise<ASTAnalysisResult> {
     const startTime = Date.now();
     
     try {
@@ -766,27 +768,52 @@ class ASTSecurityAnalyzer {
       let nodeCount = 0;
 
       // Traverse AST and apply security rules
-      const visitNode = (node: ts.Node) => {
-        nodeCount++;
-        
-        // Apply applicable rules to this node
-        for (const rule of this.securityRules) {
-          if (rule.languages.includes(language) && rule.nodeTypes.includes(node.kind)) {
-            const violation = rule.check(node, sourceFile);
-            if (violation) {
-              violations.push({
-                ...violation,
-                location: this.getNodeLocation(node, sourceFile),
-                context: this.getNodeContext(node, sourceFile)
-              });
+      if (language === 'python') {
+        // Python AST traversal
+        const pythonNodes = (sourceFile as any).body || [];
+        for (const node of pythonNodes) {
+          nodeCount++;
+          
+          // Apply applicable rules to this node
+          for (const rule of this.securityRules) {
+            if (rule.languages.includes(language) && this.matchesPythonNodeType(node, rule.nodeTypes)) {
+              const violation = rule.check(node, (sourceFile as any).source);
+              if (violation) {
+                violations.push({
+                  ...violation,
+                  location: this.getPythonNodeLocation(node),
+                  context: this.getPythonNodeContext(node, (sourceFile as any).source)
+                });
+              }
             }
           }
         }
-        
-        ts.forEachChild(node, visitNode);
-      };
+      } else {
+        // TypeScript/JavaScript AST traversal
+        const visitNode = (node: ts.Node) => {
+          nodeCount++;
+          
+          // Apply applicable rules to this node
+          for (const rule of this.securityRules) {
+            if (rule.languages.includes(language) && 
+                Array.isArray(rule.nodeTypes) && 
+                (rule.nodeTypes as ts.SyntaxKind[]).includes(node.kind)) {
+              const violation = rule.check(node, sourceFile as ts.SourceFile);
+              if (violation) {
+                violations.push({
+                  ...violation,
+                  location: this.getNodeLocation(node, sourceFile as ts.SourceFile),
+                  context: this.getNodeContext(node, sourceFile as ts.SourceFile)
+                });
+              }
+            }
+          }
+          
+          ts.forEachChild(node, visitNode);
+        };
 
-      visitNode(sourceFile);
+        visitNode(sourceFile as ts.SourceFile);
+      }
 
       const analysisTime = Date.now() - startTime;
       const confidence = this.calculateConfidence(violations, nodeCount, analysisTime);
@@ -807,7 +834,11 @@ class ASTSecurityAnalyzer {
     }
   }
 
-  private parseCode(code: string, language: 'typescript' | 'javascript'): ts.SourceFile {
+  private parseCode(code: string, language: 'typescript' | 'javascript' | 'python'): ts.SourceFile | any {
+    if (language === 'python') {
+      return this.parsePythonCode(code);
+    }
+    
     const scriptKind = language === 'typescript' ? ts.ScriptKind.TS : ts.ScriptKind.JS;
     
     return ts.createSourceFile(
@@ -819,8 +850,118 @@ class ASTSecurityAnalyzer {
     );
   }
 
+  private parsePythonCode(code: string): any {
+    // Simple Python AST parser - in production would use a proper Python AST library
+    return {
+      type: 'Module',
+      body: this.tokenizePythonCode(code),
+      source: code
+    };
+  }
+
+  private tokenizePythonCode(code: string): PythonNode[] {
+    const nodes: PythonNode[] = [];
+    const lines = code.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith('#')) continue;
+      
+      // Detect dangerous patterns
+      if (line.includes('eval(')) {
+        nodes.push({
+          type: 'Call',
+          func: { type: 'Name', id: 'eval' },
+          lineno: i + 1,
+          col_offset: line.indexOf('eval('),
+          source: line
+        });
+      }
+      
+      if (line.includes('exec(')) {
+        nodes.push({
+          type: 'Call',
+          func: { type: 'Name', id: 'exec' },
+          lineno: i + 1,
+          col_offset: line.indexOf('exec('),
+          source: line
+        });
+      }
+      
+      if (line.includes('__import__(')) {
+        nodes.push({
+          type: 'Call',
+          func: { type: 'Name', id: '__import__' },
+          lineno: i + 1,
+          col_offset: line.indexOf('__import__('),
+          source: line
+        });
+      }
+      
+      if (line.includes('os.system(') || line.includes('subprocess.')) {
+        nodes.push({
+          type: 'Call',
+          func: { type: 'Attribute', attr: line.includes('system') ? 'system' : 'subprocess' },
+          lineno: i + 1,
+          col_offset: 0,
+          source: line
+        });
+      }
+      
+      if (line.includes('open(') && (line.includes('"w"') || line.includes("'w'"))) {
+        nodes.push({
+          type: 'Call',
+          func: { type: 'Name', id: 'open' },
+          lineno: i + 1,
+          col_offset: line.indexOf('open('),
+          source: line
+        });
+      }
+      
+      // Check for SQL injection patterns
+      const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE'];
+      if (sqlKeywords.some(keyword => line.toUpperCase().includes(keyword)) && 
+          (line.includes('%s') || line.includes('{}') || line.includes('format('))) {
+        nodes.push({
+          type: 'Call',
+          func: { type: 'Name', id: 'sql_format' },
+          lineno: i + 1,
+          col_offset: 0,
+          source: line
+        });
+      }
+    }
+    
+    return nodes;
+  }
+  
+  private matchesPythonNodeType(node: PythonNode, nodeTypes: ts.SyntaxKind[] | string[]): boolean {
+    if (Array.isArray(nodeTypes) && nodeTypes.length > 0 && typeof nodeTypes[0] === 'string') {
+      return (nodeTypes as string[]).includes(node.type);
+    }
+    return false;
+  }
+
+  private getPythonNodeLocation(node: PythonNode): { line: number; column: number; length: number } {
+    return {
+      line: node.lineno || 1,
+      column: node.col_offset || 1,
+      length: (node.source as string)?.length || 0
+    };
+  }
+
+  private getPythonNodeContext(node: PythonNode, sourceCode: string): string {
+    const lines = sourceCode.split('\n');
+    const lineIndex = (node.lineno || 1) - 1;
+    const start = Math.max(0, lineIndex - 2);
+    const end = Math.min(lines.length, lineIndex + 3);
+    return lines.slice(start, end).join('\n');
+  }
+
   private initializeSecurityRules(): ASTSecurityRule[] {
     return [
+      // CRITICAL SECURITY RULES (Direct Code Execution)
+      
       // Rule 1: Detect eval() calls
       {
         id: 'detect-eval-calls',
@@ -1021,6 +1162,550 @@ class ASTSecurityAnalyzer {
                 }
               }
             }
+          }
+          return null;
+        }
+      },
+
+      // COMMAND INJECTION RULES
+      
+      // Rule 8: Detect child_process.exec calls
+      {
+        id: 'detect-child-process-exec',
+        name: 'Child Process Execution Detection',
+        description: 'Detects child_process.exec calls that can execute OS commands',
+        severity: 'critical',
+        nodeTypes: [ts.SyntaxKind.CallExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const callExpr = node as ts.CallExpression;
+          if (ts.isPropertyAccessExpression(callExpr.expression)) {
+            const propAccess = callExpr.expression;
+            if (ts.isIdentifier(propAccess.name) && 
+                ['exec', 'execSync', 'spawn', 'spawnSync'].includes(propAccess.name.text)) {
+              return {
+                type: 'child_process_execution',
+                severity: 'critical' as const,
+                description: `child_process.${propAccess.name.text}() call detected - potential command injection`,
+                remediation: 'Validate and sanitize all inputs, use execFile with argument arrays instead',
+                confidence: 90
+              };
+            }
+          }
+          return null;
+        }
+      },
+
+      // Rule 9: Detect fs module dangerous operations
+      {
+        id: 'detect-fs-dangerous-operations',
+        name: 'File System Dangerous Operations',
+        description: 'Detects file system operations that could be exploited',
+        severity: 'high',
+        nodeTypes: [ts.SyntaxKind.CallExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const callExpr = node as ts.CallExpression;
+          if (ts.isPropertyAccessExpression(callExpr.expression)) {
+            const propAccess = callExpr.expression;
+            if (ts.isIdentifier(propAccess.name)) {
+              const dangerousFsMethods = [
+                'writeFileSync', 'writeFile', 'unlinkSync', 'unlink', 
+                'rmdirSync', 'rmdir', 'createWriteStream'
+              ];
+              if (dangerousFsMethods.includes(propAccess.name.text)) {
+                return {
+                  type: 'fs_dangerous_operation',
+                  severity: 'high' as const,
+                  description: `fs.${propAccess.name.text}() call detected - potential file system manipulation`,
+                  remediation: 'Validate file paths, use path.resolve() and check against allowed directories',
+                  confidence: 85
+                };
+              }
+            }
+          }
+          return null;
+        }
+      },
+
+      // Rule 10: Detect path traversal in string literals
+      {
+        id: 'detect-path-traversal',
+        name: 'Path Traversal Detection',
+        description: 'Detects path traversal patterns in file paths',
+        severity: 'high',
+        nodeTypes: [ts.SyntaxKind.StringLiteral, ts.SyntaxKind.TemplateExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          let textContent = '';
+          if (ts.isStringLiteral(node)) {
+            textContent = node.text;
+          } else if (ts.isTemplateExpression(node)) {
+            // Check template literal parts
+            textContent = sourceFile.text.substring(node.getStart(sourceFile), node.getEnd());
+          }
+          
+          const traversalPatterns = ['../', '..\\', '%2e%2e', '....//'];
+          for (const pattern of traversalPatterns) {
+            if (textContent.toLowerCase().includes(pattern.toLowerCase())) {
+              return {
+                type: 'path_traversal_attempt',
+                severity: 'high' as const,
+                description: `Path traversal pattern "${pattern}" detected in string literal`,
+                remediation: 'Use path.resolve() and validate against allowed directories',
+                confidence: 80
+              };
+            }
+          }
+          return null;
+        }
+      },
+
+      // NETWORK SECURITY RULES
+      
+      // Rule 11: Detect HTTP request modules
+      {
+        id: 'detect-http-requests',
+        name: 'HTTP Request Detection',
+        description: 'Detects HTTP request modules that could be used for data exfiltration',
+        severity: 'medium',
+        nodeTypes: [ts.SyntaxKind.ImportDeclaration, ts.SyntaxKind.CallExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          if (ts.isImportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+            const moduleName = node.moduleSpecifier.text;
+            const httpModules = ['axios', 'fetch', 'request', 'http', 'https', 'node-fetch'];
+            if (httpModules.includes(moduleName)) {
+              return {
+                type: 'http_module_import',
+                severity: 'medium' as const,
+                description: `HTTP module "${moduleName}" imported - potential data exfiltration vector`,
+                remediation: 'Ensure all HTTP requests are to whitelisted domains and properly authenticated',
+                confidence: 75
+              };
+            }
+          }
+          return null;
+        }
+      },
+
+      // Rule 12: Detect hardcoded URLs
+      {
+        id: 'detect-hardcoded-urls',
+        name: 'Hardcoded URL Detection',
+        description: 'Detects hardcoded URLs that might be suspicious',
+        severity: 'medium',
+        nodeTypes: [ts.SyntaxKind.StringLiteral],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          if (ts.isStringLiteral(node)) {
+            const text = node.text;
+            const urlPattern = /https?:\/\/[^\s"']+/gi;
+            if (urlPattern.test(text)) {
+              // Check for suspicious domains
+              const suspiciousDomains = [
+                'pastebin.com', 'hastebin.com', 'bit.ly', 'tinyurl.com',
+                'githubusercontent.com', 'raw.github.com'
+              ];
+              if (suspiciousDomains.some(domain => text.toLowerCase().includes(domain))) {
+                return {
+                  type: 'suspicious_url_detected',
+                  severity: 'high' as const,
+                  description: `Suspicious URL detected: ${text}`,
+                  remediation: 'Review URL destination and ensure it is legitimate',
+                  confidence: 85
+                };
+              }
+              return {
+                type: 'hardcoded_url',
+                severity: 'medium' as const,
+                description: `Hardcoded URL detected: ${text}`,
+                remediation: 'Consider using environment variables or configuration files',
+                confidence: 70
+              };
+            }
+          }
+          return null;
+        }
+      },
+
+      // DATABASE SECURITY RULES
+      
+      // Rule 13: Detect SQL injection patterns in template literals
+      {
+        id: 'detect-sql-injection',
+        name: 'SQL Injection Pattern Detection',
+        description: 'Detects potential SQL injection in template literals',
+        severity: 'critical',
+        nodeTypes: [ts.SyntaxKind.TemplateExpression, ts.SyntaxKind.BinaryExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const text = sourceFile.text.substring(node.getStart(sourceFile), node.getEnd());
+          const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER'];
+          const hasSQL = sqlKeywords.some(keyword => text.toUpperCase().includes(keyword));
+          
+          if (hasSQL && (text.includes('${') || text.includes('+'))) {
+            return {
+              type: 'sql_injection_pattern',
+              severity: 'critical' as const,
+              description: 'Potential SQL injection detected - string concatenation with SQL keywords',
+              remediation: 'Use parameterized queries or prepared statements instead of string concatenation',
+              confidence: 90
+            };
+          }
+          return null;
+        }
+      },
+
+      // Rule 14: Detect database credential exposure
+      {
+        id: 'detect-db-credentials',
+        name: 'Database Credential Detection',
+        description: 'Detects hardcoded database credentials',
+        severity: 'critical',
+        nodeTypes: [ts.SyntaxKind.StringLiteral, ts.SyntaxKind.PropertyAssignment],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          if (ts.isStringLiteral(node)) {
+            const text = node.text.toLowerCase();
+            // Database connection string patterns
+            const dbPatterns = [
+              'mongodb://', 'mysql://', 'postgres://', 'sqlite://',
+              'server=', 'database=', 'uid=', 'pwd=', 'password='
+            ];
+            if (dbPatterns.some(pattern => text.includes(pattern))) {
+              return {
+                type: 'database_credential_exposure',
+                severity: 'critical' as const,
+                description: 'Hardcoded database credentials detected',
+                remediation: 'Move credentials to environment variables or secure configuration',
+                confidence: 95
+              };
+            }
+          }
+          return null;
+        }
+      },
+
+      // CRYPTOGRAPHIC SECURITY RULES
+      
+      // Rule 15: Detect weak cryptographic functions
+      {
+        id: 'detect-weak-crypto',
+        name: 'Weak Cryptography Detection',
+        description: 'Detects use of weak cryptographic functions',
+        severity: 'high',
+        nodeTypes: [ts.SyntaxKind.CallExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const callExpr = node as ts.CallExpression;
+          if (ts.isPropertyAccessExpression(callExpr.expression)) {
+            const propAccess = callExpr.expression;
+            if (ts.isIdentifier(propAccess.name)) {
+              const weakAlgorithms = ['md5', 'sha1', 'des', 'rc4'];
+              if (weakAlgorithms.includes(propAccess.name.text.toLowerCase())) {
+                return {
+                  type: 'weak_cryptography',
+                  severity: 'high' as const,
+                  description: `Weak cryptographic algorithm detected: ${propAccess.name.text}`,
+                  remediation: 'Use strong cryptographic algorithms like SHA-256, AES-256',
+                  confidence: 90
+                };
+              }
+            }
+          }
+          return null;
+        }
+      },
+
+      // Rule 16: Detect hardcoded encryption keys
+      {
+        id: 'detect-hardcoded-keys',
+        name: 'Hardcoded Encryption Key Detection',
+        description: 'Detects hardcoded encryption keys or secrets',
+        severity: 'critical',
+        nodeTypes: [ts.SyntaxKind.StringLiteral],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          if (ts.isStringLiteral(node)) {
+            const text = node.text;
+            // Look for patterns that might be keys (base64, hex, etc.)
+            const keyPatterns = [
+              /^[A-Za-z0-9+/]{32,}={0,2}$/, // Base64
+              /^[0-9a-fA-F]{32,}$/, // Hex
+              /^[A-Za-z0-9]{32,}$/, // Alphanumeric keys
+            ];
+            
+            if (text.length >= 32 && keyPatterns.some(pattern => pattern.test(text))) {
+              return {
+                type: 'hardcoded_encryption_key',
+                severity: 'critical' as const,
+                description: 'Potential hardcoded encryption key detected',
+                remediation: 'Move encryption keys to secure key management system',
+                confidence: 85
+              };
+            }
+          }
+          return null;
+        }
+      },
+
+      // AUTHENTICATION & AUTHORIZATION RULES
+      
+      // Rule 17: Detect JWT secret hardcoding
+      {
+        id: 'detect-jwt-secrets',
+        name: 'JWT Secret Detection',
+        description: 'Detects hardcoded JWT secrets',
+        severity: 'critical',
+        nodeTypes: [ts.SyntaxKind.CallExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const callExpr = node as ts.CallExpression;
+          if (ts.isPropertyAccessExpression(callExpr.expression)) {
+            const propAccess = callExpr.expression;
+            if (ts.isIdentifier(propAccess.name) && 
+                ['sign', 'verify'].includes(propAccess.name.text)) {
+              // Check if secret is a string literal
+              if (callExpr.arguments.length > 1 && ts.isStringLiteral(callExpr.arguments[1])) {
+                return {
+                  type: 'hardcoded_jwt_secret',
+                  severity: 'critical' as const,
+                  description: 'Hardcoded JWT secret detected',
+                  remediation: 'Use environment variables for JWT secrets',
+                  confidence: 95
+                };
+              }
+            }
+          }
+          return null;
+        }
+      },
+
+      // Rule 18: Detect authorization bypasses
+      {
+        id: 'detect-auth-bypass',
+        name: 'Authentication Bypass Detection',
+        description: 'Detects potential authentication bypass patterns',
+        severity: 'critical',
+        nodeTypes: [ts.SyntaxKind.IfStatement, ts.SyntaxKind.BinaryExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const text = sourceFile.text.substring(node.getStart(sourceFile), node.getEnd());
+          const bypassPatterns = [
+            'true === true', '1 === 1', 'false !== false',
+            'debug && true', 'development || true'
+          ];
+          
+          if (bypassPatterns.some(pattern => text.includes(pattern))) {
+            return {
+              type: 'authentication_bypass',
+              severity: 'critical' as const,
+              description: 'Potential authentication bypass pattern detected',
+              remediation: 'Remove debug code and implement proper authentication checks',
+              confidence: 80
+            };
+          }
+          return null;
+        }
+      },
+
+      // OBFUSCATION & EVASION DETECTION
+      
+      // Rule 19: Detect base64 encoding/decoding
+      {
+        id: 'detect-base64-operations',
+        name: 'Base64 Operations Detection',
+        description: 'Detects base64 encoding/decoding that might hide malicious content',
+        severity: 'medium',
+        nodeTypes: [ts.SyntaxKind.CallExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const callExpr = node as ts.CallExpression;
+          if (ts.isIdentifier(callExpr.expression)) {
+            const funcName = callExpr.expression.text;
+            if (['atob', 'btoa'].includes(funcName)) {
+              return {
+                type: 'base64_operation',
+                severity: 'medium' as const,
+                description: `Base64 ${funcName === 'atob' ? 'decoding' : 'encoding'} detected`,
+                remediation: 'Review base64 operations for legitimate use cases',
+                confidence: 75
+              };
+            }
+          }
+          return null;
+        }
+      },
+
+      // Rule 20: Detect string obfuscation techniques
+      {
+        id: 'detect-string-obfuscation',
+        name: 'String Obfuscation Detection',
+        description: 'Detects string obfuscation techniques',
+        severity: 'high',
+        nodeTypes: [ts.SyntaxKind.CallExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const callExpr = node as ts.CallExpression;
+          if (ts.isPropertyAccessExpression(callExpr.expression)) {
+            const propAccess = callExpr.expression;
+            if (ts.isIdentifier(propAccess.name)) {
+              const obfuscationMethods = [
+                'fromCharCode', 'charAt', 'charCodeAt', 'slice', 'substr',
+                'replace', 'split', 'join', 'reverse'
+              ];
+              
+              // Check for chained string manipulation (common in obfuscation)
+              const text = sourceFile.text.substring(node.getStart(sourceFile), node.getEnd());
+              const chainCount = (text.match(/\./g) || []).length;
+              
+              if (obfuscationMethods.includes(propAccess.name.text) && chainCount > 2) {
+                return {
+                  type: 'string_obfuscation',
+                  severity: 'high' as const,
+                  description: 'Potential string obfuscation detected - complex string manipulation chain',
+                  remediation: 'Review code for legitimate string operations',
+                  confidence: 80
+                };
+              }
+            }
+          }
+          return null;
+        }
+      },
+
+      // PYTHON-SPECIFIC SECURITY RULES
+      
+      // Rule 21: Python eval() detection
+      {
+        id: 'python-eval-detection',
+        name: 'Python Eval Detection',
+        description: 'Detects dangerous eval() calls in Python',
+        severity: 'critical',
+        nodeTypes: ['Call'],
+        languages: ['python'],
+        check: (node: PythonNode, sourceCode: string) => {
+          if (node.func && node.func.id === 'eval') {
+            return {
+              type: 'python_eval_call',
+              severity: 'critical' as const,
+              description: 'Python eval() call detected - critical security vulnerability',
+              remediation: 'Replace eval() with ast.literal_eval() for safe evaluation or validate input',
+              confidence: 95
+            };
+          }
+          return null;
+        }
+      },
+
+      // Rule 22: Python exec() detection
+      {
+        id: 'python-exec-detection',
+        name: 'Python Exec Detection',
+        description: 'Detects dangerous exec() calls in Python',
+        severity: 'critical',
+        nodeTypes: ['Call'],
+        languages: ['python'],
+        check: (node: PythonNode, sourceCode: string) => {
+          if (node.func && node.func.id === 'exec') {
+            return {
+              type: 'python_exec_call',
+              severity: 'critical' as const,
+              description: 'Python exec() call detected - code execution vulnerability',
+              remediation: 'Avoid exec() or validate input with ast.parse() first',
+              confidence: 95
+            };
+          }
+          return null;
+        }
+      },
+
+      // Rule 23: Python dynamic import detection
+      {
+        id: 'python-dynamic-import',
+        name: 'Python Dynamic Import Detection',
+        description: 'Detects potentially dangerous __import__ calls',
+        severity: 'high',
+        nodeTypes: ['Call'],
+        languages: ['python'],
+        check: (node: PythonNode, sourceCode: string) => {
+          if (node.func && node.func.id === '__import__') {
+            return {
+              type: 'python_dynamic_import',
+              severity: 'high' as const,
+              description: 'Dynamic __import__ call detected - potential code injection',
+              remediation: 'Use static imports or validate module names against whitelist',
+              confidence: 90
+            };
+          }
+          return null;
+        }
+      },
+
+      // Rule 24: Python subprocess detection
+      {
+        id: 'python-subprocess',
+        name: 'Python Subprocess Detection',
+        description: 'Detects subprocess calls that could execute OS commands',
+        severity: 'critical',
+        nodeTypes: ['Call'],
+        languages: ['python'],
+        check: (node: PythonNode, sourceCode: string) => {
+          if (node.func && node.func.attr && 
+              ['subprocess', 'system'].includes(node.func.attr)) {
+            return {
+              type: 'python_command_execution',
+              severity: 'critical' as const,
+              description: 'OS command execution detected in Python code',
+              remediation: 'Validate all inputs and use subprocess with shell=False',
+              confidence: 90
+            };
+          }
+          return null;
+        }
+      },
+
+      // Rule 25: Python file write operations
+      {
+        id: 'python-file-write',
+        name: 'Python File Write Detection',
+        description: 'Detects file write operations that could be exploited',
+        severity: 'medium',
+        nodeTypes: ['Call'],
+        languages: ['python'],
+        check: (node: PythonNode, sourceCode: string) => {
+          if (node.func && node.func.id === 'open' && 
+              node.source && (node.source.includes('"w"') || node.source.includes("'w'"))) {
+            return {
+              type: 'python_file_write',
+              severity: 'medium' as const,
+              description: 'File write operation detected - potential file system manipulation',
+              remediation: 'Validate file paths and implement proper access controls',
+              confidence: 75
+            };
+          }
+          return null;
+        }
+      },
+
+      // Rule 26: Python SQL injection in format strings
+      {
+        id: 'python-sql-injection',
+        name: 'Python SQL Injection Detection',
+        description: 'Detects potential SQL injection in Python string formatting',
+        severity: 'critical',
+        nodeTypes: ['Call'],
+        languages: ['python'],
+        check: (node: PythonNode, sourceCode: string) => {
+          if (node.func && node.func.id === 'sql_format') {
+            return {
+              type: 'python_sql_injection',
+              severity: 'critical' as const,
+              description: 'Potential SQL injection detected in Python string formatting',
+              remediation: 'Use parameterized queries instead of string formatting',
+              confidence: 85
+            };
           }
           return null;
         }

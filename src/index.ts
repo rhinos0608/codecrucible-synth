@@ -1,22 +1,22 @@
-import { CLI, CLIContext } from './core/cli.js';
+import { CLI, CLIContext } from './application/interfaces/cli.js';
 import { ConfigManager } from './config/config-manager.js';
-import { UnifiedModelClient, UnifiedClientConfig } from './core/client.js';
+import { UnifiedModelClient, UnifiedClientConfig } from './application/services/client.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { getErrorMessage } from './utils/error-utils.js';
 import { createSystem } from './core/di/system-bootstrap.js';
-import { logger } from './core/logger.js';
+import { logger } from './infrastructure/logging/logger.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import {
   initializeGlobalToolIntegration,
   getGlobalToolIntegration,
-} from './core/tools/tool-integration.js';
+} from './infrastructure/tools/tool-integration.js';
 import {
   initializeGlobalEnhancedToolIntegration,
   getGlobalEnhancedToolIntegration,
-} from './core/tools/enhanced-tool-integration.js';
+} from './infrastructure/tools/enhanced-tool-integration.js';
 
 // AbortController-based resource management for memory leak prevention
 const resourceManager = {

@@ -1,6 +1,6 @@
 /**
- * Enterprise Security Framework - Enhanced AST-based Pattern Implementation
- * Defensive security implementation with AST-based static analysis
+ * Enterprise Security Framework - Claude Code Pattern Implementation
+ * Defensive security implementation following enterprise standards
  * Provides comprehensive multi-layer security validation for all agent actions
  */
 
@@ -366,6 +366,8 @@ export class EnterpriseSecurityFramework {
     analysisMethod: 'string_matching' | 'ast_analysis' | 'hybrid';
     violations: SecurityViolation[];
   }> {
+    const startTime = Date.now();
+    
     // Determine language if not provided
     const detectedLanguage = language || this.detectLanguage(code);
     
@@ -493,19 +495,13 @@ export class EnterpriseSecurityFramework {
     const detectedPatterns: string[] = [];
     
     // Enhanced pattern matching with context awareness
-    const patternArray = Array.from(this.maliciousPatterns);
-    for (const pattern of patternArray) {
+    for (const pattern of this.maliciousPatterns) {
       const regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      const matches: RegExpMatchArray[] = [];
-      let match: RegExpExecArray | null;
-      while ((match = regex.exec(code)) !== null) {
-        matches.push(match);
-        if (!regex.global) break;
-      }
+      const matches = [...code.matchAll(regex)];
       
-      for (const matchResult of matches) {
+      for (const match of matches) {
         // Skip if pattern is in comments or strings
-        if (this.isInCommentOrString(code, matchResult.index!)) {
+        if (this.isInCommentOrString(code, match.index!)) {
           continue;
         }
         
@@ -517,7 +513,7 @@ export class EnterpriseSecurityFramework {
           remediation: `Review and validate the use of '${pattern}' in the code`,
           patterns: [pattern],
           confidence: 70,
-          location: this.getLocationInfo(code, matchResult.index!)
+          location: this.getLocationInfo(code, match.index!)
         });
       }
     }
@@ -805,7 +801,7 @@ class ASTSecurityAnalyzer {
         nodeCount,
         cacheHit: false
       };
-    } catch (error: any) {
+    } catch (error) {
       logger.error('AST analysis failed:', error);
       throw new Error(`AST parsing failed: ${error.message}`);
     }
@@ -991,12 +987,50 @@ class ASTSecurityAnalyzer {
           }
           return null;
         }
+      },
+
+      // Rule 7: Detect process.env access patterns that might leak secrets
+      {
+        id: 'detect-env-access-patterns',
+        name: 'Environment Variable Access Detection',
+        description: 'Detects potentially unsafe environment variable access',
+        severity: 'low',
+        nodeTypes: [ts.SyntaxKind.PropertyAccessExpression],
+        languages: ['typescript', 'javascript'],
+        check: (node: ts.Node, sourceFile: ts.SourceFile) => {
+          const propAccess = node as ts.PropertyAccessExpression;
+          if (ts.isPropertyAccessExpression(propAccess.expression)) {
+            const parentProp = propAccess.expression;
+            if (ts.isIdentifier(parentProp.expression) && 
+                parentProp.expression.text === 'process' &&
+                ts.isIdentifier(parentProp.name) && 
+                parentProp.name.text === 'env') {
+              
+              // Check for sensitive environment variable patterns
+              if (ts.isIdentifier(propAccess.name)) {
+                const envVar = propAccess.name.text.toLowerCase();
+                if (envVar.includes('password') || envVar.includes('secret') || 
+                    envVar.includes('key') || envVar.includes('token')) {
+                  return {
+                    type: 'sensitive_env_access',
+                    severity: 'low' as const,
+                    description: `Access to potentially sensitive environment variable: ${propAccess.name.text}`,
+                    remediation: 'Ensure proper handling and do not log sensitive environment variables',
+                    confidence: 70
+                  };
+                }
+              }
+            }
+          }
+          return null;
+        }
       }
     ];
   }
 
   private getNodeLocation(node: ts.Node, sourceFile: ts.SourceFile): { line: number; column: number; length: number } {
     const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+    const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
     
     return {
       line: start.line + 1, // Convert to 1-based line numbers

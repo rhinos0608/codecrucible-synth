@@ -6,10 +6,12 @@
  */
 
 import { EventEmitter } from 'events';
+import { performance } from 'perf_hooks';
 import { Logger } from '../logger.js';
 import { OllamaProvider } from '../../providers/ollama.js';
 import { LMStudioProvider } from '../../providers/lm-studio.js';
 import { modelCoordinator } from '../model-selection-coordinator.js';
+import { CodeQualityAnalyzer, ComprehensiveQualityMetrics, QualityRecommendation } from '../quality/code-quality-analyzer.js';
 import chalk from 'chalk';
 
 export interface SequentialAgentConfig {
@@ -96,6 +98,8 @@ export interface QualityMetrics {
   efficiency: number;
   documentation: number;
   testability: number;
+  // Enhanced with comprehensive data-driven metrics
+  comprehensiveMetrics?: ComprehensiveQualityMetrics;
 }
 
 export class SequentialDualAgentSystem extends EventEmitter {
@@ -103,12 +107,26 @@ export class SequentialDualAgentSystem extends EventEmitter {
   private config: SequentialAgentConfig;
   private writerProvider: OllamaProvider | LMStudioProvider | null = null;
   private auditorProvider: OllamaProvider | LMStudioProvider | null = null;
+  private qualityAnalyzer: CodeQualityAnalyzer;
   private isInitialized = false;
   private executionHistory: SequentialResult[] = [];
 
   constructor(config?: Partial<SequentialAgentConfig>) {
     super();
     this.logger = new Logger('SequentialDualAgent');
+    this.qualityAnalyzer = new CodeQualityAnalyzer({
+      // Configure quality analyzer for code generation context
+      weights: {
+        cyclomaticComplexity: 0.25,    // Higher weight for complexity in generated code
+        maintainabilityIndex: 0.20,    // Critical for maintainable generated code
+        lintingScore: 0.20,            // Important for code standards
+        formattingScore: 0.10,         // Baseline formatting compliance
+        typeCoverage: 0.15,            // Important for TypeScript quality
+        documentation: 0.05,           // Lower weight for generated code comments
+        duplication: 0.03,             // Minimal weight for single-function generation
+        halsteadComplexity: 0.02,      // Minimal weight for complexity metrics
+      },
+    });
 
     // Default configuration with intelligent defaults
     this.config = {
@@ -358,7 +376,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
   }
 
   /**
-   * Audit code using the auditor agent
+   * Audit code using the auditor agent with comprehensive quality analysis
    */
   private async auditCode(
     code: string,
@@ -369,15 +387,56 @@ export class SequentialDualAgentSystem extends EventEmitter {
       throw new Error('Auditor provider not initialized');
     }
 
-    const auditPrompt = this.buildAuditorPrompt(code, originalPrompt, context);
+    this.logger.info('Starting comprehensive code audit with data-driven quality metrics...');
 
-    const response = await this.auditorProvider.processRequest({
-      prompt: auditPrompt,
-      temperature: this.config.auditor.temperature,
-      maxTokens: this.config.auditor.maxTokens,
-    });
+    try {
+      // Perform data-driven quality analysis first
+      const startQualityAnalysis = performance.now();
+      const comprehensiveQualityMetrics = await this.qualityAnalyzer.analyzeCode(
+        code,
+        'typescript', // Assume TypeScript for better analysis
+        `audit-${Date.now()}.ts`
+      );
+      const qualityAnalysisDuration = performance.now() - startQualityAnalysis;
+      
+      this.logger.info(`Quality analysis completed in ${qualityAnalysisDuration.toFixed(2)}ms with score ${comprehensiveQualityMetrics.overallScore}`);
 
-    return this.parseAuditResponse(response.content || response);
+      // Build enhanced audit prompt with quality metrics context
+      const auditPrompt = this.buildEnhancedAuditorPrompt(code, originalPrompt, comprehensiveQualityMetrics, context);
+
+      const response = await this.auditorProvider.processRequest({
+        prompt: auditPrompt,
+        temperature: this.config.auditor.temperature,
+        maxTokens: this.config.auditor.maxTokens,
+      });
+
+      // Parse AI auditor response
+      const aiAuditReview = this.parseAuditResponse(response.content || response);
+
+      // Enhance with comprehensive quality metrics
+      const enhancedReview = this.enhanceAuditWithQualityMetrics(aiAuditReview, comprehensiveQualityMetrics);
+      
+      this.emit('quality_analysis_complete', {
+        comprehensiveMetrics: comprehensiveQualityMetrics,
+        auditReview: enhancedReview,
+        analysisDuration: qualityAnalysisDuration
+      });
+
+      return enhancedReview;
+      
+    } catch (error) {
+      this.logger.warn('Enhanced quality analysis failed, falling back to basic audit:', error);
+      
+      // Fallback to basic audit if quality analysis fails
+      const auditPrompt = this.buildAuditorPrompt(code, originalPrompt, context);
+      const response = await this.auditorProvider.processRequest({
+        prompt: auditPrompt,
+        temperature: this.config.auditor.temperature,
+        maxTokens: this.config.auditor.maxTokens,
+      });
+
+      return this.parseAuditResponse(response.content || response);
+    }
   }
 
   /**
@@ -437,7 +496,87 @@ Generate the code:`;
   }
 
   /**
-   * Build comprehensive audit prompt
+   * Build enhanced audit prompt with quality metrics context
+   */
+  private buildEnhancedAuditorPrompt(
+    code: string, 
+    originalPrompt: string, 
+    qualityMetrics: ComprehensiveQualityMetrics,
+    context?: any
+  ): string {
+    const recommendations = qualityMetrics.recommendations
+      .filter(r => r.priority === 'critical' || r.priority === 'high')
+      .slice(0, 5) // Top 5 critical/high priority issues
+      .map(r => `- ${r.category}: ${r.description} (${r.suggestion})`)
+      .join('\n');
+
+    return `You are a senior code auditor enhanced with data-driven quality analysis. Review the following code using both AI judgment and objective metrics.
+
+Original Request: ${originalPrompt}
+
+Code to Review:
+\`\`\`
+${code}
+\`\`\`
+
+DATA-DRIVEN QUALITY ANALYSIS RESULTS:
+- Overall Quality Score: ${qualityMetrics.overallScore}/100
+- Cyclomatic Complexity: ${qualityMetrics.complexity.cyclomaticComplexity}
+- Maintainability Index: ${qualityMetrics.complexity.maintainabilityIndex}/100
+- Linting Score: ${qualityMetrics.linting.score}/100 (${qualityMetrics.linting.totalIssues} issues)
+- Type Coverage: ${qualityMetrics.typeCoverage.coverage}%
+- Technical Debt Ratio: ${qualityMetrics.technicalDebtRatio}%
+
+KEY QUALITY ISSUES DETECTED:
+${recommendations || 'No critical issues detected by automated analysis.'}
+
+Perform a comprehensive audit that INCORPORATES these data-driven insights:
+1. **Correctness**: Does it fulfill the requirements?
+2. **Security**: Any vulnerabilities or risks?
+3. **Performance**: Efficiency and optimization issues?
+4. **Quality**: Validate and expand on the automated quality metrics
+5. **Best Practices**: Design patterns, error handling?
+
+Your review should COMPLEMENT (not duplicate) the automated analysis. Focus on areas requiring human judgment.
+
+Provide your review in this JSON format:
+{
+  "overallScore": 0-100,
+  "passed": true/false,
+  "issues": [
+    {
+      "severity": "critical/error/warning/info",
+      "type": "security/performance/logic/style",
+      "description": "...",
+      "suggestion": "...",
+      "autoFixable": true/false
+    }
+  ],
+  "improvements": [
+    {
+      "category": "...",
+      "description": "...",
+      "impact": "high/medium/low"
+    }
+  ],
+  "security": {
+    "score": 0-100,
+    "vulnerabilities": [],
+    "recommendations": []
+  },
+  "quality": {
+    "readability": 0-100,
+    "maintainability": 0-100,
+    "efficiency": 0-100,
+    "documentation": 0-100,
+    "testability": 0-100
+  },
+  "recommendation": "accept/refine/reject"
+}`;
+  }
+
+  /**
+   * Build comprehensive audit prompt (fallback)
    */
   private buildAuditorPrompt(code: string, originalPrompt: string, context?: any): string {
     return `You are a senior code auditor. Review the following code critically and thoroughly.
@@ -490,6 +629,97 @@ Provide your review in this JSON format:
   },
   "recommendation": "accept/refine/reject"
 }`;
+  }
+
+  /**
+   * Enhance AI audit review with comprehensive quality metrics
+   */
+  private enhanceAuditWithQualityMetrics(
+    aiReview: AuditReview, 
+    qualityMetrics: ComprehensiveQualityMetrics
+  ): AuditReview {
+    // Merge quality metrics into the review
+    const enhancedQuality: QualityMetrics = {
+      // Use data-driven metrics as primary source
+      readability: qualityMetrics.linting.score * 0.4 + qualityMetrics.formatting.score * 0.6,
+      maintainability: qualityMetrics.complexity.maintainabilityIndex,
+      efficiency: Math.max(0, 100 - qualityMetrics.complexity.cyclomaticComplexity * 3),
+      documentation: Math.min(100, qualityMetrics.complexity.commentRatio * 5),
+      testability: qualityMetrics.typeCoverage.coverage,
+      
+      // Include comprehensive metrics
+      comprehensiveMetrics: qualityMetrics
+    };
+
+    // Convert quality recommendations to audit issues
+    const qualityIssues: CodeIssue[] = qualityMetrics.recommendations
+      .filter(r => r.priority === 'critical' || r.priority === 'high')
+      .map(r => ({
+        severity: r.priority === 'critical' ? 'critical' as const : 'error' as const,
+        type: r.category,
+        description: r.description,
+        suggestion: r.suggestion,
+        autoFixable: r.automated
+      }));
+
+    // Merge AI issues with quality-based issues, avoiding duplicates
+    const allIssues = [...aiReview.issues];
+    qualityIssues.forEach(qIssue => {
+      const duplicate = allIssues.find(aIssue => 
+        aIssue.type === qIssue.type && aIssue.description.includes(qIssue.description.substring(0, 20))
+      );
+      if (!duplicate) {
+        allIssues.push(qIssue);
+      }
+    });
+
+    // Convert quality recommendations to improvements
+    const qualityImprovements: Improvement[] = qualityMetrics.recommendations
+      .filter(r => r.priority === 'medium' || r.priority === 'low')
+      .map(r => ({
+        category: r.category,
+        description: r.description,
+        impact: r.priority === 'medium' ? 'medium' as const : 'low' as const
+      }));
+
+    // Merge improvements
+    const allImprovements = [...aiReview.improvements, ...qualityImprovements];
+
+    // Calculate enhanced overall score
+    // Weight: 60% AI judgment + 40% data-driven metrics
+    const enhancedScore = Math.round(
+      aiReview.overallScore * 0.6 + qualityMetrics.overallScore * 0.4
+    );
+
+    // Determine if code passes based on enhanced criteria
+    const criticalIssues = allIssues.filter(i => i.severity === 'critical').length;
+    const errorIssues = allIssues.filter(i => i.severity === 'error').length;
+    const qualityPassThreshold = 70; // Configurable threshold
+    
+    const passed = criticalIssues === 0 && 
+                  errorIssues <= 2 && 
+                  enhancedScore >= qualityPassThreshold &&
+                  qualityMetrics.overallScore >= 60; // Minimum data-driven score
+
+    // Enhanced recommendation logic
+    let recommendation: 'accept' | 'refine' | 'reject';
+    if (criticalIssues > 0 || enhancedScore < 50) {
+      recommendation = 'reject';
+    } else if (errorIssues > 0 || enhancedScore < qualityPassThreshold) {
+      recommendation = 'refine';
+    } else {
+      recommendation = 'accept';
+    }
+
+    return {
+      overallScore: enhancedScore,
+      passed,
+      issues: allIssues,
+      improvements: allImprovements,
+      security: aiReview.security, // Keep AI security assessment
+      quality: enhancedQuality,
+      recommendation
+    };
   }
 
   /**
@@ -579,36 +809,95 @@ Generate the improved code with all issues resolved:`;
   }
 
   /**
-   * Display audit results in console
+   * Display audit results in console with enhanced quality metrics
    */
   private displayAuditResults(review: AuditReview): void {
-    console.log(chalk.cyan('\n📊 Audit Results:'));
+    console.log(chalk.cyan('\n📊 Enhanced Quality Audit Results:'));
     console.log(chalk.white(`   Overall Score: ${review.overallScore}/100`));
     console.log(
       chalk.white(`   Status: ${review.passed ? chalk.green('PASSED') : chalk.red('FAILED')}`)
     );
     console.log(chalk.white(`   Recommendation: ${review.recommendation.toUpperCase()}`));
 
+    // Display comprehensive quality metrics if available
+    if (review.quality.comprehensiveMetrics) {
+      const metrics = review.quality.comprehensiveMetrics;
+      console.log(chalk.cyan('\n   📈 Data-Driven Quality Metrics:'));
+      console.log(chalk.white(`     • Cyclomatic Complexity: ${metrics.complexity.cyclomaticComplexity}`));
+      console.log(chalk.white(`     • Maintainability Index: ${metrics.complexity.maintainabilityIndex}/100`));
+      console.log(chalk.white(`     • Linting Score: ${metrics.linting.score}/100 (${metrics.linting.totalIssues} issues)`));
+      console.log(chalk.white(`     • Formatting Score: ${metrics.formatting.score}/100`));
+      console.log(chalk.white(`     • Type Coverage: ${metrics.typeCoverage.coverage}%`));
+      console.log(chalk.white(`     • Technical Debt: ${metrics.technicalDebtRatio}%`));
+      
+      if (metrics.trendData) {
+        const trend = metrics.trendData;
+        const trendIcon = trend.trendDirection === 'improving' ? '📈' : 
+                         trend.trendDirection === 'declining' ? '📉' : '➡️';
+        const trendColor = trend.trendDirection === 'improving' ? chalk.green : 
+                          trend.trendDirection === 'declining' ? chalk.red : chalk.yellow;
+        console.log(trendColor(`     • Quality Trend: ${trendIcon} ${trend.trendDirection.toUpperCase()} (${trend.improvement > 0 ? '+' : ''}${trend.improvement.toFixed(1)})`));
+      }
+    }
+
+    // Display quality breakdown
+    console.log(chalk.cyan('\n   📋 Quality Breakdown:'));
+    console.log(chalk.white(`     • Readability: ${Math.round(review.quality.readability)}/100`));
+    console.log(chalk.white(`     • Maintainability: ${Math.round(review.quality.maintainability)}/100`));
+    console.log(chalk.white(`     • Efficiency: ${Math.round(review.quality.efficiency)}/100`));
+    console.log(chalk.white(`     • Documentation: ${Math.round(review.quality.documentation)}/100`));
+    console.log(chalk.white(`     • Testability: ${Math.round(review.quality.testability)}/100`));
+
     if (review.issues.length > 0) {
-      console.log(chalk.yellow('\n   Issues Found:'));
-      review.issues.forEach(issue => {
-        const color =
-          issue.severity === 'critical'
-            ? chalk.red
-            : issue.severity === 'error'
-              ? chalk.magenta
-              : issue.severity === 'warning'
-                ? chalk.yellow
-                : chalk.gray;
-        console.log(color(`     - [${issue.severity}] ${issue.description}`));
-      });
+      console.log(chalk.yellow('\n   ⚠️  Issues Found:'));
+      const criticalIssues = review.issues.filter(i => i.severity === 'critical');
+      const errorIssues = review.issues.filter(i => i.severity === 'error');
+      const warningIssues = review.issues.filter(i => i.severity === 'warning');
+      
+      if (criticalIssues.length > 0) {
+        console.log(chalk.red(`     🚨 Critical (${criticalIssues.length}):`));
+        criticalIssues.forEach(issue => {
+          console.log(chalk.red(`       - ${issue.description}`));
+          if (issue.suggestion) {
+            console.log(chalk.gray(`         💡 ${issue.suggestion}`));
+          }
+        });
+      }
+      
+      if (errorIssues.length > 0) {
+        console.log(chalk.magenta(`     ❌ Errors (${errorIssues.length}):`));
+        errorIssues.slice(0, 3).forEach(issue => { // Limit display to 3 errors
+          console.log(chalk.magenta(`       - ${issue.description}`));
+          if (issue.autoFixable) {
+            console.log(chalk.green(`         🔧 Auto-fixable`));
+          }
+        });
+        if (errorIssues.length > 3) {
+          console.log(chalk.gray(`       ... and ${errorIssues.length - 3} more errors`));
+        }
+      }
+      
+      if (warningIssues.length > 0) {
+        console.log(chalk.yellow(`     ⚠️  Warnings (${warningIssues.length})`));
+      }
     }
 
     if (review.security.vulnerabilities.length > 0) {
-      console.log(chalk.red('\n   ⚠️  Security Vulnerabilities:'));
+      console.log(chalk.red('\n   🔒 Security Vulnerabilities:'));
       review.security.vulnerabilities.forEach(v => {
         console.log(chalk.red(`     - ${v}`));
       });
+    }
+
+    // Display top improvement suggestions
+    if (review.improvements.length > 0) {
+      const highImpactImprovements = review.improvements.filter(i => i.impact === 'high').slice(0, 3);
+      if (highImpactImprovements.length > 0) {
+        console.log(chalk.cyan('\n   🎯 Top Improvement Opportunities:'));
+        highImpactImprovements.forEach(improvement => {
+          console.log(chalk.white(`     • ${improvement.category}: ${improvement.description}`));
+        });
+      }
     }
   }
 
@@ -657,6 +946,38 @@ Generate the improved code with all issues resolved:`;
       configuration: this.config,
       isInitialized: this.isInitialized,
     };
+  }
+
+  /**
+   * Get quality analyzer configuration
+   */
+  getQualityConfiguration() {
+    return this.qualityAnalyzer.getConfiguration();
+  }
+
+  /**
+   * Update quality analyzer configuration
+   */
+  updateQualityConfiguration(updates: any): void {
+    this.qualityAnalyzer.updateConfiguration(updates);
+    this.logger.info('Quality analyzer configuration updated');
+  }
+
+  /**
+   * Get quality history for trend analysis
+   */
+  getQualityHistory(identifier?: string): any {
+    if (identifier) {
+      return this.qualityAnalyzer.getQualityHistory(identifier);
+    }
+    // Return overall metrics from execution history
+    return this.executionHistory.map(result => ({
+      timestamp: result.auditorOutput.timestamp,
+      score: result.auditorOutput.review.overallScore,
+      passed: result.auditorOutput.review.passed,
+      issues: result.auditorOutput.review.issues.length,
+      recommendation: result.auditorOutput.review.recommendation
+    }));
   }
 
   /**

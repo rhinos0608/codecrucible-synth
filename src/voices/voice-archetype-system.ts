@@ -9,8 +9,8 @@ import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-
 import { getErrorMessage } from '../utils/error-utils.js';
 import { accessSync } from 'fs';
 import { execSync } from 'child_process';
-import { LivingSpiralCoordinator } from '../core/living-spiral-coordinator.js';
-import { logger } from '../core/logger.js';
+import { LivingSpiralCoordinator } from '../domain/services/living-spiral-coordinator.js';
+import { logger } from '../infrastructure/logging/logger.js';
 
 interface Voice {
   id: string;

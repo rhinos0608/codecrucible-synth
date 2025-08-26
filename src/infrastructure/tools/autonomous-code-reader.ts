@@ -1,4 +1,4 @@
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { UnifiedAgent } from '../agent.js';
 import { readdir, readFile, stat } from 'fs/promises';
 import { join, extname, relative, basename } from 'path';

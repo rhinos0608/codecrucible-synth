@@ -5,7 +5,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from '../logger.js';
+import { Logger } from '../logging/logger.js';
 import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
 import { DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
 import { SecureToolFactory } from '../security/secure-tool-factory.js';

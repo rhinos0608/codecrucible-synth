@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { spawn, exec, ChildProcess } from 'child_process';
 import { promisify } from 'util';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 const execAsync = promisify(exec);
 

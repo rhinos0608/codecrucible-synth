@@ -12,7 +12,7 @@ import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '../core/logger.js';
-import { InputSanitizer } from '../core/security/input-sanitizer.js';
+import { InputSanitizer } from '../infrastructure/security/input-sanitizer.js';
 
 const execAsync = promisify(exec);
 

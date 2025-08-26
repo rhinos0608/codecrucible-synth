@@ -11,7 +11,7 @@ import {
   ToolResult,
 } from './advanced-tool-orchestrator.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
-import { Logger } from '../logger.js';
+import { Logger } from '../logging/logger.js';
 import { join, relative, resolve } from 'path';
 
 const logger = new Logger('FilesystemTools');

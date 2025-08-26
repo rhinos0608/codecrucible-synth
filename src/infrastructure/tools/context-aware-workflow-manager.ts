@@ -4,7 +4,7 @@
  * Based on 2025 best practices for context preservation and multi-file coordination
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { UnifiedModelClient } from '../client.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';

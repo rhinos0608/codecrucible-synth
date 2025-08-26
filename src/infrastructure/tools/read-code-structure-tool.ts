@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { AutonomousCodeReader } from './autonomous-code-reader.js';
 
 /**

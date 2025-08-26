@@ -16,7 +16,7 @@ import {
   ServiceResponse,
   ErrorResponse,
 } from '../error-handling/structured-error-system.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface EnhancedToolConfig {
   name: string;

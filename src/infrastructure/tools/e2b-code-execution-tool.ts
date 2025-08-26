@@ -1,6 +1,6 @@
 import { BaseTool } from './base-tool.js';
 import { E2BService, ExecutionResult } from '../e2b/e2b-service.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { z } from 'zod';
 
 /**

@@ -11,8 +11,8 @@
 
 import { EventEmitter } from 'events';
 import chalk from 'chalk';
-import { logger } from '../logger.js';
-import { ResponseNormalizer } from '../response-normalizer.js';
+import { logger } from '../logging/logger.js';
+import { ResponseNormalizer } from '../../core/response-normalizer.js';
 
 // Domain imports - pure business logic
 import { ExecutionPlan } from '../../domain/entities/execution-plan.js';

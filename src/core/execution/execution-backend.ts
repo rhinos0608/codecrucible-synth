@@ -223,13 +223,19 @@ export class DockerBackend extends ExecutionBackend {
         if (!validatedDir.safe) {
           return ErrorHandler.createErrorResponse(
             ErrorFactory.createError(
-              `Invalid working directory: ${validatedDir.reason}`,
-              ErrorCategory.AUTHORIZATION,
-              ErrorSeverity.HIGH,
               {
-                context: { workingDirectory: options.workingDirectory },
-                userMessage: 'Working directory is not safe',
-                suggestedActions: ['Use a directory within the current project'],
+                code: 'INVALID_WORKING_DIRECTORY',
+                message: `Invalid working directory: ${validatedDir.reason}`,
+                severity: ErrorSeverity.HIGH,
+                category: ErrorCategory.AUTHORIZATION,
+                recoverable: false,
+                suggestions: ['Use a directory within the current project']
+              },
+              {
+                operation: 'validateWorkingDirectory',
+                timestamp: Date.now(),
+                component: 'docker-backend',
+                metadata: { workingDirectory: options.workingDirectory }
               }
             )
           );

@@ -11,7 +11,7 @@ import {
   ObservabilitySystem,
   ObservabilityConfig,
 } from '../core/observability/observability-system.js';
-import { UnifiedCacheSystem, UnifiedCacheConfig } from '../core/cache/unified-cache-system.js';
+import { UnifiedCacheSystem, UnifiedCacheConfig } from '../infrastructure/cache/unified-cache-system.js';
 import {
   AgentEcosystem,
   Agent,

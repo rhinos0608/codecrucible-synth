@@ -1,7 +1,7 @@
 import { EnhancedMCPClientManager } from '../../mcp-servers/enhanced-mcp-client-manager.js';
 import { LocalMCPServerManager } from '../../mcp-servers/local-mcp-server-manager.js';
 import { MCPSecurityValidator } from '../../mcp-servers/mcp-security-validator.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export class EnhancedExternalMCPTools {
   private mcpManager: EnhancedMCPClientManager;

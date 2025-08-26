@@ -7,7 +7,7 @@ import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
 import { UnifiedAgent } from '../agent.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 const ConfirmedWriteSchema = z.object({
   path: z.string().describe('The path to the file to write'),

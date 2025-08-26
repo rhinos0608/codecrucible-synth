@@ -14,7 +14,7 @@ export interface ErrorDetails {
   code: string;
   message: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
-  category: 'user' | 'system' | 'network' | 'security' | 'validation';
+  category: 'user' | 'system' | 'network' | 'security' | 'validation' | 'authorization' | 'tool_execution' | 'configuration' | 'external_api';
   recoverable: boolean;
   suggestions?: string[];
 }
@@ -22,7 +22,7 @@ export interface ErrorDetails {
 export interface StructuredError extends Error {
   code: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
-  category: 'user' | 'system' | 'network' | 'security' | 'validation';
+  category: 'user' | 'system' | 'network' | 'security' | 'validation' | 'authorization' | 'tool_execution' | 'configuration' | 'external_api';
   context: ErrorContext;
   details: ErrorDetails;
   recoverable: boolean;
@@ -231,6 +231,18 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
       case 'system':
         suggestions.push('Check system resources', 'Review configuration', 'Check logs for more details');
         break;
+      case 'authorization':
+        suggestions.push('Check permissions', 'Verify authentication', 'Review access policies');
+        break;
+      case 'tool_execution':
+        suggestions.push('Check tool configuration', 'Verify tool availability', 'Review execution environment');
+        break;
+      case 'configuration':
+        suggestions.push('Check configuration files', 'Verify environment variables', 'Review settings');
+        break;
+      case 'external_api':
+        suggestions.push('Check API connectivity', 'Verify API keys', 'Check rate limits', 'Retry request');
+        break;
     }
 
     if (error.details.suggestions) {
@@ -276,7 +288,7 @@ export const structuredErrorSystem = new StructuredErrorSystem();
 
 // Export type aliases for backward compatibility
 export type ErrorFactory = StructuredErrorSystem;
-export type ErrorCategory = 'user' | 'system' | 'network' | 'security' | 'validation';
+export type ErrorCategory = 'user' | 'system' | 'network' | 'security' | 'validation' | 'authorization' | 'tool_execution' | 'configuration' | 'external_api';
 export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 // Error category constants (for use as values)
@@ -285,7 +297,11 @@ export const ErrorCategory = {
   SYSTEM: 'system' as const,
   NETWORK: 'network' as const,
   SECURITY: 'security' as const,
-  VALIDATION: 'validation' as const
+  VALIDATION: 'validation' as const,
+  AUTHORIZATION: 'authorization' as const,
+  TOOL_EXECUTION: 'tool_execution' as const,
+  CONFIGURATION: 'configuration' as const,
+  EXTERNAL_API: 'external_api' as const
 } as const;
 
 // Error severity constants (for use as values)

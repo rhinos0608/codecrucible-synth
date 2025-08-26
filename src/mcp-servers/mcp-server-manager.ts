@@ -10,8 +10,8 @@ import { SmitheryMCPServer, SmitheryMCPConfig } from './smithery-mcp-server.js';
 import {
   AdvancedSecurityValidator,
   ValidationResult,
-} from '../core/security/advanced-security-validator.js';
-import { InputSanitizer } from '../core/security/input-sanitizer.js';
+} from '../infrastructure/security/advanced-security-validator.js';
+import { InputSanitizer } from '../infrastructure/security/input-sanitizer.js';
 
 export interface MCPServerConfig {
   filesystem: {

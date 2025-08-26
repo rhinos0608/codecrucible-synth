@@ -60,9 +60,29 @@ export interface IIntegratedSystem {
   disableIntegration(): Promise<void>;
 }
 
-// Performance monitoring interfaces - simplified to match existing implementation
+// Performance monitoring interfaces - matching actual PerformanceMonitor implementation
 export interface IPerformanceMonitor {
-  [key: string]: any; // Allow any methods for now
+  // Core tracking methods
+  track?: () => void;
+  getMetrics?: () => { avgLatency: number; errorRate: number };
+  
+  // Extended methods (optional for backwards compatibility)
+  recordRequest?: (provider: string, metrics: any) => void;
+  getProviderMetrics?: (provider?: string) => Record<string, any>;
+  getSummary?: () => any;
+  getAlerts?: (limit?: number) => any[];
+  getSystemMetrics?: () => any;
+  getRequestHistory?: (provider?: string, limit?: number) => any[];
+  resetProviderMetrics?: (provider: string) => void;
+  clearAllMetrics?: () => void;
+  startOperation?: (operationId: string, component?: string) => void;
+  endOperation?: (operationId: string) => void;
+  start?: () => void;
+  stop?: () => void;
+  destroy?: () => void;
+  
+  // Allow additional methods for flexibility
+  [key: string]: any;
 }
 
 // Client configuration interface

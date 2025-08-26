@@ -18,7 +18,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { SecureExecutionManager } from '../security/secure-execution-manager.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 /**
  * Secure Terminal Command Execution Tool

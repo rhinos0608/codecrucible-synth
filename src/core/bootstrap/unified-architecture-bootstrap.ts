@@ -424,7 +424,7 @@ export class UnifiedArchitectureBootstrap extends EventEmitter {
         ],
         metadata: {
           description: 'System integration coordinator',
-          category: 'integration',
+          category: 'infrastructure',
           priority: 10,
           healthCheckInterval: 30000
         }

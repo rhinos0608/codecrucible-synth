@@ -1,5 +1,5 @@
-import { logger } from '../logger.js';
-import { ResponseNormalizer } from '../response-normalizer.js';
+import { logger } from '../logging/logger.js';
+import { ResponseNormalizer } from '../../core/response-normalizer.js';
 import { DomainAwareToolOrchestrator, DomainAnalysis } from './domain-aware-tool-orchestrator.js';
 
 /**

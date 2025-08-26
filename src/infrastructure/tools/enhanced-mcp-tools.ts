@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 // Type definitions for MCP functions
 type MCPFunction = (...args: any[]) => Promise<any>;

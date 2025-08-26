@@ -4,7 +4,7 @@
  * Based on research of Aider, Cursor, and modern AI orchestration patterns
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { UnifiedModelClient } from '../client.js';
 
 export interface MultiStepTask {

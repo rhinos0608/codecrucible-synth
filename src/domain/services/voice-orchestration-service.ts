@@ -429,7 +429,7 @@ export class VoiceOrchestrationService {
     const words2 = content2.toLowerCase().split(/\s+/);
 
     const intersection = words1.filter(word => words2.includes(word));
-    const union = [...new Set([...words1, ...words2])];
+    const union = Array.from(new Set([...words1, ...words2]));
 
     return union.length > 0 ? intersection.length / union.length : 0;
   }

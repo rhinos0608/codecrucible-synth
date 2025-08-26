@@ -18,7 +18,7 @@ import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { TimeoutManager, TimeoutLevel, TimeoutStrategy } from '../error-handling/timeout-manager.js';
 import { CircuitBreakerManager } from '../error-handling/circuit-breaker-system.js';
 import { ObservabilitySystem } from '../../core/observability/observability-system.js';

@@ -5,7 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface MemoryMetrics {
   heapUsed: number;

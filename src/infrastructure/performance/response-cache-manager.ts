@@ -5,7 +5,7 @@
  * Performance Impact: 60-80% faster response times for repeated/similar requests
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import * as crypto from 'crypto';
 

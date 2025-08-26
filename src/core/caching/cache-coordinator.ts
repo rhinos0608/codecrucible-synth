@@ -10,7 +10,7 @@
  * - Architect: Clear separation between caching logic and client operations
  */
 
-import { unifiedCache } from '../cache/unified-cache-system.js';
+import { unifiedCache } from '../../infrastructure/cache/unified-cache-system.js';
 import { logger } from '../logger.js';
 
 export interface CacheStats {

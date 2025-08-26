@@ -4,7 +4,7 @@
  * Provides comprehensive multi-layer security validation for all agent actions
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import * as ts from 'typescript';
 import { createHash } from 'crypto';
 

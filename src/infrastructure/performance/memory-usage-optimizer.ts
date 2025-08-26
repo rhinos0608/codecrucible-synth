@@ -5,7 +5,7 @@
  * Performance Impact: 30-50% memory reduction through proactive management
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 
 interface MemoryConfig {

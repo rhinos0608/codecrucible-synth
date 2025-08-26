@@ -9,7 +9,7 @@
  * - Secret leak detection in AI-generated code
  */
 
-import { Logger } from '../logger.js';
+import { Logger } from '../logging/logger.js';
 import * as crypto from 'crypto';
 
 export interface SecurityPolicy {

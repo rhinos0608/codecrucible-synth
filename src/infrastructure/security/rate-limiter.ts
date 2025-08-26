@@ -5,7 +5,7 @@
 
 import { EventEmitter } from 'events';
 import crypto from 'crypto';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface RateLimitConfig {
   algorithm: 'sliding-window' | 'fixed-window' | 'token-bucket';

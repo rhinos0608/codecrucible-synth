@@ -14,7 +14,7 @@ import {
   IModelClient,
   IVoiceSystem,
   IIntegratedSystem,
-  IPerformanceMonitor,
+  PerformanceMonitor,
 } from '../interfaces/client-interfaces.js';
 import {
   IProviderRepository,

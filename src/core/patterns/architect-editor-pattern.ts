@@ -6,7 +6,7 @@
  */
 
 import { logger } from '../logger.js';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../application/services/client.js';
 
 export interface ArchitectPlan {
   id: string;

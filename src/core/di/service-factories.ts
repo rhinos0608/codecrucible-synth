@@ -405,6 +405,51 @@ class IntelligentRoutingCoordinatorFactory implements ServiceFactory<any> {
     } as any;
     
     const mockPerformanceMonitor = {
+      // Core tracking methods
+      recordRequest: () => {},
+      getProviderMetrics: () => ({}),
+      getSummary: () => ({ timestamp: new Date(), totalRequests: 0, averageLatency: 100, errorRate: 0.01 }),
+      getAlerts: () => [],
+      getSystemMetrics: () => null,
+      getRequestHistory: () => [],
+      resetProviderMetrics: () => {},
+      clearAllMetrics: () => {},
+      startOperation: () => {},
+      endOperation: () => {},
+      start: () => {},
+      stop: () => {},
+      destroy: () => {},
+      disableMonitoring: () => {},
+      exportMetrics: () => ({ summary: {}, history: [], alerts: [], system: null, exportTime: new Date() }),
+      getRecommendations: () => [],
+      
+      // Public properties that might be accessed
+      providerMetrics: new Map(),
+      requestHistory: [],
+      systemMetrics: null,
+      alerts: [],
+      
+      // Private properties from utils/performance.ts PerformanceMonitor class
+      startTime: Date.now(),
+      monitoringEnabled: true,
+      lastAlertTimes: new Map(),
+      MAX_HISTORY_SIZE: 50,
+      ALERT_THRESHOLDS: {
+        latency: 10000,
+        errorRate: 0.1,
+        memoryUsage: 0.85
+      },
+      monitoringInterval: null,
+      operationTracking: new Map(),
+      
+      // EventEmitter methods
+      on: () => mockPerformanceMonitor,
+      off: () => mockPerformanceMonitor,
+      emit: () => true,
+      setMaxListeners: () => mockPerformanceMonitor,
+      removeAllListeners: () => mockPerformanceMonitor,
+      
+      // Backward compatibility
       track: () => {},
       getMetrics: () => ({ avgLatency: 100, errorRate: 0.01 })
     };

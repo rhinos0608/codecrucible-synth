@@ -3,7 +3,7 @@
  * Implements comprehensive security headers and HTTPS redirection
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface SecurityHeadersConfig {
   contentSecurityPolicy?: {

@@ -14,9 +14,9 @@
  * - Adds audit logging for security monitoring
  */
 
-import { E2BService } from '../e2b/e2b-service.js';
-import { SecurityValidator } from '../e2b/security-validator.js';
-import { logger } from '../logger.js';
+import { E2BService } from '../../core/e2b/e2b-service.js';
+import { SecurityValidator } from '../../core/e2b/security-validator.js';
+import { logger } from '../logging/logger.js';
 import { z } from 'zod';
 
 export interface SecureExecutionConfig {

@@ -5,7 +5,7 @@
 
 import path from 'path';
 import { SecretsManager } from './secrets-manager.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface ConfigSchema {
   [key: string]: {

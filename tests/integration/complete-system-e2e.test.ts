@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
-import { UnifiedModelClient, createDefaultUnifiedClientConfig } from '../../src/core/client.js';
+import { UnifiedModelClient, createDefaultUnifiedClientConfig } from '../../src/application/services/client.js';
 import { LivingSpiralCoordinator, SpiralPhase } from '../../src/core/living-spiral-coordinator.js';
 import { VoiceArchetypeSystem } from '../../src/voices/voice-archetype-system.js';
-import { CLI } from '../../src/core/cli.js';
+import { CLI } from '../../src/application/interfaces/cli.js';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm, writeFile, readFile, mkdir } from 'fs/promises';

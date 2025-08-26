@@ -18,7 +18,7 @@
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { Worker } from 'worker_threads';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 // Resource Types
 export enum ResourceType {

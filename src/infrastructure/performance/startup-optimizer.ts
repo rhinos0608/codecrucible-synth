@@ -5,7 +5,7 @@
  * Performance Impact: 60-80% faster system startup through intelligent sequencing
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 
 interface InitializationTask {

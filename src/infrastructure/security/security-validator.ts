@@ -10,9 +10,9 @@
  * - Performance Engineer: Efficient validation with minimal overhead
  */
 
-import { SecurityUtils } from '../security.js';
-import { SecurityValidation } from '../types.js';
-import { logger } from '../logger.js';
+import { SecurityUtils } from '../../core/security-utils.js';
+import { SecurityValidation } from './security-types.js';
+import { logger } from '../logging/logger.js';
 
 export interface SecurityValidationOptions {
   enableSandbox?: boolean;

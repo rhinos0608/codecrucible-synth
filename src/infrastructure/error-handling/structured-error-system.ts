@@ -5,7 +5,7 @@
  * and user-friendly error reporting across the entire application.
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import chalk from 'chalk';
 
 // Error severity levels

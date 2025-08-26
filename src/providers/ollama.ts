@@ -4,8 +4,8 @@ import { readFileSync, existsSync } from 'fs';
 import { load as loadYaml } from 'js-yaml';
 import { join } from 'path';
 import { getErrorMessage } from '../utils/error-utils.js';
-import { responseCache } from '../core/performance/response-cache-manager.js';
-import { modelPreloader } from '../core/performance/model-preloader.js';
+import { responseCache } from '../infrastructure/performance/response-cache-manager.js';
+import { modelPreloader } from '../infrastructure/performance/model-preloader.js';
 
 export interface OllamaConfig {
   endpoint?: string;

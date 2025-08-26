@@ -4,7 +4,7 @@ import { promises as fs, existsSync } from 'fs';
 import { join, extname, dirname, basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { JsonValue, JsonObject, AnalysisResult, ToolArguments, ToolResult } from '../types.js';
+import { JsonValue, JsonObject, AnalysisResult, ToolArguments, ToolResult } from '../../domain/types/index.js';
 
 const execAsync = promisify(exec);
 

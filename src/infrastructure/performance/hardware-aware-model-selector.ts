@@ -3,12 +3,12 @@
  * Automatically switches models based on hardware capabilities and performance issues
  */
 
-import { Logger } from '../logger.js';
+import { Logger } from '../logging/logger.js';
 import {
   IntelligentModelDetector,
   ModelInfo,
   OptimalConfiguration,
-} from '../model-management/intelligent-model-detector.js';
+} from '../../core/model-management/intelligent-model-detector.js';
 import { EventEmitter } from 'events';
 import * as os from 'os';
 

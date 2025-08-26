@@ -6,7 +6,7 @@
 import { EventEmitter } from 'events';
 import { basename } from 'path';
 import { Logger } from '../logger.js';
-import { unifiedCache } from '../cache/unified-cache-system.js';
+import { unifiedCache } from '../../infrastructure/cache/unified-cache-system.js';
 import {
   ProjectIntelligenceSystem,
   ProjectIntelligence,

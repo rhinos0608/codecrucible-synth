@@ -8,7 +8,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { ProductionDatabaseManager } from '../../database/production-database-manager.js';
 import { SecretsManager } from './secrets-manager.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { EventEmitter } from 'events';
 
 export interface JWTPayload {

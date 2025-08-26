@@ -19,7 +19,7 @@ import { EventEmitter } from 'events';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { logger } from '../logger.js';
-import { resourceManager } from '../performance/resource-cleanup-manager.js';
+import { resourceManager } from '../../infrastructure/performance/resource-cleanup-manager.js';
 
 export interface MCPConnectionConfig {
   id: string;

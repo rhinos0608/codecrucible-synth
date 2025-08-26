@@ -6,7 +6,7 @@
  * Self-healing system that adapts to usage patterns and system load
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import { responseCache } from './response-cache-manager.js';
 import { modelPreloader } from './model-preloader.js';

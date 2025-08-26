@@ -5,7 +5,7 @@
  */
 
 import { logger } from '../logging/logger.js';
-import { UnifiedModelClient } from '../client.js';
+import { UnifiedModelClient } from '../../application/services/client.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 

@@ -1,7 +1,7 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import { CLIContext } from '../core/cli.js';
+import { CLIContext } from '../application/interfaces/cli.js';
 import { logger } from '../core/logger.js';
 import chalk from 'chalk';
 import { readFile, writeFile, stat } from 'fs/promises';

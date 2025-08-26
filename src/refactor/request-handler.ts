@@ -1,8 +1,8 @@
 import { ModelRequest, ModelResponse, ProjectContext, StreamToken } from '../core/types.js';
-import { UnifiedModelClient } from '../core/client.js';
+import { UnifiedModelClient } from '../application/services/client.js';
 import { logger } from '../core/logger.js';
-import { getGlobalEnhancedToolIntegration } from '../core/tools/enhanced-tool-integration.js';
-import { getGlobalToolIntegration } from '../core/tools/tool-integration.js';
+import { getGlobalEnhancedToolIntegration } from '../infrastructure/tools/enhanced-tool-integration.js';
+import { getGlobalToolIntegration } from '../infrastructure/tools/tool-integration.js';
 import { ProviderType } from '../core/providers/provider-repository.js';
 import { createHash } from 'crypto';
 import { getErrorMessage } from '../utils/error-utils.js';

@@ -1,5 +1,5 @@
 import { Task, ExecutionResult } from '../core/types.js';
-import { UnifiedModelClient } from '../core/client.js';
+import { UnifiedModelClient } from '../application/services/client.js';
 
 export class Agent {
   private client: UnifiedModelClient;

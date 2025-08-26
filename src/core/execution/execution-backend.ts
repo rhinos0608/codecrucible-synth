@@ -20,7 +20,7 @@ import {
   ErrorSeverity,
   ServiceResponse,
   ErrorHandler,
-} from '../error-handling/structured-error-system.js';
+} from '../../infrastructure/error-handling/structured-error-system.js';
 
 const execAsync = promisify(exec);
 
@@ -182,18 +182,15 @@ export class DockerBackend extends ExecutionBackend {
     if (!acquired) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
+          'Too many concurrent executions',
+          ErrorCategory.SYSTEM,
+          ErrorSeverity.MEDIUM,
           {
-            code: 'EXECUTION_QUEUE_FULL',
-            message: 'Too many concurrent executions',
-            severity: ErrorSeverity.MEDIUM,
-            category: ErrorCategory.SYSTEM,
+            userMessage: 'Execution queue is full',
+            suggestedActions: ['Wait for current executions to complete'],
             recoverable: true,
-            suggestions: ['Wait for current executions to complete']
-          },
-          {
-            operation: 'executeCode',
-            timestamp: Date.now(),
-            component: 'execution-backend'
+            retryable: true,
+            context: { operation: 'executeCode', component: 'execution-backend' }
           }
         )
       );
@@ -223,19 +220,18 @@ export class DockerBackend extends ExecutionBackend {
         if (!validatedDir.safe) {
           return ErrorHandler.createErrorResponse(
             ErrorFactory.createError(
+              `Invalid working directory: ${validatedDir.reason}`,
+              ErrorCategory.AUTHORIZATION,
+              ErrorSeverity.HIGH,
               {
-                code: 'INVALID_WORKING_DIRECTORY',
-                message: `Invalid working directory: ${validatedDir.reason}`,
-                severity: ErrorSeverity.HIGH,
-                category: ErrorCategory.AUTHORIZATION,
+                userMessage: 'Working directory is not safe',
+                suggestedActions: ['Use a directory within the current project'],
                 recoverable: false,
-                suggestions: ['Use a directory within the current project']
-              },
-              {
-                operation: 'validateWorkingDirectory',
-                timestamp: Date.now(),
-                component: 'docker-backend',
-                metadata: { workingDirectory: options.workingDirectory }
+                context: { 
+                  operation: 'validateWorkingDirectory', 
+                  component: 'docker-backend',
+                  workingDirectory: options.workingDirectory 
+                }
               }
             )
           );
@@ -284,10 +280,11 @@ export class DockerBackend extends ExecutionBackend {
             ErrorCategory.SYSTEM,
             ErrorSeverity.MEDIUM,
             {
-              context: { command, timeout: options.timeout },
               userMessage: 'Command execution timed out',
               suggestedActions: ['Increase timeout', 'Optimize command'],
+              recoverable: true,
               retryable: true,
+              context: { command, timeout: options.timeout, component: 'docker-backend' }
             }
           )
         );
@@ -299,22 +296,25 @@ export class DockerBackend extends ExecutionBackend {
           ErrorCategory.TOOL_EXECUTION,
           ErrorSeverity.HIGH,
           {
-            context: { command, containerId },
-            originalError: error,
             userMessage: 'Docker container execution failed',
             suggestedActions: [
               'Check Docker daemon status',
               'Verify image availability',
-              'Try E2B or local execution',
+              'Try E2B or local execution'
             ],
+            recoverable: true,
             retryable: true,
-            metadata: {
+            context: {
+              command,
+              containerId,
               stdout: error.stdout || '',
               stderr: error.stderr || error.message,
               exitCode: error.code || 1,
               duration,
               backend: 'docker',
+              component: 'docker-backend'
             },
+            originalError: error
           }
         )
       );
@@ -389,9 +389,13 @@ export class E2BBackend extends ExecutionBackend {
           ErrorCategory.SYSTEM,
           ErrorSeverity.MEDIUM,
           {
-            userMessage: 'Sandbox limit reached',
-            suggestedActions: ['Wait for current executions to complete'],
-            retryable: true,
+            context: {
+              operation: 'e2bExecute',
+              timestamp: Date.now(),
+              component: 'e2b-backend'
+            },
+            recoverable: true,
+            suggestedActions: ['Wait for current executions to complete']
           }
         )
       );
@@ -413,8 +417,10 @@ export class E2BBackend extends ExecutionBackend {
             ErrorCategory.CONFIGURATION,
             ErrorSeverity.HIGH,
             {
-              userMessage: 'E2B execution backend requires e2b package',
-              suggestedActions: ['Install e2b package: npm install e2b'],
+            {
+              operation: 'e2bExecute',
+              timestamp: Date.now(),
+              component: 'e2b-backend'
             }
           )
         );
@@ -464,16 +470,13 @@ export class E2BBackend extends ExecutionBackend {
           ErrorCategory.EXTERNAL_API,
           ErrorSeverity.HIGH,
           {
-            context: { sandboxId, command },
-            originalError: error,
-            userMessage: 'Sandbox execution failed',
-            suggestedActions: [
-              'Check E2B API key',
-              'Verify E2B service status',
-              'Try Docker backend instead',
-            ],
-            retryable: true,
-          }
+          {
+            operation: 'e2bExecute',
+            timestamp: Date.now(),
+            component: 'e2b-backend',
+            metadata: { sandboxId, command }
+          },
+          error
         )
       );
     } finally {
@@ -586,9 +589,13 @@ export class FirecrackerBackend extends ExecutionBackend {
           ErrorCategory.SYSTEM,
           ErrorSeverity.MEDIUM,
           {
-            userMessage: 'VM limit reached',
-            suggestedActions: ['Wait for current executions to complete'],
-            retryable: true,
+            context: {
+              operation: 'firecrackerExecute',
+              timestamp: Date.now(),
+              component: 'firecracker-backend'
+            },
+            recoverable: true,
+            suggestedActions: ['Wait for current executions to complete']
           }
         )
       );
@@ -812,9 +819,13 @@ export class PodmanBackend extends ExecutionBackend {
           ErrorCategory.SYSTEM,
           ErrorSeverity.MEDIUM,
           {
-            userMessage: 'Container limit reached',
-            suggestedActions: ['Wait for current executions to complete'],
-            retryable: true,
+            context: {
+              operation: 'podmanExecute',
+              timestamp: Date.now(),
+              component: 'podman-backend'
+            },
+            recoverable: true,
+            suggestedActions: ['Wait for current executions to complete']
           }
         )
       );
@@ -1059,13 +1070,17 @@ export class LocalProcessBackend extends ExecutionBackend {
             ErrorCategory.AUTHORIZATION,
             ErrorSeverity.HIGH,
             {
-              context: { command, blocked: safety.reason },
-              userMessage: 'Command blocked for safety',
+              context: {
+                operation: 'localProcessExecute',
+                timestamp: Date.now(),
+                component: 'local-process-backend',
+                metadata: { command, blocked: safety.reason }
+              },
+              recoverable: false,
               suggestedActions: [
                 'Use Docker or E2B backend for dangerous commands',
-                'Disable safeguards if you understand the risks',
-              ],
-              recoverable: false,
+                'Disable safeguards if you understand the risks'
+              ]
             }
           )
         );

@@ -8,7 +8,7 @@
  * and provides examples of usage patterns for different scenarios.
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { ProductionIntegrationManager } from './production-integration-manager.js';
 import { ProductionHardeningSystem } from './production-hardening-system.js';
 import { ProductionSecurityAuditLogger, SecurityEventType, SecuritySeverity } from '../security/production-security-audit-logger.js';

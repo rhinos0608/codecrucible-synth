@@ -4,12 +4,13 @@
  */
 
 import { EventEmitter } from 'events';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { createHash } from 'crypto';
-import { ModelRequest, ModelResponse, ProjectContext } from '../types.js';
+import { ModelRequest, ModelResponse, ProjectContext } from '../../domain/types/index.js';
 import { ISecurityValidator } from '../security/security-validator.js';
-import { ICacheCoordinator } from '../caching/cache-coordinator.js';
-import { StreamToken, IStreamingManager } from './streaming-manager.js';
+import { ICacheCoordinator } from '../../core/caching/cache-coordinator.js';
+import { IStreamingManager } from './streaming-manager.js';
+import { StreamToken } from '../../domain/types/core-types.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 
 export interface StreamProcessingConfig {

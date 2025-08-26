@@ -4,17 +4,17 @@
  */
 
 // Core exports
-export { CLI } from './core/cli.js';
-export { UnifiedModelClient } from './core/client.js';
+export { CLI } from './application/interfaces/cli.js';
+export { UnifiedModelClient } from './application/services/client.js';
 export { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 export { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
 // Security exports (working ones)
 export { SecurityUtils } from './core/security-utils.js';
-export { InputSanitizer } from './core/security/input-sanitizer.js';
-export { RBACSystem } from './core/security/production-rbac-system.js';
-export { SecretsManager } from './core/security/secrets-manager.js';
-export { EnterpriseAuthManager } from './core/security/enterprise-auth-manager.js';
+export { InputSanitizer } from './infrastructure/security/input-sanitizer.js';
+export { RBACSystem } from './infrastructure/security/production-rbac-system.js';
+export { SecretsManager } from './infrastructure/security/secrets-manager.js';
+export { EnterpriseAuthManager } from './infrastructure/security/enterprise-auth-manager.js';
 
 // Types
 export type * from './core/types.js';
@@ -24,8 +24,8 @@ export type { AppConfig } from './config/config-manager.js';
 
 // Main CLI entry point
 import { program } from 'commander';
-import { UnifiedModelClient } from './core/client.js';
-import { CLI } from './core/cli.js';
+import { UnifiedModelClient } from './application/services/client.js';
+import { CLI } from './application/interfaces/cli.js';
 import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 import { ConfigManager } from './config/config-manager.js';

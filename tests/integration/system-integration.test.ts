@@ -6,7 +6,7 @@
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import { IntegratedCodeCrucibleSystem, IntegratedSystemConfig } from '../../src/core/integration/integrated-system.js';
-import { UnifiedModelClient } from '../../src/core/client.js';
+import { UnifiedModelClient } from '../../src/application/services/client.js';
 import { Logger } from '../../src/core/logger.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';

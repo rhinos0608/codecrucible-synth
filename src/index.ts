@@ -267,8 +267,8 @@ export async function initializeCLIContextLegacy(): Promise<{ cli: CLI; context:
   }
 }
 
-export { CLI } from './core/cli.js';
-export { UnifiedModelClient } from './core/client.js';
+export { CLI } from './application/interfaces/cli.js';
+export { UnifiedModelClient } from './application/services/client.js';
 export { ConfigManager } from './config/config-manager.js';
 
 export async function main() {

@@ -9,7 +9,7 @@
  * - Multi-agent red teaming for security validation
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { EventEmitter } from 'events';
 import { InputSanitizer } from './input-sanitizer.js';
 import { RateLimiter } from './rate-limiter.js';

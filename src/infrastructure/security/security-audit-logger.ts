@@ -6,7 +6,7 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { SecretsManager } from './secrets-manager.js';
 
 export enum AuditEventType {

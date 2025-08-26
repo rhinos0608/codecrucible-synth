@@ -4,7 +4,7 @@
  */
 
 import { subAgentIsolationSystem } from '../../src/core/agents/sub-agent-isolation-system.js';
-import { unifiedCache } from '../../src/core/cache/unified-cache-system.js';
+import { unifiedCache } from '../../src/infrastructure/cache/unified-cache-system.js';
 
 // Clean up after each test to prevent timer leaks
 if (typeof afterEach !== 'undefined') {

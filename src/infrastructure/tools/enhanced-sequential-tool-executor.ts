@@ -1333,7 +1333,7 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
     const originalToolResults: any[] = [];
     
     // CRITICAL FIX: Bridge to global evidence collector to capture tool results from request-execution-manager
-    const { GlobalEvidenceCollector } = await import('../execution/request-execution-manager.js');
+    const { GlobalEvidenceCollector } = await import('../../core/execution/request-execution-manager.js');
     const globalCollector = GlobalEvidenceCollector.getInstance();
     
     const evidenceCollectorCallback = (toolResult: any) => {

@@ -5,7 +5,7 @@
 
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface CacheEntry<T = any> {
   key: string;

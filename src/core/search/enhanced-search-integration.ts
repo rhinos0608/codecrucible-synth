@@ -4,7 +4,7 @@
  * Provides backward compatibility while upgrading performance
  */
 
-import { BaseTool } from '../tools/base-tool.js';
+import { BaseTool } from '../../infrastructure/tools/base-tool.js';
 import {
   CommandLineSearchEngine,
   SearchOptions,

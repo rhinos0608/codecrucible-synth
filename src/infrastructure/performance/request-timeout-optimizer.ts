@@ -5,7 +5,7 @@
  * Performance Impact: Eliminates hanging requests, 50-70% faster failure detection
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 
 interface TimeoutConfig {

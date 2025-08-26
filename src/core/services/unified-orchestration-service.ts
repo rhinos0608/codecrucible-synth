@@ -16,7 +16,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../logger.js';
-import { resourceManager } from '../performance/resource-cleanup-manager.js';
+import { resourceManager } from '../../infrastructure/performance/resource-cleanup-manager.js';
 
 // Tool-related types
 export interface UnifiedTool {

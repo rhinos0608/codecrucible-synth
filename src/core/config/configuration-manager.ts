@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../logger.js';
-import { UnifiedClientConfig } from '../client.js';
+import { UnifiedClientConfig } from '../../application/services/client.js';
 import { ProviderType, ProviderConfig } from '../providers/provider-repository.js';
 import { StreamConfig } from '../../infrastructure/streaming/streaming-manager.js';
 

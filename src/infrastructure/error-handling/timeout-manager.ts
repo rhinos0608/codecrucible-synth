@@ -10,7 +10,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { BootstrapErrorSystem, BootstrapErrorType, BootstrapPhase } from './bootstrap-error-system.js';
 
 export enum TimeoutLevel {

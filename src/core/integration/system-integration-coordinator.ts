@@ -743,7 +743,7 @@ export class SystemIntegrationCoordinator extends EventEmitter {
     logger.info('🗄️ Initializing unified cache coordination');
     
     // Import cache coordination at runtime to avoid circular deps
-    const { getUnifiedCache } = await import('../cache/unified-cache-system.js');
+    const { getUnifiedCache } = await import('../../infrastructure/cache/unified-cache-system.js');
     const cache = getUnifiedCache();
     
     // Configure cache routing strategies for each system

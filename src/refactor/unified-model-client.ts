@@ -10,15 +10,15 @@ import {
   TaskType,
 } from '../core/types.js';
 import { IModelClient, StreamToken } from '../core/interfaces/client-interfaces.js';
-import { SecurityValidator } from '../core/security/security-validator.js';
+import { SecurityValidator } from '../infrastructure/security/security-validator.js';
 import { PerformanceMonitor } from '../utils/performance.js';
 
 import { IntegratedCodeCrucibleSystem } from './integrated-system.js';
 
 import { HardwareAwareModelSelector } from '../infrastructure/performance/hardware-aware-model-selector.js';
-import { getGlobalToolIntegration } from '../core/tools/tool-integration.js';
-import { getGlobalEnhancedToolIntegration } from '../core/tools/enhanced-tool-integration.js';
-import { ActiveProcessManager, ActiveProcess } from '../core/performance/active-process-manager.js';
+import { getGlobalToolIntegration } from '../infrastructure/tools/tool-integration.js';
+import { getGlobalEnhancedToolIntegration } from '../infrastructure/tools/enhanced-tool-integration.js';
+import { ActiveProcessManager, ActiveProcess } from '../infrastructure/performance/active-process-manager.js';
 import { ProviderManager } from './provider-manager.js';
 import { getErrorMessage, toError } from '../utils/error-utils.js';
 import { createHash } from 'crypto';

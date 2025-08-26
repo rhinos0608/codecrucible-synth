@@ -60,29 +60,41 @@ export interface IIntegratedSystem {
   disableIntegration(): Promise<void>;
 }
 
-// Performance monitoring interfaces - matching actual PerformanceMonitor implementation
-export interface IPerformanceMonitor {
+// Performance monitoring interfaces - simplified public interface
+export interface PerformanceMonitor {
   // Core tracking methods
-  track?: () => void;
-  getMetrics?: () => { avgLatency: number; errorRate: number };
+  recordRequest(provider: string, metrics: any): void;
+  getProviderMetrics(provider?: string): Record<string, any>;
+  getSummary(): any;
+  getAlerts(limit?: number): any[];
+  getSystemMetrics(): any;
+  getRequestHistory(provider?: string, limit?: number): any[];
+  resetProviderMetrics(provider: string): void;
+  clearAllMetrics(): void;
+  startOperation(operationId: string, component?: string): void;
+  endOperation(operationId: string): void;
+  start(): void;
+  stop(): void;
+  destroy(): void;
+  disableMonitoring(): void;
+  exportMetrics(): any;
+  getRecommendations(): Array<{
+    type: 'performance' | 'reliability' | 'resource';
+    priority: 'low' | 'medium' | 'high';
+    description: string;
+    action: string;
+  }>;
   
-  // Extended methods (optional for backwards compatibility)
-  recordRequest?: (provider: string, metrics: any) => void;
-  getProviderMetrics?: (provider?: string) => Record<string, any>;
-  getSummary?: () => any;
-  getAlerts?: (limit?: number) => any[];
-  getSystemMetrics?: () => any;
-  getRequestHistory?: (provider?: string, limit?: number) => any[];
-  resetProviderMetrics?: (provider: string) => void;
-  clearAllMetrics?: () => void;
-  startOperation?: (operationId: string, component?: string) => void;
-  endOperation?: (operationId: string) => void;
-  start?: () => void;
-  stop?: () => void;
-  destroy?: () => void;
+  // EventEmitter methods (extends EventEmitter)
+  on(event: string, listener: (...args: any[]) => void): this;
+  off(event: string, listener: (...args: any[]) => void): this;
+  emit(event: string, ...args: any[]): boolean;
+  setMaxListeners(n: number): this;
+  removeAllListeners(event?: string): this;
   
-  // Allow additional methods for flexibility
-  [key: string]: any;
+  // Backward compatibility methods
+  track?(): void;
+  getMetrics?(): { avgLatency: number; errorRate: number };
 }
 
 // Client configuration interface

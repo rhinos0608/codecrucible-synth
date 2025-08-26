@@ -21,6 +21,9 @@ export interface AdaptivePerformanceTunerInterface {
   analyzePerformance(metrics: PerformanceMetrics): TuningRecommendation[];
   applyTuning(recommendations: TuningRecommendation[]): Promise<boolean>;
   getOptimalConfiguration(): Record<string, unknown>;
+  
+  // Additional method expected by request-execution-manager
+  recordMetrics(responseTime: number, throughput: number, errorRate: number): void;
 }
 
 export class AdaptivePerformanceTuner implements AdaptivePerformanceTunerInterface {
@@ -31,6 +34,15 @@ export class AdaptivePerformanceTuner implements AdaptivePerformanceTunerInterfa
     cacheSize: 1000,
     retryAttempts: 3
   };
+  
+  private metricsHistory: Array<{
+    responseTime: number;
+    throughput: number;
+    errorRate: number;
+    timestamp: number;
+  }> = [];
+  
+  private readonly MAX_HISTORY_SIZE = 1000;
 
   analyzePerformance(metrics: PerformanceMetrics): TuningRecommendation[] {
     const recommendations: TuningRecommendation[] = [];
@@ -94,6 +106,52 @@ export class AdaptivePerformanceTuner implements AdaptivePerformanceTunerInterfa
 
   getOptimalConfiguration(): Record<string, unknown> {
     return { ...this.currentConfig };
+  }
+
+  /**
+   * Record performance metrics for later analysis
+   */
+  recordMetrics(responseTime: number, throughput: number, errorRate: number): void {
+    const metric = {
+      responseTime,
+      throughput,
+      errorRate,
+      timestamp: Date.now()
+    };
+
+    this.metricsHistory.push(metric);
+
+    // Trim history to prevent memory bloat
+    if (this.metricsHistory.length > this.MAX_HISTORY_SIZE) {
+      this.metricsHistory = this.metricsHistory.slice(-this.MAX_HISTORY_SIZE / 2);
+    }
+
+    // Auto-tune based on recent metrics if needed
+    if (this.metricsHistory.length >= 10) {
+      this.autoTuneBasedOnMetrics();
+    }
+  }
+
+  /**
+   * Automatically apply tuning based on recorded metrics
+   */
+  private autoTuneBasedOnMetrics(): void {
+    const recentMetrics = this.metricsHistory.slice(-10);
+    const avgResponseTime = recentMetrics.reduce((sum, m) => sum + m.responseTime, 0) / recentMetrics.length;
+    const avgErrorRate = recentMetrics.reduce((sum, m) => sum + m.errorRate, 0) / recentMetrics.length;
+
+    const syntheticMetrics: PerformanceMetrics = {
+      cpuUsage: avgResponseTime > 5000 ? 85 : 45, // High response time indicates high CPU
+      memoryUsage: 60, // Default
+      responseTime: avgResponseTime,
+      throughput: recentMetrics.reduce((sum, m) => sum + m.throughput, 0) / recentMetrics.length,
+      errorRate: avgErrorRate
+    };
+
+    const recommendations = this.analyzePerformance(syntheticMetrics);
+    if (recommendations.length > 0) {
+      this.applyTuning(recommendations);
+    }
   }
 }
 

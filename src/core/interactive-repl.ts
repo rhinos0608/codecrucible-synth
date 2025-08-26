@@ -7,7 +7,7 @@ import * as readline from 'readline';
 import chalk from 'chalk';
 import { REPLInterface } from './types.js';
 import { CLIContext } from './cli/cli-types.js';
-import { CLI } from './cli.js';
+import { CLI } from '../application/interfaces/cli.js';
 import { Logger } from './logger.js';
 import { getErrorMessage } from '../utils/error-utils.js';
 

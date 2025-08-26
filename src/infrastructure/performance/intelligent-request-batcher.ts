@@ -6,7 +6,7 @@
  * Reduces API calls by 30-50% through intelligent batching
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import { responseCache } from './response-cache-manager.js';
 import * as crypto from 'crypto';

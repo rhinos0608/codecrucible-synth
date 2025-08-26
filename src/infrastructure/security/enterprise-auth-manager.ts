@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { RBACSystem, Session, User } from './production-rbac-system.js';
 import { SecretsManager } from './secrets-manager.js';
 import { InputSanitizer } from '../security/input-sanitizer.js';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 
 export interface AuthConfig {
   jwtSecret: string;

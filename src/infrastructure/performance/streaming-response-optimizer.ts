@@ -8,7 +8,7 @@
  * Now includes V8 memory optimization and modern WebStreams API
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import { EventEmitter } from 'events';
 

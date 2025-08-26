@@ -16,7 +16,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { 
   ProductionHardeningSystem, 
   ProductionStats,

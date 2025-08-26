@@ -7,9 +7,9 @@ import {
   EnterpriseAuthManager,
   AuthRequest,
   TokenValidationResult,
-} from '../security/enterprise-auth-manager.js';
-import { RBACSystem } from '../security/production-rbac-system.js';
-import { SecretsManager } from '../security/secrets-manager.js';
+} from '../../infrastructure/security/enterprise-auth-manager.js';
+import { RBACSystem } from '../../infrastructure/security/production-rbac-system.js';
+import { SecretsManager } from '../../infrastructure/security/secrets-manager.js';
 import { logger } from '../logger.js';
 import { CLIError, CLIExitCode } from '../types.js';
 import chalk from 'chalk';

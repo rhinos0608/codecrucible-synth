@@ -5,7 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { memoryOptimizer } from './memory-optimization-2025.js';
 
 export interface ProviderConnection {

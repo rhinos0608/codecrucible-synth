@@ -1,7 +1,7 @@
 import { BaseTool } from '../base-tool.js';
-import { E2BService, ExecutionResult } from '../../e2b/e2b-service.js';
-import { SecurityValidator, ValidationResult } from '../../e2b/security-validator.js';
-import { logger } from '../../logger.js';
+import { E2BService, ExecutionResult } from '../../../core/e2b/e2b-service.js';
+import { SecurityValidator, ValidationResult } from '../../../core/e2b/security-validator.js';
+import { logger } from '../../logging/logger.js';
 import { z } from 'zod';
 
 /**

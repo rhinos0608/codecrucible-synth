@@ -258,7 +258,7 @@ export class SystemBootstrap {
     this.container.register(
       SECURITY_VALIDATOR_TOKEN,
       async container => {
-        const { SecurityValidator } = await import('../security/security-validator.js');
+        const { SecurityValidator } = await import('../../infrastructure/security/security-validator.js');
         const config = container.resolve(CLIENT_CONFIG_TOKEN);
         return new SecurityValidator(config.security);
       },

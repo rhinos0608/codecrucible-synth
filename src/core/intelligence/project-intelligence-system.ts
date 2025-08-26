@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 import { readdir, readFile, stat, access } from 'fs/promises';
 import { join, relative, extname, dirname, basename } from 'path';
 import { Logger } from '../logger.js';
-import { unifiedCache } from '../cache/unified-cache-system.js';
+import { unifiedCache } from '../../infrastructure/cache/unified-cache-system.js';
 import { ProjectContext } from '../types.js';
 
 export interface ProjectIntelligence {

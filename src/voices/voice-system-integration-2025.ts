@@ -580,7 +580,14 @@ export class VoiceSystemIntegration2025 implements VoiceArchetypeSystemInterface
   }
 
   validateVoices(voiceIds: string[]): { valid: string[]; invalid: string[] } {
-    return this.getActiveSystem().validateVoices(voiceIds);
+    const result = this.getActiveSystem().validateVoices(voiceIds);
+    
+    // Handle case where validateVoices might return a boolean
+    if (typeof result === 'boolean') {
+      return result ? { valid: voiceIds, invalid: [] } : { valid: [], invalid: voiceIds };
+    }
+    
+    return result;
   }
 
   /**
@@ -666,12 +673,12 @@ export class VoiceSystemIntegration2025 implements VoiceArchetypeSystemInterface
       const activeSystem = this.optimizedSystem || this.legacySystem;
       
       if (activeSystem && 'getVoicePerspective' in activeSystem && typeof activeSystem.getVoicePerspective === 'function') {
-        return activeSystem.getVoicePerspective(voiceId, prompt, {});
+        return activeSystem.getVoicePerspective(voiceId, prompt);
       }
 
       // Fallback - use generateSingleVoiceResponse if available
       if (activeSystem && 'generateSingleVoiceResponse' in activeSystem && typeof activeSystem.generateSingleVoiceResponse === 'function') {
-        const response = await activeSystem.generateSingleVoiceResponse(voiceId, prompt);
+        const response = await activeSystem.generateSingleVoiceResponse(voiceId, prompt, undefined);
         return {
           voiceId,
           perspective: response.content || response,

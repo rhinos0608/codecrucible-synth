@@ -9,6 +9,7 @@ export interface ProcessInfo {
   startTime: number;
   status: 'running' | 'paused' | 'completed' | 'failed';
   progress: number;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
   metadata?: Record<string, unknown>;
 }
 
@@ -26,6 +27,16 @@ export interface ActiveProcessManagerInterface {
   stopProcess(processId: string): Promise<boolean>;
   getProcessInfo(processId: string): ProcessInfo | null;
   getActiveProcesses(): ProcessInfo[];
+  
+  // Additional methods expected by request-execution-manager
+  registerProcess(processConfig: {
+    type: string;
+    modelName: string;
+    estimatedMemoryUsage: number;
+    promise: Promise<any>;
+    priority: 'low' | 'medium' | 'high' | 'critical';
+  }): { id: string };
+  unregisterProcess(processId: string): void;
 }
 
 export class ActiveProcessManager extends EventEmitter implements ActiveProcessManagerInterface {
@@ -123,6 +134,78 @@ export class ActiveProcessManager extends EventEmitter implements ActiveProcessM
   getActiveProcesses(): ProcessInfo[] {
     return Array.from(this.processes.values())
       .filter(p => p.status === 'running' || p.status === 'paused');
+  }
+
+  /**
+   * Register a process with specific configuration (for compatibility with request-execution-manager)
+   */
+  registerProcess(processConfig: {
+    type: string;
+    modelName: string;
+    estimatedMemoryUsage: number;
+    promise: Promise<any>;
+    priority: 'low' | 'medium' | 'high' | 'critical';
+  }): { id: string } {
+    const processId = `${processConfig.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const processInfo: ProcessInfo = {
+      id: processId,
+      name: `${processConfig.type}_${processConfig.modelName}`,
+      startTime: Date.now(),
+      status: 'running',
+      progress: 0,
+      priority: processConfig.priority,
+      metadata: {
+        type: processConfig.type,
+        modelName: processConfig.modelName,
+        estimatedMemoryUsage: processConfig.estimatedMemoryUsage
+      }
+    };
+
+    this.processes.set(processId, processInfo);
+    this.emit('process:registered', { processId, processConfig });
+    
+    // Handle the promise completion
+    processConfig.promise
+      .then(() => {
+        const process = this.processes.get(processId);
+        if (process) {
+          process.status = 'completed';
+          process.progress = 100;
+        }
+        this.emit('process:completed', { processId });
+      })
+      .catch((error) => {
+        const process = this.processes.get(processId);
+        if (process) {
+          process.status = 'failed';
+          process.metadata = { ...process.metadata, error: error.message };
+        }
+        this.emit('process:failed', { processId, error });
+      });
+
+    return { id: processId };
+  }
+
+  /**
+   * Unregister a process (for compatibility with request-execution-manager)
+   */
+  unregisterProcess(processId: string): void {
+    const processInfo = this.processes.get(processId);
+    if (processInfo) {
+      // Mark as completed if still running
+      if (processInfo.status === 'running' || processInfo.status === 'paused') {
+        processInfo.status = 'completed';
+      }
+      
+      // Clean up abort controller if exists
+      const abortController = this.processHandlers.get(processId);
+      if (abortController) {
+        this.processHandlers.delete(processId);
+      }
+
+      this.emit('process:unregistered', { processId });
+    }
   }
 
   // Utility methods

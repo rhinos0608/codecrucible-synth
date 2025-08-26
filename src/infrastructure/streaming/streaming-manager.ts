@@ -10,7 +10,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
+import { StreamToken } from '../../domain/types/core-types.js';
 
 // Enhanced: AI SDK v5.0 Compatible Streaming Interfaces
 export interface StreamChunk {
@@ -86,14 +87,7 @@ export interface StreamBlock {
   metadata?: Record<string, any>;
 }
 
-// Streaming interfaces (moved from client.ts)
-export interface StreamToken {
-  content: string;
-  timestamp: number;
-  index: number;
-  finished?: boolean;
-  metadata?: Record<string, any>;
-}
+// StreamToken now imported from domain types for consistency
 
 export interface StreamConfig {
   chunkSize?: number;

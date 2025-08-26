@@ -21,8 +21,8 @@ import {
   TaskType,
 } from '../types.js';
 import { ActiveProcess, ActiveProcessManager } from '../performance/active-process-manager.js';
-import { getGlobalEnhancedToolIntegration } from '../tools/enhanced-tool-integration.js';
-import { getGlobalToolIntegration } from '../tools/tool-integration.js';
+import { getGlobalEnhancedToolIntegration } from '../../infrastructure/tools/enhanced-tool-integration.js';
+import { getGlobalToolIntegration } from '../../infrastructure/tools/tool-integration.js';
 import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestrator.js';
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';

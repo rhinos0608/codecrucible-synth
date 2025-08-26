@@ -20,12 +20,28 @@ export interface RequestTimeoutOptimizerInterface {
   calculateOptimalTimeout(profile: RequestProfile): number;
   updateProfile(requestType: string, responseTime: number, success: boolean): void;
   getTimeoutRecommendation(requestType: string): number;
+  
+  // Additional methods expected by request-execution-manager
+  createOptimizedTimeout(
+    requestId: string,
+    requestType?: string,
+    complexityHint?: 'low' | 'medium' | 'high'
+  ): {
+    abortController: AbortController;
+    timeout: number;
+  };
+  completeRequest(requestId: string): void;
 }
 
 export class RequestTimeoutOptimizer implements RequestTimeoutOptimizerInterface {
   private config: TimeoutConfig;
   private profiles = new Map<string, RequestProfile>();
   private requestHistory = new Map<string, { times: number[]; successes: boolean[] }>();
+  private activeRequests = new Map<string, { 
+    startTime: number; 
+    abortController: AbortController;
+    requestType: string;
+  }>();
 
   constructor(config: Partial<TimeoutConfig> = {}) {
     this.config = {
@@ -153,6 +169,61 @@ export class RequestTimeoutOptimizer implements RequestTimeoutOptimizerInterface
         max: Math.max(...timeouts)
       }
     };
+  }
+
+  /**
+   * Create an optimized timeout with abort controller for a request
+   */
+  createOptimizedTimeout(
+    requestId: string,
+    requestType: string = 'default',
+    complexityHint: 'low' | 'medium' | 'high' = 'medium'
+  ): {
+    abortController: AbortController;
+    timeout: number;
+  } {
+    const abortController = new AbortController();
+    
+    // Get optimal timeout based on request profile
+    let timeout = this.getTimeoutRecommendation(requestType);
+    
+    // Adjust based on complexity hint if no profile exists
+    if (!this.profiles.has(requestType)) {
+      const complexityMultipliers = { low: 0.7, medium: 1.0, high: 1.5 };
+      timeout = Math.round(this.config.defaultTimeout * complexityMultipliers[complexityHint]);
+    }
+    
+    // Ensure timeout is within bounds
+    timeout = Math.max(this.config.minTimeout, Math.min(timeout, this.config.maxTimeout));
+    
+    // Track this active request
+    this.activeRequests.set(requestId, {
+      startTime: Date.now(),
+      abortController,
+      requestType
+    });
+    
+    // Set up timeout to abort the request
+    setTimeout(() => {
+      if (this.activeRequests.has(requestId)) {
+        abortController.abort();
+        this.updateProfile(requestType, timeout, false); // Mark as failed due to timeout
+      }
+    }, timeout);
+    
+    return { abortController, timeout };
+  }
+
+  /**
+   * Mark a request as completed and update performance metrics
+   */
+  completeRequest(requestId: string): void {
+    const activeRequest = this.activeRequests.get(requestId);
+    if (activeRequest) {
+      const responseTime = Date.now() - activeRequest.startTime;
+      this.updateProfile(activeRequest.requestType, responseTime, true);
+      this.activeRequests.delete(requestId);
+    }
   }
 }
 

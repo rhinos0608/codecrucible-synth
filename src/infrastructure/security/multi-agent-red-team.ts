@@ -8,7 +8,7 @@
  * - Collaborative security analysis reduces false positives by 35%
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { InputSanitizer } from './input-sanitizer.js';
 import { EventEmitter } from 'events';
 

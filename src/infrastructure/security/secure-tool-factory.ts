@@ -1,5 +1,5 @@
-import { E2BService } from '../e2b/e2b-service.js';
-import { SecurityValidator } from '../e2b/security-validator.js';
+import { E2BService } from '../../core/e2b/e2b-service.js';
+import { SecurityValidator } from '../../core/e2b/security-validator.js';
 import { E2BCodeExecutionTool } from '../tools/e2b/e2b-code-execution-tool.js';
 import { E2BTerminalTool } from '../tools/e2b/e2b-terminal-tool.js';
 import { SecureTerminalExecuteTool } from '../tools/secure-terminal-tools.js';
@@ -13,7 +13,7 @@ import {
 } from './security-audit-logger.js';
 import { RBACSystem, AuthorizationContext } from './production-rbac-system.js';
 import { z } from 'zod';
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import crypto from 'crypto';
 
 /**

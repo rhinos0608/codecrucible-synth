@@ -8,7 +8,7 @@
  * - Graceful degradation strategies
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { ErrorCategory, ErrorSeverity, StructuredError, ErrorFactory } from './structured-error-system.js';
 import chalk from 'chalk';
 

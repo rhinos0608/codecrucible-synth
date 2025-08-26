@@ -5,7 +5,7 @@
  * Performance Impact: Provides 360° visibility into system performance
  */
 
-import { logger } from '../logger.js';
+import { logger } from '../logging/logger.js';
 import { requestBatcher } from './intelligent-request-batcher.js';
 import { responseCache } from './response-cache-manager.js';
 import { adaptiveTuner } from './adaptive-performance-tuner.js';

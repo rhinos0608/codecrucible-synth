@@ -3,10 +3,10 @@
  * Monitors system resources and actively terminates/switches processes when needed
  */
 
-import { Logger } from '../logger.js';
+import { Logger } from '../logging/logger.js';
 import { EventEmitter } from 'events';
 import { HardwareAwareModelSelector } from './hardware-aware-model-selector.js';
-import { UserWarningSystem } from '../monitoring/user-warning-system.js';
+import { UserWarningSystem } from '../../core/monitoring/user-warning-system.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import * as os from 'os';
 
@@ -51,6 +51,11 @@ export class ActiveProcessManager extends EventEmitter {
   private modelSwitchInProgress = false;
   private lastCriticalWarning = 0;
   private lastEmergencyWarning = 0;
+
+  // Compatibility properties for core interface
+  public config: any;
+  public processes = new Map<string, any>();
+  public processHandlers = new Map<string, AbortController>();
 
   constructor(hardwareSelector: HardwareAwareModelSelector) {
     super();
@@ -115,6 +120,116 @@ export class ActiveProcessManager extends EventEmitter {
       this.activeProcesses.delete(processId);
       this.logger.debug(`Unregistered process ${processId}`);
     }
+  }
+
+  /**
+   * Start a process with automatic resource management
+   * Compatible with core ActiveProcessManager interface
+   */
+  async startProcess(processName: string, handler: () => Promise<any>): Promise<string> {
+    const processConfig = {
+      type: processName,
+      modelName: 'unknown',
+      estimatedMemoryUsage: 50 * 1024 * 1024, // 50MB default
+      promise: handler(),
+      priority: 'medium' as const
+    };
+
+    const { id } = this.registerProcess(processConfig);
+    
+    try {
+      await processConfig.promise;
+    } catch (error) {
+      this.logger.warn(`Process ${id} failed:`, error);
+    } finally {
+      this.unregisterProcess(id);
+    }
+
+    return id;
+  }
+
+  /**
+   * Stop a running process
+   * Compatible with core ActiveProcessManager interface
+   */
+  async stopProcess(processId: string): Promise<boolean> {
+    const process = this.activeProcesses.get(processId);
+    if (!process) {
+      return false;
+    }
+
+    try {
+      process.abortController.abort();
+      this.unregisterProcess(processId);
+      this.logger.debug(`Stopped process ${processId}`);
+      return true;
+    } catch (error) {
+      this.logger.warn(`Failed to stop process ${processId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Pause process (compatibility method - not fully implemented for infrastructure layer)
+   */
+  async pauseProcess(processId: string): Promise<boolean> {
+    // Infrastructure layer doesn't support pause/resume, but return false to indicate unsupported
+    this.logger.warn(`Pause operation not supported for process ${processId} in infrastructure layer`);
+    return false;
+  }
+
+  /**
+   * Resume process (compatibility method - not fully implemented for infrastructure layer)
+   */
+  async resumeProcess(processId: string): Promise<boolean> {
+    // Infrastructure layer doesn't support pause/resume, but return false to indicate unsupported
+    this.logger.warn(`Resume operation not supported for process ${processId} in infrastructure layer`);
+    return false;
+  }
+
+  /**
+   * Get process information (compatibility method)
+   */
+  getProcessInfo(processId: string): any | null {
+    const process = this.activeProcesses.get(processId);
+    if (!process) {
+      return null;
+    }
+
+    return {
+      id: processId,
+      name: process.type,
+      startTime: process.startTime.getTime(),
+      status: 'running',
+      progress: 0, // Not tracked in infrastructure layer
+      priority: process.priority,
+      metadata: {
+        modelName: process.modelName,
+        estimatedMemoryUsage: process.estimatedMemoryUsage
+      }
+    };
+  }
+
+  /**
+   * Get all active processes (compatibility method)
+   */
+  getActiveProcesses(): any[] {
+    const processes = [];
+    for (const [id, process] of this.activeProcesses.entries()) {
+      processes.push({
+        id,
+        name: process.type,
+        startTime: process.startTime.getTime(),
+        status: 'running',
+        progress: 0,
+        priority: process.priority,
+        metadata: {
+          modelName: process.modelName,
+          estimatedMemoryUsage: process.estimatedMemoryUsage
+        }
+      });
+    }
+    return processes;
   }
 
   /**

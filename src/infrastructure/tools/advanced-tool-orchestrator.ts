@@ -13,7 +13,7 @@ import { RBACSystem } from '../security/production-rbac-system.js';
 import { SecurityAuditLogger } from '../security/security-audit-logger.js';
 import { SecretsManager } from '../security/secrets-manager.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
-import { getTelemetryProvider } from '../observability/observability-system.js';
+import { getTelemetryProvider } from '../../core/observability/observability-system.js';
 import { AIPoweredParameterGenerator, ParameterGenerationContext } from './ai-powered-parameter-generator.js';
 
 // AI SDK v5.0 Streaming Interfaces

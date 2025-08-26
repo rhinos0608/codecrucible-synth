@@ -3,7 +3,7 @@
  * Testing the enhanced enterprise logger system
  */
 
-import { Logger } from '../../../src/core/logger.js';
+import { Logger } from '../../../src/core/logger';
 import { join } from 'path';
 
 describe('Logger Enterprise System', () => {

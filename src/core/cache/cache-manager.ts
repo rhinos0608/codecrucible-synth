@@ -810,7 +810,6 @@ export class CacheManager extends EventEmitter {
    */
   private startCleanupTimer(): void {
     this.cleanupInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
       this.cleanup();
     }, this.config.checkInterval);
   }

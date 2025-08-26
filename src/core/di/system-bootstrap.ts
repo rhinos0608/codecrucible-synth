@@ -215,7 +215,7 @@ export class SystemBootstrap {
         return {
           providers: [
             { type: 'ollama', endpoint: 'http://localhost:11434', timeout: 30000 }, // 30s timeout - appropriate for local operations
-            { type: 'lm-studio', endpoint: 'http://localhost:1234', timeout: 30000 }, // 30s timeout - appropriate for local operations
+            { type: 'lm-studio', endpoint: 'ws://localhost:8080', timeout: 30000 }, // WebSocket endpoint for LM Studio SDK
           ],
           executionMode: 'auto',
           fallbackChain: ['ollama', 'lm-studio'],
@@ -300,15 +300,15 @@ export class SystemBootstrap {
         const config = container.resolve(CLIENT_CONFIG_TOKEN);
         const providerRepository = new ProviderRepository();
 
-        // Defer provider initialization until first use for faster startup
-        // The repository will initialize providers on-demand
-        providerRepository.setDeferredConfig(config.providers || []);
+        // Initialize providers immediately during bootstrap for reliable operation
+        // This ensures providers are available when needed for AI generation
+        await providerRepository.initialize(config.providers || []);
 
         return providerRepository;
       },
       {
         lifecycle: 'singleton',
-        lazy: true,
+        lazy: false, // Remove lazy loading to ensure immediate initialization
         dependencies: [CLIENT_CONFIG_TOKEN.name],
       }
     );
@@ -329,7 +329,7 @@ export class SystemBootstrap {
         // Create hybrid config without circular dependencies
         const hybridConfig = {
           lmStudio: {
-            endpoint: 'http://localhost:1234',
+            endpoint: 'ws://localhost:8080',
             enabled: true,
             models: ['codellama:7b-instruct', 'qwen2.5-coder:7b'],
             maxConcurrent: 2,

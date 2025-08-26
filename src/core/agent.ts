@@ -179,7 +179,7 @@ export class UnifiedAgent extends EventEmitter {
   /**
    * Execute agent request with intelligent routing
    */
-  async execute(request: ExecutionRequest, _context?: ProjectContext): Promise<ExecutionResponse> {
+  async execute(request: ExecutionRequest): Promise<ExecutionResponse> {
     const startTime = Date.now();
     const workflowId = this.generateWorkflowId();
 

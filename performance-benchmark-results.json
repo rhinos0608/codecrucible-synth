@@ -1,0 +1,30 @@
+{
+  "timestamp": "2025-08-26T00:06:09.936Z",
+  "tests": [
+    {
+      "name": "CLI Help",
+      "time": 940,
+      "unit": "ms"
+    },
+    {
+      "name": "CLI Version",
+      "time": 983,
+      "unit": "ms"
+    },
+    {
+      "name": "CLI Status",
+      "time": 944,
+      "unit": "ms"
+    },
+    {
+      "name": "Module Import",
+      "time": 878,
+      "unit": "ms"
+    },
+    {
+      "name": "File Operations",
+      "time": 10,
+      "unit": "ms"
+    }
+  ]
+}

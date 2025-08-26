@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logger } from '../core/logger.js';
 
 // DATABASE_URL and REDIS_URL are required except in 'test' environment.
 // First, parse NODE_ENV to determine environment
@@ -8,7 +9,7 @@ const NodeEnvSchema = z.object({
 
 const nodeEnvParsed = NodeEnvSchema.safeParse(process.env as Record<string, string | undefined>);
 if (!nodeEnvParsed.success) {
-  console.error("Invalid NODE_ENV configuration:", nodeEnvParsed.error.format());
+  logger.error("Invalid NODE_ENV configuration:", nodeEnvParsed.error.format());
   process.exit(1);
 }
 
@@ -46,7 +47,7 @@ const EnvSchema = z.object({
 
 const parsed = EnvSchema.safeParse(process.env as Record<string, string | undefined>);
 if (!parsed.success) {
-  console.error("Invalid environment configuration:", parsed.error.format());
+  logger.error("Invalid environment configuration:", parsed.error.format());
   process.exit(1);
 }
 

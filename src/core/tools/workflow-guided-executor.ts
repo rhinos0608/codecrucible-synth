@@ -293,9 +293,11 @@ export class WorkflowGuidedExecutor {
     // Filter tools to only those required for this step
     const requiredToolNames = step.requiredTools;
     const stepTools = allAvailableTools.filter(tool => {
-      const toolName = tool.function?.name || tool.name;
+      const toolName = tool.function?.name || tool.name || '';
+      const toolId = tool.id || '';
       return requiredToolNames.some(required => 
-        toolName.includes(required) || required.includes(toolName)
+        toolName.includes(required) || required.includes(toolName) ||
+        toolId.includes(required) || required.includes(toolId)
       );
     });
 

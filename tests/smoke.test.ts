@@ -89,9 +89,28 @@ describe('CodeCrucible Synth - Smoke Tests', () => {
   test('TypeScript configuration is valid', async () => {
     try {
       const fs = await import('fs/promises');
-      const tsConfig = JSON.parse(
-        await fs.readFile('tsconfig.json', 'utf-8')
-      );
+      // Read tsconfig.json and strip comments (TypeScript allows JSONC format)
+      const tsConfigContent = await fs.readFile('tsconfig.json', 'utf-8');
+      // Remove single-line comments (// ...) but preserve strings
+      const tsConfigClean = tsConfigContent
+        .split('\n')
+        .map(line => {
+          // Find comment start, but ignore if it's in a string
+          const commentStart = line.indexOf('//');
+          if (commentStart !== -1) {
+            // Simple check: if there's an odd number of quotes before //, it's inside a string
+            const beforeComment = line.substring(0, commentStart);
+            const quoteCount = (beforeComment.match(/"/g) || []).length;
+            if (quoteCount % 2 === 0) {
+              // Even number of quotes means we're not inside a string
+              return line.substring(0, commentStart).trim();
+            }
+          }
+          return line;
+        })
+        .join('\n');
+      
+      const tsConfig = JSON.parse(tsConfigClean);
       
       expect(tsConfig.compilerOptions).toBeDefined();
       expect(tsConfig.compilerOptions.target).toBe('ES2022');

@@ -7,29 +7,38 @@ import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals
 
 // Mock implementations for security components
 const mockSecurityValidation = {
-  validateInput: jest.fn((input: string) => ({
-    isValid: !input.includes('<script>'),
-    violations: input.includes('<script>') ? ['XSS_DETECTED'] : [],
-    sanitized: input.replace(/<script>/g, '')
-  })),
+  validateInput: (input: string | null) => {
+    if (!input) {
+      return {
+        isValid: true,
+        violations: [],
+        sanitized: input || ''
+      };
+    }
+    return {
+      isValid: !input.includes('<script>'),
+      violations: input.includes('<script>') ? ['XSS_DETECTED'] : [],
+      sanitized: input.replace(/<script>/g, '')
+    };
+  },
   
-  sanitizeFilePath: jest.fn((path: string) => {
+  sanitizeFilePath: (path: string) => {
     if (path.includes('..')) {
       throw new Error('Path traversal detected');
     }
     return path;
-  }),
+  },
   
-  validateCommand: jest.fn((command: string) => {
+  validateCommand: (command: string) => {
     const dangerousCommands = ['rm', 'del', 'format', 'sudo'];
     return !dangerousCommands.some(dangerous => command.includes(dangerous));
-  })
+  }
 };
 
 const mockJWTAuth = {
-  generateToken: jest.fn((payload: any) => `mock.jwt.token.${payload.userId}`),
+  generateToken: (payload: any) => `mock.jwt.token.${payload.userId}`,
   
-  validateToken: jest.fn((token: string) => {
+  validateToken: (token: string) => {
     if (token.startsWith('mock.jwt.token.')) {
       return {
         valid: true,
@@ -37,34 +46,32 @@ const mockJWTAuth = {
       };
     }
     return { valid: false, payload: null };
-  }),
+  },
   
-  refreshToken: jest.fn((token: string) => `refreshed.${token}`)
+  refreshToken: (token: string) => `refreshed.${token}`
 };
 
 const mockRBACEngine = {
-  hasPermission: jest.fn((userId: string, resource: string, action: string) => {
+  hasPermission: (userId: string, resource: string, action: string) => {
     if (userId === 'admin') return true;
     if (userId === 'user' && action === 'read') return true;
     return false;
-  }),
+  },
   
-  getUserRole: jest.fn((userId: string) => {
+  getUserRole: (userId: string) => {
     const roles = { admin: 'administrator', user: 'regular_user', guest: 'guest' };
     return roles[userId as keyof typeof roles] || 'guest';
-  }),
+  },
   
-  assignRole: jest.fn((userId: string, role: string) => {
+  assignRole: (userId: string, role: string) => {
     return { success: true, userId, role };
-  })
+  }
 };
 
 describe('Security Framework', () => {
   
   describe('Input Validation System', () => {
-    beforeEach(() => {
-      jest.clearAllMocks();
-    });
+    // No beforeEach needed for simple function mocks
 
     it('should detect XSS attempts', () => {
       const maliciousInput = '<script>alert("xss")</script>Hello';
@@ -237,13 +244,16 @@ describe('Security Framework', () => {
     });
 
     it('should implement rate limiting', () => {
+      const limits: Record<string, number> = {};
       const mockRateLimiter = {
-        isAllowed: jest.fn((userId: string) => {
-          const limits: Record<string, number> = {};
+        isAllowed: (userId: string) => {
           limits[userId] = (limits[userId] || 0) + 1;
           return limits[userId] <= 10; // Max 10 requests
-        }),
-        resetLimit: jest.fn((userId: string) => true)
+        },
+        resetLimit: (userId: string) => {
+          delete limits[userId];
+          return true;
+        }
       };
 
       // First 10 requests should be allowed
@@ -255,7 +265,7 @@ describe('Security Framework', () => {
       expect(mockRateLimiter.isAllowed('user1')).toBe(false);
       
       // Reset should allow new requests
-      mockRateLimiter.resetLimit('user1');
+      expect(mockRateLimiter.resetLimit('user1')).toBe(true);
       expect(mockRateLimiter.isAllowed('user1')).toBe(true);
     });
   });

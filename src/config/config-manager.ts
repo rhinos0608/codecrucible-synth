@@ -116,8 +116,9 @@ export class ConfigManager {
 
   static async getInstance(): Promise<ConfigManager> {
     if (!ConfigManager.instance) {
-      ConfigManager.instance = new ConfigManager();
-      await ConfigManager.instance.loadConfiguration();
+      const instance = new ConfigManager();
+      await instance.loadConfiguration();
+      ConfigManager.instance = instance;
     }
     return ConfigManager.instance;
   }
@@ -134,7 +135,7 @@ export class ConfigManager {
       this.config = YAML.parse(userConfigContent);
 
       // Decrypt sensitive fields
-      this.decryptSensitiveFields(this.config);
+      this.decryptSensitiveFields(this.config as AppConfig);
 
       logger.info('Loaded user configuration', { path: this.configPath });
     } catch (error) {
@@ -153,27 +154,31 @@ export class ConfigManager {
         await this.saveUserConfig();
       }
     }
+    
+    // At this point config should always be populated
+    if (!this.config) {
+      throw new Error('Failed to load configuration');
+    }
 
-    return this.config!;
+    return this.config;
   }
 
-  async set(key: string, value: any): Promise<void> {
-    // eslint-disable-line @typescript-eslint/no-explicit-any
+  async set(key: string, value: unknown): Promise<void> {
     if (!this.config) {
-      await this.loadConfiguration();
+      throw new Error('Configuration not loaded');
     }
 
     const keys = key.split('.');
-    let current: Record<string, any> = this.config as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    let current: Record<string, unknown> = this.config as unknown as Record<string, unknown>;
 
     // Navigate to parent object
     for (let i = 0; i < keys.length - 1; i++) {
-      const key = keys[i];
-      if (key && !current[key]) {
-        current[key] = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+      const currentKey = keys[i];
+      if (currentKey && !current[currentKey]) {
+        current[currentKey] = {};
       }
-      if (key) {
-        current = current[key]; // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (currentKey) {
+        current = current[currentKey] as Record<string, unknown>;
       }
     }
 
@@ -187,20 +192,19 @@ export class ConfigManager {
     logger.info(`Configuration updated: ${key} = ${JSON.stringify(value)}`);
   }
 
-  async get(key: string): Promise<any> {
-    // eslint-disable-line @typescript-eslint/no-explicit-any
+  async get(key: string): Promise<unknown> {
     if (!this.config) {
       await this.loadConfiguration();
     }
 
     const keys = key.split('.');
-    let current: Record<string, any> = this.config as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    let current: Record<string, unknown> = this.config as unknown as Record<string, unknown>;
 
     for (const k of keys) {
-      if (current[k] === undefined) {
+      if (current === null || current === undefined || typeof current !== 'object' || current[k] === undefined) {
         return undefined;
       }
-      current = current[k]; // eslint-disable-line @typescript-eslint/no-explicit-any
+      current = current[k] as Record<string, unknown>;
     }
 
     return current;
@@ -334,48 +338,20 @@ export class ConfigManager {
       },
       mcp: {
         servers: {
-          filesystem: {
-            enabled: true,
-            restrictedPaths: ['/etc', '/sys', '/proc'],
-            allowedPaths: ['~/', './'],
-          },
-          git: {
-            enabled: true,
-            autoCommitMessages: false,
-            safeModeEnabled: true,
-          },
-          terminal: {
-            enabled: true,
-            allowedCommands: ['ls', 'cat', 'grep', 'find', 'git', 'npm', 'node', 'python'],
-            blockedCommands: ['rm -rf', 'sudo', 'su', 'chmod +x'],
-          },
-          packageManager: {
-            enabled: true,
-            autoInstall: false,
-            securityScan: true,
-          },
-          smithery: {
-            enabled: false,
-            apiKey: '',
-            profile: '',
-            baseUrl: 'https://server.smithery.ai',
-          },
+          filesystem: { enabled: true, restrictedPaths: ['/etc', '/sys', '/proc'], allowedPaths: ['./'] },
+          git: { enabled: true, autoCommitMessages: true, safeModeEnabled: true },
+          terminal: { enabled: true, allowedCommands: ['ls', 'pwd', 'echo'], blockedCommands: ['rm', 'sudo'] },
+          packageManager: { enabled: true, autoInstall: false, securityScan: true },
+          smithery: { enabled: true, apiKey: '', profile: 'default', baseUrl: 'https://api.smithery.ai' },
         },
       },
       performance: {
-        responseCache: {
-          enabled: true,
-          maxAge: 3600000,
-          maxSize: 100,
-        },
-        voiceParallelism: {
-          maxConcurrent: 3,
-          batchSize: 2,
-        },
+        responseCache: { enabled: true, maxAge: 3600000, maxSize: 100 },
+        voiceParallelism: { maxConcurrent: 4, batchSize: 3 },
         contextManagement: {
-          maxContextLength: 100000,
-          compressionThreshold: 80000,
-          retentionStrategy: 'sliding',
+          maxContextLength: 16384,
+          compressionThreshold: 8192,
+          retentionStrategy: 'sliding-window',
         },
       },
       logging: {
@@ -390,7 +366,7 @@ export class ConfigManager {
   /**
    * Encrypt sensitive configuration fields
    */
-  private encryptSensitiveFields(config: any): void {
+  private encryptSensitiveFields(config: AppConfig): void {
     const sensitiveFields = [
       'mcp.servers.smithery.apiKey',
       'model.apiKey',
@@ -419,7 +395,7 @@ export class ConfigManager {
   /**
    * Decrypt sensitive configuration fields
    */
-  private decryptSensitiveFields(config: any): void {
+  private decryptSensitiveFields(config: AppConfig): void {
     const sensitiveFields = [
       'mcp.servers.smithery.apiKey',
       'model.apiKey',
@@ -444,21 +420,33 @@ export class ConfigManager {
   /**
    * Get nested value from object using dot notation
    */
-  private getNestedValue(obj: any, path: string): any {
-    return path.split('.').reduce((current, key) => current?.[key], obj);
+  private getNestedValue(obj: unknown, path: string): unknown {
+    return path.split('.').reduce((current, key) => {
+      if (current === null || current === undefined) {
+        return undefined;
+      }
+      return (current as Record<string, unknown>)[key];
+    }, obj);
   }
 
   /**
    * Set nested value in object using dot notation
    */
-  private setNestedValue(obj: any, path: string, value: any): void {
+  private setNestedValue(obj: unknown, path: string, value: unknown): void {
     const keys = path.split('.');
-    const lastKey = keys.pop()!;
-    const target = keys.reduce((current, key) => {
-      if (!current[key]) current[key] = {};
-      return current[key];
-    }, obj);
-    target[lastKey] = value;
+    const lastKey = keys.pop();
+    if (!lastKey) {
+      return;
+    }
+
+    let current = obj as Record<string, any>;
+    for (const key of keys) {
+      if (current[key] === undefined || current[key] === null) {
+        current[key] = {};
+      }
+      current = current[key];
+    }
+    current[lastKey] = value;
   }
 
   /**
@@ -479,23 +467,4 @@ export class ConfigManager {
   }
 }
 
-// Export singleton instance (consolidated from core/config.ts)
-// Note: Since getInstance is async, this needs to be awaited where used
-let configManagerInstance: ConfigManager | null = null;
-
-export const configManager = {
-  async getInstance(): Promise<ConfigManager> {
-    if (!configManagerInstance) {
-      configManagerInstance = await ConfigManager.getInstance();
-    }
-    return configManagerInstance;
-  },
-  async getAgentConfig(): Promise<AgentConfig> {
-    const instance = await this.getInstance();
-    return instance.getAgentConfig();
-  },
-  async updateAgentConfig(config: AgentConfig): Promise<void> {
-    const instance = await this.getInstance();
-    return instance.updateAgentConfig(config);
-  },
-};
+export const configManager = new ConfigManager();

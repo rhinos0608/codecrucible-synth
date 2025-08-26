@@ -3,7 +3,7 @@
  * Testing the enhanced enterprise logger with OpenTelemetry integration
  */
 
-import { Logger, logger } from '../../../src/core/logger.js';
+import { Logger, logger } from '../../../src/core/logger';
 import { join } from 'path';
 import { existsSync, unlinkSync, readFileSync } from 'fs';
 import { homedir } from 'os';

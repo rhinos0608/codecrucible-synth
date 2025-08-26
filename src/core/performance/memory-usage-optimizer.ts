@@ -91,7 +91,6 @@ export class MemoryUsageOptimizer {
    */
   private startMemoryMonitoring(): void {
     const monitoringInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
       this.performMemoryCheck();
     }, this.config.monitoringInterval);
 

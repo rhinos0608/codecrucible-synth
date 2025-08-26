@@ -692,6 +692,54 @@ REMEMBER: Assumptions and generic responses are NOT acceptable. Use tools to pro
       }
     }
 
+    // CRITICAL FIX: Intelligent fallback tool selection for unstructured responses
+    if (!selectedTool && availableTools.length > 0) {
+      logger.info('🔧 INTELLIGENT FALLBACK: No tool selected from structured response, using context-based selection', {
+        responseLength: response.length,
+        availableToolsCount: availableTools.length,
+        responsePreview: response.substring(0, 100) + '...'
+      });
+
+      // Context-based tool selection
+      const lowerResponse = response.toLowerCase();
+      const lowerThought = thought.toLowerCase();
+      const combinedContext = (lowerResponse + ' ' + lowerThought).toLowerCase();
+
+      // File reading patterns
+      if (combinedContext.includes('read') || combinedContext.includes('file') || combinedContext.includes('content') || 
+          combinedContext.includes('analyze') || combinedContext.includes('readme')) {
+        selectedTool = availableTools.find(tool => {
+          const toolName = (tool.function?.name || tool.name || tool.id || '').toLowerCase();
+          return toolName.includes('read') || toolName.includes('file') || toolName.includes('filesystem');
+        });
+        
+        if (selectedTool) {
+          logger.info('🎯 INTELLIGENT SELECTION: File reading tool selected based on context', {
+            selectedToolName: selectedTool.name || selectedTool.function?.name,
+            contextReason: 'Response contains file/read/content keywords'
+          });
+          
+          // Intelligent args based on context - extract file path if possible
+          const filePathMatch = response.match(/([A-Za-z]:\\[^\\/:*?"<>|\r\n]*\\[^\\/:*?"<>|\r\n]*\.[A-Za-z0-9]+)/);
+          if (filePathMatch) {
+            toolArgs = { path: filePathMatch[1] };
+            logger.info('🎯 EXTRACTED FILE PATH from response', { filePath: filePathMatch[1] });
+          } else {
+            toolArgs = {}; // Let tool handle default behavior
+          }
+        }
+      }
+      
+      // If still no tool selected, use first available as ultimate fallback
+      if (!selectedTool) {
+        selectedTool = availableTools[0];
+        toolArgs = {};
+        logger.info('🔧 ULTIMATE FALLBACK: Using first available tool', {
+          selectedToolName: selectedTool?.name || selectedTool?.function?.name
+        });
+      }
+    }
+
     return {
       thought: thought || `Continuing with step ${stepNumber} analysis...`,
       selectedTool,
@@ -1332,13 +1380,31 @@ While I may not have reached a definitive conclusion, the systematic analysis ab
           gatheredEvidence
         );
 
-        // Execute workflow step reasoning
+        // ULTRA-DEEP DEBUG: Execute workflow step reasoning
+        logger.info('🔍 ULTRA-DEBUG: About to call executeWorkflowStepReasoning', {
+          stepIndex: currentStepIndex,
+          stepAction: workflowStep.action,
+          toolsCount: stepTools.length,
+          toolNames: stepTools.map(t => t.name || t.function?.name || 'unnamed'),
+          promptLength: workflowPrompt.length,
+          modelClientAvailable: !!modelClient
+        });
+        
         const reasoningResult = await this.executeWorkflowStepReasoning(
           workflowPrompt,
           stepTools,
           modelClient,
           currentStepIndex + 1
         );
+        
+        logger.info('🔍 ULTRA-DEBUG: executeWorkflowStepReasoning returned', {
+          hasResult: !!reasoningResult,
+          hasSelectedTool: !!reasoningResult?.selectedTool,
+          selectedToolName: reasoningResult?.selectedTool?.name || reasoningResult?.selectedTool?.function?.name,
+          hasToolArgs: !!reasoningResult?.toolArgs,
+          thought: reasoningResult?.thought?.substring(0, 100) + '...',
+          confidence: reasoningResult?.confidence
+        });
 
         // Record reasoning step
         const thoughtStep: ReasoningStep = {
@@ -2690,29 +2756,73 @@ ${result}
     toolArgs?: any;
     confidence: number;
   }> {
+    logger.info('🔍 ULTRA-DEBUG: executeWorkflowStepReasoning ENTRY', {
+      stepNumber,
+      promptLength: workflowPrompt.length,
+      toolsCount: stepTools.length,
+      modelClientType: modelClient?.constructor?.name,
+      modelClientMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(modelClient || {}))
+    });
+
     try {
+      logger.info('🔍 ULTRA-DEBUG: About to call modelClient.generateText', {
+        temperature: 0.2,
+        maxTokens: 800,
+        toolsProvided: stepTools.length,
+        promptPreview: workflowPrompt.substring(0, 200) + '...'
+      });
+
       const response = await modelClient.generateText(workflowPrompt, {
         temperature: 0.2,
         maxTokens: 800,
-        tools: [] // No tools for reasoning step
+        tools: stepTools // CRITICAL FIX: Pass actual tools to AI model
+      });
+
+      logger.info('🔍 ULTRA-DEBUG: modelClient.generateText returned', {
+        responseType: typeof response,
+        hasResponse: !!response,
+        responsePreview: typeof response === 'string' ? response.substring(0, 100) + '...' : 'Non-string response'
       });
 
       const responseText = ResponseNormalizer.normalizeToString(response);
-      return this.parseEnhancedReasoningResponse(responseText, stepTools, stepNumber);
+      logger.info('🔍 ULTRA-DEBUG: Normalized response text', {
+        normalizedTextLength: responseText.length,
+        normalizedTextPreview: responseText.substring(0, 200) + '...'
+      });
+
+      const parsedResult = this.parseEnhancedReasoningResponse(responseText, stepTools, stepNumber);
+      logger.info('🔍 ULTRA-DEBUG: parseEnhancedReasoningResponse returned', {
+        hasSelectedTool: !!parsedResult.selectedTool,
+        selectedToolName: parsedResult.selectedTool?.name || parsedResult.selectedTool?.function?.name,
+        thoughtLength: parsedResult.thought?.length,
+        confidence: parsedResult.confidence
+      });
+
+      return parsedResult;
 
     } catch (error) {
-      logger.warn('Workflow step reasoning failed, using fallback', {
+      logger.error('🔍 ULTRA-DEBUG: Exception in executeWorkflowStepReasoning', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        step: stepNumber
+        errorStack: error instanceof Error ? error.stack : 'No stack trace',
+        step: stepNumber,
+        modelClientAvailable: !!modelClient,
+        toolsCount: stepTools.length
       });
 
       // Simple fallback - use first available tool
-      return {
+      const fallbackResult = {
         thought: `Step ${stepNumber}: Using fallback reasoning due to LLM error. Selecting first available tool.`,
         selectedTool: stepTools[0],
         toolArgs: {},
         confidence: 0.5
       };
+
+      logger.info('🔍 ULTRA-DEBUG: Using fallback result', {
+        fallbackSelectedTool: fallbackResult.selectedTool?.name,
+        fallbackThought: fallbackResult.thought
+      });
+
+      return fallbackResult;
     }
   }
 

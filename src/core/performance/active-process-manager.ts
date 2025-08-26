@@ -122,7 +122,6 @@ export class ActiveProcessManager extends EventEmitter {
    */
   private startResourceMonitoring(): void {
     const monitorInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
       try {
         this.checkResourcePressure();
       } catch (error) {

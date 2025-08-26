@@ -14,8 +14,12 @@ export function createDefaultUnifiedClientConfig(): UnifiedClientConfig {
   return {
     providers: [
       {
-        type: 'auto',
+        type: 'ollama',
         endpoint: 'http://localhost:11434',
+      },
+      {
+        type: 'lm-studio',
+        endpoint: 'ws://localhost:8080',
       },
     ],
     executionMode: 'auto' as const,

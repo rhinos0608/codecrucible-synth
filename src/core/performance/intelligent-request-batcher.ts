@@ -515,7 +515,6 @@ export class IntelligentRequestBatcher {
    */
   private startBatchProcessor(): void {
     const processorInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
       this.processPendingBatches();
     }, this.BATCH_TIMEOUT / 2);
 

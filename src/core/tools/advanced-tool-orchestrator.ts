@@ -1324,7 +1324,7 @@ class ErrorRecoveryManager {
 
 // Built-in Tool Implementations
 class FileReadTool implements Tool {
-  id = 'file_read';
+  id = 'filesystem_read_file';
   name = 'File Reader';
   description = 'Read content from files';
   category = ToolCategory.FILE_SYSTEM;
@@ -1371,7 +1371,7 @@ class FileReadTool implements Tool {
 }
 
 class FileWriteTool implements Tool {
-  id = 'file_write';
+  id = 'filesystem_write_file';
   name = 'File Writer';
   description = 'Write content to files';
   category = ToolCategory.FILE_SYSTEM;

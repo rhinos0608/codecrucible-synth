@@ -1266,15 +1266,29 @@ export class CLI implements REPLInterface {
       const mcpTools = await this.getMCPCompatibleTools();
       const toolsToUse = mcpTools.length > 0 ? mcpTools : availableTools;
 
-      logger.debug('🔧 Tools available for sequential execution', {
+      logger.info('🔧 Tools available for sequential execution', {
         mcpToolCount: mcpTools.length,
         localToolCount: availableTools.length,
-        usingMcp: mcpTools.length > 0
+        usingMcp: mcpTools.length > 0,
+        finalToolCount: toolsToUse.length,
+        toolNames: toolsToUse.map(t => t.name || t.function?.name || 'unnamed').slice(0, 3).join(', ')
       });
 
       if (toolsToUse.length === 0) {
-        logger.warn('⚠️ No tools available for sequential execution, falling back to voice system');
+        logger.error('❌ CRITICAL: No tools available for sequential execution despite local tools being initialized');
+        logger.error('🔍 Debug info:', {
+          mcpToolsFailure: mcpTools.length === 0,
+          localToolsFailure: availableTools.length === 0,
+          toolOrchestratorMethod: typeof this.toolOrchestrator.getAvailableTools
+        });
         return await this.fallbackToVoiceSystem(prompt, options);
+      }
+
+      // CRITICAL FIX: Ensure we're using local tools if MCP tools aren't available
+      if (mcpTools.length === 0 && availableTools.length > 0) {
+        logger.info('🔧 Using local tools as primary (MCP integration failed)', {
+          localToolsUsed: availableTools.map(t => t.name).join(', ')
+        });
       }
 
       // Setup streaming interface

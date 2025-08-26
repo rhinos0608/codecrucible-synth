@@ -79,7 +79,6 @@
     "dist",
     "build",
     "archive",
-    "tests",
     "**/*.test.ts",
     "**/*.spec.ts",
     "src/testing/**/*"

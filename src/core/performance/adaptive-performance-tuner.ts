@@ -164,7 +164,6 @@ export class AdaptivePerformanceTuner {
    */
   private startAdaptiveTuning(): void {
     const tuningInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
       this.performAdaptiveTuning();
     }, this.TUNING_INTERVAL);
 

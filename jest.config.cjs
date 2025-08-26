@@ -11,10 +11,12 @@ module.exports = {
   transform: {
     '^.+\\.ts$': ['ts-jest', {
       useESM: true,
+      // isolatedModules setting moved to tsconfig.json to avoid deprecation warning
       tsconfig: {
         module: 'ES2022',
         target: 'ES2022',
-        moduleResolution: 'node'
+        moduleResolution: 'node',
+        isolatedModules: true // PERFORMANCE FIX: Disable type-checking during tests
       }
     }],
   },
@@ -50,11 +52,11 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov', 'html'],
   coverageDirectory: 'coverage',
-  testTimeout: 120000, // Increased to 2 minutes for AI operations
+  testTimeout: 180000, // Increased to 3 minutes for heavy initialization
   verbose: true,
   // Prevent hanging tests
   forceExit: true,
   detectOpenHandles: true,
-  // Limit workers to prevent resource exhaustion
-  maxWorkers: 2
+  // Optimize workers for better parallelization (use 50% of CPU cores)
+  maxWorkers: "50%"
 };

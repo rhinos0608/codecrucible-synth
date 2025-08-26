@@ -17,7 +17,7 @@ import {
   isObject,
   isDefined,
   isNotNull
-} from '../../../src/core/types/global.types.js';
+} from '../../../src/core/types/global.types';
 
 describe('Enterprise Error Types', () => {
   describe('ApplicationError', () => {

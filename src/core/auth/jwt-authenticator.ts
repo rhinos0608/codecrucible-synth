@@ -21,6 +21,7 @@ export class JWTAuthenticator {
   private activeSessions = new Map<string, AuthSession>();
   private refreshTokens = new Map<string, RefreshTokenPayload>();
   private blacklistedTokens = new Set<string>();
+  private cleanupIntervalId: NodeJS.Timeout | null = null;
 
   constructor(config: AuthConfig) {
     this.config = {
@@ -30,8 +31,7 @@ export class JWTAuthenticator {
     };
 
     // Start cleanup interval for expired sessions
-    setInterval(() => this.cleanupExpiredSessions(), 60000); // Every minute
-    // TODO: Store interval ID and call clearInterval in cleanup
+    this.cleanupIntervalId = setInterval(() => this.cleanupExpiredSessions(), 60000); // Every minute
   }
 
   /**
@@ -361,6 +361,23 @@ export class JWTAuthenticator {
         });
       }
     };
+  }
+
+  /**
+   * Cleanup and destroy the authenticator
+   */
+  destroy(): void {
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+    }
+    
+    // Clear all session data
+    this.activeSessions.clear();
+    this.refreshTokens.clear();
+    this.blacklistedTokens.clear();
+    
+    logger.debug('JWTAuthenticator destroyed and resources cleaned up');
   }
 
   /**

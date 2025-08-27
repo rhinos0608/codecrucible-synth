@@ -52,6 +52,40 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov', 'html'],
   coverageDirectory: 'coverage',
+  // Enforce coverage thresholds to maintain code quality
+  coverageThreshold: {
+    global: {
+      lines: 70,
+      functions: 65,
+      branches: 60,
+      statements: 70
+    },
+    // Critical components require higher coverage
+    './src/core/security/': {
+      lines: 80,
+      functions: 75,
+      branches: 70,
+      statements: 80
+    },
+    './src/core/client.ts': {
+      lines: 80,
+      functions: 75,
+      branches: 70,
+      statements: 80
+    },
+    './src/core/agent.ts': {
+      lines: 80,
+      functions: 75,
+      branches: 70,
+      statements: 80
+    },
+    './src/core/cli.ts': {
+      lines: 75,
+      functions: 70,
+      branches: 65,
+      statements: 75
+    }
+  },
   testTimeout: 180000, // Increased to 3 minutes for heavy initialization
   verbose: true,
   // Prevent hanging tests

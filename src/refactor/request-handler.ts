@@ -460,8 +460,32 @@ export class RequestHandler {
         streamed: true,
       };
 
-      // Cache the successful streaming response (temporarily disabled due to TS error)
-      // TODO: Fix cache metadata structure and re-enable caching
+      // Cache the successful streaming response with proper metadata structure
+      if (this.client.getCacheCoordinator().shouldUseIntelligentCache(request)) {
+        const cacheMetadata = {
+          cachedAt: Date.now(),
+          requestType: 'streaming',
+          hitCount: 0,
+        };
+        
+        const cacheOptions = {
+          ttl: this.client.getCacheCoordinator().getIntelligentTTL(request),
+          metadata: cacheMetadata,
+        };
+        
+        // Cache the streaming response for future hits
+        this.client.getCacheCoordinator().set(
+          this.client.getCacheCoordinator().generateIntelligentCacheKey(request),
+          fullResponse,
+          cacheOptions
+        );
+        
+        logger.debug('Streaming response cached with metadata', {
+          requestId,
+          cacheKey: this.client.getCacheCoordinator().generateIntelligentCacheKey(request),
+          ttl: cacheOptions.ttl,
+        });
+      }
 
       // Stop successful process
       await this.client.getProcessManager().stopProcess(processId);

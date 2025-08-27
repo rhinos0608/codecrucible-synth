@@ -22,6 +22,7 @@ import { InputSanitizer } from '../../infrastructure/security/input-sanitizer.js
 import { BootstrapErrorSystem, BootstrapPhase, BootstrapErrorType } from '../../infrastructure/error-handling/bootstrap-error-system.js';
 import { TimeoutManager, TimeoutLevel } from '../../infrastructure/error-handling/timeout-manager.js';
 import { CircuitBreakerManager } from '../../infrastructure/error-handling/circuit-breaker-system.js';
+import { IntelligentRejectionHandler } from '../../core/error-handling/intelligent-rejection-handler.js';
 
 // Enhanced System Integration
 import { getEnhancedSystem, createEnhancedRequest, EnhancedSystemInstance } from '../../core/integration/enhanced-system-factory.js';
@@ -382,20 +383,43 @@ export class CLI extends EventEmitter implements REPLInterface {
       process.exit(1);
     });
 
-    // Cleanup on unhandled promise rejections - TEMPORARILY DISABLED FOR DEBUGGING
-    process.on('unhandledRejection', async (reason, promise) => {
-      console.error('🚨 UNHANDLED REJECTION DETECTED:');
-      console.error('Promise:', promise);
-      console.error('Reason:', reason);
-      console.error('Stack:', reason instanceof Error ? reason.stack : 'No stack trace');
-      // DON'T EXIT - just log for now
-      // try {
-      //   await this.destroy();
-      // } catch (cleanupError) {
-      //   console.error('Cleanup error:', cleanupError);
-      // }
-      // process.exit(1);
+    // Intelligent Promise Rejection Handler - PRODUCTION READY
+    const rejectionHandler = new IntelligentRejectionHandler();
+    
+    // Set up event listeners for monitoring and cleanup
+    rejectionHandler.on('system:shutdown', async (context) => {
+      console.log('🛑 System shutdown requested by rejection handler');
+      try {
+        await this.destroy();
+      } catch (cleanupError) {
+        console.error('Cleanup error during shutdown:', cleanupError);
+      }
     });
+    
+    rejectionHandler.on('system:emergency', () => {
+      console.log('💀 Emergency shutdown - minimal cleanup');
+      this.syncCleanup();
+    });
+    
+    rejectionHandler.on('component:degraded', ({ component, reason }) => {
+      console.warn(`⚠️ Component ${component} degraded due to ${reason}`);
+      // Could implement specific component shutdown logic here
+    });
+    
+    rejectionHandler.on('rejection', (context) => {
+      // Optional: Send rejection data to monitoring system
+      if (this.contextAwareCLI && typeof (this.contextAwareCLI as any).reportRejection === 'function') {
+        (this.contextAwareCLI as any).reportRejection(context);
+      }
+    });
+    
+    // Global unhandled rejection handler with intelligent categorization
+    process.on('unhandledRejection', async (reason, promise) => {
+      await rejectionHandler.handleRejection(reason, promise);
+    });
+    
+    // Store reference for cleanup and health monitoring
+    (this as any).rejectionHandler = rejectionHandler;
   }
 
   /**
@@ -1135,7 +1159,13 @@ export class CLI extends EventEmitter implements REPLInterface {
         break;
       case 'exit':
         console.log(chalk.yellow('👋 Goodbye!'));
-        process.exit(0);
+        try {
+          await this.shutdown();
+        } catch (shutdownError) {
+          console.error('Error during shutdown:', shutdownError);
+        } finally {
+          process.exit(0);
+        }
       // break; // Removed - unreachable after process.exit()
       default:
         // Check if it's a model switch command
@@ -1294,8 +1324,12 @@ export class CLI extends EventEmitter implements REPLInterface {
               // Test model provider connections and register with connection pool
               const modelClient = this.context.modelClient;
               if (modelClient) {
-                // TODO: Implement getCapabilities method in UnifiedModelClient
-                logger.debug('Model client available, capabilities check skipped');
+                const capabilities = await modelClient.getCapabilities();
+                logger.debug('Model client capabilities:', {
+                  supportedModels: capabilities.modelCapabilities.supportedModels.length,
+                  providers: capabilities.providerCapabilities.length,
+                  initialized: capabilities.systemInfo.initialized
+                });
                 
                 // Register available providers with the connection pool
                 this.registerProvidersWithConnectionPool(modelClient);
@@ -1534,6 +1568,13 @@ export class CLI extends EventEmitter implements REPLInterface {
    */
   async destroy(): Promise<void> {
     try {
+      // Clean up rejection handler first
+      if ((this as any).rejectionHandler) {
+        const handler = (this as any).rejectionHandler;
+        handler.removeAllListeners();
+        logger.info('✅ Rejection handler cleaned up');
+      }
+
       if (this.contextAwareCLI) {
         await (this.contextAwareCLI as any).destroy?.();
       }

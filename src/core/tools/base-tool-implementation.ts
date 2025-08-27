@@ -3,6 +3,8 @@
  * Common base class for all tool implementations
  */
 
+import { getConfig } from '../config/env-config.js';
+
 export interface ToolContext {
   sessionId?: string;
   userId?: string;
@@ -35,7 +37,7 @@ export abstract class BaseToolImplementation {
     requiresAuth: false,
     requiresNetwork: false,
     canCache: true,
-    maxExecutionTime: 30000, // 30 seconds
+    maxExecutionTime: getConfig().toolExecutionTimeout,
     supportedFormats: ['text/plain']
   };
 

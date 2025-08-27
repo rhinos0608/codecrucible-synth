@@ -4,9 +4,9 @@
  */
 
 import { AIPoweredParameterGenerator } from './dist/core/tools/ai-powered-parameter-generator.js';
-import { DomainAwareToolOrchestrator } from './dist/core/tools/domain-aware-tool-orchestrator.js';
-import { AdvancedToolOrchestrator } from './dist/core/tools/advanced-tool-orchestrator.js';
-import { MCPServerManager } from './dist/mcp-servers/mcp-server-manager.js';
+import { DomainAwareToolOrchestrator } from '../dist/core/tools/domain-aware-tool-orchestrator.js';
+import { AdvancedToolOrchestrator } from '../dist/core/tools/advanced-tool-orchestrator.js';
+import { MCPServerManager } from '../dist/mcp-servers/mcp-server-manager.js';
 import { initializeGlobalToolIntegration } from './dist/core/tools/tool-integration.js';
 import { initializeGlobalEnhancedToolIntegration } from './dist/core/tools/enhanced-tool-integration.js';
 

@@ -41,8 +41,18 @@ export class ModernInputSanitizer {
     prompt: string,
     context: Partial<SecurityContext> = {}
   ): Promise<SanitizationResult> {
+    // Handle null/undefined inputs
+    if (prompt === null || prompt === undefined) {
+      return {
+        sanitized: '',
+        isValid: false,
+        violations: ['Input cannot be null or undefined'],
+        originalCommand: String(prompt),
+      };
+    }
+
     const violations: string[] = [];
-    let sanitized = prompt.trim();
+    let sanitized = String(prompt).trim();
 
     // Basic cleanup - remove only truly dangerous characters
     sanitized = this.basicCleanup(sanitized);

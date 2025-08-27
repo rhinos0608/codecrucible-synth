@@ -5,6 +5,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getConfig } from './config/env-config.js';
 
 const execAsync = promisify(exec);
 
@@ -114,7 +115,7 @@ export class AutoSetup {
   private async checkLMStudio(): Promise<boolean> {
     try {
       // Check if LM Studio is running by trying to connect to default port
-      const response = await fetch('http://localhost:1234/v1/models', {
+      const response = await fetch(`${getConfig().lmStudioEndpoint}/v1/models`, {
         method: 'GET',
         signal: AbortSignal.timeout(2000),
       });

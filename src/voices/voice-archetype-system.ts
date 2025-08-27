@@ -3,14 +3,14 @@ import {
   CouncilDecisionEngine,
   CouncilMode,
   CouncilConfig,
-} from '../core/collaboration/council-decision-engine';
-import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice-prompts';
-import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-builder';
-import { getErrorMessage } from '../utils/error-utils';
+} from '../core/collaboration/council-decision-engine.js';
+import { EnterpriseVoicePromptBuilder, RuntimeContext } from './enterprise-voice-prompts.js';
+import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-builder.js';
+import { getErrorMessage } from '../utils/error-utils.js';
 import { accessSync } from 'fs';
 import { execSync } from 'child_process';
-import { LivingSpiralCoordinator } from '../domain/services/living-spiral-coordinator';
-import { logger } from '../infrastructure/logging/logger';
+import { LivingSpiralCoordinator } from '../domain/services/living-spiral-coordinator.js';
+import { logger } from '../infrastructure/logging/logger.js';
 
 interface Voice {
   id: string;
@@ -32,13 +32,180 @@ interface VoiceConfig {
 
 import { VoiceArchetypeSystemInterface } from '../refactor/voice-archetype-system-interface';
 
+/**
+ * VoiceArchetypeSystem - Multi-Voice AI Synthesis Engine
+ * 
+ * Following Living Spiral Methodology - Council-Driven Development Implementation:
+ * This system embodies the core philosophy of the Coding Grimoire by orchestrating
+ * multiple AI voice archetypes that collaborate through structured council processes.
+ * 
+ * **Council Voice Archetypes:**
+ * - **Explorer**: Innovation-focused, creative problem-solving, discovers new approaches
+ * - **Maintainer**: Stability-focused, reliability guardian, ensures code quality
+ * - **Analyzer**: Data-driven analysis, performance optimization, metric evaluation
+ * - **Security**: Security-first perspective, vulnerability assessment, threat modeling
+ * - **Architect**: System design focus, structural integrity, scalability planning
+ * - **Developer**: Implementation-focused, practical solutions, coding best practices
+ * - **Designer**: User experience focus, interface design, accessibility considerations
+ * - **Guardian**: Quality gates enforcement, standards compliance, risk assessment
+ * - **Optimizer**: Performance engineering, resource efficiency, bottleneck resolution
+ * - **Implementor**: Execution specialist, deployment focus, operational excellence
+ * 
+ * **Core Synthesis Capabilities:**
+ * - **Multi-Perspective Analysis**: Each voice provides specialized expertise
+ * - **Consensus Building**: Democratic decision-making through council voting
+ * - **Conflict Resolution**: Systematic resolution of conflicting recommendations
+ * - **Living Spiral Integration**: Iterative refinement through spiral phases
+ * - **Context-Aware Prompting**: Dynamic prompt generation based on project context
+ * - **Performance Analytics**: Real-time voice performance tracking and optimization
+ * 
+ * **Synthesis Workflow:**
+ * 1. **Voice Selection**: Intelligent selection of relevant voices for the task
+ * 2. **Context Building**: Enriched context creation with project intelligence
+ * 3. **Parallel Processing**: Concurrent voice processing for efficiency
+ * 4. **Council Deliberation**: Structured debate and consensus building
+ * 5. **Synthesis Generation**: Unified output creation from multiple perspectives
+ * 6. **Quality Validation**: Multi-voice quality assessment and refinement
+ * 
+ * **Performance Characteristics:**
+ * - Voice Processing: 2-10 concurrent voices depending on complexity
+ * - Response Time: 3-15 seconds for multi-voice synthesis
+ * - Memory Efficiency: Optimized prompt caching and context reuse
+ * - Scalability: Horizontal scaling through parallel voice processing
+ * 
+ * **Enterprise Features:**
+ * - **Voice Performance Analytics**: Track individual voice contribution quality
+ * - **Dynamic Voice Selection**: AI-driven selection based on task requirements
+ * - **Council Configuration**: Customizable council sizes and voting mechanisms
+ * - **Synthesis Quality Scoring**: Automated quality assessment of synthesis results
+ * - **Voice Prompt Optimization**: Continuous improvement of voice prompts
+ * 
+ * @example Basic Multi-Voice Synthesis
+ * ```typescript
+ * const voiceSystem = new VoiceArchetypeSystem(modelClient, {
+ *   voices: {
+ *     default: ['explorer', 'maintainer', 'analyzer'],
+ *     available: allVoiceTypes,
+ *     parallel: true,
+ *     maxConcurrent: 5
+ *   }
+ * });
+ * 
+ * const result = await voiceSystem.synthesizeResponse({
+ *   prompt: "How should we implement user authentication?",
+ *   context: projectContext,
+ *   requiredVoices: ['security', 'architect', 'developer'],
+ *   councilMode: 'consensus'
+ * });
+ * 
+ * console.log(`Synthesis from ${result.voicesUsed.length} voices`);
+ * console.log(`Consensus score: ${result.consensusScore}%`);
+ * ```
+ * 
+ * @example Advanced Council Configuration
+ * ```typescript
+ * const voiceSystem = new VoiceArchetypeSystem(modelClient);
+ * 
+ * // Configure specialized council for security review
+ * const securityCouncil = await voiceSystem.createCouncil({
+ *   voices: ['security', 'architect', 'guardian'],
+ *   decisionThreshold: 0.8,
+ *   maxIterations: 3,
+ *   requireUnanimous: true
+ * });
+ * 
+ * const securityAnalysis = await securityCouncil.deliberate({
+ *   topic: "API security implementation",
+ *   context: codebaseContext,
+ *   deliverable: "security_recommendations"
+ * });
+ * ```
+ * 
+ * @example Living Spiral Integration
+ * ```typescript
+ * const voiceSystem = new VoiceArchetypeSystem(modelClient);
+ * 
+ * // Integrate with Living Spiral for iterative development
+ * const spiralResult = await voiceSystem.processLivingSpiralPhase({
+ *   phase: 'synthesis',
+ *   previousPhases: ['collapse', 'council'],
+ *   context: enhancedContext,
+ *   targetQuality: 0.9,
+ *   maxIterations: 5
+ * });
+ * 
+ * if (spiralResult.converged) {
+ *   console.log('Living Spiral converged successfully');
+ *   console.log(`Quality score: ${spiralResult.qualityScore}`);
+ * }
+ * ```
+ * 
+ * **Quality Assurance:**
+ * - **Multi-Voice Validation**: Cross-validation between voice perspectives
+ * - **Consistency Checking**: Ensures synthesis coherence and logical flow
+ * - **Performance Monitoring**: Tracks voice response quality over time
+ * - **Bias Mitigation**: Balances different voice perspectives to reduce bias
+ * 
+ * **Security & Privacy:**
+ * - **Context Isolation**: Each voice processes context independently
+ * - **Prompt Sanitization**: Input validation and sanitization for all voices
+ * - **Response Filtering**: Output validation and sensitive content filtering
+ * - **Audit Logging**: Complete audit trail of voice interactions and decisions
+ * 
+ * @since 3.0.0
+ * @implements {VoiceArchetypeSystemInterface}
+ * 
+ * @fires VoiceArchetypeSystem#voice-selected
+ * @fires VoiceArchetypeSystem#synthesis-started
+ * @fires VoiceArchetypeSystem#council-deliberation
+ * @fires VoiceArchetypeSystem#synthesis-completed
+ * @fires VoiceArchetypeSystem#quality-assessment
+ * @fires VoiceArchetypeSystem#convergence-achieved
+ */
 export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
+  /** Registry of available voice archetypes with their specialized configurations */
   private voices: Map<string, Voice> = new Map();
+  
+  /** Living Spiral coordinator for iterative refinement and quality convergence */
   private livingSpiralCoordinator: LivingSpiralCoordinatorInterface;
+  
+  /** Council decision engine for democratic consensus building and conflict resolution */
   private councilEngine: CouncilDecisionEngine;
+  
+  /** System configuration for voice selection, parallelization, and council behavior */
   private config: VoiceConfig;
+  
+  /** Model client for LLM interactions and response generation */
   private modelClient: any;
 
+  /**
+   * Creates a new VoiceArchetypeSystem instance
+   * 
+   * Initializes the multi-voice synthesis engine with:
+   * - Voice archetype registry with specialized prompts and configurations
+   * - Council decision engine for democratic consensus building
+   * - Living Spiral coordinator for iterative quality improvement
+   * - Performance analytics and voice optimization systems
+   * 
+   * @param modelClient - LLM client for voice response generation
+   * @param config - Voice system configuration with council and parallelization settings
+   * 
+   * @example
+   * ```typescript
+   * // Basic initialization with default voices
+   * const voiceSystem = new VoiceArchetypeSystem(modelClient);
+   * 
+   * // Advanced configuration with custom council
+   * const advancedSystem = new VoiceArchetypeSystem(modelClient, {
+   *   voices: {
+   *     default: ['explorer', 'maintainer', 'security'],
+   *     available: allVoiceTypes,
+   *     parallel: true,
+   *     maxConcurrent: 8
+   *   }
+   * });
+   * ```
+   */
   constructor(modelClient?: any, config?: VoiceConfig) {
     this.modelClient = modelClient;
     this.config = config || {

@@ -5,7 +5,7 @@
 
 import { getGlobalEnhancedToolIntegration, initializeGlobalEnhancedToolIntegration } from './dist/core/tools/enhanced-tool-integration.js';
 import { getGlobalToolIntegration, initializeGlobalToolIntegration } from './dist/core/tools/tool-integration.js';
-import { MCPServerManager } from './dist/mcp-servers/mcp-server-manager.js';
+import { MCPServerManager } from '../dist/mcp-servers/mcp-server-manager.js';
 
 console.log('🔧 Testing MCP Integration and Tool Availability');
 console.log('===============================================\n');

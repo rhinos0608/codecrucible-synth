@@ -2,12 +2,12 @@
 # Local offline AI coding assistant with gpt-oss-20b
 
 model:
-  endpoint: "http://localhost:11434"  # Ollama default endpoint
+  endpoint: "${OLLAMA_ENDPOINT:http://localhost:11434}"  # Configurable Ollama endpoint
   name: "llama3.2:latest"             # Use llama3.2 as default
-  timeout: 300000                     # 5 minutes for large codebase processing
-  maxTokens: 128000                   # Dynamic 32-128K based on task complexity
+  timeout: "${OLLAMA_TIMEOUT:300000}" # 5 minutes for large codebase processing (configurable)
+  maxTokens: "${MODEL_MAX_TOKENS:128000}"    # Dynamic token limit (configurable)
   minTokens: 32000                    # Minimum context for simple tasks
-  temperature: 0.7
+  temperature: "${MODEL_TEMPERATURE:0.7}"    # Model temperature (configurable)
   contextWindow: "adaptive"           # adaptive scaling 32K-128K based on complexity
   streamingEnabled: true              # Enable streaming for large responses
   keepAlive: "15m"                    # Keep models loaded for better performance
@@ -90,15 +90,15 @@ mcp:
 performance:
   responseCache:
     enabled: true
-    maxAge: 3600000                   # 1 hour in milliseconds
-    maxSize: 100                      # 100MB
+    maxAge: "${CACHE_TTL:3600000}"    # 1 hour in milliseconds (configurable)
+    maxSize: "${RESPONSE_CACHE_SIZE:100}"  # Cache size in MB (configurable)
   
   voiceParallelism:
-    maxConcurrent: 3
+    maxConcurrent: "${MAX_CONCURRENT_REQUESTS:3}"
     batchSize: 2
   
   contextManagement:
-    maxContextLength: 128000          # Dynamic 32-128K for local models
+    maxContextLength: "${MODEL_MAX_TOKENS:128000}"  # Dynamic token limit (configurable)
     minContextLength: 32000           # Minimum context for simple tasks
     compressionThreshold: 96000       # 75% of max before compression
     retentionStrategy: "hierarchical" # hierarchical for codebase context
@@ -108,7 +108,7 @@ performance:
     taskComplexityThresholds:         # Define when to scale context
       simple: 32000                   # Single file edits
       moderate: 64000                 # Multi-file analysis
-      complex: 128000                 # Large codebase operations
+      complex: "${MODEL_MAX_TOKENS:128000}"  # Large codebase operations (configurable)
 
 # E2B Code Interpreter Configuration - SECURITY CRITICAL
 e2b:

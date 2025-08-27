@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import { promises as fs } from 'fs';
 import { glob } from 'glob';
+import { getConfig } from './config/env-config.js';
 import { logger } from './logger.js';
 
 interface MemoryUsage {
@@ -62,6 +63,7 @@ interface MemoryAnalysis {
 export class MemoryLeakDetector extends EventEmitter {
   private memoryHistory: MemoryUsage[] = [];
   private intervals: NodeJS.Timeout[] = [];
+  private timeouts: NodeJS.Timeout[] = [];
   private eventListeners: Map<string, number> = new Map();
   private cacheGrowthTracking: Map<string, { size: number; timestamp: number }> = new Map();
   private performanceData: Map<string, number[]> = new Map();
@@ -117,7 +119,6 @@ export class MemoryLeakDetector extends EventEmitter {
     this.isMonitoring = true;
 
     const interval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
       const usage = process.memoryUsage();
       this.memoryHistory.push(usage);
 
@@ -132,10 +133,12 @@ export class MemoryLeakDetector extends EventEmitter {
 
     this.intervals.push(interval);
 
-    // Cleanup after 5 minutes
-    setTimeout(() => {
+    // Cleanup after configured timeout
+    const timeout = setTimeout(() => {
       this.stopMemoryMonitoring();
-    }, 300000);
+    }, getConfig().memoryMonitoringTimeout);
+    
+    this.timeouts.push(timeout);
   }
 
   /**
@@ -147,8 +150,13 @@ export class MemoryLeakDetector extends EventEmitter {
     for (const interval of this.intervals) {
       clearInterval(interval);
     }
+    
+    for (const timeout of this.timeouts) {
+      clearTimeout(timeout);
+    }
 
     this.intervals = [];
+    this.timeouts = [];
   }
 
   /**
@@ -170,7 +178,7 @@ export class MemoryLeakDetector extends EventEmitter {
 
       // Throttle memory spike warnings to prevent spam
       const now = Date.now();
-      if (now - this.lastMemorySpikeWarning > 30000) {
+      if (now - this.lastMemorySpikeWarning > getConfig().requestTimeout) {
         // 30 seconds between warnings
         logger.warn(`🚨 Memory spike detected: +${Math.round(heapGrowth / 1024 / 1024)}MB`);
         this.lastMemorySpikeWarning = now;
@@ -845,7 +853,11 @@ if (typeof require !== 'undefined' && require.main === module) {
     })
     .catch(error => {
       console.error('Memory leak detection failed:', error);
-      detector.dispose();
+      try {
+        detector.dispose();
+      } catch (disposeError) {
+        console.error('Error during cleanup:', disposeError);
+      }
       process.exit(1);
     });
 }

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { logger } from '../core/logger.js';
+import { getConfig } from '../core/config/env-config.js';
 import {
   ProjectContext,
   ModelRequest,
@@ -98,7 +99,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.configurationManager =
       injectedDependencies?.configurationManager || new ConfigurationManager();
     this.config = {
-      endpoint: 'http://localhost:11434',
+      endpoint: getConfig().ollamaEndpoint,
       ...this.getDefaultConfig(),
       ...config,
     };
@@ -194,9 +195,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       injectedDependencies?.modelManagementManager ||
       new ModelManagementManager(
         {
-          endpoint: this.config.endpoint || 'http://localhost:11434',
+          endpoint: this.config.endpoint || getConfig().ollamaEndpoint,
           defaultModel: 'llama2',
-          requestTimeoutMs: this.config.performanceThresholds?.timeoutMs || 30000,
+          requestTimeoutMs: this.config.performanceThresholds?.timeoutMs || getConfig().requestTimeout,
         },
         this.makeRequest.bind(this),
         this.generate.bind(this)
@@ -335,6 +336,135 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return this.modelManagementManager.getAllAvailableModels();
   }
 
+  /**
+   * Get comprehensive model and provider capabilities for hybrid routing
+   * Following Living Spiral methodology - enables intelligent model selection
+   */
+  async getCapabilities(): Promise<{
+    modelCapabilities: {
+      maxTokens: number;
+      supportedModels: string[];
+      features: string[];
+      rateLimit?: number;
+    };
+    providerCapabilities: Array<{
+      provider: string;
+      available: boolean;
+      models: string[];
+      preferredModels: string[];
+      strengths: string[];
+      responseTime: string;
+    }>;
+    systemInfo: {
+      initialized: boolean;
+      healthStatus: Record<string, boolean>;
+      currentModel: string | null;
+    };
+  }> {
+    try {
+      // Get all available providers
+      const providers = this.providerManager.getProviders();
+      const providerCapabilities = [];
+
+      for (const [providerType, provider] of providers) {
+        // Get provider status directly from provider if available
+        const status = provider?.getStatus ? await provider.getStatus() : null;
+        providerCapabilities.push({
+          provider: providerType,
+          available: status?.isHealthy ?? true,
+          models: status?.models ?? [],
+          preferredModels: this.getPreferredModelsForProvider(providerType),
+          strengths: this.getProviderStrengths(providerType),
+          responseTime: status?.isHealthy ? 'normal' : 'degraded',
+        });
+      }
+
+      // Get system-wide model capabilities
+      const allModels = await this.getAllAvailableModels();
+      const modelCapabilities = {
+        maxTokens: this.getMaxTokensSupported(),
+        supportedModels: allModels.map(m => m.name || m.id || String(m)),
+        features: this.getSupportedFeatures(),
+        rateLimit: this.config?.rateLimit,
+      };
+
+      // Get current system health
+      const healthStatus = await this.healthCheck();
+
+      return {
+        modelCapabilities,
+        providerCapabilities,
+        systemInfo: {
+          initialized: this.initialized,
+          healthStatus,
+          currentModel: this.currentModel,
+        },
+      };
+    } catch (error) {
+      logger.error('Failed to get capabilities:', error);
+      // Return minimal capabilities even on error
+      return {
+        modelCapabilities: {
+          maxTokens: 4096, // Default fallback
+          supportedModels: [],
+          features: ['text-generation'],
+        },
+        providerCapabilities: [],
+        systemInfo: {
+          initialized: this.initialized,
+          healthStatus: {},
+          currentModel: this.currentModel,
+        },
+      };
+    }
+  }
+
+  /**
+   * Get preferred models for a specific provider type
+   */
+  private getPreferredModelsForProvider(providerType: string): string[] {
+    const preferences: Record<string, string[]> = {
+      'ollama': ['qwen2.5-coder:7b', 'deepseek-coder:6.7b', 'llama3.1:8b'],
+      'lm-studio': ['qwen2.5-coder', 'deepseek-coder', 'codestral'],
+      'huggingface': ['codellama/CodeLlama-7b-hf', 'microsoft/DialoGPT-medium'],
+    };
+    return preferences[providerType] || [];
+  }
+
+  /**
+   * Get strengths for a specific provider type
+   */
+  private getProviderStrengths(providerType: string): string[] {
+    const strengths: Record<string, string[]> = {
+      'ollama': ['local-inference', 'privacy', 'code-generation'],
+      'lm-studio': ['local-inference', 'fast-response', 'model-variety'],
+      'huggingface': ['cloud-models', 'specialized-models', 'research-models'],
+    };
+    return strengths[providerType] || [];
+  }
+
+  /**
+   * Get maximum tokens supported across all providers
+   */
+  private getMaxTokensSupported(): number {
+    return this.config?.maxTokens || 32768; // Default to 32k context
+  }
+
+  /**
+   * Get supported features across the system
+   */
+  private getSupportedFeatures(): string[] {
+    return [
+      'text-generation',
+      'code-generation',
+      'streaming',
+      'multi-provider',
+      'hybrid-routing',
+      'voice-synthesis',
+      'tool-integration',
+    ];
+  }
+
   async generate(request: ModelRequest): Promise<ModelResponse> {
     return this.processRequest(request);
   }
@@ -449,7 +579,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     const strategy = {
       mode: 'balanced',
       provider: 'ollama',
-      timeout: 30000,
+      timeout: getConfig().requestTimeout,
       complexity: complexity.level,
     };
 
@@ -533,14 +663,14 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       providers: [
         {
           type: 'auto',
-          endpoint: 'http://localhost:11434',
+          endpoint: getConfig().ollamaEndpoint,
         },
       ],
       executionMode: 'auto' as const,
       fallbackChain: ['ollama', 'lm-studio', 'auto'] as const,
       performanceThresholds: {
         fastModeMaxTokens: 1000,
-        timeoutMs: 30000,
+        timeoutMs: getConfig().requestTimeout,
         maxConcurrentRequests: 3,
       },
       security: {

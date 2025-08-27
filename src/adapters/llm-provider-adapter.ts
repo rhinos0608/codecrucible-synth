@@ -103,6 +103,10 @@ export interface ILLMProviderAdapter extends EventEmitter {
   // Chat completion
   chatComplete(modelName: string, request: ChatRequest): Promise<GenerationResponse>;
   chatCompleteStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>>;
+  
+  // Alias methods for compatibility
+  chatCompletion(modelName: string, request: ChatRequest): Promise<GenerationResponse>;
+  chatCompletionStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>>;
 
   // Provider-specific features
   supportsFeature(feature: keyof LLMProviderCapabilities): boolean;
@@ -332,6 +336,15 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
 
   supportsFeature(feature: keyof LLMProviderCapabilities): boolean {
     return this.capabilities[feature];
+  }
+
+  // Alias methods for compatibility
+  async chatCompletion(modelName: string, request: ChatRequest): Promise<GenerationResponse> {
+    return await this.chatComplete(modelName, request);
+  }
+
+  async chatCompletionStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>> {
+    return await this.chatCompleteStream(modelName, request);
   }
 
   // Private helper methods
@@ -569,6 +582,15 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
 
   supportsFeature(feature: keyof LLMProviderCapabilities): boolean {
     return this.capabilities[feature];
+  }
+
+  // Alias methods for compatibility
+  async chatCompletion(modelName: string, request: ChatRequest): Promise<GenerationResponse> {
+    return await this.chatComplete(modelName, request);
+  }
+
+  async chatCompletionStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>> {
+    return await this.chatCompleteStream(modelName, request);
   }
 
   // LM Studio specific methods

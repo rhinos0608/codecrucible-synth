@@ -1,5 +1,6 @@
 import { Task, ExecutionResult } from '../core/types.js';
 import { UnifiedModelClient } from '../application/services/client.js';
+import { getConfig } from '../core/config/env-config.js';
 
 export class Agent {
   private client: UnifiedModelClient;
@@ -137,11 +138,12 @@ export class Agent {
     try {
       const prompt = `Generate code based on the following requirements:\n\n${task.input || ''}`;
 
+      const config = getConfig();
       const response = await this.client.synthesize({
         prompt,
         model: 'default',
-        temperature: 0.7,
-        maxTokens: 3000,
+        temperature: config.modelTemperature,
+        maxTokens: config.modelMaxTokens,
       });
 
       return {
@@ -251,11 +253,12 @@ export class Agent {
     try {
       const prompt = `Refactor and optimize the following code:\n\n${task.input || ''}`;
 
+      const config = getConfig();
       const response = await this.client.synthesize({
         prompt,
         model: 'default',
-        temperature: 0.3,
-        maxTokens: 3000,
+        temperature: 0.3, // Lower temperature for refactoring
+        maxTokens: config.modelMaxTokens,
       });
 
       return {

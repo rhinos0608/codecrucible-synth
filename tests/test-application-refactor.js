@@ -3,7 +3,7 @@
  * Demonstrates the new clean application layer architecture
  */
 
-import { SimpleApplicationFacade } from './src/application/simple-application-facade.js';
+import { SimpleApplicationFacade } from '../src/application/simple-application-facade.js';
 
 async function testApplicationRefactor() {
   console.log('🧪 Testing Application Layer Refactor...\n');

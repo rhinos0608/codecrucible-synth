@@ -295,6 +295,22 @@ export class DependencyContainer extends EventEmitter {
   }
 
   /**
+   * Get complete service registration details
+   */
+  getServiceRegistration(token: string | ServiceToken): { options: ServiceOptions } | null {
+    const tokenName = typeof token === 'string' ? token : token.name;
+    const registration = this.services.get(tokenName);
+    return registration ? { options: registration.options } : null;
+  }
+
+  /**
+   * Get initialization order of services
+   */
+  getInitializationOrder(): string[] {
+    return [...this.initializationOrder];
+  }
+
+  /**
    * Initialize all eager services
    */
   async initializeEagerServices(): Promise<void> {
@@ -313,6 +329,27 @@ export class DependencyContainer extends EventEmitter {
     }
 
     this.emit('eagerServicesInitialized', { services: eagerServices });
+  }
+
+  /**
+   * Initialize all services (including those with initialize methods)
+   */
+  async initializeServices(): Promise<void> {
+    // First initialize eager services
+    await this.initializeEagerServices();
+
+    // Then call initialize methods on all registered services that have them
+    for (const [token, registration] of this.services.entries()) {
+      if (registration.instance && typeof registration.instance.initialize === 'function') {
+        try {
+          await registration.instance.initialize();
+          this.emit('serviceInitialized', { token });
+        } catch (error) {
+          logger.error(`Failed to initialize service ${token}:`, error);
+          // Don't throw - continue with other services
+        }
+      }
+    }
   }
 
   /**

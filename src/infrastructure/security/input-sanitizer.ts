@@ -1,33 +1,46 @@
 /**
  * Input sanitization and validation utilities for CLI security
  * Addresses CVSS 7.8 command injection vulnerability
+ * Uses centralized security policies from security-policy-loader
  */
+
+import { SecurityPolicyLoader } from './security-policy-loader.js';
+import { logger } from '../logging/logger.js';
 
 export interface SanitizationResult {
   sanitized: string;
   isValid: boolean;
   violations: string[];
   originalCommand?: string;
+  riskLevel?: string;
 }
 
 export class InputSanitizer {
-  private static readonly ALLOWED_SLASH_COMMANDS = new Set([
-    '/help',
-    '/voices',
-    '/voice',
-    '/mode',
-    '/todo',
-    '/plan',
-    '/dual',
-    '/dualagent',
-    '/stream',
-    '/audit',
-    '/autoconfig',
-    '/config',
-  ]);
+  private static policyLoader = SecurityPolicyLoader.getInstance();
+  private static allowedCommands: Set<string> | null = null;
+  private static dangerousPatterns: RegExp[] | null = null;
 
-  // Enhanced patterns based on 2024 security research showing 29.5% Python/24.2% JavaScript vulnerabilities
-  private static readonly DANGEROUS_PATTERNS = [
+  /**
+   * Initialize security policies (async initialization)
+   */
+  private static async initializePolicies(): Promise<void> {
+    if (!InputSanitizer.allowedCommands || !InputSanitizer.dangerousPatterns) {
+      try {
+        InputSanitizer.allowedCommands = await InputSanitizer.policyLoader.getAllowedCommands();
+        InputSanitizer.dangerousPatterns = await InputSanitizer.policyLoader.getDangerousPatterns();
+        logger.debug('🔒 Security policies initialized for InputSanitizer');
+      } catch (error) {
+        logger.error(`❌ Failed to initialize security policies: ${error}`);
+        // Fallback to basic security patterns
+        InputSanitizer.allowedCommands = new Set(['/help', '/status', '/config']);
+        InputSanitizer.dangerousPatterns = [/[;&|`$(){}[\]\\]/g, /\.\./g];
+      }
+    }
+  }
+
+  // DEPRECATED: Legacy hardcoded patterns - replaced by security-policy-loader
+  // TODO: Remove after migration is complete
+  private static readonly LEGACY_DANGEROUS_PATTERNS = [
     /[;&|`$(){}[\]\\]/g, // Shell metacharacters
     /\.\./g, // Directory traversal
     /(rm|del|format|shutdown|reboot|halt)/i, // Dangerous commands
@@ -53,7 +66,8 @@ export class InputSanitizer {
   /**
    * Sanitize and validate slash command input
    */
-  static sanitizeSlashCommand(command: string): SanitizationResult {
+  static async sanitizeSlashCommand(command: string): Promise<SanitizationResult> {
+    await InputSanitizer.initializePolicies();
     const violations: string[] = [];
     let sanitized = command.trim();
 
@@ -63,7 +77,7 @@ export class InputSanitizer {
     const args = parts.slice(1).join(' ');
 
     // Validate command is in allowed list
-    if (!this.ALLOWED_SLASH_COMMANDS.has(cmd)) {
+    if (!InputSanitizer.allowedCommands!.has(cmd)) {
       violations.push(`Unauthorized command: ${cmd}`);
       return {
         sanitized: '',
@@ -73,11 +87,23 @@ export class InputSanitizer {
       };
     }
 
-    // Check for dangerous patterns in arguments
-    for (const pattern of this.DANGEROUS_PATTERNS) {
-      if (pattern.test(args)) {
-        violations.push(`Dangerous pattern detected: ${pattern.source}`);
+    // Check for dangerous patterns in arguments using external security policies
+    if (InputSanitizer.dangerousPatterns) {
+      for (const pattern of InputSanitizer.dangerousPatterns) {
+        if (pattern.test(args)) {
+          violations.push(`Dangerous pattern detected: ${pattern.source}`);
+        }
       }
+    }
+    
+    // Additional validation using policy loader
+    try {
+      const validation = await InputSanitizer.policyLoader.validatePattern(args);
+      if (!validation.isValid) {
+        violations.push(...validation.violations);
+      }
+    } catch (error) {
+      logger.warn(`⚠️ Pattern validation error: ${error}`);
     }
 
     // Check for unsafe characters

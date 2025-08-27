@@ -1,0 +1,624 @@
+# ============================================================================
+# CodeCrucible Synth - COMPLETE Unified Configuration v2.0
+# ============================================================================
+# This master configuration file consolidates ALL features from:
+# - config/default.yaml
+# - codecrucible.config.json  
+# - config/unified-model-config.yaml
+# - config/hybrid.yaml
+# - config/hybrid-config.json
+# - config/optimized-model-config.json
+# 
+# Generated: 2025-08-27
+# Following AI Coding Grimoire principles
+# ============================================================================
+
+# Configuration metadata (required)
+metadata:
+  version: "2.0"
+  description: "CodeCrucible Synth Complete Unified Configuration"
+  created: "2025-08-27"
+  last_modified: "2025-08-27"
+  precedence_level: 20
+  applies_to: ["development", "production", "testing"]
+  config_id: "unified-master-complete"
+
+# ============================================================================
+# APPLICATION CONFIGURATION
+# ============================================================================
+app:
+  name: "CodeCrucible Synth"
+  version: "4.2.4"
+  environment: "${NODE_ENV:development}"
+  log_level: "${LOG_LEVEL:info}"
+  debug_mode: false
+  telemetry_enabled: true  
+  # Application features
+  features:
+    enable_voice_system: true
+    enable_council_engine: true
+    enable_hybrid_models: true
+    enable_mcp_integration: true
+    enable_streaming: true
+    enable_caching: true
+    enable_monitoring: true
+    max_concurrent_voices: 5
+    cache_expiry: 3600
+
+# ============================================================================
+# SAFETY & TERMINAL CONFIGURATION (from default.yaml)
+# ============================================================================
+safety:
+  command_validation: true
+  file_system_restrictions: true
+  require_consent: ["delete", "execute"]
+  
+terminal:
+  shell: "auto"  # auto-detect or specify: bash, zsh, cmd, powershell
+  prompt: "CC> "
+  history_size: 1000
+  color_output: true# ============================================================================
+# VSCODE & AGENT CONFIGURATION
+# ============================================================================
+vscode:
+  auto_activate: true
+  inline_generation: true
+  show_voice_panel: true
+
+agent:
+  enabled: true
+  mode: "thorough"  # thorough, fast, auto
+  max_concurrency: 1
+  enable_caching: false
+  enable_metrics: true
+  enable_security: true
+
+# ============================================================================
+# DEBUG CONFIGURATION (from codecrucible.config.json)
+# ============================================================================
+debug:
+  enabled: false
+  verbose: false
+  log_level: "info"
+
+# ============================================================================
+# COMPREHENSIVE MODEL CONFIGURATION
+# ============================================================================
+model:
+  # Global settings from default.yaml
+  endpoint: "${OLLAMA_ENDPOINT:http://localhost:11434}"
+  name: "llama3.2:latest"  # Default model
+  timeout: "${OLLAMA_TIMEOUT:300000}"
+  max_tokens: "${MODEL_MAX_TOKENS:128000}"
+  min_tokens: 32000
+  temperature: "${MODEL_TEMPERATURE:0.7}"
+  context_window: "adaptive"
+  streaming_enabled: true
+  keep_alive: "15m"
+  
+  # Provider selection and fallback
+  default_provider: "ollama"
+  fallback_chain: ["ollama", "lm-studio", "openai", "anthropic", "mock"]
+  execution_mode: "auto"  # auto | fast | thorough | custom
+  
+  # Global timeout settings
+  max_retries: 3
+  
+  # Routing configuration
+  routing:
+    strategy: "hybrid"  # hybrid, simple, complex
+    default_provider: "auto"
+    escalation_threshold: 0.6  # From hybrid-config.json
+    confidence_scoring: true
+    learning_enabled: true    
+    # Task complexity mapping
+    task_complexity:
+      simple: ["format", "template", "boilerplate", "edit", "rename"]
+      complex: ["analysis", "architecture", "planning", "debug", "security", "multi-file"]
+    
+    # Confidence thresholds
+    confidence_thresholds:
+      high: 0.9
+      medium: 0.7
+      low: 0.5
+      escalation: 0.3
+    
+    # Performance targets
+    performance_targets:
+      simple_task_response: 1000
+      complex_task_response: 30000
+      streaming_latency: 100
+      fast_mode_threshold: 200  # From optimized-model-config.json
+  
+  # Model providers configuration
+  providers:
+    # Ollama configuration (PRIMARY)
+    - name: "ollama"
+      type: "ollama"
+      enabled: true
+      priority: 1
+      endpoint: "${OLLAMA_ENDPOINT:http://localhost:11434}"      
+      # Connection settings
+      connection:
+        timeout: 5000
+        response_timeout: 30000
+        status_check_timeout: 3000
+        keep_alive: "15m"
+        max_concurrent: 3
+      
+      # GPU configuration (from hybrid.yaml)
+      gpu:
+        enabled: true
+        layers: -1  # Use all GPU layers
+        memory_fraction: 0.85
+        
+      # Performance settings
+      performance:
+        model_ttl: 1800  # From hybrid-config.json
+        keep_alive_time: "15m"
+        max_retries: 5
+        base_timeout: 120000
+        warmup_timeout: 180000
+        concurrent_preloads: 2
+        
+      # Available models with specific settings
+      models:
+        preferred:
+          - name: "qwen2.5-coder:7b"
+            temperature: 0.1
+            max_tokens: 128000
+            context_window: 128000
+            optimal_for: ["coding", "analysis", "debugging"]
+          - name: "deepseek-coder:8b" 
+            temperature: 0.2
+            max_tokens: 128000
+            context_window: 128000
+            optimal_for: ["code_generation", "refactoring"]
+          - name: "codellama:34b"  # From hybrid.yaml
+            temperature: 0.3
+            max_tokens: 100000
+            optimal_for: ["complex_analysis", "architecture"]
+        fallback:
+          - name: "llama3.2:latest"
+            temperature: 0.7
+            max_tokens: 32000
+            optimal_for: ["general", "documentation"]
+          - name: "gemma:latest"  # From hybrid.yaml
+            temperature: 0.5
+            max_tokens: 32000
+            optimal_for: ["quick_tasks"]
+          - name: "gemma:7b"  # From hybrid-config.json
+            temperature: 0.5
+            max_tokens: 32000
+            optimal_for: ["general"]
+          - name: "qwen2.5:7b"  # From hybrid-config.json
+            temperature: 0.4
+            max_tokens: 64000
+            optimal_for: ["analysis"]
+      
+      # Task routing preferences
+      optimal_for: ["analysis", "planning", "complex", "multi-file", "architecture", "debugging"]
+      task_types: ["analysis", "planning", "complex", "multi-file"]  # From hybrid.yaml    
+    # LM Studio configuration (SECONDARY)
+    - name: "lm-studio"
+      type: "lmstudio"
+      enabled: true
+      priority: 2
+      endpoint: "${LMSTUDIO_ENDPOINT:http://localhost:1234}"
+      
+      # Connection settings
+      connection:
+        timeout: 3000
+        response_timeout: 15000
+        status_check_timeout: 2000
+        max_concurrent: 2  # From hybrid-config.json
+        
+      # Performance settings from hybrid-config.json
+      performance:
+        model_ttl: 900
+        keep_alive_enabled: true
+        keep_alive_interval: 120000
+        model_warmup_enabled: true
+        connection_timeout: 300000
+        request_timeout: 180000
+        stream_timeout: 30000
+        
+      # Available models
+      models:
+        preferred:
+          - name: "codellama-7b-instruct"  # From multiple configs
+            temperature: 0.7
+            max_tokens: 128000
+            context_window: 128000
+            optimal_for: ["template", "edit", "format", "boilerplate"]
+          - name: "gemma-2b-it"  # From hybrid.yaml
+            temperature: 0.5
+            max_tokens: 64000
+            optimal_for: ["quick_responses", "prototyping"]
+          - name: "gemma-3-12b"  # From hybrid-config.json
+            temperature: 0.6
+            max_tokens: 128000
+            optimal_for: ["large-file-processing"]
+          - name: "qwen/qwen2.5-coder-14b"  # From unified-model-config.yaml
+            temperature: 0.2
+            max_tokens: 128000
+            optimal_for: ["complex_coding"]
+        fallback:
+          - name: "gpt-3.5-turbo"  # OpenAI compatible
+            temperature: 0.7
+            max_tokens: 8000
+            optimal_for: ["general"]
+            
+      # Task routing
+      optimal_for: ["template", "edit", "format", "boilerplate", "streaming", "quick-fix"]
+      task_types: ["template", "edit", "format", "boilerplate", "codebase-analysis", "large-file-processing"]
+      streaming_enabled: true    
+    # OpenAI configuration (from codecrucible.config.json)
+    - name: "openai"
+      type: "openai"
+      enabled: false  # Disabled by default, requires API key
+      priority: 3
+      api_key: "${OPENAI_API_KEY:}"
+      
+      models:
+        - name: "gpt-4"
+          model_id: "gpt-4"
+          temperature: 0.7
+          max_tokens: 4000
+          timeout: 30000
+          retries: 3
+          optimal_for: ["complex_reasoning", "analysis"]
+          
+    # Anthropic configuration (from codecrucible.config.json)
+    - name: "anthropic"
+      type: "anthropic"
+      enabled: false  # Disabled by default, requires API key
+      priority: 4
+      api_key: "${ANTHROPIC_API_KEY:}"
+      
+      models:
+        - name: "claude-3-sonnet"
+          model_id: "claude-3-sonnet-20240229"
+          temperature: 0.7
+          max_tokens: 4000
+          timeout: 30000
+          retries: 3
+          optimal_for: ["writing", "analysis", "reasoning"]
+
+# ============================================================================
+# MODEL PRELOADER CONFIGURATION (from optimized-model-config.json)
+# ============================================================================
+model_preloader:
+  endpoint: "http://localhost:11434"
+  primary_models: ["gemma:7b", "llama3.2:latest"]
+  fallback_models: ["gemma:7b"]
+  max_concurrent_loads: 1
+  warmup_prompt: "Hi"
+  keep_alive_time: "10m"
+  retry_attempts: 2
+  load_timeout: 45000
+  initialization_timeout: 30000# ============================================================================
+# COMPREHENSIVE PERFORMANCE CONFIGURATION
+# ============================================================================
+performance:
+  # Global performance settings
+  max_concurrent_requests: "${MAX_CONCURRENT_REQUESTS:3}"
+  request_timeout: 120000
+  response_timeout: 180000
+  default_timeout: 60000  # From optimized-model-config.json
+  max_timeout: 180000
+  
+  # Response cache (from default.yaml)
+  response_cache:
+    enabled: true
+    max_age: "${CACHE_TTL:3600000}"  # 1 hour
+    max_size: "${RESPONSE_CACHE_SIZE:100}"  # Cache size in MB
+    duration: 300000  # From hybrid-config.json
+    
+  # Voice parallelism (from default.yaml)
+  voice_parallelism:
+    max_concurrent: "${MAX_CONCURRENT_REQUESTS:3}"
+    batch_size: 2
+    
+  # Context management (from default.yaml)
+  context_management:
+    max_context_length: "${MODEL_MAX_TOKENS:128000}"
+    min_context_length: 32000
+    compression_threshold: 96000  # 75% of max before compression
+    retention_strategy: "hierarchical"
+    context_window_strategy: "adaptive"
+    chunk_overlap: 2000
+    indexing_enabled: true
+    task_complexity_thresholds:
+      simple: 32000
+      moderate: 64000
+      complex: "${MODEL_MAX_TOKENS:128000}"
+      
+  # Caching configuration (multiple sources)
+  cache:
+    enabled: true
+    type: "memory"
+    ttl: 3600
+    max_size: "100MB"
+    cache_timeout: 30000  # From optimized-model-config.json
+    
+  # Resource limits
+  memory:
+    max_heap: "4096MB"
+    warning_threshold: 0.8
+    
+  # Model optimization settings
+  enable_model_caching: true
+  enable_fast_mode: true
+  skip_model_discovery: false
+  use_small_models_only: true
+  skip_complex_routing: true  # From optimized-model-config.json
+    
+  # Monitoring and metrics (from codecrucible.config.json)
+  enable_monitoring: true
+  alert_threshold: 5000
+  metrics_retention: 86400000
+  enable_tracing: true
+  metrics_port: 9090
+  
+  # Optimization flags
+  optimization:
+    lazy_loading: true
+    resource_pooling: true
+    connection_pooling: true
+    auto_optimization: true  # From hybrid.yaml
+    vram_optimization: true# ============================================================================
+# VOICE SYSTEM CONFIGURATION (from default.yaml)
+# ============================================================================
+voices:
+  enabled: true
+  default: ["explorer", "maintainer"]
+  available: ["explorer", "maintainer", "analyzer", "developer", "implementor", "security", "architect", "designer", "optimizer"]
+  parallel: true
+  max_concurrent: 5  # From codecrucible.config.json
+  max_concurrent_voices: 5
+  consensus_threshold: 0.7
+  escalation_threshold: 0.6
+  
+  # Voice archetypes
+  archetypes:
+    - name: "explorer"
+      enabled: true
+      weight: 1.2
+      specialization: ["innovation", "creativity", "prototyping"]
+    - name: "maintainer"
+      enabled: true
+      weight: 1.0
+      specialization: ["stability", "quality", "testing"]
+    - name: "security"
+      enabled: true
+      weight: 1.1
+      specialization: ["vulnerability", "authentication", "compliance"]
+    - name: "architect"
+      enabled: true
+      weight: 1.3
+      specialization: ["design", "patterns", "scalability"]
+    - name: "developer"
+      enabled: true
+      weight: 1.0
+      specialization: ["implementation", "debugging", "optimization"]
+
+# ============================================================================
+# COMPREHENSIVE SECURITY CONFIGURATION
+# ============================================================================
+security:
+  # Authentication and authorization
+  authentication:
+    enabled: true
+    type: "jwt"
+    jwt_secret: "${JWT_SECRET:change-in-production}"
+    token_expiration: "24h"
+    refresh_enabled: true    
+  # Security validation (from codecrucible.config.json)
+  enable_validation: true
+  sandbox_mode: true
+  allow_unsafe_commands: false
+  enable_rate_limit: true
+  max_requests_per_minute: 60
+  enable_cors: true
+  cors_origins: ["http://localhost:3000"]
+  audit_logging: true
+  
+  # Input validation and security patterns (from unified-model-config.yaml)
+  validate_inputs: true
+  sanitize_outputs: true
+  max_prompt_length: 128000
+  max_response_length: 128000
+  blocked_patterns: ["password", "secret", "api_key", "private_key"]
+  
+  # Security policies
+  policies:
+    max_input_length: 100000
+    rate_limiting:
+      enabled: true
+      requests_per_minute: 60
+      requests_per_hour: 1000
+    blocked_commands: ["rm -rf", "format", "del /f", "shutdown"]
+    allowed_directories: ["./src", "./tests", "./config"]
+
+# ============================================================================
+# E2B CODE INTERPRETER CONFIGURATION (from default.yaml)
+# ============================================================================
+e2b:
+  api_key: "${E2B_API_KEY}"
+  enabled: true
+  enforce_only: true  # Only allow E2B execution, block unsafe local execution
+  default_environment: "base"
+  session_timeout: 3600000  # 1 hour
+  max_concurrent_sessions: 10
+  require_authentication: true  # ✅ SECURITY: Authentication required
+  strict_mode: true
+  timeout: 30000
+  max_file_size: "10MB"
+  allowed_languages: ["python", "javascript", "typescript", "bash"]
+  block_network_access: true
+  audit_log: true
+  validate_code: true
+  block_unsafe_patterns: true
+  
+  # Resource limits
+  resource_limits:
+    memory: "512MB"
+    cpu: "0.5"
+    disk_space: "1GB"
+    execution_timeout: 30000
+    
+  # Security policy
+  security:
+    strict_mode: true
+    allow_network_access: false
+    allow_file_system_write: true
+    allow_process_spawning: false
+    validate_code: true
+    audit_log: true
+    block_unsafe_patterns: true
+    require_authentication: true# ============================================================================
+# COMPREHENSIVE MCP (Model Context Protocol) CONFIGURATION
+# ============================================================================
+mcp:
+  enabled: true
+  smithery_api_key: "${SMITHERY_API_KEY:}"
+  
+  # Core MCP servers (from default.yaml)
+  servers:
+    filesystem:
+      enabled: true
+      restricted_paths: ["/etc", "/sys", "/proc"]
+      allowed_paths: ["~/", "./"]
+      allowed_operations: ["read", "write", "list"]
+    
+    git:
+      enabled: true
+      auto_commit_messages: false
+      safe_mode_enabled: true
+      auto_commit: false
+    
+    terminal:
+      enabled: true
+      allowed_commands: ["ls", "cat", "grep", "find", "git", "npm", "node", "python"]
+      blocked_commands: ["rm -rf", "sudo", "su", "chmod +x"]
+      whitelisted_commands: ["npm", "git", "node", "python"]
+    
+    package_manager:
+      enabled: true
+      auto_install: false
+      security_scan: true
+      
+  # Smithery AI Configuration (optional)
+  smithery:
+    enabled: false
+    api_key: ""
+    profile: ""
+    base_url: "https://server.smithery.ai"
+  
+  # External MCP Servers Configuration (from default.yaml)
+  external:
+    enabled: true
+    servers:
+      terminal_controller:
+        enabled: true
+        api_key: "${MCP_API_KEY}"
+        url: "https://server.smithery.ai/@GongRzhe/terminal-controller-mcp/mcp"
+      task_manager:
+        enabled: true
+        api_key: "${MCP_API_KEY}"
+        url: "https://server.smithery.ai/@kazuph/mcp-taskmanager/mcp"
+      remote_shell:
+        enabled: false  # Disabled by default for security
+        api_key: "${MCP_API_KEY}"
+        url: "https://server.smithery.ai/@samihalawa/remote-shell-terminal-mcp/mcp"
+    
+    # MCP Security settings
+    security:
+      validate_commands: true
+      allow_remote_execution: false
+      require_user_approval: true# ============================================================================
+# HYBRID SYSTEM CONFIGURATION (from hybrid configs)
+# ============================================================================
+hybrid:
+  enabled: true
+  routing_strategy: "intelligent"
+  escalation_threshold: 0.6  # Lower value from hybrid-config.json
+  confidence_scoring: true
+  learning_enabled: true
+  
+  # Circuit breaker and fallback (from hybrid-config.json)
+  fallback:
+    auto_fallback: true
+    retry_attempts: 3
+    retry_delay: 2000
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      recovery_timeout: 60000
+  
+  # Performance optimization (from hybrid.yaml)
+  performance:
+    cache_enabled: true
+    metrics_collection: true
+    auto_optimization: true
+    vram_optimization: true
+    timeout_strategy: "adaptive"
+    circuit_breaker_enabled: true
+
+# ============================================================================
+# LOGGING CONFIGURATION (from default.yaml)
+# ============================================================================
+logging:
+  level: "info"
+  to_file: true
+  max_file_size: "10MB"
+  max_files: 5
+  format: "json"
+  
+  # Output destinations
+  outputs:
+    - type: "console"
+      level: "info"
+      colorized: true
+    - type: "file"
+      path: "./logs/codecrucible.log"
+      level: "debug"
+
+# ============================================================================
+# MONITORING & TELEMETRY (comprehensive)
+# ============================================================================
+monitoring:
+  enabled: true
+  
+  # Metrics collection (from unified-model-config.yaml)
+  metrics:
+    collect_performance: true
+    collect_errors: true
+    collect_usage: true
+    port: 3001
+    
+  # Alert thresholds (from unified-model-config.yaml)
+  alerts:
+    error_rate: 0.05
+    response_time_p99: 5000
+    availability: 0.95
+    
+  # Reporting
+  reporting:
+    interval: 60000
+    endpoint: "${TELEMETRY_ENDPOINT:}"
+
+# ============================================================================
+# EXPERIMENTAL FEATURES (from unified-model-config.yaml)
+# ============================================================================
+experimental:
+  dual_agent_review: true
+  auto_retry_on_timeout: true
+  adaptive_timeouts: true
+  connection_pooling: true
+  circuit_breaker: false  # Not yet implemented
+
+# ============================================================================
+# END OF COMPLETE UNIFIED CONFIGURATION
+# ============================================================================

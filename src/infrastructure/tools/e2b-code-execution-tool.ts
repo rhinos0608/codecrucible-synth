@@ -1,6 +1,7 @@
 import { BaseTool } from './base-tool.js';
 import { E2BService, ExecutionResult } from '../e2b/e2b-service.js';
 import { logger } from '../logging/logger.js';
+import { SecurityError } from '../security/security-types.js';
 import { z } from 'zod';
 
 /**
@@ -52,6 +53,23 @@ export class E2BCodeExecutionTool extends BaseTool {
 
   async execute(args: any): Promise<ExecutionResult & { sandbox: string; security: string }> {
     try {
+      // ✅ SECURITY: Check authentication requirement from centralized security policies
+      const { SecurityPolicyLoader } = await import('../security/security-policy-loader.js');
+      const policyLoader = SecurityPolicyLoader.getInstance();
+      const authConfig = await policyLoader.getAuthConfig();
+      
+      if (authConfig.e2b.requireAuthentication && !args.user) {
+        logger.error('🚨 E2B code execution blocked: Authentication required by security policy');
+        return {
+          success: false,
+          output: '',
+          error: 'Authentication required for code execution. Please authenticate first.',
+          executionTime: 0,
+          sandbox: 'auth-required',
+          security: 'Security policy: Authentication validation failed',
+        };
+      }
+
       const { code, language = 'python', sessionId, installPackages, files } = args;
       const actualSessionId = sessionId || this.sessionId;
 

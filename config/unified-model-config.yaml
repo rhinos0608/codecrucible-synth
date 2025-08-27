@@ -107,7 +107,7 @@ llm:
     enabled: true
     metrics_port: 3001
     collect_performance: true
-    collect_errors: true
+    collect_errors: trueDon't
     
     # Alert thresholds
     alerts:

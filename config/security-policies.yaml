@@ -1,0 +1,294 @@
+# Security Policies Configuration
+# Centralized security rules for codecrucible-synth
+# Generated: 2025-08-27
+
+# Input Validation Security Policies
+inputValidation:
+  # Dangerous patterns that pose security risks
+  dangerousPatterns:
+    # Shell metacharacters - High risk for command injection
+    - pattern: "[;&|`$(){}[\\]\\\\]"
+      description: "Shell metacharacters"
+      riskLevel: "high"
+      action: "block"
+    
+    # Directory traversal - High risk for path traversal attacks
+    - pattern: "\\.\\."
+      description: "Directory traversal"
+      riskLevel: "high"
+      action: "block"
+    
+    # Dangerous system commands - Critical risk
+    - pattern: "(rm|del|format|shutdown|reboot|halt)"
+      description: "Dangerous system commands"
+      riskLevel: "critical"
+      action: "block"
+      flags: "i"
+    
+    # Code execution functions - Critical risk
+    - pattern: "(exec\\(|eval\\(|system\\(|spawn\\(|require\\(['\"]child_process)"
+      description: "Code execution functions"
+      riskLevel: "critical"
+      action: "block"
+      flags: "i"
+    
+    # Script injection - High risk for XSS
+    - pattern: "(<script|javascript:|data:)"
+      description: "Script injection patterns"
+      riskLevel: "high"
+      action: "sanitize"
+      flags: "i"
+    
+    # SQL injection patterns - High risk
+    - pattern: "(union|select|insert|update|delete|drop)"
+      description: "SQL injection keywords"
+      riskLevel: "high"
+      action: "warn"
+      flags: "i"
+    
+    # AI-specific threat patterns (2024 research)
+    - pattern: "ignore\\s+(previous|all|above)\\s+(instructions?|prompts?|commands?)"
+      description: "AI prompt injection attempt"
+      riskLevel: "high"
+      action: "block"
+      flags: "i"
+    
+    - pattern: "forget\\s+(everything|all|previous)\\s+(instructions?|prompts?)"
+      description: "AI memory manipulation attempt"
+      riskLevel: "high"
+      action: "block"
+      flags: "i"
+    
+    - pattern: "new\\s+(instructions?|system\\s+prompt|role):\\s*"
+      description: "AI role hijacking attempt"
+      riskLevel: "critical"
+      action: "block"
+      flags: "i"
+    
+    - pattern: "system\\s*:\\s*you\\s+(are\\s+now|must\\s+now)"
+      description: "AI system override attempt"
+      riskLevel: "critical"
+      action: "block"
+      flags: "i"
+    
+    - pattern: "\\\\[system\\\\]"
+      description: "System token injection"
+      riskLevel: "high"
+      action: "block"
+      flags: "i"
+    
+    - pattern: "override\\s+security"
+      description: "Security bypass attempt"
+      riskLevel: "critical"
+      action: "block"
+      flags: "i"
+    
+    # Secret leak patterns - Critical for data protection
+    - pattern: "api_?key\\s*[=:]\\s*['\"][a-zA-Z0-9_-]{20,}['\"]?"
+      description: "API key pattern detection"
+      riskLevel: "critical"
+      action: "redact"
+      flags: "i"
+    
+    - pattern: "password\\s*[=:]\\s*['\"][^'\"]{8,}['\"]?"
+      description: "Password pattern detection"
+      riskLevel: "critical"
+      action: "redact"
+      flags: "i"
+    
+    - pattern: "token\\s*[=:]\\s*['\"][a-zA-Z0-9._-]{20,}['\"]?"
+      description: "Token pattern detection"
+      riskLevel: "critical"
+      action: "redact"
+      flags: "i"
+
+  # Allowed slash commands for CLI interface
+  allowedCommands:
+    - "/help"
+    - "/status"
+    - "/models"
+    - "/config"
+    - "/analyze"
+    - "/generate"
+    - "/auth"
+    - "/login"
+    - "/logout"
+    - "/version"
+    - "/docs"
+
+  # Input sanitization rules
+  sanitizationRules:
+    maxInputLength: 10000
+    allowSpecialChars: false
+    stripHtml: true
+    normalizeWhitespace: true
+    removeControlChars: true
+    safeCharacterPattern: "^[a-zA-Z0-9\\s\\-_.,!?'\"@#%^&*()+=:;/\\\\]+$"
+
+# Authentication Security Policies
+authentication:
+  # E2B Code Execution Authentication
+  e2b:
+    requireAuthentication: true
+    sessionTimeout: 3600
+    requireMFA: false
+    allowAnonymousRead: false
+    maxExecutionsPerSession: 100
+    
+  # API Authentication Configuration
+  api:
+    jwtExpiresIn: "1h"
+    refreshTokenExpiresIn: "7d"
+    maxConcurrentSessions: 5
+    requireHttps: true
+    allowCors: false
+    rateLimitRequests: 1000
+    rateLimitWindowMs: 900000  # 15 minutes
+    
+  # CLI Authentication Configuration  
+  cli:
+    requireAuth: true
+    sessionPersistence: true
+    autoRefresh: true
+    deviceTrust: false
+    localTokenStorage: true
+    sessionTimeoutMinutes: 480  # 8 hours
+
+  # Password Policy Configuration
+  passwordPolicy:
+    minLength: 12
+    requireUppercase: true
+    requireLowercase: true
+    requireNumbers: true
+    requireSymbols: true
+    preventReuse: 5
+    maxAge: 90  # days
+    
+# Execution Security Policies
+executionSecurity:
+  # E2B Sandbox Security
+  e2b:
+    sandboxMode: "strict"
+    networkAccess: false
+    fileSystemWrite: true
+    processSpawning: false
+    maxMemoryMB: 512
+    maxCpuPercent: 50
+    executionTimeoutSeconds: 300
+    allowedLanguages: ["python", "javascript", "bash"]
+    
+  # MCP Server Security
+  mcp:
+    validateConnections: true
+    requireAuthentication: true
+    auditAllCalls: true
+    maxConnectionsPerClient: 10
+    connectionTimeoutSeconds: 30
+    allowedServers: []  # Empty = allow all
+    blockedServers: []
+    
+  # Tool Execution Security
+  tools:
+    validateInputs: true
+    sanitizeOutputs: true
+    auditToolCalls: true
+    maxToolsPerRequest: 20
+    toolTimeoutSeconds: 120
+    allowDangerousTools: false
+
+# Logging and Auditing Policies
+logging:
+  # Security Event Logging
+  securityEvents:
+    logLevel: "info"
+    includeStackTrace: true
+    logToFile: true
+    logToSyslog: false
+    maxLogFileSizeMB: 100
+    maxLogFiles: 10
+    
+  # Authentication Event Logging
+  authenticationEvents:
+    logSuccessfulLogins: true
+    logFailedLogins: true
+    logTokenRefresh: false
+    logSessionExpiry: true
+    includeUserAgent: true
+    includeIpAddress: true
+    
+  # Execution Audit Logging
+  executionAuditing:
+    logCodeExecution: true
+    logToolCalls: true
+    logMcpCalls: true
+    includeInputs: false  # Privacy protection
+    includeOutputs: false  # Privacy protection
+    logExecutionTime: true
+
+# Rate Limiting and Abuse Protection
+rateLimiting:
+  # Authentication Rate Limiting
+  authentication:
+    maxAttempts: 5
+    windowMinutes: 15
+    blockDurationMinutes: 30
+    progressiveDelay: true
+    
+  # API Rate Limiting
+  api:
+    requestsPerMinute: 60
+    burstAllowance: 20
+    globalLimit: 10000  # per hour
+    perUserLimit: 1000  # per hour
+    
+  # Code Execution Rate Limiting
+  execution:
+    maxExecutionsPerMinute: 10
+    maxExecutionsPerHour: 100
+    maxExecutionsPerDay: 1000
+    cooldownSeconds: 5
+
+# Content Security Policies
+contentSecurity:
+  # AI Response Filtering
+  responseFiltering:
+    blockSensitiveInfo: true
+    redactCredentials: true
+    validateOutputSafety: true
+    maxResponseLength: 50000
+    
+  # Input Content Policies
+  inputPolicies:
+    blockMaliciousContent: true
+    scanForSecrets: true
+    validateFileUploads: true
+    maxFileUploadSizeMB: 10
+    allowedFileTypes: [".txt", ".md", ".json", ".yaml", ".py", ".js", ".ts"]
+
+# Environment-Specific Overrides
+environments:
+  development:
+    authentication:
+      cli:
+        requireAuth: false  # Allow development without auth
+    logging:
+      securityEvents:
+        logLevel: "debug"
+        
+  staging:
+    executionSecurity:
+      e2b:
+        networkAccess: true  # Allow network for staging tests
+        
+  production:
+    authentication:
+      api:
+        requireHttps: true
+        allowCors: false
+    rateLimiting:
+      authentication:
+        maxAttempts: 3  # Stricter in production
+    logging:
+      authenticationEvents:
+        includeIpAddress: true
+        includeUserAgent: true

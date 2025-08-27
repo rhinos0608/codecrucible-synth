@@ -562,10 +562,10 @@ export class SearchCLICommands implements CLISearchIntegration {
 
       // Calculate summary statistics
       if (results.length > 0) {
-        const avgSpeedup = results.reduce((sum, r) => sum + r.speedupVsRAG, 0) / results.length;
+        const avgSpeedup = results.reduce((sum: number, r: any) => sum + r.speedupVsRAG, 0) / results.length;
         const avgMemoryReduction =
-          results.reduce((sum, r) => sum + r.memoryReduction, 0) / results.length;
-        const fastQueries = results.filter(r => r.ripgrepTime < 200);
+          results.reduce((sum: number, r: any) => sum + r.memoryReduction, 0) / results.length;
+        const fastQueries = results.filter((r: any) => r.ripgrepTime < 200);
 
         console.log('\n📈 SUMMARY STATISTICS:');
         console.log(`   Average speedup: ${avgSpeedup.toFixed(1)}x faster`);

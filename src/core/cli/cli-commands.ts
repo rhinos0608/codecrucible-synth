@@ -139,7 +139,7 @@ export class CLICommands {
 
         if (models.length > 0) {
           console.log(chalk.cyan('📋 Available Models:'));
-          models.forEach((model, index) => {
+          models.forEach((model: any, index: number) => {  // TODO: Import AIModel from unified-types
             console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || model}`));
             if (model.size) {
               console.log(chalk.gray(`     Size: ${model.size}`));

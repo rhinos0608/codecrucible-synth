@@ -156,7 +156,7 @@ export class SystemBootstrap {
       
       if (recommendations.length > 0) {
         logger.info('📊 Startup optimization recommendations:');
-        recommendations.forEach(rec => logger.info(`   - ${rec}`));
+        recommendations.forEach((rec: string) => logger.info(`   - ${rec}`));
       }
 
       return {

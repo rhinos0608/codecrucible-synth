@@ -8,9 +8,9 @@
     "esModuleInterop": true,
     "allowJs": false,
     
-    // Strict Type Checking - 2025 Enterprise Standards (relaxed for compilation)
+    // Strict Type Checking - 2025 Enterprise Standards (gradual enablement)
     "strict": false,
-    "noImplicitAny": false,
+    "noImplicitAny": true,  // PHASE 2: Enable implicit any detection
     "strictNullChecks": false,
     "strictFunctionTypes": false,
     "strictBindCallApply": false,

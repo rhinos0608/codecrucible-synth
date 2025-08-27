@@ -24,8 +24,20 @@ export { EnterpriseAuthManager } from './infrastructure/security/enterprise-auth
 // User Interaction
 export { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
 
-// Types
-export type * from './core/types.js';
+// Types - Legacy Core Types (backward compatibility)
+export type { 
+  ExecutionRequest, 
+  ExecutionResponse, 
+  Task, 
+  Workflow, 
+  ProjectContext as LegacyProjectContext 
+} from './core/types.js';
+
+// Types - Domain Types (primary)
+export type { 
+  ProjectContext, 
+  UnifiedConfiguration 
+} from './domain/types/index.js';
 export type * from './domain/types/index.js';
 
 // Interfaces

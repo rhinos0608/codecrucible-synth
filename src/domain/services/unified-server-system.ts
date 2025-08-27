@@ -19,7 +19,7 @@ import { IUserInteraction } from '../interfaces/user-interaction.js';
 import { UnifiedConfiguration, ServerRequest, ServerResponse } from '../types/unified-types.js';
 import { UnifiedSecurityValidator } from './unified-security-validator.js';
 import { UnifiedPerformanceSystem } from './unified-performance-system.js';
-import { ILogger } from '../interfaces/this.logger.js';
+import { ILogger } from '../interfaces/logger.js';
 
 // Server Interfaces
 export interface IServerStrategy {
@@ -143,7 +143,8 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
   constructor(
     private eventBus: IEventBus,
     private securityValidator: UnifiedSecurityValidator,
-    private performanceSystem: UnifiedPerformanceSystem
+    private performanceSystem: UnifiedPerformanceSystem,
+    private logger: ILogger
   ) {
     super();
     
@@ -439,7 +440,8 @@ export class WebSocketServerStrategy extends EventEmitter implements IServerStra
   constructor(
     private eventBus: IEventBus,
     private securityValidator: UnifiedSecurityValidator,
-    private performanceSystem: UnifiedPerformanceSystem
+    private performanceSystem: UnifiedPerformanceSystem,
+    private logger: ILogger
   ) {
     super();
     
@@ -708,7 +710,8 @@ export class MCPServerStrategy extends EventEmitter implements IServerStrategy {
   constructor(
     private eventBus: IEventBus,
     private securityValidator: UnifiedSecurityValidator,
-    private performanceSystem: UnifiedPerformanceSystem
+    private performanceSystem: UnifiedPerformanceSystem,
+    private logger: ILogger
   ) {
     super();
     
@@ -791,14 +794,14 @@ export class UnifiedServerSystem extends EventEmitter {
   ) {
     super();
     this.config = config;
-    this.this.logger.info('UnifiedServerSystem initialized');
+    this.logger.info('UnifiedServerSystem initialized');
     this.eventBus = eventBus;
     this.performanceSystem = performanceSystem;
     
     // Initialize strategies
-    this.strategies.set('http', new HTTPServerStrategy(eventBus, securityValidator, performanceSystem));
-    this.strategies.set('websocket', new WebSocketServerStrategy(eventBus, securityValidator, performanceSystem));
-    this.strategies.set('mcp', new MCPServerStrategy(eventBus, securityValidator, performanceSystem));
+    this.strategies.set('http', new HTTPServerStrategy(eventBus, securityValidator, performanceSystem, this.logger));
+    this.strategies.set('websocket', new WebSocketServerStrategy(eventBus, securityValidator, performanceSystem, this.logger));
+    this.strategies.set('mcp', new MCPServerStrategy(eventBus, securityValidator, performanceSystem, this.logger));
     
     this.setupEventHandlers();
   }

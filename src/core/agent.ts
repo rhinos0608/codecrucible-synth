@@ -8,13 +8,30 @@
  */
 
 import { EventEmitter } from 'events';
-import { UnifiedAgentSystem, AgentRequest, AgentResponse } from '../domain/services/unified-agent-system.js';
+import { UnifiedAgentSystem, AgentRequest } from '../domain/services/unified-agent-system.js';
+// Create minimal AgentResponse interface for legacy compatibility
+export interface AgentResponse {
+  id: string;
+  success: boolean;
+  result?: any;
+  error?: string;
+  metadata?: Record<string, any>;
+  // Legacy compatibility properties
+  content?: string;
+  workflowId?: string;
+}
+
+// Legacy compatibility type alias
+export type ExecutionResult = AgentResponse;
 import { UnifiedConfigurationManager } from '../domain/services/unified-configuration-manager.js';
 import { EventBus } from '../domain/interfaces/event-bus.js';
 import { UnifiedSecurityValidator } from '../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../domain/services/unified-performance-system.js';
-import { configManager, AgentConfig } from '../config/config-manager.js';
-export type { AgentConfig };
+import { ConfigManager, AppConfig } from '../config/config-manager.js';
+export type { AppConfig as AgentConfig };
+
+// Create legacy configManager instance for backward compatibility
+const configManager = new ConfigManager();
 import { PerformanceMonitor } from '../utils/performance.js';
 import { logger } from './logger.js';
 import type {
@@ -23,7 +40,6 @@ import type {
   Task,
   Workflow,
   ProjectContext,
-  ExecutionResult,
 } from './types.js';
 
 export interface AgentCapability {
@@ -48,7 +64,7 @@ export interface AgentMetrics {
  */
 export class UnifiedAgent extends EventEmitter {
   private unifiedSystem?: UnifiedAgentSystem;
-  private config: AgentConfig = {
+  private config: any = {
     enabled: true,
     mode: 'balanced',
     maxConcurrency: 3,
@@ -87,27 +103,47 @@ export class UnifiedAgent extends EventEmitter {
   private async initializeUnifiedSystem(): Promise<void> {
     try {
       // Create unified system components
-      const configManager = new UnifiedConfigurationManager();
+      const eventBus = new EventBus();
+      const mockLogger = {
+        info: (msg: string) => console.log(msg),
+        error: (msg: string, error?: any) => console.error(msg, error),
+        warn: (msg: string) => console.warn(msg),
+        debug: (msg: string) => {},
+        trace: (msg: string) => {}
+      };
+      
+      const configManager = new UnifiedConfigurationManager(mockLogger);
       await configManager.initialize();
       const unifiedConfig = configManager.getConfiguration();
       
-      const eventBus = new EventBus();
-      const securityValidator = new UnifiedSecurityValidator(eventBus);
-      const performanceSystem = new UnifiedPerformanceSystem(eventBus);
+      const securityValidator = new UnifiedSecurityValidator(mockLogger);
+      const performanceSystem = new UnifiedPerformanceSystem(mockLogger, eventBus);
       
       // Create mock user interaction
       const mockUserInteraction = {
-        async promptUser(question: string): Promise<string> {
+        async display(message: string): Promise<void> {
+          console.log(message);
+        },
+        async warn(message: string): Promise<void> {
+          console.warn(message);
+        },
+        async error(message: string): Promise<void> {
+          console.error(message);
+        },
+        async success(message: string): Promise<void> {
+          console.log('✓', message);
+        },
+        async progress(message: string, progress?: number): Promise<void> {
+          console.log(progress ? `[${progress}%] ${message}` : message);
+        },
+        async prompt(question: string): Promise<string> {
           return 'yes';
         },
-        displayMessage(message: string): void {
-          logger.info(`[Agent] ${message}`);
+        async confirm(question: string): Promise<boolean> {
+          return true;
         },
-        displayError(error: string): void {
-          logger.error(`[Agent] ${error}`);
-        },
-        displayWarning(warning: string): void {
-          logger.warn(`[Agent] ${warning}`);
+        async select(question: string, choices: string[]): Promise<string> {
+          return choices[0] || '';
         }
       };
       
@@ -235,8 +271,8 @@ export class UnifiedAgent extends EventEmitter {
         // Convert legacy request to new format
         const agentRequest: AgentRequest = {
           id: workflowId,
-          type: this.determineRequestType(request.input),
-          input: request.input,
+          type: this.determineRequestType(request.input as string),
+          input: typeof request.input === 'string' ? request.input : JSON.stringify(request.input),
           priority: 'medium',
           preferences: {
             mode: request.mode || this.config.mode,
@@ -251,11 +287,12 @@ export class UnifiedAgent extends EventEmitter {
         
         // Convert back to legacy format
         const legacyResponse: ExecutionResponse = {
+          id: response.id,
           workflowId: response.id,
           success: response.success,
-          result: response.result as unknown as Record<string, unknown>,
-          results: response.result as unknown as Record<string, unknown>,
-          executionTime: response.executionTime,
+          result: response.result,
+          results: response.result,
+          executionTime: Date.now() - startTime,
         };
         
         this.updateMetrics(legacyResponse);
@@ -270,9 +307,10 @@ export class UnifiedAgent extends EventEmitter {
       this.emit('workflow-failed', { workflowId, error });
 
       return {
+        id: workflowId,
         workflowId,
         success: false,
-        result: {} as Record<string, unknown>,
+        result: {},
         error: error instanceof Error ? error.message : String(error),
         executionTime: Date.now() - startTime,
       };
@@ -283,11 +321,11 @@ export class UnifiedAgent extends EventEmitter {
     // Legacy implementation for compatibility
     const workflow: Workflow = {
       id: workflowId,
-      request: request as unknown as Record<string, unknown>,
+      request: request,
       status: 'running',
-      startTime: new Date(startTime),
+      startTime: startTime,
       tasks: [],
-      results: {} as Record<string, unknown>,
+      results: [],
     };
 
     this.activeWorkflows.set(workflowId, workflow);
@@ -302,15 +340,16 @@ export class UnifiedAgent extends EventEmitter {
 
     // Complete workflow
     workflow.status = 'completed';
-    workflow.endTime = new Date();
-    workflow.results = results as unknown as Record<string, unknown>;
+    workflow.endTime = Date.now();
+    workflow.results = results;
 
     const response: ExecutionResponse = {
+      id: workflowId,
       workflowId,
       success: true,
-      result: results as unknown as Record<string, unknown>,
-      results: results as unknown as Record<string, unknown>,
-      executionTime: workflow.endTime.getTime() - workflow.startTime.getTime(),
+      result: results,
+      results: results,
+      executionTime: workflow.endTime - workflow.startTime,
     };
 
     this.updateMetrics(response);

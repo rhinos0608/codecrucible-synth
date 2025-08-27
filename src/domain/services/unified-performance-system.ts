@@ -823,6 +823,8 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
 export class UnifiedPerformanceOptimizer implements IPerformanceOptimizer {
   private currentTuning: TuningParameters = {};
   
+  constructor(private logger: ILogger) {}
+  
   async analyze(metrics: PerformanceMetrics): Promise<OptimizationRecommendation[]> {
     const analyzer = new UnifiedPerformanceAnalyzer();
     return analyzer.generateRecommendations(metrics);
@@ -916,6 +918,7 @@ export class UnifiedPerformanceSystem extends EventEmitter {
   private optimizer: IPerformanceOptimizer;
   private autoTuneEnabled = false;
   private autoTuneInterval?: NodeJS.Timeout;
+  private _isInitialized = false;
 
   constructor(
     private logger: ILogger,
@@ -924,8 +927,37 @@ export class UnifiedPerformanceSystem extends EventEmitter {
     super();
     this.monitor = new UnifiedPerformanceMonitor(eventBus);
     this.analyzer = new UnifiedPerformanceAnalyzer();
-    this.optimizer = new UnifiedPerformanceOptimizer();
-    this.this.logger.info('UnifiedPerformanceSystem initialized');
+    this.optimizer = new UnifiedPerformanceOptimizer(this.logger);
+    this.logger.info('UnifiedPerformanceSystem initialized');
+  }
+
+  /**
+   * Initialize the performance system
+   */
+  async initialize(): Promise<void> {
+    if (!this._isInitialized) {
+      // Perform any async initialization here
+      this.logger.info('UnifiedPerformanceSystem async initialization completed');
+      this._isInitialized = true;
+    }
+  }
+
+  /**
+   * Get system metrics
+   */
+  getSystemMetrics(): any {
+    return {
+      monitor: this.monitor.getMetrics(),
+      autoTuneEnabled: this.autoTuneEnabled,
+      isInitialized: this._isInitialized
+    };
+  }
+
+  /**
+   * Track resource usage (placeholder method)
+   */
+  trackResourceUsage(resource: string, usage: number): void {
+    this.logger.debug(`Tracking resource usage: ${resource} = ${usage}`);
   }
 
   // Monitor methods

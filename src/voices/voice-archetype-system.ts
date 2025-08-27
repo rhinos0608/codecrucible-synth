@@ -234,7 +234,7 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
     this.initializeVoices();
     // Initialize Council Decision Engine for sophisticated multi-voice collaboration
     this.councilEngine = new CouncilDecisionEngine(this, this.modelClient);
-    this.this.logger.info('VoiceArchetypeSystem initialized');
+    this.logger.info('VoiceArchetypeSystem initialized');
   }
 
   private initializeVoices() {

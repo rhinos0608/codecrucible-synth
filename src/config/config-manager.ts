@@ -9,6 +9,7 @@
 
 import { UnifiedConfigurationManager } from '../domain/services/unified-configuration-manager.js';
 import { UnifiedConfiguration } from '../domain/types/index.js';
+import { createLogger } from '../infrastructure/logging/logger-adapter.js';
 
 export interface AppConfig {
   model: {
@@ -50,7 +51,8 @@ export class ConfigManager {
   
   constructor() {
     console.warn('⚠️ ConfigManager is deprecated. Use UnifiedConfigurationManager instead.');
-    this.unifiedManager = new UnifiedConfigurationManager();
+    const configLogger = createLogger('UnifiedConfigurationManager');
+    this.unifiedManager = new UnifiedConfigurationManager(configLogger);
   }
 
   async loadConfiguration(): Promise<AppConfig> {
@@ -84,8 +86,8 @@ export class ConfigManager {
         mode: 'auto',
         maxConcurrency: unified.performance.maxConcurrentRequests || 3,
         enableCaching: unified.performance.enableCaching || true,
-        enableMetrics: unified.performance.monitoring.enableMetrics || true,
-        enableSecurity: unified.security.enabled || true,
+        enableMetrics: true, // Default since monitoring not in PerformanceConfiguration
+        enableSecurity: unified.security.enableSandbox || true, // Use enableSandbox as security indicator
       },
       voices: {
         default: unified.voices.defaultVoices || ['explorer', 'developer'],
@@ -113,6 +115,10 @@ export class ConfigManager {
     }
     
     return result;
+  }
+
+  async getAgentConfig(): Promise<AppConfig> {
+    return await this.loadConfiguration();
   }
 
   private getDefaultConfig(): AppConfig {

@@ -13,8 +13,10 @@ import { EventBus } from '../domain/interfaces/event-bus.js';
 import { UnifiedSecurityValidator } from '../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../domain/services/unified-performance-system.js';
 import { CLIContext } from '../application/interfaces/cli.js';
-import { logger } from '../core/logger.js';
+import { createLogger } from '../infrastructure/logging/logger-adapter.js';
 import chalk from 'chalk';
+
+const logger = createLogger('ServerMode');
 
 export interface ServerOptions {
   port: number;
@@ -65,13 +67,17 @@ export class ServerMode implements ServerModeInterface {
 
     try {
       // Create unified system components
-      const configManager = new UnifiedConfigurationManager();
+      const configLogger = createLogger('UnifiedConfigurationManager');
+      const configManager = new UnifiedConfigurationManager(configLogger);
       await configManager.initialize();
       const unifiedConfig = configManager.getConfiguration();
       
       const eventBus = new EventBus();
-      const securityValidator = new UnifiedSecurityValidator(eventBus);
-      const performanceSystem = new UnifiedPerformanceSystem(eventBus);
+      const securityLogger = createLogger('UnifiedSecurityValidator');
+      const performanceLogger = createLogger('UnifiedPerformanceSystem');
+      
+      const securityValidator = new UnifiedSecurityValidator(securityLogger);
+      const performanceSystem = new UnifiedPerformanceSystem(performanceLogger, eventBus);
       
       // Create mock user interaction for server mode
       const mockUserInteraction = {

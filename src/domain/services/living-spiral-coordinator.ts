@@ -58,7 +58,7 @@ export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface
     config: SpiralConfig
   ) {
     this.config = config;
-    this.this.logger.info('LivingSpiralCoordinator initialized');
+    this.logger.info('LivingSpiralCoordinator initialized');
   }
 
   /**
@@ -70,7 +70,7 @@ export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface
     let convergenceAchieved = false;
     let iterationCount = 0;
 
-    this.this.logger.info('🌀 Starting Living Spiral process', {
+    this.logger.info('🌀 Starting Living Spiral process', {
       prompt: initialPrompt.substring(0, 100),
       config: this.config,
     });

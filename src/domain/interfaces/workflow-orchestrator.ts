@@ -47,6 +47,26 @@ export interface IWorkflowOrchestrator {
    * Process a model request with routing and fallbacks
    */
   processModelRequest(request: any, context: WorkflowContext): Promise<any>;
+}
+
+/**
+ * Living Spiral Coordinator Interface for iterative development processes
+ */
+export interface LivingSpiralCoordinatorInterface {
+  /**
+   * Execute the complete Living Spiral process
+   */
+  executeSpiralProcess(initialPrompt: string): Promise<any>;
+  
+  /**
+   * Execute a single spiral iteration  
+   */
+  executeSpiralIteration(input: string, iteration: number): Promise<any>;
+  
+  /**
+   * Check if convergence has been achieved
+   */
+  checkConvergence(results: any[]): Promise<boolean>;
   
   /**
    * Analyze code or files

@@ -364,6 +364,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
   private metrics: SecurityMetrics;
   private threatDatabase: Map<string, ThreatDetectionResult>;
   private sessionCache: Map<string, SecurityEvent[]>;
+  private _isInitialized = false;
 
   constructor(
     private logger: ILogger,
@@ -378,6 +379,24 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     this.threatDatabase = new Map();
     this.sessionCache = new Map();
     this.initializeThreatDatabase();
+  }
+
+  /**
+   * Initialize the security validator
+   */
+  async initialize(): Promise<void> {
+    if (!this._isInitialized) {
+      // Perform any async initialization here
+      this.logger.info('UnifiedSecurityValidator async initialization completed');
+      this._isInitialized = true;
+    }
+  }
+
+  /**
+   * Check if the security validator is initialized
+   */
+  get isInitialized(): boolean {
+    return this._isInitialized;
   }
 
   async validateInput(input: string, context: SecurityValidationContext): Promise<SecurityValidationResult> {

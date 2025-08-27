@@ -15,7 +15,7 @@ import { UnifiedAgentSystem } from '../../domain/services/unified-agent-system.j
 import { UnifiedServerSystem } from '../../domain/services/unified-server-system.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../../domain/services/unified-performance-system.js';
-import { logger } from '../../infrastructure/logging/unified-logger.js';
+import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 
 export interface OrchestrationRequest {
   id: string;
@@ -60,6 +60,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
   private config: UnifiedConfiguration;
   private eventBus: IEventBus;
   private userInteraction: IUserInteraction;
+  private logger = createLogger('UnifiedOrchestrationService');
   
   // Domain services
   private configManager: UnifiedConfigurationManager;
@@ -81,6 +82,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     this.configManager = configManager;
     this.eventBus = eventBus;
     this.userInteraction = userInteraction;
+    this.logger.info('UnifiedOrchestrationService initialized');
     
     this.setupEventHandlers();
   }
@@ -91,18 +93,18 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
     
     try {
-      logger.info('Initializing Unified Orchestration Service...');
+      this.logger.info('Initializing Unified Orchestration Service...');
       
       // Initialize configuration
       await this.configManager.initialize();
       this.config = this.configManager.getConfiguration();
       
       // Initialize domain services
-      this.securityValidator = new UnifiedSecurityValidator(this.eventBus);
-      await this.securityValidator.initialize();
+      const securityLogger = createLogger('UnifiedSecurityValidator');
+      const performanceLogger = createLogger('UnifiedPerformanceSystem');
       
-      this.performanceSystem = new UnifiedPerformanceSystem(this.eventBus);
-      await this.performanceSystem.initialize();
+      this.securityValidator = new UnifiedSecurityValidator(securityLogger);
+      this.performanceSystem = new UnifiedPerformanceSystem(performanceLogger, this.eventBus);
       
       // Initialize agent system
       this.agentSystem = new UnifiedAgentSystem(
@@ -115,7 +117,9 @@ export class UnifiedOrchestrationService extends EventEmitter {
       await this.agentSystem.initialize();
       
       // Initialize server system
+      const serverLogger = createLogger('UnifiedServerSystem');
       this.serverSystem = new UnifiedServerSystem(
+        serverLogger,
         this.config,
         this.eventBus,
         this.userInteraction,
@@ -125,10 +129,10 @@ export class UnifiedOrchestrationService extends EventEmitter {
       
       this.initialized = true;
       this.emit('initialized');
-      logger.info('Unified Orchestration Service initialized successfully');
+      this.logger.info('Unified Orchestration Service initialized successfully');
       
     } catch (error) {
-      logger.error('Failed to initialize Unified Orchestration Service:', error);
+      this.logger.error('Failed to initialize Unified Orchestration Service:', error);
       throw error;
     }
   }
@@ -142,7 +146,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     this.activeRequests.set(request.id, request);
     
     try {
-      logger.info(`Processing orchestration request: ${request.id} (${request.type})`);
+      this.logger.info(`Processing orchestration request: ${request.id} (${request.type})`);
       
       // Validate input
       await this.validateRequest(request);
@@ -204,7 +208,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
       };
       
       this.emit('request-failed', { request, response, error });
-      logger.error(`Orchestration request failed: ${request.id}`, error);
+      this.logger.error(`Orchestration request failed: ${request.id}`, error);
       
       return response;
       
@@ -221,16 +225,16 @@ export class UnifiedOrchestrationService extends EventEmitter {
       priority: request.options?.priority || 'medium',
       constraints: {
         maxExecutionTime: request.options?.timeout,
-        securityLevel: 'high'
+        securityLevel: 'high' as const
       },
       preferences: {
         mode: request.options?.mode || 'balanced',
-        outputFormat: 'structured',
+        outputFormat: 'structured' as const,
         includeReasoning: true,
         verboseLogging: false,
         interactiveMode: false
       },
-      context: request.context
+      context: this.createProjectContext(request.context)
     };
     
     if (request.options?.collaborative) {
@@ -315,11 +319,21 @@ export class UnifiedOrchestrationService extends EventEmitter {
       
     const validation = await this.securityValidator.validateInput(
       inputString, 
-      `orchestration-${request.type}`
+      {
+        sessionId: request.id,
+        operationType: 'input',
+        environment: 'development',
+        permissions: ['orchestration', request.type],
+        metadata: {
+          requestType: request.type,
+          timestamp: Date.now()
+        }
+      }
     );
     
     if (!validation.isValid) {
-      throw new Error(`Security validation failed: ${validation.issues.join(', ')}`);
+      const violationMessages = validation.violations.map(v => v.message);
+      throw new Error(`Security validation failed: ${violationMessages.join(', ')}`);
     }
     
     // Performance constraints
@@ -328,6 +342,29 @@ export class UnifiedOrchestrationService extends EventEmitter {
     }
   }
   
+  private createProjectContext(context?: any): any {
+    // Create a minimal ProjectContext with defaults for missing properties
+    return {
+      rootPath: context?.workingDirectory || process.cwd(),
+      language: context?.language || ['typescript'],
+      frameworks: context?.frameworks || [],
+      dependencies: new Map(),
+      structure: {
+        directories: [],
+        files: new Map(),
+        entryPoints: [],
+        testDirectories: [],
+        configFiles: []
+      },
+      documentation: {
+        files: new Map(),
+        apiDocs: new Map(),
+        readmeFiles: [],
+        changelogFiles: []
+      }
+    };
+  }
+
   private async getResourceUsage(): Promise<{ memory: number; cpu: number }> {
     const memUsage = process.memoryUsage();
     return {
@@ -405,19 +442,19 @@ export class UnifiedOrchestrationService extends EventEmitter {
       components: {
         agentSystem: this.agentSystem ? this.agentSystem.getSystemStats() : null,
         serverSystem: this.serverSystem ? this.serverSystem.getSystemMetrics() : null,
-        securityValidator: this.securityValidator?.isInitialized() || false,
+        securityValidator: this.securityValidator?.isInitialized || false,
         performanceSystem: this.performanceSystem ? this.performanceSystem.getSystemMetrics() : null
       }
     };
   }
   
   async shutdown(): Promise<void> {
-    logger.info('Shutting down Unified Orchestration Service...');
+    this.logger.info('Shutting down Unified Orchestration Service...');
     
     try {
       // Cancel active requests
       for (const [id, request] of this.activeRequests.entries()) {
-        logger.warn(`Cancelling active request: ${id}`);
+        this.logger.warn(`Cancelling active request: ${id}`);
         this.emit('request-cancelled', request);
       }
       this.activeRequests.clear();
@@ -439,10 +476,10 @@ export class UnifiedOrchestrationService extends EventEmitter {
       this.emit('shutdown');
       this.removeAllListeners();
       
-      logger.info('Unified Orchestration Service shut down successfully');
+      this.logger.info('Unified Orchestration Service shut down successfully');
       
     } catch (error) {
-      logger.error('Error during orchestration service shutdown:', error);
+      this.logger.error('Error during orchestration service shutdown:', error);
       throw error;
     }
   }

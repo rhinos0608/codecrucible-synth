@@ -81,7 +81,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         priority: p.priority || 1,
         models: p.models,
         apiKey: p.apiKey,
-        timeout: p.timeout
+        timeout: 30000 // Default timeout since ModelProviderConfiguration doesn't have timeout property
       })),
       fallbackStrategy: 'priority',
       timeout: unifiedConfig.model.timeout,
@@ -350,11 +350,12 @@ class OllamaProvider implements IModelProvider {
   }
   
   async initialize(): Promise<void> {
-    await this.client.initialize();
+    // OllamaClient initializes in constructor, test connection to ensure it's ready
+    await this.client.testConnection();
   }
   
   async request(request: ModelRequest): Promise<ModelResponse> {
-    return await this.client.generate({
+    const ollamaResponse = await this.client.generateText({
       model: request.model || 'default',
       prompt: request.prompt,
       stream: false,
@@ -362,11 +363,28 @@ class OllamaProvider implements IModelProvider {
         temperature: request.temperature,
         num_predict: request.maxTokens
       }
-    }) as ModelResponse;
+    });
+    
+    return {
+      id: `ollama-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      content: ollamaResponse.response || '',
+      model: request.model || 'default',
+      provider: 'ollama',
+      usage: {
+        promptTokens: ollamaResponse.prompt_eval_count || 0,
+        completionTokens: ollamaResponse.eval_count || 0,
+        totalTokens: (ollamaResponse.prompt_eval_count || 0) + (ollamaResponse.eval_count || 0)
+      },
+      metadata: {
+        finishReason: ollamaResponse.done ? 'stop' : 'length',
+        totalDuration: ollamaResponse.total_duration,
+        loadDuration: ollamaResponse.load_duration
+      }
+    } as ModelResponse;
   }
   
   async isAvailable(): Promise<boolean> {
-    return await this.client.isHealthy();
+    return await this.client.testConnection();
   }
   
   async getSupportedModels(): Promise<ModelInfo[]> {
@@ -384,7 +402,7 @@ class OllamaProvider implements IModelProvider {
   }
   
   async shutdown(): Promise<void> {
-    await this.client.shutdown();
+    await this.client.close();
   }
 }
 
@@ -396,34 +414,58 @@ class LMStudioProvider implements IModelProvider {
   constructor(private config: ProviderConfig) {
     this.endpoint = config.endpoint;
     this.client = new LMStudioClient({
-      endpoint: config.endpoint,
-      timeout: config.timeout || 30000
+      baseUrl: config.endpoint,
+      timeout: config.timeout || 30000,
+      retryAttempts: 3,
+      retryDelayMs: 1000,
+      connectionTimeout: 10000,
+      healthCheckInterval: 60000,
+      websocketReconnectDelay: 5000
     });
   }
   
   async initialize(): Promise<void> {
-    await this.client.initialize();
+    // LMStudioClient initializes in constructor, test connection to ensure it's ready
+    await this.client.testConnection();
   }
   
   async request(request: ModelRequest): Promise<ModelResponse> {
-    return await this.client.generateCompletion({
+    const lmResponse = await this.client.complete({
+      modelPath: request.model || 'default',
       prompt: request.prompt,
-      temperature: request.temperature,
-      max_tokens: request.maxTokens
-    }) as ModelResponse;
+      options: {
+        temperature: request.temperature,
+        maxTokens: request.maxTokens
+      }
+    });
+    
+    return {
+      id: `lm-studio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      content: lmResponse.content,
+      model: request.model || 'default',
+      provider: 'lm-studio',
+      usage: lmResponse.usage || {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      },
+      metadata: {
+        finishReason: lmResponse.finishReason || 'stop'
+      }
+    } as ModelResponse;
   }
   
   async isAvailable(): Promise<boolean> {
-    return await this.client.isConnected();
+    return await this.client.testConnection();
   }
   
   async getSupportedModels(): Promise<ModelInfo[]> {
-    const models = await this.client.getLoadedModels();
+    const models = await this.client.listLoadedModels();
     return models.map(model => ({
-      id: model.id,
-      name: model.name,
+      id: model.identifier,
+      name: model.path,
       provider: 'lm-studio',
-      description: model.description,
+      description: `LM Studio model: ${model.path}`,
       capabilities: [
         { type: 'completion', supported: true },
         { type: 'chat', supported: true }
@@ -432,7 +474,7 @@ class LMStudioProvider implements IModelProvider {
   }
   
   async shutdown(): Promise<void> {
-    await this.client.shutdown();
+    await this.client.close();
   }
 }
 

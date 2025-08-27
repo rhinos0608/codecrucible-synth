@@ -1,8 +1,16 @@
 /**
- * Core logger re-export for backward compatibility
+ * Legacy Core Logger - Compatibility Stub
  * 
- * @deprecated Use UnifiedLogger from infrastructure/logging/unified-logger.ts
+ * This is a minimal stub to maintain backward compatibility
+ * during the architectural migration.
+ * 
+ * @deprecated Use createLogger from infrastructure/logging/logger-adapter.js instead
  */
 
-export * from '../infrastructure/logging/unified-logger.js';
-export { logger } from '../infrastructure/logging/unified-logger.js';
+import { createLogger } from '../infrastructure/logging/logger-adapter.js';
+
+// Create a default logger instance for legacy compatibility
+export const logger = createLogger('LegacyCore');
+
+// Re-export createLogger for convenience
+export { createLogger };

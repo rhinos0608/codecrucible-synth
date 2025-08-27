@@ -168,12 +168,12 @@ export interface RAGConfig {
 
 // Main RAG System
 export class VectorRAGSystem extends EventEmitter {
-  private logger: Logger;
+  protected logger: Logger;
   private config: RAGConfig;
   private vectorStore!: VectorStore;
   private embeddingModel!: EmbeddingModel;
   private codeChunker!: CodeChunker;
-  private modelClient: UnifiedModelClient;
+  protected modelClient: UnifiedModelClient;
   private fileWatcher?: chokidar.FSWatcher;
   private embeddingCache: Map<string, number[]> = new Map();
   private indexingQueue: Set<string> = new Set();
@@ -909,12 +909,19 @@ class LanceDBVectorStore implements VectorStore {
   constructor(private config: RAGConfig['vectorStore']) {}
 
   async initialize(): Promise<void> {
-    const lancedb = await import('lancedb');
-    this.db = await lancedb.connect(this.config.storagePath);
+    let lancedb: any;
     try {
-      this.table = await this.db.openTable(this.config.tableName);
+      // Optional import of lancedb
+      lancedb = await Function('return import("lancedb")')() as any;
+    } catch (error) {
+      throw new Error('lancedb module not found. Please install lancedb: npm install lancedb');
+    }
+    this.db = await lancedb.connect(this.config.storagePath);
+    const tableName = (this.config as any).tableName || 'vectors';
+    try {
+      this.table = await this.db.openTable(tableName);
     } catch (e) {
-      this.table = await this.db.createTable(this.config.tableName, {
+      this.table = await this.db.createTable(tableName, {
         vector: [],
         text: '',
         metadata: {},
@@ -1002,7 +1009,7 @@ class LanceDBVectorStore implements VectorStore {
   }
 
   async getDocument(id: string): Promise<VectorDocument | null> {
-    const result = await this.table.search(0).where(`id = '${id}'`).execute<VectorDocument>();
+    const result = await (this.table as any).search(0).where(`id = '${id}'`).execute();
     if (result.length === 0) {
       return null;
     }

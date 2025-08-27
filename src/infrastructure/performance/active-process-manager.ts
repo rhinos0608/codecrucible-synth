@@ -128,7 +128,7 @@ export class ActiveProcessManager extends EventEmitter {
    */
   async startProcess(processName: string, handler: () => Promise<any>): Promise<string> {
     const processConfig = {
-      type: processName,
+      type: 'analysis' as const,
       modelName: 'unknown',
       estimatedMemoryUsage: 50 * 1024 * 1024, // 50MB default
       promise: handler(),

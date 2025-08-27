@@ -417,10 +417,11 @@ export class E2BBackend extends ExecutionBackend {
             ErrorCategory.CONFIGURATION,
             ErrorSeverity.HIGH,
             {
-            {
-              operation: 'e2bExecute',
-              timestamp: Date.now(),
-              component: 'e2b-backend'
+              context: {
+                operation: 'e2bExecute',
+                timestamp: Date.now(),
+                component: 'e2b-backend'
+              }
             }
           )
         );
@@ -470,13 +471,14 @@ export class E2BBackend extends ExecutionBackend {
           ErrorCategory.EXTERNAL_API,
           ErrorSeverity.HIGH,
           {
-          {
-            operation: 'e2bExecute',
-            timestamp: Date.now(),
-            component: 'e2b-backend',
-            metadata: { sandboxId, command }
-          },
-          error
+            context: {
+              operation: 'e2bExecute',
+              timestamp: Date.now(),
+              component: 'e2b-backend',
+              metadata: { sandboxId, command },
+              error
+            }
+          }
         )
       );
     } finally {

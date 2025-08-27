@@ -644,7 +644,7 @@ export class StandardizedErrorCoordinationService extends EventEmitter {
       'Sensitive error information masked',
       error.category,
       error.severity,
-      { ...error.context, sensitive: '[MASKED]' },
+      { ...error.context },
       { 
         originalError: undefined, // Remove original error details
         isRetryable: error.isRetryable,

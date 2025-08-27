@@ -371,7 +371,7 @@ export class RequestHandler {
       // Stream cached response progressively using StreamingManager
       await this.client
         .getStreamingManager()
-        .startStream(cachedResponse.value, onToken, this.client.getDefaultConfig().streaming);
+        .startStream(cachedResponse.value, (token) => onToken(token as StreamToken), this.client.getDefaultConfig().streaming);
 
       return {
         content: cachedResponse.value,
@@ -445,9 +445,9 @@ export class RequestHandler {
       // Stream the real response using StreamingManager
       await this.client.getStreamingManager().startStream(
         responseContent,
-        (token: StreamToken) => {
+        (token) => {
           fullResponse += token.content;
-          onToken(token);
+          onToken(token as StreamToken);
         },
         this.client.getConfig().streaming
       );

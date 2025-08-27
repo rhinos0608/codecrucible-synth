@@ -10,7 +10,7 @@
  * - Performance Engineer: Efficient validation with minimal overhead
  */
 
-import { SecurityUtils } from '../../core/security-utils.js';
+import { SecurityUtils } from '../../core/security.js';
 import { SecurityValidation } from './security-types.js';
 import { logger } from '../logging/logger.js';
 

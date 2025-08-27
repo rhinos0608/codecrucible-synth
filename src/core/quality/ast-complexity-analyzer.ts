@@ -312,7 +312,6 @@ export class ASTComplexityAnalyzer {
     const text = node.getText().trim();
     return TYPESCRIPT_OPERATORS.has(text) || 
            ts.isBinaryExpression(node) ||
-           ts.isUnaryExpression(node) ||
            ts.isPostfixUnaryExpression(node) ||
            ts.isPrefixUnaryExpression(node);
   }

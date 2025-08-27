@@ -394,7 +394,14 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
         complexity: updates.cyclomaticComplexity ? {
           cyclomaticLow: updates.cyclomaticComplexity.lowThreshold,
           cyclomaticMedium: updates.cyclomaticComplexity.mediumThreshold,
-          cyclomaticHigh: updates.cyclomaticComplexity.highThreshold
+          cyclomaticHigh: updates.cyclomaticComplexity.highThreshold,
+          cyclomaticCritical: updates.cyclomaticComplexity.highThreshold + 10,
+          cognitiveLow: 15,
+          cognitiveMedium: 25,
+          cognitiveHigh: 35,
+          halsteadEffortLow: 1000,
+          halsteadEffortMedium: 5000,
+          halsteadEffortHigh: 10000
         } : undefined,
         weights: updates.weights ? {
           complexity: updates.weights.cyclomaticComplexity,

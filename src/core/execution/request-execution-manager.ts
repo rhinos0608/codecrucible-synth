@@ -199,9 +199,9 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
             temperature: request.temperature,
             maxTokens: request.maxTokens,
             mode: strategy.mode,
-            priority: this.getRequestPriority(request)
-          },
-          request.tools
+            priority: this.getRequestPriority(request),
+            tools: request.tools
+          }
         );
 
         // Record performance metrics for adaptive tuning
@@ -389,8 +389,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         const { abortController, timeout: optimizedTimeout } = requestTimeoutOptimizer.createOptimizedTimeout(
           requestId,
           requestType,
-          providerType,
-          strategy.timeout
+          providerType === 'fast' ? 'low' : providerType === 'quality' ? 'high' : 'medium'
         );
 
         // Add abort signal to request

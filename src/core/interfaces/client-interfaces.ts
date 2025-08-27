@@ -12,7 +12,7 @@
 // Import and re-export types from the existing types module to ensure compatibility
 import { ProjectContext, ModelRequest, ModelResponse } from '../types.js';
 
-export { ProjectContext, ModelRequest, ModelResponse };
+export type { ProjectContext, ModelRequest, ModelResponse };
 
 // Streaming interfaces
 export interface StreamToken {

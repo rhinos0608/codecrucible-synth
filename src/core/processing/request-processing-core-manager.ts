@@ -53,12 +53,12 @@ export interface IRequestProcessingCoreManager {
   /**
    * Determine process type based on request content
    */
-  getProcessType(request: ModelRequest): ActiveProcess['type'];
+  getProcessType(request: ModelRequest): string;
 
   /**
    * Determine request priority
    */
-  getRequestPriority(request: ModelRequest): ActiveProcess['priority'];
+  getRequestPriority(request: ModelRequest): 'low' | 'medium' | 'high' | 'critical';
 
   /**
    * Assess complexity quickly for timeout determination
@@ -184,7 +184,7 @@ export class RequestProcessingCoreManager
   /**
    * Determine process type based on request content
    */
-  getProcessType(request: ModelRequest): ActiveProcess['type'] {
+  getProcessType(request: ModelRequest): string {
     if (!request.prompt) {
       return 'model_inference';
     }
@@ -207,7 +207,7 @@ export class RequestProcessingCoreManager
   /**
    * Determine request priority
    */
-  getRequestPriority(request: ModelRequest): ActiveProcess['priority'] {
+  getRequestPriority(request: ModelRequest): 'low' | 'medium' | 'high' | 'critical' {
     // Simple priority determination - could be enhanced with explicit priority in request
     if (request.prompt?.toLowerCase().includes('urgent') || request.stream) {
       return 'high';

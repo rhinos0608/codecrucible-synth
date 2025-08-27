@@ -106,11 +106,13 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.securityValidator =
       injectedDependencies?.securityValidator ||
       new SecurityValidator({
-        allowExecutableCommands: !this.config.security?.enableSandbox,
+        enableSandbox: this.config.security?.enableSandbox,
         maxInputLength: this.config.security?.maxInputLength || 10000,
+        strictMode: this.config.security?.strictMode,
+        logViolations: true
       });
     this.hardwareSelector = new HardwareAwareModelSelector();
-    this.processManager = new ActiveProcessManager();
+    this.processManager = new ActiveProcessManager(config);
     this.streamingManager =
       injectedDependencies?.streamingManager || new StreamingManager(config.streaming);
 
@@ -162,7 +164,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
             high: 1000,
           },
         },
-        this.processManager,
+        this.processManager as any,
         this.providerManager.getProviderRepository()
       );
     this.healthStatusManager =
@@ -210,7 +212,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       new StreamProcessingManager(
         this.securityValidator,
         this.cacheCoordinator,
-        this.streamingManager,
+        this.streamingManager as any,
         async (request, context) => this.processRequest(request, context),
         () => this.generateRequestId(),
         {

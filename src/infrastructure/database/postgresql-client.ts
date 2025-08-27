@@ -296,7 +296,7 @@ export class PostgreSQLClient extends EventEmitter {
       if (cached) {
         this.metrics.cacheHits++;
         this.emit('cacheHit', { key });
-        return JSON.parse(cached);
+        return JSON.parse(cached as string);
       } else {
         this.metrics.cacheMisses++;
         this.emit('cacheMiss', { key });

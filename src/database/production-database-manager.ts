@@ -583,7 +583,7 @@ export class ProductionDatabaseManager {
     try {
       const key = `query:${queryId}:${JSON.stringify(params)}`;
       const cached = await this.redisClient.get(key);
-      return cached ? JSON.parse(cached) : null;
+      return cached ? JSON.parse(cached as string) : null;
     } catch (error) {
       logger.warn('Cache get failed:', error);
       return null;

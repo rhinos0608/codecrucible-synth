@@ -1268,7 +1268,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
           content,
           priority: context.priority || 'medium',
           calculateComplexity: () => this.calculateContentComplexity(content)
-        } as ProcessingRequest,
+        } as unknown as ProcessingRequest,
         priority: context.priority || 'medium',
         phase: context.phase,
         preferences: {
@@ -1282,7 +1282,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
       };
 
       // Use existing routing logic
-      return await this.route(routingContext);
+      return await this.routeRequest(routingContext);
       
     } catch (error) {
       logger.error('Failed to decide routing strategy:', error);
@@ -1333,22 +1333,23 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     
     return {
       modelSelection: {
-        selectedModel: 'default',
-        confidence: 0.5,
-        reasoning: 'Fallback model selection',
-        alternatives: []
+        primaryModel: { name: 'default' as any, capabilities: [] } as any,
+        fallbackModels: [],
+        selectionReason: 'Fallback model selection',
+        routingStrategy: 'single' as any,
+        estimatedCost: 0.01,
+        estimatedLatency: 5000
       },
       voiceSelection: {
-        selectedVoice: 'maintainer',
-        confidence: 0.5,
-        reasoning: 'Fallback to stable voice',
-        alternatives: []
+        primaryVoice: { id: 'maintainer', name: 'Maintainer', style: 'maintainer' as any } as any,
+        supportingVoices: [],
+        synthesisMode: 'single' as any,
+        reasoning: 'Fallback to stable voice'
       },
       providerSelection: {
-        selectedProvider: 'ollama',
+        provider: 'ollama' as any,
         confidence: 0.5,
-        reasoning: 'Fallback provider selection',
-        metrics: {},
+        reason: 'Fallback provider selection',
         fallbackChain: []
       },
       routingStrategy: 'single-model',
@@ -1372,7 +1373,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
           content,
           priority: 'medium',
           calculateComplexity: () => 0.5
-        } as ProcessingRequest,
+        } as unknown as ProcessingRequest,
         priority: 'medium',
         phase: context.phase
       }

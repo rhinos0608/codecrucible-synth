@@ -517,7 +517,6 @@ export class StateManagementHarmonizationSystem extends EventEmitter {
           conflictId: conflict.conflictId,
           success: resolution.success,
           resolution: resolution.resolution,
-          error: resolution.error,
         });
         
       } catch (error) {

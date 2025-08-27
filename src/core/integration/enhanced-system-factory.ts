@@ -112,31 +112,31 @@ export class EnhancedSystemFactory {
       // Create additional systems for direct access
       const securityFramework = finalConfig.security.enabled ? new EnterpriseSecurityFramework() : undefined;
       const qualityAnalyzer = finalConfig.quality.enabled ? new CodeQualityAnalyzer({
-        cyclomaticComplexity: {
-          lowThreshold: 10,
-          mediumThreshold: finalConfig.quality.thresholds.complexity,
-          highThreshold: finalConfig.quality.thresholds.complexity * 1.5,
+        quality: {
+          maintainability: {
+            excellent: 80,
+            acceptable: 60,
+            problematic: 40,
+            critical: 20
+          },
+          weights: {
+            complexity: 0.25,
+            maintainability: 0.20,
+            linting: 0.15,
+            formatting: 0.10,
+            typeScript: 0.15,
+            documentation: 0.10,
+            security: 0.05,
+          }
         },
-        maintainabilityIndex: {
-          lowThreshold: 25,
-          mediumThreshold: finalConfig.quality.thresholds.maintainability,
-          highThreshold: 100,
-        },
-        weights: {
-          cyclomaticComplexity: 0.25,
-          maintainabilityIndex: 0.20,
-          lintingScore: 0.15,
-          formattingScore: 0.10,
-          typeCoverage: 0.15,
-          documentation: 0.10,
-          duplication: 0.05,
-          halsteadComplexity: 0.00,
-        }
+        performance: {},
+        tools: {},
+        analysis: {}
       }) : undefined;
 
       const voiceSystem = finalConfig.voice.enabled ? new VoiceArchetypeSystem(modelClient) : undefined;
       const sequentialAgentSystem = finalConfig.voice.collaborationMode === 'sequential' 
-        ? new SequentialDualAgentSystem(modelClient) 
+        ? new SequentialDualAgentSystem() 
         : undefined;
 
       this.instance = {
@@ -250,5 +250,4 @@ export function createEnhancedRequest(
   };
 }
 
-// Export types for external use
-export type { EnhancedSystemConfig, EnhancedSystemInstance };
+// Types are already exported via the interface declarations above

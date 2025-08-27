@@ -10,6 +10,7 @@
  */
 
 import { promises as fs, constants, Stats } from 'fs';
+import * as fsSync from 'fs';
 import { join, resolve, dirname, basename, extname, relative } from 'path';
 import { EventEmitter } from 'events';
 import { glob } from 'glob';
@@ -554,7 +555,8 @@ export class FileSystemClient extends EventEmitter {
     const absolutePath = this.resolveAbsolutePath(filePath);
 
     try {
-      const watcher = fs.watch(absolutePath, { recursive: recursive }, (eventType: string, filename: string | null) => {
+      const watcher = fsSync.watch(absolutePath, { recursive: recursive });
+      watcher.addListener('change', (eventType: string, filename: string | null) => {
         if (filename) {
           const fullPath = join(absolutePath, filename);
           this.emit('fileWatchEvent', {

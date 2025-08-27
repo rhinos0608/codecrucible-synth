@@ -167,12 +167,18 @@ export class IntelligentFileWatcher extends EventEmitter {
       if (this.isWatching) {
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
-            'File watcher is already running',
-            ErrorCategory.SYSTEM,
-            ErrorSeverity.MEDIUM,
             {
-              userMessage: 'File watching is already active',
-              suggestedActions: ['Stop current watcher before starting new one'],
+              code: 'FILE_WATCHER_ALREADY_RUNNING',
+              message: 'File watcher is already running',
+              severity: 'medium',
+              category: 'system',
+              recoverable: true,
+              suggestions: ['Stop current watcher before starting new one']
+            },
+            {
+              operation: 'startWatching',
+              timestamp: Date.now(),
+              component: 'intelligent-file-watcher'
             }
           )
         );
@@ -204,18 +210,24 @@ export class IntelligentFileWatcher extends EventEmitter {
     } catch (error) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
-          `Failed to start file watcher: ${(error as Error).message}`,
-          ErrorCategory.SYSTEM,
-          ErrorSeverity.HIGH,
           {
-            originalError: error as Error,
-            userMessage: 'Unable to start file monitoring',
-            suggestedActions: [
+            code: 'FILE_WATCHER_START_FAILED',
+            message: `Failed to start file watcher: ${(error as Error).message}`,
+            severity: 'high',
+            category: 'system',
+            recoverable: true,
+            suggestions: [
               'Check file permissions',
               'Verify watch paths exist',
-              'Try with fewer paths',
-            ],
-          }
+              'Try with fewer paths'
+            ]
+          },
+          {
+            operation: 'startWatching',
+            timestamp: Date.now(),
+            component: 'intelligent-file-watcher'
+          },
+          error as Error
         )
       );
     }

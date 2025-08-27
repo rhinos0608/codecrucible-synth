@@ -190,7 +190,7 @@ export class PerformanceOptimizer extends EventEmitter {
       // Record performance metrics
       this.recordOperationMetrics(operationId, startTime, true, options?.systemId);
       
-      return result;
+      return result as T;
       
     } catch (error) {
       this.recordOperationMetrics(operationId, startTime, false, options?.systemId);
@@ -226,7 +226,7 @@ export class PerformanceOptimizer extends EventEmitter {
     // Record batch performance metrics
     this.recordBatchMetrics(operations.map(op => op.id), startTime);
     
-    return results;
+    return results as T[];
   }
   
   /**
@@ -587,7 +587,7 @@ class OperationQueue extends EventEmitter {
   
   async enqueueBatch<T>(operations: any[]): Promise<T[]> {
     const promises = operations.map(op => this.enqueue(op));
-    return Promise.all(promises);
+    return Promise.all(promises) as Promise<T[]>;
   }
   
   private async processQueue(): Promise<void> {

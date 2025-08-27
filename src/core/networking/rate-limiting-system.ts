@@ -114,18 +114,23 @@ export class RateLimitManager {
 
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
-            `Rate limit exceeded for ${identifier}`,
-            ErrorCategory.SYSTEM,
-            ErrorSeverity.MEDIUM,
             {
-              context: {
+              code: 'RATE_LIMIT_EXCEEDED',
+              message: `Rate limit exceeded for ${identifier}`,
+              severity: 'medium',
+              category: 'system',
+              recoverable: true,
+              suggestions: [`Wait ${Math.ceil(remainingTime / 1000)} seconds before retrying`]
+            },
+            {
+              operation: 'checkRateLimit',
+              timestamp: Date.now(),
+              component: 'rate-limiting-system',
+              metadata: {
                 identifier,
                 remainingBlockTime: remainingTime,
-                rateLimitConfig,
-              },
-              userMessage: 'Too many requests, please wait before trying again',
-              suggestedActions: [`Wait ${Math.ceil(remainingTime / 1000)} seconds before retrying`],
-              retryable: true,
+                rateLimitConfig
+              }
             }
           )
         );
@@ -147,14 +152,19 @@ export class RateLimitManager {
 
         return ErrorHandler.createErrorResponse(
           ErrorFactory.createError(
-            `Rate limit bucket exhausted for ${identifier}`,
-            ErrorCategory.SYSTEM,
-            ErrorSeverity.MEDIUM,
             {
-              context: { identifier, rateLimitConfig },
-              userMessage: 'Request rate limit exceeded',
-              suggestedActions: ['Reduce request frequency', 'Wait before retrying'],
-              retryable: true,
+              code: 'RATE_LIMIT_BUCKET_EXHAUSTED',
+              message: `Rate limit bucket exhausted for ${identifier}`,
+              severity: 'medium',
+              category: 'system',
+              recoverable: true,
+              suggestions: ['Reduce request frequency', 'Wait before retrying']
+            },
+            {
+              operation: 'checkRateLimit',
+              timestamp: Date.now(),
+              component: 'rate-limiting-system',
+              metadata: { identifier, rateLimitConfig }
             }
           )
         );
@@ -167,15 +177,21 @@ export class RateLimitManager {
     } catch (error) {
       return ErrorHandler.createErrorResponse(
         ErrorFactory.createError(
-          `Rate limit check failed: ${(error as Error).message}`,
-          ErrorCategory.SYSTEM,
-          ErrorSeverity.HIGH,
           {
-            context: { identifier },
-            originalError: error as Error,
-            userMessage: 'Rate limiting system error',
-            suggestedActions: ['Try again', 'Contact support if issue persists'],
-          }
+            code: 'RATE_LIMIT_CHECK_FAILED',
+            message: `Rate limit check failed: ${(error as Error).message}`,
+            severity: 'high',
+            category: 'system',
+            recoverable: false,
+            suggestions: ['Try again', 'Contact support if issue persists']
+          },
+          {
+            operation: 'checkRateLimit',
+            timestamp: Date.now(),
+            component: 'rate-limiting-system',
+            metadata: { identifier }
+          },
+          error as Error
         )
       );
     }
@@ -362,26 +378,31 @@ export class TimeoutRetryManager {
     // All retries exhausted
     return ErrorHandler.createErrorResponse(
       ErrorFactory.createError(
-        `Request failed after ${attempt} attempts: ${lastError?.message || 'Unknown error'}`,
-        ErrorCategory.NETWORK,
-        ErrorSeverity.HIGH,
         {
-          context: {
+          code: 'REQUEST_FAILED_AFTER_RETRIES',
+          message: `Request failed after ${attempt} attempts: ${lastError?.message || 'Unknown error'}`,
+          severity: 'high',
+          category: 'network',
+          recoverable: true,
+          suggestions: [
+            'Check network connection',
+            'Verify service availability',
+            'Try again later'
+          ]
+        },
+        {
+          operation: 'executeWithTimeoutAndRetry',
+          timestamp: Date.now(),
+          component: 'rate-limiting-system',
+          metadata: {
             identifier,
             attempts: attempt,
             lastError: lastError?.message,
             timeoutConfig,
-            retryConfig,
-          },
-          originalError: lastError,
-          userMessage: 'Network request failed after multiple attempts',
-          suggestedActions: [
-            'Check network connection',
-            'Verify service availability',
-            'Try again later',
-          ],
-          retryable: true,
-        }
+            retryConfig
+          }
+        },
+        lastError
       )
     );
   }
@@ -395,15 +416,19 @@ export class TimeoutRetryManager {
       const timeoutHandle = setTimeout(() => {
         reject(
           ErrorFactory.createError(
-            `Request timeout after ${config.totalTimeout}ms`,
-            ErrorCategory.NETWORK,
-            ErrorSeverity.MEDIUM,
             {
-              context: { identifier, timeout: config.totalTimeout },
-              userMessage: 'Request timed out',
-              suggestedActions: ['Try again with longer timeout', 'Check network connection'],
-              retryable: true,
-              metadata: { timeout: true },
+              code: 'REQUEST_TIMEOUT',
+              message: `Request timeout after ${config.totalTimeout}ms`,
+              severity: 'medium',
+              category: 'network',
+              recoverable: true,
+              suggestions: ['Try again with longer timeout', 'Check network connection']
+            },
+            {
+              operation: 'executeWithTimeout',
+              timestamp: Date.now(),
+              component: 'rate-limiting-system',
+              metadata: { identifier, timeout: config.totalTimeout, isTimeout: true }
             }
           )
         );
@@ -463,7 +488,7 @@ export class APICallQueue {
     );
 
     if (!rateLimitCheck.success) {
-      throw (rateLimitCheck as ErrorResponse).error;
+      throw rateLimitCheck.error;
     }
 
     return new Promise((resolve, reject) => {
@@ -575,7 +600,7 @@ export class APICallQueue {
       if (!result.success) {
         // Record failed request for rate limiting
         this.rateLimitManager.recordRequest(config.identifier, false, config.rateLimit);
-        reject((result as ErrorResponse).error);
+        reject(result.error);
         return;
       }
 

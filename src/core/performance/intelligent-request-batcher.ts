@@ -90,7 +90,8 @@ export class IntelligentRequestBatcher extends EventEmitter implements Intellige
 
     // Check if batch is ready
     if (queue.length >= this.config.maxBatchSize) {
-      return this.executeBatch(requestType);
+      const batchResult = await this.executeBatch(requestType);
+      return batchResult ? `batched:${batchResult.batchId}` : `queued:${request.id}`;
     }
 
     // Set timeout for batch execution

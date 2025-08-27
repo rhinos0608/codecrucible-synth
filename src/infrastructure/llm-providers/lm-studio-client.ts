@@ -253,7 +253,7 @@ export class LMStudioClient extends EventEmitter {
       
       // Fallback to alternative API patterns
       if ((this.client as any).models && typeof (this.client as any).models.list === 'function') {
-        return await this.client.models.list();
+        return await (this.client as any).models.list();
       }
       
       // If no list method is available, return empty array
@@ -276,8 +276,8 @@ export class LMStudioClient extends EventEmitter {
       }
       
       // Fallback to alternative API patterns
-      if (this.client.llm && typeof this.client.llm.getLoadedModels === 'function') {
-        return await this.client.llm.getLoadedModels();
+      if (this.client.llm && typeof (this.client.llm as any).getLoadedModels === 'function') {
+        return await (this.client.llm as any).getLoadedModels();
       }
       
       // If no loaded model method is available, return empty array
@@ -349,11 +349,11 @@ export class LMStudioClient extends EventEmitter {
 
       return {
         content: response.content,
-        finishReason: response.finishReason,
-        usage: response.usage ? {
-          promptTokens: response.usage.promptTokens,
-          completionTokens: response.usage.completionTokens,
-          totalTokens: response.usage.totalTokens,
+        finishReason: (response as any).finishReason,
+        usage: (response as any).usage ? {
+          promptTokens: (response as any).usage.promptTokens,
+          completionTokens: (response as any).usage.completionTokens,
+          totalTokens: (response as any).usage.totalTokens,
         } : undefined,
       };
     };
@@ -396,11 +396,11 @@ export class LMStudioClient extends EventEmitter {
       return {
         content: response.content,
         role: 'assistant',
-        finishReason: response.finishReason,
-        usage: response.usage ? {
-          promptTokens: response.usage.promptTokens,
-          completionTokens: response.usage.completionTokens,
-          totalTokens: response.usage.totalTokens,
+        finishReason: (response as any).finishReason,
+        usage: (response as any).usage ? {
+          promptTokens: (response as any).usage.promptTokens,
+          completionTokens: (response as any).usage.completionTokens,
+          totalTokens: (response as any).usage.totalTokens,
         } : undefined,
       };
     };

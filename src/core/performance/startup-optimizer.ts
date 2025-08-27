@@ -62,7 +62,9 @@ export class StartupOptimizer implements StartupOptimizerInterface {
       initializationTime,
       componentLoadTime: Object.fromEntries(this.componentLoadTimes),
       memoryUsage,
-      totalStartupTime
+      totalStartupTime,
+      successCount: 1,
+      totalTime: totalStartupTime
     };
 
     return metrics;
@@ -108,20 +110,7 @@ export class StartupOptimizer implements StartupOptimizerInterface {
     };
   }
 
-  async executeOptimizedStartup(): Promise<StartupMetrics> {
-    this.startTime = Date.now();
-    
-    try {
-      if (this.config.enableParallelInitialization) {
-        await this.initializeComponentsParallel();
-      }
-      
-      return this.getStartupMetrics();
-    } catch (error) {
-      console.error('Startup optimization failed:', error);
-      return this.getStartupMetrics();
-    }
-  }
+  // This method was moved below to avoid duplication
 
   private async initializeComponentsParallel(): Promise<void> {
     const criticalComponents = this.config.preloadCriticalComponents;

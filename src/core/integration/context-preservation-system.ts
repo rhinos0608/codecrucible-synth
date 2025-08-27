@@ -16,7 +16,7 @@ import {
   ContextPreservation,
   ContextChange,
   ContextIntegrity,
-  StateSnapshot,
+  UnifiedStateSnapshot,
   ValidationResult,
 } from './unified-data-models.js';
 

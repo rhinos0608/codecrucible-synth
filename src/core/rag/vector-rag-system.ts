@@ -10,7 +10,7 @@ import * as path from 'path';
 import { Worker } from 'worker_threads';
 import chokidar from 'chokidar';
 import { Logger } from '../logger.js';
-import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+import { UnifiedModelClient } from '../../application/services/client.js';
 import { HybridSearchCoordinator, HybridSearchConfig } from '../search/hybrid-search-coordinator.js';
 import { CommandLineSearchEngine } from '../search/command-line-search-engine.js';
 

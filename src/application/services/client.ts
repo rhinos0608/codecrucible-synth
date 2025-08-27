@@ -1,9 +1,14 @@
 /**
- * Core client module - Re-exports from refactored unified model client
- * This file bridges the old import structure with the new refactored system
+ * Core client module - Unified Model Client
+ * Application layer service that coordinates multiple AI model providers
  */
 
-export { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+export { 
+  UnifiedModelClient, 
+  createUnifiedModelClient,
+  type UnifiedModelClientConfig,
+  type ProviderConfig
+} from './unified-model-client.js';
 
 // Use the local UnifiedClientConfig from types.ts
 import type { UnifiedClientConfig } from '../../domain/types/index.js';

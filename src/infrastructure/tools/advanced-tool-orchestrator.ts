@@ -6,7 +6,7 @@
 
 import { EventEmitter } from 'events';
 import { Logger } from '../logging/logger.js';
-import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+import { UnifiedModelClient } from '../../application/services/client.js';
 import { DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
 import { SecureToolFactory } from '../security/secure-tool-factory.js';
 import { RBACSystem } from '../security/production-rbac-system.js';

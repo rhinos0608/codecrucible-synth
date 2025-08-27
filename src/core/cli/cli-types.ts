@@ -3,7 +3,7 @@
  * Extracted from monolithic cli.ts for better organization
  */
 
-import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+import { UnifiedModelClient } from '../../application/services/client.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { UnifiedAgent } from '../agent.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';

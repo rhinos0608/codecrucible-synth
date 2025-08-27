@@ -1,4 +1,5 @@
-import { LivingSpiralCoordinatorInterface } from '../refactor/living-spiral-coordinator-interface.js';
+import { LivingSpiralCoordinatorInterface } from '../domain/interfaces/workflow-orchestrator.js';
+import { ILogger } from '../domain/interfaces/logger.js';
 import {
   CouncilDecisionEngine,
   CouncilMode,
@@ -9,8 +10,6 @@ import { EnterpriseSystemPromptBuilder } from '../core/enterprise-system-prompt-
 import { getErrorMessage } from '../utils/error-utils.js';
 import { accessSync } from 'fs';
 import { execSync } from 'child_process';
-import { LivingSpiralCoordinator } from '../domain/services/living-spiral-coordinator.js';
-import { logger } from '../infrastructure/logging/logger.js';
 
 interface Voice {
   id: string;
@@ -30,7 +29,7 @@ interface VoiceConfig {
   };
 }
 
-import { VoiceArchetypeSystemInterface } from '../refactor/voice-archetype-system-interface';
+import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system.js';
 
 /**
  * VoiceArchetypeSystem - Multi-Voice AI Synthesis Engine
@@ -206,8 +205,14 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
    * });
    * ```
    */
-  constructor(modelClient?: any, config?: VoiceConfig) {
+  constructor(
+    private logger: ILogger,
+    private spiralCoordinator: LivingSpiralCoordinatorInterface,
+    modelClient?: any, 
+    config?: VoiceConfig
+  ) {
     this.modelClient = modelClient;
+    this.livingSpiralCoordinator = spiralCoordinator;
     this.config = config || {
       voices: {
         default: ['explorer', 'maintainer'],
@@ -227,10 +232,9 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
       },
     };
     this.initializeVoices();
-    // Initialize LivingSpiralCoordinator with default values - will be properly initialized when used
-    this.livingSpiralCoordinator = null as any;
     // Initialize Council Decision Engine for sophisticated multi-voice collaboration
     this.councilEngine = new CouncilDecisionEngine(this, this.modelClient);
+    this.this.logger.info('VoiceArchetypeSystem initialized');
   }
 
   private initializeVoices() {
@@ -675,7 +679,7 @@ Provide helpful, concise responses with practical value.`;
     const voiceConfig = this.getVoice(voice);
     if (!voiceConfig) throw new Error(`Voice not found: ${voice}`);
 
-    logger.info('🔥 VOICE DEBUG: generateSingleVoiceResponse called', {
+    this.logger.info('🔥 VOICE DEBUG: generateSingleVoiceResponse called', {
       voice,
       promptLength: prompt.length,
       hasClient: !!client
@@ -820,7 +824,7 @@ Provide helpful, concise responses with practical value.`;
     const enhancedPrompt = `${lightweightPrompt}\n\n${prompt}`;
 
     // Use different client methods based on what's available
-    logger.info('🔥 VOICE DEBUG: About to generate response', {
+    this.logger.info('🔥 VOICE DEBUG: About to generate response', {
       voiceId,
       promptLength: enhancedPrompt.length,
       hasGenerateVoiceResponse: !!this.modelClient?.generateVoiceResponse,
@@ -844,13 +848,13 @@ Provide helpful, concise responses with practical value.`;
         }
       }
       
-      logger.debug('Voice system: Available tools for enhanced AI capabilities', {
+      this.logger.debug('Voice system: Available tools for enhanced AI capabilities', {
         voiceId,
         toolCount: availableTools.length,
         hasTools: availableTools.length > 0
       });
     } catch (error) {
-      logger.debug('Voice system: Failed to get tools, continuing without tools', {
+      this.logger.debug('Voice system: Failed to get tools, continuing without tools', {
         voiceId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -858,14 +862,14 @@ Provide helpful, concise responses with practical value.`;
 
     let response;
     if (this.modelClient?.generateVoiceResponse) {
-      logger.info('🔥 VOICE DEBUG: Using generateVoiceResponse method');
+      this.logger.info('🔥 VOICE DEBUG: Using generateVoiceResponse method');
       response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
         temperature: voice.temperature,
         tools: availableTools,
         maxTokens: 4096
       });
     } else if (this.modelClient?.processRequest) {
-      logger.info('🔥 VOICE DEBUG: Using processRequest method');
+      this.logger.info('🔥 VOICE DEBUG: Using processRequest method');
       response = await this.modelClient.processRequest({
         prompt: enhancedPrompt,
         temperature: voice.temperature,
@@ -874,7 +878,7 @@ Provide helpful, concise responses with practical value.`;
       });
     } else if (this.modelClient?.generateText) {
       // Fallback to basic generateText method
-      logger.info('🔥 VOICE DEBUG: Using generateText method');
+      this.logger.info('🔥 VOICE DEBUG: Using generateText method');
       const textResponse = await this.modelClient.generateText(enhancedPrompt, {
         temperature: voice.temperature,
         tools: availableTools,
@@ -938,7 +942,7 @@ Provide helpful, concise responses with practical value.`;
       let synthesizedContent = '';
 
       // Debug responses before synthesis
-      logger.info('🔍 SYNTHESIS DEBUG: Responses received', {
+      this.logger.info('🔍 SYNTHESIS DEBUG: Responses received', {
         responseCount: responses.length,
         responses: responses.map((r: any, i: number) => ({
           index: i,
@@ -972,7 +976,7 @@ Provide helpful, concise responses with practical value.`;
 
       // Additional content extraction attempts if synthesis failed
       if (!synthesizedContent && responses.length > 0) {
-        logger.warn('🚨 SYNTHESIS FALLBACK: Primary synthesis failed, attempting fallback extraction');
+        this.logger.warn('🚨 SYNTHESIS FALLBACK: Primary synthesis failed, attempting fallback extraction');
         
         for (const response of responses) {
           const fallbackContent = (
@@ -986,14 +990,14 @@ Provide helpful, concise responses with practical value.`;
           
           if (fallbackContent && fallbackContent.trim()) {
             synthesizedContent = fallbackContent;
-            logger.info('✅ SYNTHESIS FALLBACK: Found content via fallback extraction');
+            this.logger.info('✅ SYNTHESIS FALLBACK: Found content via fallback extraction');
             break;
           }
         }
       }
 
       // Final validation and logging
-      logger.info('🔍 SYNTHESIS RESULT', {
+      this.logger.info('🔍 SYNTHESIS RESULT', {
         hasSynthesizedContent: !!synthesizedContent,
         synthesizedContentLength: synthesizedContent.length,
         synthesizedContentPreview: synthesizedContent.substring(0, 200)
@@ -1105,22 +1109,6 @@ Provide helpful, concise responses with practical value.`;
   }
 
   getLivingSpiralCoordinator(): LivingSpiralCoordinatorInterface {
-    if (!this.livingSpiralCoordinator) {
-      // Lazy initialization - need to import here to avoid circular dependencies
-      const defaultConfig = {
-        maxIterations: 5,
-        qualityThreshold: 0.8,
-        convergenceTarget: 0.9,
-        enableReflection: true,
-        parallelVoices: false,
-        councilSize: 3,
-      };
-      this.livingSpiralCoordinator = new LivingSpiralCoordinator(
-        this,
-        this.modelClient,
-        defaultConfig
-      );
-    }
     return this.livingSpiralCoordinator;
   }
 

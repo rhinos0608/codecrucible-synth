@@ -1,7 +1,8 @@
-// Backward compatibility bridge for logger
-// This file re-exports from the new infrastructure/logging structure
+/**
+ * Core logger re-export for backward compatibility
+ * 
+ * @deprecated Use UnifiedLogger from infrastructure/logging/unified-logger.ts
+ */
 
-export * from '../infrastructure/logging/logger.js';
-
-// Legacy warning
-console.warn('Warning: Importing from src/core/logger.ts is deprecated. Use src/infrastructure/logging/logger.js instead.');
+export * from '../infrastructure/logging/unified-logger.js';
+export { logger } from '../infrastructure/logging/unified-logger.js';

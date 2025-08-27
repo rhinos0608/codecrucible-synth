@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { logger } from '../logger.js';
-import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+import { UnifiedModelClient } from '../../application/services/client.js';
 
 export interface ModelInfo {
   id: string;

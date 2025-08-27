@@ -3,7 +3,7 @@
  * Creates and configures fully integrated system with all enhancements
  */
 
-import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+import { UnifiedModelClient } from '../../application/services/client.js';
 import { SystemIntegrationCoordinator } from './system-integration-coordinator.js';
 import { EnterpriseSecurityFramework } from '../security/enterprise-security-framework.js';
 import { ReconstructedCodeQualityAnalyzer as CodeQualityAnalyzer } from '../quality/reconstructed-code-quality-analyzer.js';

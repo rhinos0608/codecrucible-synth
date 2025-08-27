@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import { promises as fs } from 'fs';
 import { join, relative, isAbsolute, dirname, extname } from 'path';
-import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
+import { UnifiedModelClient } from '../../application/services/client.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 

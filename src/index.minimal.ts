@@ -1,124 +1,137 @@
 /**
- * Minimal CodeCrucible Synth Entry Point
- * Core functionality without enterprise features
+ * Minimal CodeCrucible Synth Entry Point - Updated for Unified Architecture
+ * Core functionality using new unified systems
  */
 
-// Core exports
-export { CLI } from './application/interfaces/cli.js';
-export { UnifiedModelClient } from './application/services/client.js';
+// Unified Core exports
+export { UnifiedCLI as CLI } from './application/interfaces/unified-cli.js';
+export { UnifiedModelClient } from './application/services/unified-model-client.js';
 export { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
 export { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
-// Security exports (working ones)
-export { SecurityUtils } from './core/security-utils.js';
+// Unified System exports
+export { UnifiedCLICoordinator } from './application/services/unified-cli-coordinator.js';
+export { ConcreteWorkflowOrchestrator } from './application/services/concrete-workflow-orchestrator.js';
+export { UnifiedAgentSystem } from './domain/services/unified-agent-system.js';
+export { UnifiedConfigurationManager } from './domain/services/unified-configuration-manager.js';
+
+// Security exports (production-ready)
 export { InputSanitizer } from './infrastructure/security/input-sanitizer.js';
 export { RBACSystem } from './infrastructure/security/production-rbac-system.js';
 export { SecretsManager } from './infrastructure/security/secrets-manager.js';
 export { EnterpriseAuthManager } from './infrastructure/security/enterprise-auth-manager.js';
 
+// User Interaction
+export { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
+
 // Types
 export type * from './core/types.js';
+export type * from './domain/types/index.js';
+
+// Interfaces
+export type * from './domain/interfaces/workflow-orchestrator.js';
+export type * from './domain/interfaces/user-interaction.js';
+export type * from './domain/interfaces/event-bus.js';
 
 // Config
 export type { AppConfig } from './config/config-manager.js';
 
-// Main CLI entry point
+// Main CLI entry point using unified architecture
 import { program } from 'commander';
-import { UnifiedModelClient } from './application/services/client.js';
-import { CLI } from './application/interfaces/cli.js';
-import { VoiceArchetypeSystem } from './voices/voice-archetype-system.js';
-import { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
-import { ConfigManager } from './config/config-manager.js';
-import { logger } from './core/logger.js';
+import { UnifiedCLI } from './application/interfaces/unified-cli.js';
+import { ConcreteWorkflowOrchestrator } from './application/services/concrete-workflow-orchestrator.js';
+import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
+import { getGlobalEventBus } from './domain/interfaces/event-bus.js';
+import { getErrorMessage } from './utils/error-utils.js';
 
-async function main() {
+/**
+ * Minimal initialization function
+ */
+export async function initializeMinimal(): Promise<UnifiedCLI> {
   try {
-    const config = await ConfigManager.load();
+    // Create event bus and user interaction
+    const eventBus = getGlobalEventBus();
+    const userInteraction = new CLIUserInteraction({ verbose: false });
 
-    // Create a simplified client config for now
-    const clientConfig = {
-      executionMode: 'auto' as const,
-      fallbackChain: ['ollama' as const],
-      performanceThresholds: {
-        fastModeMaxTokens: 1000,
-        timeoutMs: 30000,
-        maxConcurrentRequests: 3,
-      },
-      security: {
-        enableSandbox: true,
-        maxInputLength: 50000,
-        allowedCommands: ['ls', 'cat', 'echo'],
-      },
-      providers: [], // Simplified for now
-    };
+    // Create workflow orchestrator
+    const orchestrator = new ConcreteWorkflowOrchestrator();
+    await orchestrator.initialize({
+      userInteraction,
+      eventBus,
+      // Minimal dependencies - can be extended as needed
+    });
 
-    const modelClient = new UnifiedModelClient(clientConfig);
+    // Create unified CLI
+    const cli = new UnifiedCLI({
+      verbose: false,
+      contextAware: true,
+      performance: true,
+      resilience: true
+    });
+    
+    await cli.initialize(orchestrator);
+    return cli;
 
-    // Fix voice system config structure
-    const voiceConfig = {
-      voices: config.voices,
-    };
-
-    const voiceSystem = new VoiceArchetypeSystem(modelClient, voiceConfig);
-
-    // Create MCP server config
-    const mcpConfig = {
-      filesystem: { enabled: true, restrictedPaths: [], allowedPaths: [process.cwd()] },
-      git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
-      terminal: {
-        enabled: true,
-        allowedCommands: ['ls', 'cat', 'echo'],
-        blockedCommands: ['rm', 'sudo'],
-      },
-      packageManager: { enabled: false, autoInstall: false, securityScan: true },
-    };
-
-    const mcpManager = new MCPServerManager(mcpConfig);
-
-    const cli = new CLI(modelClient, voiceSystem, mcpManager, config);
-    await cli.initialize();
-
-    // Set up CLI commands
-    program
-      .name('codecrucible')
-      .description('AI-powered code generation and analysis CLI')
-      .version('3.8.10');
-
-    program
-      .command('status')
-      .description('Show system status')
-      .action(async () => {
-        await cli.showStatus();
-      });
-
-    program
-      .argument('[prompt]', 'The prompt to process')
-      .option('-v, --voices <voices>', 'Voice archetypes to use')
-      .option('-f, --file <file>', 'File to analyze')
-      .option('--interactive', 'Interactive mode')
-      .action(async (prompt, options) => {
-        if (!prompt && !options.interactive) {
-          program.outputHelp();
-          return;
-        }
-
-        if (options.interactive) {
-          // Interactive mode - use CLI run method with empty args
-          await cli.run(['--interactive']);
-        } else {
-          const result = await cli.processPrompt(prompt, options);
-          console.log(result);
-        }
-      });
-
-    await program.parseAsync();
   } catch (error) {
-    logger.error('CLI error:', error);
+    console.error('❌ Failed to initialize minimal system:', getErrorMessage(error));
+    throw error;
+  }
+}
+
+/**
+ * Minimal CLI runner
+ */
+export async function runMinimal(args: string[]): Promise<void> {
+  const cli = await initializeMinimal();
+  
+  // Setup graceful shutdown
+  const cleanup = async () => {
+    await cli.shutdown();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+
+  try {
+    await cli.run(args);
+  } catch (error) {
+    console.error('❌ CLI error:', getErrorMessage(error));
     process.exit(1);
   }
 }
 
-// Only run if this is the main module
-if (import.meta.url === new URL(process.argv[1], 'file://').href) {
-  main().catch(console.error);
+// CLI setup for minimal version
+if (typeof process !== 'undefined') {
+  program
+    .name('codecrucible-minimal')
+    .description('CodeCrucible Synth - Minimal Version with Unified Architecture')
+    .version('4.0.7-minimal')
+    .argument('[prompt...]', 'AI prompt to process')
+    .option('-i, --interactive', 'Start interactive mode')
+    .option('-v, --verbose', 'Verbose output')
+    .option('--no-context', 'Disable context awareness')
+    .option('--no-performance', 'Disable performance optimization')
+    .option('--no-resilience', 'Disable error resilience')
+    .action(async (prompt, options) => {
+      const args = [];
+      
+      if (options.interactive) {
+        args.push('interactive');
+      } else if (prompt && prompt.length > 0) {
+        args.push(...prompt);
+      }
+
+      if (options.verbose) args.push('--verbose');
+      if (options.noContext) args.push('--no-intelligence');
+      if (options.noPerformance) args.push('--no-performance');
+      if (options.noResilience) args.push('--no-resilience');
+
+      await runMinimal(args);
+    });
+
+  // Auto-run if this is the main module
+  if (process.argv[1]?.includes('index.minimal')) {
+    program.parse();
+  }
 }

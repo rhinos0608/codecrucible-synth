@@ -3,10 +3,10 @@
  * Implements the core Living Spiral philosophy for iterative development
  */
 
-import { logger } from '../../infrastructure/logging/logger';
-import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
-import { UnifiedModelClient } from '../../refactor/unified-model-client.js';
-import { LivingSpiralCoordinatorInterface } from '../../refactor/living-spiral-coordinator-interface.js';
+import { ILogger } from '../interfaces/this.logger.js';
+import { IModelClient } from '../interfaces/model-client.js';
+import { IVoiceOrchestrationService, VoiceResponse, CouncilSession } from '../interfaces/voice-orchestration.js';
+import { LivingSpiralCoordinatorInterface } from '../interfaces/workflow-orchestrator.js';
 
 export enum SpiralPhase {
   COLLAPSE = 'collapse',
@@ -49,18 +49,16 @@ export interface SpiralResult {
 }
 
 export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface {
-  private voiceSystem: VoiceArchetypeSystem;
-  private modelClient: UnifiedModelClient;
   private config: SpiralConfig;
 
   constructor(
-    voiceSystem: VoiceArchetypeSystem,
-    modelClient: UnifiedModelClient,
+    private voiceSystem: IVoiceOrchestrationService,
+    private modelClient: IModelClient,
+    private logger: ILogger,
     config: SpiralConfig
   ) {
-    this.voiceSystem = voiceSystem;
-    this.modelClient = modelClient;
     this.config = config;
+    this.this.logger.info('LivingSpiralCoordinator initialized');
   }
 
   /**
@@ -72,7 +70,7 @@ export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface
     let convergenceAchieved = false;
     let iterationCount = 0;
 
-    logger.info('🌀 Starting Living Spiral process', {
+    this.this.logger.info('🌀 Starting Living Spiral process', {
       prompt: initialPrompt.substring(0, 100),
       config: this.config,
     });
@@ -91,7 +89,7 @@ export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface
       // Check for convergence
       if (spiralIteration.quality >= this.config.qualityThreshold) {
         convergenceAchieved = true;
-        logger.info('✅ Spiral convergence achieved', {
+        this.logger.info('✅ Spiral convergence achieved', {
           iteration: iterationCount,
           quality: spiralIteration.quality,
         });
@@ -110,7 +108,7 @@ export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface
       synthesisResults: this.extractSynthesisResults(iterations),
     };
 
-    logger.info('🎯 Living Spiral process completed', {
+    this.logger.info('🎯 Living Spiral process completed', {
       iterations: iterationCount,
       converged: convergenceAchieved,
       finalQuality: result.quality,
@@ -129,7 +127,7 @@ export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface
   ): Promise<SpiralIteration> {
     const startTime = Date.now();
 
-    logger.info(`🌀 Spiral iteration ${iteration} starting`, { phase: 'beginning' });
+    this.logger.info(`🌀 Spiral iteration ${iteration} starting`, { phase: 'beginning' });
 
     // Phase 1: Collapse - Break down the problem
     const collapsed = await this.collapsePhase(input);
@@ -171,7 +169,7 @@ export class LivingSpiralCoordinator implements LivingSpiralCoordinatorInterface
    * Phase 1: Collapse - Decompose complexity into manageable atoms
    */
   private async collapsePhase(input: string): Promise<{ output: string; voices: string[] }> {
-    logger.debug('📉 Collapse phase starting');
+    this.logger.debug('📉 Collapse phase starting');
 
     const collapsePrompt = `
 Act as The Explorer archetype. Decompose this complex problem into its essential components:
@@ -203,7 +201,7 @@ Provide a clear, structured breakdown that eliminates unnecessary complexity.
     output: string;
     voices: string[];
   }): Promise<{ output: string; voices: string[] }> {
-    logger.debug('🏛️ Council phase starting');
+    this.logger.debug('🏛️ Council phase starting');
 
     const councilVoices = this.selectCouncilVoices();
     const perspectives: string[] = [];
@@ -253,7 +251,7 @@ ${p}
     output: string;
     voices: string[];
   }): Promise<{ output: string; voices: string[] }> {
-    logger.debug('⚗️ Synthesis phase starting');
+    this.logger.debug('⚗️ Synthesis phase starting');
 
     const synthesisPrompt = `
 Act as The Architect archetype. You must synthesize the following council perspectives into a unified, coherent solution:
@@ -285,7 +283,7 @@ Deliver a comprehensive synthesis that represents the collective wisdom of the c
     output: string;
     voices: string[];
   }): Promise<{ output: string; voices: string[] }> {
-    logger.debug('🎯 Rebirth phase starting');
+    this.logger.debug('🎯 Rebirth phase starting');
 
     const rebirthPrompt = `
 Act as The Implementor archetype. Transform this synthesized design into concrete, actionable implementation:
@@ -318,7 +316,7 @@ Focus on practical, executable solutions that can be immediately implemented.
     rebirth: { output: string; voices: string[] },
     previousIterations: SpiralIteration[]
   ): Promise<{ output: string; voices: string[] }> {
-    logger.debug('🔄 Reflection phase starting');
+    this.logger.debug('🔄 Reflection phase starting');
 
     const iterationHistory =
       previousIterations.length > 0

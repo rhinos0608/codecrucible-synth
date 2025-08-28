@@ -12,7 +12,7 @@ import { UnifiedConfigurationManager } from '../domain/services/unified-configur
 import { EventBus } from '../domain/interfaces/event-bus.js';
 import { UnifiedSecurityValidator } from '../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../domain/services/unified-performance-system.js';
-import { CLIContext } from '../application/interfaces/cli.js';
+import { CLIContext } from '../core/cli/cli-types.js';
 import { createLogger } from '../infrastructure/logging/logger-adapter.js';
 import chalk from 'chalk';
 

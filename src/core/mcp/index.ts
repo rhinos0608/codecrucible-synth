@@ -83,6 +83,7 @@ import { IntelligentMCPLoadBalancer } from './intelligent-mcp-load-balancer.js';
 import { EnhancedMCPSecuritySystem } from './enhanced-mcp-security-system.js';
 import { IntelligentMCPVoiceIntegration } from './intelligent-mcp-voice-integration.js';
 import { MCPPerformanceAnalyticsSystem } from './mcp-performance-analytics-system.js';
+import { PerformanceReport } from '../../domain/services/unified-performance-system.js';
 
 /**
  * Enhanced MCP Integration Manager
@@ -259,7 +260,7 @@ export class EnhancedMCPIntegrationManager {
     const [trends, alerts, recommendations] = await Promise.all([
       Promise.resolve(this.analyticsSystem.getPerformanceTrends()),
       Promise.resolve(this.analyticsSystem.getActiveAlerts()),
-      this.analyticsSystem.generatePerformanceReport('daily').then(report => report.recommendations),
+      this.analyticsSystem.generatePerformanceReport('daily').then((report: PerformanceReport) => report.recommendations),
     ]);
     
     return {

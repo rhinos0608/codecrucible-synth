@@ -29,6 +29,14 @@ export interface ModelResponse {
   };
   metadata?: Record<string, any>;
   toolCalls?: ToolCall[];
+  // Additional properties for compatibility
+  tokens_used?: number;
+  cached?: boolean;
+  tokensUsed?: number;
+  text?: string;
+  response?: string;
+  confidence?: number;
+  error?: string;
 }
 
 export interface ModelTool {

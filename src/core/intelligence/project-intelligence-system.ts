@@ -6,7 +6,7 @@
 import { EventEmitter } from 'events';
 import { readdir, readFile, stat, access } from 'fs/promises';
 import { join, relative, extname, dirname, basename } from 'path';
-import { Logger } from '../logger.js';
+import { logger } from '../logger.js';
 import { unifiedCache } from '../../infrastructure/cache/unified-cache-system.js';
 import { ProjectContext } from '../types.js';
 
@@ -483,7 +483,7 @@ export interface ProjectStats {
  * @fires ProjectIntelligenceSystem#pattern-discovered
  */
 export class ProjectIntelligenceSystem extends EventEmitter {
-  private logger: Logger;
+  private logger: typeof logger;
   private analysisInProgress: Set<string> = new Set();
 
   /**
@@ -503,7 +503,7 @@ export class ProjectIntelligenceSystem extends EventEmitter {
    */
   constructor() {
     super();
-    this.logger = new Logger('ProjectIntelligenceSystem');
+    this.logger = logger;
     this.setMaxListeners(0); // Allow unlimited listeners for large projects
   }
 

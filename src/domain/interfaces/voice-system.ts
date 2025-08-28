@@ -21,6 +21,11 @@ export interface VoiceArchetypeSystemInterface {
   generateMultiVoiceSolutions(voices: string[], prompt: string): Promise<any>;
   
   /**
+   * Get perspective from a specific voice
+   */
+  getVoicePerspective(voiceId: string, prompt: string): Promise<any>;
+  
+  /**
    * Get the Living Spiral Coordinator
    */
   getLivingSpiralCoordinator(): any;

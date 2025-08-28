@@ -4,7 +4,7 @@
  * Enhanced with Claude Code patterns for enterprise-grade coordination
  */
 
-import { VoiceArchetypeSystemInterface } from '../../refactor/voice-archetype-system-interface.js';
+import { VoiceArchetypeSystemInterface } from '../../domain/interfaces/voice-system.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { logger } from '../logger';
 import { EventEmitter } from 'events';

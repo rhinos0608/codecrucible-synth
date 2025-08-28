@@ -10,7 +10,8 @@
  */
 
 // Import and re-export types from the existing types module to ensure compatibility
-import { ProjectContext, ModelRequest, ModelResponse } from '../types.js';
+import { ModelRequest, ModelResponse } from '../../domain/interfaces/model-client.js';
+import { ProjectContext } from '../../domain/types/unified-types.js';
 
 export type { ProjectContext, ModelRequest, ModelResponse };
 

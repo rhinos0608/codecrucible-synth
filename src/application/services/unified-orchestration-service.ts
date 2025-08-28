@@ -57,6 +57,8 @@ export interface OrchestrationResponse {
  * and routes them to appropriate domain services.
  */
 export class UnifiedOrchestrationService extends EventEmitter {
+  private static instance: UnifiedOrchestrationService | null = null;
+  
   private config: UnifiedConfiguration;
   private eventBus: IEventBus;
   private userInteraction: IUserInteraction;
@@ -85,6 +87,31 @@ export class UnifiedOrchestrationService extends EventEmitter {
     this.logger.info('UnifiedOrchestrationService initialized');
     
     this.setupEventHandlers();
+  }
+
+  /**
+   * Get singleton instance
+   */
+  static async getInstance(options?: {
+    configManager?: UnifiedConfigurationManager;
+    eventBus?: IEventBus;
+    userInteraction?: IUserInteraction;
+  }): Promise<UnifiedOrchestrationService> {
+    if (!this.instance) {
+      // Create dependencies if not provided
+      const configManager = options?.configManager || await UnifiedConfigurationManager.getInstance();
+      
+      // Import dependencies to avoid circular imports
+      const { EventBus } = await import('../../domain/interfaces/event-bus.js');
+      const { CLIUserInteraction } = await import('../../infrastructure/user-interaction/cli-user-interaction.js');
+      
+      const eventBus = options?.eventBus || new EventBus();
+      const userInteraction = options?.userInteraction || new CLIUserInteraction();
+      
+      this.instance = new UnifiedOrchestrationService(configManager, eventBus, userInteraction);
+      await this.instance.initialize();
+    }
+    return this.instance;
   }
   
   async initialize(): Promise<void> {

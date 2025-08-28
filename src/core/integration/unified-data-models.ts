@@ -557,6 +557,10 @@ export interface SynthesisResult {
   finalContent: string;
   contributionWeights: Record<string, number>;
   qualityScore: number;
+  // Additional properties for compatibility
+  voicesUsed?: string[];
+  content?: string;
+  combinedCode?: string;
 }
 
 export interface CoordinationStrategy {

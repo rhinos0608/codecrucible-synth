@@ -599,10 +599,10 @@ export class SearchCLICommands implements CLISearchIntegration {
           results,
           summary: {
             totalQueries: results.length,
-            avgSpeedup: results.reduce((sum, r) => sum + r.speedupVsRAG, 0) / results.length,
+            avgSpeedup: results.reduce((sum: number, r: any) => sum + r.speedupVsRAG, 0) / results.length,
             avgMemoryReduction:
-              results.reduce((sum, r) => sum + r.memoryReduction, 0) / results.length,
-            fastQueries: results.filter(r => r.ripgrepTime < 200).length,
+              results.reduce((sum: number, r: any) => sum + r.memoryReduction, 0) / results.length,
+            fastQueries: results.filter((r: any) => r.ripgrepTime < 200).length,
             iterations: parseInt(options.iterations || '3', 10),
           },
         };

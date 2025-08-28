@@ -396,12 +396,10 @@ export class IntelligentRequestBatcher {
       const chunkPromises = chunk.map(async (request) => {
         try {
           // Check cache first
-          const cached = responseCache.get(
-            request.prompt,
-            request.model,
-            request.provider,
-            request.tools
-          );
+          const cacheKey = crypto.createHash('sha256')
+            .update(`${request.prompt}-${request.model}-${request.provider}-${JSON.stringify(request.tools || [])}`)
+            .digest('hex');
+          const cached = responseCache.get(cacheKey);
           
           if (cached) {
             return {

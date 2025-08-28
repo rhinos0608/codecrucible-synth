@@ -14,6 +14,10 @@ export * from '../../domain/services/unified-configuration-manager.js';
 
 // For backward compatibility, also provide type aliases
 export type {
-  UnifiedConfigurationManager as UnifiedConfigService,
   UnifiedConfiguration as UnifiedConfig
+} from '../../domain/services/unified-configuration-manager.js';
+
+// Export the class as a value, not just a type
+export {
+  UnifiedConfigurationManager as UnifiedConfigService
 } from '../../domain/services/unified-configuration-manager.js';

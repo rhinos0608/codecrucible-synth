@@ -21,7 +21,7 @@ import { EventEmitter } from 'events';
 import { performance, PerformanceObserver } from 'perf_hooks';
 import * as os from 'os';
 import { IEventBus } from '../interfaces/event-bus.js';
-import { ILogger } from '../interfaces/this.logger.js';
+import { ILogger } from '../interfaces/logger.js';
 
 // ============================================================================
 // CORE PERFORMANCE INTERFACES
@@ -1032,7 +1032,7 @@ export class UnifiedPerformanceSystem extends EventEmitter {
     const recommendations = await this.analyzer.generateRecommendations(metrics);
     
     // Apply high-priority recommendations automatically
-    for (const rec of recommendations.filter(r => r.priority === 'critical')) {
+    for (const rec of recommendations.filter((r: any) => r.priority === 'critical')) {
       this.logger.info(`Auto-tuning: Applying ${rec.title}`);
       
       // Map recommendation to optimization target

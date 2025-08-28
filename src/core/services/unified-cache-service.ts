@@ -446,7 +446,7 @@ export class UnifiedCacheService extends EventEmitter {
       return null;
 
     } catch (error) {
-      logger.error('Cache get error', error as Error, { key });
+      logger.error('Cache get error', { error: error as Error, key });
       this.emit('cache-error', { operation: 'get', key, error });
       return null;
     }
@@ -492,7 +492,7 @@ export class UnifiedCacheService extends EventEmitter {
       this.emit('cache-set', { key: cacheKey, ttl, options });
 
     } catch (error) {
-      logger.error('Cache set error', error as Error, { key });
+      logger.error('Cache set error', { error: error as Error, key });
       this.emit('cache-error', { operation: 'set', key, error });
       throw error;
     }

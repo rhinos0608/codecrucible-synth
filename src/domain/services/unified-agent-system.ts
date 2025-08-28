@@ -297,7 +297,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
       agents.map((agent, i) => agent.process(requests[i]))
     );
     
-    responses.forEach((response, i) => {
+    responses.forEach((response: any, i: number) => {
       contributions.set(agents[i].id, response.result);
     });
     
@@ -357,7 +357,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     const synthesisRequest: AgentRequest = {
       id: `${task.id}-synthesis`,
       type: 'collaborate',
-      input: `Synthesize results for: ${task.description}\nResults: ${executionResults.map(r => r.content).join('\n')}`,
+      input: `Synthesize results for: ${task.description}\nResults: ${executionResults.map((r: any) => r.content).join('\n')}`,
       priority: 'high',
       context: this.context
     };

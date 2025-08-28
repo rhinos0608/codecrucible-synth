@@ -75,6 +75,8 @@ export interface IUnifiedConfigurationManager {
 }
 
 export class UnifiedConfigurationManager extends EventEmitter implements IUnifiedConfigurationManager {
+  private static instance: UnifiedConfigurationManager | null = null;
+  
   private currentConfig!: UnifiedConfiguration;
   private configFilePath: string;
   private eventBus?: IEventBus;
@@ -98,6 +100,29 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
     this.logger.info('UnifiedConfigurationManager initialized');
     this.configFilePath = configFilePath || join(homedir(), '.codecrucible', 'config.yaml');
     this.eventBus = eventBus;
+  }
+
+  /**
+   * Get singleton instance
+   */
+  static async getInstance(options?: {
+    logger?: ILogger;
+    configFilePath?: string;
+    eventBus?: IEventBus;
+  }): Promise<UnifiedConfigurationManager> {
+    if (!this.instance) {
+      // Need to import logger here to avoid circular dependencies
+      const { createLogger } = await import('../../infrastructure/logging/logger-adapter.js');
+      const logger = options?.logger || createLogger('UnifiedConfigurationManager');
+      
+      this.instance = new UnifiedConfigurationManager(
+        logger,
+        options?.configFilePath,
+        options?.eventBus
+      );
+      await this.instance.initialize();
+    }
+    return this.instance;
   }
 
   async initialize(): Promise<void> {

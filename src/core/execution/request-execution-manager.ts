@@ -13,15 +13,10 @@
 import { EventEmitter } from 'events';
 import { logger } from '../logger.js';
 import { getErrorMessage, toError } from '../../utils/error-utils.js';
-import {
-  ProjectContext,
-  ModelRequest,
-  ModelResponse,
-  ComplexityAnalysis,
-  TaskType,
-} from '../types.js';
+import { ModelRequest, ModelResponse } from '../../domain/interfaces/model-client.js';
+import { ProjectContext, ComplexityAnalysis, TaskType } from '../../domain/types/unified-types.js';
 import { ActiveProcess, ActiveProcessManager } from '../performance/active-process-manager.js';
-import { getGlobalEnhancedToolIntegration } from '../../infrastructure/tools/enhanced-tool-integration.js';
+import { EnhancedToolIntegration, getGlobalEnhancedToolIntegration } from '../../infrastructure/tools/enhanced-tool-integration.js';
 import { getGlobalToolIntegration } from '../../infrastructure/tools/tool-integration.js';
 import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestrator.js';
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
@@ -212,6 +207,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         logger.info(`✅ Request ${requestId} completed via batching in ${responseTime}ms`);
         
         return {
+          id: `batch_${requestId}_${Date.now()}`,
           content: batchResult.content,
           model: strategy.provider,
           provider: strategy.provider,

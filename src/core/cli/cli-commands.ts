@@ -13,7 +13,7 @@ import { logger } from '../logger.js';
 import { CLIOptions, CLIContext } from './cli-types.js';
 // import { CLIDisplay } from './cli-display.js';
 // import { ProjectContext } from '../client.js';
-import { ServerModeInterface } from '../../refactor/server-mode-interface.js';
+import { ServerModeInterface } from '../../server/server-mode.js';
 import { analysisWorkerPool, AnalysisTask } from '../workers/analysis-worker.js';
 import { randomUUID } from 'crypto';
 
@@ -37,7 +37,7 @@ export class CLICommands {
     try {
       if (this.context.modelClient) {
         logger.debug('About to call healthCheck');
-        const healthCheck = await this.context.modelClient.healthCheck();
+        const healthCheck = await this.context.modelClient.isHealthy();
         logger.debug('HealthCheck completed', { healthCheck });
         console.log(chalk.green(`  ✅ Status: ${healthCheck ? 'Connected' : 'Disconnected'}`));
 
@@ -60,7 +60,7 @@ export class CLICommands {
       if (this.context.voiceSystem) {
         const voices = this.context.voiceSystem.getAvailableVoices();
         console.log(chalk.green(`  ✅ Available Voices: ${voices.length}`));
-        console.log(chalk.cyan(`  🎯 Voice Names: ${voices.map(v => v.name).join(', ')}`));
+        console.log(chalk.cyan(`  🎯 Voice Names: ${voices.join(', ')}`));
       } else {
         console.log(chalk.red('  ❌ Voice system not initialized'));
       }
@@ -131,9 +131,9 @@ export class CLICommands {
         return;
       }
 
-      // Check if getAllAvailableModels method exists
-      if (typeof this.context.modelClient.getAllAvailableModels === 'function') {
-        const models = await this.context.modelClient.getAllAvailableModels();
+      // Check if getAvailableModels method exists
+      if (typeof this.context.modelClient.getAvailableModels === 'function') {
+        const models = await this.context.modelClient.getAvailableModels();
 
         spinner.succeed(`Found ${models.length} models`);
 

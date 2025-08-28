@@ -5,7 +5,7 @@
 
 import chalk from 'chalk';
 // import ora from 'ora';
-import { SynthesisResult } from '../types.js';
+import { SynthesisResult } from '../integration/unified-data-models.js';
 
 export class CLIDisplay {
   /**

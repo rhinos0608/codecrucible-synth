@@ -5,7 +5,7 @@
 
 import { EventEmitter } from 'events';
 import { basename } from 'path';
-import { Logger } from '../logger.js';
+import { logger } from '../logger.js';
 import { unifiedCache } from '../../infrastructure/cache/unified-cache-system.js';
 import {
   ProjectIntelligenceSystem,
@@ -39,7 +39,7 @@ export interface PerformanceMetrics {
 }
 
 export class LazyProjectIntelligenceSystem extends EventEmitter {
-  private logger: Logger;
+  private logger: typeof logger;
   private fullSystem: ProjectIntelligenceSystem;
   private loadingPromises: Map<string, Promise<ProjectIntelligence>> = new Map();
   private cleanupInterval?: NodeJS.Timeout;
@@ -53,7 +53,7 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
 
   constructor() {
     super();
-    this.logger = new Logger('LazyProjectIntelligence');
+    this.logger = logger;
     this.fullSystem = new ProjectIntelligenceSystem();
 
     // Cleanup timer to prevent memory leaks

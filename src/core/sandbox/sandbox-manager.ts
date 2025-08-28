@@ -1,5 +1,5 @@
 import { logger } from '../logger.js';
-import { UnifiedAgent } from '../agent.js';
+import { UnifiedAgentSystem } from '../../domain/services/unified-agent-system.js';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';

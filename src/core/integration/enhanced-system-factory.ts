@@ -9,6 +9,7 @@ import { EnterpriseSecurityFramework } from '../security/enterprise-security-fra
 import { ReconstructedCodeQualityAnalyzer as CodeQualityAnalyzer } from '../quality/reconstructed-code-quality-analyzer.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { SequentialDualAgentSystem } from '../collaboration/sequential-dual-agent-system.js';
+import { LivingSpiralCoordinator } from '../living-spiral-coordinator.js';
 import { logger } from '../logger.js';
 
 export interface EnhancedSystemConfig {
@@ -106,6 +107,9 @@ export class EnhancedSystemFactory {
       // Create system integration coordinator
       const coordinator = SystemIntegrationCoordinator.getInstance();
       
+      // Create Living Spiral coordinator for voice system
+      const spiralCoordinator = new LivingSpiralCoordinator(logger);
+      
       // Initialize all integrated systems
       await coordinator.initializeIntegratedSystems();
 
@@ -134,7 +138,11 @@ export class EnhancedSystemFactory {
         analysis: {}
       }) : undefined;
 
-      const voiceSystem = finalConfig.voice.enabled ? new VoiceArchetypeSystem(modelClient) : undefined;
+      const voiceSystem = finalConfig.voice.enabled ? new VoiceArchetypeSystem(
+        logger,
+        spiralCoordinator, 
+        modelClient
+      ) : undefined;
       const sequentialAgentSystem = finalConfig.voice.collaborationMode === 'sequential' 
         ? new SequentialDualAgentSystem() 
         : undefined;

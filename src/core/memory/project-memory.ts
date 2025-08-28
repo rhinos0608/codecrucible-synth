@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { homedir } from 'os';
 import { logger } from '../logger.js';
-import { SynthesisResult } from '../types.js';
+import { SynthesisResult } from '../integration/unified-data-models.js';
 
 export interface ProjectContext {
   guidance: string;

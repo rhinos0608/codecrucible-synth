@@ -304,7 +304,11 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
       totalSymbols: qualityMetrics.typescriptResults.totalErrors + qualityMetrics.typescriptResults.totalWarnings + 100, // Estimate
       typedSymbols: Math.max(0, 100 - qualityMetrics.typescriptResults.totalErrors), // Estimate
       coverage: qualityMetrics.typescriptResults.coverage,
-      untypedAreas: [] // Would need more detailed analysis
+      untypedAreas: [] as Array<{
+        file: string;
+        line: number;
+        symbol: string;
+      }>
     };
 
     // Create minimal duplication data (not available from new analyzer by default)
@@ -312,7 +316,11 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
       duplicatedLines: 0, // Not calculated in new analyzer
       totalLines: qualityMetrics.astMetrics.linesOfCode,
       duplicationPercentage: 0, // Not calculated in new analyzer
-      duplicatedBlocks: []
+      duplicatedBlocks: [] as Array<{
+        lines: number;
+        tokens: number;
+        files: string[];
+      }>
     };
 
     // Transform recommendations to legacy format
@@ -468,13 +476,21 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
         totalSymbols: 100,
         typedSymbols: Math.max(0, 100 - metrics.typescriptResults.totalErrors),
         coverage: metrics.typescriptResults.coverage,
-        untypedAreas: []
+        untypedAreas: [] as Array<{
+          file: string;
+          line: number;
+          symbol: string;
+        }>
       },
       duplication: {
         duplicatedLines: 0,
         totalLines: metrics.astMetrics.linesOfCode,
         duplicationPercentage: 0,
-        duplicatedBlocks: []
+        duplicatedBlocks: [] as Array<{
+          lines: number;
+          tokens: number;
+          files: string[];
+        }>
       },
       technicalDebtRatio: metrics.technicalDebtRatio,
       recommendations: metrics.recommendations.map(rec => ({

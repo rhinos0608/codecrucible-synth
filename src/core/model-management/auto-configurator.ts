@@ -7,6 +7,9 @@ import { Logger } from '../logger.js';
 import { IntelligentModelDetector, OptimalConfiguration } from './intelligent-model-detector.js';
 import { DualAgentRealtimeSystem } from '../collaboration/dual-agent-realtime-system.js';
 import chalk from 'chalk';
+import * as fs from 'fs';
+import * as yaml from 'js-yaml';
+import * as path from 'path';
 
 export interface AutoConfigResult {
   success: boolean;
@@ -113,30 +116,53 @@ export class AutoConfigurator {
    * Create dual-agent system from configuration
    */
   private createDualAgentSystem(config: OptimalConfiguration): DualAgentRealtimeSystem {
-    return new DualAgentRealtimeSystem({
-      writer: {
+    const system = new DualAgentRealtimeSystem();
+    
+    try {
+      // Read unified model config
+      const configPath = path.join(process.cwd(), 'config', 'unified-model-config.yaml');
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      const modelConfig = yaml.load(configContent) as any;
+      
+      // Extract provider configurations from YAML
+      const ollamaConfig = modelConfig.llm?.providers?.ollama || {};
+      const lmStudioConfig = modelConfig.llm?.providers?.['lm-studio'] || {};
+      
+      // Writer agent configuration (Ollama for complex analysis)
+      const writerConfig = {
         platform: 'ollama',
         model: config.writer.model,
-        endpoint: 'http://localhost:11434',
-        temperature: 0.7,
-        maxTokens: 2048,
-        keepAlive: '24h',
-      },
-      auditor: {
-        platform: 'lmstudio' as const,
+        endpoint: ollamaConfig.endpoint || 'http://localhost:11434',
+        temperature: ollamaConfig.models?.settings?.[config.writer.model]?.temperature || 0.1,
+        maxTokens: ollamaConfig.models?.settings?.[config.writer.model]?.max_tokens || 128000,
+        timeout: ollamaConfig.timeout?.response || 30000,
+      };
+      
+      // Auditor agent configuration (LM Studio for fast reviews)
+      const auditorConfig = {
+        platform: 'lm-studio', 
         model: config.auditor.model,
-        endpoint:
-          config.auditor.platform === 'lmstudio'
-            ? 'http://localhost:1234/v1'
-            : 'http://localhost:11434',
-        temperature: 0.2,
-        maxTokens: 1024,
-        contextLength: 8192,
-      },
-      enableRealTimeAudit: true,
-      auditInBackground: true,
-      autoApplyFixes: false,
-    });
+        endpoint: lmStudioConfig.endpoint || 'http://localhost:1234',
+        temperature: lmStudioConfig.models?.settings?.[config.auditor.model]?.temperature || 0.7,
+        maxTokens: lmStudioConfig.models?.settings?.[config.auditor.model]?.max_tokens || 128000,
+        timeout: lmStudioConfig.timeout?.response || 15000,
+      };
+      
+      // Check if dual-agent review is enabled
+      const dualAgentEnabled = modelConfig.llm?.experimental?.dual_agent_review || false;
+      
+      this.logger.info('Dual-agent system configured from unified-model-config.yaml', {
+        writerEndpoint: writerConfig.endpoint,
+        auditorEndpoint: auditorConfig.endpoint,
+        dualAgentEnabled,
+        configPath
+      });
+      
+    } catch (error) {
+      this.logger.warn('Failed to load unified model config, using defaults', { error });
+    }
+    
+    return system;
   }
 
   /**

@@ -174,7 +174,7 @@ export class RBACPolicyEngine {
 
       return authorized;
     } catch (error) {
-      logger.error('Authorization evaluation failed', error as Error, context);
+      logger.error('Authorization evaluation failed', { error: error as Error, context });
       return false; // Fail secure
     }
   }

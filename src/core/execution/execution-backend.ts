@@ -627,7 +627,7 @@ export class FirecrackerBackend extends ExecutionBackend {
           mem_size_mib: this.config.firecrackerMemSizeMib,
           ht_enabled: false,
         },
-        'network-interfaces': [],
+        'network-interfaces': [] as any[],
       };
 
       // Write configuration to temporary file

@@ -66,7 +66,7 @@ export class ToolIntegration {
       }
 
       // Initialize filesystem tools lazily
-      this.filesystemTools = new FilesystemTools(this.mcpManager);
+      this.filesystemTools = new FilesystemTools();
       
       // Register filesystem tools
       const fsTools = this.filesystemTools.getTools();

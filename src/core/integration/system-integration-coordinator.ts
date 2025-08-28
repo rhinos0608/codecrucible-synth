@@ -20,7 +20,7 @@ import { EnhancedMCPIntegrationManager } from '../mcp/index.js';
 import { UnifiedOrchestrationService } from '../services/unified-orchestration-service.js';
 
 // Import enhanced systems for full integration
-import { EnterpriseSecurityFramework, AgentAction, SecurityContext, SecurityValidation } from '../security/enterprise-security-framework.js';
+import { EnterpriseSecurityFramework, AgentAction, SecurityContext, SecurityValidationResult as SecurityValidation } from '../security/enterprise-security-framework.js';
 import { ReconstructedCodeQualityAnalyzer as CodeQualityAnalyzer, ComprehensiveQualityMetrics } from '../quality/reconstructed-code-quality-analyzer.js';
 import { SpiralConvergenceAnalyzer, IterationResult, ConvergenceAnalysis } from '../../application/services/spiral-convergence-analyzer.js';
 import { SystemHealthMonitor } from './system-health-monitor.js';
@@ -282,14 +282,7 @@ export class SystemIntegrationCoordinator extends EventEmitter {
     // Use performance optimizer if available
     if (this.performanceOptimizer) {
       return await this.performanceOptimizer.executeOptimized(
-        `integrated-request-${request.id}`,
-        () => this.processIntegratedRequestInternal(request),
-        {
-          priority: request.priority,
-          timeout: request.constraints?.maxExecutionTime,
-          cacheKey: this.generateCacheKey(request),
-          systemId: 'integration-coordinator'
-        }
+        () => this.processIntegratedRequestInternal(request)
       );
     }
     
@@ -1059,74 +1052,58 @@ export class SystemIntegrationCoordinator extends EventEmitter {
     if (!this.securityFramework) {
       logger.warn('Security framework not initialized, skipping validation');
       return {
-        allowed: true,
+        isValid: true,
         violations: [],
+        mitigationActions: [],
         mitigations: [],
-        riskScore: 0,
-        auditTrail: {
-          id: 'skipped',
-          timestamp: new Date(),
-          agentId: request.id,
-          action: 'validation_skipped',
-          allowed: true,
-          riskScore: 0,
-          violations: [],
-          context: {
-            sessionId: request.id,
-            permissions: [],
-            environment: 'development',
-            riskProfile: 'low'
-          }
-        }
+        allowed: true,
+        riskScore: 0
       };
     }
 
     const agentAction: AgentAction = {
-      type: request.type === 'analysis' ? 'code_generation' : 'tool_usage',
+      id: request.id,
+      type: request.type === 'analysis' ? 'analyze' : 'generate',
       agentId: request.id,
-      payload: { 
+      timestamp: new Date(),
+      parameters: { 
         code: request.content,
         operation: request.type
       },
-      timestamp: new Date(),
-      metadata: { requestId: request.id }
+      securityLevel: 'medium',
+      resourceRequirements: {
+        memory: 64 * 1024 * 1024, // 64MB
+        cpu: 0.1, // 10% CPU
+        network: false,
+        fileSystem: true
+      }
     };
 
     const securityContext: SecurityContext = {
       sessionId: request.id,
       permissions: ['basic_operations', 'code_generation'],
-      environment: 'development',
-      riskProfile: 'medium'
+      isolation: {
+        level: 'medium',
+        allowedResources: ['filesystem', 'memory'],
+        maxExecutionTime: 30000
+      },
+      audit: {
+        trackActions: true,
+        logLevel: 'detailed'
+      }
     };
 
     try {
-      return await this.securityFramework.validateAgentAction(
-        request.id,
-        agentAction,
-        securityContext
-      );
+      return await this.securityFramework.validateAgentAction(agentAction, securityContext);
     } catch (error) {
       logger.error('Security validation failed:', error);
       return {
-        allowed: false,
-        violations: [{
-          type: 'validation_error',
-          severity: 'high',
-          description: `Security validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          remediation: 'Review security configuration and try again'
-        }],
+        isValid: false,
+        violations: [`Security validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+        mitigationActions: ['Review security configuration and try again'],
         mitigations: ['Enhanced monitoring enabled'],
-        riskScore: 75,
-        auditTrail: {
-          id: 'error',
-          timestamp: new Date(),
-          agentId: request.id,
-          action: 'validation_error',
-          allowed: false,
-          riskScore: 75,
-          violations: [],
-          context: securityContext
-        }
+        allowed: false,
+        riskScore: 0.75
       };
     }
   }

@@ -28,7 +28,7 @@ import {
   PERFORMANCE_MONITOR_TOKEN,
 } from '../di/service-tokens.js';
 import { logger } from '../logger.js';
-import { ModelRequest, ModelResponse } from '../types.js';
+import { ModelRequest, ModelResponse, RequestContext } from '../../domain/interfaces/model-client.js';
 
 export interface ApplicationRequest {
   id?: string;
@@ -152,13 +152,22 @@ export class SynthesisCoordinator extends EventEmitter {
     try {
       // Phase 1: Security validation
       const securityValidator = this.container.resolve(SECURITY_VALIDATOR_TOKEN);
+      // Transform request context to proper RequestContext interface
+      const requestContext: RequestContext = {
+        sessionId: request.context?.sessionId || requestId,
+        workingDirectory: request.context?.workingDirectory || process.cwd(),
+        files: request.context?.files,
+        securityLevel: (request.context?.securityLevel as 'low' | 'medium' | 'high') || 'medium',
+        userPreferences: request.context?.userPreferences,
+      };
+
       const modelRequest: ModelRequest = {
         prompt: request.prompt,
         model: request.model,
         temperature: request.temperature,
         maxTokens: request.maxTokens,
         stream: request.stream,
-        context: request.context,
+        context: requestContext,
       };
 
       const validation = await securityValidator.validateRequest(modelRequest);
@@ -183,7 +192,7 @@ export class SynthesisCoordinator extends EventEmitter {
 
       return synthesisResponse;
     } catch (error) {
-      logger.error('Synthesis request failed', error, { requestId });
+      logger.error('Synthesis request failed', { error, requestId });
 
       // Return error response in expected format
       return this.createErrorResponse(requestId, error, startTime);

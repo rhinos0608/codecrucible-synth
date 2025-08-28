@@ -97,7 +97,7 @@ export class UnifiedResponseCoordinator extends EventEmitter {
             action: 'audit',
             content: `Audit complete - Score: ${result.audit.score}/100`,
             confidence: result.audit.confidence,
-            issues: result.audit.issues.map(i => i.description),
+            issues: result.audit.issues.map((i: any) => i.description),
           });
 
           // Step 3: Apply refinements if needed
@@ -151,8 +151,8 @@ export class UnifiedResponseCoordinator extends EventEmitter {
         responseTime: Date.now() - startTime,
         warnings:
           result.audit?.issues
-            .filter(i => i.severity === 'warning' || i.severity === 'critical')
-            .map(i => i.description) || [],
+            .filter((i: any) => i.severity === 'warning' || i.severity === 'critical')
+            .map((i: any) => i.description) || [],
       };
 
       this.logger.info(`[${requestId}] Response coordination complete`, {

@@ -18,6 +18,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { ProviderType } from '../interfaces/provider-interfaces.js';
 import { logger } from '../logger.js';
 
 // Domain imports
@@ -1202,7 +1203,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
 
   private setupEventHandlers(): void {
     // Listen for provider health changes
-    this.performanceMonitor.on('providerHealthChange', (event) => {
+    this.performanceMonitor.on('providerHealthChange', (event: { type: ProviderType; isHealthy: boolean }) => {
       logger.info('Provider health changed, routing may be affected', event);
     });
     

@@ -8,7 +8,7 @@ import { join, relative, basename, dirname } from 'path';
 import { readFile, stat } from 'fs/promises';
 import chalk from 'chalk';
 import ora from 'ora';
-import { Logger } from '../logger.js';
+import { logger } from '../logger.js';
 import {
   ProjectIntelligenceSystem,
   ProjectIntelligence,
@@ -72,7 +72,7 @@ export interface IntelligentCommand {
 }
 
 export class ContextAwareCLIIntegration extends EventEmitter {
-  private logger: Logger;
+  private logger: typeof logger;
   private intelligenceSystem: ProjectIntelligenceSystem;
   private projectCache: Map<string, ProjectIntelligence> = new Map();
   private contextHistory: Map<string, ContextInformation[]> = new Map();
@@ -81,7 +81,7 @@ export class ContextAwareCLIIntegration extends EventEmitter {
 
   constructor() {
     super();
-    this.logger = new Logger('ContextAwareCLI');
+    this.logger = logger;
     this.intelligenceSystem = new ProjectIntelligenceSystem();
   }
 

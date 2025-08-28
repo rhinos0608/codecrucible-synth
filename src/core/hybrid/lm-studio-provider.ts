@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../logger.js';
-import { LLMProvider, LLMResponse, LLMCapabilities, LLMStatus } from '../types.js';
+import { LLMProvider, LLMResponse, LLMCapabilities, LLMStatus } from '../../domain/interfaces/llm-interfaces.js';
 
 export interface LMStudioConfig {
   endpoint: string;

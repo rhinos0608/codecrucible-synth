@@ -8,6 +8,7 @@ import {
   EnterpriseSecurityFramework,
   SecurityContext,
 } from '../security/enterprise-security-framework.js';
+import { SecurityViolation } from '../../domain/services/unified-security-validator.js';
 import { logger } from '../logger.js';
 
 export interface ToolCoordination {
@@ -350,7 +351,7 @@ export class EnterpriseMCPOrchestrator {
           logger.warn('Tool failed security validation', {
             toolName: capability.name,
             serverId: capability.serverId,
-            violations: validation.violations.map(v => v.type),
+            violations: validation.violations.map((v: SecurityViolation) => v.type),
           });
         }
       } catch (error) {

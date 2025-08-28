@@ -8,12 +8,14 @@
 import { EventEmitter } from 'events';
 import { 
   IModelClient, 
+  StreamToken,
+} from '../../core/interfaces/client-interfaces.js';
+import { 
   IModelProvider, 
   IModelRouter,
   ModelRequest, 
   ModelResponse, 
   ModelInfo, 
-  StreamToken,
   ModelCapability
 } from '../../domain/interfaces/model-client.js';
 import { UnifiedConfiguration } from '../../domain/interfaces/configuration.js';
@@ -25,6 +27,14 @@ export interface UnifiedModelClientConfig {
   defaultProvider: string;
   providers: ProviderConfig[];
   fallbackStrategy: 'fail-fast' | 'round-robin' | 'priority';
+  executionMode?: 'auto' | 'quality' | 'fast' | 'balanced';
+  fallbackChain?: string[];
+  performanceThresholds?: {
+    fastModeMaxTokens: number;
+    timeoutMs: number;
+    maxConcurrentRequests: number;
+  };
+  security?: any; // For compatibility with existing usage
   timeout: number;
   retryAttempts: number;
   enableCaching: boolean;
@@ -46,6 +56,15 @@ export interface ProviderConfig {
  * Unified Model Client that provides a single interface to multiple AI model providers.
  * Handles provider selection, fallbacks, and coordination.
  */
+export interface UnifiedModelClientDependencies {
+  providerRepository?: any;
+  securityValidator?: any;
+  streamingManager?: any;
+  cacheCoordinator?: any;
+  performanceMonitor?: any;
+  hybridRouter?: any;
+}
+
 export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private config: UnifiedModelClientConfig;
   private providers: Map<string, IModelProvider> = new Map();
@@ -53,9 +72,12 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private initialized = false;
   private requestCount = 0;
   private cache = new Map<string, { response: ModelResponse; timestamp: number }>();
+  private dependencies?: UnifiedModelClientDependencies;
   
-  constructor(config: UnifiedModelClientConfig | UnifiedConfiguration) {
+  constructor(config: UnifiedModelClientConfig | UnifiedConfiguration, dependencies?: UnifiedModelClientDependencies) {
     super();
+    
+    this.dependencies = dependencies;
     
     // Handle both config types for backward compatibility
     if ('model' in config) {
@@ -223,7 +245,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         const response = await provider.request(requestWithId);
         yield {
           content: response.content,
-          isComplete: true,
+          finished: true,
+          index: 0,
+          timestamp: Date.now(),
           metadata: response.metadata
         };
       }
@@ -305,7 +329,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
   
   // Public utility methods for backward compatibility
-  getProviders(): string[] {
+  getProviderNames(): string[] {
     return Array.from(this.providers.keys());
   }
   
@@ -319,6 +343,88 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     for (const [name, provider] of this.providers.entries()) {
       const startTime = Date.now();
       try {
+        const available = await provider.isAvailable();
+        const latency = Date.now() - startTime;
+        results.push({ provider: name, available, latency });
+      } catch (error) {
+        results.push({ provider: name, available: false });
+      }
+    }
+    
+    return results;
+  }
+
+  // IModelClient interface methods
+  async processRequest(request: ModelRequest): Promise<ModelResponse> {
+    return this.request(request);
+  }
+
+  async streamRequest(
+    request: ModelRequest,
+    onToken: (token: StreamToken) => void
+  ): Promise<ModelResponse> {
+    // For now, simulate streaming by calling request and emitting tokens
+    const response = await this.request(request);
+    
+    // Simulate token streaming
+    const words = response.content.split(' ');
+    for (let i = 0; i < words.length; i++) {
+      onToken({
+        content: words[i] + (i < words.length - 1 ? ' ' : ''),
+        finished: i === words.length - 1,
+        index: i,
+        timestamp: Date.now()
+      });
+    }
+    
+    return response;
+  }
+
+  async generateText(prompt: string, options?: any): Promise<string> {
+    const request: ModelRequest = {
+      id: `gen_${Date.now()}`,
+      prompt,
+      model: options?.model || this.config.defaultProvider,
+      temperature: options?.temperature,
+      maxTokens: options?.maxTokens
+    };
+    
+    const response = await this.request(request);
+    return response.content;
+  }
+
+  async synthesize(request: ModelRequest): Promise<ModelResponse> {
+    return this.request(request);
+  }
+
+  async healthCheck(): Promise<Record<string, boolean>> {
+    const status = await this.getStatus();
+    const result: Record<string, boolean> = {};
+    
+    for (const providerStatus of status) {
+      result[providerStatus.provider] = providerStatus.available;
+    }
+    
+    return result;
+  }
+
+  getProviders(): Map<string, any> {
+    return new Map([...this.providers.entries()]);
+  }
+
+  async destroy(): Promise<void> {
+    return this.shutdown();
+  }
+
+  /**
+   * Get status of all providers
+   */
+  async getStatus(): Promise<Array<{ provider: string; available: boolean; latency?: number }>> {
+    const results: Array<{ provider: string; available: boolean; latency?: number }> = [];
+    
+    for (const [name, provider] of this.providers) {
+      try {
+        const startTime = Date.now();
         const available = await provider.isAvailable();
         const latency = Date.now() - startTime;
         results.push({ provider: name, available, latency });

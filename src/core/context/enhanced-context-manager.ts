@@ -3,7 +3,7 @@ import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import { Task } from '../planning/enhanced-agentic-planner.js';
-import { registerShutdownHandler, createManagedInterval, clearManagedInterval } from '../agent.js';
+import { registerShutdownHandler, createManagedInterval, clearManagedInterval } from '../utils/lifecycle-utils.js';
 
 export interface ContextItem {
   key: string;

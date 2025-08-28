@@ -68,9 +68,9 @@ export class UnifiedCacheSystem extends EventEmitter {
     this.cacheManager = new CacheManager(config);
 
     // Set up event forwarding
-    this.cacheManager.on('hit', data => this.emit('hit', data));
-    this.cacheManager.on('miss', data => this.emit('miss', data));
-    this.cacheManager.on('error', error => this.emit('error', error));
+    this.cacheManager.on('hit', (data: any) => this.emit('hit', data));
+    this.cacheManager.on('miss', (data: any) => this.emit('miss', data));
+    this.cacheManager.on('error', (error: any) => this.emit('error', error));
 
     logger.info('Unified Cache System initialized', {
       semanticEnabled: config.semantic.enabled,

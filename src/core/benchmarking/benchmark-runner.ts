@@ -290,7 +290,7 @@ Function signature and implementation:`;
         // Use specific model (Ollama)
         if (this.ollamaClient) {
           const result = (await Promise.race([
-            this.ollamaClient.generateText(enhancedPrompt, { includeContext: false }),
+            this.ollamaClient.request({ prompt: enhancedPrompt }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs)),
           ])) as any;
 
@@ -308,7 +308,7 @@ Function signature and implementation:`;
         // Use hybrid client
         if (this.hybridClient) {
           const result = (await Promise.race([
-            this.hybridClient.generate({
+            this.hybridClient.request({
               prompt: enhancedPrompt,
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs)),
@@ -738,12 +738,18 @@ except Exception as e:
   private initializeClients(): void {
     try {
       this.hybridClient = new UnifiedModelClient({
+        defaultProvider: 'ollama',
         providers: [
-          { type: 'ollama', endpoint: 'http://localhost:11434', model: 'auto', timeout: 30000 },
-          { type: 'lm-studio', endpoint: 'http://localhost:1234', model: 'auto', timeout: 30000 },
+          { type: 'ollama', name: 'ollama', endpoint: 'http://localhost:11434', models: ['auto'], enabled: true, priority: 1, timeout: 30000 },
+          { type: 'lm-studio', name: 'lm-studio', endpoint: 'http://localhost:1234', models: ['auto'], enabled: true, priority: 2, timeout: 30000 },
         ],
+        fallbackStrategy: 'priority',
         executionMode: 'auto',
         fallbackChain: ['ollama', 'lm-studio'],
+        timeout: 30000,
+        retryAttempts: 3,
+        enableCaching: true,
+        enableMetrics: true,
         performanceThresholds: {
           fastModeMaxTokens: 2048,
           timeoutMs: 30000,
@@ -751,22 +757,38 @@ except Exception as e:
         },
         security: {
           enableSandbox: true,
+          sandboxTimeout: 30000,
           maxInputLength: 10000,
+          enableInputSanitization: true,
           allowedCommands: ['node', 'python3'],
+          blockedCommands: ['rm', 'del', 'format'],
+          allowedPaths: ['.'],
+          restrictedPaths: ['/etc', '/sys', '/proc'],
+          securityLevel: 'medium' as const,
+          enableAuditLogging: false,
         },
       });
 
       this.ollamaClient = new UnifiedModelClient({
+        defaultProvider: 'ollama-quality',
         providers: [
           {
             type: 'ollama',
+            name: 'ollama-quality',
             endpoint: 'http://localhost:11434',
-            model: 'codellama:34b',
+            models: ['codellama:34b'],
+            enabled: true,
+            priority: 1,
             timeout: 60000,
           },
         ],
+        fallbackStrategy: 'fail-fast',
         executionMode: 'quality',
         fallbackChain: ['ollama'],
+        timeout: 60000,
+        retryAttempts: 2,
+        enableCaching: false,
+        enableMetrics: true,
         performanceThresholds: {
           fastModeMaxTokens: 4096,
           timeoutMs: 60000,
@@ -774,8 +796,15 @@ except Exception as e:
         },
         security: {
           enableSandbox: true,
+          sandboxTimeout: 60000,
           maxInputLength: 20000,
+          enableInputSanitization: true,
           allowedCommands: ['node', 'python3'],
+          blockedCommands: ['rm', 'del', 'format'],
+          allowedPaths: ['.'],
+          restrictedPaths: ['/etc', '/sys', '/proc'],
+          securityLevel: 'high' as const,
+          enableAuditLogging: true,
         },
       });
 

@@ -391,7 +391,7 @@ export class SystemBootstrap {
       CLIENT_TOKEN,
       async container => {
         // Import client class dynamically to avoid circular imports
-        const { UnifiedModelClient } = await import('../../refactor/unified-model-client.js');
+        const { UnifiedModelClient } = await import('../../application/services/unified-model-client.js');
 
         // Resolve all dependencies (await async ones properly)
         const config = container.resolve(CLIENT_CONFIG_TOKEN);
@@ -498,47 +498,77 @@ export class SystemBootstrap {
    */
   private registerStartupTasks(): void {
     // Critical path tasks
-    startupOptimizer.registerTask('core_infrastructure', async () => {
-      await this.initializeCoreInfrastructure();
+    startupOptimizer.registerTask({
+      name: 'core_infrastructure',
+      priority: 'critical',
+      timeout: 5000,
+      task: async () => await this.initializeCoreInfrastructure()
     });
 
-    startupOptimizer.registerTask('configuration', async () => {
-      await this.initializeConfiguration();
+    startupOptimizer.registerTask({
+      name: 'configuration',
+      priority: 'critical',
+      timeout: 5000,
+      task: async () => await this.initializeConfiguration()
     });
 
     // High priority parallel tasks
-    startupOptimizer.registerTask('security_services', async () => {
-      await this.initializeSecurity();
+    startupOptimizer.registerTask({
+      name: 'security_services',
+      priority: 'high',
+      timeout: 10000,
+      task: async () => await this.initializeSecurity()
     });
 
-    startupOptimizer.registerTask('cache_services', async () => {
-      await this.initializeCache();
+    startupOptimizer.registerTask({
+      name: 'cache_services',
+      priority: 'high',
+      timeout: 10000,
+      task: async () => await this.initializeCache()
     });
 
-    startupOptimizer.registerTask('monitoring_services', async () => {
-      await this.initializeMonitoring();
+    startupOptimizer.registerTask({
+      name: 'monitoring_services',
+      priority: 'high',
+      timeout: 10000,
+      task: async () => await this.initializeMonitoring()
     });
 
     // Medium priority tasks
-    startupOptimizer.registerTask('provider_services', async () => {
-      await this.initializeProviders();
+    startupOptimizer.registerTask({
+      name: 'provider_services',
+      priority: 'medium',
+      timeout: 15000,
+      task: async () => await this.initializeProviders()
     });
 
-    startupOptimizer.registerTask('routing_services', async () => {
-      await this.initializeRouting();
+    startupOptimizer.registerTask({
+      name: 'routing_services',
+      priority: 'medium',
+      timeout: 15000,
+      task: async () => await this.initializeRouting()
     });
 
-    startupOptimizer.registerTask('streaming_services', async () => {
-      await this.initializeStreaming();
+    startupOptimizer.registerTask({
+      name: 'streaming_services',
+      priority: 'medium',
+      timeout: 15000,
+      task: async () => await this.initializeStreaming()
     });
 
     // Low priority (can fail without blocking)
-    startupOptimizer.registerTask('client_initialization', async () => {
-      await this.initializeClient();
+    startupOptimizer.registerTask({
+      name: 'client_initialization',
+      priority: 'low',
+      timeout: 20000,
+      task: async () => await this.initializeClient()
     });
 
-    startupOptimizer.registerTask('synthesis_coordinator', async () => {
-      await this.initializeSynthesisCoordinator();
+    startupOptimizer.registerTask({
+      name: 'synthesis_coordinator',
+      priority: 'low',
+      timeout: 20000,
+      task: async () => await this.initializeSynthesisCoordinator()
     });
   }
 

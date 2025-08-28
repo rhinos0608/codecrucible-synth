@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from '../logger.js';
+import { logger } from '../logger.js';
 import { LazyProjectIntelligenceSystem, BasicProjectInfo } from './lazy-project-intelligence.js';
 import { ProjectIntelligence } from './project-intelligence-system.js';
 import {
@@ -32,7 +32,7 @@ export interface QuickContextInfo {
 }
 
 export class OptimizedContextAwareCLI extends EventEmitter {
-  private logger: Logger;
+  private logger: typeof logger;
   private lazyIntelligence: LazyProjectIntelligenceSystem;
   private currentWorkingDir: string = process.cwd();
   private initializationPromise: Promise<void> | null = null;
@@ -40,7 +40,7 @@ export class OptimizedContextAwareCLI extends EventEmitter {
 
   constructor() {
     super();
-    this.logger = new Logger('OptimizedContextCLI');
+    this.logger = logger;
     this.lazyIntelligence = new LazyProjectIntelligenceSystem();
   }
 

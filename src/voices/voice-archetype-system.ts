@@ -402,8 +402,23 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
     return undefined;
   }
 
-  getAvailableVoices(): Voice[] {
-    return Array.from(this.voices.values());
+  getAvailableVoices(): string[] {
+    return Array.from(this.voices.keys());
+  }
+
+  /**
+   * Process a prompt with multiple voices (required by interface)
+   */
+  async processPrompt(prompt: string, options?: any): Promise<any> {
+    const defaultVoices = options?.voices || this.config.voices.default;
+    return await this.generateMultiVoiceSolutions(defaultVoices, prompt, options);
+  }
+
+  /**
+   * Get perspective from a specific voice
+   */
+  async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
+    return await this.generateSingleVoiceResponse(voiceId, prompt, this.modelClient);
   }
 
   /**
@@ -1339,24 +1354,5 @@ Focus on the ${phase} aspect of this task. Provide detailed ${phase} considerati
     return candidates.slice(0, count);
   }
 
-  /**
-   * Get a voice perspective for council sessions
-   */
-  async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
-    const voice = this.getVoice(voiceId);
-    if (!voice) {
-      throw new Error(`Voice ${voiceId} not found`);
-    }
-
-    // Simple perspective generation - in real implementation would use the model
-    return {
-      voiceId,
-      position: `${voice.name} perspective on: ${prompt}`,
-      confidence: 0.8,
-      reasoning: `Analysis from ${voice.name} viewpoint`,
-      supportingEvidence: [],
-      concerns: [],
-      alternatives: [],
-    };
-  }
+  // getVoicePerspective method already implemented above
 }

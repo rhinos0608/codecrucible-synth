@@ -30,4 +30,18 @@ export class PerformanceMonitor {
       activeMeasurements: this.measurements.size
     };
   }
+
+  getProviderMetrics(): any {
+    return {
+      measurements: Object.fromEntries(this.measurements),
+      totalMeasurements: this.measurements.size
+    };
+  }
+
+  getSummary(): any {
+    return {
+      activeMeasurements: this.measurements.size,
+      measurementCount: this.measurements.size
+    };
+  }
 }

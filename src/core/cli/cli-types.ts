@@ -5,7 +5,7 @@
 
 import { UnifiedModelClient } from '../../application/services/client.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
-import { UnifiedAgent } from '../agent.js';
+import { UnifiedAgentSystem } from '../../domain/services/unified-agent-system.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { AppConfig } from '../../config/config-manager.js';
 
@@ -107,6 +107,6 @@ export interface CLIContext {
   voiceSystem: VoiceArchetypeSystem;
   mcpManager: MCPServerManager;
   config: AppConfig;
-  agentOrchestrator?: UnifiedAgent;
-  autonomousAgent?: UnifiedAgent;
+  agentOrchestrator?: UnifiedAgentSystem;
+  autonomousAgent?: UnifiedAgentSystem;
 }

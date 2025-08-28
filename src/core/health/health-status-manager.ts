@@ -8,7 +8,7 @@ import { logger } from '../logger.js';
 import { IProviderRepository } from '../providers/provider-repository.js';
 import { ICacheCoordinator } from '../caching/cache-coordinator.js';
 import { PerformanceMonitor } from '../../utils/performance.js';
-import { MetricsData } from '../types.js';
+import { MetricsData } from '../../domain/types/unified-types.js';
 
 export interface HealthStatus {
   [providerType: string]: boolean;

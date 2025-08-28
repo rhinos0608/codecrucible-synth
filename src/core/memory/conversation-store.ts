@@ -3,7 +3,7 @@ import { Database, open } from 'sqlite';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { logger } from '../logger.js';
-import { SynthesisResult } from '../types.js';
+import { SynthesisResult } from '../integration/unified-data-models.js';
 import { ProjectContext } from './project-memory.js';
 
 export interface StoredInteraction {

@@ -5,17 +5,17 @@
 
 import * as readline from 'readline';
 import chalk from 'chalk';
-import { REPLInterface } from './types.js';
+import { REPLInterface } from '../domain/types/unified-types.js';
 import { CLIContext } from './cli/cli-types.js';
 import { CLI } from '../application/interfaces/cli.js';
-import { Logger } from './logger.js';
+import { logger } from './logger.js';
 import { getErrorMessage } from '../utils/error-utils.js';
 
 export class InteractiveREPL {
   private rl: readline.Interface;
   private cli: CLI;
   private context: CLIContext;
-  private logger: Logger;
+  private logger: typeof logger;
   private isProcessing = false;
   private history: string[] = [];
   private currentModel: string = '';
@@ -23,7 +23,7 @@ export class InteractiveREPL {
   constructor(cli: CLI, context: CLIContext) {
     this.cli = cli;
     this.context = context;
-    this.logger = new Logger('InteractiveREPL');
+    this.logger = logger;
 
     // Create readline interface for interactive input
     this.rl = readline.createInterface({

@@ -198,7 +198,7 @@ export class AdvancedMCPDiscoverySystem extends EventEmitter {
       // Get servers by categories
       const categories = ['productivity', 'development', 'ai', 'data', 'communication'];
       const categoryPromises = categories.map(category => 
-        smithery.getServersByTag(category, 20).catch(() => [])
+        smithery.getServersByTag(category, 20).catch((): SmitheryServer[] => [])
       );
       
       const categoryResults = await Promise.allSettled(categoryPromises);

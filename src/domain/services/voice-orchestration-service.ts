@@ -166,7 +166,7 @@ export class VoiceOrchestrationService implements IVoiceOrchestrationService {
           conflictId: conflict.id,
           resolution: 'unresolved',
           reasoning: 'Voice not found for conflict resolution',
-          winningVoiceId: null,
+          winningVoiceId: null as string | null,
         };
       }
 

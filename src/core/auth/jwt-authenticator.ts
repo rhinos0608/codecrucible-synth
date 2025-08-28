@@ -111,7 +111,8 @@ export class JWTAuthenticator {
         expiresIn: this.config.expiry,
       };
     } catch (error) {
-      logger.error('Token generation failed', error as Error, {
+      logger.error('Token generation failed', {
+        error: error as Error,
         userId: user.id,
         ipAddress,
       });

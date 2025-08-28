@@ -911,11 +911,11 @@ export class UnifiedServerSystem extends EventEmitter {
   private setupEventHandlers(): void {
     // Forward events from strategies
     for (const strategy of this.strategies.values()) {
-      strategy.on('server-started', (data) => this.emit('server-started', data));
-      strategy.on('server-stopped', (data) => this.emit('server-stopped', data));
-      strategy.on('server-error', (error) => this.emit('server-error', error));
-      strategy.on('client-connected', (client) => this.emit('client-connected', client));
-      strategy.on('client-disconnected', (client) => this.emit('client-disconnected', client));
+      strategy.on('server-started', (data: any) => this.emit('server-started', data));
+      strategy.on('server-stopped', (data: any) => this.emit('server-stopped', data));
+      strategy.on('server-error', (error: any) => this.emit('server-error', error));
+      strategy.on('client-connected', (client: any) => this.emit('client-connected', client));
+      strategy.on('client-disconnected', (client: any) => this.emit('client-disconnected', client));
     }
     
     // System shutdown handler

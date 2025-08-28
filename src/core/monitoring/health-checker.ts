@@ -440,7 +440,8 @@ export class HealthChecker extends EventEmitter {
         }
       } catch (error) {
         lastError = error as Error;
-        logger.error('Health check error', error as Error, {
+        logger.error('Health check error', {
+          error: error as Error,
           name,
           attempt,
           max_attempts: this.config.retryAttempts,

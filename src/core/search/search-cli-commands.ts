@@ -5,7 +5,7 @@
  */
 
 import { Command } from 'commander';
-import { Logger } from '../logger.js';
+import { logger } from '../logger.js';
 import { HybridSearchCoordinator } from './hybrid-search-coordinator.js';
 import { CommandLineSearchEngine, SearchResult } from './command-line-search-engine.js';
 import { HybridSearchFactory } from './hybrid-search-factory.js';
@@ -89,14 +89,14 @@ interface PerformanceCommandOptions {
 }
 
 export class SearchCLICommands implements CLISearchIntegration {
-  private logger: Logger;
+  private logger: typeof logger;
   private hybridCoordinator?: HybridSearchCoordinator;
   private commandSearch: CommandLineSearchEngine;
   private workingDirectory: string;
   private performanceMonitor?: PerformanceMonitor;
 
   constructor(workingDirectory: string = process.cwd()) {
-    this.logger = new Logger('SearchCLI');
+    this.logger = logger;
     this.workingDirectory = workingDirectory;
     this.commandSearch = new CommandLineSearchEngine(workingDirectory);
 

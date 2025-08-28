@@ -53,5 +53,30 @@ export interface ProjectContext {
   documentation: string[];
 }
 
+// CLI Error handling types
+export class CLIError extends Error {
+  constructor(
+    message: string,
+    public exitCode: CLIExitCode = CLIExitCode.GeneralError,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'CLIError';
+  }
+}
+
+export enum CLIExitCode {
+  Success = 0,
+  GeneralError = 1,
+  InvalidArguments = 2,
+  NetworkError = 3,
+  AuthenticationError = 4,
+  PermissionDenied = 5,
+  FileNotFound = 6,
+  ConfigurationError = 7,
+  TimeoutError = 8,
+  InternalError = 9
+}
+
 // Re-export from domain types for compatibility
 export type { UnifiedConfiguration } from '../domain/types/unified-types.js';

@@ -9,7 +9,7 @@ import { EnterpriseSecurityFramework } from '../security/enterprise-security-fra
 import { ReconstructedCodeQualityAnalyzer as CodeQualityAnalyzer } from '../quality/reconstructed-code-quality-analyzer.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
 import { SequentialDualAgentSystem } from '../collaboration/sequential-dual-agent-system.js';
-import { LivingSpiralCoordinator } from '../living-spiral-coordinator.js';
+import { LivingSpiralCoordinator } from '../../domain/services/living-spiral-coordinator.js';
 import { logger } from '../logger.js';
 
 export interface EnhancedSystemConfig {

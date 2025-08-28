@@ -51,6 +51,14 @@ export interface PerformanceMetric {
   metadata?: Record<string, any>;
 }
 
+export interface PerformanceReport {
+  timestamp: number;
+  systemMetrics: SystemPerformanceMetrics;
+  serverMetrics: MCPServerMetrics[];
+  alerts: PerformanceAlert[];
+  recommendations: string[];
+}
+
 export interface PerformanceTrend {
   metric: string;
   trend: 'improving' | 'stable' | 'declining';
@@ -339,6 +347,110 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
   private async getCpuUsage(): Promise<number> {
     // Simplified CPU usage calculation
     return Math.random() * 100;
+  }
+
+  /**
+   * Record a performance metric
+   */
+  recordMetric(name: string, value: number, unit: string = 'ms'): void {
+    const metric: PerformanceMetric = {
+      name,
+      value,
+      timestamp: Date.now(),
+      unit
+    };
+    
+    // Store metric or process as needed
+    logger.debug(`Performance metric recorded: ${name} = ${value}${unit}`);
+    this.emit('metric-recorded', metric);
+  }
+
+  /**
+   * Get analytics statistics
+   */
+  getAnalyticsStats(): any {
+    return {
+      totalMetrics: this.serverMetrics.size,
+      systemMetrics: this.systemMetrics,
+      alertCount: this.alerts.length,
+      averageResponseTime: this.calculateSystemAverageResponseTime(),
+      systemUptime: Date.now() - this.systemStartTime
+    };
+  }
+
+  /**
+   * Get performance trends
+   */
+  getPerformanceTrends(): any {
+    const servers = Array.from(this.serverMetrics.values());
+    return {
+      responseTimeTrend: servers.map(s => ({
+        serverId: s.serverId,
+        averageResponseTime: s.averageResponseTime,
+        trend: 'stable' // Simplified trend analysis
+      })),
+      errorRateTrend: servers.map(s => ({
+        serverId: s.serverId,
+        errorRate: s.errorRate,
+        trend: s.errorRate > this.thresholds.errorRate ? 'increasing' : 'stable'
+      }))
+    };
+  }
+
+  /**
+   * Get active alerts
+   */
+  getActiveAlerts(): PerformanceAlert[] {
+    const now = Date.now();
+    // Return recent alerts from last 5 minutes
+    return this.alerts.filter(alert => now - alert.timestamp < 300000);
+  }
+
+  /**
+   * Generate performance report (alias for getPerformanceReport for compatibility)
+   */
+  generatePerformanceReport(): any {
+    return this.getPerformanceReport();
+  }
+
+  /**
+   * Generate capacity planning report
+   */
+  generateCapacityPlan(): any {
+    const servers = Array.from(this.serverMetrics.values());
+    const totalCapacity = servers.length * 100; // Simplified capacity calculation
+    const usedCapacity = servers.reduce((sum, server) => sum + (server.requestCount / 1000), 0);
+    
+    return {
+      currentCapacity: {
+        total: totalCapacity,
+        used: usedCapacity,
+        available: totalCapacity - usedCapacity,
+        utilizationPercentage: (usedCapacity / totalCapacity) * 100
+      },
+      recommendations: this.generateCapacityRecommendations(servers),
+      projections: {
+        nextMonth: {
+          expectedLoad: usedCapacity * 1.1,
+          recommendedCapacity: totalCapacity * 1.2
+        }
+      }
+    };
+  }
+
+  private generateCapacityRecommendations(servers: MCPServerMetrics[]): string[] {
+    const recommendations: string[] = [];
+    
+    const highLoadServers = servers.filter(s => s.errorRate > 5 || s.averageResponseTime > 1000);
+    if (highLoadServers.length > 0) {
+      recommendations.push(`Consider scaling servers: ${highLoadServers.map(s => s.serverName).join(', ')}`);
+    }
+    
+    if (servers.length < 2) {
+      recommendations.push('Consider adding redundant MCP servers for high availability');
+    }
+    
+    return recommendations;
   }
 }
 

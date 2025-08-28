@@ -3,7 +3,7 @@
  * Automatically detects available models and configures optimal dual-agent setup
  */
 
-import { Logger } from '../logger.js';
+import { logger } from '../logger.js';
 
 export interface ModelInfo {
   name: string;

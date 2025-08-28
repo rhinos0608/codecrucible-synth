@@ -5,9 +5,7 @@
 
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { FilesystemTools } from './filesystem-tools.js';
-import { Logger } from '../logging/logger.js';
-
-const logger = new Logger('ToolIntegration');
+import { logger } from '../logging/logger.js';
 
 export interface LLMFunction {
   type: 'function';

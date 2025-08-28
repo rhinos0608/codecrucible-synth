@@ -3,7 +3,7 @@
  * Automatically configures optimal dual-agent setup based on available models
  */
 
-import { Logger } from '../logger.js';
+import { logger } from '../logger.js';
 import { IntelligentModelDetector, OptimalConfiguration } from './intelligent-model-detector.js';
 import { DualAgentRealtimeSystem } from '../collaboration/dual-agent-realtime-system.js';
 import chalk from 'chalk';
@@ -20,13 +20,13 @@ export interface AutoConfigResult {
 }
 
 export class AutoConfigurator {
-  private logger: Logger;
+  private logger: typeof logger;
   private modelDetector: IntelligentModelDetector;
   private currentConfiguration: OptimalConfiguration | null = null;
   private currentDualAgent: DualAgentRealtimeSystem | null = null;
 
   constructor() {
-    this.logger = new Logger('AutoConfigurator');
+    this.logger = logger;
     this.modelDetector = new IntelligentModelDetector();
   }
 

@@ -561,6 +561,12 @@ export interface SynthesisResult {
   voicesUsed?: string[];
   content?: string;
   combinedCode?: string;
+  // Extended properties for memory and analytics
+  synthesis?: string;
+  confidence?: number;
+  latency?: number;
+  modelUsed?: string;
+  reasoning?: string;
 }
 
 export interface CoordinationStrategy {

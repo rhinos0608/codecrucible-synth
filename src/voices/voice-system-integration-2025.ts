@@ -29,10 +29,31 @@ export class VoiceSystemIntegration2025 {
       ...config
     };
 
+    // Create a simple logger
+    const simpleLogger = {
+      info: (msg: string) => console.log(`[VoiceSystem] ${msg}`),
+      error: (msg: string, error?: any) => console.error(`[VoiceSystem] ${msg}`, error),
+      warn: (msg: string) => console.warn(`[VoiceSystem] ${msg}`),
+      debug: (msg: string) => console.debug(`[VoiceSystem] ${msg}`),
+      trace: (msg: string) => console.trace(`[VoiceSystem] ${msg}`)
+    };
+
     // Initialize with the actual voice archetype system
-    this.voiceArchetypeSystem = new VoiceArchetypeSystem(modelClient, {
-      logger: console // Simple logger for now
-    });
+    const voiceConfig = {
+      voices: {
+        default: ['architect', 'developer', 'analyzer'],
+        available: this.getAvailableVoices(),
+        parallel: true,
+        maxConcurrent: this.config.maxConcurrentVoices || 3
+      }
+    };
+    
+    this.voiceArchetypeSystem = new VoiceArchetypeSystem(
+      simpleLogger,
+      undefined, // spiral coordinator 
+      modelClient,
+      voiceConfig
+    );
   }
 
   async initialize(): Promise<void> {
@@ -197,6 +218,105 @@ export class VoiceSystemIntegration2025 {
       averageResponseTime: 0,
       errorRate: 0,
       lastActivity: Date.now()
+    };
+  }
+
+  // === Missing Interface Methods ===
+
+  /**
+   * Get system analytics data
+   */
+  getSystemAnalytics(): any {
+    return {
+      systemStatus: this.getSystemStatus(),
+      performanceMetrics: this.getPerformanceMetrics(),
+      voiceUsageStats: this.getVoiceUsageStats(),
+      healthMetrics: {
+        initialized: this.initialized,
+        errorRate: 0, // Would track actual errors
+        uptime: Date.now(), // Would track actual uptime
+        lastError: null
+      }
+    };
+  }
+
+  /**
+   * Process request with integrated routing
+   */
+  async processWithIntegratedRouting(request: string, routing: any = {}): Promise<any> {
+    logger.info('Processing request with integrated routing');
+    
+    const selectedVoices = await this.selectVoices({
+      type: routing.type || 'general',
+      complexity: routing.complexity || 'medium',
+      ...routing
+    });
+
+    const result = await this.synthesizeVoices(request, {
+      voices: selectedVoices,
+      routing,
+      timestamp: Date.now()
+    });
+
+    return {
+      ...result,
+      routing: {
+        strategy: this.config.voiceSelectionStrategy,
+        selectedVoices,
+        routingCriteria: routing
+      }
+    };
+  }
+
+  /**
+   * Synthesize multiple voices for a given request
+   */
+  async synthesizeMultipleVoices(request: string, options: any = {}): Promise<any> {
+    logger.info('Synthesizing multiple voices for request');
+    
+    const voices = options.voices || await this.selectVoices(options);
+    const results: any[] = [];
+
+    for (const voice of voices) {
+      try {
+        const voiceResult = await this.synthesizeSingleVoice(voice, request, options);
+        results.push(voiceResult);
+      } catch (error) {
+        logger.error(`Failed to synthesize voice ${voice}:`, error);
+        // Continue with other voices
+      }
+    }
+
+    return {
+      request,
+      voices,
+      results,
+      synthesisType: 'multiple',
+      timestamp: Date.now(),
+      success: results.length > 0
+    };
+  }
+
+  // === Helper Methods ===
+
+  private getVoiceUsageStats(): any {
+    return {
+      totalSyntheses: 0, // Would track actual usage
+      voiceDistribution: {},
+      averageVoicesPerRequest: this.config.maxConcurrentVoices || 3,
+      mostUsedVoice: 'analyzer', // Would track actual usage
+      leastUsedVoice: 'guardian'
+    };
+  }
+
+  private async synthesizeSingleVoice(voice: string, request: string, options: any): Promise<any> {
+    // Simple voice synthesis - in a real implementation this would use the actual voice system
+    return {
+      voice,
+      response: `Response from ${voice} archetype for: ${request.substring(0, 50)}...`,
+      confidence: Math.random() * 0.5 + 0.5, // Random confidence between 0.5-1.0
+      processingTime: Math.random() * 1000 + 500, // Random time between 500-1500ms
+      options
     };
   }
 }

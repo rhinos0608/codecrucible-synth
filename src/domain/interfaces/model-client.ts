@@ -85,6 +85,11 @@ export interface IModelClient {
   request(request: ModelRequest): Promise<ModelResponse>;
   
   /**
+   * Generate text from a prompt - legacy compatibility method
+   */
+  generate(prompt: string, options?: any): Promise<string>;
+  
+  /**
    * Send a streaming request to the model
    */
   stream(request: ModelRequest): AsyncIterableIterator<StreamToken>;

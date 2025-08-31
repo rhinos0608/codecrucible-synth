@@ -190,16 +190,49 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
     }
 
     // If result is a string, parse it into structured format
-    const resultText = typeof result === 'string' ? result : String(result);
+    let resultText: string;
+    if (typeof result === 'string') {
+      resultText = result;
+    } else if (result && typeof result === 'object') {
+      // Properly handle object responses by extracting meaningful content
+      if (result.content) {
+        resultText = result.content;
+      } else if (result.text) {
+        resultText = result.text;
+      } else if (result.response) {
+        resultText = result.response;
+      } else if (result.message && result.message.content) {
+        resultText = result.message.content;
+      } else {
+        // If no standard content field found, try to stringify but log for debugging
+        console.error('Unexpected result format in analyze-file-use-case:', result);
+        resultText = JSON.stringify(result, null, 2);
+      }
+    } else {
+      resultText = String(result);
+    }
+    
+    // CRITICAL FIX: Return the actual AI response content instead of generic fallbacks
+    const extractedSummary = this.extractSection(resultText, 'Summary');
+    const extractedInsights = this.extractListItems(resultText, 'Key Insights') || this.extractListItems(resultText, 'Insights');
+    const extractedRecommendations = this.extractListItems(resultText, 'Recommendations');
+    
+    // If we can't extract structured sections, return the full AI content as the summary
+    // This ensures users see the actual AI response rather than generic messages
+    if (!extractedSummary && !extractedInsights && !extractedRecommendations && resultText.length > 50) {
+      return {
+        summary: resultText, // Return the full AI response
+        insights: [],
+        recommendations: [],
+        codeQuality: this.extractCodeQuality(resultText),
+        structure: this.extractStructure(resultText)
+      };
+    }
     
     return {
-      summary: this.extractSection(resultText, 'Summary') || 
-               'Analysis completed successfully',
-      insights: this.extractListItems(resultText, 'Key Insights') || 
-                this.extractListItems(resultText, 'Insights') || 
-                ['Code structure and functionality analyzed'],
-      recommendations: this.extractListItems(resultText, 'Recommendations') || 
-                      ['Review the analysis for potential improvements'],
+      summary: extractedSummary || 'Analysis completed successfully',
+      insights: extractedInsights || ['Code structure and functionality analyzed'],
+      recommendations: extractedRecommendations || ['Review the analysis for potential improvements'],
       codeQuality: this.extractCodeQuality(resultText),
       structure: this.extractStructure(resultText)
     };

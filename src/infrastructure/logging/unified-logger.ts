@@ -42,6 +42,7 @@ export interface LoggerConfig {
   maxFiles?: number;
   enableAudit: boolean;
   auditPath?: string;
+  context?: string;
 }
 
 export interface LogDestination {
@@ -83,6 +84,10 @@ export class UnifiedLogger extends EventEmitter {
   }
 
   debug(message: string, metadata?: any): void {
+    this.log(LogLevel.DEBUG, message, metadata);
+  }
+
+  trace(message: string, metadata?: any): void {
     this.log(LogLevel.DEBUG, message, metadata);
   }
 

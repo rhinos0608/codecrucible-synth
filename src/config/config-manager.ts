@@ -90,10 +90,10 @@ export class ConfigManager {
         enableSecurity: unified.security.enableSandbox || true, // Use enableSandbox as security indicator
       },
       voices: {
-        default: unified.voices.defaultVoices || ['explorer', 'developer'],
-        available: unified.voices.availableVoices || ['explorer', 'maintainer', 'architect'],
-        parallel: unified.voices.parallelVoices || true,
-        maxConcurrent: unified.voices.maxConcurrentVoices || 3,
+        default: unified.voice.defaultVoices || ['explorer', 'developer'],
+        available: unified.voice.availableVoices || ['explorer', 'maintainer', 'architect'],
+        parallel: unified.voice.parallelVoices || true,
+        maxConcurrent: unified.voice.maxConcurrentVoices || 3,
       },
       database: {
         path: unified.infrastructure.database.path || './data.db',

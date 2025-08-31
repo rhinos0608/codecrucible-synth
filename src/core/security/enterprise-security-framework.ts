@@ -23,6 +23,7 @@ export interface SecurityPolicy {
 export interface SecurityValidationResult {
   isValid: boolean;
   violations: string[];
+  issues?: string[];
   mitigationActions: string[];
   mitigations: string[];
   allowed: boolean;
@@ -46,11 +47,12 @@ export interface SecurityContext {
 
 export interface AgentAction {
   id: string;
-  type: 'analyze' | 'generate' | 'transform' | 'validate' | 'communicate';
+  type: 'analyze' | 'generate' | 'transform' | 'validate' | 'communicate' | 'tool_usage';
   agentId: string;
   timestamp: Date;
-  parameters: Record<string, any>;
-  securityLevel: 'low' | 'medium' | 'high' | 'critical';
+  payload?: any;
+  parameters?: Record<string, any>;
+  securityLevel?: 'low' | 'medium' | 'high' | 'critical';
   resourceRequirements: {
     memory: number;
     cpu: number;

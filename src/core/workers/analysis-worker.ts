@@ -33,7 +33,15 @@ if (!isMainThread) {
 
       // Initialize minimal client for analysis
       const client = new UnifiedModelClient(config);
-      const voiceSystem = new VoiceArchetypeSystem(client, config);
+      // Create a minimal logger for the voice system
+      const logger = {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+        trace: () => {}
+      };
+      const voiceSystem = new VoiceArchetypeSystem(logger, undefined, client, config);
 
       // Perform analysis
       const result = await performAnalysis(task, client, voiceSystem);

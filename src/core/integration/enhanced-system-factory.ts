@@ -32,6 +32,12 @@ export interface EnhancedSystemConfig {
     enabled: boolean;
     maxVoices: number;
     collaborationMode: 'sequential' | 'parallel';
+    maxIterations?: number;
+    qualityThreshold?: number;
+    convergenceTarget?: number;
+    enableReflection?: boolean;
+    parallelVoices?: boolean;
+    councilSize?: number;
   };
   spiral: {
     enabled: boolean;
@@ -92,7 +98,13 @@ export class EnhancedSystemFactory {
       voice: {
         enabled: true,
         maxVoices: 3,
-        collaborationMode: 'sequential'
+        collaborationMode: 'sequential',
+        maxIterations: 5,
+        qualityThreshold: 0.8,
+        convergenceTarget: 0.85,
+        enableReflection: true,
+        parallelVoices: false,
+        councilSize: 3
       },
       spiral: {
         enabled: true,
@@ -106,9 +118,52 @@ export class EnhancedSystemFactory {
     try {
       // Create system integration coordinator
       const coordinator = SystemIntegrationCoordinator.getInstance();
-      
-      // Create Living Spiral coordinator for voice system
-      const spiralCoordinator = new LivingSpiralCoordinator(logger);
+
+      // Step 1: Create VoiceArchetypeSystem first (without spiral coordinator to break circular dependency)
+      const voiceSystem = finalConfig.voice.enabled ? new VoiceArchetypeSystem(
+        logger,
+        undefined, // Will be injected later
+        modelClient,
+        {
+          voices: {
+            default: ['explorer', 'maintainer'],
+            available: [
+              'explorer',
+              'maintainer', 
+              'analyzer',
+              'developer',
+              'implementor',
+              'security',
+              'architect',
+              'designer',
+              'optimizer',
+              'guardian'
+            ],
+            parallel: finalConfig.voice.parallelVoices || false,
+            maxConcurrent: finalConfig.voice.maxVoices || 3
+          }
+        }
+      ) : undefined;
+
+      // Step 2: Create LivingSpiralCoordinator with VoiceArchetypeSystem as orchestration service
+      const spiralCoordinator = voiceSystem ? new LivingSpiralCoordinator(
+        voiceSystem as any, // VoiceArchetypeSystem implements the needed methods
+        modelClient,
+        logger,
+        {
+          maxIterations: finalConfig.voice.maxIterations || 5,
+          qualityThreshold: finalConfig.voice.qualityThreshold || 0.8,
+          convergenceTarget: finalConfig.voice.convergenceTarget || 0.85,
+          enableReflection: finalConfig.voice.enableReflection || true,
+          parallelVoices: finalConfig.voice.parallelVoices || false,
+          councilSize: finalConfig.voice.councilSize || 3
+        }
+      ) : undefined;
+
+      // Step 3: Inject the spiral coordinator back into the voice system (complete the circular dependency)
+      if (voiceSystem && spiralCoordinator) {
+        voiceSystem.setLivingSpiralCoordinator(spiralCoordinator);
+      }
       
       // Initialize all integrated systems
       await coordinator.initializeIntegratedSystems();
@@ -138,11 +193,6 @@ export class EnhancedSystemFactory {
         analysis: {}
       }) : undefined;
 
-      const voiceSystem = finalConfig.voice.enabled ? new VoiceArchetypeSystem(
-        logger,
-        spiralCoordinator, 
-        modelClient
-      ) : undefined;
       const sequentialAgentSystem = finalConfig.voice.collaborationMode === 'sequential' 
         ? new SequentialDualAgentSystem() 
         : undefined;

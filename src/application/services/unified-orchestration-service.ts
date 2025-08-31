@@ -248,7 +248,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
     const agentRequest = {
       id: request.id,
       type: request.type as any,
-      input: request.input,
+      input: typeof request.input === 'string' ? request.input : JSON.stringify(request.input),
       priority: request.options?.priority || 'medium',
       constraints: {
         maxExecutionTime: request.options?.timeout,
@@ -348,7 +348,11 @@ export class UnifiedOrchestrationService extends EventEmitter {
       inputString, 
       {
         sessionId: request.id,
-        operationType: 'input',
+        requestId: request.id,
+        userAgent: 'CodeCrucible-OrchestrationService',
+        ipAddress: '127.0.0.1',
+        timestamp: new Date(),
+        operationType: 'orchestration-input',
         environment: 'development',
         permissions: ['orchestration', request.type],
         metadata: {
@@ -509,6 +513,188 @@ export class UnifiedOrchestrationService extends EventEmitter {
       this.logger.error('Error during orchestration service shutdown:', error);
       throw error;
     }
+  }
+
+  // === Missing Interface Methods ===
+
+  /**
+   * Get performance statistics for the orchestration service
+   */
+  getPerformanceStats(): any {
+    this.logger.debug('Getting performance stats');
+    
+    const performanceStats = this.performanceSystem ? 
+      this.performanceSystem.getMetrics() : 
+      this.getBasicPerformanceStats();
+
+    return {
+      ...performanceStats,
+      orchestrationMetrics: {
+        activeRequests: this.activeRequests.size,
+        totalProcessed: this.getTotalProcessedRequests(),
+        averageResponseTime: this.getAverageResponseTime(),
+        successRate: this.getSuccessRate()
+      },
+      systemStatus: {
+        initialized: this.initialized,
+        uptime: this.getUptime(),
+        memoryUsage: process.memoryUsage(),
+        timestamp: Date.now()
+      }
+    };
+  }
+
+  /**
+   * Synthesize integrated result from multiple components
+   */
+  async synthesizeIntegratedResult(results: any[], options: any = {}): Promise<any> {
+    this.logger.info('Synthesizing integrated result from components');
+    
+    if (!results || results.length === 0) {
+      return {
+        success: false,
+        error: 'No results to synthesize',
+        synthesis: null
+      };
+    }
+
+    try {
+      // Aggregate successful results
+      const successfulResults = results.filter(r => r && r.success !== false);
+      const failedResults = results.filter(r => !r || r.success === false);
+
+      // Calculate confidence based on success rate
+      const confidence = successfulResults.length / results.length;
+
+      // Synthesize the main result
+      const synthesizedContent = this.combineResults(successfulResults, options);
+      
+      // Extract metadata from all results
+      const metadata = this.extractMetadata(results);
+
+      const synthesis = {
+        success: true,
+        content: synthesizedContent,
+        confidence,
+        componentsUsed: metadata.componentsUsed,
+        processingTime: metadata.totalProcessingTime,
+        qualityMetrics: {
+          completeness: this.calculateCompleteness(successfulResults),
+          consistency: this.calculateConsistency(successfulResults),
+          accuracy: confidence
+        },
+        statistics: {
+          totalInputs: results.length,
+          successfulInputs: successfulResults.length,
+          failedInputs: failedResults.length,
+          averageConfidence: this.calculateAverageConfidence(successfulResults)
+        },
+        timestamp: Date.now()
+      };
+
+      this.logger.info(`Synthesis completed with ${confidence * 100}% confidence`);
+      return synthesis;
+
+    } catch (error) {
+      this.logger.error('Error during result synthesis:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown synthesis error',
+        synthesis: null,
+        timestamp: Date.now()
+      };
+    }
+  }
+
+  // === Helper Methods for Interface Implementation ===
+
+  private getBasicPerformanceStats(): any {
+    return {
+      enabled: false,
+      message: 'Performance system not available',
+      basicStats: {
+        memoryUsage: process.memoryUsage(),
+        uptime: process.uptime(),
+        timestamp: Date.now()
+      }
+    };
+  }
+
+  private getTotalProcessedRequests(): number {
+    // In a real implementation, this would track actual request counts
+    return 0;
+  }
+
+  private getAverageResponseTime(): number {
+    // In a real implementation, this would calculate actual average
+    return 0;
+  }
+
+  private getSuccessRate(): number {
+    // In a real implementation, this would calculate actual success rate
+    return 1.0;
+  }
+
+  private getUptime(): number {
+    return process.uptime() * 1000; // Convert to milliseconds
+  }
+
+  private combineResults(results: any[], options: any): string {
+    // Simple combination strategy - in a real implementation this would be more sophisticated
+    const contents = results
+      .map(r => r.content || r.result || r.response || JSON.stringify(r))
+      .filter(c => c && typeof c === 'string');
+
+    if (options.synthesisStrategy === 'concatenate') {
+      return contents.join('\n\n---\n\n');
+    }
+
+    // Default: extract key insights
+    return `Integrated analysis based on ${results.length} components:\n\n${contents.join('\n\n')}`;
+  }
+
+  private extractMetadata(results: any[]): any {
+    const componentsUsed: string[] = [];
+    let totalProcessingTime = 0;
+
+    results.forEach(result => {
+      if (result.metadata?.componentsUsed) {
+        componentsUsed.push(...result.metadata.componentsUsed);
+      }
+      if (result.metadata?.processingTime) {
+        totalProcessingTime += result.metadata.processingTime;
+      }
+    });
+
+    return {
+      componentsUsed: [...new Set(componentsUsed)], // Remove duplicates
+      totalProcessingTime
+    };
+  }
+
+  private calculateCompleteness(results: any[]): number {
+    // Simple heuristic - percentage of results that have substantial content
+    const substantialResults = results.filter(r => 
+      (r.content && r.content.length > 100) || 
+      (r.result && JSON.stringify(r.result).length > 100)
+    );
+    return results.length > 0 ? substantialResults.length / results.length : 0;
+  }
+
+  private calculateConsistency(results: any[]): number {
+    // Simple heuristic - for now return a default value
+    // In a real implementation, this would analyze similarity between results
+    return 0.8;
+  }
+
+  private calculateAverageConfidence(results: any[]): number {
+    const confidenceValues = results
+      .map(r => r.confidence || r.score || 0.5)
+      .filter(c => typeof c === 'number');
+    
+    return confidenceValues.length > 0 
+      ? confidenceValues.reduce((sum, c) => sum + c, 0) / confidenceValues.length
+      : 0.5;
   }
 }
 

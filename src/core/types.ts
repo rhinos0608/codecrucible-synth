@@ -51,6 +51,7 @@ export interface ProjectContext {
   dependencies: string[];
   structure: any;
   documentation: string[];
+  files?: string[];
 }
 
 // CLI Error handling types
@@ -75,8 +76,10 @@ export enum CLIExitCode {
   FileNotFound = 6,
   ConfigurationError = 7,
   TimeoutError = 8,
-  InternalError = 9
+  InternalError = 9,
+  AUTHENTICATION_REQUIRED = 10,
+  AUTHENTICATION_FAILED = 11
 }
 
 // Re-export from domain types for compatibility
-export type { UnifiedConfiguration } from '../domain/types/unified-types.js';
+export type { UnifiedConfiguration, ModelRequest, ModelResponse } from '../domain/types/unified-types.js';

@@ -504,6 +504,8 @@ export const defaultUnifiedCacheConfig: UnifiedCacheConfig = {
   maxSize: 10000,
   defaultTTL: 3600,
   checkInterval: 300,
+  enableCleanup: true,
+  cleanupInterval: 300,
   enableCompression: true,
   enableEncryption: false,
   layers: {

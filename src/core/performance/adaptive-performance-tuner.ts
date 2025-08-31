@@ -50,6 +50,10 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     newValue: any;
     reason: string;
   }> = [];
+  private responseTimeHistory: number[] = [];
+  private requestCount: number = 0;
+  private errorCount: number = 0;
+  private lastError: Error | undefined;
 
   constructor() {
     super();

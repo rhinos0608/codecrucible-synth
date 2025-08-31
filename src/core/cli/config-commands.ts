@@ -41,12 +41,12 @@ export class ConfigCommands {
 
       console.log('\n📊 Configuration Status\n');
       console.log(`✅ Status: ${validation.isValid ? 'Valid' : 'Invalid'}`);
-      console.log(`🎯 Environment: ${config.app.environment}`);
-      console.log(`📝 Log Level: ${config.app.logLevel}`);
+      console.log(`🎯 Environment: ${config.application.environment}`);
+      console.log(`📝 Log Level: ${config.application.logLevel}`);
       console.log(`🤖 Default Provider: ${config.model.defaultProvider}`);
       console.log(`🔒 Security Level: ${config.security.securityLevel}`);
       console.log(`⚡ Max Concurrent: ${config.performance.maxConcurrentRequests}`);
-      console.log(`🎭 Default Voices: ${config.voices.defaultVoices.join(', ')}`);
+      console.log(`🎭 Default Voices: ${config.voice.defaultVoices.join(', ')}`);
 
       if (validation.warnings.length > 0) {
         console.log(`\n⚠️  Warnings: ${validation.warnings.length}`);

@@ -48,6 +48,21 @@ export interface IVoiceOrchestrationService {
   /**
    * Get a single voice response
    */
+  getSingleVoiceResponse(voice: Voice, prompt: string): Promise<VoiceResponse>;
+
+  /**
+   * Generate multi-voice solutions (legacy compatibility method)
+   */
+  generateMultiVoiceSolutions(voices: string[], prompt: string, context?: any): Promise<VoiceResponse[]>;
+
+  /**
+   * Generate single voice response (legacy compatibility method)
+   */
+  generateSingleVoiceResponse(voice: string, prompt: string, client?: any): Promise<VoiceResponse>;
+
+  /**
+   * Get a voice response by name
+   */
   getVoiceResponse(voiceName: string, prompt: string): Promise<VoiceResponse>;
 
   /**

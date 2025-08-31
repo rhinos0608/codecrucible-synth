@@ -76,6 +76,16 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       this.securityValidator = dependencies.securityValidator;
       this.configManager = dependencies.configManager;
 
+      // DEBUG: Verify critical dependencies
+      logger.info('🔧 ConcreteWorkflowOrchestrator dependency injection:');
+      logger.info(`  - modelClient: ${this.modelClient ? '✅ Available' : '❌ NULL/UNDEFINED'}`);
+      logger.info(`  - userInteraction: ${this.userInteraction ? '✅ Available' : '❌ NULL/UNDEFINED'}`);
+      logger.info(`  - eventBus: ${this.eventBus ? '✅ Available' : '❌ NULL/UNDEFINED'}`);
+      
+      if (!this.modelClient) {
+        throw new Error('CRITICAL: ModelClient dependency is null/undefined - AI functionality will not work');
+      }
+
       this.isInitialized = true;
       
       logger.info('ConcreteWorkflowOrchestrator initialized successfully');
@@ -223,8 +233,12 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     
     if (this.modelClient) {
       const modelRequest = {
+        id: request.id,
         prompt: payload.input || payload.prompt,
-        options: payload.options || {},
+        model: payload.options?.model,
+        temperature: payload.options?.temperature,
+        maxTokens: payload.options?.maxTokens,
+        stream: payload.options?.stream || false,
         context: request.context
       };
       
@@ -265,19 +279,39 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private async handleAnalysisRequest(request: WorkflowRequest): Promise<any> {
     const { payload } = request;
     
-    if (payload.filePath && this.modelClient) {
-      const analysisPrompt = `Analyze the following file: ${payload.filePath}`;
-      return await this.modelClient.request({
-        prompt: analysisPrompt,
-        context: request.context
-      });
-    } else {
-      return {
-        analysis: `Basic analysis of ${payload.filePath || 'unknown'}`,
-        limited: true,
-        reason: 'Full analysis capabilities not available'
-      };
+    // DEBUG: Check if modelClient is available
+    if (!this.modelClient) {
+      logger.error('🚨 CRITICAL: ModelClient is null/undefined in ConcreteWorkflowOrchestrator.handleAnalysisRequest');
+      logger.error('🚨 This breaks all AI-powered analysis capabilities');
+      throw new Error('ModelClient not available in orchestrator - dependency injection failed');
     }
+
+    // Construct analysis prompt
+    let analysisPrompt: string;
+    if (payload.filePath) {
+      analysisPrompt = payload.prompt || `Analyze the following file: ${payload.filePath}`;
+    } else if (payload.content) {
+      analysisPrompt = payload.prompt || `Analyze the following content: ${payload.content}`;
+    } else if (payload.input) {
+      analysisPrompt = payload.prompt || payload.input;
+    } else {
+      analysisPrompt = payload.prompt || 'Please provide analysis.';
+    }
+
+    logger.info(`🔍 Making AI analysis request with prompt: "${analysisPrompt.substring(0, 100)}..."`);
+    
+    const modelRequest = {
+      id: request.id,
+      prompt: analysisPrompt,
+      model: payload.options?.model,
+      temperature: payload.options?.temperature || 0.3, // Lower temperature for analysis
+      maxTokens: payload.options?.maxTokens || 2000,
+      context: request.context
+    };
+    
+    const result = await this.modelClient.request(modelRequest);
+    logger.info(`✅ AI analysis completed: ${result.usage?.totalTokens || 'unknown'} tokens`);
+    return result;
   }
 
   private createDefaultContext(): WorkflowContext {

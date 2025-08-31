@@ -4,7 +4,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 import { ErrorRecoverySystem, ErrorContext, RecoveryAction } from './error-recovery-system.js';
 import chalk from 'chalk';
 
@@ -31,14 +32,14 @@ export interface OperationResult {
 }
 
 export class ResilientCLIWrapper extends EventEmitter {
-  private logger: Logger;
+  private logger: ILogger;
   private errorRecovery: ErrorRecoverySystem;
   private operationCount = 0;
   private defaultOptions: ResilientOptions;
 
   constructor(options: Partial<ResilientOptions> = {}) {
     super();
-    this.logger = new Logger('ResilientCLI');
+    this.logger = createLogger('ResilientCLI');
     this.errorRecovery = new ErrorRecoverySystem();
 
     this.defaultOptions = {

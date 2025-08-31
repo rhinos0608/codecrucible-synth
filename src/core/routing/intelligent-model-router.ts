@@ -5,7 +5,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 import { UnifiedModelClient } from '../../application/services/client.js';
 
 // Core Router Interfaces
@@ -194,7 +195,7 @@ export interface RouterConfig {
 
 // Intelligent Model Router
 export class IntelligentModelRouter extends EventEmitter {
-  private logger: Logger;
+  private logger: ILogger;
   private config: RouterConfig;
   private providers: Map<string, ModelProvider> = new Map();
   private modelSpecs: Map<string, ModelSpec> = new Map();
@@ -207,7 +208,7 @@ export class IntelligentModelRouter extends EventEmitter {
 
   constructor(config: RouterConfig) {
     super();
-    this.logger = new Logger('IntelligentModelRouter');
+    this.logger = createLogger('IntelligentModelRouter');
     this.config = config;
     this.performanceMetrics = new RouterMetrics();
     this.costTracker = new CostTracker(config.costOptimization);
@@ -1515,10 +1516,10 @@ class CircuitBreaker {
 
 class HealthMonitor {
   private monitoringInterval: NodeJS.Timeout | null = null;
-  private logger: Logger;
+  private logger: ILogger;
 
   constructor(private router: IntelligentModelRouter) {
-    this.logger = new Logger('HealthMonitor');
+    this.logger = createLogger('HealthMonitor');
   }
 
   start(): void {

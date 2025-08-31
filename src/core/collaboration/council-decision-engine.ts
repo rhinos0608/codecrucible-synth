@@ -6,10 +6,10 @@
 
 import { VoiceArchetypeSystemInterface } from '../../domain/interfaces/voice-system.js';
 import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
-import { logger } from '../logger';
+import { logger } from '../logger.js';
 import { EventEmitter } from 'events';
 import { subAgentIsolationSystem, IsolationLevel } from '../agents/sub-agent-isolation-system.js';
-import { EnterpriseSecurityFramework } from '../security/enterprise-security-framework';
+import { EnterpriseSecurityFramework } from '../security/enterprise-security-framework.js';
 
 export interface VoicePerspective {
   voiceId: string;

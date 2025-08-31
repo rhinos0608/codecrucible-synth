@@ -9,4 +9,5 @@
 export * from '../../infrastructure/streaming/streaming-manager.js';
 
 // For backward compatibility, also export with the old interface name
-export type { StreamingManagerInterface } from '../../infrastructure/streaming/streaming-manager.js';
+export type { IStreamingManager } from '../../infrastructure/streaming/streaming-manager.js';
+export type { IStreamingManager as StreamingManagerInterface } from '../../infrastructure/streaming/streaming-manager.js';

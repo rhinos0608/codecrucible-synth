@@ -5,7 +5,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 import { VectorRAGSystem, RAGQuery, RAGResult, ScoredDocument } from '../rag/vector-rag-system.js';
 import {
   CommandLineSearchEngine,
@@ -70,7 +71,7 @@ export interface HybridSearchMetrics {
  * Core hybrid search coordinator that intelligently routes queries
  */
 export class HybridSearchCoordinator extends EventEmitter {
-  private logger: Logger;
+  private logger: ILogger;
   private config: HybridSearchConfig;
   private ragSystem?: VectorRAGSystem;
   private commandSearch: CommandLineSearchEngine;
@@ -85,7 +86,7 @@ export class HybridSearchCoordinator extends EventEmitter {
     ragSystem?: VectorRAGSystem
   ) {
     super();
-    this.logger = new Logger('HybridSearchCoordinator');
+    this.logger = createLogger('HybridSearchCoordinator');
     this.config = config;
     this.commandSearch = commandSearch;
     this.ragSystem = ragSystem;

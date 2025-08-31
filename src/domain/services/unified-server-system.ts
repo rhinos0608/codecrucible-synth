@@ -16,7 +16,7 @@ import { createServer, Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { IEventBus } from '../interfaces/event-bus.js';
 import { IUserInteraction } from '../interfaces/user-interaction.js';
-import { UnifiedConfiguration, ServerRequest, ServerResponse } from '../types/unified-types.js';
+import { UnifiedConfiguration, ServerRequest, ServerResponse, SecurityValidationContext } from '../types/unified-types.js';
 import { UnifiedSecurityValidator } from './unified-security-validator.js';
 import { UnifiedPerformanceSystem } from './unified-performance-system.js';
 import { ILogger } from '../interfaces/logger.js';
@@ -30,6 +30,12 @@ export interface IServerStrategy {
   isRunning(): boolean;
   getStatus(): ServerStatus;
   handleRequest(request: ServerRequest): Promise<ServerResponse>;
+  
+  // EventEmitter capabilities
+  on(event: string, listener: (...args: any[]) => void): this;
+  emit(event: string, ...args: any[]): boolean;
+  removeListener(event: string, listener: (...args: any[]) => void): this;
+  removeAllListeners(event?: string): this;
 }
 
 export interface ServerConfiguration {
@@ -250,20 +256,30 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
     
     try {
       // Validate request
-      await this.securityValidator.validateInput(JSON.stringify(request), 'server-request');
+      await this.securityValidator.validateInput(JSON.stringify(request), {
+        userId: 'system',
+        sessionId: `server-${Date.now()}`,
+        requestId: request.id,
+        userAgent: 'CodeCrucible-Server',
+        ipAddress: '127.0.0.1',
+        timestamp: new Date(),
+        operationType: 'server-request'
+      } as SecurityValidationContext);
       
       // Process request (simplified - would route to appropriate handlers)
       const response: ServerResponse = {
         id: request.id,
-        status: 200,
+        requestId: request.id,
+        statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
         body: { message: 'Request processed successfully', requestId: request.id },
-        processingTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
+        timestamp: new Date()
       };
       
       // Update metrics
       this.requestCount++;
-      this.responseTimeSum += response.processingTime;
+      this.responseTimeSum += response.executionTime;
       this.status.requestsProcessed = this.requestCount;
       
       return response;
@@ -274,10 +290,12 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
       
       return {
         id: request.id,
-        status: 500,
+        requestId: request.id,
+        statusCode: 500,
         headers: { 'Content-Type': 'application/json' },
         body: { error: 'Internal server error', requestId: request.id },
-        processingTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
+        timestamp: new Date()
       };
     }
   }
@@ -373,7 +391,15 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
         const { input, type } = req.body;
         
         // Validate input
-        await this.securityValidator.validateInput(input, 'api-analyze');
+        await this.securityValidator.validateInput(input, {
+          userId: req.user?.id || 'anonymous',
+          sessionId: req.session?.id || `session-${Date.now()}`,
+          requestId: req.headers['x-request-id'] as string || Date.now().toString(),
+          userAgent: req.headers['user-agent'] || 'unknown',
+          ipAddress: req.ip || '127.0.0.1',
+          timestamp: new Date(),
+          operationType: 'api-analyze'
+        } as SecurityValidationContext);
         
         // Process via event bus
         this.eventBus.emit('api:analyze', { input, type, requestId: req.headers['x-request-id'] });
@@ -395,7 +421,15 @@ export class HTTPServerStrategy extends EventEmitter implements IServerStrategy 
         const { prompt, options } = req.body;
         
         // Validate input
-        await this.securityValidator.validateInput(prompt, 'api-generate');
+        await this.securityValidator.validateInput(prompt, {
+          userId: req.user?.id || 'anonymous',
+          sessionId: req.session?.id || `session-${Date.now()}`,
+          requestId: req.headers['x-request-id'] as string || Date.now().toString(),
+          userAgent: req.headers['user-agent'] || 'unknown',
+          ipAddress: req.ip || '127.0.0.1',
+          timestamp: new Date(),
+          operationType: 'api-generate'
+        } as SecurityValidationContext);
         
         // Process via event bus
         this.eventBus.emit('api:generate', { prompt, options, requestId: req.headers['x-request-id'] });
@@ -465,13 +499,18 @@ export class WebSocketServerStrategy extends EventEmitter implements IServerStra
     return new Promise((resolve, reject) => {
       try {
         this.httpServer = createServer();
-        this.io = new SocketIOServer(this.httpServer, {
-          path: config.websocket?.path || '/socket.io',
-          cors: config.cors?.enabled ? {
+        const socketOptions: any = {
+          path: config.websocket?.path || '/socket.io'
+        };
+        
+        if (config.cors?.enabled) {
+          socketOptions.cors = {
             origin: config.cors.origins || '*',
             credentials: config.cors.credentials || false
-          } : false
-        });
+          };
+        }
+        
+        this.io = new SocketIOServer(this.httpServer, socketOptions);
         
         this.setupSocketHandlers();
         
@@ -546,10 +585,12 @@ export class WebSocketServerStrategy extends EventEmitter implements IServerStra
     // WebSocket requests are handled via socket events
     return {
       id: request.id,
-      status: 200,
+      requestId: request.id,
+      statusCode: 200,
       headers: {},
       body: { message: 'WebSocket server handles requests via socket events' },
-      processingTime: 0
+      executionTime: 0,
+      timestamp: new Date()
     };
   }
   
@@ -640,7 +681,18 @@ export class WebSocketServerStrategy extends EventEmitter implements IServerStra
       }
       
       // Validate input
-      await this.securityValidator.validateInput(JSON.stringify(data), `socket-${type}`);
+      await this.securityValidator.validateInput(JSON.stringify(data), {
+        sessionId: connection.id,
+        requestId: `socket-${type}-${Date.now()}`,
+        userAgent: 'WebSocket-Client',
+        ipAddress: '127.0.0.1',
+        timestamp: new Date(),
+        operationType: `socket-${type}`,
+        userId: connection.id,
+        environment: 'development',
+        permissions: ['websocket'],
+        metadata: { socketType: type }
+      });
       
       // Update activity
       connection.lastActivity = new Date();
@@ -754,10 +806,12 @@ export class MCPServerStrategy extends EventEmitter implements IServerStrategy {
   async handleRequest(request: ServerRequest): Promise<ServerResponse> {
     return {
       id: request.id,
-      status: 200,
+      requestId: request.id,
+      statusCode: 200,
       headers: {},
       body: { message: 'MCP request processed', servers: Array.from(this.mcpServers.values()) },
-      processingTime: 10
+      executionTime: 10,
+      timestamp: new Date()
     };
   }
   
@@ -829,7 +883,7 @@ export class UnifiedServerSystem extends EventEmitter {
     this.activeServers.add(type);
     
     this.emit('server-started', { type, config });
-    this.performanceSystem.trackResourceUsage('server-start', { type });
+    this.performanceSystem.trackResourceUsage('server-start', 1);
   }
   
   async stopServer(type: ServerType): Promise<void> {
@@ -984,9 +1038,10 @@ export function createUnifiedServerSystem(
   eventBus: IEventBus,
   userInteraction: IUserInteraction,
   securityValidator: UnifiedSecurityValidator,
-  performanceSystem: UnifiedPerformanceSystem
+  performanceSystem: UnifiedPerformanceSystem,
+  logger: ILogger
 ): UnifiedServerSystem {
-  return new UnifiedServerSystem(config, eventBus, userInteraction, securityValidator, performanceSystem);
+  return new UnifiedServerSystem(logger, config, eventBus, userInteraction, securityValidator, performanceSystem);
 }
 
 // Legacy compatibility exports
@@ -995,7 +1050,7 @@ export interface ServerModeInterface {
   stop(): Promise<void>;
   isRunning(): boolean;
   getStatus(): ServerStatus;
-  handleRequest(request: ServerRequest): Promise<ServerResponse>;
+  handleRequest(type: ServerType, request: ServerRequest): Promise<ServerResponse>;
 }
 
 export class ServerMode extends UnifiedServerSystem implements ServerModeInterface {
@@ -1022,7 +1077,7 @@ export class ServerMode extends UnifiedServerSystem implements ServerModeInterfa
     };
   }
   
-  async handleRequest(request: ServerRequest): Promise<ServerResponse> {
-    return await super.handleRequest('http', request);
+  async handleRequest(type: ServerType, request: ServerRequest): Promise<ServerResponse> {
+    return await super.handleRequest(type, request);
   }
 }

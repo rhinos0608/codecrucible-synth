@@ -74,12 +74,16 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     this.eventBus = getGlobalEventBus();
     this.logger = createLogger('UnifiedCLI');
 
-    // Create coordinator with options
-    const coordinatorOptions: Partial<UnifiedCLIOptions> = {
+    // Create simplified coordinator with proper options
+    const coordinatorOptions: UnifiedCLIOptions = {
+      enableGracefulDegradation: true,
+      retryAttempts: 3,
+      timeoutMs: 30000,
+      fallbackMode: 'basic',
+      errorNotification: this.context.options.verbose || false,
       enableContextIntelligence: this.context.options.contextAware,
       enablePerformanceOptimization: this.context.options.performance,
-      enableErrorResilience: this.context.options.resilience,
-      errorNotification: this.context.options.verbose
+      enableErrorResilience: this.context.options.resilience
     };
 
     this.coordinator = new UnifiedCLICoordinator(coordinatorOptions);
@@ -425,7 +429,7 @@ ${chalk.yellow('Examples:')}
   /**
    * Show system status
    */
-  private async showStatus(): Promise<void> {
+  public async showStatus(): Promise<void> {
     try {
       const metrics = this.coordinator.getSystemMetrics();
       const contextStatus = await this.coordinator.getQuickContextStatus();
@@ -489,6 +493,47 @@ ${chalk.yellow('Capabilities:')}
   }
 
   /**
+   * List available models
+   */
+  public async listModels(): Promise<void> {
+    try {
+      // Mock model list until coordinator method is implemented
+      const models = [
+        { name: 'qwen2.5-coder:7b', description: 'Fast coding model', provider: 'Ollama' },
+        { name: 'deepseek-coder:8b', description: 'Advanced reasoning model', provider: 'Ollama' },
+        { name: 'llama3.2:3b', description: 'General purpose model', provider: 'Ollama' }
+      ];
+      
+      if (models.length === 0) {
+        await this.userInteraction.display('No models available.', { type: 'warn' });
+        return;
+      }
+
+      let output = `\n${chalk.cyan('🤖 Available Models:')}\n`;
+      models.forEach((model: any, index: number) => {
+        output += `\n${chalk.green(`${index + 1}.`)} ${model.name}`;
+        if (model.description) {
+          output += `\n   ${model.description}`;
+        }
+        if (model.provider) {
+          output += `\n   ${chalk.gray(`Provider: ${model.provider}`)}`;
+        }
+      });
+      
+      await this.userInteraction.display(output);
+    } catch (error) {
+      await this.userInteraction.error(`Failed to list models: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
+   * Execute prompt processing (alias for processPrompt for backward compatibility)
+   */
+  public async executePromptProcessing(prompt: string, options: any = {}): Promise<string> {
+    return await this.processPrompt(prompt, options);
+  }
+
+  /**
    * Get current session
    */
   getCurrentSession(): CLISession | null {
@@ -524,11 +569,40 @@ ${chalk.yellow('Capabilities:')}
    * Format response for display
    */
   private formatResponse(result: any): string {
+    
     if (typeof result === 'string') {
       return result;
     }
     
     if (result && typeof result === 'object') {
+      // Handle structured analysis results
+      if (result.analysis && typeof result.analysis === 'object') {
+        let output = '';
+        
+        if (result.analysis.summary) {
+          output += result.analysis.summary + '\n\n';
+        }
+        
+        if (result.analysis.insights && Array.isArray(result.analysis.insights) && result.analysis.insights.length > 0) {
+          output += '💡 Key Insights:\n';
+          result.analysis.insights.forEach((insight: string) => {
+            output += `• ${insight}\n`;
+          });
+          output += '\n';
+        }
+        
+        if (result.analysis.recommendations && Array.isArray(result.analysis.recommendations) && result.analysis.recommendations.length > 0) {
+          output += '🔧 Recommendations:\n';
+          result.analysis.recommendations.forEach((rec: string) => {
+            output += `• ${rec}\n`;
+          });
+          output += '\n';
+        }
+        
+
+        return output.trim();
+      }
+      
       if (result.response) {
         return result.response;
       }

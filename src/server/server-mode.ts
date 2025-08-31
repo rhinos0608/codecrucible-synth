@@ -81,17 +81,32 @@ export class ServerMode implements ServerModeInterface {
       
       // Create mock user interaction for server mode
       const mockUserInteraction = {
-        async promptUser(question: string): Promise<string> {
-          return 'yes'; // Default response for server mode
-        },
-        displayMessage(message: string): void {
+        async display(message: string): Promise<void> {
           logger.info(`[Server] ${message}`);
         },
-        displayError(error: string): void {
-          logger.error(`[Server] ${error}`);
+        async warn(message: string): Promise<void> {
+          logger.warn(`[Server] ${message}`);
         },
-        displayWarning(warning: string): void {
-          logger.warn(`[Server] ${warning}`);
+        async error(message: string): Promise<void> {
+          logger.error(`[Server] ${message}`);
+        },
+        async success(message: string): Promise<void> {
+          logger.info(`[Server] Success: ${message}`);
+        },
+        async progress(message: string, progress?: number): Promise<void> {
+          logger.info(`[Server] Progress: ${message}${progress ? ` (${progress}%)` : ''}`);
+        },
+        async prompt(question: string): Promise<string> {
+          logger.info(`[Server] Prompt: ${question} (auto-responding: yes)`);
+          return 'yes'; // Default response for server mode
+        },
+        async confirm(question: string): Promise<boolean> {
+          logger.info(`[Server] Confirm: ${question} (auto-responding: true)`);
+          return true; // Default response for server mode
+        },
+        async select(question: string, choices: string[]): Promise<string> {
+          logger.info(`[Server] Select: ${question} (auto-responding: ${choices[0]})`);
+          return choices[0] || 'default'; // Default to first choice
         }
       };
       
@@ -99,8 +114,18 @@ export class ServerMode implements ServerModeInterface {
       await securityValidator.initialize();
       await performanceSystem.initialize();
       
+      // Create a logger for the server system
+      const serverLogger = {
+        info: (msg: string) => console.log(`[ServerSystem] ${msg}`),
+        error: (msg: string, error?: any) => console.error(`[ServerSystem] ${msg}`, error),
+        warn: (msg: string) => console.warn(`[ServerSystem] ${msg}`),
+        debug: (msg: string) => console.debug(`[ServerSystem] ${msg}`),
+        trace: (msg: string) => console.trace(`[ServerSystem] ${msg}`)
+      };
+
       // Create unified server system
       this.unifiedServer = new UnifiedServerSystem(
+        serverLogger,
         unifiedConfig,
         eventBus,
         mockUserInteraction,

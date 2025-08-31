@@ -29,7 +29,16 @@ export type {
 } from '../../domain/types/core-types.js';
 
 export type {
-  UnifiedClientConfig,
-  AppConfig,
-  AgentConfig,
-} from '../../infrastructure/config/config-types.js';
+  UnifiedConfiguration as UnifiedClientConfig,
+  AppConfiguration as AppConfig,
+} from '../../domain/interfaces/configuration.js';
+
+// Agent configuration based on legacy config structure
+export interface AgentConfig {
+  enabled: boolean;
+  mode: 'fast' | 'balanced' | 'thorough' | 'auto';
+  maxConcurrency: number;
+  enableCaching: boolean;
+  enableMetrics: boolean;
+  enableSecurity: boolean;
+}

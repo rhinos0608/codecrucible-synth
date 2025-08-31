@@ -342,4 +342,12 @@ export class ModernInputSanitizer {
   static updateSecurityPolicy(updates: any): void {
     this.securitySystem.updatePolicy(updates);
   }
+
+  /**
+   * Instance method for sanitizing input (for compatibility with AdvancedSecurityValidator)
+   */
+  async sanitize(input: any, context: Partial<SecurityContext> = {}): Promise<any> {
+    const result = await ModernInputSanitizer.sanitizePrompt(String(input), context);
+    return result.sanitized;
+  }
 }

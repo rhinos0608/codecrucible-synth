@@ -164,7 +164,27 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
   ): GenerationResponse['generated']['files'] {
     const files: GenerationResponse['generated']['files'] = [];
     
-    let resultText = typeof result === 'string' ? result : String(result);
+    let resultText: string;
+    if (typeof result === 'string') {
+      resultText = result;
+    } else if (result && typeof result === 'object') {
+      // Properly handle object responses by extracting meaningful content
+      if (result.content) {
+        resultText = result.content;
+      } else if (result.text) {
+        resultText = result.text;
+      } else if (result.response) {
+        resultText = result.response;
+      } else if (result.message && result.message.content) {
+        resultText = result.message.content;
+      } else {
+        // If no standard content field found, try to stringify but log for debugging
+        console.error('Unexpected result format in generate-code-use-case:', result);
+        resultText = JSON.stringify(result, null, 2);
+      }
+    } else {
+      resultText = String(result);
+    }
     
     // Extract files from code blocks with filenames
     const fileBlockRegex = /```(?:filename:\s*(.+?)\n)?([\s\S]*?)```/g;

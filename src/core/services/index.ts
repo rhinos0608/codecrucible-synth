@@ -171,8 +171,8 @@ export function createMCPService(): UnifiedMCPConnectionService {
 /**
  * Create a pre-configured orchestration service instance
  */
-export function createOrchestrationService(): UnifiedOrchestrationService {
-  return UnifiedOrchestrationService.getInstance();
+export async function createOrchestrationService(): Promise<UnifiedOrchestrationService> {
+  return await UnifiedOrchestrationService.getInstance();
 }
 
 /**
@@ -228,7 +228,8 @@ export async function checkServicesHealth(): Promise<{
 
   try {
     // Orchestration service health
-    const orchStats = unifiedOrchestrationService.getPerformanceStats();
+    const orchService = await unifiedOrchestrationService;
+    const orchStats = orchService.getPerformanceStats();
     results.orchestration = true;
   } catch (error) {
     console.warn('Orchestration service health check failed:', error);

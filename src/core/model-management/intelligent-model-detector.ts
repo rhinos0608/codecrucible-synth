@@ -3,7 +3,8 @@
  * Automatically detects available models and configures optimal dual-agent setup
  */
 
-import { logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 
 export interface ModelInfo {
   name: string;
@@ -50,7 +51,7 @@ export interface OptimalConfiguration {
 }
 
 export class IntelligentModelDetector {
-  private logger: Logger;
+  private logger: ILogger;
   private detectedModels: ModelInfo[] = [];
   private lastScan: Date | null = null;
   private platformHealth = {
@@ -59,7 +60,7 @@ export class IntelligentModelDetector {
   };
 
   constructor() {
-    this.logger = new Logger('ModelDetector');
+    this.logger = createLogger('ModelDetector');
   }
 
   /**

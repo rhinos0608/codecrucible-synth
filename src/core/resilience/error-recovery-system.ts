@@ -4,7 +4,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 
 export interface ErrorContext {
@@ -33,7 +34,7 @@ export interface ErrorPattern {
 
 export class ErrorRecoverySystem extends EventEmitter {
   private static globalErrorHandlersRegistered = false;
-  private logger: Logger;
+  private logger: ILogger;
   private errorHistory: Map<string, ErrorContext[]> = new Map();
   private recoveryPatterns: ErrorPattern[] = [];
   private globalErrorCount = 0;
@@ -41,7 +42,7 @@ export class ErrorRecoverySystem extends EventEmitter {
 
   constructor() {
     super();
-    this.logger = new Logger('ErrorRecovery');
+    this.logger = createLogger('ErrorRecovery');
     this.setupDefaultPatterns();
     this.setupGlobalErrorHandling();
   }

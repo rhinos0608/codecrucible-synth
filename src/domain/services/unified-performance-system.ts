@@ -36,7 +36,7 @@ export interface IPerformanceMonitor {
 }
 
 export interface IPerformanceOptimizer {
-  analyze(metrics: PerformanceMetrics): OptimizationRecommendation[];
+  analyze(metrics: PerformanceMetrics): Promise<OptimizationRecommendation[]>;
   optimize(target: OptimizationTarget): Promise<OptimizationResult>;
   tune(parameters: TuningParameters): Promise<TuningResult>;
 }
@@ -45,6 +45,7 @@ export interface IPerformanceAnalyzer {
   analyzeBottlenecks(metrics: PerformanceMetrics): Bottleneck[];
   analyzeTrends(history: PerformanceMetrics[]): TrendAnalysis;
   predictPerformance(workload: WorkloadProfile): PerformancePrediction;
+  generateRecommendations(metrics: PerformanceMetrics): OptimizationRecommendation[];
 }
 
 // ============================================================================
@@ -1063,9 +1064,18 @@ export class UnifiedPerformanceSystem extends EventEmitter {
 // Export singleton instance
 let globalPerformanceSystem: UnifiedPerformanceSystem | null = null;
 
-export function getGlobalPerformanceSystem(eventBus?: IEventBus): UnifiedPerformanceSystem {
+export function getGlobalPerformanceSystem(logger?: ILogger, eventBus?: IEventBus): UnifiedPerformanceSystem {
   if (!globalPerformanceSystem) {
-    globalPerformanceSystem = new UnifiedPerformanceSystem(eventBus);
+    // Create a simple logger if none provided
+    const defaultLogger = logger || {
+      info: (msg: string) => console.log(`[INFO] ${msg}`),
+      error: (msg: string, error?: any) => console.error(`[ERROR] ${msg}`, error),
+      warn: (msg: string) => console.warn(`[WARN] ${msg}`),
+      debug: (msg: string) => console.debug(`[DEBUG] ${msg}`),
+      trace: (msg: string) => console.trace(`[TRACE] ${msg}`)
+    } as ILogger;
+    
+    globalPerformanceSystem = new UnifiedPerformanceSystem(defaultLogger, eventBus);
   }
   return globalPerformanceSystem;
 }

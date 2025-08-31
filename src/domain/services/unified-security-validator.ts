@@ -113,11 +113,16 @@ export type SecurityViolationType =
 export interface SecurityValidationContext {
   sessionId: string;
   userId?: string;
-  operationType: 'input' | 'command' | 'code' | 'file' | 'network' | 'process';
+  requestId: string;
+  userAgent: string;
+  ipAddress: string;
+  timestamp: Date;
+  operationType: string;
   language?: string;
-  environment: 'development' | 'production' | 'testing' | 'sandbox';
-  permissions: string[];
+  environment?: 'development' | 'production' | 'testing' | 'sandbox';
+  permissions?: string[];
   metadata?: Record<string, any>;
+  workingDirectory?: string;
 }
 
 /**

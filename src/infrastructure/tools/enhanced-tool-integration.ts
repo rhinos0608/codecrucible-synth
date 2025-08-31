@@ -5,6 +5,7 @@
 
 import { ToolIntegration, LLMFunction, ToolCall } from './tool-integration.js';
 import { DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
+import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import { logger } from '../../core/logger.js';
 import { EventEmitter } from 'events';
 
@@ -59,7 +60,37 @@ export class EnhancedToolIntegration extends EventEmitter {
       ...config
     };
 
-    this.baseToolIntegration = new ToolIntegration();
+    // Create a basic MCP manager for tool integration
+    const mcpConfig = {
+      filesystem: {
+        enabled: true,
+        restrictedPaths: [] as string[],
+        allowedPaths: [process.cwd()]
+      },
+      git: {
+        enabled: false,
+        autoCommitMessages: false,
+        safeModeEnabled: true
+      },
+      terminal: {
+        enabled: false,
+        allowedCommands: [] as string[],
+        blockedCommands: ['rm', 'del', 'rmdir']
+      },
+      packageManager: {
+        enabled: false,
+        autoInstall: false,
+        securityScan: true
+      },
+      smithery: {
+        enabled: !!process.env.SMITHERY_API_KEY,
+        apiKey: process.env.SMITHERY_API_KEY,
+        enabledServers: [] as string[],
+        autoDiscovery: true
+      }
+    };
+    const mcpManager = new MCPServerManager(mcpConfig);
+    this.baseToolIntegration = new ToolIntegration(mcpManager);
     this.orchestrator = new DomainAwareToolOrchestrator();
     
     this.setupCacheCleanup();
@@ -92,11 +123,13 @@ export class EnhancedToolIntegration extends EventEmitter {
       // Use intelligent routing if enabled
       let result;
       if (this.config.enableIntelligentRouting && context.domain) {
-        result = await this.orchestrator.executeDomainSpecificTool(
-          toolCall.function.name,
-          JSON.parse(toolCall.function.arguments),
-          context.domain
-        );
+        // Use the orchestrator to analyze the domain and then execute with base integration
+        const toolPrompt = `${toolCall.function.name}: ${toolCall.function.arguments}`;
+        const availableTools: any[] = [];
+        const domainAnalysis = this.orchestrator.getToolsForPrompt(toolPrompt, availableTools);
+        // Log domain analysis for debugging
+        console.log('Domain analysis:', domainAnalysis);
+        result = await this.executeWithRetry(toolCall, context);
       } else {
         result = await this.executeWithRetry(toolCall, context);
       }
@@ -122,7 +155,10 @@ export class EnhancedToolIntegration extends EventEmitter {
     const baseFunctions = await this.baseToolIntegration.getLLMFunctions();
     
     if (domain && this.config.enableIntelligentRouting) {
-      return this.orchestrator.getToolsForDomain(domain) || baseFunctions;
+      // Use getToolsForPrompt instead since getToolsForDomain is private
+      const domainPrompt = `Tools needed for ${domain} domain`;
+      const domainTools = this.orchestrator.getToolsForPrompt(domainPrompt, baseFunctions);
+      return domainTools.tools || baseFunctions;
     }
     
     return baseFunctions;

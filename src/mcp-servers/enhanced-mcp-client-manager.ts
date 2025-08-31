@@ -16,13 +16,17 @@ export interface ClientConfig {
 }
 
 export interface MCPServerConfig {
+  id?: string;
   name: string;
-  command: string;
+  command?: string;
+  url?: string;
+  apiKey?: string;
   args?: string[];
   env?: Record<string, string>;
   enabled: boolean;
   timeout?: number;
   maxRetries?: number;
+  capabilities?: string[];
 }
 
 export class EnhancedMCPClientManager extends EventEmitter {
@@ -43,7 +47,14 @@ export class EnhancedMCPClientManager extends EventEmitter {
       ...config
     };
 
-    this.baseManager = new MCPServerManager();
+    // Create default MCP server config for the base manager
+    const defaultMCPConfig = {
+      filesystem: { enabled: true, restrictedPaths: [] as string[], allowedPaths: [] as string[] },
+      git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
+      terminal: { enabled: false, allowedCommands: [] as string[], blockedCommands: [] as string[] },
+      packageManager: { enabled: false, autoInstall: false, securityScan: true }
+    };
+    this.baseManager = new MCPServerManager(defaultMCPConfig);
     this.startHealthMonitoring();
   }
 

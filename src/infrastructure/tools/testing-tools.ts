@@ -128,7 +128,7 @@ Generate ONLY the complete test file code wrapped in triple backticks. Include n
 Import examples:
 \`\`\`typescript
 import { jest } from '@jest/globals';
-import { functionToTest, ClassToTest } from '../src/module';
+import { functionToTest, ClassToTest } from '../src/module.js';
 \`\`\`
 
 Mocking examples:
@@ -142,14 +142,14 @@ Import examples:
 \`\`\`typescript
 import { expect } from 'chai';
 import sinon from 'sinon';
-import { functionToTest } from '../src/module';
+import { functionToTest } from '../src/module.js';
 \`\`\``,
 
       vitest: `
 Import examples:
 \`\`\`typescript
 import { describe, it, expect, vi } from 'vitest';
-import { functionToTest } from '../src/module';
+import { functionToTest } from '../src/module.js';
 \`\`\``,
 
       cypress: `

@@ -5,7 +5,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from './logger.js';
+import { createLogger } from './logger.js';
+import { ILogger } from '../domain/interfaces/logger.js';
 
 export interface ModelSelectionConfig {
   provider: 'ollama' | 'lm-studio' | 'auto';
@@ -29,7 +30,7 @@ export interface ProviderCapabilities {
  * Resolves conflicts between multiple routing systems
  */
 export class ModelSelectionCoordinator extends EventEmitter {
-  private logger: Logger;
+  private logger: ILogger;
   private selectedModels: Map<string, ModelSelectionConfig> = new Map();
   private providerCapabilities: Map<string, ProviderCapabilities> = new Map();
   private routingHistory: ModelSelectionConfig[] = [];
@@ -50,7 +51,7 @@ export class ModelSelectionCoordinator extends EventEmitter {
 
   constructor() {
     super();
-    this.logger = new Logger('ModelSelectionCoordinator');
+    this.logger = createLogger('ModelSelectionCoordinator');
   }
 
   /**

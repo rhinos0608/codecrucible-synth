@@ -447,7 +447,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
           content: tokens[i],
           timestamp: Date.now(),
           index: i,
-          finished: i === tokens.length - 1,
+          isComplete: i === tokens.length - 1,
           metadata: {
             sessionId,
             progress: (i + 1) / tokens.length,

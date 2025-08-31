@@ -15,7 +15,7 @@
 import { EventEmitter } from 'events';
 import { IEventBus } from '../interfaces/event-bus.js';
 import { IUserInteraction } from '../interfaces/user-interaction.js';
-import { UnifiedConfiguration, AgentTask, AgentResponse, ExecutionResult } from '../types/unified-types.js';
+import { UnifiedConfiguration, AgentTask, AgentResponse, ExecutionResult, SecurityValidationContext } from '../types/unified-types.js';
 import { UnifiedSecurityValidator } from './unified-security-validator.js';
 import { UnifiedPerformanceSystem } from './unified-performance-system.js';
 
@@ -251,7 +251,13 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     task: CollaborativeTask, 
     contributions: Map<string, ExecutionResult>
   ): Promise<CollaborativeResponse> {
-    let result = { success: true, content: '', metadata: { model: '', tokens: 0, latency: 0 } };
+    let result = { 
+      success: true, 
+      content: '', 
+      metadata: { model: '', tokens: 0, latency: 0 },
+      executionTime: 0,
+      resourcesUsed: [] as string[]
+    };
     
     for (const agent of agents) {
       const request: AgentRequest = {
@@ -420,7 +426,9 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
         model: 'collaborative',
         tokens: results.reduce((sum, r) => sum + (r.metadata?.tokens || 0), 0),
         latency: Math.max(...results.map(r => r.metadata?.latency || 0))
-      }
+      },
+      executionTime: results.reduce((sum, r) => sum + r.executionTime, 0),
+      resourcesUsed: [...new Set(results.flatMap(r => r.resourcesUsed))]
     };
   }
   
@@ -527,9 +535,17 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
   protected async validateRequest(request: AgentRequest): Promise<boolean> {
     // Security validation
     if (typeof request.input === 'string') {
-      const validation = await this.securityValidator.validateInput(request.input, 'agent-request');
+      const validation = await this.securityValidator.validateInput(request.input, {
+        userId: 'system',
+        sessionId: `agent-${this.id}`,
+        requestId: Date.now().toString(),
+        userAgent: 'CodeCrucible-Agent',
+        ipAddress: '127.0.0.1',
+        timestamp: new Date(),
+        operationType: 'agent-request'
+      } as SecurityValidationContext);
       if (!validation.isValid) {
-        throw new Error(`Invalid request: ${validation.issues.join(', ')}`);
+        throw new Error(`Invalid request: ${validation.violations.map(v => v.message).join(', ')}`);
       }
     }
     
@@ -544,6 +560,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
   protected createResponse(result: ExecutionResult, requestId: string): AgentResponse {
     return {
       id: `${this.id}-${requestId}`,
+      taskId: requestId,
       agentId: this.id,
       success: result.success,
       result,
@@ -615,7 +632,9 @@ export class ExplorerAgent extends BaseAgent {
     return {
       success: true,
       content: 'Code structure analysis completed',
-      metadata: { model: 'explorer', tokens: 100, latency: 1500 }
+      metadata: { model: 'explorer', tokens: 100, latency: 1500 },
+      executionTime: 1500,
+      resourcesUsed: ['cpu', 'memory']
     };
   }
   
@@ -624,7 +643,9 @@ export class ExplorerAgent extends BaseAgent {
     return {
       success: true,
       content: 'Innovation research completed',
-      metadata: { model: 'explorer', tokens: 200, latency: 3000 }
+      metadata: { model: 'explorer', tokens: 200, latency: 3000 },
+      executionTime: 3000,
+      resourcesUsed: ['cpu', 'knowledge-base', 'network']
     };
   }
 }
@@ -680,12 +701,22 @@ export class SecurityAgent extends BaseAgent {
   private async analyzeVulnerabilities(task: AgentTask): Promise<ExecutionResult> {
     // Use the unified security validator for analysis
     const content = typeof task.input === 'string' ? task.input : JSON.stringify(task.input);
-    const validation = await this.securityValidator.validateInput(content, 'security-analysis');
+    const validation = await this.securityValidator.validateInput(content, {
+      userId: 'system',
+      sessionId: `security-${this.id}`,
+      requestId: Date.now().toString(),
+      userAgent: 'CodeCrucible-SecurityAgent',
+      ipAddress: '127.0.0.1',
+      timestamp: new Date(),
+      operationType: 'security-analysis'
+    } as SecurityValidationContext);
     
     return {
       success: validation.isValid,
-      content: validation.isValid ? 'No vulnerabilities detected' : `Vulnerabilities found: ${validation.issues.join(', ')}`,
-      metadata: { model: 'security', tokens: 150, latency: 2000 }
+      content: validation.isValid ? 'No vulnerabilities detected' : `Vulnerabilities found: ${validation.violations.map(v => v.message).join(', ') || 'unknown issues'}`,
+      metadata: { model: 'security', tokens: 150, latency: 2000 },
+      executionTime: 2000,
+      resourcesUsed: ['cpu', 'security-scanner']
     };
   }
   
@@ -693,7 +724,9 @@ export class SecurityAgent extends BaseAgent {
     return {
       success: true,
       content: 'Security hardening recommendations generated',
-      metadata: { model: 'security', tokens: 300, latency: 2500 }
+      metadata: { model: 'security', tokens: 300, latency: 2500 },
+      executionTime: 2500,
+      resourcesUsed: ['cpu', 'knowledge-base']
     };
   }
 }
@@ -750,7 +783,9 @@ export class ArchitectAgent extends BaseAgent {
     return {
       success: true,
       content: 'System architecture design completed',
-      metadata: { model: 'architect', tokens: 500, latency: 4000 }
+      metadata: { model: 'architect', tokens: 500, latency: 4000 },
+      executionTime: 4000,
+      resourcesUsed: ['cpu', 'memory', 'design-patterns']
     };
   }
   
@@ -758,7 +793,9 @@ export class ArchitectAgent extends BaseAgent {
     return {
       success: true,
       content: 'Architecture review completed with recommendations',
-      metadata: { model: 'architect', tokens: 350, latency: 3000 }
+      metadata: { model: 'architect', tokens: 350, latency: 3000 },
+      executionTime: 3000,
+      resourcesUsed: ['cpu', 'memory', 'analysis-engine']
     };
   }
 }
@@ -997,7 +1034,9 @@ class GenericAgent extends BaseAgent {
     return {
       success: true,
       content: `Processed task: ${JSON.stringify(task)}`,
-      metadata: { model: 'generic', tokens: 50, latency: 1000 }
+      metadata: { model: 'generic', tokens: 50, latency: 1000 },
+      executionTime: 1000,
+      resourcesUsed: ['cpu', 'memory']
     };
   }
 }
@@ -1041,7 +1080,7 @@ export class UnifiedAgentSystem extends EventEmitter {
     ];
     
     for (const type of defaultAgentTypes) {
-      if (this.config.voices.availableVoices.includes(type) || type === 'security' || type === 'architect') {
+      if (this.config.voice.availableVoices.includes(type) || type === 'security' || type === 'architect') {
         const agent = this.agentFactory.createAgent(type);
         await agent.initialize();
         this.agents.set(agent.id, agent);
@@ -1204,6 +1243,7 @@ export class UnifiedAgentSystem extends EventEmitter {
     
     return {
       id: `multi-${request.id}`,
+      taskId: request.id,
       agentId: 'multi-agent-system',
       success: collaborativeResponse.consensus,
       result: collaborativeResponse.result,
@@ -1255,7 +1295,7 @@ export class UnifiedAgentSystem extends EventEmitter {
     
     // Performance monitoring
     this.on('agent-created', (agent: IAgent) => {
-      this.performanceSystem.trackResourceUsage('agent-creation', { agentId: agent.id });
+      this.performanceSystem.trackResourceUsage('agent-creation', 1);
     });
   }
   

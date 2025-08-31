@@ -5,7 +5,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from './logger.js';
+import { Logger } from '../infrastructure/logging/unified-logger.js';
 import {
   DualAgentRealtimeSystem,
   CodeGenerationResult,
@@ -135,10 +135,35 @@ export class UnifiedResponseCoordinator extends EventEmitter {
         result = {
           code: 'Fallback response generation not implemented',
           language: 'text',
+          explanation: 'Generated using fallback system due to dual-agent unavailability',
+          quality: {
+            overallScore: 0.6,
+            dimensions: [
+              { name: 'Fallback', score: 0.6, weight: 1.0, details: 'Single model fallback generation' }
+            ],
+            recommendations: ['Enable dual-agent system for better quality'],
+            passedGates: ['basic'],
+            failedGates: ['dual-agent']
+          },
           performance: {
             generationTime: 100,
             totalTime: 100,
+            tokensPerSecond: 50
           },
+          iterationsPerformed: 1,
+          voicesUsed: ['fallback'],
+          improvementHistory: [
+            {
+              iteration: 1,
+              agent: 'fallback',
+              changes: ['Basic fallback response generated'],
+              reasoning: 'Dual-agent system unavailable, using single model fallback',
+              score: 0.6,
+              qualityImprovement: 0.6,
+              feedback: 'Fallback generation completed',
+              voice: 'fallback'
+            }
+          ]
         };
       }
 

@@ -6,7 +6,8 @@
 
 import { promises as fs } from 'fs';
 import { createHash } from 'crypto';
-import { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 
 export interface CacheEntry {
   query: string;
@@ -50,7 +51,7 @@ export interface CacheStats {
  * Advanced caching system with file-hash based invalidation
  */
 export class AdvancedSearchCacheManager {
-  private logger: Logger;
+  private logger: ILogger;
   private config: CacheConfig;
   private cache = new Map<string, CacheEntry>();
   private accessTimes = new Map<string, number>();
@@ -61,7 +62,7 @@ export class AdvancedSearchCacheManager {
   private fileWatchMap = new Map<string, string>(); // file -> last hash
 
   constructor(config: Partial<CacheConfig> = {}) {
-    this.logger = new Logger('AdvancedSearchCache');
+    this.logger = createLogger('AdvancedSearchCache');
     this.config = {
       maxCacheSize: config.maxCacheSize ?? 1000,
       maxCacheAge: config.maxCacheAge ?? 5 * 60 * 1000, // 5 minutes
@@ -513,11 +514,11 @@ export class AdvancedSearchCacheManager {
  */
 export class CachedSearchExecutor {
   private cache: AdvancedSearchCacheManager;
-  private logger: Logger;
+  private logger: ILogger;
 
   constructor(cache: AdvancedSearchCacheManager) {
     this.cache = cache;
-    this.logger = new Logger('CachedSearchExecutor');
+    this.logger = createLogger('CachedSearchExecutor');
   }
 
   /**

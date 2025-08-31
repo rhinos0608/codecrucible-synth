@@ -207,12 +207,12 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
    */
   constructor(
     private logger: ILogger,
-    private spiralCoordinator: LivingSpiralCoordinatorInterface,
+    private spiralCoordinator?: LivingSpiralCoordinatorInterface,
     modelClient?: any, 
     config?: VoiceConfig
   ) {
     this.modelClient = modelClient;
-    this.livingSpiralCoordinator = spiralCoordinator;
+    this.livingSpiralCoordinator = spiralCoordinator!;
     this.config = config || {
       voices: {
         default: ['explorer', 'maintainer'],
@@ -419,6 +419,78 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
    */
   async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
     return await this.generateSingleVoiceResponse(voiceId, prompt, this.modelClient);
+  }
+
+  /**
+   * Initialize the voice archetype system (for compatibility)
+   */
+  async initialize(): Promise<void> {
+    try {
+      this.logger.info('Initializing VoiceArchetypeSystem');
+      
+      // Re-initialize voices in case configuration has changed
+      this.initializeVoices();
+      
+      // Initialize council engine if not already done
+      if (!this.councilEngine) {
+        this.councilEngine = new CouncilDecisionEngine(this, this.modelClient);
+      }
+      
+      // Verify model client availability
+      if (this.modelClient) {
+        try {
+          await this.modelClient.checkStatus?.();
+        } catch (error) {
+          this.logger.warn('Model client status check failed, but continuing initialization');
+        }
+      }
+      
+      this.logger.info('VoiceArchetypeSystem initialization complete');
+    } catch (error) {
+      this.logger.error('VoiceArchetypeSystem initialization failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Synthesize multiple voices for a request (required by integration layer)
+   */
+  async synthesizeMultipleVoices(request: string, context: any = {}): Promise<any> {
+    try {
+      this.logger.info('Starting multi-voice synthesis');
+      
+      // Determine which voices to use
+      const voicesToUse = context.voices || 
+                         context.requiredVoices || 
+                         this.config.voices.default;
+      
+      // Use existing multi-voice generation logic
+      const result = await this.generateMultiVoiceSolutions(voicesToUse, request, context);
+      
+      // If council mode is requested, conduct council decision
+      if (context.useCouncil || context.councilMode) {
+        const councilResult = await this.conductCouncilDecision(
+          request,
+          voicesToUse,
+          context.councilMode || CouncilMode.CONSENSUS
+        );
+        
+        return {
+          ...result,
+          councilDecision: councilResult,
+          synthesisMethod: 'council-driven'
+        };
+      }
+      
+      return {
+        ...result,
+        synthesisMethod: 'multi-voice'
+      };
+      
+    } catch (error) {
+      this.logger.error('Multi-voice synthesis failed:', error);
+      throw error;
+    }
   }
 
   /**
@@ -1125,6 +1197,15 @@ Provide helpful, concise responses with practical value.`;
 
   getLivingSpiralCoordinator(): LivingSpiralCoordinatorInterface {
     return this.livingSpiralCoordinator;
+  }
+
+  /**
+   * Set the Living Spiral Coordinator (for dependency injection)
+   * Used to resolve circular dependencies during system initialization
+   */
+  setLivingSpiralCoordinator(coordinator: LivingSpiralCoordinatorInterface): void {
+    this.livingSpiralCoordinator = coordinator;
+    this.logger.info('Living Spiral Coordinator injected into VoiceArchetypeSystem');
   }
 
   /**

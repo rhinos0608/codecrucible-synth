@@ -9,7 +9,8 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { Worker } from 'worker_threads';
 import chokidar from 'chokidar';
-import { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 import { UnifiedModelClient } from '../../application/services/client.js';
 import { HybridSearchCoordinator, HybridSearchConfig } from '../search/hybrid-search-coordinator.js';
 import { CommandLineSearchEngine } from '../search/command-line-search-engine.js';
@@ -168,7 +169,7 @@ export interface RAGConfig {
 
 // Main RAG System
 export class VectorRAGSystem extends EventEmitter {
-  protected logger: Logger;
+  protected logger: ILogger;
   private config: RAGConfig;
   private vectorStore!: VectorStore;
   private embeddingModel!: EmbeddingModel;
@@ -183,7 +184,7 @@ export class VectorRAGSystem extends EventEmitter {
 
   constructor(config: RAGConfig, modelClient: UnifiedModelClient, hybridConfig?: HybridSearchConfig) {
     super();
-    this.logger = new Logger('VectorRAGSystem');
+    this.logger = createLogger('VectorRAGSystem');
     this.config = config;
     this.modelClient = modelClient;
     this.performanceMetrics = new RAGMetrics();
@@ -778,11 +779,11 @@ export interface Critique {
  */
 export class QueryRewriter {
   private modelClient: UnifiedModelClient;
-  private logger: Logger;
+  private logger: ILogger;
 
   constructor(modelClient: UnifiedModelClient) {
     this.modelClient = modelClient;
-    this.logger = new Logger('QueryRewriter');
+    this.logger = createLogger('QueryRewriter');
   }
 
   async rewriteQuery(query: string): Promise<string> {

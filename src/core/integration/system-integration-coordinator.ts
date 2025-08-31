@@ -226,7 +226,7 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       
       // Phase 6: Initialize orchestration system (coordinates all others)
       this.initializationPhase = 'orchestration';
-      this.orchestrationSystem = UnifiedOrchestrationService.getInstance();
+      this.orchestrationSystem = await UnifiedOrchestrationService.getInstance();
       await this.waitForSystemReady(async () => {
         // Orchestration system coordinates others, so no additional initialization
       }, 'orchestration', 5000);
@@ -338,8 +338,10 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       const voiceStart = Date.now();
       const voiceResult = await this.voiceSystem!.processWithIntegratedRouting(
         request.content,
-        routingDecision,
-        request.context
+        {
+          ...routingDecision,
+          context: request.context
+        }
       );
       const voiceTime = Date.now() - voiceStart;
       
@@ -353,12 +355,17 @@ export class SystemIntegrationCoordinator extends EventEmitter {
       
       // Phase 4: Orchestration and final synthesis
       const orchestrationStart = Date.now();
-      const finalResult = await this.orchestrationSystem!.synthesizeIntegratedResult({
-        routingDecision,
-        voiceResult,
-        mcpResult,
-        originalRequest: request
-      });
+      const finalResult = await this.orchestrationSystem!.synthesizeIntegratedResult(
+        [routingDecision, voiceResult, mcpResult],
+        {
+          originalRequest: request,
+          integrationMetadata: {
+            routingTime,
+            voiceTime,
+            mcpTime
+          }
+        }
+      );
       const orchestrationTime = Date.now() - orchestrationStart;
       
       // Phase 5: Quality analysis of generated content

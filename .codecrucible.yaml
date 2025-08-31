@@ -1,0 +1,57 @@
+# CodeCrucible Synth Project Configuration
+
+name: "codecrucible-synth"
+version: "4.2.4"
+language: "typescript"
+framework: "node"
+type: "cli"
+
+# File handling preferences
+include:
+  - "src/**/*.ts"
+  - "src/**/*.js"
+  - "config/**/*.yaml"
+  - "config/**/*.json"
+  - "*.md"
+
+exclude:
+  - "node_modules/**"
+  - "dist/**"
+  - "*.log"
+  - ".git/**"
+  - "*.min.js"
+
+maxFileSize: 1048576  # 1MB
+maxTotalSize: 10485760  # 10MB
+
+# AI behavior configuration
+ai:
+  model: "qwen2.5-coder:7b"
+  provider: "ollama"
+  temperature: 0.1
+  responseFormat: "markdown"
+  voices: ["architect", "developer", "security", "maintainer"]
+  systemPrompt: "You are an expert TypeScript developer working on an enterprise AI CLI tool. Follow the project's coding standards and architectural patterns."
+
+# Development workflow
+workflow:
+  methodology: "living-spiral"
+  phases: ["collapse", "council", "synthesis", "rebirth", "reflection"]
+  testingStrategy: "unit"
+  qualityGates: ["typecheck", "lint", "test", "build"]
+
+# Tool integrations
+tools:
+  linter: "eslint"
+  formatter: "prettier"
+  testRunner: "jest"
+  buildCommand: "npm run build"
+  devCommand: "npm run dev"
+
+# Security settings
+security:
+  allowedCommands: ["git", "npm", "node", "tsc"]
+  restrictedPaths: ["node_modules", ".git", "*.env"]
+  allowExecution: true
+  allowFileWrite: true
+  allowNetworkAccess: true

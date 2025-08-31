@@ -144,19 +144,7 @@ export class EnhancedMCPIntegrationManager {
     // Coordinate load balancer with performance analytics
     this.loadBalancer.on('request-completed', (poolId: string, connectionId: string, success: boolean, responseTime: number) => {
       // Record performance metric
-      this.analyticsSystem.recordMetric({
-        metricId: `metric-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        timestamp: new Date(),
-        connectionId,
-        serverId: connectionId.split('-')[0], // Extract server ID
-        serverName: connectionId.split('-')[0],
-        responseTime,
-        throughput: 1, // 1 request
-        errorRate: success ? 0 : 100,
-        availability: success ? 100 : 0,
-        successRate: success ? 100 : 0,
-        reliability: success ? 100 : 0,
-      });
+      this.analyticsSystem.recordMetric('mcp_request_response_time', responseTime, 'ms');
     });
     
     // Coordinate security with voice integration
@@ -260,7 +248,7 @@ export class EnhancedMCPIntegrationManager {
     const [trends, alerts, recommendations] = await Promise.all([
       Promise.resolve(this.analyticsSystem.getPerformanceTrends()),
       Promise.resolve(this.analyticsSystem.getActiveAlerts()),
-      this.analyticsSystem.generatePerformanceReport('daily').then((report: PerformanceReport) => report.recommendations),
+      this.analyticsSystem.generatePerformanceReport().then((report: PerformanceReport) => report.recommendations),
     ]);
     
     return {
@@ -274,7 +262,7 @@ export class EnhancedMCPIntegrationManager {
    * Generate capacity planning report
    */
   async generateCapacityPlan(serverId: string) {
-    return this.analyticsSystem.generateCapacityPlan(serverId);
+    return this.analyticsSystem.generateCapacityPlan();
   }
   
   /**

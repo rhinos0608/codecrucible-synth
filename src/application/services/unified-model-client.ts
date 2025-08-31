@@ -22,6 +22,11 @@ import { UnifiedConfiguration } from '../../domain/interfaces/configuration.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { OllamaClient } from '../../infrastructure/llm-providers/ollama-client.js';
 import { LMStudioClient } from '../../infrastructure/llm-providers/lm-studio-client.js';
+import { IntelligentModelRouter, RouterConfig, ModelProvider, ModelSpec, RoutingRequest, TaskType } from '../../core/routing/intelligent-model-router.js';
+import { VoiceArchetypeSystem } from '../../voices/voice-archetype-system.js';
+import { VoiceArchetypeSystemInterface } from '../../domain/interfaces/voice-system.js';
+import { LivingSpiralCoordinator, SpiralConfig } from '../../domain/services/living-spiral-coordinator.js';
+import { LivingSpiralCoordinatorInterface } from '../../domain/interfaces/workflow-orchestrator.js';
 
 export interface UnifiedModelClientConfig {
   defaultProvider: string;
@@ -63,12 +68,18 @@ export interface UnifiedModelClientDependencies {
   cacheCoordinator?: any;
   performanceMonitor?: any;
   hybridRouter?: any;
+  voiceSystem?: VoiceArchetypeSystemInterface;
+  livingSpiralCoordinator?: LivingSpiralCoordinatorInterface;
+  logger?: any;
 }
 
 export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private config: UnifiedModelClientConfig;
   private providers: Map<string, IModelProvider> = new Map();
   private router: IModelRouter;
+  private intelligentRouter: IntelligentModelRouter;
+  private voiceSystem?: VoiceArchetypeSystemInterface;
+  private livingSpiralCoordinator?: LivingSpiralCoordinatorInterface;
   private initialized = false;
   private requestCount = 0;
   private cache = new Map<string, { response: ModelResponse; timestamp: number }>();
@@ -90,6 +101,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     
     this.setupProviders();
     this.setupRouter();
+    this.setupIntelligentRouter();
+    this.setupVoiceSystem();
+    this.setupLivingSpiralCoordinator();
   }
   
   private convertUnifiedConfig(unifiedConfig: UnifiedConfiguration): UnifiedModelClientConfig {
@@ -145,6 +159,215 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.router = new SimpleModelRouter(this.providers, this.config);
   }
   
+  private setupIntelligentRouter(): void {
+    const routerConfig = this.convertToRouterConfig();
+    this.intelligentRouter = new IntelligentModelRouter(routerConfig);
+  }
+  
+  private convertToRouterConfig(): RouterConfig {
+    const modelProviders: ModelProvider[] = this.config.providers.map(providerConfig => {
+      const models: ModelSpec[] = providerConfig.models.map(modelName => ({
+        id: modelName,
+        name: modelName,
+        displayName: modelName,
+        contextWindow: 128000, // Default context window
+        maxTokens: 128000,
+        strengthProfiles: [
+          {
+            category: providerConfig.type === 'ollama' ? 'analysis' : 'code-generation',
+            score: 0.8,
+            examples: [`${modelName} for ${providerConfig.type}`]
+          }
+        ],
+        costPerToken: {
+          input: providerConfig.type === 'ollama' || providerConfig.type === 'lm-studio' ? 0 : 0.001,
+          output: providerConfig.type === 'ollama' || providerConfig.type === 'lm-studio' ? 0 : 0.002
+        },
+        latencyProfile: {
+          firstToken: providerConfig.type === 'lm-studio' ? 500 : 1000,
+          tokensPerSecond: providerConfig.type === 'lm-studio' ? 50 : 30
+        },
+        qualityScore: 0.8,
+        supportedFeatures: ['completion', 'chat']
+      }));
+      
+      return {
+        id: providerConfig.name,
+        name: providerConfig.name,
+        type: providerConfig.type as any,
+        endpoint: providerConfig.endpoint,
+        models,
+        capabilities: [
+          { feature: 'streaming', supported: true },
+          { feature: 'function-calling', supported: false }
+        ],
+        costProfile: {
+          tier: providerConfig.type === 'ollama' || providerConfig.type === 'lm-studio' ? 'local' : 'paid',
+          costPerRequest: 0,
+          costOptimized: true
+        },
+        performanceProfile: {
+          averageLatency: providerConfig.timeout || 5000,
+          throughput: 1,
+          reliability: 0.95,
+          uptime: 95
+        },
+        healthStatus: {
+          status: 'healthy',
+          lastChecked: new Date(),
+          responseTime: 0,
+          errorRate: 0,
+          availableModels: providerConfig.models
+        }
+      };
+    });
+    
+    return {
+      providers: modelProviders,
+      defaultStrategy: {
+        primary: 'balanced',
+        fallback: 'escalate',
+        escalationTriggers: [
+          {
+            condition: 'low-confidence',
+            threshold: 0.5,
+            action: 'upgrade-model'
+          }
+        ]
+      },
+      costOptimization: {
+        enabled: true,
+        budgetLimits: {
+          daily: 10.0,
+          monthly: 100.0
+        },
+        thresholds: {
+          lowCost: 0.01,
+          mediumCost: 0.10,
+          highCost: 1.00
+        }
+      },
+      performance: {
+        healthCheckInterval: 60000,
+        timeoutMs: this.config.timeout || 30000,
+        retryAttempts: this.config.retryAttempts || 3,
+        circuitBreakerThreshold: 5
+      },
+      intelligence: {
+        learningEnabled: true,
+        adaptiveRouting: true,
+        qualityFeedbackWeight: 0.3,
+        costFeedbackWeight: 0.2
+      }
+    };
+  }
+  
+  private setupVoiceSystem(): void {
+    if (this.dependencies?.voiceSystem) {
+      this.voiceSystem = this.dependencies.voiceSystem;
+      logger.info('Voice system provided via dependencies');
+    } else {
+      // Create a default voice system if not provided
+      try {
+        // Import the createLogger function for voice system
+        const voiceLogger = this.dependencies?.logger || logger;
+        
+        // Initialize voice system with this client (spiral coordinator will be connected later)
+        this.voiceSystem = new VoiceArchetypeSystem(
+          voiceLogger, 
+          undefined, // spiralCoordinator will be set up in setupLivingSpiralCoordinator
+          this, // Pass this model client to the voice system
+          {
+            voices: {
+              default: ['explorer', 'maintainer'],
+              available: [
+                'explorer', 'maintainer', 'analyzer', 'developer', 
+                'implementor', 'security', 'architect', 'designer', 'optimizer'
+              ],
+              parallel: true,
+              maxConcurrent: 3
+            }
+          }
+        );
+        logger.info('Voice archetype system initialized with default configuration');
+      } catch (error) {
+        logger.warn('Failed to initialize voice system:', error);
+        this.voiceSystem = undefined;
+      }
+    }
+  }
+  
+  private setupLivingSpiralCoordinator(): void {
+    if (this.dependencies?.livingSpiralCoordinator) {
+      this.livingSpiralCoordinator = this.dependencies.livingSpiralCoordinator;
+      logger.info('Living Spiral Coordinator provided via dependencies');
+    } else if (this.voiceSystem) {
+      // Create a default Living Spiral Coordinator if not provided
+      try {
+        const spiralConfig: SpiralConfig = {
+          maxIterations: 5,
+          qualityThreshold: 0.8,
+          convergenceTarget: 0.9,
+          enableReflection: true,
+          parallelVoices: true,
+          councilSize: 3
+        };
+        
+        // Note: For now, we'll create a basic implementation
+        // The full Living Spiral Coordinator requires voice orchestration service interface
+        logger.info('Living Spiral Coordinator integration setup (requires voice orchestration service)');
+        
+        // For now, we'll create a simplified integration point
+        this.livingSpiralCoordinator = {
+          executeSpiralProcess: async (prompt: string) => {
+            if (this.voiceSystem) {
+              return await this.voiceSystem.processPrompt(prompt, {
+                voices: ['explorer', 'maintainer', 'analyzer'],
+                councilMode: 'consensus'
+              });
+            }
+            return { error: 'No voice system available' };
+          },
+          executeSpiralIteration: async (input: string, iteration: number) => {
+            return await this.processWithVoices(input, { 
+              voices: ['explorer', 'maintainer'], 
+              context: { iteration } 
+            });
+          },
+          checkConvergence: async (results: any[]) => {
+            // Simple convergence check based on result consistency
+            return results.length >= 3;
+          },
+          analyzeCode: async (filePath: string, context: any) => {
+            return await this.processWithVoices(`Analyze code in ${filePath}`, { 
+              voices: ['analyzer', 'security', 'maintainer'],
+              context 
+            });
+          },
+          initialize: async (dependencies: any) => {
+            logger.info('Living Spiral Coordinator initialized');
+          },
+          shutdown: async () => {
+            logger.info('Living Spiral Coordinator shutdown');
+          }
+        };
+        
+        logger.info('Living Spiral Coordinator integrated with voice system');
+        
+        // Update voice system with spiral coordinator if it supports it
+        if (this.voiceSystem && (this.voiceSystem as any).setLivingSpiralCoordinator) {
+          (this.voiceSystem as any).setLivingSpiralCoordinator(this.livingSpiralCoordinator);
+        }
+        
+      } catch (error) {
+        logger.warn('Failed to initialize Living Spiral Coordinator:', error);
+        this.livingSpiralCoordinator = undefined;
+      }
+    } else {
+      logger.warn('Living Spiral Coordinator requires voice system - skipping initialization');
+    }
+  }
+  
   async initialize(): Promise<void> {
     if (this.initialized) return;
     
@@ -195,8 +418,45 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     try {
       logger.debug(`Processing request: ${requestId}`);
       
-      // Route to appropriate provider
-      const { provider, model } = await this.router.route(request);
+      // Use intelligent routing for better provider selection
+      let provider: IModelProvider;
+      let model: string;
+      
+      try {
+        const routingRequest: RoutingRequest = {
+          query: request.prompt,
+          context: typeof request.context === 'string' ? request.context : JSON.stringify(request.context),
+          taskType: this.analyzeTaskType(request),
+          priority: 'medium', // Default priority since ModelRequest doesn't have this property
+          constraints: {
+            maxCost: 1.0,
+            maxLatency: this.config.timeout || 30000,
+            requireLocal: false,
+            requireStreaming: request.stream || false
+          }
+        };
+        
+        const routingDecision = await this.intelligentRouter.route(routingRequest);
+        const selectedProvider = this.providers.get(routingDecision.provider.name);
+        
+        if (selectedProvider && await selectedProvider.isAvailable()) {
+          provider = selectedProvider;
+          model = routingDecision.model.name;
+          logger.debug(`Intelligent router selected: ${routingDecision.provider.name}/${model}`);
+        } else {
+          // Fallback to simple router
+          const fallback = await this.router.route(request);
+          provider = fallback.provider;
+          model = fallback.model;
+          logger.debug(`Fallback to simple router: ${provider.type}/${model}`);
+        }
+      } catch (routingError) {
+        logger.warn(`Intelligent routing failed, using simple router:`, routingError);
+        // Fallback to simple router
+        const fallback = await this.router.route(request);
+        provider = fallback.provider;
+        model = fallback.model;
+      }
       
       // Execute request with the selected provider
       const requestWithId = { ...request, id: requestId, model };
@@ -245,7 +505,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         const response = await provider.request(requestWithId);
         yield {
           content: response.content,
-          finished: true,
+          isComplete: true,
           index: 0,
           timestamp: Date.now(),
           metadata: response.metadata
@@ -299,6 +559,16 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     
     await Promise.allSettled(shutdownPromises);
     
+    // Shutdown intelligent router
+    if (this.intelligentRouter) {
+      this.intelligentRouter.shutdown();
+    }
+    
+    // Shutdown Living Spiral Coordinator
+    if (this.livingSpiralCoordinator) {
+      await this.livingSpiralCoordinator.shutdown();
+    }
+    
     this.providers.clear();
     this.cache.clear();
     this.initialized = false;
@@ -310,6 +580,198 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   // Utility methods
   private getCacheKey(request: ModelRequest): string {
     return `${request.model || 'default'}:${request.prompt}:${JSON.stringify(request.tools || [])}`;
+  }
+  
+  private analyzeTaskType(request: ModelRequest): TaskType {
+    const prompt = request.prompt.toLowerCase();
+    let category: TaskType['category'] = 'general';
+    let complexity: TaskType['complexity'] = 'simple';
+    
+    // Analyze category based on prompt content
+    if (prompt.includes('code') || prompt.includes('function') || prompt.includes('class')) {
+      category = 'code-generation';
+    } else if (prompt.includes('analyze') || prompt.includes('explain') || prompt.includes('review')) {
+      category = 'analysis';
+    } else if (prompt.includes('fix') || prompt.includes('debug') || prompt.includes('error')) {
+      category = 'debugging';
+    } else if (prompt.includes('refactor') || prompt.includes('optimize')) {
+      category = 'refactoring';
+    } else if (prompt.includes('edit') || prompt.includes('change') || prompt.includes('modify')) {
+      category = 'editing';
+    } else if (prompt.includes('document') || prompt.includes('explain') || prompt.includes('describe')) {
+      category = 'documentation';
+    }
+    
+    // Analyze complexity based on prompt length and content
+    const promptLength = request.prompt.length;
+    if (promptLength > 1000 || prompt.includes('complex') || prompt.includes('architecture')) {
+      complexity = 'complex';
+    } else if (promptLength > 500 || prompt.includes('analysis') || prompt.includes('detailed')) {
+      complexity = 'moderate';
+    } else if (prompt.includes('expert') || prompt.includes('advanced') || prompt.includes('sophisticated')) {
+      complexity = 'expert';
+    }
+    
+    return {
+      category,
+      complexity,
+      estimatedTokens: Math.min(request.maxTokens || 2000, promptLength * 2),
+      timeConstraint: this.config.timeout || 30000, // Use config timeout since ModelRequest doesn't have timeout
+      qualityRequirement: complexity === 'expert' ? 'critical' : complexity === 'complex' ? 'production' : 'draft'
+    };
+  }
+  
+  // Voice Archetype System Integration Methods
+  
+  /**
+   * Process a prompt with multiple voices for comprehensive analysis
+   */
+  async processWithVoices(prompt: string, options?: { voices?: string[]; context?: any }): Promise<any> {
+    if (!this.voiceSystem) {
+      logger.warn('Voice system not available, falling back to single voice response');
+      return await this.generateText(prompt);
+    }
+    
+    try {
+      return await this.voiceSystem.processPrompt(prompt, options);
+    } catch (error) {
+      logger.error('Multi-voice processing failed, using fallback:', error);
+      return await this.generateText(prompt);
+    }
+  }
+  
+  /**
+   * Generate multi-voice solutions for a given problem
+   */
+  async generateMultiVoiceResponses(voices: string[], prompt: string, options?: any): Promise<any> {
+    if (!this.voiceSystem) {
+      logger.warn('Voice system not available, generating single response');
+      return {
+        responses: [{ voice: 'default', content: await this.generateText(prompt) }],
+        synthesis: await this.generateText(prompt),
+        voicesUsed: ['default'],
+        consensusScore: 1.0
+      };
+    }
+    
+    try {
+      return await this.voiceSystem.generateMultiVoiceSolutions(voices, prompt);
+    } catch (error) {
+      logger.error('Multi-voice generation failed:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get a specific voice perspective on a prompt
+   */
+  async getVoicePerspective(voiceId: string, prompt: string): Promise<any> {
+    if (!this.voiceSystem) {
+      logger.warn('Voice system not available, generating default response');
+      return {
+        voice: 'default',
+        content: await this.generateText(prompt),
+        confidence: 0.5
+      };
+    }
+    
+    try {
+      return await this.voiceSystem.getVoicePerspective(voiceId, prompt);
+    } catch (error) {
+      logger.error(`Failed to get ${voiceId} perspective:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get available voice archetypes
+   */
+  getAvailableVoices(): string[] {
+    if (!this.voiceSystem) {
+      return ['default'];
+    }
+    
+    try {
+      return this.voiceSystem.getAvailableVoices();
+    } catch (error) {
+      logger.error('Failed to get available voices:', error);
+      return ['default'];
+    }
+  }
+  
+  /**
+   * Get the voice archetype system instance
+   */
+  getVoiceSystem(): VoiceArchetypeSystemInterface | undefined {
+    return this.voiceSystem;
+  }
+  
+  // Living Spiral Coordinator Integration Methods
+  
+  /**
+   * Execute the complete Living Spiral process for iterative development
+   */
+  async executeLivingSpiralProcess(prompt: string): Promise<any> {
+    if (!this.livingSpiralCoordinator) {
+      logger.warn('Living Spiral Coordinator not available, falling back to voice processing');
+      return await this.processWithVoices(prompt, { 
+        voices: ['explorer', 'maintainer', 'analyzer'] 
+      });
+    }
+    
+    try {
+      return await this.livingSpiralCoordinator.executeSpiralProcess(prompt);
+    } catch (error) {
+      logger.error('Living Spiral process failed:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Execute a single Living Spiral iteration
+   */
+  async executeSpiralIteration(input: string, iteration: number): Promise<any> {
+    if (!this.livingSpiralCoordinator) {
+      logger.warn('Living Spiral Coordinator not available, using voice processing');
+      return await this.processWithVoices(input, { 
+        voices: ['explorer', 'maintainer'], 
+        context: { iteration } 
+      });
+    }
+    
+    try {
+      return await this.livingSpiralCoordinator.executeSpiralIteration(input, iteration);
+    } catch (error) {
+      logger.error('Spiral iteration failed:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Analyze code using the Living Spiral methodology
+   */
+  async analyzeLivingSpiralCode(filePath: string, context?: any): Promise<any> {
+    if (!this.livingSpiralCoordinator) {
+      logger.warn('Living Spiral Coordinator not available, using voice analysis');
+      return await this.processWithVoices(`Analyze code in ${filePath}`, {
+        voices: ['analyzer', 'security', 'maintainer'],
+        context
+      });
+    }
+    
+    try {
+      return await this.livingSpiralCoordinator.analyzeCode(filePath, context);
+    } catch (error) {
+      logger.error('Living Spiral code analysis failed:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get the Living Spiral Coordinator instance
+   */
+  getLivingSpiralCoordinator(): LivingSpiralCoordinatorInterface | undefined {
+    return this.livingSpiralCoordinator;
   }
   
   private async getAvailableProviders(): Promise<IModelProvider[]> {
@@ -371,13 +833,20 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     for (let i = 0; i < words.length; i++) {
       onToken({
         content: words[i] + (i < words.length - 1 ? ' ' : ''),
-        finished: i === words.length - 1,
+        isComplete: i === words.length - 1,
         index: i,
         timestamp: Date.now()
       });
     }
     
     return response;
+  }
+
+  /**
+   * Generate text from a prompt - legacy compatibility method
+   */
+  async generate(prompt: string, options?: any): Promise<string> {
+    return this.generateText(prompt, options);
   }
 
   async generateText(prompt: string, options?: any): Promise<string> {
@@ -464,10 +933,17 @@ class OllamaProvider implements IModelProvider {
     const ollamaResponse = await this.client.generateText({
       model: request.model || 'default',
       prompt: request.prompt,
-      stream: false,
       options: {
         temperature: request.temperature,
-        num_predict: request.maxTokens
+        num_predict: request.maxTokens,
+        num_ctx: 256000, // Set large context window (256K tokens)
+        num_batch: 512,  // Batch size for processing
+        num_gqa: 1,      // Grouped query attention
+        num_gpu: 999,    // Use all available GPU layers
+        top_k: 40,       // Top-k sampling
+        top_p: 0.9,      // Top-p sampling
+        repeat_penalty: 1.1, // Repetition penalty
+        seed: -1         // Random seed
       }
     });
     

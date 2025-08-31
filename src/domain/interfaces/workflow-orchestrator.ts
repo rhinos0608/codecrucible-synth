@@ -47,6 +47,16 @@ export interface IWorkflowOrchestrator {
    * Process a model request with routing and fallbacks
    */
   processModelRequest(request: any, context: WorkflowContext): Promise<any>;
+  
+  /**
+   * Initialize the orchestrator with dependencies
+   */
+  initialize(dependencies: OrchestratorDependencies): Promise<void>;
+  
+  /**
+   * Shutdown and cleanup resources
+   */
+  shutdown(): Promise<void>;
 }
 
 /**

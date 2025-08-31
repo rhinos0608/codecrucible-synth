@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { join, resolve, normalize } from 'path';
 import * as path from 'path';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/unified-logger.js';
 import chalk from 'chalk';
 import { readFile, writeFile, access, stat, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -117,11 +117,12 @@ export class MCPServerManager {
     this.config = config;
     this.servers = new Map();
     this.securityValidator = new AdvancedSecurityValidator({
-      allowCodeExecution: false,
-      allowFileAccess: true,
-      allowNetworkAccess: false,
-      requireSandbox: true,
+      enableStrictMode: true,
       maxInputLength: 10000,
+      allowedPatterns: [],
+      blockedPatterns: [],
+      enableLogging: true,
+      requireEncryption: false,
     });
     this.initializeServers();
   }
@@ -648,7 +649,7 @@ export class MCPServerManager {
         riskLevel: validationResult.riskLevel,
       });
       throw new Error(
-        `Command blocked: ${validationResult.violations[0]?.description || 'Security violation detected'}`
+        `Command blocked: ${validationResult.violations[0]?.message || 'Security violation detected'}`
       );
     }
 
@@ -1448,5 +1449,19 @@ export class MCPServerManager {
     // Perform standard shutdown
     await this.stopServers();
     logger.info('Enhanced MCP shutdown completed');
+  }
+
+  /**
+   * Alias for startServers() for compatibility with enhanced client manager
+   */
+  async initialize(): Promise<void> {
+    await this.startServers();
+  }
+
+  /**
+   * Alias for shutdownResilient() for compatibility with enhanced client manager
+   */
+  async shutdown(): Promise<void> {
+    await this.shutdownResilient();
   }
 }

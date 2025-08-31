@@ -3,10 +3,14 @@
  * Implements the core Living Spiral philosophy for iterative development
  */
 
-import { ILogger } from '../interfaces/this.logger.js';
+import { ILogger } from '../interfaces/logger.js';
 import { IModelClient } from '../interfaces/model-client.js';
 import { IVoiceOrchestrationService, VoiceResponse, CouncilSession } from '../interfaces/voice-orchestration.js';
-import { LivingSpiralCoordinatorInterface } from '../interfaces/workflow-orchestrator.js';
+import { 
+  LivingSpiralCoordinatorInterface, 
+  WorkflowContext, 
+  OrchestratorDependencies 
+} from '../interfaces/workflow-orchestrator.js';
 
 export enum SpiralPhase {
   COLLAPSE = 'collapse',
@@ -186,10 +190,10 @@ Break it down into:
 Provide a clear, structured breakdown that eliminates unnecessary complexity.
 `;
 
-    const response = await this.modelClient.generate({ prompt: collapsePrompt });
+    const response = await this.modelClient.generate(collapsePrompt);
 
     return {
-      output: response.content,
+      output: response,
       voices: ['explorer'],
     };
   }
@@ -221,7 +225,7 @@ Provide a clear, structured breakdown that eliminates unnecessary complexity.
           collapsed.output,
           this.modelClient
         );
-        perspectives.push(response.content);
+        perspectives.push(response.response);
       }
     }
 
@@ -268,10 +272,10 @@ Your synthesis should:
 Deliver a comprehensive synthesis that represents the collective wisdom of the council.
 `;
 
-    const response = await this.modelClient.generate({ prompt: synthesisPrompt });
+    const response = await this.modelClient.generate(synthesisPrompt);
 
     return {
-      output: response.content,
+      output: response,
       voices: [...council.voices, 'architect'],
     };
   }
@@ -301,10 +305,10 @@ Provide:
 Focus on practical, executable solutions that can be immediately implemented.
 `;
 
-    const response = await this.modelClient.generate({ prompt: rebirthPrompt });
+    const response = await this.modelClient.generate(rebirthPrompt);
 
     return {
-      output: response.content,
+      output: response,
       voices: [...synthesis.voices, 'implementor'],
     };
   }
@@ -343,7 +347,7 @@ Provide critical reflection on:
 Be honest about quality and provide specific guidance for next steps.
 `;
 
-    const reflectionContent = await this.modelClient.generate({ prompt: reflectionPrompt });
+    const reflectionContent = await this.modelClient.generate(reflectionPrompt);
 
     // Combine rebirth output with reflection insights
     const finalOutput = `
@@ -554,6 +558,119 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
       duration: iter.metadata.duration,
       voiceCount: iter.voices.length,
     }));
+  }
+
+  // === Interface Implementation Methods ===
+
+  /**
+   * Execute a single spiral iteration (public interface method)
+   */
+  async executeSpiralIteration(input: string, iteration: number): Promise<any> {
+    this.logger.info(`Executing spiral iteration ${iteration}`);
+    const previousIterations: SpiralIteration[] = [];
+    return await this.executeSingleSpiral(input, iteration, previousIterations);
+  }
+
+  /**
+   * Check if convergence has been achieved
+   */
+  async checkConvergence(results: any[]): Promise<boolean> {
+    if (results.length === 0) return false;
+    
+    const qualities = results.map((r: any) => r.quality || 0);
+    const avgQuality = qualities.reduce((sum, q) => sum + q, 0) / qualities.length;
+    
+    return avgQuality >= this.config.qualityThreshold;
+  }
+
+  /**
+   * Analyze code or files
+   */
+  async analyzeCode(filePath: string, context: WorkflowContext): Promise<any> {
+    this.logger.info(`Analyzing code: ${filePath}`);
+    
+    const analysisPrompt = `
+Please analyze the code file: ${filePath}
+
+Context:
+- Working Directory: ${context.workingDirectory}
+- Security Level: ${context.securityLevel}
+- Permissions: ${context.permissions.join(', ')}
+
+Provide a comprehensive analysis including:
+1. Code quality assessment
+2. Potential improvements
+3. Security considerations
+4. Performance implications
+5. Architectural feedback
+`;
+
+    const response = await this.modelClient.generate(analysisPrompt);
+
+    return {
+      filePath,
+      analysis: response,
+      quality: this.calculateQualityScore(response),
+      recommendations: this.extractRecommendations(response),
+      context
+    };
+  }
+
+  /**
+   * Initialize the orchestrator with dependencies
+   */
+  async initialize(dependencies: OrchestratorDependencies): Promise<void> {
+    this.logger.info('Initializing LivingSpiralCoordinator with dependencies');
+    
+    // Store references to dependencies if needed
+    // For now, we assume the coordinator is already initialized in constructor
+    // But this provides a hook for future dependency injection
+    
+    this.logger.info('LivingSpiralCoordinator initialization completed');
+  }
+
+  /**
+   * Shutdown and cleanup
+   */
+  async shutdown(): Promise<void> {
+    this.logger.info('Shutting down LivingSpiralCoordinator');
+    
+    // Cleanup any resources, stop timers, etc.
+    // Currently no cleanup needed, but this provides the interface hook
+    
+    this.logger.info('LivingSpiralCoordinator shutdown completed');
+  }
+
+  // === Helper Methods for Interface Implementation ===
+
+  private calculateQualityScore(content: string): number {
+    // Simple heuristic for quality scoring
+    const length = content.length;
+    const hasStructure = content.includes('\n') && content.includes('1.');
+    const hasRecommendations = content.toLowerCase().includes('recommend');
+    
+    let score = 0.5; // Base score
+    if (length > 500) score += 0.2;
+    if (hasStructure) score += 0.2;
+    if (hasRecommendations) score += 0.1;
+    
+    return Math.min(1.0, score);
+  }
+
+  private extractRecommendations(content: string): string[] {
+    // Extract recommendations from analysis content
+    const lines = content.split('\n');
+    const recommendations: string[] = [];
+    
+    for (const line of lines) {
+      if (line.toLowerCase().includes('recommend') || 
+          line.toLowerCase().includes('suggest') ||
+          line.toLowerCase().includes('should')) {
+        recommendations.push(line.trim());
+      }
+    }
+    
+    return recommendations;
   }
 }
 

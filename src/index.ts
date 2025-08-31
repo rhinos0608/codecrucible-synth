@@ -72,15 +72,108 @@ export async function initialize(): Promise<UnifiedCLI> {
       verbose: process.argv.includes('--verbose') 
     });
 
+    // Initialize MCP Server Manager for extended functionality
+    const { MCPServerManager } = await import('./mcp-servers/mcp-server-manager.js');
+    const mcpConfig = {
+      filesystem: {
+        enabled: true,
+        restrictedPaths: ['/etc', '/sys', '/proc'],
+        allowedPaths: [process.cwd()]
+      },
+      git: {
+        enabled: true,
+        autoCommitMessages: true,
+        safeModeEnabled: true
+      },
+      terminal: {
+        enabled: true,
+        allowedCommands: ['ls', 'cat', 'echo', 'pwd', 'which', 'node', 'npm'],
+        blockedCommands: ['rm', 'sudo', 'chmod', 'chown', 'kill', 'pkill']
+      },
+      packageManager: {
+        enabled: true,
+        autoInstall: false,
+        securityScan: true
+      },
+      smithery: {
+        enabled: !!process.env.SMITHERY_API_KEY,
+        apiKey: process.env.SMITHERY_API_KEY,
+        autoDiscovery: true
+      }
+    };
+    
+    const mcpServerManager = new MCPServerManager(mcpConfig);
+    
+    // Start MCP servers asynchronously (don't block initialization)
+    mcpServerManager.startServers().catch(error => {
+      logger.warn('MCP servers initialization had issues:', error);
+      // Continue without MCP servers - graceful degradation
+    });
+
     // Create concrete workflow orchestrator (breaks circular dependencies)
     const orchestrator = new ConcreteWorkflowOrchestrator();
+    
+    // Initialize proper UnifiedModelClient with dynamic model selection
+    const { UnifiedModelClient } = await import('./application/services/unified-model-client.js');
+    const { ModelSelector, quickSelectModel } = await import('./infrastructure/user-interaction/model-selector.js');
+    
+    // Interactive model selection (unless in non-interactive mode)
+    let selectedModelInfo;
+    const isInteractive = !process.argv.includes('--no-interactive') && 
+                         !process.argv.includes('status') &&
+                         !process.argv.includes('--version') &&
+                         !process.argv.includes('--help') &&
+                         process.stdin.isTTY;
+
+    if (isInteractive) {
+      try {
+        const modelSelector = new ModelSelector();
+        selectedModelInfo = await modelSelector.selectModel();
+      } catch (error) {
+        logger.warn('Interactive model selection failed, using quick select:', error);
+        selectedModelInfo = await quickSelectModel();
+      }
+    } else {
+      selectedModelInfo = await quickSelectModel();
+    }
+
+    // Create model client configuration based on selected model
+    const modelClientConfig = {
+      defaultProvider: selectedModelInfo.provider,
+      providers: [
+        {
+          type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
+          name: `${selectedModelInfo.provider}-selected`,
+          endpoint: selectedModelInfo.provider === 'ollama' 
+            ? (process.env.OLLAMA_ENDPOINT || 'http://localhost:11434')
+            : (process.env.LM_STUDIO_ENDPOINT || 'ws://localhost:8080'),
+          enabled: true,
+          priority: 1,
+          models: [selectedModelInfo.selectedModel.id],
+          timeout: parseInt(process.env.REQUEST_TIMEOUT || '110000')
+        }
+      ],
+      fallbackStrategy: 'priority' as const,
+      timeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'),
+      retryAttempts: 3,
+      enableCaching: true,
+      enableMetrics: true
+    };
+    
+    const modelClient = new UnifiedModelClient(modelClientConfig);
+    await modelClient.initialize();
+
+    if (isInteractive) {
+      logger.info(`🤖 Using model: ${selectedModelInfo.selectedModel.name}`);
+    }
+    
     await orchestrator.initialize({
       userInteraction,
       eventBus,
-      // Components will be injected as they become available
-      // modelClient: unifiedModelClient,
-      // mcpManager: mcpServerManager,
-      // securityValidator: unifiedSecurityValidator,
+      modelClient,
+      mcpManager: mcpServerManager, // MCP servers now activated!
+      // These will be added as they become available:
+      // securityValidator: unifiedSecurityValidator,  
       // configManager: unifiedConfigManager,
     });
 
@@ -140,6 +233,15 @@ export async function main(): Promise<void> {
       return;
     }
 
+    // Handle models command
+    if (args[0] === 'models') {
+      const { ModelsCommand, parseModelsArgs } = await import('./core/cli/models-command.js');
+      const modelsCommand = new ModelsCommand();
+      const modelsOptions = parseModelsArgs(args.slice(1));
+      await modelsCommand.execute(modelsOptions);
+      return;
+    }
+
     // Initialize full system
     const cli = await initialize();
 
@@ -178,6 +280,7 @@ function showHelp(): void {
   console.log('Commands:');
   console.log('  interactive, -i      Start interactive chat mode');
   console.log('  analyze <file>       Analyze a code file');
+  console.log('  models              Manage AI models');
   console.log('  status              Show system status');
   console.log('  --help, -h          Show this help');
   console.log('  --version, -v       Show version');
@@ -203,6 +306,7 @@ function showHelp(): void {
   console.log('  cc -i                                    # Interactive mode');
   console.log('  crucible "Create a React component"      # Generate code');
   console.log('  cc analyze src/main.ts                   # Analyze file');
+  console.log('  cc models --list                         # List available models');
   console.log('  codecrucible "Review this code" --verbose # Detailed analysis');
 }
 

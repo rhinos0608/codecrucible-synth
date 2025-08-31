@@ -118,10 +118,14 @@ export interface RateLimit {
 }
 
 export interface ProviderConfiguration {
+  type?: string;
+  name?: string;
+  endpoint?: string;
+  models?: string[];
   apiKey?: string;
-  timeout: number;
-  retries: number;
-  backoffStrategy: 'linear' | 'exponential' | 'fixed';
+  timeout?: number;
+  retries?: number;
+  backoffStrategy?: 'linear' | 'exponential' | 'fixed';
   priority: number;
   enabled: boolean;
 }
@@ -317,6 +321,23 @@ export interface GenerationResult {
   improvementHistory: ImprovementStep[];
 }
 
+export interface CodeGenerationResult extends GenerationResult {
+  refinedCode?: string;
+  language?: string;
+  performance?: {
+    generationTime: number;
+    totalTime: number;
+    tokensPerSecond?: number;
+  };
+  audit?: {
+    score: number;
+    confidence: number;
+    issues?: string[];
+    recommendations?: string[];
+    securityWarnings?: string[];
+  };
+}
+
 export interface QualityAssessment {
   overallScore: number;
   dimensions: QualityDimension[];
@@ -329,13 +350,17 @@ export interface QualityDimension {
   name: string;
   score: number;
   weight: number;
-  feedback: string;
-  suggestions: string[];
+  feedback?: string;
+  details?: string;
+  suggestions?: string[];
 }
 
 export interface ImprovementStep {
   iteration: number;
-  changes: string;
+  agent?: string;
+  changes: string[];
+  reasoning?: string;
+  score?: number;
   qualityImprovement: number;
   feedback: string;
   voice: string;
@@ -544,6 +569,9 @@ export interface ModelConfiguration {
   providers: ProviderConfiguration[];
   routing: ModelRoutingConfiguration;
   fallback: FallbackConfiguration;
+  timeout?: number;
+  maxTokens?: number;
+  temperature?: number;
 }
 
 export interface ModelRoutingConfiguration {
@@ -562,6 +590,8 @@ export interface FallbackConfiguration {
 export interface VoiceSystemConfiguration {
   enabled: boolean;
   defaultVoices: string[];
+  availableVoices?: string[];
+  parallelVoices?: boolean;
   maxConcurrentVoices: number;
   consensusThreshold: number;
   voices: Record<string, VoiceConfiguration>;
@@ -597,6 +627,8 @@ export interface SecurityConfiguration {
   policies: SecurityPolicy[];
   auditing: AuditConfiguration;
   encryption: EncryptionConfiguration;
+  enableSandbox?: boolean;
+  securityLevel?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export interface AuditConfiguration {
@@ -631,6 +663,11 @@ export interface PerformanceConfiguration {
   pooling: PoolConfiguration;
   optimization: OptimizationConfiguration;
   monitoring: MonitoringConfiguration;
+  maxConcurrentRequests?: number;
+  enableCaching?: boolean;
+  defaultTimeout?: number;
+  preferGPU?: boolean;
+  memoryThresholdMB?: number;
 }
 
 export interface CacheConfiguration {
@@ -729,6 +766,8 @@ export interface DatabaseConfiguration {
   poolSize: number;
   migrations: boolean;
   backup: BackupConfiguration;
+  path?: string;
+  inMemory?: boolean;
 }
 
 export interface BackupConfiguration {
@@ -1078,6 +1117,127 @@ export interface ModelResponse {
     promptTokens?: number;
     completionTokens?: number;
   };
+}
+
+// ============================================================================
+// MISSING TYPES - Commonly referenced across the codebase
+// ============================================================================
+
+// Unified Configuration - Composite of all configurations
+export interface UnifiedConfiguration {
+  system: SystemConfiguration;
+  application: ApplicationConfiguration;
+  model: ModelConfiguration;
+  voice: VoiceSystemConfiguration;
+  tools: ToolConfiguration;
+  security: SecurityConfiguration;
+  performance: PerformanceConfiguration;
+  monitoring: MonitoringConfiguration;
+  infrastructure: InfrastructureConfiguration;
+}
+
+// Configuration Validation Types
+export interface ConfigurationError {
+  field: string;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+}
+
+export interface ConfigurationWarning {
+  field: string;
+  message: string;
+  suggestion?: string;
+}
+
+export interface ConfigurationValidation {
+  isValid: boolean;
+  errors: ConfigurationError[];
+  warnings: ConfigurationWarning[];
+  sanitized?: UnifiedConfiguration;
+}
+
+// Agent Task Management Types
+export interface AgentTask {
+  id: string;
+  type: string;
+  name: string;
+  description?: string;
+  input?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  agentId: string;
+  context: Record<string, any>;
+  parameters: Record<string, any>;
+  dependencies: string[];
+  estimatedDuration?: number;
+  actualDuration?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AgentResponse {
+  id: string;
+  taskId: string;
+  agentId: string;
+  success: boolean;
+  result?: any;
+  error?: string;
+  executionTime: number;
+  metadata?: Record<string, any>;
+  timestamp: Date;
+}
+
+export interface ExecutionResult {
+  success: boolean;
+  result?: any;
+  content?: string;
+  error?: string;
+  executionTime: number;
+  resourcesUsed: string[];
+  metadata?: Record<string, any>;
+  warnings?: string[];
+}
+
+// Server Communication Types
+export interface ServerRequest {
+  id: string;
+  method: string;
+  path: string;
+  headers: Record<string, string>;
+  body?: any;
+  query?: Record<string, string>;
+  params?: Record<string, string>;
+  timestamp: Date;
+  clientId?: string;
+}
+
+export interface ServerResponse {
+  id: string;
+  requestId: string;
+  statusCode: number;
+  headers: Record<string, string>;
+  body?: any;
+  error?: string;
+  executionTime: number;
+  timestamp: Date;
+}
+
+// Re-export SecurityValidationContext from security validator
+export type { SecurityValidationContext } from '../services/unified-security-validator.js';
+
+// Configuration source tracking interfaces
+export interface ConfigurationSource {
+  type: 'file' | 'environment' | 'default' | 'override';
+  name: string;
+  priority: number;
+  lastModified?: Date;
+}
+
+export interface ConfigurationSourceInfo {
+  source: ConfigurationSource;
+  fields: string[];
+  loadTime: Date;
+  checksum?: string;
 }
 
 // Export all as a convenient namespace

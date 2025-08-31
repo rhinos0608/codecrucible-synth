@@ -5,7 +5,8 @@
  */
 
 import { EventEmitter } from 'events';
-import { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 import { performance } from 'perf_hooks';
 import { promises as fs } from 'fs';
 import * as path from 'path';
@@ -278,7 +279,7 @@ export interface LogOutput {
 
 // Main Observability System
 export class ObservabilitySystem extends EventEmitter {
-  private logger: Logger;
+  private logger: ILogger;
   private config: ObservabilityConfig;
   private metricsCollector: MetricsCollector;
   private tracingSystem: TracingSystem;
@@ -292,7 +293,7 @@ export class ObservabilitySystem extends EventEmitter {
 
   constructor(config: ObservabilityConfig) {
     super();
-    this.logger = new Logger('ObservabilitySystem');
+    this.logger = createLogger('ObservabilitySystem');
     this.config = config;
 
     // Initialize components
@@ -745,13 +746,13 @@ class MetricsCollector {
   private metrics: MetricPoint[] = [];
   private aggregatedMetrics: Map<string, AggregatedMetric> = new Map();
   private exporters: MetricExporter[] = [];
-  private logger: Logger;
+  private logger: ILogger;
 
   constructor(
     private config: any,
     private observabilitySystem: ObservabilitySystem
   ) {
-    this.logger = new Logger('MetricsCollector');
+    this.logger = createLogger('MetricsCollector');
     this.exporters = config.exporters || [];
   }
 
@@ -923,13 +924,13 @@ class MetricsCollector {
 class TracingSystem {
   private traces: Map<string, TraceSpan[]> = new Map();
   private activeSpans: Map<string, TraceSpan> = new Map();
-  private logger: Logger;
+  private logger: ILogger;
 
   constructor(
     private config: any,
     private observabilitySystem: ObservabilitySystem
   ) {
-    this.logger = new Logger('TracingSystem');
+    this.logger = createLogger('TracingSystem');
   }
 
   async initialize(): Promise<void> {
@@ -1027,13 +1028,13 @@ class TracingSystem {
 
 class HealthMonitor {
   private components: Map<string, ComponentHealth> = new Map();
-  private logger: Logger;
+  private logger: ILogger;
 
   constructor(
     private config: any,
     private observabilitySystem: ObservabilitySystem
   ) {
-    this.logger = new Logger('HealthMonitor');
+    this.logger = createLogger('HealthMonitor');
   }
 
   async initialize(): Promise<void> {
@@ -1244,13 +1245,13 @@ class AlertManager {
   private rules: Map<string, AlertRule> = new Map();
   private activeAlerts: Map<string, Alert> = new Map();
   private alertHistory: Alert[] = [];
-  private logger: Logger;
+  private logger: ILogger;
 
   constructor(
     private config: any,
     private observabilitySystem: ObservabilitySystem
   ) {
-    this.logger = new Logger('AlertManager');
+    this.logger = createLogger('AlertManager');
   }
 
   async initialize(): Promise<void> {
@@ -1555,10 +1556,10 @@ class PerformanceProfiler {
 }
 
 class ObservabilityStorage {
-  private logger: Logger;
+  private logger: ILogger;
 
   constructor(private config: any) {
-    this.logger = new Logger('ObservabilityStorage');
+    this.logger = createLogger('ObservabilityStorage');
   }
 
   async initialize(): Promise<void> {

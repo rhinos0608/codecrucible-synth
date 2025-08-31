@@ -9,7 +9,7 @@ import { logger } from '../logger.js';
 import { HybridSearchCoordinator } from './hybrid-search-coordinator.js';
 import { CommandLineSearchEngine, SearchResult } from './command-line-search-engine.js';
 import { HybridSearchFactory } from './hybrid-search-factory.js';
-import { PerformanceMonitor } from './performance-monitor.js';
+import { SearchPerformanceMonitor } from './performance-monitor.js';
 import { SearchOptions } from './types.js';
 import { RAGQuery, RAGResult, DocumentMetadata } from '../rag/vector-rag-system.js';
 import * as path from 'path';
@@ -93,7 +93,7 @@ export class SearchCLICommands implements CLISearchIntegration {
   private hybridCoordinator?: HybridSearchCoordinator;
   private commandSearch: CommandLineSearchEngine;
   private workingDirectory: string;
-  private performanceMonitor?: PerformanceMonitor;
+  private performanceMonitor?: SearchPerformanceMonitor;
 
   constructor(workingDirectory: string = process.cwd()) {
     this.logger = logger;
@@ -106,7 +106,7 @@ export class SearchCLICommands implements CLISearchIntegration {
       this.hybridCoordinator = new HybridSearchCoordinator(this.commandSearch, hybridConfig);
 
       // Initialize performance monitoring
-      this.performanceMonitor = new PerformanceMonitor(
+      this.performanceMonitor = new SearchPerformanceMonitor(
         this.hybridCoordinator,
         undefined, // RAG system would be injected here if available
         this.commandSearch

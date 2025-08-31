@@ -331,8 +331,8 @@ export class EnterpriseMCPOrchestrator {
     for (const capability of capabilities) {
       try {
         const validation = await this.securityFramework.validateAgentAction(
-          'mcp-orchestrator',
           {
+            id: `action-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             type: 'tool_usage',
             agentId: 'mcp-orchestrator',
             payload: {
@@ -341,6 +341,12 @@ export class EnterpriseMCPOrchestrator {
               securityLevel: capability.securityLevel,
             },
             timestamp: new Date(),
+            resourceRequirements: {
+              memory: 0,
+              cpu: 0,
+              network: true,
+              fileSystem: false
+            }
           },
           context.securityContext
         );
@@ -351,7 +357,7 @@ export class EnterpriseMCPOrchestrator {
           logger.warn('Tool failed security validation', {
             toolName: capability.name,
             serverId: capability.serverId,
-            violations: validation.violations.map((v: SecurityViolation) => v.type),
+            violations: validation.violations.map((v: any) => typeof v === 'string' ? v : v.type || v),
           });
         }
       } catch (error) {

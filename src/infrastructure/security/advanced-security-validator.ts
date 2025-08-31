@@ -6,6 +6,7 @@
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { ModernInputSanitizer } from './modern-input-sanitizer.js';
 import { logger } from '../../core/logger.js';
+import type { ILogger } from '../../domain/interfaces/logger.js';
 
 export interface SecurityValidationOptions {
   enableStrictMode: boolean;
@@ -23,6 +24,14 @@ export interface ValidationResult {
   sanitizedInput?: any;
   securityLevel: 'low' | 'medium' | 'high' | 'critical';
   validationTime: number;
+  // Add missing properties for compatibility
+  riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  violations: Array<{
+    type: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    message: string;
+    pattern?: string;
+  }>;
 }
 
 export class AdvancedSecurityValidator {
@@ -50,7 +59,48 @@ export class AdvancedSecurityValidator {
       ...options
     };
 
-    this.unifiedValidator = new UnifiedSecurityValidator();
+    // Create a logger for the validator
+    const validatorLogger = {
+      info: (msg: string) => console.log(`[SecurityValidator] ${msg}`),
+      error: (msg: string, error?: any) => console.error(`[SecurityValidator] ${msg}`, error),
+      warn: (msg: string) => console.warn(`[SecurityValidator] ${msg}`),
+      debug: (msg: string) => console.debug(`[SecurityValidator] ${msg}`),
+      trace: (msg: string) => console.trace(`[SecurityValidator] ${msg}`)
+    } as ILogger;
+
+    this.unifiedValidator = new UnifiedSecurityValidator(validatorLogger, {
+      enabled: true,
+      securityLevel: this.options.enableStrictMode ? 'strict' : 'medium',
+      maxInputLength: this.options.maxInputLength,
+      enableInputSanitization: true,
+      enablePatternMatching: true,
+      enableSandbox: true,
+      sandboxTimeout: 30000,
+      allowedCommands: [],
+      blockedCommands: ['rm', 'del', 'format', 'shutdown'],
+      allowedShells: ['bash', 'sh', 'zsh'],
+      allowedPaths: [],
+      restrictedPaths: ['/etc', '/usr', '/var'],
+      allowFileSystemWrite: false,
+      allowFileSystemRead: true,
+      allowProcessSpawning: false,
+      allowProcessKilling: false,
+      maxProcesses: 5,
+      allowNetworkAccess: false,
+      allowedDomains: [],
+      blockedDomains: [],
+      allowedPorts: [80, 443],
+      allowEnvironmentAccess: false,
+      allowEnvironmentModification: false,
+      protectedEnvironmentVars: ['PATH', 'HOME'],
+      allowedLanguages: ['javascript', 'typescript', 'python'],
+      blockedLanguages: ['bash'],
+      allowCodeEvaluation: false,
+      allowDynamicImports: false,
+      enableAuditLogging: this.options.enableLogging,
+      logSecurityViolations: true,
+      alertOnCriticalViolations: true
+    });
     this.inputSanitizer = new ModernInputSanitizer();
   }
 
@@ -62,11 +112,26 @@ export class AdvancedSecurityValidator {
 
     try {
       // Basic validation using unified validator
-      const basicValidation = await this.unifiedValidator.validateInput(input);
+      const basicValidation = await this.unifiedValidator.validateInput(input.toString(), {
+        sessionId: context.sessionId || 'default',
+        requestId: `advanced-${Date.now()}`,
+        userAgent: 'CodeCrucible-AdvancedSecurityValidator',
+        ipAddress: '127.0.0.1',
+        timestamp: new Date(),
+        operationType: 'advanced-security-validation',
+        userId: context.userId,
+        workingDirectory: context.workingDirectory || process.cwd(),
+        environment: this.options.enableStrictMode ? 'production' : 'development',
+        permissions: context.permissions || [],
+        metadata: {
+          securityLevel: this.options.enableStrictMode ? 'high' : 'medium',
+          timeoutMs: 30000
+        }
+      });
       
       if (!basicValidation.isValid) {
-        errors.push(...(basicValidation.errors || ['Basic validation failed']));
-        securityLevel = 'high';
+        errors.push(...basicValidation.violations.map(v => v.message));
+        securityLevel = basicValidation.riskLevel === 'critical' ? 'critical' : 'high';
       }
 
       // Advanced pattern-based validation
@@ -108,7 +173,13 @@ export class AdvancedSecurityValidator {
         warnings,
         sanitizedInput,
         securityLevel,
-        validationTime: Date.now() - startTime
+        validationTime: Date.now() - startTime,
+        riskLevel: securityLevel === 'critical' ? 'critical' : securityLevel === 'high' ? 'high' : securityLevel === 'medium' ? 'medium' : 'low',
+        violations: errors.map(error => ({
+          type: 'validation_error',
+          severity: securityLevel === 'critical' ? 'critical' : securityLevel === 'high' ? 'high' : 'medium',
+          message: error
+        }))
       };
 
       if (this.options.enableLogging) {
@@ -125,9 +196,22 @@ export class AdvancedSecurityValidator {
         errors: [`Validation error: ${error}`],
         warnings: [],
         securityLevel: 'critical',
-        validationTime: Date.now() - startTime
+        validationTime: Date.now() - startTime,
+        riskLevel: 'critical',
+        violations: [{
+          type: 'system_error',
+          severity: 'critical',
+          message: `Validation error: ${error}`
+        }]
       };
     }
+  }
+
+  /**
+   * Validate input (alias for validate method for backward compatibility)
+   */
+  async validateInput(input: any, context: any = {}): Promise<ValidationResult> {
+    return await this.validate(input, context);
   }
 
   async validateBatch(inputs: any[], context: any = {}): Promise<ValidationResult[]> {

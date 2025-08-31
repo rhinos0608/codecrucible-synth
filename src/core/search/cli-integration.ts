@@ -5,7 +5,8 @@
  */
 
 import { CLIContext } from '../cli/cli-types.js';
-import { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import { ILogger } from '../../domain/interfaces/logger.js';
 import { SearchCLICommands } from './search-cli-commands.js';
 import { HybridSearchCoordinator } from './hybrid-search-coordinator.js';
 import { CommandLineSearchEngine } from './command-line-search-engine.js';
@@ -15,13 +16,13 @@ import { HybridSearchFactory } from './hybrid-search-factory.js';
  * Integration class that adds search functionality to the existing CLI
  */
 export class CLISearchIntegration {
-  private logger: Logger;
+  private logger: ILogger;
   private searchCommands: SearchCLICommands;
   private hybridCoordinator?: HybridSearchCoordinator;
   private context: CLIContext;
 
   constructor(context: CLIContext, workingDirectory: string = process.cwd()) {
-    this.logger = new Logger('CLISearchIntegration');
+    this.logger = createLogger('CLISearchIntegration');
     this.context = context;
 
     // Initialize search command system

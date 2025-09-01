@@ -61,6 +61,11 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   private context: CLIContext;
   private currentSession: CLISession | null = null;
   private initialized = false;
+  private coordinatorInitializedHandler?: () => void;
+  private coordinatorCriticalHandler?: (data: any) => void;
+  private coordinatorOverloadHandler?: (data: any) => void;
+  private sigintHandler?: () => Promise<void>;
+  private sigtermHandler?: () => Promise<void>;
 
   constructor(options: CLIOptions = {}) {
     super();
@@ -349,7 +354,9 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
             }
           }
           const result = await this.execCommand(name, args);
-          await this.userInteraction.display(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+          await this.userInteraction.display(
+            typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+          );
           continue;
         }
 
@@ -846,6 +853,7 @@ ${chalk.yellow('Capabilities:')}
     }
 
     await this.coordinator.shutdown();
+    this.cleanupEventHandlers();
 
     // Cleanup singleton instances
     cleanupApprovalManager();
@@ -855,6 +863,33 @@ ${chalk.yellow('Capabilities:')}
 
     this.initialized = false;
     this.removeAllListeners();
+  }
+
+  async dispose(): Promise<void> {
+    await this.shutdown();
+  }
+
+  private cleanupEventHandlers(): void {
+    if (this.coordinatorInitializedHandler) {
+      this.coordinator.off('initialized', this.coordinatorInitializedHandler);
+      this.coordinatorInitializedHandler = undefined;
+    }
+    if (this.coordinatorCriticalHandler) {
+      this.coordinator.off('error:critical', this.coordinatorCriticalHandler);
+      this.coordinatorCriticalHandler = undefined;
+    }
+    if (this.coordinatorOverloadHandler) {
+      this.coordinator.off('error:overload', this.coordinatorOverloadHandler);
+      this.coordinatorOverloadHandler = undefined;
+    }
+    if (this.sigintHandler) {
+      process.off('SIGINT', this.sigintHandler);
+      this.sigintHandler = undefined;
+    }
+    if (this.sigtermHandler) {
+      process.off('SIGTERM', this.sigtermHandler);
+      this.sigtermHandler = undefined;
+    }
   }
 
   /**
@@ -1046,7 +1081,9 @@ ${chalk.yellow('Capabilities:')}
 
   private async showCommands(): Promise<void> {
     try {
-      const { UnifiedOrchestrationService } = await import('../services/unified-orchestration-service.js');
+      const { UnifiedOrchestrationService } = await import(
+        '../services/unified-orchestration-service.js'
+      );
       const svc = await UnifiedOrchestrationService.getInstance();
       const cmds = svc.listPluginCommands();
       if (!cmds.length) {
@@ -1061,7 +1098,9 @@ ${chalk.yellow('Capabilities:')}
   }
 
   private async execCommand(name: string, args: any[]): Promise<any> {
-    const { UnifiedOrchestrationService } = await import('../services/unified-orchestration-service.js');
+    const { UnifiedOrchestrationService } = await import(
+      '../services/unified-orchestration-service.js'
+    );
     const svc = await UnifiedOrchestrationService.getInstance();
     return svc.executePluginCommand(name, ...(args || []));
   }
@@ -1071,31 +1110,36 @@ ${chalk.yellow('Capabilities:')}
    */
   private setupEventHandlers(): void {
     // Forward coordinator events
-    this.coordinator.on('initialized', () => {
+    this.coordinatorInitializedHandler = () => {
       this.emit('coordinator:initialized');
-    });
+    };
+    this.coordinator.on('initialized', this.coordinatorInitializedHandler);
 
-    this.coordinator.on('error:critical', data => {
+    this.coordinatorCriticalHandler = data => {
       this.emit('error:critical', data);
       this.logger.error('Critical error in CLI coordinator:', data);
-    });
+    };
+    this.coordinator.on('error:critical', this.coordinatorCriticalHandler);
 
-    this.coordinator.on('error:overload', data => {
+    this.coordinatorOverloadHandler = data => {
       this.emit('error:overload', data);
       this.logger.warn('System overload in CLI coordinator:', data);
-    });
+    };
+    this.coordinator.on('error:overload', this.coordinatorOverloadHandler);
 
     // Handle process termination
-    process.on('SIGINT', async () => {
+    this.sigintHandler = async () => {
       await this.userInteraction.display('\n👋 Shutting down gracefully...');
       await this.shutdown();
       process.exit(0);
-    });
+    };
+    process.on('SIGINT', this.sigintHandler);
 
-    process.on('SIGTERM', async () => {
+    this.sigtermHandler = async () => {
       await this.shutdown();
       process.exit(0);
-    });
+    };
+    process.on('SIGTERM', this.sigtermHandler);
   }
 
   // REPLInterface implementation

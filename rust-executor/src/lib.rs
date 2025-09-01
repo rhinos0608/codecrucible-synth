@@ -208,7 +208,7 @@ impl RustExecutor {
         };
 
         let error_str = response.error.map(|e| {
-            serde_json::to_string(&e).unwrap_or_else(|_| e.message)
+            serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
         });
 
         ExecutionResult {

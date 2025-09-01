@@ -51,6 +51,11 @@ export interface LLMProvider {
   generateCode(prompt: string, options?: any): Promise<LLMResponse>;
 
   /**
+   * Process a generic request with tool support (optional for function calling)
+   */
+  request?(request: any): Promise<any>;
+
+  /**
    * Get provider capabilities
    */
   getCapabilities(): LLMCapabilities;

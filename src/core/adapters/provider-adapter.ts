@@ -105,6 +105,27 @@ export class ProviderAdapter implements IModelProvider {
    * Process a generic request - implements IModelProvider interface
    */
   async request(request: ModelRequest): Promise<ModelResponse> {
+    console.log('🔧 DEBUG: ProviderAdapter.request() METHOD ENTRY');
+    logger.info('🔧 ProviderAdapter.request() called', {
+      hasTools: !!request.tools,
+      toolCount: request.tools?.length || 0,
+      providerName: this.name,
+      hasUnderlyingRequest: 'request' in this.llmProvider && typeof this.llmProvider.request === 'function',
+      providerMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(this.llmProvider)),
+      requestMethodType: typeof this.llmProvider.request,
+      hasRequestProperty: 'request' in this.llmProvider,
+    });
+    
+    // CRITICAL FIX: Forward to underlying provider's request method if available
+    if ('request' in this.llmProvider && typeof this.llmProvider.request === 'function') {
+      logger.info(`🔧 Forwarding request to underlying ${this.name} provider with tools`, {
+        hasTools: !!request.tools,
+        toolCount: request.tools?.length || 0,
+      });
+      return await this.llmProvider.request(request);
+    }
+
+    // Fallback to generateText for legacy providers
     const options = {
       temperature: request.temperature,
       maxTokens: request.maxTokens,
@@ -112,7 +133,6 @@ export class ProviderAdapter implements IModelProvider {
       tools: request.tools,
     };
 
-    // Default to generateText
     return await this.generateText(request.prompt, options);
   }
 

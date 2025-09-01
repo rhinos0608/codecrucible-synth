@@ -336,6 +336,9 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         stream: payload.options?.stream || false,
         tools: mcpTools, // KEY FIX: Include MCP tools for AI model
         context: request.context,
+        // CRITICAL FIX: Always include num_ctx to override Ollama's 4096 default
+        num_ctx: parseInt(process.env.OLLAMA_NUM_CTX || '131072'),
+        options: payload.options,
       };
 
       const response = await this.modelClient.request(modelRequest);
@@ -484,7 +487,7 @@ Based on these tool results, please provide a comprehensive response to the user
       prompt: analysisPrompt,
       model: payload.options?.model,
       temperature: payload.options?.temperature || 0.3, // Lower temperature for analysis
-      maxTokens: payload.options?.maxTokens || 2000,
+      maxTokens: payload.options?.maxTokens || 32768, // Increased from 2000 for comprehensive responses
       tools: mcpTools, // Include MCP tools for analysis too
       context: request.context,
     };

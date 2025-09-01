@@ -1300,7 +1300,7 @@ export class MCPServerManager {
             ...smitheryTools.map(tool => ({
               name: tool.name,
               description: tool.description,
-              inputSchema: tool.inputSchema || {},
+              inputSchema: (tool.inputSchema as Record<string, unknown>) || {},
             }))
           );
         }
@@ -1609,6 +1609,75 @@ export class MCPServerManager {
    */
   async initialize(): Promise<void> {
     await this.startServers();
+  }
+
+  /**
+   * CRITICAL BRIDGE METHOD: Execute MCP tools by name
+   * This is the missing link that connects the AI orchestrator to actual MCP operations
+   */
+  async executeTool(toolName: string, args: any, context?: any): Promise<any> {
+    logger.info(`🔧 Executing MCP tool: ${toolName} with args:`, args);
+
+    try {
+      switch (toolName) {
+        // Filesystem operations
+        case 'filesystem_list_directory':
+          return await this.listDirectorySecure(args.path || args.dirPath);
+
+        case 'filesystem_read_file':
+          return await this.readFileSecure(args.file_path || args.filePath || args.path);
+
+        case 'filesystem_write_file':
+          await this.writeFileSecure(
+            args.file_path || args.filePath || args.path,
+            args.content
+          );
+          return { success: true, message: 'File written successfully' };
+
+        case 'filesystem_get_stats':
+          return await this.getFileStats(args.file_path || args.filePath || args.path);
+
+        // Git operations
+        case 'git_status':
+          return await this.gitStatus();
+
+        case 'git_add':
+          return await this.gitAdd(args.files || []);
+
+        case 'git_commit':
+          return await this.gitCommit(args.message);
+
+        // Terminal operations
+        case 'terminal_execute':
+        case 'execute_command':
+          return await this.executeCommandSecure(args.command, args.args || []);
+
+        // Package manager operations
+        case 'npm_install':
+          return await this.installPackage(args.packageName || args.package, args.dev || false);
+
+        case 'npm_run':
+          return await this.runScript(args.scriptName || args.script);
+
+        // Smithery operations
+        case 'smithery_status':
+          return await this.getSmitheryStatus();
+
+        case 'smithery_refresh':
+          await this.refreshSmitheryServers();
+          return { success: true, message: 'Smithery servers refreshed' };
+
+        default:
+          const errorMsg = `Unknown tool: ${toolName}. Available tools: filesystem_list_directory, filesystem_read_file, filesystem_write_file, git_status, git_add, git_commit, execute_command, npm_install, npm_run`;
+          logger.error(errorMsg);
+          throw new Error(errorMsg);
+      }
+    } catch (error) {
+      logger.error(`❌ Tool execution failed for ${toolName}:`, error);
+      throw new Error(
+        `Tool ${toolName} failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
   }
 
   /**

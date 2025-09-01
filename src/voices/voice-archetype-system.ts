@@ -987,7 +987,7 @@ Provide helpful, concise responses with practical value.`;
       response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
         temperature: voice.temperature,
         tools: availableTools,
-        maxTokens: 4096,
+        maxTokens: parseInt(process.env.MODEL_MAX_TOKENS || '131072'), // Use configured max tokens
       });
     } else if (this.modelClient?.processRequest) {
       this.logger.info('🔥 VOICE DEBUG: Using processRequest method');
@@ -995,7 +995,7 @@ Provide helpful, concise responses with practical value.`;
         prompt: enhancedPrompt,
         temperature: voice.temperature,
         tools: availableTools,
-        maxTokens: 4096,
+        maxTokens: parseInt(process.env.MODEL_MAX_TOKENS || '131072'), // Use configured max tokens
       });
     } else if (this.modelClient?.generateText) {
       // Fallback to basic generateText method
@@ -1003,7 +1003,7 @@ Provide helpful, concise responses with practical value.`;
       const textResponse = await this.modelClient.generateText(enhancedPrompt, {
         temperature: voice.temperature,
         tools: availableTools,
-        maxTokens: 4096,
+        maxTokens: parseInt(process.env.MODEL_MAX_TOKENS || '131072'), // Use configured max tokens
       });
       response = { content: textResponse };
     } else {

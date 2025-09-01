@@ -39,7 +39,7 @@ export class OllamaProvider implements LLMProvider {
   async isAvailable(): Promise<boolean> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), parseInt(process.env.OLLAMA_HEALTH_CHECK_TIMEOUT || '5000'));
 
       const response = await fetch(`${this.endpoint}/api/tags`, {
         method: 'GET',
@@ -108,8 +108,8 @@ export class OllamaProvider implements LLMProvider {
       stream: false,
       options: {
         temperature: this.getTemperature(options.taskType),
-        top_p: 0.9,
-        top_k: 40,
+        top_p: parseFloat(process.env.MODEL_TOP_P || '0.9'),
+        top_k: parseInt(process.env.MODEL_TOP_K || '40'),
         num_ctx: this.getContextLength(options.taskType),
       },
     };
@@ -180,14 +180,15 @@ export class OllamaProvider implements LLMProvider {
    * Get temperature based on task type
    */
   private getTemperature(taskType: string): number {
+    const baseTemp = parseFloat(process.env.MODEL_TEMPERATURE || '0.7');
     const temperatures: Record<string, number> = {
-      analysis: 0.1, // Low temperature for analytical tasks
-      security: 0.05, // Very low for security analysis
-      architecture: 0.3, // Moderate creativity for design
-      'multi-file': 0.2, // Low for systematic approaches
-      debugging: 0.1, // Low for systematic debugging
-      review: 0.2, // Low-moderate for consistent reviews
-      default: 0.4,
+      analysis: Math.min(baseTemp * 0.14, 0.1), // Low temperature for analytical tasks
+      security: Math.min(baseTemp * 0.07, 0.05), // Very low for security analysis
+      architecture: Math.min(baseTemp * 0.43, 0.3), // Moderate creativity for design
+      'multi-file': Math.min(baseTemp * 0.29, 0.2), // Low for systematic approaches
+      debugging: Math.min(baseTemp * 0.14, 0.1), // Low for systematic debugging
+      review: Math.min(baseTemp * 0.29, 0.2), // Low-moderate for consistent reviews
+      default: Math.min(baseTemp * 0.57, 0.4),
     };
 
     return temperatures[taskType] || temperatures.default;
@@ -197,14 +198,15 @@ export class OllamaProvider implements LLMProvider {
    * Get context length based on task type
    */
   private getContextLength(taskType: string): number {
+    const defaultContext = parseInt(process.env.MODEL_CONTEXT_WINDOW || '131072');
     const contextLengths: Record<string, number> = {
-      analysis: 8192, // Large context for analysis
-      security: 8192, // Large context for security review
-      architecture: 4096, // Moderate context for design
-      'multi-file': 8192, // Large context for multiple files
-      debugging: 4096, // Moderate context for debugging
-      review: 8192, // Large context for code review
-      default: 4096,
+      analysis: defaultContext, // Large context for analysis
+      security: defaultContext, // Large context for security review
+      architecture: Math.floor(defaultContext / 2), // Moderate context for design
+      'multi-file': defaultContext, // Large context for multiple files
+      debugging: Math.floor(defaultContext / 2), // Moderate context for debugging
+      review: defaultContext, // Large context for code review
+      default: Math.floor(defaultContext / 2),
     };
 
     return contextLengths[taskType] || contextLengths.default;
@@ -214,7 +216,7 @@ export class OllamaProvider implements LLMProvider {
    * Calculate confidence score based on response characteristics
    */
   private calculateConfidence(content: string, responseTime: number, taskType?: string): number {
-    let confidence = 0.9; // Base confidence for Ollama (higher quality)
+    let confidence = parseFloat(process.env.MODEL_BASE_CONFIDENCE || '0.9'); // Base confidence for Ollama (higher quality)
 
     // Adjust based on response characteristics
     if (content.length < 50) {
@@ -325,6 +327,112 @@ export class OllamaProvider implements LLMProvider {
       logger.error('Failed to get available Ollama models:', error);
       return [];
     }
+  }
+
+  /**
+   * CRITICAL FIX: Implement IModelProvider interface with proper tool support
+   * This method is called by UnifiedModelClient and must handle function calling
+   */
+  async request(request: any): Promise<any> {
+    console.log('🔧 DEBUG: OllamaProvider.request() METHOD ENTRY - CORRECT FILE');
+    logger.info('🔧 OllamaProvider.request() called', {
+      hasTools: !!request.tools,
+      toolCount: request.tools?.length || 0,
+      requestKeys: Object.keys(request),
+    });
+
+    // For requests with tools, use function calling support
+    if (request.tools && request.tools.length > 0) {
+      logger.info(`🔧 OLLAMA FUNCTION CALLING: Processing ${request.tools.length} tools`);
+      
+      try {
+        const ollamaRequest = {
+          model: this.config.defaultModel,
+          messages: [
+            {
+              role: 'user',
+              content: request.prompt,
+            }
+          ],
+          tools: request.tools.map((tool: any) => ({
+            type: 'function',
+            function: {
+              name: tool.function.name,
+              description: tool.function.description,
+              parameters: tool.function.parameters,
+            }
+          })),
+          stream: false,
+          options: {
+            temperature: request.temperature || parseFloat(process.env.MODEL_TEMPERATURE || '0.7'),
+            num_ctx: request.num_ctx || parseInt(process.env.OLLAMA_NUM_CTX || '131072'),
+            ...request.options,
+          },
+        };
+
+        logger.info('🔧 SENDING TO OLLAMA WITH TOOLS:', {
+          model: ollamaRequest.model,
+          toolCount: ollamaRequest.tools.length,
+        });
+
+        const response = await fetch(`${this.endpoint}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(ollamaRequest),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.warn('🔧 OLLAMA FUNCTION CALLING FAILED - attempting fallback', {
+            status: response.status,
+            error: errorText,
+          });
+          
+          // If function calling failed, try without tools (fallback mode)
+          if (response.status === 500 || errorText.includes('does not support tools')) {
+            logger.info('🔧 OLLAMA FALLBACK: Model does not support tools, using prompt-based approach');
+            return await this.generateCode(request.prompt, request.options || {});
+          }
+          
+          throw new Error(`Ollama request failed: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        
+        logger.info('🔧 OLLAMA FUNCTION CALLING: Response received', {
+          hasToolCalls: !!result.message?.tool_calls,
+          toolCallCount: result.message?.tool_calls?.length || 0,
+        });
+
+        // Return response in expected format
+        return {
+          id: request.id,
+          content: result.message?.content || '',
+          toolCalls: result.message?.tool_calls?.map((toolCall: any) => ({
+            id: toolCall.function?.name || `tool_${Date.now()}`,
+            function: {
+              name: toolCall.function?.name,
+              arguments: JSON.stringify(toolCall.function?.arguments),
+            },
+          })) || [],
+          usage: {
+            promptTokens: result.prompt_eval_count || 0,
+            completionTokens: result.eval_count || 0,
+            totalTokens: (result.prompt_eval_count || 0) + (result.eval_count || 0),
+          },
+          model: this.config.defaultModel,
+          provider: this.name,
+        };
+      } catch (error) {
+        logger.error('🔧 OLLAMA FUNCTION CALLING FAILED:', error);
+        throw error;
+      }
+    }
+
+    // Fallback to regular generateCode for non-tool requests
+    return await this.generateCode(request.prompt, request.options || {});
   }
 
   /**

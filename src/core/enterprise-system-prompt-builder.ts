@@ -263,70 +263,154 @@ DO NOT use TodoWrite for:
   }
 
   /**
-   * Tool policies - Claude Code patterns
+   * Tool policies - Comprehensive MCP tool documentation
    */
   private static getToolPoliciesSection(): string {
-    return `# AI-DRIVEN TOOL SELECTION POLICIES
+    return `# COMPREHENSIVE MCP TOOL REFERENCE
 
-## Core Principle: INTELLIGENT TOOL SELECTION
-**CRITICAL**: You have comprehensive tools available. Choose the RIGHT tool based on user intent, NOT hardcoded rules. Use your natural language understanding to determine the best approach for each request.
+## CRITICAL: WHEN AND HOW TO USE TOOLS
 
-## Tool Selection Guidelines
+**YOU MUST USE THE AVAILABLE TOOLS TO PERFORM ACTUAL OPERATIONS**
+- When user requests file operations, use filesystem tools to actually read/write files
+- When user requests git operations, use git tools to check status and make changes  
+- When user requests system operations, use terminal tools to execute commands
+- Do NOT generate code examples or instructions - USE THE TOOLS TO DO THE WORK
 
-### For SPECIFIC File/Folder Operations:
-**When user mentions specific files, folders, or directories** → Use MCP filesystem tools
-- "Read the Docs folder" → filesystem_list_directory + filesystem_read_file
-- "Show me package.json" → filesystem_read_file
-- "List files in src/" → filesystem_list_directory  
-- "What's in the config directory?" → filesystem_list_directory + filesystem_read_file
-- "Analyze this specific file" → filesystem_read_file
+## 📁 FILESYSTEM OPERATIONS
 
-### For BROAD Project Analysis:
-**When user requests comprehensive project understanding** → Consider codebase analysis tools
-- "Analyze the entire codebase" → May benefit from codebase analysis
-- "Give me project architecture overview" → May benefit from codebase analysis
-- "Review all code for patterns" → May benefit from codebase analysis
+### **filesystem_list_directory**
+**Purpose**: List files and directories in a specified path
+**Parameters**: 
+- \`path\` (required): Directory path to list (e.g., "src", "./config", "/absolute/path")
+**Usage Patterns**:
+- "List TypeScript files in src" → \`{"path": "src"}\`
+- "What's in the current directory?" → \`{"path": "."}\`  
+- "Show me the config folder contents" → \`{"path": "config"}\`
+**Common Errors**:
+- Path not found → Try parent directory or check working directory
+- Permission denied → Use relative paths within allowed directories
+- Empty response → Directory exists but is empty (valid result)
+**Iteration Pattern**: List directory → Filter results → Read specific files
 
-### Primary MCP Tools (Use First):
+### **filesystem_read_file** 
+**Purpose**: Read the complete contents of any file
+**Parameters**:
+- \`file_path\` (required): Path to file (e.g., "package.json", "src/index.ts")
+**Usage Patterns**:
+- "Show me package.json" → \`{"file_path": "package.json"}\`
+- "Read the main config file" → \`{"file_path": "config/default.yaml"}\`
+- "What's in src/utils/helpers.ts?" → \`{"file_path": "src/utils/helpers.ts"}\`
+**Common Errors**:
+- File not found → Use filesystem_list_directory to find correct path
+- Permission denied → File may be restricted or path incorrect
+- Large file timeout → Files >10MB may timeout, use streaming if available
+**Iteration Pattern**: List directory → Read multiple files → Analyze patterns
 
-**FILESYSTEM OPERATIONS**:
-- **filesystem_read_file**: Read any file contents (prefer over bash 'cat')
-- **filesystem_write_file**: Create/modify files with validation
-- **filesystem_list_directory**: List directory contents with metadata
-- **filesystem_file_stats**: Get file information and metadata
-- **filesystem_find_files**: Search for files by name/pattern
+### **filesystem_write_file**
+**Purpose**: Create new files or modify existing files with content
+**Parameters**:
+- \`file_path\` (required): Target file path 
+- \`content\` (required): Complete file content to write
+**Usage Patterns**:
+- Create new file → \`{"file_path": "src/new-feature.ts", "content": "export class..."}\`
+- Modify existing → Read first, then write with changes
+- Update config → \`{"file_path": "config/settings.json", "content": "{\\"key\\": \\"value\\"}"}\`
+**Common Errors**:
+- Path traversal blocked → Use relative paths within project
+- Permission denied → Target directory may not be writable
+- File in use → On Windows, file may be locked by running process
+**Iteration Pattern**: Read file → Analyze → Modify → Write back → Verify
 
-**GIT OPERATIONS**:
-- **git_status**: Check repository status before other operations  
-- **git_diff**: Analyze changes and modifications
-- **git_log**: Review commit history and changes
-- **git_add/git_commit**: Stage and commit changes
+## 🔀 GIT OPERATIONS
 
-**TERMINAL OPERATIONS**:
-- **terminal_execute**: Run system commands safely
-- **terminal_read_output**: Get command results
-- **terminal_kill_process**: Terminate processes safely
+### **git_status**
+**Purpose**: Check current git repository status (modified files, staged changes, etc.)
+**Parameters**: None required
+**Usage Patterns**:
+- "What's changed?" → \`{}\`
+- "Check git status before committing" → \`{}\`
+- "Show me modified files" → \`{}\`
+**Returns**: Porcelain format status (M=modified, A=added, D=deleted, ??=untracked)
+**Common Errors**:
+- Not a git repository → Ensure you're in a git project
+- Git command not found → Git must be installed and in PATH
+**Iteration Pattern**: Check status → Add files → Commit changes
 
-## Decision Framework:
-1. **Understand Intent**: What is the user actually trying to accomplish?
-2. **Choose Best Tool**: Select the most appropriate tool for the task
-3. **Start Simple**: Begin with the most direct approach
-4. **Escalate if Needed**: Use more complex tools only when necessary
+## ⚡ COMMON WORKFLOW PATTERNS
 
-## Security & Approval:
-- Low-risk operations (reading): Usually auto-approved
-- Medium-risk operations (writing): May require approval based on mode
-- High-risk operations (system): Always subject to approval checks
-- Use approval system gracefully - inform user if approval needed
+### **Analyze Files in Directory**:
+1. \`filesystem_list_directory\` to see structure
+2. \`filesystem_read_file\` for each relevant file  
+3. Analyze patterns and provide insights
 
-## Performance Considerations:
-- MCP filesystem tools: Fast for <10MB files, may timeout for larger
-- Git operations: Optimized but large repositories may be slower  
-- Terminal commands: Execute safely with timeout protection
-- Always prefer efficient tools over complex workarounds
+### **Find and Read TypeScript Files**:
+1. \`filesystem_list_directory\` on "src"
+2. Filter results for .ts files
+3. \`filesystem_read_file\` for each TypeScript file
+4. Analyze code structure and patterns
 
-## Remember: TRUST YOUR INTELLIGENCE
-You are better at understanding user intent than any hardcoded routing logic. Use your natural language understanding to choose the right approach for each unique request.`;
+### **Check Project Status**:
+1. \`filesystem_read_file\` on "package.json" for project info
+2. \`git_status\` to see changes
+3. \`filesystem_list_directory\` on key directories
+4. Provide comprehensive status report
+
+### **Modify Configuration**:
+1. \`filesystem_read_file\` to see current config
+2. Analyze what needs changing
+3. \`filesystem_write_file\` with updated content
+4. \`git_status\` to confirm changes
+
+## 🚨 ERROR HANDLING & RECOVERY
+
+### **Path Issues**:
+- Absolute paths may fail → Try relative paths
+- Windows backslashes → Use forward slashes
+- Spaces in paths → Should work, but test with simple paths first
+
+### **Permission Denied**:
+- Check allowed directories in path policy
+- Use relative paths within project root
+- Some system directories may be restricted
+
+### **File Not Found**:
+- Use \`filesystem_list_directory\` to explore structure
+- Check spelling and case sensitivity  
+- Verify working directory context
+
+### **Tool Failures**:
+- Git not available → Check if in git repository
+- Command timeout → Large operations may need chunking
+- Security blocks → Use approved paths and operations
+
+## 💡 INTELLIGENT USAGE TIPS
+
+### **Be Direct and Practical**:
+- User: "List TypeScript files in src" → USE \`filesystem_list_directory\` + \`filesystem_read_file\`
+- User: "Show git status" → USE \`git_status\`
+- User: "What changed?" → USE \`git_status\` then analyze results
+
+### **Combine Tools Effectively**:
+- Always check git status when making changes
+- Read files before modifying them
+- List directories before reading specific files
+- Chain operations logically: explore → analyze → act
+
+### **Provide Real Results**:
+- Return actual file contents, not examples
+- Show real git status, not placeholder text
+- Use tools to provide factual, current information
+- Let tools do the work - you interpret the results
+
+## ⚙️ TOOL EXECUTION PRIORITY
+
+1. **READ FIRST**: Always read/explore before making changes
+2. **UNDERSTAND CONTEXT**: Check git status, file structure, project type
+3. **USE APPROPRIATE TOOL**: Match tool to task (filesystem for files, git for version control)
+4. **HANDLE ERRORS GRACEFULLY**: Provide alternatives when tools fail
+5. **ITERATE INTELLIGENTLY**: Use results from one tool to inform the next
+
+**REMEMBER**: You have powerful tools - USE THEM to provide real, actionable results rather than hypothetical examples or code snippets.`;
   }
 
   /**

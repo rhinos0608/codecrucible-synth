@@ -65,9 +65,13 @@ export class SmitheryMCPServer {
       await this.discoverServers();
 
       // Register tool handlers
-      this.server.setRequestHandler(CallToolRequestSchema, async request => {
+      this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
         const { name, arguments: args } = request.params;
-        return await this.handleToolCall(name, args);
+        const result = await this.handleToolCall(name, args);
+        return {
+          content: result.content,
+          isError: result.isError,
+        };
       });
 
       // Register available tools dynamically from discovered servers
@@ -91,16 +95,36 @@ export class SmitheryMCPServer {
       if (this.config.enabledServers && this.config.enabledServers.length > 0) {
         // Load specific servers
         for (const serverName of this.config.enabledServers) {
-          const server = (await this.registryIntegration.getServerDetails(
-            serverName
-          )) as RegisteredServer | null;
-          if (server) {
-            servers.push(server);
+          const smitheryServer = await this.registryIntegration.getServerDetails(serverName);
+          if (smitheryServer) {
+            const registeredServer: RegisteredServer = {
+              qualifiedName: smitheryServer.qualifiedName,
+              displayName: smitheryServer.displayName,
+              tools: smitheryServer.tools.map(tool => ({
+                name: tool.name,
+                description: tool.description,
+                inputSchema: tool.inputSchema,
+                serverName: smitheryServer.qualifiedName,
+                originalName: tool.name,
+              })),
+            };
+            servers.push(registeredServer);
           }
         }
       } else if (this.config.autoDiscovery !== false) {
         // Auto-discover popular servers
-        servers = (await this.registryIntegration.getPopularServers(10)) as RegisteredServer[];
+        const smitheryServers = await this.registryIntegration.getPopularServers(10);
+        servers = smitheryServers.map(smitheryServer => ({
+          qualifiedName: smitheryServer.qualifiedName,
+          displayName: smitheryServer.displayName,
+          tools: smitheryServer.tools.map(tool => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema,
+            serverName: smitheryServer.qualifiedName,
+            originalName: tool.name,
+          })),
+        }));
       }
 
       // Register tools from discovered servers

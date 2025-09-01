@@ -15,6 +15,9 @@ export interface ModelRequest {
   stream?: boolean;
   tools?: ModelTool[];
   context?: RequestContext;
+  // Ollama-specific parameters  
+  num_ctx?: number;
+  options?: Record<string, any>;
 }
 
 export interface ModelResponse {

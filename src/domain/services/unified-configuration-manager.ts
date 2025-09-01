@@ -562,7 +562,7 @@ export class UnifiedConfigurationManager
       },
       model: {
         defaultProvider: 'ollama',
-        defaultModel: 'qwen2.5-coder:7b',
+        defaultModel: process.env.MODEL_DEFAULT_NAME,
         providers: [
           {
             type: 'ollama',
@@ -570,7 +570,7 @@ export class UnifiedConfigurationManager
             endpoint: 'http://localhost:11434',
             enabled: true,
             priority: 1,
-            models: ['qwen2.5-coder:7b', 'deepseek-coder:8b'],
+            models: [process.env.MODEL_DEFAULT_NAME, 'deepseek-coder:8b'],
             timeout: 30000,
             retries: 3,
             backoffStrategy: 'exponential',
@@ -1133,7 +1133,7 @@ export class UnifiedConfigurationManager
     if (config.model) {
       transformed.model = {
         defaultProvider: 'ollama',
-        defaultModel: 'qwen2.5-coder:7b',
+        defaultModel: process.env.MODEL_DEFAULT_NAME,
         providers: [
           {
             type: 'ollama',
@@ -1524,7 +1524,7 @@ export class UnifiedConfigurationManager
     if (config.modelPreloader || config.hybridClient) {
       transformed.model = {
         defaultProvider: 'ollama',
-        defaultModel: 'qwen2.5-coder:7b',
+        defaultModel: process.env.MODEL_DEFAULT_NAME,
         providers: [
           {
             type: 'ollama',

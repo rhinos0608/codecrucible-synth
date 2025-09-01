@@ -237,7 +237,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
     try {
       switch (config.type) {
         case 'ollama': {
-          const { OllamaProvider } = await import('../../providers/ollama.js');
+          const { OllamaProvider } = await import('../hybrid/ollama-provider.js');
           return new (OllamaProvider as any)(config);
         }
 
@@ -249,7 +249,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
         case 'huggingface': {
           // HuggingFace provider fallback to Ollama for now
           logger.warn('HuggingFace provider not implemented, falling back to Ollama');
-          const { OllamaProvider } = await import('../../providers/ollama.js');
+          const { OllamaProvider } = await import('../hybrid/ollama-provider.js');
           return new (OllamaProvider as any)({ ...config, type: 'ollama' });
         }
 

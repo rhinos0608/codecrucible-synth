@@ -166,6 +166,7 @@ export interface GitPullResponse {
   remote: string;
   branch: string;
   output: string;
+  rebase?: boolean;
 }
 
 /**
@@ -523,7 +524,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Branch operations
    */
-  async handleGitBranch(args: BranchArgs): Promise<ToolResponse<{ currentBranch: string }>> {
+  async handleGitBranch(args: BranchArgs): Promise<ToolResponse<{ currentBranch: string; action?: string; branch?: string }>> {
     try {
       const { name, checkout = false, delete: deleteBranch = false, remote } = args;
 
@@ -556,7 +557,7 @@ export class GitMCPServer extends BaseMCPServer {
 
         return {
           success: true,
-          data: { action: 'deleted', branch: name },
+          data: { currentBranch: name, action: 'deleted', branch: name },
         };
       }
 
@@ -573,9 +574,9 @@ export class GitMCPServer extends BaseMCPServer {
       return {
         success: true,
         data: {
+          currentBranch: name,
           action: checkout ? 'created_and_checked_out' : 'created',
           branch: name,
-          remote,
         },
       };
     } catch (error) {
@@ -690,7 +691,7 @@ export class GitMCPServer extends BaseMCPServer {
    */
   async handleGitMerge(
     args: MergeArgs
-  ): Promise<ToolResponse<{ branch: string; strategy: string }>> {
+  ): Promise<ToolResponse<{ branch: string; strategy: string; noFastForward?: boolean; output?: string }>> {
     try {
       const { branch, strategy = 'merge', noFastForward = false } = args;
 
@@ -818,7 +819,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git tags
    */
-  async handleGitTag(args: TagArgs): Promise<ToolResponse<{ name: string; message?: string }>> {
+  async handleGitTag(args: TagArgs): Promise<ToolResponse<{ name: string; message?: string; action?: string; tag?: string }>> {
     try {
       const { name, message, delete: deleteTag = false, push = false } = args;
 
@@ -850,7 +851,7 @@ export class GitMCPServer extends BaseMCPServer {
 
         return {
           success: true,
-          data: { action: 'deleted', tag: name },
+          data: { name, action: 'deleted', tag: name },
         };
       }
 
@@ -868,10 +869,10 @@ export class GitMCPServer extends BaseMCPServer {
       return {
         success: true,
         data: {
+          name,
           action: 'created',
           tag: name,
           message,
-          pushed: push,
         },
       };
     } catch (error) {

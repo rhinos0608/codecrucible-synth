@@ -6,6 +6,10 @@
  * unified system that eliminates architectural debt and circular dependencies.
  */
 
+// Load environment variables from .env file
+import { config } from 'dotenv';
+config();
+
 import { UnifiedCLI, CLIOptions } from './application/interfaces/unified-cli.js';
 import { ConcreteWorkflowOrchestrator } from './application/services/concrete-workflow-orchestrator.js';
 import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
@@ -64,8 +68,11 @@ export async function initialize(): Promise<UnifiedCLI> {
     logger.info('🚀 Initializing CodeCrucible Synth with Unified Architecture...');
     const startTime = Date.now();
 
-    // Create event bus for decoupled communication
-    const eventBus = getGlobalEventBus();
+    // Create and set global event bus for decoupled communication
+    const { EventBus } = await import('./infrastructure/messaging/event-bus.js');
+    const eventBus = new EventBus();
+    const { setGlobalEventBus } = await import('./domain/interfaces/event-bus.js');
+    setGlobalEventBus(eventBus);
 
     // Create user interaction system
     const userInteraction = new CLIUserInteraction({

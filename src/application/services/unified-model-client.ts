@@ -225,9 +225,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
           case 'ollama': {
             // Convert ProviderConfig to OllamaConfig format
             const ollamaConfig = {
-              endpoint: providerConfig.endpoint,
-              defaultModel: providerConfig.models[0] || 'llama3.1',
-              timeout: providerConfig.timeout || 30000,
+              endpoint: providerConfig.endpoint || process.env.OLLAMA_ENDPOINT || 'http://localhost:11434',
+              defaultModel: process.env.MODEL_DEFAULT_NAME || providerConfig.models[0] || 'llama3.1:8b',
+              timeout: providerConfig.timeout || parseInt(process.env.OLLAMA_TIMEOUT || '30000'),
               maxRetries: 3,
             };
             const ollamaProvider = new OllamaProvider(ollamaConfig);
@@ -238,9 +238,9 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
           case 'lm-studio': {
             // Convert ProviderConfig to LMStudioConfig format
             const lmStudioConfig = {
-              endpoint: providerConfig.endpoint,
-              defaultModel: providerConfig.models[0] || 'codellama',
-              timeout: providerConfig.timeout || 30000,
+              endpoint: providerConfig.endpoint || process.env.LM_STUDIO_ENDPOINT || 'http://localhost:1234',
+              defaultModel: process.env.MODEL_DEFAULT_NAME || providerConfig.models[0] || 'codellama',
+              timeout: providerConfig.timeout || parseInt(process.env.LM_STUDIO_TIMEOUT || '30000'),
               maxRetries: 3,
             };
             const lmStudioProvider = new LMStudioProvider(lmStudioConfig);
@@ -526,6 +526,12 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   }
 
   async request(request: ModelRequest): Promise<ModelResponse> {
+    logger.info('🔧 UnifiedModelClient.request() called', {
+      hasTools: !!request.tools,
+      toolCount: request.tools?.length || 0,
+      requestKeys: Object.keys(request),
+    });
+
     if (!this.initialized) {
       throw new Error('Model client not initialized');
     }
@@ -643,7 +649,21 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
 
       // Execute request with the selected provider
       const requestWithId = { ...request, id: requestId, model };
+      logger.info('🔧 About to call provider.request()', {
+        providerType: provider.type || provider.constructor.name,
+        hasRequestMethod: typeof provider.request === 'function',
+        providerMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(provider)),
+        hasTools: !!requestWithId.tools,
+        toolCount: requestWithId.tools?.length || 0,
+      });
+      
+      logger.info('🔧 DEBUG: Calling provider.request() NOW');
       const response = await provider.request(requestWithId);
+      logger.info('🔧 DEBUG: provider.request() returned', {
+        hasContent: !!response.content,
+        hasToolCalls: !!response.toolCalls,
+        toolCallCount: response.toolCalls?.length || 0,
+      });
 
       // End LLM inference profiling on success
       if (this.performanceProfiler && profilingSessionId && inferenceOperationId) {
@@ -881,7 +901,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return {
       category,
       complexity,
-      estimatedTokens: Math.min(request.maxTokens || 2000, promptLength * 2),
+      estimatedTokens: Math.min(request.maxTokens || 32768, promptLength * 2),
       timeConstraint: this.config.timeout || 30000, // Use config timeout since ModelRequest doesn't have timeout
       qualityRequirement:
         complexity === 'expert' ? 'critical' : complexity === 'complex' ? 'production' : 'draft',
@@ -1001,7 +1021,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       const voiceRequest: ModelRequest = {
         prompt: `[VOICE: ${voiceId}] ${prompt}`,
         temperature: options.temperature || 0.7,
-        maxTokens: options.maxTokens || 4096,
+        maxTokens: options.maxTokens || parseInt(process.env.MODEL_MAX_TOKENS || '131072'),
         tools: options.tools || [],
         context: {
           voice: voiceId,

@@ -165,23 +165,24 @@ impl RustExecutor {
             stream_response: false,
         };
 
-        // Execute request through communication handler
+        // Execute request through communication handler and update performance metrics in a single async block
         let rt = Runtime::new().expect("Failed to create Tokio runtime");
-        let response = rt.block_on(self.communication_handler.execute_request(request));
-
-        // Update performance metrics
-        {
-            let mut metrics = rt.block_on(self.performance_metrics.write());
-            metrics.total_requests += 1;
-            metrics.total_execution_time_ms += response.execution_time_ms;
-            if response.success {
-                metrics.successful_requests += 1;
-            } else {
-                metrics.failed_requests += 1;
+        let response = rt.block_on(async {
+            let response = self.communication_handler.execute_request(request).await;
+            {
+                let mut metrics = self.performance_metrics.write().await;
+                metrics.total_requests += 1;
+                metrics.total_execution_time_ms += response.execution_time_ms;
+                if response.success {
+                    metrics.successful_requests += 1;
+                } else {
+                    metrics.failed_requests += 1;
+                }
+                metrics.average_execution_time_ms =
+                    metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
             }
-            metrics.average_execution_time_ms =
-                metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
-        }
+            response
+        });
 
         // Serialize response fields
         let result_str = match response.result {

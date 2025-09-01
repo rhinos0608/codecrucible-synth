@@ -216,14 +216,20 @@ export class RustExecutionBackend {
           failedRequests: metrics.failed_requests ?? 0,
           averageExecutionTime: metrics.average_execution_time_ms ?? 0,
         };
-        parsedMetrics = result.performance_metrics
-          ? JSON.parse(result.performance_metrics)
-          : undefined;
       } catch (err) {
-        logger.warn('Failed to parse Rust performance metrics', err);
-        parsedMetrics = result.performance_metrics;
+        logger.warn('Failed to parse Rust executor global performance metrics', err);
       }
 
+      if (result.performance_metrics) {
+        try {
+          parsedMetrics = JSON.parse(result.performance_metrics);
+        } catch (err) {
+          logger.warn('Failed to parse Rust execution performance_metrics', err);
+          parsedMetrics = result.performance_metrics;
+        }
+      } else {
+        parsedMetrics = undefined;
+      }
       logger.debug('✅ Rust execution completed', {
         toolId: request.toolId,
         executionTime: result.execution_time_ms,

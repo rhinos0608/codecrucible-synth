@@ -494,96 +494,40 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
    * Detect if a prompt is requesting coding operations
    */
   private detectCodingOperation(prompt: string): boolean {
-    const codingKeywords = [
-      'write code',
-      'implement',
-      'create function',
-      'build class',
-      'refactor',
-      'debug',
-      'fix error',
-      'optimize code',
-      'add feature',
-      'create component',
-      'write test',
-      'generate code',
-      'code review',
-      'programming',
-      'algorithm',
-      'data structure',
-      'API',
-      'function',
-      'class',
-      'method',
-      'variable',
-      'loop',
-      'condition',
-      'typescript',
-      'javascript',
-      'python',
-      'java',
-      'react',
-      'node.js',
-      'express',
-      'database',
-      'sql',
-      'html',
-      'css',
-      'framework',
-      'library',
-      'package',
-      'module',
-      'import',
-      'export',
-      'async',
-      'await',
-      'promise',
-      'callback',
-    ];
-
-    const lowerPrompt = prompt.toLowerCase();
-    return codingKeywords.some(keyword => lowerPrompt.includes(keyword));
+    // DISABLED: Let the AI model decide how to respond based on the actual request
+    // Rule-based detection creates more problems than it solves
+    return false;
   }
 
   /**
    * 2025 Best Practice: Lightweight prompt building for performance
    */
   private buildLightweightPrompt(voiceId: string, isCoding: boolean): string {
+    // Keep it minimal - just voice identity + tool descriptions
     const voiceIdentities: Record<string, string> = {
-      explorer:
-        'You are Explorer Voice, focused on innovative discovery and creative problem-solving.',
-      maintainer:
-        'You are Maintainer Voice, focused on code stability and long-term sustainability.',
-      developer:
-        'You are Developer Voice, focused on practical development and pragmatic solutions.',
-      architect: 'You are Architect Voice, focused on scalable architecture and system design.',
-      analyzer: 'You are Analyzer Voice, focused on performance analysis and optimization.',
-      implementor: 'You are Implementor Voice, focused on practical execution and delivery.',
-      security: 'You are Security Voice, focused on secure coding and vulnerability prevention.',
-      designer: 'You are Designer Voice, focused on user experience and interface design.',
-      optimizer: 'You are Optimizer Voice, focused on performance optimization and efficiency.',
-      guardian: 'You are Guardian Voice, focused on quality gates and system reliability.',
+      explorer: 'You are an AI assistant focused on exploration and creative solutions.',
+      maintainer: 'You are an AI assistant focused on code maintenance and stability.',
+      developer: 'You are an AI assistant focused on practical development.',
+      architect: 'You are an AI assistant focused on system architecture.',
+      analyzer: 'You are an AI assistant focused on analysis and optimization.',
+      implementor: 'You are an AI assistant focused on implementation.',
+      security: 'You are an AI assistant focused on security.',
+      designer: 'You are an AI assistant focused on design.',
+      optimizer: 'You are an AI assistant focused on optimization.',
+      guardian: 'You are an AI assistant focused on quality assurance.',
     };
 
-    const basePrompt = voiceIdentities[voiceId] || voiceIdentities.developer;
+    const basePrompt = voiceIdentities[voiceId] || 'You are an AI assistant.';
+    
+    // Always include tool descriptions so the AI knows what's available
+    return `${basePrompt}
 
-    if (isCoding) {
-      return `${basePrompt}
-
-## Coding Guidelines
-- Follow Living Spiral: Collapse → Council → Synthesis → Rebirth → Reflection
-- Apply TDD and security-first principles
-- Write clean, maintainable code
-- Provide concise, practical solutions
-- Consider performance and scalability
-- Document key decisions
-
-## Tool Usage - CRITICAL: Always Use Available Tools
-You have access to comprehensive MCP (Model Context Protocol) tools. ALWAYS USE THESE TOOLS when the user requests file operations, git operations, terminal commands, or analysis tasks.
+## Available Tools
+You have access to MCP (Model Context Protocol) tools. Use them when appropriate:
 
 ### Filesystem Operations:
 - filesystem_read_file - Read file contents
-- filesystem_write_file - Write/create files  
+- filesystem_write_file - Write/create files
 - filesystem_list_directory - List directory contents
 - filesystem_file_stats - Get file metadata
 - filesystem_find_files - Search for files
@@ -594,73 +538,13 @@ You have access to comprehensive MCP (Model Context Protocol) tools. ALWAYS USE 
 - git_add, git_commit - Stage and commit
 - git_push, git_pull - Remote operations
 - git_branch, git_checkout - Branch management
-- git_merge, git_rebase - Integration
-- git_tag, git_stash - Advanced operations
 
 ### Terminal Operations:
 - execute_command - Run shell commands
 - change_directory - Navigate filesystem
 - get_current_directory - Check location
 
-### Package Management:
-- install_package - Install npm packages
-- run_script - Execute npm scripts
-
-### External MCP Tools (available if connected):
-- Terminal Controller tools (write_file, read_file, insert_file_content, etc.)
-- Remote Shell execution
-- Custom MCP servers (auto-discovered via Smithery registry)
-
-IMPORTANT: When user asks to "read a file", "create a file", "list files", "check git status", etc., USE THE APPROPRIATE TOOL instead of giving generic explanations. Execute the actual operation.`;
-    }
-
-    return `${basePrompt}
-
-## Tool Usage - CRITICAL: Always Use Available Tools
-You have access to comprehensive MCP (Model Context Protocol) tools. ALWAYS USE THESE TOOLS when the user requests file operations, git operations, terminal commands, or analysis tasks.
-
-### Filesystem Operations:
-- filesystem_read_file - Read file contents (use EXACT filename like "README.md", NEVER "/path/to/README.md")
-- filesystem_write_file - Write/create files (use EXACT filename)
-- filesystem_list_directory - List directory contents
-- filesystem_file_stats - Get file metadata
-- filesystem_find_files - Search for files
-
-🚨 CRITICAL FILE PATH RULES:
-- When user asks "read README.md" → use "README.md" exactly (NO leading slash!)
-- When user asks "read package.json" → use "package.json" exactly  
-- NEVER use paths starting with "/" like "/README.md" ❌
-- NEVER use placeholder paths like "/path/to/file.md" ❌
-- NEVER use absolute paths like "/Users/name/project/README.md" ❌
-- ALWAYS use relative paths: "README.md" ✅, "src/index.ts" ✅
-- The working directory is already correct - just use the filename directly!
-
-### Git Operations:
-- git_status - Repository status
-- git_diff, git_log - View changes/history
-- git_add, git_commit - Stage and commit
-- git_push, git_pull - Remote operations
-- git_branch, git_checkout - Branch management
-- git_merge, git_rebase - Integration
-- git_tag, git_stash - Advanced operations
-
-### Terminal Operations:
-- execute_command - Run shell commands
-- change_directory - Navigate filesystem
-- get_current_directory - Check location
-
-### Package Management:
-- install_package - Install npm packages
-- run_script - Execute npm scripts
-
-### External MCP Tools (available if connected):
-- Terminal Controller tools (write_file, read_file, insert_file_content, etc.)
-- Remote Shell execution
-- Custom MCP servers (auto-discovered via Smithery registry)
-
-IMPORTANT: When user asks to "read a file", "create a file", "list files", "check git status", etc., USE THE APPROPRIATE TOOL instead of giving generic explanations. Execute the actual operation.
-
-Provide helpful, concise responses with practical value.`;
+When users ask questions, provide direct answers. When they request operations, use the appropriate tools.`;
   }
 
   getDefaultVoices(): string[] {

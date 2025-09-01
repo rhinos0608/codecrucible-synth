@@ -246,7 +246,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
    * Get MCP tools and convert them to ModelTool format for AI model
    * CRITICAL FIX: Expose ALL available MCP tools, not just 4 hardcoded ones
    */
-  private async getMCPToolsForModel(): Promise<ModelTool[]> {
+  private async getMCPToolsForModel(userQuery?: string): Promise<ModelTool[]> {
     if (!this.mcpManager) {
       return [];
     }
@@ -466,6 +466,41 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         },
       ];
 
+      // Smart tool selection based on user query to reduce memory pressure
+      if (userQuery) {
+        const query = userQuery.toLowerCase();
+        const selectedTools: ModelTool[] = [];
+        
+        // Start with minimal filesystem tools for basic queries
+        if (query.includes('list') || query.includes('show') || query.includes('directory') || query.includes('files')) {
+          // Only include list_directory and read_file for basic queries
+          selectedTools.push(mcpTools[0]); // filesystem_list_directory
+          selectedTools.push(mcpTools[1]); // filesystem_read_file
+        } else {
+          // Include all filesystem tools for more complex operations
+          selectedTools.push(...mcpTools.slice(0, 4));
+        }
+        
+        // Add domain-specific tools based on query intent (be more specific)
+        if (query.includes('git ') || query.includes('git status') || query.includes('commit') || query.includes('branch') || query.includes('git diff') || query.startsWith('git')) {
+          // Add git tools (indices 4-5)
+          selectedTools.push(...mcpTools.slice(4, 6));
+        }
+        
+        if (query.includes('run') || query.includes('execute') || query.includes('command') || query.includes('terminal') || query.includes('npm') || query.includes('build') || query.includes('install')) {
+          // Add terminal and package tools (indices 6-9)
+          selectedTools.push(...mcpTools.slice(6, 10));
+        }
+        
+        if (query.includes('smithery') || query.includes('registry') || query.includes('mcp')) {
+          // Add smithery tools (indices 10-11)
+          selectedTools.push(...mcpTools.slice(10, 12));
+        }
+        
+        logger.info(`🎯 Smart tool selection: ${selectedTools.length} tools for query intent (reduced from ${mcpTools.length})`);
+        return selectedTools;
+      }
+
       logger.info(`🔧 Providing ${mcpTools.length} MCP tools to AI model (EXPANDED from 4 to complete set)`);
       return mcpTools;
     } catch (error) {
@@ -478,8 +513,8 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     const { payload } = request;
 
     if (this.modelClient) {
-      // Get MCP tools for AI model
-      const mcpTools = await this.getMCPToolsForModel();
+      // Get MCP tools for AI model with smart selection
+      const mcpTools = await this.getMCPToolsForModel(payload.input || payload.prompt);
 
       const modelRequest: ModelRequest = {
         id: request.id,
@@ -636,8 +671,8 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       `🔍 Making AI analysis request with prompt: "${analysisPrompt.substring(0, 100)}..."`
     );
 
-    // Get MCP tools for AI model
-    const mcpTools = await this.getMCPToolsForModel();
+    // Get MCP tools for AI model with smart selection
+    const mcpTools = await this.getMCPToolsForModel(analysisPrompt);
 
     const modelRequest: ModelRequest = {
       id: request.id,

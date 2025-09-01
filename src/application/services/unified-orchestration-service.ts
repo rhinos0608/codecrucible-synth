@@ -22,6 +22,7 @@ import { AgentOperationHandler } from '../cqrs/handlers/agent-operation-handler.
 import { PluginDispatchHandler } from '../cqrs/handlers/plugin-dispatch-handler.js';
 import { discoverPlugins } from '../../infrastructure/plugins/plugin-loader.js';
 import { CommandRegistry } from './command-registry.js';
+import { RuntimeContext } from '../../core/runtime/runtime-context.js';
 
 export interface OrchestrationRequest {
   id: string;
@@ -63,12 +64,11 @@ export interface OrchestrationResponse {
  * and routes them to appropriate domain services.
  */
 export class UnifiedOrchestrationService extends EventEmitter {
-  private static instance: UnifiedOrchestrationService | null = null;
-
   private config: UnifiedConfiguration;
   private eventBus: IEventBus;
   private userInteraction: IUserInteraction;
   private logger = createLogger('UnifiedOrchestrationService');
+  private runtimeContext?: RuntimeContext;
 
   // Domain services
   private configManager: UnifiedConfigurationManager;
@@ -86,44 +86,45 @@ export class UnifiedOrchestrationService extends EventEmitter {
   constructor(
     configManager: UnifiedConfigurationManager,
     eventBus: IEventBus,
-    userInteraction: IUserInteraction
+    userInteraction: IUserInteraction,
+    runtimeContext?: RuntimeContext
   ) {
     super();
 
     this.configManager = configManager;
     this.eventBus = eventBus;
     this.userInteraction = userInteraction;
-    this.logger.info('UnifiedOrchestrationService initialized');
+    this.runtimeContext = runtimeContext;
+    this.logger.info('UnifiedOrchestrationService initialized with dependency injection');
 
     this.setupEventHandlers();
   }
 
   /**
    * Get singleton instance
+   * @deprecated Use createUnifiedOrchestrationServiceWithContext instead
    */
   static async getInstance(options?: {
     configManager?: UnifiedConfigurationManager;
     eventBus?: IEventBus;
     userInteraction?: IUserInteraction;
   }): Promise<UnifiedOrchestrationService> {
-    if (!this.instance) {
-      // Create dependencies if not provided
-      const configManager =
-        options?.configManager || (await UnifiedConfigurationManager.getInstance());
+    // Create dependencies if not provided
+    const configManager =
+      options?.configManager || (await UnifiedConfigurationManager.getInstance());
 
-      // Import dependencies to avoid circular imports
-      const { EventBus } = await import('../../infrastructure/messaging/event-bus.js');
-      const { CLIUserInteraction } = await import(
-        '../../infrastructure/user-interaction/cli-user-interaction.js'
-      );
+    // Import dependencies to avoid circular imports
+    const { EventBus } = await import('../../infrastructure/messaging/event-bus.js');
+    const { CLIUserInteraction } = await import(
+      '../../infrastructure/user-interaction/cli-user-interaction.js'
+    );
 
-      const eventBus = options?.eventBus || new EventBus();
-      const userInteraction = options?.userInteraction || new CLIUserInteraction();
+    const eventBus = options?.eventBus || new EventBus();
+    const userInteraction = options?.userInteraction || new CLIUserInteraction();
 
-      this.instance = new UnifiedOrchestrationService(configManager, eventBus, userInteraction);
-      await this.instance.initialize();
-    }
-    return this.instance;
+    const service = new UnifiedOrchestrationService(configManager, eventBus, userInteraction);
+    await service.initialize();
+    return service;
   }
 
   async initialize(): Promise<void> {
@@ -777,4 +778,18 @@ export function createUnifiedOrchestrationService(
   userInteraction: IUserInteraction
 ): UnifiedOrchestrationService {
   return new UnifiedOrchestrationService(configManager, eventBus, userInteraction);
+}
+
+// New factory function that uses RuntimeContext for dependency injection
+export function createUnifiedOrchestrationServiceWithContext(
+  runtimeContext: RuntimeContext,
+  configManager: UnifiedConfigurationManager,
+  userInteraction: IUserInteraction
+): UnifiedOrchestrationService {
+  return new UnifiedOrchestrationService(
+    configManager,
+    runtimeContext.getEventBus(),
+    userInteraction,
+    runtimeContext
+  );
 }

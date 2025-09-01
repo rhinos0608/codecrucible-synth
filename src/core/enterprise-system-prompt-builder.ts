@@ -75,9 +75,9 @@ export class EnterpriseSystemPromptBuilder {
       voiceSpecific: options.voiceId ? this.getVoiceSpecificSection(options.voiceId) : undefined,
       codeReferences: this.getCodeReferencesSection(),
       performance: this.getPerformanceSection(),
-      codingGrimoire: context.isCodingOperation
-        ? this.getCodingGrimoireSection(context)
-        : undefined,
+      // DISABLED: Excessive context injection was overwhelming simple queries
+      // Let the AI model decide how to handle requests without forced methodology
+      codingGrimoire: undefined,
     };
   }
 

@@ -129,6 +129,7 @@ export class UnifiedConfigurationManager
 
   /**
    * Get singleton instance
+   * @deprecated Use createUnifiedConfigurationManager for dependency injection
    */
   static async getInstance(options?: {
     logger?: ILogger;
@@ -1936,4 +1937,15 @@ export async function getUnifiedConfigurationManager(): Promise<UnifiedConfigura
     await _unifiedConfigManager.initialize();
   }
   return _unifiedConfigManager;
+}
+
+// New factory function for dependency injection (non-singleton)
+export async function createUnifiedConfigurationManager(
+  logger: ILogger,
+  configFilePath?: string,
+  eventBus?: IEventBus
+): Promise<UnifiedConfigurationManager> {
+  const configManager = new UnifiedConfigurationManager(logger, configFilePath, eventBus);
+  await configManager.initialize();
+  return configManager;
 }

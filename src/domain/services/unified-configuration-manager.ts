@@ -10,6 +10,7 @@
  */
 
 import { readFile, writeFile, mkdir, access } from 'fs/promises';
+import { watch, existsSync, type FSWatcher } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import YAML from 'yaml';
@@ -113,6 +114,7 @@ export class UnifiedConfigurationManager
   private sourcePriorities = new Map<ConfigurationSource, number>();
   private configSources = new Map<string, ConfigurationSourceInfo>();
   private isWatching = false;
+  private watchers: FSWatcher[] = [];
 
   constructor(
     private logger: ILogger,
@@ -484,11 +486,51 @@ export class UnifiedConfigurationManager
 
   watchForChanges(enabled: boolean): void {
     if (enabled && !this.isWatching) {
-      // TODO: Implement file watching
+      const watchPaths = [this.configFilePath, join(process.cwd(), 'config')];
+
+      for (const watchPath of watchPaths) {
+        try {
+          if (!existsSync(watchPath)) continue;
+          const watcher = watch(
+            watchPath,
+            { recursive: true },
+            async (eventType, filename) => {
+              this.logger.debug(
+                `Configuration change detected: ${filename || watchPath} (${eventType})`
+              );
+              try {
+                const newConfig = await this.loadConfiguration();
+                this.currentConfig = newConfig;
+                const source = this.createConfigurationSource('file', 'file-watch');
+                this.emit('configurationChanged', {
+                  config: this.currentConfig,
+                  updates: {},
+                  source,
+                });
+                if (this.eventBus) {
+                  this.eventBus.emit('system:configuration-changed', {
+                    config: this.currentConfig,
+                    source,
+                  });
+                }
+              } catch (error) {
+                this.logger.error('Failed to reload configuration:', error);
+              }
+            }
+          );
+          this.watchers.push(watcher);
+        } catch (error) {
+          this.logger.warn(`Unable to watch configuration path ${watchPath}:`, error);
+        }
+      }
+
       this.isWatching = true;
       this.logger.info('Configuration file watching enabled');
     } else if (!enabled && this.isWatching) {
-      // TODO: Stop file watching
+      for (const watcher of this.watchers) {
+        watcher.close();
+      }
+      this.watchers = [];
       this.isWatching = false;
       this.logger.info('Configuration file watching disabled');
     }

@@ -380,6 +380,10 @@ export class LazyProjectIntelligenceSystem extends EventEmitter {
   }
 
   async dispose(): Promise<void> {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
     await this.shutdown();
   }
 }

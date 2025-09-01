@@ -42,8 +42,8 @@ export class RequestTimeoutOptimizer {
     streamingTimeout: 60000, // 60 seconds for streaming
     batchTimeout: 20000, // 20 seconds for batch requests
   };
-
   private cleanupIntervalId: string | null = null;
+  private monitoringInterval: NodeJS.Timeout | null = null;
 
   private constructor() {
     this.startTimeoutMonitoring();
@@ -286,18 +286,17 @@ export class RequestTimeoutOptimizer {
    * Start monitoring for hung requests
    */
   private startTimeoutMonitoring(): void {
-    const monitoringInterval = setInterval(() => {
-      // TODO: Store interval ID and call clearInterval in cleanup
+    this.monitoringInterval = setInterval(() => {
       this.monitorHungRequests();
     }, 10000); // Check every 10 seconds
 
     // Don't let monitoring interval keep process alive
-    if (monitoringInterval.unref) {
-      monitoringInterval.unref();
+    if (this.monitoringInterval.unref) {
+      this.monitoringInterval.unref();
     }
 
     this.cleanupIntervalId = resourceManager.registerInterval(
-      monitoringInterval,
+      this.monitoringInterval,
       'RequestTimeoutOptimizer',
       'timeout monitoring'
     );
@@ -426,6 +425,10 @@ export class RequestTimeoutOptimizer {
    * Shutdown and cleanup
    */
   shutdown(): void {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = null;
+    }
     if (this.cleanupIntervalId) {
       resourceManager.cleanup(this.cleanupIntervalId);
       this.cleanupIntervalId = null;

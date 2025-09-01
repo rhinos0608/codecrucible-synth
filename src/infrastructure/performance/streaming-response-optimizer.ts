@@ -56,7 +56,10 @@ export class StreamingResponseOptimizer extends EventEmitter {
   private readonly V8_MEMORY_OPTIMIZATION = true; // Enable V8 memory tuning
 
   // Performance tracking
+  private cleanupInterval: NodeJS.Timeout | null = null;
   private cleanupIntervalId: string | null = null;
+  private processorInterval: NodeJS.Timeout | null = null;
+  private processorIntervalId: string | null = null;
 
   private constructor() {
     super();
@@ -64,13 +67,12 @@ export class StreamingResponseOptimizer extends EventEmitter {
       this.startStreamProcessor();
 
       // Setup cleanup interval
-      const cleanupInterval = setInterval(() => {
-        // TODO: Store interval ID and call clearInterval in cleanup
+      this.cleanupInterval = setInterval(() => {
         this.cleanupExpiredStreams();
       }, 30000); // 30 seconds
 
       this.cleanupIntervalId = resourceManager.registerInterval(
-        cleanupInterval,
+        this.cleanupInterval,
         'StreamingResponseOptimizer',
         'stream cleanup'
       );
@@ -477,18 +479,17 @@ export class StreamingResponseOptimizer extends EventEmitter {
    * Start background stream processor
    */
   private startStreamProcessor(): void {
-    const processorInterval = setInterval(() => {
-      // TODO: Store interval ID and call clearInterval in cleanup
+    this.processorInterval = setInterval(() => {
       this.processStreams();
     }, this.FLUSH_INTERVAL);
 
     // Don't let processor interval keep process alive
-    if (processorInterval.unref) {
-      processorInterval.unref();
+    if (this.processorInterval.unref) {
+      this.processorInterval.unref();
     }
 
-    resourceManager.registerInterval(
-      processorInterval,
+    this.processorIntervalId = resourceManager.registerInterval(
+      this.processorInterval,
       'StreamingResponseOptimizer',
       'stream processing'
     );
@@ -756,8 +757,21 @@ export class StreamingResponseOptimizer extends EventEmitter {
     }
 
     // Cleanup intervals
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
     if (this.cleanupIntervalId) {
       resourceManager.cleanup(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+    }
+    if (this.processorInterval) {
+      clearInterval(this.processorInterval);
+      this.processorInterval = null;
+    }
+    if (this.processorIntervalId) {
+      resourceManager.cleanup(this.processorIntervalId);
+      this.processorIntervalId = null;
     }
 
     const stats = this.getStreamingStats();

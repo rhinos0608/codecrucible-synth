@@ -34,6 +34,7 @@ export class ModelPreloader {
   private warmupQueue: string[] = [];
   private isWarming = false;
   private preloadIntervalId: string | null = null;
+  private monitoringInterval: NodeJS.Timeout | null = null;
 
   // Configuration
   private readonly WARM_POOL_SIZE = 3; // Keep top 3 models warm
@@ -282,21 +283,20 @@ export class ModelPreloader {
    * Start periodic monitoring and warmup processing
    */
   private startPreloadMonitoring(): void {
-    const monitoringInterval = setInterval(() => {
-      // TODO: Store interval ID and call clearInterval in cleanup
+    this.monitoringInterval = setInterval(() => {
       this.processWarmupQueue();
       this.cooldownIdleModels();
       this.saveModelMetrics();
     }, this.WARMUP_INTERVAL);
 
     // Don't let monitoring interval keep process alive
-    if (monitoringInterval.unref) {
-      monitoringInterval.unref();
+    if (this.monitoringInterval.unref) {
+      this.monitoringInterval.unref();
     }
 
     // Register with resource cleanup manager
     this.preloadIntervalId = resourceManager.registerInterval(
-      monitoringInterval,
+      this.monitoringInterval,
       'ModelPreloader',
       'model warmup monitoring'
     );
@@ -406,6 +406,10 @@ export class ModelPreloader {
    * Shutdown and cleanup
    */
   shutdown(): void {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = null;
+    }
     if (this.preloadIntervalId) {
       resourceManager.cleanup(this.preloadIntervalId);
       this.preloadIntervalId = null;

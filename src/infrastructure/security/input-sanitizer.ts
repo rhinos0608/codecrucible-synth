@@ -19,47 +19,33 @@ export class InputSanitizer {
   private static policyLoader = SecurityPolicyLoader.getInstance();
   private static allowedCommands: Set<string> | null = null;
   private static dangerousPatterns: RegExp[] | null = null;
-
+  private static policyInitialization: Promise<void> | null = null;
   /**
    * Initialize security policies (async initialization)
    */
   private static async initializePolicies(): Promise<void> {
-    if (!InputSanitizer.allowedCommands || !InputSanitizer.dangerousPatterns) {
-      try {
-        InputSanitizer.allowedCommands = await InputSanitizer.policyLoader.getAllowedCommands();
-        InputSanitizer.dangerousPatterns = await InputSanitizer.policyLoader.getDangerousPatterns();
-        logger.debug('🔒 Security policies initialized for InputSanitizer');
-      } catch (error) {
-        logger.error(`❌ Failed to initialize security policies: ${error}`);
-        // Fallback to basic security patterns
-        InputSanitizer.allowedCommands = new Set(['/help', '/status', '/config']);
-        InputSanitizer.dangerousPatterns = [/[;&|`$(){}[\]\\]/g, /\.\./g];
-      }
+    if (InputSanitizer.allowedCommands && InputSanitizer.dangerousPatterns) {
+      return;
     }
-  }
 
-  // DEPRECATED: Legacy hardcoded patterns - replaced by security-policy-loader
-  // TODO: Remove after migration is complete
-  private static readonly LEGACY_DANGEROUS_PATTERNS = [
-    /[;&|`$(){}[\]\\]/g, // Shell metacharacters
-    /\.\./g, // Directory traversal
-    /(rm|del|format|shutdown|reboot|halt)/i, // Dangerous commands
-    /(exec\(|eval\(|system\(|spawn\(|require\(['"]child_process)/i, // Code execution functions with parentheses
-    /(<script|javascript:|data:)/i, // Script injection
-    /(union|select|insert|update|delete|drop)/i, // SQL injection
-    /(malicious|attack|exploit|hack|virus|trojan)/i, // Malicious keywords
-    // 2024 AI-specific threat patterns
-    /ignore\s+(previous|all|above)\s+(instructions?|prompts?|commands?)/i, // Prompt injection
-    /forget\s+(everything|all|previous)\s+(instructions?|prompts?)/i, // Memory manipulation
-    /new\s+(instructions?|system\s+prompt|role):\s*/i, // Role hijacking
-    /system\s*:\s*you\s+(are\s+now|must\s+now)/i, // System override
-    /\\[system\\]/i, // System token injection
-    /override\s+security/i, // Security bypass attempts
-    // Secret leak patterns from 2024 research
-    /api_?key\s*[=:]\s*['"][a-zA-Z0-9_-]{20,}['"]?/i, // API key patterns
-    /password\s*[=:]\s*['"][^'"]{8,}['"]?/i, // Password patterns
-    /token\s*[=:]\s*['"][a-zA-Z0-9._-]{20,}['"]?/i, // Token patterns
-  ];
+    if (!InputSanitizer.policyInitialization) {
+      InputSanitizer.policyInitialization = (async () => {
+        try {
+          InputSanitizer.allowedCommands = await InputSanitizer.policyLoader.getAllowedCommands();
+          InputSanitizer.dangerousPatterns =
+            await InputSanitizer.policyLoader.getDangerousPatterns();
+          logger.debug('🔒 Security policies initialized for InputSanitizer');
+        } catch (error) {
+          logger.error(`❌ Failed to initialize security policies: ${error}`);
+          // Fallback to basic security patterns
+          InputSanitizer.allowedCommands = new Set(['/help', '/status', '/config']);
+          InputSanitizer.dangerousPatterns = [/[;&|`$(){}[\\]\\]/g, /\\.\\./g];
+        }
+      })();
+    }
+
+    return InputSanitizer.policyInitialization;
+  }
 
   private static readonly SAFE_CHARACTERS = /^[a-zA-Z0-9\s\-_.,!?'"@#%^&*()+=:;/\\]+$/;
 

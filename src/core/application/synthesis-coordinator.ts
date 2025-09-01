@@ -28,6 +28,8 @@ import {
   PERFORMANCE_MONITOR_TOKEN,
 } from '../di/service-tokens.js';
 import { logger } from '../logger.js';
+import * as os from 'os';
+import { getTelemetryProvider } from '../observability/observability-system.js';
 import {
   ModelRequest,
   ModelResponse,
@@ -101,6 +103,7 @@ export class SynthesisCoordinator extends EventEmitter {
   private container: DependencyContainer;
   private initialized = false;
   private startTime: number;
+  private telemetry = getTelemetryProvider();
 
   constructor(container: DependencyContainer) {
     super();
@@ -212,6 +215,35 @@ export class SynthesisCoordinator extends EventEmitter {
     startTime: number
   ): Promise<ApplicationResponse> {
     const processingTime = Date.now() - startTime;
+    const totalTokens = modelResponse.tokens_used || modelResponse.metadata?.tokens || 0;
+    let cacheHitRate = 0;
+    try {
+      const cacheCoordinator = this.container.resolve(CACHE_COORDINATOR_TOKEN);
+      const cacheStats = await cacheCoordinator.getCacheStats();
+      const hit = cacheStats.hitRate ?? 0;
+      // Normalize hit rate: if > 1, assume percentage (0-100); if <= 1, assume fraction (0-1)
+      let hitNum = typeof hit === 'string' ? parseFloat(hit) : hit;
+      if (isNaN(hitNum) || hitNum < 0) hitNum = 0;
+      if (hitNum > 1) {
+        cacheHitRate = hitNum / 100;
+      } else {
+        cacheHitRate = hitNum;
+      }
+      this.telemetry.recordMetric(
+        'cache_hit_rate',
+        cacheHitRate * 100,
+        { component: 'synthesis' },
+        '%'
+      );
+    } catch {
+      cacheHitRate = 0;
+    }
+    const cpuUsage = this.getCpuUsage();
+    const memoryUsage = this.getMemoryUsage();
+    const costEstimate = this.estimateCost(totalTokens);
+    this.telemetry.recordMetric('cpu_usage', cpuUsage, { component: 'synthesis' }, '%');
+    this.telemetry.recordMetric('memory_usage', memoryUsage, { component: 'synthesis' }, 'MB');
+    this.telemetry.recordMetric('cost_estimate', costEstimate, { component: 'synthesis' }, 'usd');
 
     // Enhanced synthesis response
     return {
@@ -240,11 +272,11 @@ export class SynthesisCoordinator extends EventEmitter {
         processingTime,
         voicesConsulted: 1,
         modelsUsed: [modelResponse.model || 'unknown'],
-        totalTokens: modelResponse.tokens_used || modelResponse.metadata?.tokens || 0,
+        totalTokens,
         cachingUsed: modelResponse.cached || false,
         ragUsed: false, // TODO: Implement when RAG is integrated
         workflowUsed: false, // TODO: Implement when workflows are integrated
-        costEstimate: 0, // TODO: Implement cost calculation
+        costEstimate,
       },
       quality: {
         overall: 0.8,
@@ -256,10 +288,10 @@ export class SynthesisCoordinator extends EventEmitter {
       performance: {
         responseTime: processingTime,
         tokenRate: this.calculateTokenRate(modelResponse, processingTime),
-        cacheHitRate: 0.0, // TODO: Get from cache coordinator
+        cacheHitRate,
         resourceUsage: {
-          memory: this.getMemoryUsage(),
-          cpu: 0.0, // TODO: Implement CPU monitoring
+          memory: memoryUsage,
+          cpu: cpuUsage,
         },
       },
     };
@@ -393,6 +425,20 @@ export class SynthesisCoordinator extends EventEmitter {
     } catch (error) {
       return 0;
     }
+  }
+
+  private getCpuUsage(): number {
+    try {
+      const loads = os.loadavg();
+      const cores = os.cpus().length || 1;
+      return (loads[0] / cores) * 100;
+    } catch {
+      return 0;
+    }
+  }
+
+  private estimateCost(tokens: number): number {
+    return tokens * 0.0001;
   }
 
   /**

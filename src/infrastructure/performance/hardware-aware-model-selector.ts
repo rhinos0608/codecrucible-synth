@@ -11,6 +11,7 @@ import {
 } from '../../core/model-management/intelligent-model-detector.js';
 import { EventEmitter } from 'events';
 import * as os from 'os';
+import { resourceManager } from './resource-cleanup-manager.js';
 
 export interface HardwareProfile {
   totalMemoryGB: number;
@@ -50,6 +51,7 @@ export class HardwareAwareModelSelector extends EventEmitter {
   private fallbackModels: ModelInfo[] = [];
   private switchingInProgress = false;
   private monitoringInterval: NodeJS.Timeout | null = null;
+  private monitoringIntervalId: string | null = null;
 
   // Performance thresholds for automatic switching
   private readonly thresholds = {
@@ -506,7 +508,6 @@ export class HardwareAwareModelSelector extends EventEmitter {
    */
   private startPerformanceMonitoring(): void {
     this.monitoringInterval = setInterval(() => {
-      // TODO: Store interval ID and call clearInterval in cleanup
       try {
         this.updateHardwareProfile();
       } catch (error) {
@@ -518,6 +519,12 @@ export class HardwareAwareModelSelector extends EventEmitter {
     if (this.monitoringInterval.unref) {
       this.monitoringInterval.unref();
     }
+
+    this.monitoringIntervalId = resourceManager.registerInterval(
+      this.monitoringInterval,
+      'HardwareAwareModelSelector',
+      'hardware monitoring'
+    );
   }
 
   /**
@@ -612,6 +619,10 @@ export class HardwareAwareModelSelector extends EventEmitter {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
+    }
+    if (this.monitoringIntervalId) {
+      resourceManager.cleanup(this.monitoringIntervalId);
+      this.monitoringIntervalId = null;
     }
     this.removeAllListeners();
   }

@@ -53,7 +53,7 @@ export interface SlidingWindowConfig {
  */
 class MemoryStore implements RateLimitStore {
   private store = new Map<string, { info: RateLimitInfo; expiry: number }>();
-  private cleanupInterval?: NodeJS.Timeout;
+  private cleanupInterval!: NodeJS.Timeout;
 
   constructor() {
     // Clean up expired entries every minute

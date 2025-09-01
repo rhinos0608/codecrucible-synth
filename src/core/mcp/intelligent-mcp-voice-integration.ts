@@ -1168,62 +1168,99 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
   }
 
   private topologicalSort(steps: MCPToolStep[]): MCPToolStep[] {
-    // Simple topological sort implementation
-    const visited = new Set<string>();
-    const sorted: MCPToolStep[] = [];
+    // Enhanced topological sort with cycle + missing dependency detection
+    const byId = new Map<string, MCPToolStep>();
+    steps.forEach(s => byId.set(s.stepId, s));
 
-    const visit = (step: MCPToolStep) => {
-      if (visited.has(step.stepId)) return;
-
-      visited.add(step.stepId);
-
-      // Visit dependencies first
-      for (const depId of step.dependencies) {
-        const depStep = steps.find(s => s.stepId === depId);
-        if (depStep) {
-          visit(depStep);
+    // Detect missing dependencies early (non-fatal: we log & skip)
+    for (const step of steps) {
+      for (const dep of step.dependencies) {
+        if (!byId.has(dep)) {
+          logger.warn(`Orchestration: missing dependency '${dep}' referenced by step '${step.stepId}' - will skip that edge.`);
         }
       }
-
-      sorted.push(step);
-    };
-
-    for (const step of steps) {
-      visit(step);
     }
 
-    return sorted;
+    const temp = new Set<string>(); // gray set for cycle detection
+    const perm = new Set<string>(); // black set visited
+    const sorted: MCPToolStep[] = [];
+    const cyclePaths: string[][] = [];
+    const path: string[] = [];
+
+    const visit = (id: string) => {
+      if (perm.has(id)) return;
+      if (temp.has(id)) {
+        // cycle discovered
+        const cycleStart = path.indexOf(id);
+        cyclePaths.push(path.slice(cycleStart).concat(id));
+        return;
+      }
+      temp.add(id);
+      path.push(id);
+      const step = byId.get(id);
+      if (step) {
+        for (const dep of step.dependencies) {
+          if (byId.has(dep)) visit(dep);
+        }
+        sorted.push(step); // post-order
+      }
+      path.pop();
+      temp.delete(id);
+      perm.add(id);
+    };
+
+    steps.forEach(s => visit(s.stepId));
+
+    if (cyclePaths.length) {
+      const rendered = cyclePaths.map(c => c.join(' -> ')).join('; ');
+      // Emit event or log; do not throw to avoid breaking existing flows, but mark degraded state
+      logger.error(`Cycle(s) detected in MCP tool graph: ${rendered}`);
+      // Fallback: remove duplicates while preserving order of first occurrence
+      const seen = new Set<string>();
+      return sorted.filter(s => !seen.has(s.stepId) && (seen.add(s.stepId), true));
+    }
+
+    // Deduplicate (in case of shared deps) preserving topological order
+    const seen = new Set<string>();
+    return sorted.filter(s => !seen.has(s.stepId) && (seen.add(s.stepId), true));
   }
 
   private groupParallelSteps(steps: MCPToolStep[]): MCPToolStep[][] {
-    // Group steps that can run in parallel (no dependencies between them)
+    // Improved grouping: ensure no transitive dependency conflicts & stable ordering
+    const dependencyMap = new Map<string, Set<string>>();
+    const buildTransitive = (step: MCPToolStep, stack: string[] = []): Set<string> => {
+      if (dependencyMap.has(step.stepId)) return dependencyMap.get(step.stepId)!;
+      const agg = new Set<string>();
+      for (const depId of step.dependencies) {
+        const dep = steps.find(s => s.stepId === depId);
+        if (!dep) continue;
+        agg.add(depId);
+        buildTransitive(dep).forEach(d => agg.add(d));
+      }
+      dependencyMap.set(step.stepId, agg);
+      return agg;
+    };
+    steps.forEach(s => buildTransitive(s));
+
+    const remaining = [...steps];
     const groups: MCPToolStep[][] = [];
-    const processed = new Set<string>();
-
-    for (const step of steps) {
-      if (processed.has(step.stepId)) continue;
-
-      const group = [step];
-      processed.add(step.stepId);
-
-      // Find other steps that can run in parallel
-      for (const otherStep of steps) {
-        if (processed.has(otherStep.stepId)) continue;
-
-        // Check if steps can run in parallel (no dependencies)
-        const hasConflict =
-          step.dependencies.includes(otherStep.stepId) ||
-          otherStep.dependencies.includes(step.stepId);
-
-        if (!hasConflict) {
-          group.push(otherStep);
-          processed.add(otherStep.stepId);
+    while (remaining.length) {
+      const group: MCPToolStep[] = [];
+      for (let i = 0; i < remaining.length; ) {
+        const candidate = remaining[i];
+        const conflicts = group.some(existing =>
+          dependencyMap.get(candidate.stepId)!.has(existing.stepId) ||
+          dependencyMap.get(existing.stepId)!.has(candidate.stepId)
+        );
+        if (!conflicts) {
+          group.push(candidate);
+          remaining.splice(i, 1);
+        } else {
+          i++;
         }
       }
-
       groups.push(group);
     }
-
     return groups;
   }
 

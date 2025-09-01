@@ -21,6 +21,7 @@ import { IModelClient, ModelRequest, ModelTool } from '../../domain/interfaces/m
 import { UnifiedConfigurationManager } from '../../domain/services/unified-configuration-manager.js';
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
+import { RuntimeContext } from '../runtime/runtime-context.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { randomUUID } from 'crypto';
 
@@ -43,6 +44,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
   private securityValidator?: UnifiedSecurityValidator;
   private configManager?: UnifiedConfigurationManager;
   private isInitialized = false;
+  private runtimeContext?: RuntimeContext;
 
   // Request tracking
   private activeRequests: Map<
@@ -72,12 +74,20 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
    */
   async initialize(dependencies: OrchestratorDependencies): Promise<void> {
     try {
+      // Prefer runtimeContext if provided (incremental migration)
+      if (dependencies.runtimeContext) {
+        this.runtimeContext = dependencies.runtimeContext;
+        this.eventBus = dependencies.runtimeContext.eventBus;
+        this.securityValidator = dependencies.runtimeContext.securityValidator ?? dependencies.securityValidator;
+        this.configManager = dependencies.runtimeContext.configManager ?? dependencies.configManager;
+      } else {
+        this.eventBus = dependencies.eventBus;
+        this.securityValidator = dependencies.securityValidator;
+        this.configManager = dependencies.configManager;
+      }
       this.userInteraction = dependencies.userInteraction;
-      this.eventBus = dependencies.eventBus;
       this.modelClient = dependencies.modelClient;
       this.mcpManager = dependencies.mcpManager;
-      this.securityValidator = dependencies.securityValidator;
-      this.configManager = dependencies.configManager;
 
       // DEBUG: Verify critical dependencies
       logger.info('🔧 ConcreteWorkflowOrchestrator dependency injection:');

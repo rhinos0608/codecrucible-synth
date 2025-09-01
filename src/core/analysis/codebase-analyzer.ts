@@ -1,3 +1,54 @@
+import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
+import * as path from 'path';
+
+interface ProjectAnalysis {
+  name: string;
+  version: string;
+  totalFiles: number;
+  fileCounts: Record<string, number>;
+  discoveredComponents: Component[];
+}
+
+interface Component {
+  name: string;
+  description: string;
+  files: number;
+}
+
+interface CodeMetrics {
+  totalLines: number;
+  typescriptFiles: number;
+  typescriptLines: number;
+  javascriptFiles: number;
+  javascriptLines: number;
+  docFiles: number;
+}
+
+interface DependencyAnalysis {
+  prodDeps: number;
+  devDeps: number;
+  keyFrameworks: string[];
+}
+
+interface ConfigAnalysis {
+  configs: ConfigItem[];
+  configFiles: number;
+}
+
+interface ConfigItem {
+  name: string;
+  file: string;
+  status: string;
+}
+
+interface TestAnalysis {
+  testFiles: number;
+  testLines: number;
+  frameworks: string[];
+  estimatedCoverage: number;
+}
+
 /**
  * Shared Codebase Analyzer - Real-time dynamic analysis utility
  */
@@ -6,7 +57,7 @@ export class CodebaseAnalyzer {
   private workingDirectory: string;
 
   constructor(workingDirectory: string) {
-    this.workingDirectory = workingDirectory;
+    this.workingDirectory = path.resolve(workingDirectory);
   }
 
   /**
@@ -51,7 +102,7 @@ ${Object.entries(projectAnalysis.fileCounts)
   .join('\n')}
 
 ## Discovered Components
-${projectAnalysis.discoveredComponents.map((comp: any) => `- **${comp.name}**: ${comp.description} (${comp.files} files)`).join('\n')}
+${projectAnalysis.discoveredComponents.map((comp) => `- **${comp.name}**: ${comp.description} (${comp.files} files)`).join('\n')}
 
 ## Dependencies Analysis
 - **Production Dependencies:** ${dependencyAnalysis.prodDeps}
@@ -59,7 +110,7 @@ ${projectAnalysis.discoveredComponents.map((comp: any) => `- **${comp.name}**: $
 - **Key Frameworks:** ${dependencyAnalysis.keyFrameworks.join(', ')}
 
 ## Configuration Assessment
-${configAnalysis.configs.map((config: any) => `- **${config.name}**: ${config.status}`).join('\n')}
+${configAnalysis.configs.map((config) => `- **${config.name}**: ${config.status}`).join('\n')}
 
 ## Test Coverage Analysis
 - **Test Files Found:** ${testAnalysis.testFiles}
@@ -89,16 +140,13 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze project structure and metadata
    */
-  private async analyzeProjectStructure(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
+  private async analyzeProjectStructure(): Promise<ProjectAnalysis> {
     let projectInfo = { name: 'Unknown', version: 'Unknown' };
     const packageJsonPath = path.join(this.workingDirectory, 'package.json');
 
-    if (fs.existsSync(packageJsonPath)) {
+    if (await this.fileExists(packageJsonPath)) {
       try {
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        const packageJson = JSON.parse(await this.readFile(packageJsonPath));
         projectInfo = { name: packageJson.name, version: packageJson.version };
       } catch (error) {
         // Continue with defaults
@@ -121,10 +169,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze code metrics and lines of code
    */
-  private async analyzeCodeMetrics(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
+  private async analyzeCodeMetrics(): Promise<CodeMetrics> {
     let totalLines = 0;
     let typescriptFiles = 0;
     let typescriptLines = 0;
@@ -134,7 +179,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     const analyzeFile = (filePath: string, ext: string): number => {
       try {
-        const content = fs.readFileSync(filePath, 'utf-8');
+        const content = fsSync.readFileSync(filePath, 'utf-8');
         const lines = content.split('\n').length;
 
         if (ext === '.ts' || ext === '.tsx') {
@@ -157,7 +202,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
       if (depth > 3) return; // Limit recursion depth
 
       try {
-        const items = fs.readdirSync(dir, { withFileTypes: true });
+        const items = fsSync.readdirSync(dir, { withFileTypes: true });
 
         for (const item of items) {
           if (item.name.startsWith('.') || item.name === 'node_modules' || item.name === 'dist')
@@ -192,18 +237,15 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze dependencies from package.json
    */
-  private async analyzeDependencies(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
+  private async analyzeDependencies(): Promise<DependencyAnalysis> {
     const packageJsonPath = path.join(this.workingDirectory, 'package.json');
     let prodDeps = 0;
     let devDeps = 0;
     let keyFrameworks: string[] = [];
 
-    if (fs.existsSync(packageJsonPath)) {
+    if (await this.fileExists(packageJsonPath)) {
       try {
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        const packageJson = JSON.parse(await this.readFile(packageJsonPath));
         prodDeps = Object.keys(packageJson.dependencies || {}).length;
         devDeps = Object.keys(packageJson.devDependencies || {}).length;
 
@@ -235,10 +277,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze configuration files
    */
-  private async analyzeConfiguration(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
+  private async analyzeConfiguration(): Promise<ConfigAnalysis> {
     const configs = [
       { name: 'TypeScript Config', file: 'tsconfig.json', status: '' },
       { name: 'ESLint Config', file: '.eslintrc.cjs', status: '' },
@@ -249,7 +288,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     for (const config of configs) {
       const configPath = path.join(this.workingDirectory, config.file);
-      config.status = fs.existsSync(configPath) ? '✅ Present' : '❌ Missing';
+      config.status = (await this.fileExists(configPath)) ? '✅ Present' : '❌ Missing';
     }
 
     return { configs, configFiles: configs.filter(c => c.status.includes('✅')).length };
@@ -258,10 +297,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze test coverage and test files
    */
-  private async analyzeTestCoverage(): Promise<any> {
-    const fs = await import('fs');
-    const path = await import('path');
-
+  private async analyzeTestCoverage(): Promise<TestAnalysis> {
     let testFiles = 0;
     let testLines = 0;
     const frameworks: string[] = [];
@@ -270,7 +306,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
       if (depth > 2) return;
 
       try {
-        const items = fs.readdirSync(dir, { withFileTypes: true });
+        const items = fsSync.readdirSync(dir, { withFileTypes: true });
 
         for (const item of items) {
           if (item.name.startsWith('.') || item.name === 'node_modules') continue;
@@ -288,7 +324,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
           ) {
             testFiles++;
             try {
-              const content = fs.readFileSync(fullPath, 'utf-8');
+              const content = fsSync.readFileSync(fullPath, 'utf-8');
               testLines += content.split('\n').length;
 
               // Detect test frameworks
@@ -320,17 +356,14 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Discover project components by analyzing file structure
    */
-  private async discoverProjectComponents(): Promise<any[]> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    const components: any[] = [];
+  private async discoverProjectComponents(): Promise<Component[]> {
+    const components: Component[] = [];
 
     const checkComponent = (name: string, dirPath: string, description: string) => {
       const fullPath = path.join(this.workingDirectory, dirPath);
-      if (fs.existsSync(fullPath)) {
+      if (fsSync.existsSync(fullPath)) {
         try {
-          const files = fs.readdirSync(fullPath).length;
+          const files = fsSync.readdirSync(fullPath).length;
           components.push({ name, description, files });
         } catch (error) {
           // Continue
@@ -360,9 +393,6 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    * Discover architecture components by analyzing imports and exports
    */
   private async discoverArchitectureComponents(): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
-
     const architectureComponents: string[] = [];
 
     // Check for key architecture files
@@ -403,7 +433,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     for (const { file, component } of keyFiles) {
       const fullPath = path.join(this.workingDirectory, file);
-      if (fs.existsSync(fullPath)) {
+      if (fsSync.existsSync(fullPath)) {
         architectureComponents.push(component);
       }
     }
@@ -418,13 +448,11 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     const issues: string[] = [];
 
     // Check for TypeScript strict mode
-    const fs = await import('fs');
-    const path = await import('path');
     const tsconfigPath = path.join(this.workingDirectory, 'tsconfig.json');
 
-    if (fs.existsSync(tsconfigPath)) {
+    if (await this.fileExists(tsconfigPath)) {
       try {
-        const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
+        const tsconfig = JSON.parse(await this.readFile(tsconfigPath));
         if (tsconfig.compilerOptions?.strict !== true) {
           issues.push('🟡 **Warning**: TypeScript strict mode disabled - may hide type errors');
         }
@@ -435,7 +463,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     // Check for test coverage
     const testDir = path.join(this.workingDirectory, 'tests');
-    if (!fs.existsSync(testDir)) {
+    if (!fsSync.existsSync(testDir)) {
       issues.push(
         '🟡 **Warning**: Limited test coverage - tests directory structure needs expansion'
       );
@@ -464,15 +492,15 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     // Check for missing environment variables
     const envExamplePath = path.join(this.workingDirectory, '.env.example');
     const envPath = path.join(this.workingDirectory, '.env');
-    if (fs.existsSync(envExamplePath) && !fs.existsSync(envPath)) {
+    if (fsSync.existsSync(envExamplePath) && !fsSync.existsSync(envPath)) {
       issues.push('🟠 **Configuration**: No .env file found - some features may be limited');
     }
 
     // Check package.json for outdated patterns
     const packagePath = path.join(this.workingDirectory, 'package.json');
-    if (fs.existsSync(packagePath)) {
+    if (fsSync.existsSync(packagePath)) {
       try {
-        const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
+        const packageJson = JSON.parse(await this.readFile(packagePath));
 
         // Check for missing scripts
         const scripts = packageJson.scripts || {};
@@ -522,15 +550,12 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    * Assess security configuration
    */
   private async assessSecurity(): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
-
     const securityFeatures: string[] = [];
 
     // Check for security components
     const securityDir = path.join(this.workingDirectory, 'src/core/security');
-    if (fs.existsSync(securityDir)) {
-      const securityFiles = fs.readdirSync(securityDir);
+    if (fsSync.existsSync(securityDir)) {
+      const securityFiles = fsSync.readdirSync(securityDir);
       securityFeatures.push(
         `✅ **Security Framework**: ${securityFiles.length} security modules implemented`
       );
@@ -553,26 +578,23 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    * Analyze performance characteristics
    */
   private async analyzePerformance(): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
-
     const performanceFeatures: string[] = [];
 
     // Check for performance components
     const perfDir = path.join(this.workingDirectory, 'src/core/performance');
-    if (fs.existsSync(perfDir)) {
-      const perfFiles = fs.readdirSync(perfDir);
+    if (fsSync.existsSync(perfDir)) {
+      const perfFiles = fsSync.readdirSync(perfDir);
       performanceFeatures.push(
         `✅ **Performance Suite**: ${perfFiles.length} optimization modules`
       );
 
-      if (perfFiles.some(f => f.includes('cache'))) {
+      if (perfFiles.some((f: string) => f.includes('cache'))) {
         performanceFeatures.push('✅ **Caching System**: Multi-layer caching implementation');
       }
-      if (perfFiles.some(f => f.includes('batch'))) {
+      if (perfFiles.some((f: string) => f.includes('batch'))) {
         performanceFeatures.push('✅ **Batch Processing**: Intelligent request batching');
       }
-      if (perfFiles.some(f => f.includes('monitor'))) {
+      if (perfFiles.some((f: string) => f.includes('monitor'))) {
         performanceFeatures.push('✅ **Performance Monitoring**: Real-time performance tracking');
       }
     }
@@ -584,9 +606,9 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    * Generate recommendations based on analysis
    */
   private async generateRecommendations(
-    codeMetrics: any,
-    testAnalysis: any,
-    dependencyAnalysis: any
+    codeMetrics: CodeMetrics,
+    testAnalysis: TestAnalysis,
+    dependencyAnalysis: DependencyAnalysis
   ): Promise<string> {
     const recommendations: string[] = [];
     let priority = 1;
@@ -600,13 +622,11 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     // Only recommend enabling TypeScript strict mode if it's actually disabled
     if (codeMetrics.typescriptFiles > 0) {
-      const fs = await import('fs');
-      const path = await import('path');
       const tsconfigPath = path.join(this.workingDirectory, 'tsconfig.json');
 
-      if (fs.existsSync(tsconfigPath)) {
+      if (fsSync.existsSync(tsconfigPath)) {
         try {
-          const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
+          const tsconfig = JSON.parse(await this.readFile(tsconfigPath));
           if (tsconfig.compilerOptions?.strict !== true) {
             recommendations.push(
               `${priority++}. **Medium Priority**: Enable TypeScript strict mode for better type safety`
@@ -654,35 +674,51 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
    * Count files by extension for analysis
    */
   private async countFilesByType(): Promise<Record<string, number>> {
-    const path = await import('path');
-    const fs = await import('fs');
-
     const counts: Record<string, number> = {};
 
-    const countInDirectory = (dir: string, maxDepth: number = 2): void => {
-      if (maxDepth <= 0) return;
+  const countInDirectory = async (dir: string, maxDepth: number = 2): Promise<void> => {
+    if (maxDepth <= 0) return;
 
-      try {
-        const items = fs.readdirSync(dir, { withFileTypes: true });
+    try {
+      const items = await fs.readdir(dir, { withFileTypes: true });
 
-        for (const item of items) {
-          if (item.name.startsWith('.') || item.name === 'node_modules') continue;
+      for (const item of items) {
+        if (item.name.startsWith('.') || item.name === 'node_modules') continue;
 
-          const fullPath = path.join(dir, item.name);
+        const fullPath = path.join(dir, item.name);
 
-          if (item.isDirectory()) {
-            countInDirectory(fullPath, maxDepth - 1);
-          } else if (item.isFile()) {
-            const ext = path.extname(item.name) || 'no-extension';
-            counts[ext] = (counts[ext] || 0) + 1;
-          }
+        if (item.isDirectory()) {
+          await countInDirectory(fullPath, maxDepth - 1);
+        } else if (item.isFile()) {
+          const ext = path.extname(item.name) || 'no-extension';
+          counts[ext] = (counts[ext] || 0) + 1;
         }
-      } catch (error) {
-        // Ignore permission errors
       }
-    };
+    } catch (error) {
+      // Ignore permission errors
+    }
+  };
 
-    countInDirectory(this.workingDirectory);
-    return counts;
+  await countInDirectory(this.workingDirectory);
+  return counts;
+  }
+
+  /**
+   * Helper method to check if a file exists
+   */
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Helper method to read a file with UTF-8 encoding
+   */
+  private async readFile(filePath: string): Promise<string> {
+    return fs.readFile(filePath, 'utf-8');
   }
 }

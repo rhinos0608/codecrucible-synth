@@ -11,9 +11,10 @@ import { config } from 'dotenv';
 config();
 
 import { UnifiedCLI, CLIOptions } from './application/interfaces/unified-cli.js';
+import { createRuntimeContext } from './application/runtime/runtime-context.js';
 import { ConcreteWorkflowOrchestrator } from './application/services/concrete-workflow-orchestrator.js';
 import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
-import { getGlobalEventBus } from './domain/interfaces/event-bus.js';
+// getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
 import { program } from 'commander';
@@ -118,7 +119,7 @@ export async function initialize(): Promise<UnifiedCLI> {
     });
 
     // Create concrete workflow orchestrator (breaks circular dependencies)
-    const orchestrator = new ConcreteWorkflowOrchestrator();
+  const orchestrator = new ConcreteWorkflowOrchestrator();
 
     // Initialize proper UnifiedModelClient with dynamic model selection
     const { UnifiedModelClient } = await import('./application/services/unified-model-client.js');
@@ -178,14 +179,19 @@ export async function initialize(): Promise<UnifiedCLI> {
       logger.info(`🤖 Using model: ${selectedModelInfo.selectedModel.name}`);
     }
 
-    await orchestrator.initialize({
-      userInteraction,
+    // Build runtime context (initial version)
+    const runtimeContext = createRuntimeContext({
       eventBus,
-      modelClient,
-      mcpManager: mcpServerManager, // MCP servers now activated!
-      // These will be added as they become available:
       // securityValidator: unifiedSecurityValidator,
       // configManager: unifiedConfigManager,
+    });
+
+    await orchestrator.initialize({
+      userInteraction,
+      eventBus, // kept for backward compatibility
+      modelClient,
+      mcpManager: mcpServerManager,
+      runtimeContext,
     });
 
     // Create unified CLI with all capabilities
@@ -260,27 +266,30 @@ export async function main(): Promise<void> {
     const cli = await initialize();
 
     // Setup graceful shutdown
+    let cleanedUp = false;
     const cleanup = async () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       console.log('\n🔄 Shutting down gracefully...');
       await cli.shutdown();
-      process.exit(0);
+      // Avoid forced exit to let stdout flush naturally
     };
 
-    process.on('SIGINT', cleanup);
-    process.on('SIGTERM', cleanup);
-    process.on('exit', cleanup);
+    process.on('SIGINT', () => { cleanup().finally(() => {}); });
+    process.on('SIGTERM', () => { cleanup().finally(() => {}); });
+    // Note: do not attach to 'exit' to avoid recursive exits
 
     // Run CLI with arguments
     await cli.run(args);
 
-    // Explicitly exit after command completion (non-interactive mode)
+    // After command completion (non-interactive), shutdown and let process exit naturally
     if (!args.includes('interactive') && !args.includes('-i') && !args.includes('--interactive')) {
-      await cli.shutdown();
-      process.exit(0);
+      await cleanup();
+      return;
     }
   } catch (error) {
     console.error('❌ Fatal error:', getErrorMessage(error));
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 

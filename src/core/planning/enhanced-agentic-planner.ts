@@ -3,6 +3,9 @@
  * Provides intelligent task planning and decomposition
  */
 
+import { EventEmitter } from 'events';
+import { logger } from '../../infrastructure/logging/unified-logger.js';
+
 export interface Task {
   id: string;
   description: string;
@@ -47,12 +50,13 @@ export interface ExecutionPlan {
   };
 }
 
-export class EnhancedAgenticPlanner {
+export class EnhancedAgenticPlanner extends EventEmitter {
   private taskQueue: Map<string, Task> = new Map();
   private completedTasks: Set<string> = new Set();
   private failedTasks: Map<string, string> = new Map(); // taskId -> failure reason
 
   constructor() {
+    super();
     // Initialize planner
   }
 
@@ -164,22 +168,61 @@ export class EnhancedAgenticPlanner {
   }
 
   private calculateExecutionOrder(tasks: Task[], dependencies: Map<string, string[]>): string[] {
-    // Simple topological sort
-    const visited = new Set<string>();
+    // Enhanced topological sort with cycle detection
+    const temp = new Set<string>(); // Gray set (visiting)
+    const perm = new Set<string>(); // Black set (completed)
     const order: string[] = [];
+    const cyclePaths: string[][] = [];
+    const path: string[] = [];
 
     const visit = (taskId: string) => {
-      if (visited.has(taskId)) return;
-      visited.add(taskId);
+      if (perm.has(taskId)) return;
+      if (temp.has(taskId)) {
+        // Cycle detected - record the cycle path
+        const cycleStart = path.indexOf(taskId);
+        cyclePaths.push(path.slice(cycleStart).concat(taskId));
+        return;
+      }
+
+      temp.add(taskId);
+      path.push(taskId);
 
       const deps = dependencies.get(taskId) || [];
-      deps.forEach(depId => visit(depId));
+      deps.forEach(depId => {
+        // Only visit dependencies that exist in our task set
+        if (tasks.some(t => t.id === depId)) {
+          visit(depId);
+        }
+      });
 
+      path.pop();
+      temp.delete(taskId);
+      perm.add(taskId);
       order.push(taskId);
     };
 
     tasks.forEach(task => visit(task.id));
-    return order;
+
+    // Handle cycle detection
+    if (cyclePaths.length > 0) {
+      const cycleDescription = cyclePaths.map(c => c.join(' -> ')).join('; ');
+      logger.error(`Dependency cycles detected in execution plan: ${cycleDescription}`);
+      
+      // Emit event for monitoring/alerting
+      this.emit('cycle-detected', {
+        cycles: cyclePaths,
+        taskCount: tasks.length,
+        affectedTasks: [...new Set(cyclePaths.flat())]
+      });
+
+      // Fallback: return tasks in original order, removing duplicates
+      const seen = new Set<string>();
+      return tasks
+        .map(t => t.id)
+        .filter(id => !seen.has(id) && (seen.add(id), true));
+    }
+
+    return order.reverse(); // Reverse for correct topological order
   }
 
   private identifyParallelGroups(tasks: Task[], dependencies: Map<string, string[]>): string[][] {
@@ -218,7 +261,10 @@ export class EnhancedAgenticPlanner {
     const memo = new Map<string, number>();
 
     const getLongestPath = (taskId: string): number => {
-      if (memo.has(taskId)) return memo.get(taskId)!;
+      if (memo.has(taskId)) {
+        const cachedResult = memo.get(taskId);
+        return cachedResult ?? 0;
+      }
 
       const task = taskMap.get(taskId);
       if (!task) return 0;
@@ -256,7 +302,7 @@ export class EnhancedAgenticPlanner {
     return path;
   }
 
-  private estimateTotalTime(tasks: Task[], executionOrder: string[]): number {
+  private estimateTotalTime(tasks: Task[], _executionOrder: string[]): number {
     return tasks.reduce((total, task) => total + (task.estimatedDuration || 0), 0);
   }
 

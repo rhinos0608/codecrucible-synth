@@ -3,12 +3,12 @@
  * Implements dynamic capability discovery and secure tool execution
  */
 
+import { EventEmitter } from 'events';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
 import {
   EnterpriseSecurityFramework,
   SecurityContext,
 } from '../security/enterprise-security-framework.js';
-import { SecurityViolation } from '../../domain/services/unified-security-validator.js';
 import { logger } from '../logger.js';
 
 export interface ToolCoordination {
@@ -31,7 +31,7 @@ export interface ToolExecutionStep {
   name: string;
   toolName: string;
   serverId: string;
-  args: any;
+  args: Record<string, unknown>;
   dependencies: string[];
   qualityGate?: QualityGate;
   timeout: number;
@@ -44,7 +44,7 @@ export interface ExecutionContext {
   workingDirectory: string;
   environment: string;
   permissions: string[];
-  constraints: any[];
+  constraints: unknown[];
   securityContext: SecurityContext;
 }
 
@@ -52,7 +52,7 @@ export interface ToolCapability {
   serverId: string;
   name: string;
   description: string;
-  schema: any;
+  schema: Record<string, unknown>;
   reliability: number;
   securityLevel: 'safe' | 'restricted' | 'dangerous';
   dependencies: string[];
@@ -109,7 +109,7 @@ export interface ToolResult {
   stepId: string;
   toolName: string;
   success: boolean;
-  output: any;
+  output: unknown;
   duration: number;
   qualityScore?: number;
   securityValidation: SecurityValidation;
@@ -130,14 +130,15 @@ export interface SecurityValidation {
   mitigations: string[];
 }
 
-export class EnterpriseMCPOrchestrator {
+export class EnterpriseMCPOrchestrator extends EventEmitter {
   private mcpManager: MCPServerManager;
   private securityFramework: EnterpriseSecurityFramework;
-  private capabilityCache: Map<string, ToolCapability[]> = new Map();
+  private capabilityCache: Map<string, { capabilities: ToolCapability[]; timestamp: number }> = new Map();
   private performanceMetrics: Map<string, PerformanceMetric[]> = new Map();
   private cacheExpirationMs = 300000; // 5 minutes
 
   constructor(mcpManager: MCPServerManager) {
+    super();
     this.mcpManager = mcpManager;
     this.securityFramework = new EnterpriseSecurityFramework();
   }
@@ -168,10 +169,10 @@ export class EnterpriseMCPOrchestrator {
 
     // Check cache first
     if (this.capabilityCache.has(cacheKey)) {
-      const cached = this.capabilityCache.get(cacheKey)!;
-      if (Date.now() - (cached as any).timestamp < this.cacheExpirationMs) {
+      const cached = this.capabilityCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.cacheExpirationMs) {
         logger.debug('Using cached capabilities');
-        return cached;
+        return cached.capabilities;
       }
     }
 
@@ -185,7 +186,12 @@ export class EnterpriseMCPOrchestrator {
         const resources = server.capabilities?.resources || [];
         const prompts = server.capabilities?.prompts || [];
 
-        const serverCapabilities = tools.map((tool: any) => ({
+        interface MCPTool {
+          name: string;
+          description: string;
+          inputSchema: Record<string, unknown>;
+        }
+        const serverCapabilities = tools.map((tool: MCPTool) => ({
           serverId: server.id,
           name: tool.name,
           description: tool.description,
@@ -211,8 +217,7 @@ export class EnterpriseMCPOrchestrator {
     }
 
     // Cache the results
-    (allCapabilities as any).timestamp = Date.now();
-    this.capabilityCache.set(cacheKey, allCapabilities);
+    this.capabilityCache.set(cacheKey, { capabilities: allCapabilities, timestamp: Date.now() });
 
     logger.info('Capability discovery complete', { totalTools: allCapabilities.length });
     return allCapabilities;
@@ -277,16 +282,17 @@ export class EnterpriseMCPOrchestrator {
               throw new Error(`Quality gate failed for step: ${step.name}`);
             }
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Implement recovery strategy
-          const recovery = await this.attemptRecovery(step, error, currentContext);
+          const err = error instanceof Error ? error : new Error(String(error));
+          const recovery = await this.attemptRecovery(step, err, currentContext);
           if (!recovery.success) {
             errors.push({
               stepId: step.id,
               type: 'execution_failure',
-              message: error.message,
-              recoverable: this.isRecoverableError(error),
-              suggestedActions: this.getSuggestedActions(error),
+              message: err.message,
+              recoverable: this.isRecoverableError(err),
+              suggestedActions: this.getSuggestedActions(err),
             });
 
             if (step.qualityGate?.blocking) {
@@ -357,8 +363,8 @@ export class EnterpriseMCPOrchestrator {
           logger.warn('Tool failed security validation', {
             toolName: capability.name,
             serverId: capability.serverId,
-            violations: validation.violations.map((v: any) =>
-              typeof v === 'string' ? v : v.type || v
+            violations: validation.violations.map((v: string | { type?: string }) =>
+              typeof v === 'string' ? v : v.type || String(v)
             ),
           });
         }
@@ -427,10 +433,27 @@ export class EnterpriseMCPOrchestrator {
   }
 
   private groupStepsByDependencies(steps: ToolExecutionStep[]): ToolExecutionStep[][] {
+    // First, check for cycles using DFS
+    const cycleDetectionResult = this.detectCyclesInSteps(steps);
+    if (cycleDetectionResult.hasCycles) {
+      logger.error('Dependency cycles detected in MCP tool execution plan:', {
+        cycles: cycleDetectionResult.cycles,
+        affectedSteps: [...new Set(cycleDetectionResult.cycles.flat())]
+      });
+      
+      // Emit warning event for monitoring
+      this.emit('dependency-cycle-detected', {
+        cycles: cycleDetectionResult.cycles,
+        stepCount: steps.length
+      });
+    }
+
     const groups: ToolExecutionStep[][] = [];
     const processed = new Set<string>();
+    let iterationCount = 0;
+    const maxIterations = steps.length + 1; // Safety valve
 
-    while (processed.size < steps.length) {
+    while (processed.size < steps.length && iterationCount < maxIterations) {
       const currentGroup: ToolExecutionStep[] = [];
 
       for (const step of steps) {
@@ -448,12 +471,59 @@ export class EnterpriseMCPOrchestrator {
       if (currentGroup.length > 0) {
         groups.push(currentGroup);
       } else {
-        // Break infinite loop if no progress
+        // No progress made - likely due to cycles or missing dependencies
+        logger.warn('No progress in dependency resolution. Remaining steps may have circular dependencies.', {
+          remainingSteps: steps.filter(s => !processed.has(s.id)).map(s => s.id),
+          processedCount: processed.size,
+          totalSteps: steps.length
+        });
         break;
       }
+      iterationCount++;
     }
 
     return groups;
+  }
+
+  private detectCyclesInSteps(steps: ToolExecutionStep[]): { hasCycles: boolean; cycles: string[][] } {
+    const stepMap = new Map(steps.map(s => [s.id, s]));
+    const temp = new Set<string>(); // Gray (visiting)
+    const perm = new Set<string>(); // Black (completed)
+    const cycles: string[][] = [];
+    const path: string[] = [];
+
+    const visit = (stepId: string) => {
+      if (perm.has(stepId)) return;
+      if (temp.has(stepId)) {
+        // Cycle detected
+        const cycleStart = path.indexOf(stepId);
+        cycles.push(path.slice(cycleStart).concat(stepId));
+        return;
+      }
+
+      temp.add(stepId);
+      path.push(stepId);
+
+      const step = stepMap.get(stepId);
+      if (step) {
+        for (const depId of step.dependencies) {
+          if (stepMap.has(depId)) {
+            visit(depId);
+          }
+        }
+      }
+
+      path.pop();
+      temp.delete(stepId);
+      perm.add(stepId);
+    };
+
+    steps.forEach(step => visit(step.id));
+
+    return {
+      hasCycles: cycles.length > 0,
+      cycles
+    };
   }
 
   private async executeStep(
@@ -485,12 +555,19 @@ export class EnterpriseMCPOrchestrator {
       };
 
       return { result, context };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
       const result: ToolResult = {
         stepId: step.id,
         toolName: step.toolName,
         success: false,
-        output: { error: error.message },
+        output: { error: errorMessage },
         duration: Date.now() - startTime,
         securityValidation: {
           validated: false,
@@ -659,12 +736,12 @@ export class EnterpriseMCPOrchestrator {
 
   // Placeholder methods that would be implemented based on specific requirements
   private async validateStepExecution(
-    step: ToolExecutionStep,
-    context: ExecutionContext
+    _step: ToolExecutionStep,
+    _context: ExecutionContext
   ): Promise<void> {}
   private async executeWithRetries(
-    step: ToolExecutionStep,
-    context: ExecutionContext
+    _step: ToolExecutionStep,
+    _context: ExecutionContext
   ): Promise<ToolResult> {
     return {} as ToolResult;
   }

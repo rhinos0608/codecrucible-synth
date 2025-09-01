@@ -101,6 +101,11 @@ export interface OrchestratorDependencies {
   mcpManager?: any; // Interface to be defined later
   securityValidator?: any; // Interface to be defined later
   configManager?: any; // Interface to be defined later
+  /**
+   * Optional aggregated runtime context replacing scattered singletons.
+   * When supplied, fields inside take precedence for orchestration internals.
+   */
+  runtimeContext?: import('../../application/runtime/runtime-context.js').RuntimeContext;
 }
 
 /**

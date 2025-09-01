@@ -388,7 +388,35 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
 
     try {
       if (args.length === 0) {
-        // No arguments - start interactive mode
+        // No arguments provided. If stdin is not a TTY (piped input),
+        // read from stdin once and process as a single prompt.
+        if (process.stdin && !process.stdin.isTTY) {
+          const input: string = await new Promise(resolve => {
+            let data = '';
+            try {
+              process.stdin.setEncoding('utf8');
+            } catch {}
+            process.stdin.on('data', chunk => {
+              data += chunk;
+            });
+            process.stdin.on('end', () => resolve(data));
+            process.stdin.on('error', () => resolve(data));
+          });
+
+          const prompt = input.trim();
+          if (prompt.length === 0) {
+            // Nothing was piped; fall back to interactive.
+            await this.startInteractive();
+            return;
+          }
+
+          // For piped, default to safe behavior but ensure output is shown.
+          const response = await this.processPrompt(prompt, { dryRun: true });
+          await this.userInteraction.display(response);
+          return;
+        }
+
+        // No args and stdin is a TTY -> interactive mode
         await this.startInteractive();
         return;
       }

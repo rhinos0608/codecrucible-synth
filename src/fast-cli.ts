@@ -205,7 +205,8 @@ export async function fastMain() {
     return main();
   } catch (error) {
     console.error('❌ Error:', error);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 }
 
@@ -216,6 +217,6 @@ if (
 ) {
   fastMain().catch(error => {
     console.error('Fatal error:', error);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

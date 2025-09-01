@@ -1,6 +1,6 @@
 /**
  * Rust Provider Client - Phase 4 Implementation
- * 
+ *
  * Provides a client interface for interacting with Rust-backed services,
  * integrating with the existing provider system architecture.
  */
@@ -115,10 +115,10 @@ export class RustProviderClient implements ProviderClient {
       }
 
       const rustModule = this.bridgeManager.getRustModule();
-      
+
       // Execute the request through the Rust module
       const result = await this.executeRequest(rustModule, request);
-      
+
       // Update statistics
       const responseTime = Date.now() - startTime;
       this.updateStats(true, responseTime);
@@ -128,7 +128,7 @@ export class RustProviderClient implements ProviderClient {
       const responseTime = Date.now() - startTime;
       this.updateStats(false, responseTime);
       this.stats.lastError = error instanceof Error ? error : new Error(String(error));
-      
+
       logger.error('Rust provider execution failed:', error);
       throw error;
     }
@@ -177,35 +177,30 @@ export class RustProviderClient implements ProviderClient {
   }
 
   private async executeFileOperation(rustModule: any, request: any): Promise<any> {
-    // Placeholder for file operation execution
-    return {
-      type: 'file-operation-result',
-      success: true,
-      result: `File operation ${request.operation} completed`,
-    };
+    if (typeof rustModule.executeFilesystem !== 'function') {
+      throw new Error('File operation not supported by Rust module');
+    }
+
+    const { operation, path, content, options } = request;
+    return await rustModule.executeFilesystem(operation, path, content, options);
   }
 
   private async executeCodeAnalysis(rustModule: any, request: any): Promise<any> {
-    // Placeholder for code analysis execution
-    return {
-      type: 'code-analysis-result',
-      success: true,
-      result: {
-        linesOfCode: 100,
-        complexity: 'medium',
-        issues: [],
-      },
-    };
+    if (typeof rustModule.execute !== 'function') {
+      throw new Error('Code analysis not supported by Rust module');
+    }
+
+    const args = JSON.stringify(request);
+    return await rustModule.execute('code-analysis', args, request.options);
   }
 
   private async executeComputeTask(rustModule: any, request: any): Promise<any> {
-    // Placeholder for compute task execution
-    return {
-      type: 'compute-task-result',
-      success: true,
-      result: `Compute task ${request.taskId} completed`,
-      executionTime: 150,
-    };
+    if (typeof rustModule.execute !== 'function') {
+      throw new Error('Compute task not supported by Rust module');
+    }
+
+    const args = JSON.stringify(request);
+    return await rustModule.execute('compute-task', args, request.options ?? undefined);
   }
 
   private async executeGenericRequest(rustModule: any, request: any): Promise<any> {
@@ -214,7 +209,7 @@ export class RustProviderClient implements ProviderClient {
       const result = await rustModule.execute(JSON.stringify(request));
       return JSON.parse(result);
     }
-    
+
     throw new Error('Generic request execution not supported');
   }
 
@@ -227,7 +222,7 @@ export class RustProviderClient implements ProviderClient {
 
     // Update average response time using exponential moving average
     const alpha = 0.1;
-    this.stats.averageResponseTime = 
+    this.stats.averageResponseTime =
       alpha * responseTime + (1 - alpha) * this.stats.averageResponseTime;
   }
 }

@@ -9,6 +9,22 @@
 
 import { EventEmitter } from 'events';
 
+export interface IPerformanceMetrics {
+  activeMeasurements: number;
+}
+
+export interface IProviderMetric {
+  averageLatency: number;
+  successRate: number;
+}
+
+export type ProviderMetrics = Record<string, IProviderMetric>;
+
+export interface IPerformanceSummary {
+  activeMeasurements: number;
+  measurementCount: number;
+}
+
 export class PerformanceMonitor extends EventEmitter {
   private measurements = new Map<string, number>();
 
@@ -31,13 +47,13 @@ export class PerformanceMonitor extends EventEmitter {
     return duration;
   }
 
-  getMetrics(): any {
+  getMetrics(): IPerformanceMetrics {
     return {
       activeMeasurements: this.measurements.size,
     };
   }
 
-  getProviderMetrics(): Record<string, { averageLatency: number; successRate: number }> {
+  getProviderMetrics(): ProviderMetrics {
     // Create mock provider metrics for compatibility
     return {
       ollama: { averageLatency: 150, successRate: 0.95 },
@@ -46,7 +62,7 @@ export class PerformanceMonitor extends EventEmitter {
     };
   }
 
-  getSummary(): any {
+  getSummary(): IPerformanceSummary {
     return {
       activeMeasurements: this.measurements.size,
       measurementCount: this.measurements.size,

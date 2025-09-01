@@ -10,7 +10,7 @@
     
     // Strict Type Checking - 2025 Enterprise Standards (gradual enablement)
     "strict": false,
-    "noImplicitAny": true,  // PHASE 2: Enable implicit any detection
+    "noImplicitAny": true,
     "strictNullChecks": false,
     "strictFunctionTypes": false,
     "strictBindCallApply": false,

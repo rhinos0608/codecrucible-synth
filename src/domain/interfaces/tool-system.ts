@@ -39,6 +39,7 @@ export interface ToolExecutionContext {
   sessionId: string;
   userId?: string;
   workingDirectory: string;
+  rootDirectory?: string;
   securityLevel: 'low' | 'medium' | 'high';
   permissions: ToolPermission[];
   environment: Record<string, string>;

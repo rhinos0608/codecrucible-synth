@@ -164,7 +164,7 @@ export class MCPServerManager {
       return;
     }
 
-    console.log(chalk.blue('🔧 Starting MCP servers with resilient error handling...'));
+    logger.info(chalk.blue('🔧 Starting MCP servers with resilient error handling...'));
     const startTime = Date.now();
 
     // Create resilient promises for each server with retry logic
@@ -234,10 +234,10 @@ export class MCPServerManager {
     const runningServers = Array.from(this.servers.values()).filter(s => s.status === 'running');
     const failedServers = Array.from(this.servers.values()).filter(s => s.status === 'error');
 
-    console.log(chalk.green(`✅ MCP initialization complete in ${totalTime}ms`));
-    console.log(chalk.green(`   • ${runningServers.length} servers running`));
+    logger.info(chalk.green(`✅ MCP initialization complete in ${totalTime}ms`));
+    logger.info(chalk.green(`   • ${runningServers.length} servers running`));
     if (failedServers.length > 0) {
-      console.log(chalk.yellow(`   • ${failedServers.length} servers in degraded mode`));
+      logger.warn(chalk.yellow(`   • ${failedServers.length} servers in degraded mode`));
     }
 
     // Log status for monitoring
@@ -290,7 +290,7 @@ export class MCPServerManager {
 
     try {
       server.status = 'starting';
-      console.log(chalk.gray(`  Starting ${serverName} server...`));
+      logger.info(chalk.gray(`  Starting ${serverName} server...`));
 
       // For now, we'll implement built-in MCP functionality
       // rather than spawning external processes
@@ -335,7 +335,7 @@ export class MCPServerManager {
    * Stop all MCP servers
    */
   async stopServers(): Promise<void> {
-    console.log(chalk.yellow('🛑 Stopping MCP servers...'));
+    logger.info(chalk.yellow('🛑 Stopping MCP servers...'));
 
     const stopPromises = Array.from(this.servers.values())
       .filter(server => server.status === 'running')
@@ -344,7 +344,7 @@ export class MCPServerManager {
     await Promise.allSettled(stopPromises);
     this.isInitialized = false;
 
-    console.log(chalk.green('✅ All MCP servers stopped'));
+    logger.info(chalk.green('✅ All MCP servers stopped'));
   }
 
   /**

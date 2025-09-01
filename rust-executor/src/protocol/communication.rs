@@ -512,32 +512,29 @@ impl CommunicationHandler {
     async fn check_rate_limit(&self, session_id: &str) -> bool {
         let now = std::time::Instant::now();
 
-        // Ensure session exists
-        {
-            let mut sessions = self.active_sessions.write().await;
-            if !sessions.contains_key(session_id) {
-                // get security context from registry if exists
-                let registry = self.registry.read().await;
-                let context = registry
-                    .security_contexts
-                    .get(session_id)
-                    .cloned()
-                    .unwrap_or_else(SecurityContext::default);
-                sessions.insert(
-                    session_id.to_string(),
-                    SessionState {
-                        session_id: session_id.to_string(),
-                        created_at: now,
-                        last_activity: now,
-                        message_count: 0,
-                        security_context: context,
-                        message_timestamps: VecDeque::new(),
-                    },
-                );
-            }
-        }
-
+        // Combine session creation and rate limit check in a single lock
         let mut sessions = self.active_sessions.write().await;
+        // If session does not exist, create it
+        if !sessions.contains_key(session_id) {
+            // get security context from registry if exists
+            let registry = self.registry.read().await;
+            let context = registry
+                .security_contexts
+                .get(session_id)
+                .cloned()
+                .unwrap_or_else(SecurityContext::default);
+            sessions.insert(
+                session_id.to_string(),
+                SessionState {
+                    session_id: session_id.to_string(),
+                    created_at: now,
+                    last_activity: now,
+                    message_count: 0,
+                    security_context: context,
+                    message_timestamps: VecDeque::new(),
+                },
+            );
+        }
         if let Some(session) = sessions.get_mut(session_id) {
             session.last_activity = now;
 

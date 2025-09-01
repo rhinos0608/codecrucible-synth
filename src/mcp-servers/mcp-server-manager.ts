@@ -74,7 +74,7 @@ export interface ServerCapabilities {
 export interface ToolInfo {
   name: string;
   description: string;
-  inputSchema: any;
+  inputSchema: Record<string, unknown>;
 }
 
 export interface ResourceInfo {
@@ -87,7 +87,7 @@ export interface ResourceInfo {
 export interface PromptInfo {
   name: string;
   description?: string;
-  arguments?: any[];
+  arguments?: unknown[];
 }
 
 export interface PerformanceMetrics {
@@ -96,6 +96,47 @@ export interface PerformanceMetrics {
   lastHealthCheck: Date;
   availability: number;
 }
+
+export interface CommandExecutionArgs {
+  command: string;
+  args: string[];
+}
+
+export interface SmitheryServerInfo {
+  name: string;
+  displayName: string;
+  toolCount: number;
+}
+
+export interface SmitheryToolInfo {
+  name: string;
+  description: string;
+}
+
+export interface SmitheryStatus {
+  enabled: boolean;
+  health?: unknown;
+  servers?: number;
+  tools?: number;
+  serversList?: SmitheryServerInfo[];
+  toolsList?: SmitheryToolInfo[];
+  error?: string;
+}
+
+export interface ServerHealth {
+  enabled: boolean;
+  status: MCPServer['status'];
+  lastError?: string;
+  performance?: PerformanceMetrics;
+  capabilities: {
+    toolCount: number;
+    resourceCount: number;
+    promptCount: number;
+    lastDiscovered: Date;
+  } | null;
+}
+
+export type HealthCheckResult = Record<string, ServerHealth>;
 
 /**
  * MCP Server Manager
@@ -595,10 +636,10 @@ export class MCPServerManager {
     this.validateCommandSecurity(sanitizedCommand, sanitizedArgs);
 
     // Check approval for command execution
-    const approvalRequest = await this.createCommandApprovalRequest(
-      sanitizedCommand,
-      sanitizedArgs
-    );
+    const approvalRequest = await this.createCommandApprovalRequest({
+      command: sanitizedCommand,
+      args: sanitizedArgs,
+    });
     const approvalResponse = await getApprovalManager().requestApproval(approvalRequest);
 
     if (!approvalResponse.approved) {
@@ -665,7 +706,7 @@ export class MCPServerManager {
   /**
    * Create approval request for command execution
    */
-  private async createCommandApprovalRequest(command: string, args: string[]) {
+  private async createCommandApprovalRequest({ command, args }: CommandExecutionArgs) {
     // Determine risk level based on command type
     let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'medium';
 
@@ -959,7 +1000,7 @@ export class MCPServerManager {
   /**
    * Get Smithery registry health and available tools
    */
-  async getSmitheryStatus(): Promise<any> {
+  async getSmitheryStatus(): Promise<SmitheryStatus> {
     if (!this.smitheryServer) {
       return {
         enabled: false,
@@ -1277,8 +1318,8 @@ export class MCPServerManager {
   /**
    * Health check for all servers with performance metrics
    */
-  async healthCheck(): Promise<{ [key: string]: any }> {
-    const health: { [key: string]: any } = {};
+  async healthCheck(): Promise<HealthCheckResult> {
+    const health: HealthCheckResult = {};
 
     for (const [name, server] of this.servers) {
       const startTime = Date.now();

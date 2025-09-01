@@ -107,19 +107,102 @@ npm install && npm run build
 npm link  # Makes 'crucible' command available globally
 ```
 
-### MCP Integration Setup
+### Environment Configuration
 
-CodeCrucible integrates with Smithery AI registry for external MCP servers:
+CodeCrucible uses a comprehensive typed configuration system with automatic validation. Create your environment configuration:
 
 ```bash
-# Copy environment template
+# Copy the environment template
 cp .env.example .env
 
-# Add your Smithery API key to .env
+# Edit the file with your preferred editor
+nano .env  # or code .env, vim .env, etc.
+```
+
+#### Key Configuration Categories
+
+**API Keys & External Services:**
+```bash
+# Smithery registry for external MCP servers
 SMITHERY_API_KEY=your_smithery_api_key_here
 
-# Verify MCP integration
+# E2B for secure code execution
+E2B_API_KEY=your_e2b_api_key_here
+
+# MCP server integrations
+MCP_TERMINAL_API_KEY=your_terminal_controller_api_key_here
+MCP_TASK_MANAGER_API_KEY=your_task_manager_api_key_here
+```
+
+**AI Provider Configuration:**
+```bash
+# Local AI endpoints (customize if different from defaults)
+OLLAMA_ENDPOINT=http://localhost:11434
+LM_STUDIO_ENDPOINT=http://localhost:1234
+
+# Model behavior
+MODEL_MAX_TOKENS=3000      # Range: 1-32768
+MODEL_TEMPERATURE=0.7      # Range: 0.0-2.0
+```
+
+**Performance & Timeouts:**
+```bash
+# Request timeouts (in milliseconds)
+REQUEST_TIMEOUT=30000           # 30 seconds
+OLLAMA_TIMEOUT=110000          # 110 seconds
+TOOL_EXECUTION_TIMEOUT=30000   # 30 seconds
+
+# Performance limits
+MAX_CONCURRENT_REQUESTS=10     # Range: 1-100
+RESPONSE_CACHE_SIZE=100        # Cache size
+MEMORY_WARNING_THRESHOLD=512   # MB
+```
+
+**Security & Environment:**
+```bash
+# Environment and security
+NODE_ENV=development           # development|test|production
+LOG_LEVEL=info                # trace|debug|info|warn|error
+STRICT_MODE=true              # Recommended: true
+VALIDATE_INPUTS=true          # Recommended: true
+```
+
+#### Configuration Validation
+
+The configuration system provides automatic validation with clear error messages:
+
+- **Type Safety**: All values are validated and coerced to correct types
+- **Range Validation**: Numeric values are checked against valid ranges
+- **URL Validation**: Endpoints are validated as proper URLs
+- **Environment-Specific Rules**: Production requires stricter security settings
+- **Port Conflict Detection**: Prevents server port conflicts
+
+```bash
+# Test your configuration
 crucible status
+```
+
+#### Minimal vs Full Setup
+
+**Minimal Setup** (basic functionality):
+```bash
+cp .env.example .env
+# No additional configuration needed
+```
+
+**Recommended Setup** (full features):
+```bash
+cp .env.example .env
+# Add Smithery API key for external MCP servers
+# Configure AI endpoints if using non-default ports
+```
+
+**Production Setup**:
+```bash
+cp .env.example .env
+# Set NODE_ENV=production
+# Configure all security settings
+# Add required API keys
 ```
 
 ### AI Model Setup (Optional)

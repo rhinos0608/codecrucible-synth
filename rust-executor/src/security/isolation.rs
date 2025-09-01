@@ -2,7 +2,7 @@ use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::time::timeout;
-use super::capabilities::{SecurityContext, ResourceLimits, SecurityError};
+use super::capabilities::{SecurityContext, SecurityError};
 use thiserror::Error;
 
 #[cfg(unix)]
@@ -14,12 +14,7 @@ use nix::sys::wait::{waitpid, WaitStatus};
 #[cfg(unix)]
 use nix::sys::signal::{kill, Signal};
 
-#[cfg(windows)]
-use winapi::um::processthreadsapi::{CreateProcessW, PROCESS_INFORMATION, STARTUPINFOW};
-#[cfg(windows)]
-use winapi::um::jobapi2::{CreateJobObjectW, AssignProcessToJobObject};
-#[cfg(windows)]
-use winapi::um::handleapi::CloseHandle;
+// Windows isolation support would go here
 
 #[derive(Error, Debug)]
 pub enum IsolationError {
@@ -122,7 +117,7 @@ impl ProcessIsolation {
         // This is a simplified version - full Windows sandboxing would require
         // Windows Job Objects, restricted tokens, and AppContainer
         
-        let start_time = Instant::now();
+        let _start_time = Instant::now();
         let timeout_duration = self.security_context.execution_timeout;
         
         // Apply resource limits via Windows mechanisms

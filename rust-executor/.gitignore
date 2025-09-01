@@ -1,0 +1,6 @@
+# Rust build artifacts
+target/
+*.node
+
+# Keep the main binary
+!codecrucible-rust-executor.win32-x64-msvc.node

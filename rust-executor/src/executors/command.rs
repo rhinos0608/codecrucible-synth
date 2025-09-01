@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 use thiserror::Error;
@@ -350,7 +350,7 @@ impl CommandExecutor {
         );
 
         let output = timeout(timeout_duration, async {
-            let mut child = cmd.spawn()?;
+            let child = cmd.spawn()?;
             child.wait_with_output().await
         })
         .await;

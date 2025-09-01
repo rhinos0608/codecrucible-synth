@@ -1,19 +1,17 @@
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, Write};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::{timeout, Duration};
 use serde_json;
 use tracing::{error, info, warn, debug};
-use async_trait::async_trait;
-use sysinfo::{System, SystemExt, ProcessExt, PidExt};
+use sysinfo::{System};
 
 use crate::protocol::messages::{
     ExecutionMessage, MessageType, MessagePayload, ExecutionRequest, ExecutionResponse,
-    StreamUpdate, ErrorPayload, ErrorInfo, ErrorCategory, HeartbeatPayload, HealthCheckPayload,
-    HealthStatus, CheckResult
+    ErrorInfo, ErrorCategory, HealthStatus, CheckResult
 };
-use crate::executors::filesystem::{FileSystemExecutor, FileSystemError};
+use crate::executors::filesystem::{FileSystemExecutor};
 
 use crate::security::{SecurityContext, SecurityError, Capability};
 use crate::executors::command::CommandExecutor as CommandExecutorImpl;
@@ -404,7 +402,7 @@ impl CommunicationHandler {
     }
 
     /// Handle heartbeat message
-    async fn handle_heartbeat(&self, message: &ExecutionMessage) -> Result<ExecutionMessage, CommunicationError> {
+    async fn handle_heartbeat(&self, _message: &ExecutionMessage) -> Result<ExecutionMessage, CommunicationError> {
         // Create heartbeat response with current process stats
         let process_id = std::process::id();
         let uptime = std::time::SystemTime::now()

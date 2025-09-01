@@ -1,14 +1,10 @@
-use napi::{
-    threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode},
-    Error, JsFunction, Result as NapiResult,
-};
 use napi_derive::napi;
 use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info};
 use uuid::Uuid;
 
 // Module declarations - keeping full complexity
@@ -17,14 +13,10 @@ pub mod protocol;
 pub mod security;
 pub mod utils;
 
-use crate::executors::command::CommandExecutor;
-use crate::executors::filesystem::FileSystemExecutor;
-use crate::protocol::communication::{CommunicationHandler, ExecutorRegistry};
+use crate::protocol::communication::CommunicationHandler;
 use crate::protocol::messages::{
-    ExecutionContext, ExecutionMessage, ExecutionRequest, MessagePayload, MessageType,
-    ResourceLimitConfig, SecurityLevel as ProtocolSecurityLevel,
+    ExecutionContext, ExecutionRequest, ResourceLimitConfig, SecurityLevel as ProtocolSecurityLevel,
 };
-use crate::security::{Capability, SecurityContext};
 
 /// Main Rust Executor class exposed to Node.js via NAPI
 #[napi]
@@ -472,7 +464,7 @@ pub fn benchmark_execution(iterations: u32) -> String {
 
     let start_time = std::time::Instant::now();
     let mut successful = 0u32;
-    let mut failed = 0u32;
+    let failed = 0u32;
 
     for _i in 0..iterations {
         // Simplified benchmark without async operations for now

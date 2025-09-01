@@ -19,6 +19,8 @@ futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
+sysinfo = "0.30"
+
 # Cross-platform process management
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["process", "signal", "user", "fs"] }

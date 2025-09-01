@@ -220,8 +220,15 @@ export class SynthesisCoordinator extends EventEmitter {
     try {
       const cacheCoordinator = this.container.resolve(CACHE_COORDINATOR_TOKEN);
       const cacheStats = await cacheCoordinator.getCacheStats();
-      const hit = cacheStats.hitRate || 0;
-      cacheHitRate = typeof hit === 'string' ? parseFloat(hit) / 100 : hit / 100;
+      const hit = cacheStats.hitRate ?? 0;
+      // Normalize hit rate: if > 1, assume percentage (0-100); if <= 1, assume fraction (0-1)
+      let hitNum = typeof hit === 'string' ? parseFloat(hit) : hit;
+      if (isNaN(hitNum) || hitNum < 0) hitNum = 0;
+      if (hitNum > 1) {
+        cacheHitRate = hitNum / 100;
+      } else {
+        cacheHitRate = hitNum;
+      }
       this.telemetry.recordMetric(
         'cache_hit_rate',
         cacheHitRate * 100,

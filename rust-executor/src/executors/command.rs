@@ -200,7 +200,7 @@ impl CommandExecutor {
             )
             .await
             .map(|res| CommandResult {
-                success: res.exit_code.unwrap_or(1) == 0,
+                success: res.exit_code.map_or(false, |code| code == 0),
                 exit_code: res.exit_code,
                 stdout: if command_request.capture_output {
                     res.stdout

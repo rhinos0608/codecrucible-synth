@@ -525,10 +525,16 @@ export class MCPServerManager {
    * Safe file system operations - SECURITY FIX for path traversal
    */
   async readFileSecure(filePath: string): Promise<string> {
+    // CRITICAL FIX: Normalize paths that start with '/' as relative to project root
+    let normalizedFilePath = filePath;
+    if (filePath.startsWith('/')) {
+      normalizedFilePath = path.join(process.cwd(), filePath.substring(1));
+    }
+    
     // SECURITY FIX: Additional validation using InputSanitizer with AI-friendly preprocessing
-    const pathValidation = InputSanitizer.validateFilePath(filePath);
+    const pathValidation = InputSanitizer.validateFilePath(normalizedFilePath);
 
-    let processedPath = filePath;
+    let processedPath = normalizedFilePath;
     if (!pathValidation.isValid) {
       logger.warn(
         `Path validation failed for "${filePath}": ${pathValidation.violations.join(', ')} - attempting with processed path "${pathValidation.sanitized}"`
@@ -576,12 +582,18 @@ export class MCPServerManager {
   }
 
   async listDirectorySecure(dirPath: string): Promise<string[]> {
-    if (!this.isPathAllowed(dirPath)) {
-      throw new Error(`Access denied: ${dirPath}`);
+    // CRITICAL FIX: Normalize paths that start with '/' as relative to project root
+    let normalizedDirPath = dirPath;
+    if (dirPath.startsWith('/')) {
+      normalizedDirPath = path.join(process.cwd(), dirPath.substring(1));
+    }
+    
+    if (!this.isPathAllowed(normalizedDirPath)) {
+      throw new Error(`Access denied: ${normalizedDirPath}`);
     }
 
     try {
-      return await readdir(dirPath);
+      return await readdir(normalizedDirPath);
     } catch (error) {
       throw new Error(
         `Failed to list directory: ${error instanceof Error ? error.message : 'Unknown error'}`

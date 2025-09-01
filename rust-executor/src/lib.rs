@@ -2,6 +2,7 @@ use napi_derive::napi;
 use napi::{Result as NapiResult, Error, JsFunction, threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode}};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
 use serde_json;
 use tracing::{info, error, warn, debug};
@@ -164,15 +165,57 @@ impl RustExecutor {
             stream_response: false,
         };
 
-        // For now, return a simplified response until we fix async integration
-        let execution_time_ms = start_time.elapsed().as_millis() as u32;
-        
+        // Execute request through communication handler
+        let rt = Runtime::new().expect("Failed to create Tokio runtime");
+        let response = rt.block_on(self.communication_handler.execute_request(request));
+
+        // Update performance metrics
+        {
+            let mut metrics = rt.block_on(self.performance_metrics.write());
+            metrics.total_requests += 1;
+            metrics.total_execution_time_ms += response.execution_time_ms;
+            if response.success {
+                metrics.successful_requests += 1;
+            } else {
+                metrics.failed_requests += 1;
+            }
+            metrics.average_execution_time_ms =
+                metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
+        }
+
+        // Serialize response fields
+        let result_str = match response.result {
+            Some(val) => match serde_json::to_string(&val) {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    error!("Failed to serialize result: {}", e);
+                    None
+                }
+            },
+            None => None,
+        };
+
+        let perf_str = match response.performance_metrics {
+            Some(metrics) => match serde_json::to_string(&metrics) {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    error!("Failed to serialize performance metrics: {}", e);
+                    None
+                }
+            },
+            None => None,
+        };
+
+        let error_str = response.error.map(|e| {
+            serde_json::to_string(&e).unwrap_or_else(|_| e.message)
+        });
+
         ExecutionResult {
-            success: true,
-            result: Some(format!("Executed tool with args: {}", arguments)),
-            error: None,
-            execution_time_ms,
-            performance_metrics: Some("{}".to_string()),
+            success: response.success,
+            result: result_str,
+            error: error_str,
+            execution_time_ms: response.execution_time_ms as u32,
+            performance_metrics: perf_str,
         }
     }
 

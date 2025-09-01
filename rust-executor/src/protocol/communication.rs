@@ -419,11 +419,8 @@ impl CommunicationHandler {
 
         let (memory_usage, cpu_usage) = if let Some(process) = system.process(pid) {
             let mem_mb = process.memory() as f64 / 1024.0 / 1024.0;
-            let cpu = if system.cpus().len() > 0 {
-                process.cpu_usage() as f64 / system.cpus().len() as f64
-            } else {
-                0.0
-            };
+            // sysinfo's process.cpu_usage() returns the total CPU usage as a percentage (e.g., 100.0 = one full core)
+            let cpu = process.cpu_usage() as f64;
             (mem_mb, cpu)
         } else {
             (0.0, 0.0)

@@ -200,7 +200,7 @@ export class RustProviderClient implements ProviderClient {
     }
 
     const args = JSON.stringify(request);
-    return await rustModule.execute('compute-task', args, request.options);
+    return await rustModule.execute('compute-task', args, request.options ?? undefined);
   }
 
   private async executeGenericRequest(rustModule: any, request: any): Promise<any> {

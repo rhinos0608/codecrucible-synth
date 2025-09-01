@@ -6,6 +6,7 @@ use tokio::time::{timeout, Duration};
 use serde_json;
 use tracing::{error, info, warn, debug};
 use async_trait::async_trait;
+use sysinfo::{System, SystemExt, ProcessExt, PidExt};
 
 use crate::protocol::messages::{
     ExecutionMessage, MessageType, MessagePayload, ExecutionRequest, ExecutionResponse,
@@ -147,6 +148,7 @@ pub struct CommunicationHandler {
     message_timeout: Duration,
     max_message_size: usize,
     max_messages_per_minute: usize,
+    system: Arc<RwLock<System>>,
 }
 
 #[derive(Debug, Clone)]
@@ -167,6 +169,7 @@ impl CommunicationHandler {
             message_timeout: Duration::from_secs(30),
             max_message_size: 10 * 1024 * 1024, // 10MB
             max_messages_per_minute: 60,
+            system: Arc::new(RwLock::new(System::new())),
         }
     }
 
@@ -409,10 +412,20 @@ impl CommunicationHandler {
             .unwrap_or_default()
             .as_millis() as u64;
             
-        // TODO: Get actual memory and CPU usage
-        let memory_usage = 0.0;
-        let cpu_usage = 0.0;
-        
+        // Get actual memory and CPU usage using sysinfo
+        let mut system = self.system.write().await;
+        let pid = sysinfo::Pid::from_u32(process_id);
+        system.refresh_process(pid);
+
+        let (memory_usage, cpu_usage) = if let Some(process) = system.process(pid) {
+            let mem_mb = process.memory() as f64 / 1024.0 / 1024.0;
+            // sysinfo's process.cpu_usage() returns the total CPU usage as a percentage (e.g., 100.0 = one full core)
+            let cpu = process.cpu_usage() as f64;
+            (mem_mb, cpu)
+        } else {
+            (0.0, 0.0)
+        };
+
         Ok(ExecutionMessage::heartbeat(process_id, uptime, memory_usage, cpu_usage))
     }
 

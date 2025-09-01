@@ -1,5 +1,5 @@
 use std::io::{self, BufRead, BufReader, Write};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::{timeout, Duration};
@@ -13,8 +13,12 @@ use crate::protocol::messages::{
     HealthStatus, CheckResult
 };
 use crate::executors::filesystem::{FileSystemExecutor, FileSystemError};
+
+use crate::security::{SecurityContext, SecurityError, Capability};
+=======
 use crate::executors::command::CommandExecutor as CommandExecutorImpl;
 use crate::security::{SecurityContext, SecurityError};
+
 
 #[derive(Debug)]
 pub enum CommunicationError {
@@ -144,6 +148,7 @@ pub struct CommunicationHandler {
     active_sessions: Arc<RwLock<HashMap<String, SessionState>>>,
     message_timeout: Duration,
     max_message_size: usize,
+    max_messages_per_minute: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -153,6 +158,7 @@ pub struct SessionState {
     pub last_activity: std::time::Instant,
     pub message_count: u64,
     pub security_context: SecurityContext,
+    pub message_timestamps: VecDeque<std::time::Instant>,
 }
 
 impl CommunicationHandler {
@@ -162,6 +168,7 @@ impl CommunicationHandler {
             active_sessions: Arc::new(RwLock::new(HashMap::new())),
             message_timeout: Duration::from_secs(30),
             max_message_size: 10 * 1024 * 1024, // 10MB
+            max_messages_per_minute: 60,
         }
     }
 
@@ -200,7 +207,7 @@ impl CommunicationHandler {
         tx: mpsc::UnboundedSender<ExecutionMessage>
     ) -> Result<(), CommunicationError> {
         let mut line = String::new();
-        
+
         loop {
             line.clear();
             
@@ -223,7 +230,37 @@ impl CommunicationHandler {
                 warn!("Message too large: {} bytes", line.len());
                 continue;
             }
-            
+            // Validate message schema and extract session ID
+            let session_id = match self.validate_message_schema(&line) {
+                Ok(id) => id,
+                Err(e) => {
+                    error!("Invalid message schema: {:?}", e);
+                    let error_message = ExecutionMessage::error(
+                        "INVALID_MESSAGE_SCHEMA".to_string(),
+                        format!("{:?}", e),
+                        None
+                    );
+                    if tx.send(error_message).is_err() {
+                        break;
+                    }
+                    continue;
+                }
+            };
+
+            // Enforce rate limiting
+            if !self.check_rate_limit(&session_id).await {
+                warn!("Rate limit exceeded for session: {}", session_id);
+                let error_message = ExecutionMessage::error(
+                    "RATE_LIMIT_EXCEEDED".to_string(),
+                    "Too many requests".to_string(),
+                    None,
+                );
+                if tx.send(error_message).is_err() {
+                    break;
+                }
+                continue;
+            }
+
             // Parse and process message
             match self.parse_and_process_message(&line).await {
                 Ok(response_message) => {
@@ -234,21 +271,20 @@ impl CommunicationHandler {
                 }
                 Err(e) => {
                     error!("Error processing message: {:?}", e);
-                    
-                    // Send error response
+
                     let error_message = ExecutionMessage::error(
                         "MESSAGE_PROCESSING_ERROR".to_string(),
                         format!("{:?}", e),
-                        None
+                        None,
                     );
-                    
+
                     if tx.send(error_message).is_err() {
                         break;
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -317,21 +353,21 @@ impl CommunicationHandler {
     /// Handle execution request
     async fn handle_execution_request(&self, request: ExecutionRequest, original_message: &ExecutionMessage) -> Result<ExecutionMessage, CommunicationError> {
         let start_time = std::time::Instant::now();
-        
+
         // Validate session and security
         let session_id = original_message.session_id.as_ref()
             .unwrap_or(&"default".to_string()).clone();
-            
-        if !self.validate_session_security(&session_id, &request).await {
+
+        if let Err(e) = self.validate_request_security(&session_id, &request).await {
             let error_response = ExecutionMessage::response(
                 original_message.id.clone(),
                 Err(ErrorInfo {
                     code: "SECURITY_VIOLATION".to_string(),
-                    message: "Session security validation failed".to_string(),
+                    message: format!("{:?}", e),
                     category: ErrorCategory::Security,
                     details: HashMap::new(),
                 }),
-                0
+                0,
             );
             return Ok(error_response);
         }
@@ -405,7 +441,7 @@ impl CommunicationHandler {
         if let Some(session_id) = &message.session_id {
             let mut sessions = self.active_sessions.write().await;
             let now = std::time::Instant::now();
-            
+
             if let Some(session) = sessions.get_mut(session_id) {
                 session.last_activity = now;
                 session.message_count += 1;
@@ -417,24 +453,124 @@ impl CommunicationHandler {
                     last_activity: now,
                     message_count: 1,
                     security_context: SecurityContext::default(),
+                    message_timestamps: VecDeque::new(),
                 };
                 sessions.insert(session_id.clone(), session);
             }
         }
     }
 
-    /// Validate session security for execution request
-    async fn validate_session_security(&self, session_id: &str, request: &ExecutionRequest) -> bool {
+    /// Validate session security and request fields
+    async fn validate_request_security(&self, session_id: &str, request: &ExecutionRequest) -> Result<(), SecurityError> {
         let sessions = self.active_sessions.read().await;
-        
-        if let Some(session) = sessions.get(session_id) {
-            // TODO: Add more sophisticated security validation
-            // For now, just check if session exists and is recent
-            let age = session.last_activity.elapsed();
-            age < Duration::from_secs(3600) // Sessions expire after 1 hour of inactivity
+        let session = sessions.get(session_id);
+        let context = if let Some(s) = session {
+            s
         } else {
-            // Allow default session for basic operations
-            session_id == "default"
+            return Err(SecurityError::CapabilityDenied { capability: "Session not found".into() });
+        };
+
+        // Basic session expiration check
+        let age = context.last_activity.elapsed();
+        if age >= Duration::from_secs(3600) {
+            return Err(SecurityError::SessionExpired);
+        }
+
+        // Validate environment variables
+        for var in request.context.environment.keys() {
+            context
+                .security_context
+                .validate_environment_access(var)?;
+        }
+
+        // Validate capabilities based on tool and operation
+        match request.tool_id.as_str() {
+            "filesystem" => {
+                if let Some(path_val) = request.arguments.get("path").and_then(|v| v.as_str()) {
+                    let path = std::path::PathBuf::from(path_val);
+                    let capability = match request.operation.as_str() {
+                        "read" => Capability::FileRead(path),
+                        _ => Capability::FileWrite(path),
+                    };
+                    context.security_context.validate_capability(&capability)?;
+                }
+            }
+            "command" => {
+                context.security_context.validate_capability(&Capability::ProcessSpawn)?;
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    /// Validate message schema and return session ID
+    fn validate_message_schema(&self, line: &str) -> Result<String, CommunicationError> {
+        let value: serde_json::Value = serde_json::from_str(line.trim())?;
+        let obj = value.as_object().ok_or_else(|| {
+            CommunicationError::InvalidMessage("Message must be a JSON object".to_string())
+        })?;
+
+        if !(obj.contains_key("id") && obj.contains_key("type") && obj.contains_key("payload")) {
+            return Err(CommunicationError::InvalidMessage(
+                "Missing required message fields".to_string(),
+            ));
+        }
+
+        Ok(obj
+            .get("session_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("default")
+            .to_string())
+    }
+
+    /// Check and update rate limiting for a session
+    async fn check_rate_limit(&self, session_id: &str) -> bool {
+        let now = std::time::Instant::now();
+
+        // Combine session creation and rate limit check in a single lock
+        let mut sessions = self.active_sessions.write().await;
+        // If session does not exist, create it
+        if !sessions.contains_key(session_id) {
+            // get security context from registry if exists
+            let registry = self.registry.read().await;
+            let context = registry
+                .security_contexts
+                .get(session_id)
+                .cloned()
+                .unwrap_or_else(SecurityContext::default);
+            sessions.insert(
+                session_id.to_string(),
+                SessionState {
+                    session_id: session_id.to_string(),
+                    created_at: now,
+                    last_activity: now,
+                    message_count: 0,
+                    security_context: context,
+                    message_timestamps: VecDeque::new(),
+                },
+            );
+        }
+        if let Some(session) = sessions.get_mut(session_id) {
+            session.last_activity = now;
+
+            // Clean old timestamps
+            while let Some(front) = session.message_timestamps.front() {
+                if now.duration_since(*front) > Duration::from_secs(60) {
+                    session.message_timestamps.pop_front();
+                } else {
+                    break;
+                }
+            }
+
+            if session.message_timestamps.len() >= self.max_messages_per_minute {
+                return false;
+            }
+
+            session.message_timestamps.push_back(now);
+            true
+        } else {
+            true
         }
     }
 
@@ -605,5 +741,84 @@ mod tests {
         // Check session was created
         let sessions = handler.active_sessions.read().await;
         assert!(sessions.contains_key("test_session"));
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiting() {
+        let mut handler = CommunicationHandler::new();
+        handler.max_messages_per_minute = 2;
+        handler.initialize().await.unwrap();
+
+        let req = ExecutionMessage::request(
+            "filesystem".to_string(),
+            "read".to_string(),
+            [("path".to_string(), serde_json::Value::String("/tmp/test.txt".to_string()))]
+                .into_iter()
+                .collect(),
+            crate::protocol::messages::ExecutionContext {
+                session_id: "rate-test".to_string(),
+                working_directory: "/tmp".to_string(),
+                environment: HashMap::new(),
+                security_level: crate::protocol::messages::SecurityLevel::Medium,
+                capabilities: vec!["file-read".to_string()],
+                resource_limits: crate::protocol::messages::ResourceLimitConfig::default(),
+            },
+        );
+
+        let ndjson = req.to_ndjson().unwrap();
+        let input_data = format!("{}{}{}", ndjson, ndjson, ndjson);
+        let cursor = Cursor::new(input_data.as_bytes());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        handler.process_input_stream(cursor, tx).await.unwrap();
+
+        let mut responses = Vec::new();
+        while let Ok(msg) = rx.try_recv() {
+            responses.push(msg);
+        }
+
+        assert_eq!(responses.len(), 3);
+        match &responses[2].payload {
+            MessagePayload::Error(err) => assert_eq!(err.code, "RATE_LIMIT_EXCEEDED"),
+            _ => panic!("Expected rate limit error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_security_validation() {
+        let handler = CommunicationHandler::new();
+        handler.initialize().await.unwrap();
+
+        let req = ExecutionMessage::request(
+            "filesystem".to_string(),
+            "read".to_string(),
+            [("path".to_string(), serde_json::Value::String("/etc/passwd".to_string()))]
+                .into_iter()
+                .collect(),
+            crate::protocol::messages::ExecutionContext {
+                session_id: "default".to_string(),
+                working_directory: "/tmp".to_string(),
+                environment: HashMap::new(),
+                security_level: crate::protocol::messages::SecurityLevel::Medium,
+                capabilities: vec!["file-read".to_string()],
+                resource_limits: crate::protocol::messages::ResourceLimitConfig::default(),
+            },
+        );
+
+        let ndjson = req.to_ndjson().unwrap();
+        let cursor = Cursor::new(ndjson.as_bytes());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        handler.process_input_stream(cursor, tx).await.unwrap();
+        let resp = rx.try_recv().expect("expected response");
+
+        match resp.payload {
+            MessagePayload::ExecutionResponse(res) => {
+                assert!(!res.success);
+                assert_eq!(res.error.unwrap().code, "SECURITY_VIOLATION");
+            }
+            MessagePayload::Error(err) => assert_eq!(err.code, "SECURITY_VIOLATION"),
+            _ => panic!("Unexpected payload"),
+        }
     }
 }

@@ -21,7 +21,7 @@ serde_json = "1.0"
 
 # Cross-platform process management
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.27", features = ["process", "signal", "user", "fs"] }
+nix = { version = "0.27", features = ["process", "signal", "user", "fs", "resource"] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["processthreadsapi", "jobapi", "jobapi2", "handleapi", "winbase", "errhandlingapi"] }

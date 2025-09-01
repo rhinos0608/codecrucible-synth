@@ -112,6 +112,9 @@ pub struct CommandExecutor {
     blocked_patterns: Vec<Regex>,
     max_execution_time: Duration,
     max_output_size: usize,
+    /// Maximum amount of memory the spawned process can allocate (in bytes).
+    /// This limit is best-effort and currently enforced only on Unix systems.
+    max_memory_bytes: u64,
 }
 
 impl CommandExecutor {
@@ -131,6 +134,7 @@ impl CommandExecutor {
             blocked_patterns,
             max_execution_time: Duration::from_secs(120), // 2 minutes default
             max_output_size: 1024 * 1024,                 // 1MB default
+            max_memory_bytes: 512 * 1024 * 1024,          // 512MB memory limit
         }
     }
 
@@ -292,6 +296,27 @@ impl CommandExecutor {
 
         // Ensure spawned process is terminated if dropped
         cmd.kill_on_drop(true);
+
+        // Apply resource limits on Unix platforms
+        #[cfg(unix)]
+        {
+            use nix::sys::resource::{rlim_t, setrlimit, Resource};
+            use std::os::unix::process::CommandExt;
+
+            let mem_limit: rlim_t = self.max_memory_bytes as rlim_t;
+            let cpu_limit: rlim_t = self.max_execution_time.as_secs() as rlim_t;
+
+            // Safety: pre_exec runs in the spawned child before exec
+            unsafe {
+                cmd.pre_exec(move || {
+                    setrlimit(Resource::RLIMIT_AS, mem_limit, mem_limit)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                    setrlimit(Resource::RLIMIT_CPU, cpu_limit, cpu_limit)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                    Ok(())
+                });
+            }
+        }
 
         // Execute with timeout
         let timeout_duration = Duration::from_millis(

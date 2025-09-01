@@ -9,12 +9,35 @@ export interface SmitheryMCPConfig {
   autoDiscovery?: boolean; // Whether to auto-discover popular servers
 }
 
+export interface RegisteredTool {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+  serverName: string;
+  originalName: string;
+}
+
+export interface RegisteredServer {
+  qualifiedName: string;
+  displayName: string;
+  tools: RegisteredTool[];
+}
+
+export interface ToolCallArgs {
+  [key: string]: unknown;
+}
+
+export interface ToolCallResponse {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
 export class SmitheryMCPServer {
   private server: Server;
   private config: SmitheryMCPConfig;
   private registryIntegration: SmitheryRegistryIntegration;
-  private availableServers: Map<string, any> = new Map();
-  private availableTools: Map<string, any> = new Map();
+  private availableServers: Map<string, RegisteredServer> = new Map();
+  private availableTools: Map<string, RegisteredTool> = new Map();
   private initialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
 
@@ -63,19 +86,21 @@ export class SmitheryMCPServer {
 
   private async discoverServers(): Promise<void> {
     try {
-      let servers: any[] = [];
+      let servers: RegisteredServer[] = [];
 
       if (this.config.enabledServers && this.config.enabledServers.length > 0) {
         // Load specific servers
         for (const serverName of this.config.enabledServers) {
-          const server = await this.registryIntegration.getServerDetails(serverName);
+          const server = (await this.registryIntegration.getServerDetails(
+            serverName
+          )) as RegisteredServer | null;
           if (server) {
             servers.push(server);
           }
         }
       } else if (this.config.autoDiscovery !== false) {
         // Auto-discover popular servers
-        servers = await this.registryIntegration.getPopularServers(10);
+        servers = (await this.registryIntegration.getPopularServers(10)) as RegisteredServer[];
       }
 
       // Register tools from discovered servers
@@ -84,13 +109,14 @@ export class SmitheryMCPServer {
 
         for (const tool of server.tools) {
           const toolName = `${server.qualifiedName.replace('/', '_')}_${tool.name}`;
-          this.availableTools.set(toolName, {
+          const toolDef: RegisteredTool = {
             name: toolName,
             description: `${tool.description} (from ${server.displayName})`,
             inputSchema: tool.inputSchema,
             serverName: server.qualifiedName,
             originalName: tool.name,
-          });
+          };
+          this.availableTools.set(toolName, toolDef);
         }
       }
 
@@ -101,7 +127,7 @@ export class SmitheryMCPServer {
     }
   }
 
-  private async handleToolCall(name: string, args: any): Promise<any> {
+  private async handleToolCall(name: string, args: ToolCallArgs): Promise<ToolCallResponse> {
     try {
       const tool = this.availableTools.get(name);
       if (!tool) {
@@ -119,13 +145,14 @@ export class SmitheryMCPServer {
           },
         ],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(`Tool execution error for ${name}:`, error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         content: [
           {
             type: 'text',
-            text: `Tool execution error: ${error.message || 'Unknown error'}`,
+            text: `Tool execution error: ${message}`,
           },
         ],
         isError: true,
@@ -152,16 +179,16 @@ export class SmitheryMCPServer {
     this.initialized = true;
   }
 
-  async getRegistryHealth(): Promise<any> {
+  async getRegistryHealth(): Promise<Record<string, unknown>> {
     await this.ensureInitialized();
-    return await this.registryIntegration.healthCheck();
+    return (await this.registryIntegration.healthCheck()) as Record<string, unknown>;
   }
 
-  getAvailableServers(): Array<any> {
+  getAvailableServers(): RegisteredServer[] {
     return Array.from(this.availableServers.values());
   }
 
-  getAvailableTools(): Array<any> {
+  getAvailableTools(): RegisteredTool[] {
     return Array.from(this.availableTools.values());
   }
 

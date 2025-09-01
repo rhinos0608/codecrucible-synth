@@ -68,12 +68,7 @@ export class RustBridgeManager {
 
       this.rustModule = await Promise.race([loadPromise, timeoutPromise]);
 
-      if (!this.rustModule) {
-        logger.warn('Rust bridge module not found', {
-          modulePath: this.config.modulePath,
-        });
-        this.health.status = 'failed';
-        return false;
+        throw new Error('Rust bridge module not found');
       }
 
       this.health.status = 'healthy';

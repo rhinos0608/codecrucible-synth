@@ -177,8 +177,7 @@ impl CommunicationHandler {
         registry.register_filesystem_executor(fs_executor);
 
         // Register command executor with its security context
-        let command_context = SecurityContext::for_command_execution();
-        let command_executor: Arc<dyn CommandExecutor> = Arc::new(CommandExecutorImpl::new(command_context.clone()));
+        let command_executor: Arc<dyn CommandExecutor> = Arc::new(CommandExecutorImpl::new(command_context));
         registry.register_command_executor(command_executor);
 
         // Register default security context

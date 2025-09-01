@@ -367,12 +367,14 @@ export class UnifiedCacheSystem extends EventEmitter {
           throw new Error(`HuggingFace error: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           embedding = data[0];
-        } else if (Array.isArray(data?.data)) {
+        } else if (Array.isArray(data?.data) && data.data.length > 0) {
           embedding = data.data[0];
-        } else if (Array.isArray(data?.embeddings)) {
+        } else if (Array.isArray(data?.embeddings) && data.embeddings.length > 0) {
           embedding = data.embeddings[0];
+        } else {
+          throw new Error('HuggingFace API returned no embedding data.');
         }
       } else if (process.env.OPENAI_API_KEY) {
         const response = await fetch('https://api.openai.com/v1/embeddings', {

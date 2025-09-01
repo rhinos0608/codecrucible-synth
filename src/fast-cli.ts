@@ -6,6 +6,7 @@
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { logger } from './utils/logger.js';
 
 // Get package version (async version)
 async function getPackageVersion(): Promise<string> {
@@ -183,7 +184,7 @@ export async function fastMain() {
     }
 
     if (args.includes('--version') || args.includes('-v')) {
-      console.log(`CodeCrucible Synth v${await getPackageVersion()}`);
+      logger.info(`CodeCrucible Synth v${await getPackageVersion()}`);
       return;
     }
 
@@ -200,11 +201,11 @@ export async function fastMain() {
     }
 
     // For complex commands, delegate to the full system
-    console.log('🔄 Loading full system for complex operations...');
+    logger.info('🔄 Loading full system for complex operations...');
     const { main } = await import('./index.js');
     return main();
   } catch (error) {
-    console.error('❌ Error:', error);
+    logger.error('❌ Error:', error);
     process.exit(1);
   }
 }
@@ -215,7 +216,7 @@ if (
   (process.argv[1].includes('fast-cli.js') || process.argv[1].endsWith('fast-cli.ts'))
 ) {
   fastMain().catch(error => {
-    console.error('Fatal error:', error);
+    logger.fatal('Fatal error:', error);
     process.exit(1);
   });
 }

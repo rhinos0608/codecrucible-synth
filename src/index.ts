@@ -11,6 +11,7 @@ import { ConcreteWorkflowOrchestrator } from './application/services/concrete-wo
 import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
 import { getGlobalEventBus } from './domain/interfaces/event-bus.js';
 import { getErrorMessage } from './utils/error-utils.js';
+import { logger as structuredLogger } from './utils/logger.js';
 import { logger } from './infrastructure/logging/logger.js';
 import { program } from 'commander';
 import { readFile } from 'fs/promises';
@@ -199,13 +200,9 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     // Display system capabilities
     if (cliOptions.verbose) {
-      console.log(
-        '🧠 Capabilities: Context Intelligence, Performance Optimization, Error Resilience'
-      );
-      console.log(
-        '🔧 Architecture: Dependency Injection, Event-Driven, Circular Dependencies Eliminated'
-      );
-      console.log('📊 Complexity: Reduced by 90% through unified coordination');
+      structuredLogger.info('🧠 Capabilities: Context Intelligence, Performance Optimization, Error Resilience');
+      structuredLogger.info('🔧 Architecture: Dependency Injection, Event-Driven, Circular Dependencies Eliminated');
+      structuredLogger.info('📊 Complexity: Reduced by 90% through unified coordination');
     }
 
     return cli;
@@ -224,7 +221,7 @@ export async function main(): Promise<void> {
 
     // Handle version command
     if (args.includes('--version') || args.includes('-v')) {
-      console.log(`CodeCrucible Synth v${await getPackageVersion()} (Unified Architecture)`);
+      structuredLogger.info(`CodeCrucible Synth v${await getPackageVersion()} (Unified Architecture)`);
       return;
     }
 
@@ -254,7 +251,7 @@ export async function main(): Promise<void> {
 
     // Setup graceful shutdown
     const cleanup = async () => {
-      console.log('\n🔄 Shutting down gracefully...');
+      structuredLogger.info('\n🔄 Shutting down gracefully...');
       await cli.shutdown();
       process.exit(0);
     };
@@ -272,7 +269,7 @@ export async function main(): Promise<void> {
       process.exit(0);
     }
   } catch (error) {
-    console.error('❌ Fatal error:', getErrorMessage(error));
+    structuredLogger.fatal('❌ Fatal error:', error);
     process.exit(1);
   }
 }
@@ -281,67 +278,67 @@ export async function main(): Promise<void> {
  * Show help information
  */
 function showHelp(): void {
-  console.log('🤖 CodeCrucible Synth - AI-Powered Development Assistant');
-  console.log('=====================================================');
-  console.log('');
-  console.log('Usage:');
-  console.log('  codecrucible [options] <prompt>');
-  console.log('  crucible [options] <prompt>');
-  console.log('  cc [options] <prompt>');
-  console.log('');
-  console.log('Commands:');
-  console.log('  interactive, -i      Start interactive chat mode');
-  console.log('  analyze <file>       Analyze a code file');
-  console.log('  models              Manage AI models');
-  console.log('  status              Show system status');
-  console.log('  --help, -h          Show this help');
-  console.log('  --version, -v       Show version');
-  console.log('');
-  console.log('Options:');
-  console.log('  --verbose           Show detailed output');
-  console.log('  --no-stream         Disable streaming responses');
-  console.log('  --no-intelligence   Disable context awareness');
-  console.log('  --no-autonomous     Disable autonomous mode');
-  console.log('  --no-performance    Disable performance optimization');
-  console.log('  --no-resilience     Disable error resilience');
-  console.log('');
-  console.log('✨ New Unified Architecture Features:');
-  console.log('  🧠 Context-aware responses based on your project');
-  console.log('  🚀 Performance-optimized with lazy loading');
-  console.log('  🛡️  Error resilience with automatic recovery');
-  console.log('  🔄 Multi-voice AI collaboration');
-  console.log('  📊 Project intelligence and analysis');
-  console.log('  🔧 Dependency injection for modularity');
-  console.log('  ⚡ 90% complexity reduction');
-  console.log('');
-  console.log('Examples:');
-  console.log('  cc -i                                    # Interactive mode');
-  console.log('  crucible "Create a React component"      # Generate code');
-  console.log('  cc analyze src/main.ts                   # Analyze file');
-  console.log('  cc models --list                         # List available models');
-  console.log('  codecrucible "Review this code" --verbose # Detailed analysis');
+  structuredLogger.info('🤖 CodeCrucible Synth - AI-Powered Development Assistant');
+  structuredLogger.info('=====================================================');
+  structuredLogger.info('');
+  structuredLogger.info('Usage:');
+  structuredLogger.info('  codecrucible [options] <prompt>');
+  structuredLogger.info('  crucible [options] <prompt>');
+  structuredLogger.info('  cc [options] <prompt>');
+  structuredLogger.info('');
+  structuredLogger.info('Commands:');
+  structuredLogger.info('  interactive, -i      Start interactive chat mode');
+  structuredLogger.info('  analyze <file>       Analyze a code file');
+  structuredLogger.info('  models              Manage AI models');
+  structuredLogger.info('  status              Show system status');
+  structuredLogger.info('  --help, -h          Show this help');
+  structuredLogger.info('  --version, -v       Show version');
+  structuredLogger.info('');
+  structuredLogger.info('Options:');
+  structuredLogger.info('  --verbose           Show detailed output');
+  structuredLogger.info('  --no-stream         Disable streaming responses');
+  structuredLogger.info('  --no-intelligence   Disable context awareness');
+  structuredLogger.info('  --no-autonomous     Disable autonomous mode');
+  structuredLogger.info('  --no-performance    Disable performance optimization');
+  structuredLogger.info('  --no-resilience     Disable error resilience');
+  structuredLogger.info('');
+  structuredLogger.info('✨ New Unified Architecture Features:');
+  structuredLogger.info('  🧠 Context-aware responses based on your project');
+  structuredLogger.info('  🚀 Performance-optimized with lazy loading');
+  structuredLogger.info('  🛡️  Error resilience with automatic recovery');
+  structuredLogger.info('  🔄 Multi-voice AI collaboration');
+  structuredLogger.info('  📊 Project intelligence and analysis');
+  structuredLogger.info('  🔧 Dependency injection for modularity');
+  structuredLogger.info('  ⚡ 90% complexity reduction');
+  structuredLogger.info('');
+  structuredLogger.info('Examples:');
+  structuredLogger.info('  cc -i                                    # Interactive mode');
+  structuredLogger.info('  crucible "Create a React component"      # Generate code');
+  structuredLogger.info('  cc analyze src/main.ts                   # Analyze file');
+  structuredLogger.info('  cc models --list                         # List available models');
+  structuredLogger.info('  codecrucible "Review this code" --verbose # Detailed analysis');
 }
 
 /**
  * Show system status
  */
 async function showStatus(): Promise<void> {
-  console.log('📊 CodeCrucible Synth Status');
-  console.log('━'.repeat(40));
-  console.log(`Version: ${await getPackageVersion()}`);
-  console.log(`Node.js: ${process.version}`);
-  console.log(`Platform: ${process.platform} ${process.arch}`);
-  console.log(`Working Directory: ${process.cwd()}`);
-  console.log('');
-  console.log('🏗️  Architecture: Unified Coordination System');
-  console.log('✅ Circular Dependencies: Eliminated');
-  console.log('✅ Code Complexity: Reduced by 90%');
-  console.log('✅ Performance: Optimized with lazy loading');
-  console.log('✅ Error Resilience: Automatic recovery enabled');
-  console.log('✅ Context Intelligence: Project-aware responses');
-  console.log('');
-  console.log('💡 Ready for AI-powered development assistance!');
-  console.log('━'.repeat(40));
+  structuredLogger.info('📊 CodeCrucible Synth Status');
+  structuredLogger.info('━'.repeat(40));
+  structuredLogger.info(`Version: ${await getPackageVersion()}`);
+  structuredLogger.info(`Node.js: ${process.version}`);
+  structuredLogger.info(`Platform: ${process.platform} ${process.arch}`);
+  structuredLogger.info(`Working Directory: ${process.cwd()}`);
+  structuredLogger.info('');
+  structuredLogger.info('🏗️  Architecture: Unified Coordination System');
+  structuredLogger.info('✅ Circular Dependencies: Eliminated');
+  structuredLogger.info('✅ Code Complexity: Reduced by 90%');
+  structuredLogger.info('✅ Performance: Optimized with lazy loading');
+  structuredLogger.info('✅ Error Resilience: Automatic recovery enabled');
+  structuredLogger.info('✅ Context Intelligence: Project-aware responses');
+  structuredLogger.info('');
+  structuredLogger.info('💡 Ready for AI-powered development assistance!');
+  structuredLogger.info('━'.repeat(40));
 }
 
 // Commander.js setup for enhanced CLI
@@ -380,7 +377,7 @@ program
 // Auto-run when directly executed
 if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts')) {
   main().catch(error => {
-    console.error('❌ Fatal error:', getErrorMessage(error));
+    structuredLogger.fatal('❌ Fatal error:', error);
     process.exit(1);
   });
 }

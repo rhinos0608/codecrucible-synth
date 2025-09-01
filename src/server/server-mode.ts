@@ -18,6 +18,7 @@ import { UnifiedSecurityValidator } from '../domain/services/unified-security-va
 import { UnifiedPerformanceSystem } from '../domain/services/unified-performance-system.js';
 import { CLIContext } from '../core/cli/cli-types.js';
 import { createLogger } from '../infrastructure/logging/logger-adapter.js';
+import { logger as structuredLogger } from '../utils/logger.js';
 import chalk from 'chalk';
 
 const logger = createLogger('ServerMode');
@@ -48,7 +49,7 @@ export class ServerMode implements ServerModeInterface {
   private unifiedServer?: UnifiedServerSystem;
 
   async startServerMode(context: CLIContext, options: ServerOptions): Promise<void> {
-    console.warn('⚠️ ServerMode is deprecated. Use UnifiedServerSystem instead.');
+    structuredLogger.warn('⚠️ ServerMode is deprecated. Use UnifiedServerSystem instead.');
 
     // Validate context initialization
     if (!context) {
@@ -67,7 +68,7 @@ export class ServerMode implements ServerModeInterface {
       throw new Error('Configuration not loaded');
     }
 
-    console.log(chalk.blue('🚀 Starting CodeCrucible Server Mode...'));
+    structuredLogger.info('🚀 Starting CodeCrucible Server Mode...');
 
     try {
       // Create unified system components
@@ -120,11 +121,11 @@ export class ServerMode implements ServerModeInterface {
 
       // Create a logger for the server system
       const serverLogger = {
-        info: (msg: string) => console.log(`[ServerSystem] ${msg}`),
-        error: (msg: string, error?: any) => console.error(`[ServerSystem] ${msg}`, error),
-        warn: (msg: string) => console.warn(`[ServerSystem] ${msg}`),
-        debug: (msg: string) => console.debug(`[ServerSystem] ${msg}`),
-        trace: (msg: string) => console.trace(`[ServerSystem] ${msg}`),
+        info: (msg: string) => structuredLogger.info(`[ServerSystem] ${msg}`),
+        error: (msg: string, error?: any) => structuredLogger.error(`[ServerSystem] ${msg}`, error),
+        warn: (msg: string) => structuredLogger.warn(`[ServerSystem] ${msg}`),
+        debug: (msg: string) => structuredLogger.debug(`[ServerSystem] ${msg}`),
+        trace: (msg: string) => structuredLogger.trace(`[ServerSystem] ${msg}`),
       };
 
       // Create unified server system
@@ -170,14 +171,14 @@ export class ServerMode implements ServerModeInterface {
       // Start hybrid server (HTTP + WebSocket + MCP)
       await this.unifiedServer.startServer('hybrid', serverConfig);
 
-      console.log(chalk.green('✅ CodeCrucible Server Mode started successfully'));
-      console.log(chalk.cyan(`🌐 HTTP Server: http://${options.host}:${options.port}`));
-      console.log(chalk.cyan(`🔌 WebSocket Server: ws://${options.host}:${options.port + 1}`));
-      console.log(chalk.cyan('🔧 MCP Protocol: enabled'));
+      structuredLogger.info('✅ CodeCrucible Server Mode started successfully');
+      structuredLogger.info(`🌐 HTTP Server: http://${options.host}:${options.port}`);
+      structuredLogger.info(`🔌 WebSocket Server: ws://${options.host}:${options.port + 1}`);
+      structuredLogger.info('🔧 MCP Protocol: enabled');
 
       // Setup graceful shutdown
       process.on('SIGINT', async () => {
-        console.log(chalk.yellow('\n🛑 Shutting down server...'));
+        structuredLogger.info('\n🛑 Shutting down server...');
         if (this.unifiedServer) {
           await this.unifiedServer.stopAllServers();
         }
@@ -185,14 +186,14 @@ export class ServerMode implements ServerModeInterface {
       });
 
       process.on('SIGTERM', async () => {
-        console.log(chalk.yellow('\n🛑 Received SIGTERM, shutting down server...'));
+        structuredLogger.info('\n🛑 Received SIGTERM, shutting down server...');
         if (this.unifiedServer) {
           await this.unifiedServer.stopAllServers();
         }
         process.exit(0);
       });
     } catch (error) {
-      console.error(chalk.red('❌ Failed to start server mode:'), error);
+      structuredLogger.error('❌ Failed to start server mode:', error);
       throw error;
     }
   }

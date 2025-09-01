@@ -350,6 +350,35 @@ performance:
     maxAge: 3600000  # 1 hour
 ```
 
+### Environment Variables
+
+**LOG_LEVEL** - Controls logging verbosity and output format:
+- `trace` - Most verbose, includes all internal operations
+- `debug` - Development debugging information
+- `info` - General application information (default)
+- `warn` - Warning messages and non-critical issues
+- `error` - Error messages only
+- `fatal` - Critical errors that cause application failure
+
+```bash
+# Set logging level for development
+export LOG_LEVEL=debug
+
+# Production logging (errors only)
+export LOG_LEVEL=error
+
+# Enable structured JSON logging
+export NODE_ENV=production
+
+# Development mode with pretty-printed logs
+export NODE_ENV=development
+```
+
+**Other Environment Variables:**
+- `OLLAMA_ENDPOINT` - Ollama server endpoint (default: http://localhost:11434)
+- `LM_STUDIO_ENDPOINT` - LM Studio endpoint (default: ws://localhost:8080)
+- `SMITHERY_API_KEY` - Smithery registry integration key
+
 ### Configuration Commands
 
 ```bash

@@ -155,9 +155,7 @@ export class RustExecutionBackend {
         return true;
       }
 
-      logger.warn('⚠️ Rust module not found or invalid');
-      this.initialized = false;
-      return false;
+      throw new Error('Rust module not found or invalid');
     } catch (error) {
       logger.error('RustExecutionBackend initialization error:', error);
       this.initialized = false;

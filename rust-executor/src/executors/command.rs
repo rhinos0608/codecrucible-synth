@@ -190,9 +190,33 @@ impl CommandExecutor {
         }
 
         // Execute in isolated process for additional security
-        let request_clone = command_request.clone();
-        // Simplified execution without isolation for now to avoid lifetime issues
-        let isolation_result = self.execute_command_internal(request_clone).await;
+        let arg_refs: Vec<&str> = command_request.args.iter().map(|s| s.as_str()).collect();
+        let isolation_result = self
+            .isolation
+            .execute_command(
+                &command_request.command,
+                &arg_refs,
+                command_request.working_directory.as_deref(),
+            )
+            .await
+            .map(|res| CommandResult {
+                success: res.exit_code.unwrap_or(1) == 0,
+                exit_code: res.exit_code,
+                stdout: if command_request.capture_output {
+                    res.stdout
+                } else {
+                    String::new()
+                },
+                stderr: if command_request.capture_output {
+                    res.stderr
+                } else {
+                    String::new()
+                },
+                execution_time_ms: res.execution_time.as_millis() as u64,
+                command: command_request.command.clone(),
+                working_directory: command_request.working_directory.clone(),
+            })
+            .map_err(CommandExecutionError::IsolationError);
 
         let execution_time = start_time.elapsed().as_millis() as u64;
 
@@ -560,6 +584,11 @@ fn generate_request_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::messages::{
+        ExecutionContext, ExecutionRequest, ResourceLimitConfig, SecurityLevel,
+    };
+    use serde_json::json;
+    use std::collections::HashMap;
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -587,6 +616,51 @@ mod tests {
         let result = executor.execute_command_internal(request).await.unwrap();
         assert!(result.success);
         assert!(result.stdout.contains("hello world"));
+    }
+
+    #[tokio::test]
+    async fn test_command_execution_in_sandbox() {
+        let (executor, temp_dir) = create_test_executor();
+
+        let mut arguments = HashMap::new();
+        arguments.insert(
+            "command".to_string(),
+            serde_json::Value::String("pwd".to_string()),
+        );
+        arguments.insert("args".to_string(), json!([]));
+        arguments.insert(
+            "working_directory".to_string(),
+            serde_json::Value::String(temp_dir.path().to_string_lossy().to_string()),
+        );
+
+        let context = ExecutionContext {
+            session_id: "test".to_string(),
+            working_directory: temp_dir.path().to_string_lossy().to_string(),
+            environment: HashMap::new(),
+            security_level: SecurityLevel::Medium,
+            capabilities: vec![],
+            resource_limits: ResourceLimitConfig {
+                max_memory_mb: 128,
+                max_cpu_time_ms: 1_000,
+                max_execution_time_ms: 5_000,
+                max_file_handles: 64,
+            },
+        };
+
+        let request = ExecutionRequest {
+            tool_id: "command".to_string(),
+            operation: "execute".to_string(),
+            arguments,
+            context,
+            timeout_ms: Some(5_000),
+            stream_response: false,
+        };
+
+        let response = executor.execute(request).await;
+        assert!(response.success, "{:?}", response.error);
+
+        let result: CommandResult = serde_json::from_value(response.result.unwrap()).unwrap();
+        assert_eq!(result.stdout.trim(), temp_dir.path().to_string_lossy());
     }
 
     #[tokio::test]

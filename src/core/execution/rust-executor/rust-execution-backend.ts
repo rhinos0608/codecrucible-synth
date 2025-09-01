@@ -87,7 +87,7 @@ export class RustExecutionBackend {
   /**
    * Initialize the Rust executor NAPI module
    */
-  async initialize(): Promise<boolean> {
+  async initialize(): Promise<void> {
     try {
       // Initialize logging for Rust module
       if (typeof global !== 'undefined') {

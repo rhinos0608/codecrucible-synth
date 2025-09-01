@@ -338,8 +338,7 @@ export class UnifiedCacheSystem extends EventEmitter {
   }
 
   /**
-   * Generate embedding for semantic search (mock implementation)
-   * TODO: Replace with actual embedding service (OpenAI, HuggingFace, etc.)
+   * Generate embedding for semantic search using external provider
    */
   private async getEmbedding(text: string): Promise<number[]> {
     const hash = createHash('sha256').update(text).digest('hex');
@@ -348,25 +347,84 @@ export class UnifiedCacheSystem extends EventEmitter {
       return this.embeddingCache.get(hash)!;
     }
 
-    // Generate deterministic mock embedding
-    const embedding = new Array(this.config.semantic.embeddingDimension).fill(0);
-    const hashBytes = createHash('sha256').update(text).digest();
+    try {
+      let embedding: number[] | undefined;
+      const provider = process.env.EMBEDDING_PROVIDER ?? 'openai';
 
-    for (let i = 0; i < this.config.semantic.embeddingDimension; i++) {
-      embedding[i] = (hashBytes[i % hashBytes.length] / 255) * 2 - 1; // Normalize to [-1, 1]
-    }
+      if (provider === 'huggingface' && process.env.HUGGINGFACE_API_KEY) {
+        const response = await fetch(
+          'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+            },
+            body: JSON.stringify({ inputs: text }),
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`HuggingFace error: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          embedding = data[0];
+        } else if (Array.isArray(data?.data) && data.data.length > 0) {
+          embedding = data.data[0];
+        } else if (Array.isArray(data?.embeddings) && data.embeddings.length > 0) {
+          embedding = data.embeddings[0];
+        } else {
+          throw new Error('HuggingFace API returned no embedding data.');
+        }
+      } else if (process.env.OPENAI_API_KEY) {
+        const response = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            input: text,
+            model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+          }),
+        });
 
-    this.embeddingCache.set(hash, embedding);
+        if (!response.ok) {
+          throw new Error(`OpenAI error: ${response.status} ${response.statusText}`);
+        }
 
-    // Limit embedding cache size
-    if (this.embeddingCache.size > 1000) {
-      const firstKey = this.embeddingCache.keys().next().value;
-      if (firstKey) {
-        this.embeddingCache.delete(firstKey);
+        const data = await response.json();
+        if (
+          data &&
+          Array.isArray(data.data) &&
+          data.data.length > 0 &&
+          data.data[0] &&
+          Array.isArray(data.data[0].embedding) // OpenAI embeddings are arrays
+        ) {
+          embedding = data.data[0].embedding;
+        } else {
+          throw new Error('OpenAI API response missing expected embedding data');
+        }
+      } else {
+        throw new Error('No embedding provider configured');
       }
+
+      if (embedding) {
+        this.embeddingCache.set(hash, embedding);
+        if (this.embeddingCache.size > 1000) {
+          const firstKey = this.embeddingCache.keys().next().value;
+          if (firstKey) {
+            this.embeddingCache.delete(firstKey);
+          }
+        }
+        return embedding;
+      }
+    } catch (error) {
+      logger.error('Embedding provider error:', error);
     }
 
-    return embedding;
+    // Fallback to zero vector on error
+    return new Array(this.config.semantic.embeddingDimension).fill(0);
   }
 
   /**

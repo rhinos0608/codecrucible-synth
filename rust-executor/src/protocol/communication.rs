@@ -457,7 +457,7 @@ impl CommunicationHandler {
         // Basic session expiration check
         let age = context.last_activity.elapsed();
         if age >= Duration::from_secs(3600) {
-            return Err(SecurityError::CapabilityDenied { capability: "Session expired".into() });
+            return Err(SecurityError::SessionExpired);
         }
 
         // Validate environment variables

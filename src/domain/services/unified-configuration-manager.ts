@@ -1,9 +1,9 @@
 /**
  * Unified Configuration Manager
- * 
+ *
  * Single authoritative configuration system that replaces all existing managers:
  * - /config/config-manager.ts (YAML-based)
- * - /core/config/configuration-manager.ts (Validation-focused)  
+ * - /core/config/configuration-manager.ts (Validation-focused)
  * - /infrastructure/config/config-types.ts (Type definitions)
  *
  * Implements configuration hierarchy: defaults → file → environment → CLI args
@@ -37,66 +37,75 @@ export interface IUnifiedConfigurationManager {
    * Initialize the configuration manager
    */
   initialize(): Promise<void>;
-  
+
   /**
    * Load configuration with full hierarchy resolution
    */
   loadConfiguration(): Promise<UnifiedConfiguration>;
-  
+
   /**
    * Get current configuration
    */
   getConfiguration(): UnifiedConfiguration;
-  
+
   /**
    * Update configuration at runtime
    */
-  updateConfiguration(updates: Partial<UnifiedConfiguration>, source: ConfigurationSource): Promise<void>;
-  
+  updateConfiguration(
+    updates: Partial<UnifiedConfiguration>,
+    source: ConfigurationSource
+  ): Promise<void>;
+
   /**
    * Validate configuration
    */
   validateConfiguration(config: Partial<UnifiedConfiguration>): ConfigurationValidation;
-  
+
   /**
    * Save configuration to file
    */
   saveConfiguration(filePath?: string): Promise<void>;
-  
+
   /**
    * Reset to defaults
    */
   resetToDefaults(): Promise<void>;
-  
+
   /**
    * Watch for configuration changes
    */
   watchForChanges(enabled: boolean): void;
 }
 
-export class UnifiedConfigurationManager extends EventEmitter implements IUnifiedConfigurationManager {
+export class UnifiedConfigurationManager
+  extends EventEmitter
+  implements IUnifiedConfigurationManager
+{
   private static instance: UnifiedConfigurationManager | null = null;
-  
+
   private currentConfig!: UnifiedConfiguration;
   private configFilePath: string;
   private eventBus?: IEventBus;
   private isInitialized = false;
   // ConfigurationSource factory method
-  private createConfigurationSource(type: ConfigurationSource['type'], name: string): ConfigurationSource {
+  private createConfigurationSource(
+    type: ConfigurationSource['type'],
+    name: string
+  ): ConfigurationSource {
     return {
       type,
       name,
       priority: this.getSourcePriority(type),
-      lastModified: new Date()
+      lastModified: new Date(),
     };
   }
 
   private getSourcePriority(type: ConfigurationSource['type']): number {
     const priorities = {
-      'default': 0,
-      'file': 10,
-      'environment': 20,
-      'override': 30
+      default: 0,
+      file: 10,
+      environment: 20,
+      override: 30,
     };
     return priorities[type] || 0;
   }
@@ -107,7 +116,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
 
   constructor(
     private logger: ILogger,
-    configFilePath?: string, 
+    configFilePath?: string,
     eventBus?: IEventBus
   ) {
     super();
@@ -128,7 +137,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       // Need to import logger here to avoid circular dependencies
       const { createLogger } = await import('../../infrastructure/logging/logger-adapter.js');
       const logger = options?.logger || createLogger('UnifiedConfigurationManager');
-      
+
       this.instance = new UnifiedConfigurationManager(
         logger,
         options?.configFilePath,
@@ -151,14 +160,14 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
 
       // Load configuration
       this.currentConfig = await this.loadConfiguration();
-      
+
       this.isInitialized = true;
       this.emit('initialized', this.currentConfig);
-      
+
       if (this.eventBus) {
         this.eventBus.emit('system:initialize', { component: 'UnifiedConfigurationManager' });
       }
-      
+
       this.logger.info('UnifiedConfigurationManager initialized successfully');
     } catch (error) {
       this.logger.error('Failed to initialize UnifiedConfigurationManager:', error);
@@ -179,7 +188,12 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       const globalConfig = await this.loadGlobalUserConfig();
       if (globalConfig && Object.keys(globalConfig).length > 0) {
         config = this.mergeConfigurations(config, globalConfig);
-        this.recordConfigSource('global-user-config', 'file', 'global-user-config', this.configFilePath);
+        this.recordConfigSource(
+          'global-user-config',
+          'file',
+          'global-user-config',
+          this.configFilePath
+        );
         this.logger.debug('Loaded global user configuration');
       }
 
@@ -187,7 +201,12 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       const projectDefaults = await this.loadProjectDefaults();
       if (projectDefaults && Object.keys(projectDefaults).length > 0) {
         config = this.mergeConfigurations(config, projectDefaults);
-        this.recordConfigSource('project-defaults', 'file', 'project-defaults', 'config/default.yaml');
+        this.recordConfigSource(
+          'project-defaults',
+          'file',
+          'project-defaults',
+          'config/default.yaml'
+        );
         this.logger.debug('Loaded project defaults from config/default.yaml');
       }
 
@@ -196,7 +215,12 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       for (const [source, specializedConfig] of specializedConfigs) {
         if (specializedConfig && Object.keys(specializedConfig).length > 0) {
           config = this.mergeConfigurations(config, specializedConfig);
-          this.recordConfigSource(`specialized-${source}`, 'file', `specialized-${source}`, `config/${source}`);
+          this.recordConfigSource(
+            `specialized-${source}`,
+            'file',
+            `specialized-${source}`,
+            `config/${source}`
+          );
           this.logger.debug(`Loaded specialized configuration from config/${source}`);
         }
       }
@@ -219,8 +243,15 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       const envConfig = await this.loadEnvironmentSpecificConfig();
       if (envConfig && Object.keys(envConfig).length > 0) {
         config = this.mergeConfigurations(config, envConfig);
-        this.recordConfigSource('environment-specific', 'file', 'environment-specific', `config/${config.application.environment}.yaml`);
-        this.logger.debug(`Loaded environment-specific configuration for ${config.application.environment}`);
+        this.recordConfigSource(
+          'environment-specific',
+          'file',
+          'environment-specific',
+          `config/${config.application.environment}.yaml`
+        );
+        this.logger.debug(
+          `Loaded environment-specific configuration for ${config.application.environment}`
+        );
       }
 
       // Phase 7: Load local overrides (Level 40)
@@ -280,37 +311,45 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
     return this.currentConfig;
   }
 
-  async updateConfiguration(updates: Partial<UnifiedConfiguration>, source: ConfigurationSource): Promise<void> {
+  async updateConfiguration(
+    updates: Partial<UnifiedConfiguration>,
+    source: ConfigurationSource
+  ): Promise<void> {
     if (!this.isInitialized) {
       throw new Error('Configuration manager not initialized');
     }
 
     try {
       const newConfig = this.mergeConfigurations(this.currentConfig, updates);
-      
+
       // Validate the updated configuration
       const validation = this.validateConfiguration(newConfig);
       if (!validation.isValid) {
-        throw new Error(`Configuration update invalid: ${validation.errors.map(e => e.message).join(', ')}`);
+        throw new Error(
+          `Configuration update invalid: ${validation.errors.map(e => e.message).join(', ')}`
+        );
       }
 
       this.currentConfig = validation.sanitized || newConfig;
       this.recordConfigSource('runtime-update', 'override', 'runtime-update');
-      
-      this.emit('configurationChanged', { 
-        config: this.currentConfig, 
-        updates, 
-        source 
+
+      this.emit('configurationChanged', {
+        config: this.currentConfig,
+        updates,
+        source,
       });
-      
+
       if (this.eventBus) {
-        this.eventBus.emit('system:configuration-changed', { 
-          config: this.currentConfig, 
-          source 
+        this.eventBus.emit('system:configuration-changed', {
+          config: this.currentConfig,
+          source,
         });
       }
 
-      this.logger.info('Configuration updated successfully', { source, updates: Object.keys(updates) });
+      this.logger.info('Configuration updated successfully', {
+        source,
+        updates: Object.keys(updates),
+      });
     } catch (error) {
       this.logger.error('Failed to update configuration:', error);
       throw error;
@@ -324,28 +363,36 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
     // Validate app configuration
     if (config.application) {
       if (!config.application.name) {
-        errors.push({ field: 'application.name', message: 'App name is required', severity: 'error' });
+        errors.push({
+          field: 'application.name',
+          message: 'App name is required',
+          severity: 'error',
+        });
       }
       if (!['development', 'production', 'testing'].includes(config.application.environment)) {
-        errors.push({ field: 'application.environment', message: 'Invalid environment', severity: 'error' });
+        errors.push({
+          field: 'application.environment',
+          message: 'Invalid environment',
+          severity: 'error',
+        });
       }
     }
 
     // Validate model configuration
     if (config.model) {
       if (config.model.providers && config.model.providers.length === 0) {
-        warnings.push({ 
-          field: 'model.providers', 
-          message: 'No model providers configured', 
-          suggestion: 'Add at least one provider' 
+        warnings.push({
+          field: 'model.providers',
+          message: 'No model providers configured',
+          suggestion: 'Add at least one provider',
         });
       }
-      
+
       if (config.model.timeout && config.model.timeout < 1000) {
-        warnings.push({ 
-          field: 'model.timeout', 
-          message: 'Timeout very low', 
-          suggestion: 'Consider increasing timeout' 
+        warnings.push({
+          field: 'model.timeout',
+          message: 'Timeout very low',
+          suggestion: 'Consider increasing timeout',
         });
       }
     }
@@ -359,21 +406,24 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           message: 'Input length limit very low' 
         });
       }*/
-      
+
       if (config.security.securityLevel === 'low') {
-        warnings.push({ 
-          field: 'security.securityLevel', 
-          message: 'Low security level enabled' 
+        warnings.push({
+          field: 'security.securityLevel',
+          message: 'Low security level enabled',
         });
       }
     }
 
     // Validate performance configuration
     if (config.performance) {
-      if (config.performance.maxConcurrentRequests && config.performance.maxConcurrentRequests > 10) {
-        warnings.push({ 
-          field: 'performance.maxConcurrentRequests', 
-          message: 'High concurrency may cause issues' 
+      if (
+        config.performance.maxConcurrentRequests &&
+        config.performance.maxConcurrentRequests > 10
+      ) {
+        warnings.push({
+          field: 'performance.maxConcurrentRequests',
+          message: 'High concurrency may cause issues',
         });
       }
     }
@@ -398,18 +448,18 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
 
   async saveConfiguration(filePath?: string): Promise<void> {
     const targetPath = filePath || this.configFilePath;
-    
+
     try {
       // Ensure directory exists
       await mkdir(dirname(targetPath), { recursive: true });
-      
+
       // Convert to YAML and save
-      const yamlContent = YAML.stringify(this.currentConfig, { 
+      const yamlContent = YAML.stringify(this.currentConfig, {
         indent: 2,
       });
-      
+
       await writeFile(targetPath, yamlContent, 'utf-8');
-      
+
       this.logger.info(`Configuration saved to ${targetPath}`);
       this.emit('configurationSaved', { path: targetPath });
     } catch (error) {
@@ -422,13 +472,13 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
     this.currentConfig = this.getDefaultConfiguration();
     this.configSources.clear();
     this.recordConfigSource('reset', 'override', 'reset');
-    
+
     this.emit('configurationReset', this.currentConfig);
-    
+
     if (this.eventBus) {
       this.eventBus.emit('system:configuration-reset', { config: this.currentConfig });
     }
-    
+
     this.logger.info('Configuration reset to defaults');
   }
 
@@ -455,7 +505,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           features: [],
         } as import('../types/unified-types.js').ApplicationConfiguration,
         models: {} as import('../types/unified-types.js').ModelConfiguration,
-        voices: {} as import('../types/unified-types.js').VoiceSystemConfiguration, 
+        voices: {} as import('../types/unified-types.js').VoiceSystemConfiguration,
         tools: {} as ToolConfiguration,
         security: {} as SecurityConfiguration,
         performance: {} as PerformanceConfiguration,
@@ -483,10 +533,10 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
             retries: 3,
             backoffStrategy: 'exponential',
             // capabilities: [ // Removed - not in ProviderConfiguration interface
-              // { type: 'completion', supported: true },
-              // { type: 'chat', supported: true },
-              // { type: 'tools', supported: true },
-              // { type: 'code', supported: true },
+            // { type: 'completion', supported: true },
+            // { type: 'chat', supported: true },
+            // { type: 'tools', supported: true },
+            // { type: 'code', supported: true },
             // ],
           },
           {
@@ -500,8 +550,8 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
             retries: 3,
             backoffStrategy: 'exponential',
             // capabilities: [ // Removed - not in ProviderConfiguration interface
-              // { type: 'completion', supported: true },
-              // { type: 'chat', supported: true },
+            // { type: 'completion', supported: true },
+            // { type: 'chat', supported: true },
             // ],
           },
         ],
@@ -510,7 +560,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         routing: {
           strategy: 'round_robin',
           healthCheckInterval: 30000,
-          failoverThreshold: 3
+          failoverThreshold: 3,
           // healthCheck: true, // Removed - not in ModelRoutingConfiguration interface
           // loadBalancing: true // Removed - not in ModelRoutingConfiguration interface
         },
@@ -518,7 +568,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           enabled: true,
           chain: ['ollama', 'lm-studio'],
           maxRetries: 3,
-          backoffMs: 1000
+          backoffMs: 1000,
           // timeoutMs: 30000, // Removed - not in FallbackConfiguration interface
           // providers: ['ollama', 'lm-studio'] // Renamed to chain
         },
@@ -537,28 +587,28 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           retention: {
             days: 30,
             maxSizeMB: 100,
-            compressionEnabled: true
+            compressionEnabled: true,
           },
           destinations: [
             {
               type: 'file' as const,
               configuration: {
-                path: './logs/audit.log'
+                path: './logs/audit.log',
               },
-              enabled: true
-            }
-          ]
+              enabled: true,
+            },
+          ],
         },
         encryption: {
           enabled: false,
           algorithm: 'AES-256',
           keyRotationIntervalDays: 90,
           encryptAtRest: false,
-          encryptInTransit: true
+          encryptInTransit: true,
           // keyRotationDays: 90 // Fixed - should be keyRotationIntervalDays
         },
         enableSandbox: true,
-        securityLevel: 'medium'
+        securityLevel: 'medium',
         // sandboxTimeout: 60000, // Removed - not in SecurityConfiguration interface
         // maxInputLength: 50000, // Removed - not in SecurityConfiguration interface
         // enableInputSanitization: true, // Removed - not in SecurityConfiguration interface
@@ -574,47 +624,55 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           type: 'memory',
           maxSizeMB: 100,
           ttlSeconds: 300,
-          evictionPolicy: 'lru'
+          evictionPolicy: 'lru',
         },
         pooling: {
           connections: {
             maxConnections: 10,
             minConnections: 2,
             acquireTimeoutMs: 5000,
-            idleTimeoutMs: 300000
+            idleTimeoutMs: 300000,
           },
           threads: {
             coreSize: 2,
             maxSize: 4,
             queueSize: 100,
-            keepAliveMs: 60000
-          }
+            keepAliveMs: 60000,
+          },
         },
         optimization: {
           enabled: true,
           strategies: [],
-          adaptiveTuning: true
+          adaptiveTuning: true,
         },
         monitoring: {
           enabled: true,
           metrics: [],
           alerts: [],
-          dashboards: []
+          dashboards: [],
         },
         maxConcurrentRequests: 3,
         enableCaching: true,
         defaultTimeout: 30000,
         preferGPU: false,
-        memoryThresholdMB: 512
+        memoryThresholdMB: 512,
       },
       voice: {
         enabled: true,
         defaultVoices: ['explorer', 'developer'],
-        availableVoices: ['explorer', 'maintainer', 'architect', 'developer', 'analyzer', 'optimizer', 'guardian'],
+        availableVoices: [
+          'explorer',
+          'maintainer',
+          'architect',
+          'developer',
+          'analyzer',
+          'optimizer',
+          'guardian',
+        ],
         parallelVoices: true,
         maxConcurrentVoices: 3,
         consensusThreshold: 0.7,
-        voices: {}
+        voices: {},
       },
       tools: {
         enabled: true,
@@ -629,11 +687,11 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
             maxCpuPercent: 50,
             maxDiskMB: 100,
             maxExecutionTimeMs: 30000,
-            maxFileDescriptors: 100
+            maxFileDescriptors: 100,
           },
           networkIsolation: false,
-          fileSystemIsolation: true
-        }
+          fileSystemIsolation: true,
+        },
       },
       infrastructure: {
         database: {
@@ -647,7 +705,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
             schedule: '0 2 * * *', // daily at 2am
             retention: 7, // 7 days
             compression: true,
-            destination: join(homedir(), '.codecrucible', 'backups')
+            destination: join(homedir(), '.codecrucible', 'backups'),
           },
         },
         storage: {
@@ -660,9 +718,9 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
               enabled: false,
               schedule: '0 3 * * *',
               retention: 30,
-              destination: join(homedir(), '.codecrucible', 'storage-backups')
-            }
-          }
+              destination: join(homedir(), '.codecrucible', 'storage-backups'),
+            },
+          },
           // credentials: {}, // Removed - not in StorageConfiguration interface
         },
         messaging: {
@@ -672,8 +730,8 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
             queueSize: 1000,
             batchSize: 100,
             retries: 3,
-            timeout: 5000
-          }
+            timeout: 5000,
+          },
           // queueSize: 1000, // Removed - not in MessagingConfiguration interface, moved to configuration
           // batchSize: 100, // Removed - not in MessagingConfiguration interface, moved to configuration
           // retries: 3, // Removed - not in MessagingConfiguration interface, moved to configuration
@@ -685,8 +743,8 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           tls: {
             enabled: false,
             version: 'TLS1.3',
-            verifyPeer: true
-          }
+            verifyPeer: true,
+          },
           // enableCORS: true, // Removed - not in NetworkConfiguration interface
           // allowedOrigins: ['http://localhost:3000', 'http://localhost:3001'], // Removed - not in NetworkConfiguration interface
           // rateLimit: { // Removed - not in NetworkConfiguration interface
@@ -695,7 +753,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           //   windowMs: 60000
           // },
           // compression: true // Removed - not in NetworkConfiguration interface
-        }
+        },
         // streaming: { // Removed - not in InfrastructureConfiguration interface
         //   enabled: true,
         //   bufferSize: 1024,
@@ -728,7 +786,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
             type: 'counter',
             enabled: true,
             labels: ['method', 'status'],
-            aggregation: 'sum'
+            aggregation: 'sum',
             // description: 'Total number of requests' // Removed - not in MetricConfiguration interface
           },
           {
@@ -736,13 +794,13 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
             type: 'histogram',
             enabled: true,
             labels: ['method'],
-            aggregation: 'avg'
+            aggregation: 'avg',
             // description: 'Response time in milliseconds' // Removed - not in MetricConfiguration interface
-          }
+          },
         ],
         alerts: [],
-        dashboards: []
-      }
+        dashboards: [],
+      },
     };
   }
 
@@ -771,12 +829,12 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
 
   private async loadSpecializedConfigs(): Promise<Map<string, Partial<UnifiedConfiguration>>> {
     const configs = new Map<string, Partial<UnifiedConfiguration>>();
-    
+
     const specializedFiles = [
       'voices.yaml',
-      'model-config.yaml', 
+      'model-config.yaml',
       'security.yaml',
-      'performance.yaml'
+      'performance.yaml',
     ];
 
     for (const filename of specializedFiles) {
@@ -785,7 +843,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         await access(filePath);
         const content = await readFile(filePath, 'utf-8');
         const parsed = YAML.parse(content);
-        
+
         if (filename === 'voices.yaml') {
           configs.set(filename, this.transformVoicesConfig(parsed));
         } else {
@@ -801,13 +859,13 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
 
   private async loadLegacyConfigs(): Promise<Map<string, Partial<UnifiedConfiguration>>> {
     const configs = new Map<string, Partial<UnifiedConfiguration>>();
-    
+
     const legacyFiles = [
       'codecrucible.config.json',
       'config/unified-model-config.yaml',
       'config/hybrid.yaml',
-      'config/hybrid-config.json', 
-      'config/optimized-model-config.json'
+      'config/hybrid-config.json',
+      'config/optimized-model-config.json',
     ];
 
     for (const filename of legacyFiles) {
@@ -815,14 +873,14 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         const filePath = join(process.cwd(), filename);
         await access(filePath);
         const content = await readFile(filePath, 'utf-8');
-        
+
         let parsed: any;
         if (filename.endsWith('.json')) {
           parsed = JSON.parse(content);
         } else {
           parsed = YAML.parse(content);
         }
-        
+
         configs.set(filename, this.transformLegacyConfig(parsed, filename));
       } catch {
         // File doesn't exist, skip
@@ -862,61 +920,67 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
 
   private loadFromEnvironment(): Partial<UnifiedConfiguration> {
     const config: Partial<UnifiedConfiguration> = {};
-    
+
     // Map environment variables to configuration
     if (process.env.CC_LOG_LEVEL) {
       config.application = { ...config.application, logLevel: process.env.CC_LOG_LEVEL as any };
     }
-    
+
     if (process.env.CC_ENVIRONMENT) {
-      config.application = { ...config.application, environment: process.env.CC_ENVIRONMENT as any };
+      config.application = {
+        ...config.application,
+        environment: process.env.CC_ENVIRONMENT as any,
+      };
     }
-    
+
     if (process.env.CC_OLLAMA_ENDPOINT) {
       // Update ollama endpoint in providers
       // This would be more complex in practice
     }
-    
+
     if (process.env.SMITHERY_API_KEY) {
       config.infrastructure = {
-        ...config.infrastructure
+        ...config.infrastructure,
         // integrations: { // Removed - not in InfrastructureConfiguration interface
-          // ...config.infrastructure?.integrations,
-          // smithery: {
-          //   enabled: true,
-          //   apiKey: process.env.SMITHERY_API_KEY,
-          //   autoDiscovery: true,
-          //   servers: [],
-          // },
+        // ...config.infrastructure?.integrations,
+        // smithery: {
+        //   enabled: true,
+        //   apiKey: process.env.SMITHERY_API_KEY,
+        //   autoDiscovery: true,
+        //   servers: [],
+        // },
         // },
       };
     }
-    
+
     return config;
   }
 
   private loadFromCliArgs(): Partial<UnifiedConfiguration> {
     const config: Partial<UnifiedConfiguration> = {};
     const args = process.argv;
-    
+
     // Parse CLI arguments
     if (args.includes('--verbose')) {
       config.application = { ...config.application, logLevel: 'debug' };
     }
-    
+
     if (args.includes('--no-stream')) {
       config.infrastructure = {
-        ...config.infrastructure
+        ...config.infrastructure,
         // streaming: { ...config.infrastructure?.streaming, enabled: false }, // Removed - not in InfrastructureConfiguration interface
       };
     }
-    
+
     // Add more CLI argument parsing as needed
-    
+
     return config;
   }
 
-  private mergeConfigurations(base: UnifiedConfiguration, override: Partial<UnifiedConfiguration>): UnifiedConfiguration {
+  private mergeConfigurations(
+    base: UnifiedConfiguration,
+    override: Partial<UnifiedConfiguration>
+  ): UnifiedConfiguration {
     // Deep merge configurations
     // This is a simplified version - in practice you'd use a proper deep merge utility
     return {
@@ -938,29 +1002,37 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         // streaming: { ...base.infrastructure.streaming, ...override.infrastructure?.streaming }, // Removed - not in InfrastructureConfiguration interface
         // monitoring: { ...base.infrastructure.monitoring, ...override.infrastructure?.monitoring }, // Removed - not in InfrastructureConfiguration interface
         // integrations: { // Removed - not in InfrastructureConfiguration interface
-          // ...base.infrastructure.integrations,
-          // ...override.infrastructure?.integrations,
-          // smithery: { ...base.infrastructure.integrations.smithery, ...override.infrastructure?.integrations?.smithery },
-          // e2b: { ...base.infrastructure.integrations.e2b, ...override.infrastructure?.integrations?.e2b },
+        // ...base.infrastructure.integrations,
+        // ...override.infrastructure?.integrations,
+        // smithery: { ...base.infrastructure.integrations.smithery, ...override.infrastructure?.integrations?.smithery },
+        // e2b: { ...base.infrastructure.integrations.e2b, ...override.infrastructure?.integrations?.e2b },
         // },
       },
     };
   }
 
-  private recordConfigSource(key: string, sourceType: ConfigurationSource['type'], sourceName: string, path?: string): void {
+  private recordConfigSource(
+    key: string,
+    sourceType: ConfigurationSource['type'],
+    sourceName: string,
+    path?: string
+  ): void {
     const source = this.createConfigurationSource(sourceType, sourceName);
     this.configSources.set(key, {
       source,
       fields: [], // Will be populated by caller if needed
       loadTime: new Date(),
-      checksum: path ? `${path}-${Date.now()}` : `${sourceName}-${Date.now()}`
+      checksum: path ? `${path}-${Date.now()}` : `${sourceName}-${Date.now()}`,
     });
   }
 
-  private applySanitization(config: UnifiedConfiguration, warnings: ConfigurationWarning[]): UnifiedConfiguration {
+  private applySanitization(
+    config: UnifiedConfiguration,
+    warnings: ConfigurationWarning[]
+  ): UnifiedConfiguration {
     // Apply automatic fixes for common issues
     const sanitized = { ...config };
-    
+
     for (const warning of warnings) {
       switch (warning.field) {
         case 'model.timeout':
@@ -977,7 +1049,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         // Add more automatic fixes as needed
       }
     }
-    
+
     return sanitized;
   }
 
@@ -1009,7 +1081,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         version: config.app?.version || '4.0.7',
         environment: config.app?.environment || 'development',
         logLevel: config.logging?.level || config.app?.logLevel || 'info',
-        features: []
+        features: [],
         // enableReflection: true, // Removed - not in ApplicationConfiguration interface
         // reflectionMode: 'detailed' // Removed - not in ApplicationConfiguration interface
       };
@@ -1020,29 +1092,31 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       transformed.model = {
         defaultProvider: 'ollama',
         defaultModel: 'qwen2.5-coder:7b',
-        providers: [{
-          type: 'ollama',
-          name: 'ollama',
-          endpoint: config.model.endpoint || 'http://localhost:11434',
-          enabled: true,
-          priority: 1,
-          models: [config.model.name || 'qwen2.5-coder:7b']
-          // capabilities: [ // Removed - not in ProviderConfiguration interface
-          //   { type: 'completion', supported: true },
-          //   { type: 'chat', supported: true },
-          //   { type: 'code', supported: true },
-          // ],
-        }],
+        providers: [
+          {
+            type: 'ollama',
+            name: 'ollama',
+            endpoint: config.model.endpoint || 'http://localhost:11434',
+            enabled: true,
+            priority: 1,
+            models: [config.model.name || 'qwen2.5-coder:7b'],
+            // capabilities: [ // Removed - not in ProviderConfiguration interface
+            //   { type: 'completion', supported: true },
+            //   { type: 'chat', supported: true },
+            //   { type: 'code', supported: true },
+            // ],
+          },
+        ],
         routing: {
           strategy: 'round_robin',
           healthCheckInterval: 30000,
-          failoverThreshold: 3
+          failoverThreshold: 3,
         },
         fallback: {
           enabled: true,
           chain: ['ollama'],
           maxRetries: 3,
-          backoffMs: 1000
+          backoffMs: 1000,
         },
         timeout: this.parseTimeout(config.model.timeout) || 30000,
         temperature: parseFloat(config.model.temperature) || 0.7,
@@ -1062,20 +1136,22 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           retention: {
             days: 30,
             maxSizeMB: 100,
-            compressionEnabled: true
+            compressionEnabled: true,
           },
-          destinations: [{
-            type: 'file',
-            configuration: { path: './logs/audit.log' },
-            enabled: true
-          }]
+          destinations: [
+            {
+              type: 'file',
+              configuration: { path: './logs/audit.log' },
+              enabled: true,
+            },
+          ],
         },
         encryption: {
           enabled: false,
           algorithm: 'AES-256',
           keyRotationIntervalDays: 90,
           encryptAtRest: false,
-          encryptInTransit: true
+          encryptInTransit: true,
         },
         enableSandbox: config.e2b?.enabled || config.safety?.commandValidation || true,
       };
@@ -1088,33 +1164,34 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           enabled: config.performance.responseCache?.enabled || true,
           type: 'memory',
           maxSizeMB: parseInt(config.performance.responseCache?.maxSize) || 100,
-          ttlSeconds: (this.parseTimeout(config.performance.responseCache?.maxAge) || 300000) / 1000,
-          evictionPolicy: 'lru'
+          ttlSeconds:
+            (this.parseTimeout(config.performance.responseCache?.maxAge) || 300000) / 1000,
+          evictionPolicy: 'lru',
         },
         pooling: {
           connections: {
             maxConnections: 10,
             minConnections: 2,
             acquireTimeoutMs: 5000,
-            idleTimeoutMs: 300000
+            idleTimeoutMs: 300000,
           },
           threads: {
             coreSize: 2,
             maxSize: 4,
             queueSize: 100,
-            keepAliveMs: 60000
-          }
+            keepAliveMs: 60000,
+          },
         },
         optimization: {
           enabled: true,
           strategies: [],
-          adaptiveTuning: true
+          adaptiveTuning: true,
         },
         monitoring: {
           enabled: true,
           metrics: [],
           alerts: [],
-          dashboards: []
+          dashboards: [],
         },
         maxConcurrentRequests: parseInt(config.performance.voiceParallelism?.maxConcurrent) || 3,
         enableCaching: config.performance.responseCache?.enabled || true,
@@ -1130,7 +1207,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         parallelVoices: config.voices.parallel || true,
         maxConcurrentVoices: config.voices.maxConcurrent || 3,
         consensusThreshold: 0.7,
-        voices: {}
+        voices: {},
       };
     }
 
@@ -1149,11 +1226,11 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
             maxCpuPercent: 50,
             maxDiskMB: 100,
             maxExecutionTimeMs: 30000,
-            maxFileDescriptors: 100
+            maxFileDescriptors: 100,
           },
           networkIsolation: false,
-          fileSystemIsolation: true
-        }
+          fileSystemIsolation: true,
+        },
       };
     }
 
@@ -1166,14 +1243,18 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
     // Model configuration from models section
     if (config.models) {
       const providers: any[] = [];
-      
+
       for (const [modelKey, modelConfig] of Object.entries(config.models as any)) {
         const configObj = modelConfig as any;
         if (configObj && typeof configObj === 'object') {
           const provider = {
             type: configObj.provider || 'ollama',
             name: configObj.provider || 'ollama',
-            endpoint: configObj.endpoint || (configObj.provider === 'ollama' ? 'http://localhost:11434' : 'https://api.openai.com/v1'),
+            endpoint:
+              configObj.endpoint ||
+              (configObj.provider === 'ollama'
+                ? 'http://localhost:11434'
+                : 'https://api.openai.com/v1'),
             enabled: true,
             priority: providers.length + 1,
             models: [configObj.model || 'qwen2.5-coder:7b'],
@@ -1190,13 +1271,13 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         routing: {
           strategy: 'round_robin',
           healthCheckInterval: 30000,
-          failoverThreshold: 3
+          failoverThreshold: 3,
         },
         fallback: {
           enabled: true,
           chain: providers.map(p => p.name),
           maxRetries: 3,
-          backoffMs: 1000
+          backoffMs: 1000,
         },
         timeout: 30000,
         temperature: 0.7,
@@ -1211,33 +1292,33 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           enabled: config.agent?.enableCaching || config.features?.enableCaching || true,
           type: 'memory',
           maxSizeMB: 100,
-          ttlSeconds: (config.features?.cacheExpiry || 300),
-          evictionPolicy: 'lru'
+          ttlSeconds: config.features?.cacheExpiry || 300,
+          evictionPolicy: 'lru',
         },
         pooling: {
           connections: {
             maxConnections: 10,
             minConnections: 2,
             acquireTimeoutMs: 5000,
-            idleTimeoutMs: 300000
+            idleTimeoutMs: 300000,
           },
           threads: {
             coreSize: 2,
             maxSize: 4,
             queueSize: 100,
-            keepAliveMs: 60000
-          }
+            keepAliveMs: 60000,
+          },
         },
         optimization: {
           enabled: true,
           strategies: [],
-          adaptiveTuning: true
+          adaptiveTuning: true,
         },
         monitoring: {
           enabled: true,
           metrics: [],
           alerts: [],
-          dashboards: []
+          dashboards: [],
         },
         maxConcurrentRequests: config.agent?.maxConcurrency || 3,
         enableCaching: config.agent?.enableCaching || config.features?.enableCaching || true,
@@ -1256,20 +1337,22 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           retention: {
             days: 30,
             maxSizeMB: 100,
-            compressionEnabled: true
+            compressionEnabled: true,
           },
-          destinations: [{
-            type: 'file',
-            configuration: { path: './logs/audit.log' },
-            enabled: true
-          }]
+          destinations: [
+            {
+              type: 'file',
+              configuration: { path: './logs/audit.log' },
+              enabled: true,
+            },
+          ],
         },
         encryption: {
           enabled: false,
           algorithm: 'AES-256',
           keyRotationIntervalDays: 90,
           encryptAtRest: false,
-          encryptInTransit: true
+          encryptInTransit: true,
         },
         enableSandbox: config.security.sandboxMode || true,
       };
@@ -1284,7 +1367,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         parallelVoices: true,
         maxConcurrentVoices: config.features.maxConcurrentVoices || 3,
         consensusThreshold: 0.7,
-        voices: {}
+        voices: {},
       };
     }
 
@@ -1318,13 +1401,13 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         routing: {
           strategy: 'round_robin',
           healthCheckInterval: 30000,
-          failoverThreshold: 3
+          failoverThreshold: 3,
         },
         fallback: {
           enabled: true,
           chain: config.llm.fallback_chain || [config.llm.default_provider],
           maxRetries: 3,
-          backoffMs: 1000
+          backoffMs: 1000,
         },
         timeout: config.llm.providers?.ollama?.timeout?.response || 30000,
         temperature: 0.7,
@@ -1376,13 +1459,13 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         routing: {
           strategy: 'round_robin',
           healthCheckInterval: 30000,
-          failoverThreshold: 3
+          failoverThreshold: 3,
         },
         fallback: {
           enabled: true,
           chain: ['ollama', 'lm-studio'],
           maxRetries: 3,
-          backoffMs: 1000
+          backoffMs: 1000,
         },
         timeout: 30000,
         temperature: 0.7,
@@ -1400,25 +1483,27 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       transformed.model = {
         defaultProvider: 'ollama',
         defaultModel: 'qwen2.5-coder:7b',
-        providers: [{
-          type: 'ollama',
-          name: 'ollama',
-          endpoint: config.modelPreloader?.endpoint || 'http://localhost:11434',
-          enabled: true,
-          priority: 1,
-          models: config.modelPreloader?.primaryModels || []
-          // capabilities: [{ type: 'completion', supported: true }], // Removed - not in ProviderConfiguration interface
-        }],
+        providers: [
+          {
+            type: 'ollama',
+            name: 'ollama',
+            endpoint: config.modelPreloader?.endpoint || 'http://localhost:11434',
+            enabled: true,
+            priority: 1,
+            models: config.modelPreloader?.primaryModels || [],
+            // capabilities: [{ type: 'completion', supported: true }], // Removed - not in ProviderConfiguration interface
+          },
+        ],
         routing: {
           strategy: 'round_robin',
           healthCheckInterval: 30000,
-          failoverThreshold: 3
+          failoverThreshold: 3,
         },
         fallback: {
           enabled: true,
           chain: ['ollama'],
           maxRetries: config.modelPreloader?.retryAttempts || 2,
-          backoffMs: 1000
+          backoffMs: 1000,
         },
         timeout: config.hybridClient?.defaultTimeout || 60000,
         temperature: 0.7,
@@ -1433,32 +1518,32 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
           type: 'memory',
           maxSizeMB: 100,
           ttlSeconds: (config.hybridClient?.cacheDuration || 300000) / 1000,
-          evictionPolicy: 'lru'
+          evictionPolicy: 'lru',
         },
         pooling: {
           connections: {
             maxConnections: 10,
             minConnections: 2,
             acquireTimeoutMs: 5000,
-            idleTimeoutMs: 300000
+            idleTimeoutMs: 300000,
           },
           threads: {
             coreSize: 2,
             maxSize: 4,
             queueSize: 100,
-            keepAliveMs: 60000
-          }
+            keepAliveMs: 60000,
+          },
         },
         optimization: {
           enabled: config.performance.enableMemoryOptimization !== false,
           strategies: [],
-          adaptiveTuning: true
+          adaptiveTuning: true,
         },
         monitoring: {
           enabled: true,
           metrics: [],
           alerts: [],
-          dashboards: []
+          dashboards: [],
         },
         maxConcurrentRequests: config.performance.maxConcurrentRequests || 2,
         enableCaching: config.performance.enableModelCaching !== false,
@@ -1473,7 +1558,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
 
     if (config.perspectives || config.roles || config.presets) {
       const voiceSettings: Record<string, any> = {};
-      
+
       // Transform perspectives
       if (config.perspectives) {
         for (const [voiceName, voiceConfig] of Object.entries(config.perspectives)) {
@@ -1505,7 +1590,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
         parallelVoices: true,
         maxConcurrentVoices: 3,
         consensusThreshold: 0.7,
-        voices: voiceSettings
+        voices: voiceSettings,
       };
     }
 
@@ -1573,7 +1658,10 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
     return undefined;
   }
 
-  private detectConflicts(baseConfig: UnifiedConfiguration, newConfig: Partial<UnifiedConfiguration>): string[] {
+  private detectConflicts(
+    baseConfig: UnifiedConfiguration,
+    newConfig: Partial<UnifiedConfiguration>
+  ): string[] {
     const conflicts: string[] = [];
 
     // Model timeout conflicts
@@ -1582,23 +1670,43 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
     }
 
     // Model provider conflicts
-    if (newConfig.model?.defaultProvider && baseConfig.model.defaultProvider !== newConfig.model.defaultProvider) {
-      conflicts.push(`model.defaultProvider: ${baseConfig.model.defaultProvider} vs ${newConfig.model.defaultProvider}`);
+    if (
+      newConfig.model?.defaultProvider &&
+      baseConfig.model.defaultProvider !== newConfig.model.defaultProvider
+    ) {
+      conflicts.push(
+        `model.defaultProvider: ${baseConfig.model.defaultProvider} vs ${newConfig.model.defaultProvider}`
+      );
     }
 
     // Security level conflicts
-    if (newConfig.security?.securityLevel && baseConfig.security.securityLevel !== newConfig.security.securityLevel) {
-      conflicts.push(`security.securityLevel: ${baseConfig.security.securityLevel} vs ${newConfig.security.securityLevel}`);
+    if (
+      newConfig.security?.securityLevel &&
+      baseConfig.security.securityLevel !== newConfig.security.securityLevel
+    ) {
+      conflicts.push(
+        `security.securityLevel: ${baseConfig.security.securityLevel} vs ${newConfig.security.securityLevel}`
+      );
     }
 
     // Performance concurrency conflicts
-    if (newConfig.performance?.maxConcurrentRequests && baseConfig.performance.maxConcurrentRequests !== newConfig.performance.maxConcurrentRequests) {
-      conflicts.push(`performance.maxConcurrentRequests: ${baseConfig.performance.maxConcurrentRequests} vs ${newConfig.performance.maxConcurrentRequests}`);
+    if (
+      newConfig.performance?.maxConcurrentRequests &&
+      baseConfig.performance.maxConcurrentRequests !== newConfig.performance.maxConcurrentRequests
+    ) {
+      conflicts.push(
+        `performance.maxConcurrentRequests: ${baseConfig.performance.maxConcurrentRequests} vs ${newConfig.performance.maxConcurrentRequests}`
+      );
     }
 
     // Caching conflicts
-    if (newConfig.performance?.enableCaching !== undefined && baseConfig.performance.enableCaching !== newConfig.performance.enableCaching) {
-      conflicts.push(`performance.enableCaching: ${baseConfig.performance.enableCaching} vs ${newConfig.performance.enableCaching}`);
+    if (
+      newConfig.performance?.enableCaching !== undefined &&
+      baseConfig.performance.enableCaching !== newConfig.performance.enableCaching
+    ) {
+      conflicts.push(
+        `performance.enableCaching: ${baseConfig.performance.enableCaching} vs ${newConfig.performance.enableCaching}`
+      );
     }
 
     return conflicts;
@@ -1678,7 +1786,7 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
     try {
       const keys = path.split('.');
       const updates: any = {};
-      
+
       // Build nested object structure
       let current = updates;
       for (let i = 0; i < keys.length - 1; i++) {
@@ -1688,8 +1796,11 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       current[keys[keys.length - 1]] = value;
 
       // Use existing updateConfiguration method
-      await this.updateConfiguration(updates, this.createConfigurationSource('override', 'runtime'));
-      
+      await this.updateConfiguration(
+        updates,
+        this.createConfigurationSource('override', 'runtime')
+      );
+
       this.logger.debug(`Set config path "${path}" to:`, value);
     } catch (error) {
       this.logger.error(`Failed to set config path "${path}":`, error);
@@ -1756,11 +1867,11 @@ export class UnifiedConfigurationManager extends EventEmitter implements IUnifie
       const lastKey = keys[keys.length - 1];
       if (current && typeof current === 'object' && lastKey in current) {
         delete current[lastKey];
-        
+
         // Update configuration
         this.currentConfig = config;
         this.emit('configurationChanged', { path, action: 'delete' });
-        
+
         return true;
       }
 

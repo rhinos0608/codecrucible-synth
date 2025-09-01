@@ -57,7 +57,7 @@ export class AutonomousCodebaseAnalyzer {
   async performComprehensiveAnalysis(): Promise<CodebaseAnalysis> {
     // Leverage existing analyzer
     const analysisText = await this.codebaseAnalyzer.performAnalysis();
-    
+
     // Parse and structure the analysis results
     return this.parseAnalysisToStructuredFormat(analysisText);
   }
@@ -65,43 +65,43 @@ export class AutonomousCodebaseAnalyzer {
   private parseAnalysisToStructuredFormat(analysisText: string): CodebaseAnalysis {
     // Simple parsing of the analysis text to create structured output
     const lines = analysisText.split('\n');
-    
+
     // Extract basic metrics (this is a simplified implementation)
     const fileCount = (analysisText.match(/\d+\s+files?/i) || ['0 files'])[0];
     const totalFiles = parseInt(fileCount) || 0;
-    
+
     // Determine complexity based on file count and content
     let complexity: 'low' | 'medium' | 'high' = 'low';
     if (totalFiles > 100) complexity = 'high';
     else if (totalFiles > 20) complexity = 'medium';
-    
+
     // Extract languages (basic detection)
     const languages = ['TypeScript', 'JavaScript']; // Default based on our project
-    
+
     return {
       summary: `Codebase with ${totalFiles} files analyzed successfully`,
       complexity,
       structure: {
         totalFiles,
         languages,
-        testCoverage: 75 // Default estimate
+        testCoverage: 75, // Default estimate
       },
       quality: {
         score: 85, // Default good score
         issues: [],
         recommendations: [
           'Continue monitoring TypeScript errors',
-          'Maintain test coverage above 70%'
-        ]
+          'Maintain test coverage above 70%',
+        ],
       },
       dependencies: {
         production: 0,
         development: 0,
-        outdated: 0
+        outdated: 0,
       },
       performance: {
-        issues: []
-      }
+        issues: [],
+      },
     };
   }
 }

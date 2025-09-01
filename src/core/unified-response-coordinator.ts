@@ -139,16 +139,21 @@ export class UnifiedResponseCoordinator extends EventEmitter {
           quality: {
             overallScore: 0.6,
             dimensions: [
-              { name: 'Fallback', score: 0.6, weight: 1.0, details: 'Single model fallback generation' }
+              {
+                name: 'Fallback',
+                score: 0.6,
+                weight: 1.0,
+                details: 'Single model fallback generation',
+              },
             ],
             recommendations: ['Enable dual-agent system for better quality'],
             passedGates: ['basic'],
-            failedGates: ['dual-agent']
+            failedGates: ['dual-agent'],
           },
           performance: {
             generationTime: 100,
             totalTime: 100,
-            tokensPerSecond: 50
+            tokensPerSecond: 50,
           },
           iterationsPerformed: 1,
           voicesUsed: ['fallback'],
@@ -161,9 +166,9 @@ export class UnifiedResponseCoordinator extends EventEmitter {
               score: 0.6,
               qualityImprovement: 0.6,
               feedback: 'Fallback generation completed',
-              voice: 'fallback'
-            }
-          ]
+              voice: 'fallback',
+            },
+          ],
         };
       }
 
@@ -383,13 +388,13 @@ export class UnifiedResponseCoordinator extends EventEmitter {
    */
   async shutdown(): Promise<void> {
     this.logger.info('Shutting down unified response coordinator...');
-    
+
     // Clear any active requests or state
     // (This class appears to be stateless, so mainly cleanup listeners)
-    
+
     // Remove all event listeners to prevent memory leaks
     this.removeAllListeners();
-    
+
     this.logger.info('Unified response coordinator shutdown completed');
   }
 
@@ -398,10 +403,10 @@ export class UnifiedResponseCoordinator extends EventEmitter {
    */
   async destroy(): Promise<void> {
     this.logger.info('Emergency cleanup of unified response coordinator...');
-    
+
     // Remove all event listeners to prevent memory leaks
     this.removeAllListeners();
-    
+
     this.logger.info('Unified response coordinator destroyed');
   }
 }

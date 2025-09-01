@@ -1,9 +1,9 @@
 /**
  * Legacy Performance Utils - Compatibility Stub
- * 
+ *
  * This is a minimal stub to maintain backward compatibility
  * during the architectural migration.
- * 
+ *
  * @deprecated Use UnifiedPerformanceSystem from domain/services instead
  */
 
@@ -25,7 +25,7 @@ export class PerformanceMonitor extends EventEmitter {
   endMeasurement(id: string): number {
     const startTime = this.measurements.get(id);
     if (!startTime) return 0;
-    
+
     const duration = performance.now() - startTime;
     this.measurements.delete(id);
     return duration;
@@ -33,7 +33,7 @@ export class PerformanceMonitor extends EventEmitter {
 
   getMetrics(): any {
     return {
-      activeMeasurements: this.measurements.size
+      activeMeasurements: this.measurements.size,
     };
   }
 
@@ -42,14 +42,14 @@ export class PerformanceMonitor extends EventEmitter {
     return {
       ollama: { averageLatency: 150, successRate: 0.95 },
       lmstudio: { averageLatency: 100, successRate: 0.98 },
-      huggingface: { averageLatency: 300, successRate: 0.90 }
+      huggingface: { averageLatency: 300, successRate: 0.9 },
     };
   }
 
   getSummary(): any {
     return {
       activeMeasurements: this.measurements.size,
-      measurementCount: this.measurements.size
+      measurementCount: this.measurements.size,
     };
   }
 }

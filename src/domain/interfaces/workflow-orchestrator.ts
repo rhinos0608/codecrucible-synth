@@ -1,6 +1,6 @@
 /**
  * Workflow Orchestrator Interface
- * 
+ *
  * This interface provides a mediator pattern to coordinate between
  * CLI, UnifiedModelClient, MCP-Manager, and Tools without circular dependencies.
  */
@@ -37,22 +37,22 @@ export interface IWorkflowOrchestrator {
    * Process a workflow request
    */
   processRequest(request: WorkflowRequest): Promise<WorkflowResponse>;
-  
+
   /**
    * Execute a tool with proper context and security
    */
   executeTool(toolName: string, args: any, context: WorkflowContext): Promise<any>;
-  
+
   /**
    * Process a model request with routing and fallbacks
    */
   processModelRequest(request: any, context: WorkflowContext): Promise<any>;
-  
+
   /**
    * Initialize the orchestrator with dependencies
    */
   initialize(dependencies: OrchestratorDependencies): Promise<void>;
-  
+
   /**
    * Shutdown and cleanup resources
    */
@@ -67,27 +67,27 @@ export interface LivingSpiralCoordinatorInterface {
    * Execute the complete Living Spiral process
    */
   executeSpiralProcess(initialPrompt: string): Promise<any>;
-  
+
   /**
-   * Execute a single spiral iteration  
+   * Execute a single spiral iteration
    */
   executeSpiralIteration(input: string, iteration: number): Promise<any>;
-  
+
   /**
    * Check if convergence has been achieved
    */
   checkConvergence(results: any[]): Promise<boolean>;
-  
+
   /**
    * Analyze code or files
    */
   analyzeCode(filePath: string, context: WorkflowContext): Promise<any>;
-  
+
   /**
    * Initialize the orchestrator with dependencies
    */
   initialize(dependencies: OrchestratorDependencies): Promise<void>;
-  
+
   /**
    * Shutdown and cleanup
    */

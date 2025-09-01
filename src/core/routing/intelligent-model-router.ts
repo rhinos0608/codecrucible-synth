@@ -90,6 +90,8 @@ export interface RoutingRequest {
   constraints: RoutingConstraints;
   userPreferences?: UserPreferences;
   sessionContext?: SessionContext;
+  tools?: any[]; // MCP tools provided - triggers function calling model selection
+  requiresFunctionCalling?: boolean; // Explicit function calling requirement
 }
 
 export interface TaskType {
@@ -114,6 +116,7 @@ export interface RoutingConstraints {
   excludedProviders?: string[];
   requireLocal?: boolean;
   requireStreaming?: boolean;
+  requireFunctionCalling?: boolean; // Force function calling capable models
 }
 
 export interface UserPreferences {
@@ -379,6 +382,19 @@ export class IntelligentModelRouter extends EventEmitter {
     };
     score += complexityMap[request.taskType.complexity] || 0.5;
 
+    // FUNCTION CALLING DETECTION: If tools provided or function calling required, increase complexity
+    if (request.tools && request.tools.length > 0) {
+      score += 0.3; // Function calling adds complexity
+      this.logger.info(
+        `🔧 Function calling detected: ${request.tools.length} tools available, increasing complexity score`
+      );
+    }
+
+    if (request.requiresFunctionCalling || request.constraints.requireFunctionCalling) {
+      score += 0.2; // Explicit function calling requirement
+      this.logger.info(`🔧 Explicit function calling requirement detected`);
+    }
+
     // Adjust based on query length and content
     const queryComplexity = this.analyzeQueryComplexity(request.query);
     score = (score + queryComplexity) / 2;
@@ -433,6 +449,67 @@ export class IntelligentModelRouter extends EventEmitter {
     return Math.min(1.0, complexity);
   }
 
+  /**
+   * Calculate function calling capability score based on research
+   * Best models: llama3.1:8b (1.0), qwen2.5-coder:7b (0.9), qwen2.5-coder:14b (0.95)
+   * Poor models: qwen2.5-coder:3b (0.3), gemma:2b (0.1), llama3.2:latest (0.2)
+   */
+  private calculateFunctionCallingScore(model: ModelSpec, provider: ModelProvider): number {
+    // Check if provider explicitly supports function calling
+    const hasFunctionCallingCapability = provider.capabilities.some(
+      cap => cap.feature === 'function-calling' && cap.supported
+    );
+
+    // If provider doesn't support function calling at all, return very low score
+    if (!hasFunctionCallingCapability && !model.supportedFeatures.includes('function-calling')) {
+      // Check model name for known function calling capable models
+      const modelName = model.name.toLowerCase();
+
+      // TIER 1: Excellent function calling (based on research + new models)
+      if (modelName.includes('gpt-oss') && modelName.includes('20b')) {
+        return 1.0; // Latest GPT model with excellent function calling
+      }
+      if (modelName.includes('llama3.1') && modelName.includes('8b')) {
+        return 1.0; // Best overall for function calling
+      }
+      if (modelName.includes('qwen2.5-coder') && modelName.includes('14b')) {
+        return 0.95; // Excellent performance
+      }
+      if (modelName.includes('qwen2.5-coder') && modelName.includes('7b')) {
+        return 0.9; // Very good function calling
+      }
+      if (modelName.includes('qwen2.5') && modelName.includes('32b')) {
+        return 0.95; // Most reliable according to research
+      }
+
+      // TIER 2: Moderate function calling
+      if (modelName.includes('qwen2.5-coder') && modelName.includes('3b')) {
+        return 0.3; // Limited function calling capabilities
+      }
+      if (modelName.includes('deepseek-coder')) {
+        return 0.7; // Decent function calling
+      }
+
+      // TIER 3: Poor function calling
+      if (
+        modelName.includes('llama3.2') ||
+        modelName.includes('gemma:2b') ||
+        modelName.includes('gemma2')
+      ) {
+        return 0.2; // Poor function calling support
+      }
+      if (modelName.includes('gemma') && !modelName.includes('instruct')) {
+        return 0.1; // Very poor function calling
+      }
+
+      // Default for unknown models
+      return 0.4;
+    }
+
+    // If explicitly marked as supporting function calling, give higher score
+    return 0.8;
+  }
+
   private async scoreProviders(
     request: RoutingRequest,
     taskAnalysis: TaskAnalysis
@@ -468,6 +545,27 @@ export class IntelligentModelRouter extends EventEmitter {
     let performanceScore = this.calculatePerformanceScore(provider, request);
     let costScore = this.calculateCostScore(model, request);
     const reliabilityScore = provider.performanceProfile.reliability;
+
+    // FUNCTION CALLING PRIORITY: Boost scores for function calling capable models
+    let functionCallingScore = 1.0;
+    if (
+      (request.tools && request.tools.length > 0) ||
+      request.requiresFunctionCalling ||
+      request.constraints.requireFunctionCalling
+    ) {
+      functionCallingScore = this.calculateFunctionCallingScore(model, provider);
+      this.logger.info(
+        `🔧 Function calling score for ${model.name}: ${functionCallingScore.toFixed(3)}`
+      );
+
+      // If model doesn't support function calling but it's required, heavily penalize
+      if (functionCallingScore < 0.3) {
+        qualityScore *= 0.1; // Severe penalty for non-function calling models
+        this.logger.warn(
+          `⚠️ Model ${model.name} has poor function calling support, applying penalty`
+        );
+      }
+    }
 
     // Apply user preferences
     if (request.userPreferences) {

@@ -1,7 +1,7 @@
 /**
  * Process AI Request Use Case
  * Application Layer - Clean orchestration of domain operations
- * 
+ *
  * Handles: Single AI request processing with proper input/output transformation
  * Imports: Domain services only (follows ARCHITECTURE.md)
  */
@@ -44,14 +44,14 @@ export class ProcessAIRequestUseCase {
   async execute(input: AIRequestInput): Promise<AIRequestOutput> {
     // Input validation and transformation
     const request = this.transformToProcessingRequest(input);
-    
+
     // Domain orchestration
     const selectedModel = await this.modelSelectionService.selectOptimalModel(request);
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request);
-    
+
     // Use primary voice for single request
     const primaryVoice = voiceSelection.primaryVoice;
-    
+
     // Generate response through model (domain operation)
     let response;
     if (selectedModel.generateResponse) {
@@ -65,7 +65,7 @@ export class ProcessAIRequestUseCase {
         timestamp: new Date(),
       };
     }
-    
+
     // Output transformation
     return this.transformToOutput(response, selectedModel.primaryModel, primaryVoice);
   }
@@ -85,14 +85,10 @@ export class ProcessAIRequestUseCase {
     } as any;
   }
 
-  private transformToOutput(
-    response: any,
-    model: Model,
-    voice: any
-  ): AIRequestOutput {
+  private transformToOutput(response: any, model: Model, voice: any): AIRequestOutput {
     return {
       content: response.content,
-      model: (model.name as unknown) as string,
+      model: model.name as unknown as string,
       voice: voice.id,
       metadata: {
         tokensUsed: response.tokensUsed || 0,

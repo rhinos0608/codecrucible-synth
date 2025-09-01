@@ -65,7 +65,7 @@ export class ToolIntegration {
 
       // Initialize filesystem tools lazily
       this.filesystemTools = new FilesystemTools();
-      
+
       // Register filesystem tools
       const fsTools = this.filesystemTools.getTools();
       for (const tool of fsTools) {
@@ -86,7 +86,7 @@ export class ToolIntegration {
    */
   async getLLMFunctions(): Promise<LLMFunction[]> {
     await this.ensureInitialized();
-    
+
     const functions: LLMFunction[] = [];
 
     for (const tool of this.availableTools.values()) {
@@ -146,11 +146,13 @@ export class ToolIntegration {
       const args = JSON.parse(toolCall.function.arguments);
 
       logger.info(`Executing tool: ${functionName} with args:`, args);
-      
+
       const tool = this.availableTools.get(functionName);
       if (!tool) {
         const availableTools = Array.from(this.availableTools.keys());
-        throw new Error(`Unknown tool: ${functionName}. Available tools: ${availableTools.join(', ')}`);
+        throw new Error(
+          `Unknown tool: ${functionName}. Available tools: ${availableTools.join(', ')}`
+        );
       }
 
       const context = {

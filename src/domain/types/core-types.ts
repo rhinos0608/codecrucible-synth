@@ -1,9 +1,9 @@
 /**
  * Core Domain Types - Compatibility Stub
- * 
+ *
  * This provides core types that were removed during refactoring
  * to maintain backward compatibility.
- * 
+ *
  * @deprecated Use unified-types.ts instead
  */
 

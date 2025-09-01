@@ -1,7 +1,7 @@
 /**
  * Architect/Editor Pattern Implementation for CodeCrucible Synth
  * Based on 2025 best practices from Aider, Cursor, and modern AI development workflows
- * 
+ *
  * Separates planning (Architect) from execution (Editor) for better workflow management
  */
 
@@ -84,9 +84,9 @@ export class Architect {
    */
   async createPlan(request: string, context?: any): Promise<ArchitectPlan> {
     logger.info('🏗️ Architect: Creating comprehensive plan for request');
-    
+
     const planPrompt = this.buildPlanningPrompt(request, context);
-    
+
     try {
       const response = await this.modelClient.generateText(planPrompt);
 
@@ -100,14 +100,17 @@ export class Architect {
   /**
    * Analyze feasibility and risks before execution
    */
-  async analyzeFeasibility(plan: ArchitectPlan, context?: any): Promise<{
+  async analyzeFeasibility(
+    plan: ArchitectPlan,
+    context?: any
+  ): Promise<{
     feasible: boolean;
     confidence: number;
     recommendations: string[];
     adjustments: string[];
   }> {
     logger.info('🔍 Architect: Analyzing plan feasibility');
-    
+
     const analysisPrompt = `
 Analyze the feasibility of this development plan:
 
@@ -139,7 +142,7 @@ Provide a JSON response with feasible, confidence, recommendations, and adjustme
         feasible: true,
         confidence: 0.7,
         recommendations: ['Proceed with caution', 'Monitor progress closely'],
-        adjustments: ['Consider breaking down complex tasks']
+        adjustments: ['Consider breaking down complex tasks'],
       };
     }
   }
@@ -176,10 +179,10 @@ Respond in a structured format that can be parsed into a plan object.
   private parsePlanResponse(response: string, request: string): ArchitectPlan {
     // For now, create a structured plan from the response
     // In a real implementation, this would parse LLM output more intelligently
-    
+
     const planId = `plan_${Date.now()}`;
     const complexity = this.inferComplexity(request);
-    
+
     return {
       id: planId,
       title: `Implementation Plan for: ${request.substring(0, 50)}...`,
@@ -193,49 +196,55 @@ Respond in a structured format that can be parsed into a plan object.
         'All code compiles successfully',
         'Tests pass',
         'Documentation updated',
-        'No breaking changes'
-      ]
+        'No breaking changes',
+      ],
     };
   }
 
   private createFallbackPlan(request: string): ArchitectPlan {
     const planId = `fallback_${Date.now()}`;
-    
+
     return {
       id: planId,
       title: `Basic Plan: ${request.substring(0, 50)}`,
       description: 'Fallback plan created due to planning system failure',
       complexity: 'moderate',
       estimatedDuration: 30,
-      phases: [{
-        id: 'phase_1',
-        name: 'Implementation',
-        description: 'Execute the requested changes',
-        type: 'implementation',
-        estimatedDuration: 30,
-        dependencies: [],
-        tasks: [{
-          id: 'task_1',
-          name: 'Execute Request',
-          description: request,
-          type: 'code',
-          priority: 'high',
-          estimatedEffort: 30,
-          requiredTools: ['file-tools', 'code-tools'],
-          files: [],
-          dependencies: []
-        }],
-        deliverables: ['Completed implementation']
-      }],
+      phases: [
+        {
+          id: 'phase_1',
+          name: 'Implementation',
+          description: 'Execute the requested changes',
+          type: 'implementation',
+          estimatedDuration: 30,
+          dependencies: [],
+          tasks: [
+            {
+              id: 'task_1',
+              name: 'Execute Request',
+              description: request,
+              type: 'code',
+              priority: 'high',
+              estimatedEffort: 30,
+              requiredTools: ['file-tools', 'code-tools'],
+              files: [],
+              dependencies: [],
+            },
+          ],
+          deliverables: ['Completed implementation'],
+        },
+      ],
       dependencies: [],
-      risks: [{ 
-        id: 'risk_1', 
-        description: 'Limited planning due to system error', 
-        impact: 'medium', 
-        probability: 'certain',
-        mitigation: 'Proceed with careful validation'
-      }],
-      successCriteria: ['Request completed successfully']
+      risks: [
+        {
+          id: 'risk_1',
+          description: 'Limited planning due to system error',
+          impact: 'medium',
+          probability: 'certain',
+          mitigation: 'Proceed with careful validation',
+        },
+      ],
+      successCriteria: ['Request completed successfully'],
     };
   }
 
@@ -244,17 +253,22 @@ Respond in a structured format that can be parsed into a plan object.
       simple: ['fix bug', 'update text', 'change config', 'add comment'],
       moderate: ['implement feature', 'refactor code', 'add tests', 'update docs'],
       complex: ['architecture change', 'multiple files', 'system redesign', 'migration'],
-      enterprise: ['entire system', 'production deployment', 'security audit', 'performance optimization']
+      enterprise: [
+        'entire system',
+        'production deployment',
+        'security audit',
+        'performance optimization',
+      ],
     };
 
     const requestLower = request.toLowerCase();
-    
+
     for (const [level, indicators] of Object.entries(complexityIndicators)) {
       if (indicators.some(indicator => requestLower.includes(indicator))) {
         return level as any;
       }
     }
-    
+
     return 'moderate';
   }
 
@@ -263,16 +277,16 @@ Respond in a structured format that can be parsed into a plan object.
       simple: 15,
       moderate: 45,
       complex: 120,
-      enterprise: 300
+      enterprise: 300,
     };
-    
+
     let duration = baseDurations[complexity as keyof typeof baseDurations] || 45;
-    
+
     // Adjust based on request content
     if (request.includes('test')) duration += 15;
     if (request.includes('documentation')) duration += 10;
     if (request.includes('multiple')) duration *= 1.5;
-    
+
     return Math.round(duration);
   }
 
@@ -284,7 +298,7 @@ Respond in a structured format that can be parsed into a plan object.
     const needsDocs = /document|readme|guide/i.test(request);
 
     const phases: PlanPhase[] = [];
-    
+
     if (needsAnalysis) {
       phases.push({
         id: 'analysis',
@@ -293,18 +307,20 @@ Respond in a structured format that can be parsed into a plan object.
         type: 'analysis',
         estimatedDuration: 10,
         dependencies: [],
-        tasks: [{
-          id: 'analyze_task',
-          name: 'Analyze Requirements',
-          description: 'Understand the current state and requirements',
-          type: 'code',
-          priority: 'high',
-          estimatedEffort: 10,
-          requiredTools: ['file-tools', 'analysis-tools'],
-          files: [],
-          dependencies: []
-        }],
-        deliverables: ['Analysis report']
+        tasks: [
+          {
+            id: 'analyze_task',
+            name: 'Analyze Requirements',
+            description: 'Understand the current state and requirements',
+            type: 'code',
+            priority: 'high',
+            estimatedEffort: 10,
+            requiredTools: ['file-tools', 'analysis-tools'],
+            files: [],
+            dependencies: [],
+          },
+        ],
+        deliverables: ['Analysis report'],
       });
     }
 
@@ -316,18 +332,20 @@ Respond in a structured format that can be parsed into a plan object.
         type: 'design',
         estimatedDuration: 15,
         dependencies: needsAnalysis ? ['analysis'] : [],
-        tasks: [{
-          id: 'design_task',
-          name: 'Create Design',
-          description: 'Design the solution architecture',
-          type: 'document',
-          priority: 'high',
-          estimatedEffort: 15,
-          requiredTools: ['documentation-tools'],
-          files: [],
-          dependencies: []
-        }],
-        deliverables: ['Design document']
+        tasks: [
+          {
+            id: 'design_task',
+            name: 'Create Design',
+            description: 'Design the solution architecture',
+            type: 'document',
+            priority: 'high',
+            estimatedEffort: 15,
+            requiredTools: ['documentation-tools'],
+            files: [],
+            dependencies: [],
+          },
+        ],
+        deliverables: ['Design document'],
       });
     }
 
@@ -337,19 +355,21 @@ Respond in a structured format that can be parsed into a plan object.
       description: 'Implement the solution',
       type: 'implementation',
       estimatedDuration: 30,
-      dependencies: needsDesign ? ['design'] : (needsAnalysis ? ['analysis'] : []),
-      tasks: [{
-        id: 'impl_task',
-        name: 'Implement Solution',
-        description: 'Write code to implement the solution',
-        type: 'code',
-        priority: 'critical',
-        estimatedEffort: 30,
-        requiredTools: ['code-tools', 'file-tools'],
-        files: [],
-        dependencies: []
-      }],
-      deliverables: ['Working implementation']
+      dependencies: needsDesign ? ['design'] : needsAnalysis ? ['analysis'] : [],
+      tasks: [
+        {
+          id: 'impl_task',
+          name: 'Implement Solution',
+          description: 'Write code to implement the solution',
+          type: 'code',
+          priority: 'critical',
+          estimatedEffort: 30,
+          requiredTools: ['code-tools', 'file-tools'],
+          files: [],
+          dependencies: [],
+        },
+      ],
+      deliverables: ['Working implementation'],
     });
 
     if (needsTesting) {
@@ -360,18 +380,20 @@ Respond in a structured format that can be parsed into a plan object.
         type: 'testing',
         estimatedDuration: 15,
         dependencies: ['implementation'],
-        tasks: [{
-          id: 'test_task',
-          name: 'Run Tests',
-          description: 'Execute tests and verify functionality',
-          type: 'test',
-          priority: 'high',
-          estimatedEffort: 15,
-          requiredTools: ['testing-tools'],
-          files: [],
-          dependencies: []
-        }],
-        deliverables: ['Test results']
+        tasks: [
+          {
+            id: 'test_task',
+            name: 'Run Tests',
+            description: 'Execute tests and verify functionality',
+            type: 'test',
+            priority: 'high',
+            estimatedEffort: 15,
+            requiredTools: ['testing-tools'],
+            files: [],
+            dependencies: [],
+          },
+        ],
+        deliverables: ['Test results'],
       });
     }
 
@@ -383,18 +405,20 @@ Respond in a structured format that can be parsed into a plan object.
         type: 'documentation',
         estimatedDuration: 10,
         dependencies: ['implementation'],
-        tasks: [{
-          id: 'docs_task',
-          name: 'Update Documentation',
-          description: 'Write or update relevant documentation',
-          type: 'document',
-          priority: 'medium',
-          estimatedEffort: 10,
-          requiredTools: ['documentation-tools'],
-          files: [],
-          dependencies: []
-        }],
-        deliverables: ['Updated documentation']
+        tasks: [
+          {
+            id: 'docs_task',
+            name: 'Update Documentation',
+            description: 'Write or update relevant documentation',
+            type: 'document',
+            priority: 'medium',
+            estimatedEffort: 10,
+            requiredTools: ['documentation-tools'],
+            files: [],
+            dependencies: [],
+          },
+        ],
+        deliverables: ['Updated documentation'],
       });
     }
 
@@ -408,8 +432,8 @@ Respond in a structured format that can be parsed into a plan object.
         description: 'Implementation may introduce breaking changes',
         impact: 'high',
         probability: 'possible',
-        mitigation: 'Careful testing and rollback plan'
-      }
+        mitigation: 'Careful testing and rollback plan',
+      },
     ];
 
     if (complexity === 'complex' || complexity === 'enterprise') {
@@ -418,7 +442,7 @@ Respond in a structured format that can be parsed into a plan object.
         description: 'Requirements may expand during implementation',
         impact: 'medium',
         probability: 'likely',
-        mitigation: 'Clear scope definition and change management'
+        mitigation: 'Clear scope definition and change management',
       });
     }
 
@@ -436,7 +460,7 @@ Respond in a structured format that can be parsed into a plan object.
       feasible: !response.toLowerCase().includes('not feasible'),
       confidence: 0.8,
       recommendations: ['Monitor progress', 'Validate at each phase'],
-      adjustments: ['Consider iterative approach']
+      adjustments: ['Consider iterative approach'],
     };
   }
 }
@@ -453,7 +477,7 @@ export class Editor {
    */
   async executeTask(task: PlanTask, context?: any): Promise<ExecutionResult> {
     logger.info('⚙️ Editor: Executing task', { taskId: task.id, name: task.name });
-    
+
     const startTime = Date.now();
     const result: ExecutionResult = {
       taskId: task.id,
@@ -464,7 +488,7 @@ export class Editor {
       filesModified: [],
       testsRun: 0,
       testsPassed: 0,
-      errors: []
+      errors: [],
     };
 
     try {
@@ -491,24 +515,23 @@ export class Editor {
 
       result.success = true;
       result.duration = Date.now() - startTime;
-      
+
       logger.info('✅ Editor: Task completed successfully', {
         taskId: task.id,
-        duration: result.duration
+        duration: result.duration,
       });
-      
     } catch (error) {
       result.success = false;
       result.duration = Date.now() - startTime;
       result.errors.push({
         type: 'runtime',
         message: error instanceof Error ? error.message : String(error),
-        severity: 'error'
+        severity: 'error',
       });
-      
+
       logger.error('❌ Editor: Task execution failed', {
         taskId: task.id,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
 
@@ -520,27 +543,27 @@ export class Editor {
    */
   async executePhase(phase: PlanPhase, context?: any): Promise<ExecutionResult[]> {
     logger.info('🔧 Editor: Executing phase', { phaseId: phase.id, name: phase.name });
-    
+
     const results: ExecutionResult[] = [];
-    
+
     // Sort tasks by dependencies
     const sortedTasks = this.sortTasksByDependencies(phase.tasks);
-    
+
     for (const task of sortedTasks) {
       const result = await this.executeTask(task, context);
       result.phaseId = phase.id;
       results.push(result);
-      
+
       // Stop execution if a critical task fails
       if (!result.success && task.priority === 'critical') {
         logger.error('❌ Critical task failed, stopping phase execution', {
           phaseId: phase.id,
-          taskId: task.id
+          taskId: task.id,
         });
         break;
       }
     }
-    
+
     return results;
   }
 
@@ -632,7 +655,10 @@ export class ArchitectEditorCoordinator {
   /**
    * Full workflow: Plan -> Review -> Execute
    */
-  async executeRequest(request: string, context?: any): Promise<{
+  async executeRequest(
+    request: string,
+    context?: any
+  ): Promise<{
     plan: ArchitectPlan;
     feasibility: any;
     results: ExecutionResult[];
@@ -645,17 +671,17 @@ export class ArchitectEditorCoordinator {
     try {
       // Phase 1: Planning (Architect)
       const plan = await this.architect.createPlan(request, context);
-      logger.info('📋 Plan created', { 
-        planId: plan.id, 
+      logger.info('📋 Plan created', {
+        planId: plan.id,
         phases: plan.phases.length,
-        estimatedDuration: plan.estimatedDuration 
+        estimatedDuration: plan.estimatedDuration,
       });
 
       // Phase 2: Feasibility Analysis (Architect)
       const feasibility = await this.architect.analyzeFeasibility(plan, context);
-      logger.info('🔍 Feasibility analyzed', { 
+      logger.info('🔍 Feasibility analyzed', {
         feasible: feasibility.feasible,
-        confidence: feasibility.confidence
+        confidence: feasibility.confidence,
       });
 
       if (!feasibility.feasible || feasibility.confidence < 0.5) {
@@ -665,27 +691,26 @@ export class ArchitectEditorCoordinator {
           feasibility,
           results: [],
           success: false,
-          duration: Date.now() - startTime
+          duration: Date.now() - startTime,
         };
       }
 
       // Phase 3: Execution (Editor)
       const allResults: ExecutionResult[] = [];
-      
+
       // Sort phases by dependencies
       const sortedPhases = this.sortPhasesByDependencies(plan.phases);
-      
+
       for (const phase of sortedPhases) {
         logger.info(`🔧 Executing phase: ${phase.name}`);
         const phaseResults = await this.editor.executePhase(phase, context);
         allResults.push(...phaseResults);
-        
+
         // Check if phase had critical failures
-        const criticalFailures = phaseResults.filter(r => 
-          !r.success && 
-          phase.tasks.find(t => t.id === r.taskId)?.priority === 'critical'
+        const criticalFailures = phaseResults.filter(
+          r => !r.success && phase.tasks.find(t => t.id === r.taskId)?.priority === 'critical'
         );
-        
+
         if (criticalFailures.length > 0) {
           logger.error('❌ Critical phase failures, stopping execution');
           break;
@@ -699,7 +724,7 @@ export class ArchitectEditorCoordinator {
         success,
         duration,
         totalTasks: allResults.length,
-        successfulTasks: allResults.filter(r => r.success).length
+        successfulTasks: allResults.filter(r => r.success).length,
       });
 
       return {
@@ -707,9 +732,8 @@ export class ArchitectEditorCoordinator {
         feasibility,
         results: allResults,
         success,
-        duration
+        duration,
       };
-
     } catch (error) {
       logger.error('❌ Architect/Editor workflow failed:', error);
       return {
@@ -717,7 +741,7 @@ export class ArchitectEditorCoordinator {
         feasibility: { feasible: false, confidence: 0, recommendations: [], adjustments: [] },
         results: [],
         success: false,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       };
     }
   }

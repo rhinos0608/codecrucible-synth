@@ -33,11 +33,11 @@ import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system
 
 /**
  * VoiceArchetypeSystem - Multi-Voice AI Synthesis Engine
- * 
+ *
  * Following Living Spiral Methodology - Council-Driven Development Implementation:
  * This system embodies the core philosophy of the Coding Grimoire by orchestrating
  * multiple AI voice archetypes that collaborate through structured council processes.
- * 
+ *
  * **Council Voice Archetypes:**
  * - **Explorer**: Innovation-focused, creative problem-solving, discovers new approaches
  * - **Maintainer**: Stability-focused, reliability guardian, ensures code quality
@@ -49,7 +49,7 @@ import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system
  * - **Guardian**: Quality gates enforcement, standards compliance, risk assessment
  * - **Optimizer**: Performance engineering, resource efficiency, bottleneck resolution
  * - **Implementor**: Execution specialist, deployment focus, operational excellence
- * 
+ *
  * **Core Synthesis Capabilities:**
  * - **Multi-Perspective Analysis**: Each voice provides specialized expertise
  * - **Consensus Building**: Democratic decision-making through council voting
@@ -57,7 +57,7 @@ import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system
  * - **Living Spiral Integration**: Iterative refinement through spiral phases
  * - **Context-Aware Prompting**: Dynamic prompt generation based on project context
  * - **Performance Analytics**: Real-time voice performance tracking and optimization
- * 
+ *
  * **Synthesis Workflow:**
  * 1. **Voice Selection**: Intelligent selection of relevant voices for the task
  * 2. **Context Building**: Enriched context creation with project intelligence
@@ -65,20 +65,20 @@ import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system
  * 4. **Council Deliberation**: Structured debate and consensus building
  * 5. **Synthesis Generation**: Unified output creation from multiple perspectives
  * 6. **Quality Validation**: Multi-voice quality assessment and refinement
- * 
+ *
  * **Performance Characteristics:**
  * - Voice Processing: 2-10 concurrent voices depending on complexity
  * - Response Time: 3-15 seconds for multi-voice synthesis
  * - Memory Efficiency: Optimized prompt caching and context reuse
  * - Scalability: Horizontal scaling through parallel voice processing
- * 
+ *
  * **Enterprise Features:**
  * - **Voice Performance Analytics**: Track individual voice contribution quality
  * - **Dynamic Voice Selection**: AI-driven selection based on task requirements
  * - **Council Configuration**: Customizable council sizes and voting mechanisms
  * - **Synthesis Quality Scoring**: Automated quality assessment of synthesis results
  * - **Voice Prompt Optimization**: Continuous improvement of voice prompts
- * 
+ *
  * @example Basic Multi-Voice Synthesis
  * ```typescript
  * const voiceSystem = new VoiceArchetypeSystem(modelClient, {
@@ -89,22 +89,22 @@ import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system
  *     maxConcurrent: 5
  *   }
  * });
- * 
+ *
  * const result = await voiceSystem.synthesizeResponse({
  *   prompt: "How should we implement user authentication?",
  *   context: projectContext,
  *   requiredVoices: ['security', 'architect', 'developer'],
  *   councilMode: 'consensus'
  * });
- * 
+ *
  * console.log(`Synthesis from ${result.voicesUsed.length} voices`);
  * console.log(`Consensus score: ${result.consensusScore}%`);
  * ```
- * 
+ *
  * @example Advanced Council Configuration
  * ```typescript
  * const voiceSystem = new VoiceArchetypeSystem(modelClient);
- * 
+ *
  * // Configure specialized council for security review
  * const securityCouncil = await voiceSystem.createCouncil({
  *   voices: ['security', 'architect', 'guardian'],
@@ -112,18 +112,18 @@ import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system
  *   maxIterations: 3,
  *   requireUnanimous: true
  * });
- * 
+ *
  * const securityAnalysis = await securityCouncil.deliberate({
  *   topic: "API security implementation",
  *   context: codebaseContext,
  *   deliverable: "security_recommendations"
  * });
  * ```
- * 
+ *
  * @example Living Spiral Integration
  * ```typescript
  * const voiceSystem = new VoiceArchetypeSystem(modelClient);
- * 
+ *
  * // Integrate with Living Spiral for iterative development
  * const spiralResult = await voiceSystem.processLivingSpiralPhase({
  *   phase: 'synthesis',
@@ -132,28 +132,28 @@ import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system
  *   targetQuality: 0.9,
  *   maxIterations: 5
  * });
- * 
+ *
  * if (spiralResult.converged) {
  *   console.log('Living Spiral converged successfully');
  *   console.log(`Quality score: ${spiralResult.qualityScore}`);
  * }
  * ```
- * 
+ *
  * **Quality Assurance:**
  * - **Multi-Voice Validation**: Cross-validation between voice perspectives
  * - **Consistency Checking**: Ensures synthesis coherence and logical flow
  * - **Performance Monitoring**: Tracks voice response quality over time
  * - **Bias Mitigation**: Balances different voice perspectives to reduce bias
- * 
+ *
  * **Security & Privacy:**
  * - **Context Isolation**: Each voice processes context independently
  * - **Prompt Sanitization**: Input validation and sanitization for all voices
  * - **Response Filtering**: Output validation and sensitive content filtering
  * - **Audit Logging**: Complete audit trail of voice interactions and decisions
- * 
+ *
  * @since 3.0.0
  * @implements {VoiceArchetypeSystemInterface}
- * 
+ *
  * @fires VoiceArchetypeSystem#voice-selected
  * @fires VoiceArchetypeSystem#synthesis-started
  * @fires VoiceArchetypeSystem#council-deliberation
@@ -164,36 +164,36 @@ import { VoiceArchetypeSystemInterface } from '../domain/interfaces/voice-system
 export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
   /** Registry of available voice archetypes with their specialized configurations */
   private voices: Map<string, Voice> = new Map();
-  
+
   /** Living Spiral coordinator for iterative refinement and quality convergence */
   private livingSpiralCoordinator: LivingSpiralCoordinatorInterface;
-  
+
   /** Council decision engine for democratic consensus building and conflict resolution */
   private councilEngine: CouncilDecisionEngine;
-  
+
   /** System configuration for voice selection, parallelization, and council behavior */
   private config: VoiceConfig;
-  
+
   /** Model client for LLM interactions and response generation */
   private modelClient: any;
 
   /**
    * Creates a new VoiceArchetypeSystem instance
-   * 
+   *
    * Initializes the multi-voice synthesis engine with:
    * - Voice archetype registry with specialized prompts and configurations
    * - Council decision engine for democratic consensus building
    * - Living Spiral coordinator for iterative quality improvement
    * - Performance analytics and voice optimization systems
-   * 
+   *
    * @param modelClient - LLM client for voice response generation
    * @param config - Voice system configuration with council and parallelization settings
-   * 
+   *
    * @example
    * ```typescript
    * // Basic initialization with default voices
    * const voiceSystem = new VoiceArchetypeSystem(modelClient);
-   * 
+   *
    * // Advanced configuration with custom council
    * const advancedSystem = new VoiceArchetypeSystem(modelClient, {
    *   voices: {
@@ -208,7 +208,7 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
   constructor(
     private logger: ILogger,
     private spiralCoordinator?: LivingSpiralCoordinatorInterface,
-    modelClient?: any, 
+    modelClient?: any,
     config?: VoiceConfig
   ) {
     this.modelClient = modelClient;
@@ -427,15 +427,15 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
   async initialize(): Promise<void> {
     try {
       this.logger.info('Initializing VoiceArchetypeSystem');
-      
+
       // Re-initialize voices in case configuration has changed
       this.initializeVoices();
-      
+
       // Initialize council engine if not already done
       if (!this.councilEngine) {
         this.councilEngine = new CouncilDecisionEngine(this, this.modelClient);
       }
-      
+
       // Verify model client availability
       if (this.modelClient) {
         try {
@@ -444,7 +444,7 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
           this.logger.warn('Model client status check failed, but continuing initialization');
         }
       }
-      
+
       this.logger.info('VoiceArchetypeSystem initialization complete');
     } catch (error) {
       this.logger.error('VoiceArchetypeSystem initialization failed:', error);
@@ -458,15 +458,13 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
   async synthesizeMultipleVoices(request: string, context: any = {}): Promise<any> {
     try {
       this.logger.info('Starting multi-voice synthesis');
-      
+
       // Determine which voices to use
-      const voicesToUse = context.voices || 
-                         context.requiredVoices || 
-                         this.config.voices.default;
-      
+      const voicesToUse = context.voices || context.requiredVoices || this.config.voices.default;
+
       // Use existing multi-voice generation logic
       const result = await this.generateMultiVoiceSolutions(voicesToUse, request, context);
-      
+
       // If council mode is requested, conduct council decision
       if (context.useCouncil || context.councilMode) {
         const councilResult = await this.conductCouncilDecision(
@@ -474,19 +472,18 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
           voicesToUse,
           context.councilMode || CouncilMode.CONSENSUS
         );
-        
+
         return {
           ...result,
           councilDecision: councilResult,
-          synthesisMethod: 'council-driven'
+          synthesisMethod: 'council-driven',
         };
       }
-      
+
       return {
         ...result,
-        synthesisMethod: 'multi-voice'
+        synthesisMethod: 'multi-voice',
       };
-      
     } catch (error) {
       this.logger.error('Multi-voice synthesis failed:', error);
       throw error;
@@ -498,18 +495,52 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
    */
   private detectCodingOperation(prompt: string): boolean {
     const codingKeywords = [
-      'write code', 'implement', 'create function', 'build class',
-      'refactor', 'debug', 'fix error', 'optimize code',
-      'add feature', 'create component', 'write test',
-      'generate code', 'code review', 'programming',
-      'algorithm', 'data structure', 'API', 'function',
-      'class', 'method', 'variable', 'loop', 'condition',
-      'typescript', 'javascript', 'python', 'java', 'react',
-      'node.js', 'express', 'database', 'sql', 'html', 'css',
-      'framework', 'library', 'package', 'module', 'import',
-      'export', 'async', 'await', 'promise', 'callback'
+      'write code',
+      'implement',
+      'create function',
+      'build class',
+      'refactor',
+      'debug',
+      'fix error',
+      'optimize code',
+      'add feature',
+      'create component',
+      'write test',
+      'generate code',
+      'code review',
+      'programming',
+      'algorithm',
+      'data structure',
+      'API',
+      'function',
+      'class',
+      'method',
+      'variable',
+      'loop',
+      'condition',
+      'typescript',
+      'javascript',
+      'python',
+      'java',
+      'react',
+      'node.js',
+      'express',
+      'database',
+      'sql',
+      'html',
+      'css',
+      'framework',
+      'library',
+      'package',
+      'module',
+      'import',
+      'export',
+      'async',
+      'await',
+      'promise',
+      'callback',
     ];
-    
+
     const lowerPrompt = prompt.toLowerCase();
     return codingKeywords.some(keyword => lowerPrompt.includes(keyword));
   }
@@ -519,9 +550,12 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
    */
   private buildLightweightPrompt(voiceId: string, isCoding: boolean): string {
     const voiceIdentities: Record<string, string> = {
-      explorer: 'You are Explorer Voice, focused on innovative discovery and creative problem-solving.',
-      maintainer: 'You are Maintainer Voice, focused on code stability and long-term sustainability.',
-      developer: 'You are Developer Voice, focused on practical development and pragmatic solutions.',
+      explorer:
+        'You are Explorer Voice, focused on innovative discovery and creative problem-solving.',
+      maintainer:
+        'You are Maintainer Voice, focused on code stability and long-term sustainability.',
+      developer:
+        'You are Developer Voice, focused on practical development and pragmatic solutions.',
       architect: 'You are Architect Voice, focused on scalable architecture and system design.',
       analyzer: 'You are Analyzer Voice, focused on performance analysis and optimization.',
       implementor: 'You are Implementor Voice, focused on practical execution and delivery.',
@@ -532,7 +566,7 @@ export class VoiceArchetypeSystem implements VoiceArchetypeSystemInterface {
     };
 
     const basePrompt = voiceIdentities[voiceId] || voiceIdentities.developer;
-    
+
     if (isCoding) {
       return `${basePrompt}
 
@@ -579,7 +613,7 @@ You have access to comprehensive MCP (Model Context Protocol) tools. ALWAYS USE 
 
 IMPORTANT: When user asks to "read a file", "create a file", "list files", "check git status", etc., USE THE APPROPRIATE TOOL instead of giving generic explanations. Execute the actual operation.`;
     }
-    
+
     return `${basePrompt}
 
 ## Tool Usage - CRITICAL: Always Use Available Tools
@@ -769,7 +803,7 @@ Provide helpful, concise responses with practical value.`;
     this.logger.info('🔥 VOICE DEBUG: generateSingleVoiceResponse called', {
       voice,
       promptLength: prompt.length,
-      hasClient: !!client
+      hasClient: !!client,
     });
 
     // Use the internal method that has all our debug logging and proper pipeline
@@ -916,7 +950,7 @@ Provide helpful, concise responses with practical value.`;
       promptLength: enhancedPrompt.length,
       hasGenerateVoiceResponse: !!this.modelClient?.generateVoiceResponse,
       hasProcessRequest: !!this.modelClient?.processRequest,
-      hasGenerateText: !!this.modelClient?.generateText
+      hasGenerateText: !!this.modelClient?.generateText,
     });
 
     // CRITICAL FIX 3: Voice system tool integration
@@ -934,16 +968,16 @@ Provide helpful, concise responses with practical value.`;
           availableTools = await toolIntegration.getAllLLMFunctions();
         }
       }
-      
+
       this.logger.debug('Voice system: Available tools for enhanced AI capabilities', {
         voiceId,
         toolCount: availableTools.length,
-        hasTools: availableTools.length > 0
+        hasTools: availableTools.length > 0,
       });
     } catch (error) {
       this.logger.debug('Voice system: Failed to get tools, continuing without tools', {
         voiceId,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
 
@@ -953,7 +987,7 @@ Provide helpful, concise responses with practical value.`;
       response = await this.modelClient.generateVoiceResponse(enhancedPrompt, voiceId, {
         temperature: voice.temperature,
         tools: availableTools,
-        maxTokens: 4096
+        maxTokens: 4096,
       });
     } else if (this.modelClient?.processRequest) {
       this.logger.info('🔥 VOICE DEBUG: Using processRequest method');
@@ -961,7 +995,7 @@ Provide helpful, concise responses with practical value.`;
         prompt: enhancedPrompt,
         temperature: voice.temperature,
         tools: availableTools,
-        maxTokens: 4096
+        maxTokens: 4096,
       });
     } else if (this.modelClient?.generateText) {
       // Fallback to basic generateText method
@@ -969,7 +1003,7 @@ Provide helpful, concise responses with practical value.`;
       const textResponse = await this.modelClient.generateText(enhancedPrompt, {
         temperature: voice.temperature,
         tools: availableTools,
-        maxTokens: 4096
+        maxTokens: 4096,
       });
       response = { content: textResponse };
     } else {
@@ -978,7 +1012,7 @@ Provide helpful, concise responses with practical value.`;
 
     // Normalize response format
     let content = response.content || response.text || response.response || '';
-    
+
     // CRITICAL FIX: Handle Buffer/ArrayBuffer responses to prevent "string 58" display issue
     if (Buffer.isBuffer(content)) {
       content = content.toString('utf8');
@@ -989,7 +1023,10 @@ Provide helpful, concise responses with practical value.`;
     } else if (typeof content !== 'string') {
       content = String(content);
     }
-    
+
+    // Apply ultra-concise communication patterns (Claude Code research findings)
+    content = this.applyUltraConcisePatterns(content, voice.name);
+
     return {
       content: content,
       voice: voice.name,
@@ -1003,6 +1040,113 @@ Provide helpful, concise responses with practical value.`;
         provider: response.provider || 'unknown',
       },
     };
+  }
+
+  /**
+   * Apply ultra-concise communication patterns based on Claude Code research
+   */
+  private applyUltraConcisePatterns(content: string, voiceName: string): string {
+    if (!content || typeof content !== 'string') return content;
+
+    // Remove promotional language and excessive elaboration
+    content = content
+      // Remove marketing/promotional phrases
+      .replace(/\b(certainly|absolutely|definitely|of course|indeed|naturally)\b\s*/gi, '')
+      // Remove unnecessary explanatory phrases
+      .replace(/\b(as you can see|it's worth noting|it should be noted|please note)\b\s*/gi, '')
+      // Remove redundant transitional phrases
+      .replace(/\b(furthermore|moreover|in addition|additionally|also,?\s*)\b/gi, '')
+      // Remove apologetic language
+      .replace(/\b(I apologize|sorry|I'm sorry)\b\s*/gi, '')
+      // Remove obvious statements
+      .replace(/\b(here is|here are|this is|these are)\b\s*/gi, '');
+
+    // Apply voice-specific conciseness patterns
+    switch (voiceName) {
+      case 'Guardian':
+        // Guardian should be direct about quality gates
+        content = this.applyGuardianConciseness(content);
+        break;
+      case 'Architect':
+        // Architect should be concise about system design
+        content = this.applyArchitectConciseness(content);
+        break;
+      case 'Security':
+        // Security should be direct about vulnerabilities and risks
+        content = this.applySecurityConciseness(content);
+        break;
+      case 'Developer':
+        // Developer should focus on implementation without explanation
+        content = this.applyDeveloperConciseness(content);
+        break;
+      default:
+        // Apply general conciseness patterns
+        content = this.applyGeneralConciseness(content);
+    }
+
+    // Final cleanup - remove excessive whitespace and empty lines
+    content = content
+      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
+      .replace(/\s{2,}/g, ' ') // Max 1 consecutive space
+      .trim();
+
+    return content;
+  }
+
+  private applyGuardianConciseness(content: string): string {
+    return (
+      content
+        // Direct quality assessments
+        .replace(/the code quality is/gi, '')
+        .replace(/I would recommend/gi, 'Recommend:')
+        .replace(/you should consider/gi, 'Consider:')
+        .replace(/it would be better to/gi, 'Better:')
+    );
+  }
+
+  private applyArchitectConciseness(content: string): string {
+    return (
+      content
+        // Direct architectural guidance
+        .replace(/the system architecture should/gi, 'Architecture:')
+        .replace(/I suggest implementing/gi, 'Implement:')
+        .replace(/the design pattern/gi, 'Pattern:')
+    );
+  }
+
+  private applySecurityConciseness(content: string): string {
+    return (
+      content
+        // Direct security assessments
+        .replace(/security vulnerability/gi, 'vulnerability')
+        .replace(/potential security risk/gi, 'risk')
+        .replace(/I recommend securing/gi, 'Secure:')
+    );
+  }
+
+  private applyDeveloperConciseness(content: string): string {
+    return (
+      content
+        // Direct implementation guidance
+        .replace(/you can implement this by/gi, 'Implementation:')
+        .replace(/the code should/gi, 'Code:')
+        .replace(/here's how to/gi, 'How:')
+    );
+  }
+
+  private applyGeneralConciseness(content: string): string {
+    return (
+      content
+        // Remove common verbose patterns
+        .replace(/in order to/gi, 'to')
+        .replace(/due to the fact that/gi, 'because')
+        .replace(/for the purpose of/gi, 'to')
+        .replace(/it is important to note that/gi, '')
+        // Direct answers for common question patterns
+        .replace(/the answer is that/gi, '')
+        .replace(/the result is/gi, '')
+        .replace(/the solution is/gi, '')
+    );
   }
 
   async synthesize(
@@ -1035,8 +1179,8 @@ Provide helpful, concise responses with practical value.`;
           index: i,
           hasContent: !!(r.content || r.text || r.response),
           contentType: typeof (r.content || r.text || r.response),
-          contentPreview: (r.content || r.text || r.response || '').substring(0, 100)
-        }))
+          contentPreview: (r.content || r.text || r.response || '').substring(0, 100),
+        })),
       });
 
       if (mode === 'competitive') {
@@ -1063,19 +1207,20 @@ Provide helpful, concise responses with practical value.`;
 
       // Additional content extraction attempts if synthesis failed
       if (!synthesizedContent && responses.length > 0) {
-        this.logger.warn('🚨 SYNTHESIS FALLBACK: Primary synthesis failed, attempting fallback extraction');
-        
+        this.logger.warn(
+          '🚨 SYNTHESIS FALLBACK: Primary synthesis failed, attempting fallback extraction'
+        );
+
         for (const response of responses) {
-          const fallbackContent = (
+          const fallbackContent =
             response.content ||
             response.text ||
             response.response ||
             response.message ||
             response.output ||
-            (typeof response === 'string' ? response : '')
-          );
-          
-          if (fallbackContent && fallbackContent.trim()) {
+            (typeof response === 'string' ? response : '');
+
+          if (fallbackContent?.trim()) {
             synthesizedContent = fallbackContent;
             this.logger.info('✅ SYNTHESIS FALLBACK: Found content via fallback extraction');
             break;
@@ -1087,7 +1232,7 @@ Provide helpful, concise responses with practical value.`;
       this.logger.info('🔍 SYNTHESIS RESULT', {
         hasSynthesizedContent: !!synthesizedContent,
         synthesizedContentLength: synthesizedContent.length,
-        synthesizedContentPreview: synthesizedContent.substring(0, 200)
+        synthesizedContentPreview: synthesizedContent.substring(0, 200),
       });
 
       return {

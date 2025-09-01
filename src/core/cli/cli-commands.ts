@@ -139,7 +139,8 @@ export class CLICommands {
 
         if (models.length > 0) {
           console.log(chalk.cyan('📋 Available Models:'));
-          models.forEach((model: any, index: number) => {  // TODO: Import AIModel from unified-types
+          models.forEach((model: any, index: number) => {
+            // TODO: Import AIModel from unified-types
             console.log(chalk.white(`  ${index + 1}. ${model.name || model.id || model}`));
             if (model.size) {
               console.log(chalk.gray(`     Size: ${model.size}`));
@@ -365,7 +366,7 @@ export class CLICommands {
               } else if (chunk.analysis) {
                 console.log(chalk.green(`✅ Successfully analyzed ${chunk.files.length} files`));
                 if (chunk.analysis.length > 0) {
-                  console.log(chalk.white(`${chunk.analysis[0].content.substring(0, 200)  }...`));
+                  console.log(chalk.white(`${chunk.analysis[0].content.substring(0, 200)}...`));
                 }
               }
             });

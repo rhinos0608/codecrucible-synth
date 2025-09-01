@@ -57,7 +57,7 @@ export class E2BCodeExecutionTool extends BaseTool {
       const { SecurityPolicyLoader } = await import('../security/security-policy-loader.js');
       const policyLoader = SecurityPolicyLoader.getInstance();
       const authConfig = await policyLoader.getAuthConfig();
-      
+
       if (authConfig.e2b.requireAuthentication && !args.user) {
         logger.error('🚨 E2B code execution blocked: Authentication required by security policy');
         return {

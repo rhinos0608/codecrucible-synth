@@ -1,7 +1,7 @@
 /**
  * Pure Ollama Infrastructure Client
  * Handles only connection management and API communication
- * 
+ *
  * Architecture Compliance:
  * - Infrastructure layer: concrete implementation only
  * - No business logic for model selection or optimization
@@ -107,7 +107,7 @@ export class OllamaClient extends EventEmitter {
   constructor(config: OllamaConnectionConfig) {
     super();
     this.config = config;
-    
+
     // Initialize connection status
     this.connectionStatus = {
       connected: false,
@@ -132,23 +132,20 @@ export class OllamaClient extends EventEmitter {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const models = await this.withTimeout(
-        this.client.list(),
-        this.config.connectionTimeout
-      );
-      
+      const models = await this.withTimeout(this.client.list(), this.config.connectionTimeout);
+
       this.connectionStatus.connected = true;
       this.connectionStatus.modelCount = models.models.length;
       this.connectionStatus.consecutiveFailures = 0;
       this.connectionStatus.lastHealthCheck = new Date();
-      
+
       this.emit('connected', this.connectionStatus);
       return true;
     } catch (error) {
       this.connectionStatus.connected = false;
       this.connectionStatus.consecutiveFailures++;
       this.connectionStatus.lastHealthCheck = new Date();
-      
+
       this.emit('connectionError', error);
       return false;
     }
@@ -160,13 +157,12 @@ export class OllamaClient extends EventEmitter {
   async listModels(): Promise<OllamaModelInfo[]> {
     const operation = async () => {
       const response = await this.client.list();
-      
+
       // Transform ModelResponse to OllamaModelInfo format
       return response.models.map(model => ({
         ...model,
-        modified_at: model.modified_at instanceof Date 
-          ? model.modified_at.toISOString() 
-          : model.modified_at
+        modified_at:
+          model.modified_at instanceof Date ? model.modified_at.toISOString() : model.modified_at,
       }));
     };
 
@@ -192,7 +188,9 @@ export class OllamaClient extends EventEmitter {
   /**
    * Generate streaming text using specified model
    */
-  async generateTextStream(request: OllamaGenerationRequest): Promise<AsyncIterable<OllamaResponse>> {
+  async generateTextStream(
+    request: OllamaGenerationRequest
+  ): Promise<AsyncIterable<OllamaResponse>> {
     const operation = async () => {
       return this.client.generate({
         model: request.model,
@@ -293,7 +291,7 @@ export class OllamaClient extends EventEmitter {
    */
   updateConfig(newConfig: Partial<OllamaConnectionConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    
+
     // Reinitialize client if endpoint changed
     if (newConfig.endpoint) {
       this.client = new Ollama({
@@ -306,7 +304,7 @@ export class OllamaClient extends EventEmitter {
       if (this.healthCheckTimer) {
         clearInterval(this.healthCheckTimer);
       }
-      
+
       if (newConfig.healthCheckInterval > 0) {
         this.startHealthMonitoring();
       }
@@ -319,38 +317,38 @@ export class OllamaClient extends EventEmitter {
 
   private async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
     let lastError: Error = new Error('Operation failed with no attempts');
-    
+
     for (let attempt = 0; attempt <= this.config.retryAttempts; attempt++) {
       try {
         const result = await this.withTimeout(operation(), this.config.timeout);
-        
+
         // Reset failure count on success
         if (this.connectionStatus.consecutiveFailures > 0) {
           this.connectionStatus.consecutiveFailures = 0;
           this.emit('recoverySuccess');
         }
-        
+
         return result;
       } catch (error) {
         lastError = error as Error;
         this.connectionStatus.consecutiveFailures++;
-        
+
         this.emit('operationError', {
           error,
           attempt,
           maxAttempts: this.config.retryAttempts,
         });
-        
+
         // Don't retry on the last attempt
         if (attempt === this.config.retryAttempts) {
           break;
         }
-        
+
         // Wait before retrying
         await this.delay(this.config.retryDelayMs * Math.pow(2, attempt));
       }
     }
-    
+
     this.emit('operationFailed', lastError);
     throw lastError;
   }
@@ -363,7 +361,7 @@ export class OllamaClient extends EventEmitter {
     return Promise.race([promise, timeoutPromise]);
   }
 
-  private delay(ms: number): Promise<void> {
+  private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 

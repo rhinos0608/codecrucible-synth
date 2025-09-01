@@ -595,7 +595,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     });
 
     // Create cleanup timeout to prevent hanging
-    const cleanupTimeout = new Promise((resolve) => {
+    const cleanupTimeout = new Promise(resolve => {
       setTimeout(() => {
         logger.warn('Streaming cleanup timeout reached, force cleanup initiated');
         resolve(undefined);
@@ -606,7 +606,7 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     const cleanupPromise = (async () => {
       // Stop all active streams gracefully
       const cleanupPromises: Promise<void>[] = [];
-      
+
       for (const sessionId of this.activeStreams) {
         cleanupPromises.push(this.gracefullyTerminateSession(sessionId));
       }
@@ -657,11 +657,10 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
 
       // Give a brief moment for any pending operations to complete
       await new Promise(resolve => setTimeout(resolve, 50));
-
     } catch (error) {
       logger.warn('Error during graceful session termination', {
         sessionId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     } finally {
       // Ensure session is removed even if cleanup fails
@@ -712,8 +711,8 @@ export class StreamingManager extends EventEmitter implements IStreamingManager 
     if (bufferUtilization > 0.8) {
       logger.warn('High buffer utilization detected, triggering token cleanup', {
         sessionId,
-        bufferUtilization: Math.round(bufferUtilization * 100) + '%',
-        tokenCount: session.tokens.length
+        bufferUtilization: `${Math.round(bufferUtilization * 100)}%`,
+        tokenCount: session.tokens.length,
       });
 
       // Keep only the last 50% of tokens to free memory

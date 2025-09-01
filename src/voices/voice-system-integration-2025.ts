@@ -26,7 +26,7 @@ export class VoiceSystemIntegration2025 {
       maxConcurrentVoices: 3,
       enablePerformanceMonitoring: false,
       voiceSelectionStrategy: 'adaptive',
-      ...config
+      ...config,
     };
 
     // Create a simple logger
@@ -35,7 +35,7 @@ export class VoiceSystemIntegration2025 {
       error: (msg: string, error?: any) => console.error(`[VoiceSystem] ${msg}`, error),
       warn: (msg: string) => console.warn(`[VoiceSystem] ${msg}`),
       debug: (msg: string) => console.debug(`[VoiceSystem] ${msg}`),
-      trace: (msg: string) => console.trace(`[VoiceSystem] ${msg}`)
+      trace: (msg: string) => console.trace(`[VoiceSystem] ${msg}`),
     };
 
     // Initialize with the actual voice archetype system
@@ -44,13 +44,13 @@ export class VoiceSystemIntegration2025 {
         default: ['architect', 'developer', 'analyzer'],
         available: this.getAvailableVoices(),
         parallel: true,
-        maxConcurrent: this.config.maxConcurrentVoices || 3
-      }
+        maxConcurrent: this.config.maxConcurrentVoices || 3,
+      },
     };
-    
+
     this.voiceArchetypeSystem = new VoiceArchetypeSystem(
       simpleLogger,
-      undefined, // spiral coordinator 
+      undefined, // spiral coordinator
       modelClient,
       voiceConfig
     );
@@ -59,7 +59,7 @@ export class VoiceSystemIntegration2025 {
   async initialize(): Promise<void> {
     try {
       logger.info('Initializing Voice System Integration 2025');
-      
+
       // Initialize the underlying voice system if it has an initialize method
       if (this.voiceArchetypeSystem.initialize) {
         await this.voiceArchetypeSystem.initialize();
@@ -88,22 +88,19 @@ export class VoiceSystemIntegration2025 {
       return await this.basicVoiceSynthesis(request, context);
     } catch (error) {
       logger.error('Voice synthesis failed:', error);
-      
+
       if (this.config.fallbackToLegacy) {
         logger.info('Falling back to legacy voice processing');
         return await this.basicVoiceSynthesis(request, context);
       }
-      
+
       throw error;
     }
   }
 
   async selectVoices(criteria: any = {}): Promise<string[]> {
     const availableVoices = this.getAvailableVoices();
-    const maxVoices = Math.min(
-      this.config.maxConcurrentVoices || 3,
-      availableVoices.length
-    );
+    const maxVoices = Math.min(this.config.maxConcurrentVoices || 3, availableVoices.length);
 
     switch (this.config.voiceSelectionStrategy) {
       case 'random':
@@ -120,7 +117,7 @@ export class VoiceSystemIntegration2025 {
     // Default voice archetypes based on the system
     return [
       'architect',
-      'developer', 
+      'developer',
       'analyzer',
       'maintainer',
       'explorer',
@@ -128,7 +125,7 @@ export class VoiceSystemIntegration2025 {
       'optimizer',
       'implementor',
       'designer',
-      'guardian'
+      'guardian',
     ];
   }
 
@@ -137,20 +134,20 @@ export class VoiceSystemIntegration2025 {
       initialized: this.initialized,
       config: this.config,
       availableVoices: this.getAvailableVoices().length,
-      performance: this.getPerformanceMetrics()
+      performance: this.getPerformanceMetrics(),
     };
   }
 
   // Private methods
   private async basicVoiceSynthesis(request: string, context: any): Promise<any> {
     const selectedVoices = await this.selectVoices(context);
-    
+
     return {
       request,
       voices: selectedVoices,
       synthesis: `Basic voice synthesis completed with ${selectedVoices.length} voices`,
       timestamp: Date.now(),
-      fallback: true
+      fallback: true,
     };
   }
 
@@ -177,10 +174,13 @@ export class VoiceSystemIntegration2025 {
       .map(v => v.voice);
   }
 
-  private calculateVoicePriorities(voices: string[], criteria: any): Array<{voice: string, priority: number}> {
+  private calculateVoicePriorities(
+    voices: string[],
+    criteria: any
+  ): Array<{ voice: string; priority: number }> {
     return voices.map(voice => ({
       voice,
-      priority: this.calculateVoicePriority(voice, criteria)
+      priority: this.calculateVoicePriority(voice, criteria),
     }));
   }
 
@@ -191,15 +191,15 @@ export class VoiceSystemIntegration2025 {
     if (criteria.type === 'analysis' && ['analyzer', 'architect'].includes(voice)) {
       priority += 0.3;
     }
-    
+
     if (criteria.type === 'implementation' && ['developer', 'implementor'].includes(voice)) {
       priority += 0.3;
     }
-    
+
     if (criteria.type === 'security' && voice === 'security') {
       priority += 0.4;
     }
-    
+
     if (criteria.complexity === 'high' && ['architect', 'analyzer'].includes(voice)) {
       priority += 0.2;
     }
@@ -217,7 +217,7 @@ export class VoiceSystemIntegration2025 {
       synthesisCount: 0, // Would track actual usage
       averageResponseTime: 0,
       errorRate: 0,
-      lastActivity: Date.now()
+      lastActivity: Date.now(),
     };
   }
 
@@ -235,8 +235,8 @@ export class VoiceSystemIntegration2025 {
         initialized: this.initialized,
         errorRate: 0, // Would track actual errors
         uptime: Date.now(), // Would track actual uptime
-        lastError: null
-      }
+        lastError: null,
+      },
     };
   }
 
@@ -245,17 +245,17 @@ export class VoiceSystemIntegration2025 {
    */
   async processWithIntegratedRouting(request: string, routing: any = {}): Promise<any> {
     logger.info('Processing request with integrated routing');
-    
+
     const selectedVoices = await this.selectVoices({
       type: routing.type || 'general',
       complexity: routing.complexity || 'medium',
-      ...routing
+      ...routing,
     });
 
     const result = await this.synthesizeVoices(request, {
       voices: selectedVoices,
       routing,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return {
@@ -263,8 +263,8 @@ export class VoiceSystemIntegration2025 {
       routing: {
         strategy: this.config.voiceSelectionStrategy,
         selectedVoices,
-        routingCriteria: routing
-      }
+        routingCriteria: routing,
+      },
     };
   }
 
@@ -273,8 +273,8 @@ export class VoiceSystemIntegration2025 {
    */
   async synthesizeMultipleVoices(request: string, options: any = {}): Promise<any> {
     logger.info('Synthesizing multiple voices for request');
-    
-    const voices = options.voices || await this.selectVoices(options);
+
+    const voices = options.voices || (await this.selectVoices(options));
     const results: any[] = [];
 
     for (const voice of voices) {
@@ -293,7 +293,7 @@ export class VoiceSystemIntegration2025 {
       results,
       synthesisType: 'multiple',
       timestamp: Date.now(),
-      success: results.length > 0
+      success: results.length > 0,
     };
   }
 
@@ -305,7 +305,7 @@ export class VoiceSystemIntegration2025 {
       voiceDistribution: {},
       averageVoicesPerRequest: this.config.maxConcurrentVoices || 3,
       mostUsedVoice: 'analyzer', // Would track actual usage
-      leastUsedVoice: 'guardian'
+      leastUsedVoice: 'guardian',
     };
   }
 
@@ -316,7 +316,7 @@ export class VoiceSystemIntegration2025 {
       response: `Response from ${voice} archetype for: ${request.substring(0, 50)}...`,
       confidence: Math.random() * 0.5 + 0.5, // Random confidence between 0.5-1.0
       processingTime: Math.random() * 1000 + 500, // Random time between 500-1500ms
-      options
+      options,
     };
   }
 }

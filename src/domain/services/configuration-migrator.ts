@@ -1,6 +1,6 @@
 /**
  * Configuration Migrator
- * 
+ *
  * Tool to migrate from legacy configuration files to the unified configuration system.
  * Provides analysis, transformation, and backup capabilities.
  */
@@ -86,7 +86,7 @@ export class ConfigurationMigrator {
     'config/hybrid.yaml',
     'config/hybrid-config.json',
     'config/optimized-model-config.json',
-    'config/voices.yaml'
+    'config/voices.yaml',
   ];
 
   constructor(
@@ -99,7 +99,7 @@ export class ConfigurationMigrator {
    */
   async analyzeLegacyConfiguration(): Promise<MigrationAnalysis> {
     this.logger.info('Analyzing legacy configuration files...');
-    
+
     const legacyFiles: LegacyFileInfo[] = [];
     const conflicts: ConfigurationConflict[] = [];
     const recommendations: MigrationRecommendation[] = [];
@@ -132,7 +132,9 @@ export class ConfigurationMigrator {
       compatibilityScore,
     };
 
-    this.logger.info(`Migration analysis complete: ${legacyFiles.length} files, ${conflicts.length} conflicts, ${compatibilityScore}% compatibility`);
+    this.logger.info(
+      `Migration analysis complete: ${legacyFiles.length} files, ${conflicts.length} conflicts, ${compatibilityScore}% compatibility`
+    );
     return analysis;
   }
 
@@ -149,10 +151,14 @@ export class ConfigurationMigrator {
 
     try {
       // Get analysis if not provided
-      const migrationAnalysis = analysis || await this.analyzeLegacyConfiguration();
+      const migrationAnalysis = analysis || (await this.analyzeLegacyConfiguration());
 
       // Create backup directory
-      const backupDir = join(this.projectRoot, 'config-backup', new Date().toISOString().slice(0, 19).replace(/:/g, '-'));
+      const backupDir = join(
+        this.projectRoot,
+        'config-backup',
+        new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      );
       await mkdir(backupDir, { recursive: true });
 
       // Backup existing files
@@ -171,7 +177,7 @@ export class ConfigurationMigrator {
 
       // Validate the unified configuration
       const validation = configManager.validateConfiguration(unifiedConfig);
-      
+
       if (!validation.isValid) {
         errors.push(...validation.errors.map(e => `${e.field}: ${e.message}`));
       }
@@ -184,7 +190,9 @@ export class ConfigurationMigrator {
       const migrationReport: MigrationReport = {
         filesProcessed: migrationAnalysis.legacyFiles.length,
         conflictsResolved: migrationAnalysis.conflicts.filter(c => c.resolution === 'auto').length,
-        manualInterventionsRequired: migrationAnalysis.conflicts.filter(c => c.resolution === 'manual').length,
+        manualInterventionsRequired: migrationAnalysis.conflicts.filter(
+          c => c.resolution === 'manual'
+        ).length,
         backupLocation: backupDir,
         migrationTime: Date.now() - startTime,
         validationResults: validation,
@@ -207,7 +215,6 @@ export class ConfigurationMigrator {
         warnings,
         errors,
       };
-
     } catch (error) {
       this.logger.error('Migration failed:', error);
       errors.push(`Migration failed: ${error.message}`);
@@ -259,34 +266,46 @@ Your original configuration files have been backed up to: \`${backupPath}\`
 
 ## Legacy Files Analyzed
 
-${analysis.legacyFiles.map(file => `
+${analysis.legacyFiles
+  .map(
+    file => `
 ### ${file.path}
 - **Format**: ${file.format}
 - **Size**: ${file.size} bytes
 - **Auto-migrate**: ${file.canAutoMigrate ? '✅' : '❌'}
 - **Issues**: ${file.issues.length}
 ${file.issues.map(issue => `  - ${issue.type}: ${issue.message}`).join('\n')}
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 ## Conflicts Resolved
 
-${analysis.conflicts.map(conflict => `
+${analysis.conflicts
+  .map(
+    conflict => `
 ### ${conflict.key}
 - **Severity**: ${conflict.severity}
 - **Resolution**: ${conflict.resolution}
 - **Values**:
 ${conflict.values.map(v => `  - ${v.source}: ${JSON.stringify(v.value)}`).join('\n')}
 - **Suggestion**: ${conflict.suggestion}
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 ## Next Steps
 
-${analysis.recommendations.map((rec, i) => `
+${analysis.recommendations
+  .map(
+    (rec, i) => `
 ${i + 1}. **${rec.type.toUpperCase()}**: ${rec.target}
    - **Reason**: ${rec.reason}
    - **Action**: ${rec.action}
    - **Priority**: ${rec.priority}
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 ## Configuration Precedence
 
@@ -333,8 +352,8 @@ If you encounter issues:
 
   private async analyzeFile(filePath: string): Promise<LegacyFileInfo> {
     const content = await readFile(filePath, 'utf-8');
-    const stats = await import('fs').then(fs => fs.promises.stat(filePath));
-    
+    const stats = await import('fs').then(async fs => fs.promises.stat(filePath));
+
     const format = filePath.endsWith('.json') ? 'json' : 'yaml';
     const issues: FileIssue[] = [];
     const sections: string[] = [];
@@ -348,7 +367,7 @@ If you encounter issues:
         issues.push({
           type: 'deprecation',
           message: 'Fast mode is deprecated, use executionMode: "fast"',
-          suggestion: 'Update to use model.executionMode: "fast"'
+          suggestion: 'Update to use model.executionMode: "fast"',
         });
       }
 
@@ -357,7 +376,7 @@ If you encounter issues:
         issues.push({
           type: 'security',
           message: 'Unsafe commands are allowed',
-          suggestion: 'Review security.allowedCommands and security.blockedCommands'
+          suggestion: 'Review security.allowedCommands and security.blockedCommands',
         });
       }
 
@@ -366,22 +385,21 @@ If you encounter issues:
         issues.push({
           type: 'conflict',
           message: 'Multiple timeout configurations found',
-          suggestion: 'Consolidate timeout settings'
+          suggestion: 'Consolidate timeout settings',
         });
       }
-
     } catch (error) {
       issues.push({
         type: 'invalid',
         message: `Failed to parse file: ${error.message}`,
-        suggestion: 'Fix syntax errors before migration'
+        suggestion: 'Fix syntax errors before migration',
       });
     }
 
     const canAutoMigrate = issues.filter(i => i.type === 'invalid').length === 0;
 
     return {
-      path: filePath.replace(this.projectRoot + '/', ''),
+      path: filePath.replace(`${this.projectRoot}/`, ''),
       size: stats.size,
       lastModified: stats.mtime,
       format,
@@ -391,7 +409,9 @@ If you encounter issues:
     };
   }
 
-  private async detectCrossFileConflicts(files: LegacyFileInfo[]): Promise<ConfigurationConflict[]> {
+  private async detectCrossFileConflicts(
+    files: LegacyFileInfo[]
+  ): Promise<ConfigurationConflict[]> {
     const conflicts: ConfigurationConflict[] = [];
     const configValues = new Map<string, ConflictingValue[]>();
 
@@ -429,7 +449,12 @@ If you encounter issues:
     return conflicts;
   }
 
-  private extractConfigValues(obj: any, source: string, configValues: Map<string, ConflictingValue[]>, prefix = ''): void {
+  private extractConfigValues(
+    obj: any,
+    source: string,
+    configValues: Map<string, ConflictingValue[]>,
+    prefix = ''
+  ): void {
     for (const [key, value] of Object.entries(obj)) {
       const fullKey = prefix ? `${prefix}.${key}` : key;
 
@@ -461,7 +486,10 @@ If you encounter issues:
     return precedenceMap[source] || 10;
   }
 
-  private assessConflictSeverity(key: string, values: ConflictingValue[]): 'low' | 'medium' | 'high' | 'critical' {
+  private assessConflictSeverity(
+    key: string,
+    values: ConflictingValue[]
+  ): 'low' | 'medium' | 'high' | 'critical' {
     // Critical conflicts that could break the system
     if (key.includes('endpoint') || key.includes('timeout') || key.includes('security')) {
       return 'critical';
@@ -480,11 +508,14 @@ If you encounter issues:
     return 'low';
   }
 
-  private determineResolutionStrategy(key: string, values: ConflictingValue[]): 'auto' | 'manual' | 'prompt' {
+  private determineResolutionStrategy(
+    key: string,
+    values: ConflictingValue[]
+  ): 'auto' | 'manual' | 'prompt' {
     // Auto-resolve if there's a clear precedence winner
     const maxPrecedence = Math.max(...values.map(v => v.precedence));
     const highestPrecedenceValues = values.filter(v => v.precedence === maxPrecedence);
-    
+
     if (highestPrecedenceValues.length === 1) {
       return 'auto';
     }
@@ -500,11 +531,14 @@ If you encounter issues:
   private generateConflictSuggestion(key: string, values: ConflictingValue[]): string {
     const maxPrecedence = Math.max(...values.map(v => v.precedence));
     const winner = values.find(v => v.precedence === maxPrecedence);
-    
+
     return `Use value ${JSON.stringify(winner?.value)} from ${winner?.source} (highest precedence)`;
   }
 
-  private generateRecommendations(files: LegacyFileInfo[], conflicts: ConfigurationConflict[]): MigrationRecommendation[] {
+  private generateRecommendations(
+    files: LegacyFileInfo[],
+    conflicts: ConfigurationConflict[]
+  ): MigrationRecommendation[] {
     const recommendations: MigrationRecommendation[] = [];
 
     // Recommend consolidation
@@ -519,7 +553,9 @@ If you encounter issues:
     }
 
     // Recommend deprecation of legacy files
-    const legacyFiles = files.filter(f => f.path.includes('codecrucible.config.json') || f.path.includes('hybrid'));
+    const legacyFiles = files.filter(
+      f => f.path.includes('codecrucible.config.json') || f.path.includes('hybrid')
+    );
     for (const file of legacyFiles) {
       recommendations.push({
         type: 'deprecate',
@@ -545,7 +581,10 @@ If you encounter issues:
     return recommendations;
   }
 
-  private calculateEffort(files: LegacyFileInfo[], conflicts: ConfigurationConflict[]): 'low' | 'medium' | 'high' {
+  private calculateEffort(
+    files: LegacyFileInfo[],
+    conflicts: ConfigurationConflict[]
+  ): 'low' | 'medium' | 'high' {
     let score = 0;
 
     // File complexity
@@ -563,7 +602,10 @@ If you encounter issues:
     return 'high';
   }
 
-  private calculateCompatibilityScore(files: LegacyFileInfo[], conflicts: ConfigurationConflict[]): number {
+  private calculateCompatibilityScore(
+    files: LegacyFileInfo[],
+    conflicts: ConfigurationConflict[]
+  ): number {
     let totalItems = 0;
     let compatibleItems = 0;
 
@@ -573,9 +615,12 @@ If you encounter issues:
 
     // Issue compatibility
     const totalIssues = files.reduce((sum, f) => sum + f.issues.length, 0);
-    const criticalIssues = files.reduce((sum, f) => sum + f.issues.filter(i => i.type === 'invalid').length, 0);
+    const criticalIssues = files.reduce(
+      (sum, f) => sum + f.issues.filter(i => i.type === 'invalid').length,
+      0
+    );
     totalItems += totalIssues;
-    compatibleItems += (totalIssues - criticalIssues);
+    compatibleItems += totalIssues - criticalIssues;
 
     // Conflict compatibility
     totalItems += conflicts.length;
@@ -585,9 +630,12 @@ If you encounter issues:
     return Math.round((compatibleItems / totalItems) * 100);
   }
 
-  private async saveUnifiedConfiguration(config: UnifiedConfiguration, path: string): Promise<void> {
+  private async saveUnifiedConfiguration(
+    config: UnifiedConfiguration,
+    path: string
+  ): Promise<void> {
     await mkdir(dirname(path), { recursive: true });
-    
+
     const yamlContent = YAML.stringify(config, {
       indent: 2,
       lineWidth: 120,

@@ -1,7 +1,7 @@
 /**
  * Request Timeout Optimizer
  * Prevents hanging requests and optimizes timeout handling based on usage patterns
- * 
+ *
  * Performance Impact: Eliminates hanging requests, 50-70% faster failure detection
  */
 
@@ -28,19 +28,19 @@ interface RequestTimeoutData {
 export class RequestTimeoutOptimizer {
   private static instance: RequestTimeoutOptimizer | null = null;
   private activeRequests = new Map<string, RequestTimeoutData>();
-  private timeoutHistory: Array<{ 
-    type: string; 
-    duration: number; 
-    success: boolean; 
-    provider: string 
+  private timeoutHistory: Array<{
+    type: string;
+    duration: number;
+    success: boolean;
+    provider: string;
   }> = [];
-  
+
   private config: TimeoutConfig = {
-    defaultTimeout: 30000,     // 30 seconds default
-    fastModeTimeout: 10000,    // 10 seconds for fast mode
+    defaultTimeout: 30000, // 30 seconds default
+    fastModeTimeout: 10000, // 10 seconds for fast mode
     toolExecutionTimeout: 45000, // 45 seconds for tool execution
-    streamingTimeout: 60000,   // 60 seconds for streaming
-    batchTimeout: 20000        // 20 seconds for batch requests
+    streamingTimeout: 60000, // 60 seconds for streaming
+    batchTimeout: 20000, // 20 seconds for batch requests
   };
 
   private cleanupIntervalId: string | null = null;
@@ -65,17 +65,16 @@ export class RequestTimeoutOptimizer {
     provider: string,
     customTimeout?: number
   ): { abortController: AbortController; timeout: number } {
-    
     const abortController = new AbortController();
     const optimizedTimeout = customTimeout || this.calculateOptimalTimeout(type, provider);
-    
+
     const requestData: RequestTimeoutData = {
       requestId,
       startTime: Date.now(),
       timeout: optimizedTimeout,
       type,
       provider,
-      abortController
+      abortController,
     };
 
     this.activeRequests.set(requestId, requestData);
@@ -97,7 +96,7 @@ export class RequestTimeoutOptimizer {
       type,
       provider,
       timeout: `${optimizedTimeout}ms`,
-      adaptive: customTimeout ? false : true
+      adaptive: customTimeout ? false : true,
     });
 
     return { abortController, timeout: optimizedTimeout };
@@ -111,12 +110,12 @@ export class RequestTimeoutOptimizer {
     provider: string
   ): number {
     // Get historical data for this type/provider combination
-    const relevantHistory = this.timeoutHistory.filter(h => 
-      h.type === type && h.provider === provider && h.success
-    ).slice(-20); // Last 20 successful requests
+    const relevantHistory = this.timeoutHistory
+      .filter(h => h.type === type && h.provider === provider && h.success)
+      .slice(-20); // Last 20 successful requests
 
     let baseTimeout: number;
-    
+
     switch (type) {
       case 'streaming':
         baseTimeout = this.config.streamingTimeout;
@@ -144,7 +143,7 @@ export class RequestTimeoutOptimizer {
 
     // Use 95th percentile + 50% buffer, but cap at 2x base timeout
     const adaptiveTimeout = Math.min(p95 * 1.5, baseTimeout * 2);
-    
+
     logger.debug('Calculated adaptive timeout', {
       type,
       provider,
@@ -152,7 +151,7 @@ export class RequestTimeoutOptimizer {
       avgDuration: avg.toFixed(0),
       p95Duration: p95.toFixed(0),
       adaptiveTimeout: adaptiveTimeout.toFixed(0),
-      baseTimeout
+      baseTimeout,
     });
 
     return Math.max(adaptiveTimeout, baseTimeout * 0.5); // Never less than 50% of base
@@ -166,13 +165,13 @@ export class RequestTimeoutOptimizer {
     if (!requestData) return;
 
     const duration = Date.now() - requestData.startTime;
-    
+
     logger.warn('Request timeout triggered', {
       requestId,
       type: requestData.type,
       provider: requestData.provider,
       timeout: `${requestData.timeout}ms`,
-      actualDuration: `${duration}ms`
+      actualDuration: `${duration}ms`,
     });
 
     // Abort the request
@@ -187,7 +186,7 @@ export class RequestTimeoutOptimizer {
       type: requestData.type,
       duration,
       success: false, // Timeout = failure
-      provider: requestData.provider
+      provider: requestData.provider,
     });
 
     // Cleanup
@@ -205,13 +204,13 @@ export class RequestTimeoutOptimizer {
     if (!requestData) return;
 
     const duration = Date.now() - requestData.startTime;
-    
+
     // Record successful completion
     this.timeoutHistory.push({
       type: requestData.type,
       duration,
       success: true,
-      provider: requestData.provider
+      provider: requestData.provider,
     });
 
     this.activeRequests.delete(requestId);
@@ -221,7 +220,7 @@ export class RequestTimeoutOptimizer {
       type: requestData.type,
       provider: requestData.provider,
       duration: `${duration}ms`,
-      timeoutWas: `${requestData.timeout}ms`
+      timeoutWas: `${requestData.timeout}ms`,
     });
 
     // Keep history manageable
@@ -251,7 +250,10 @@ export class RequestTimeoutOptimizer {
           this.config.batchTimeout = Math.min(this.config.batchTimeout * 1.2, 45000);
           break;
         case 'tool_execution':
-          this.config.toolExecutionTimeout = Math.min(this.config.toolExecutionTimeout * 1.2, 90000);
+          this.config.toolExecutionTimeout = Math.min(
+            this.config.toolExecutionTimeout * 1.2,
+            90000
+          );
           break;
       }
 
@@ -259,7 +261,7 @@ export class RequestTimeoutOptimizer {
         type,
         provider,
         recentFailures: recentFailures.length,
-        newTimeout: this.getTimeoutForType(type)
+        newTimeout: this.getTimeoutForType(type),
       });
     }
   }
@@ -269,10 +271,14 @@ export class RequestTimeoutOptimizer {
    */
   private getTimeoutForType(type: string): number {
     switch (type) {
-      case 'streaming': return this.config.streamingTimeout;
-      case 'batch': return this.config.batchTimeout;
-      case 'tool_execution': return this.config.toolExecutionTimeout;
-      default: return this.config.defaultTimeout;
+      case 'streaming':
+        return this.config.streamingTimeout;
+      case 'batch':
+        return this.config.batchTimeout;
+      case 'tool_execution':
+        return this.config.toolExecutionTimeout;
+      default:
+        return this.config.defaultTimeout;
     }
   }
 
@@ -281,7 +287,7 @@ export class RequestTimeoutOptimizer {
    */
   private startTimeoutMonitoring(): void {
     const monitoringInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       this.monitorHungRequests();
     }, 10000); // Check every 10 seconds
 
@@ -306,7 +312,7 @@ export class RequestTimeoutOptimizer {
 
     for (const [requestId, requestData] of this.activeRequests.entries()) {
       const elapsed = now - requestData.startTime;
-      
+
       // If request has been running for 2x its timeout, it's definitely hung
       if (elapsed > requestData.timeout * 2) {
         hungRequests.push(requestId);
@@ -314,11 +320,11 @@ export class RequestTimeoutOptimizer {
     }
 
     if (hungRequests.length > 0) {
-      logger.warn('Detected hung requests', { 
+      logger.warn('Detected hung requests', {
         count: hungRequests.length,
-        requestIds: hungRequests 
+        requestIds: hungRequests,
       });
-      
+
       // Force abort hung requests
       for (const requestId of hungRequests) {
         this.handleTimeout(requestId);
@@ -336,28 +342,32 @@ export class RequestTimeoutOptimizer {
     averageRequestDuration: number;
     adaptiveAdjustments: number;
     currentConfig: TimeoutConfig;
-    performanceByType: Record<string, {
-      avgDuration: number;
-      timeoutRate: number;
-      requestCount: number;
-    }>;
+    performanceByType: Record<
+      string,
+      {
+        avgDuration: number;
+        timeoutRate: number;
+        requestCount: number;
+      }
+    >;
   } {
     const totalRequests = this.timeoutHistory.length;
     const timeouts = this.timeoutHistory.filter(h => !h.success).length;
-    const avgDuration = totalRequests > 0 
-      ? this.timeoutHistory.reduce((sum, h) => sum + h.duration, 0) / totalRequests 
-      : 0;
+    const avgDuration =
+      totalRequests > 0
+        ? this.timeoutHistory.reduce((sum, h) => sum + h.duration, 0) / totalRequests
+        : 0;
 
     // Performance by type
     const performanceByType: Record<string, any> = {};
     const types = [...new Set(this.timeoutHistory.map(h => h.type))];
-    
+
     for (const type of types) {
       const typeHistory = this.timeoutHistory.filter(h => h.type === type);
       performanceByType[type] = {
         avgDuration: typeHistory.reduce((sum, h) => sum + h.duration, 0) / typeHistory.length,
         timeoutRate: typeHistory.filter(h => !h.success).length / typeHistory.length,
-        requestCount: typeHistory.length
+        requestCount: typeHistory.length,
       };
     }
 
@@ -368,7 +378,7 @@ export class RequestTimeoutOptimizer {
       averageRequestDuration: avgDuration,
       adaptiveAdjustments: 0, // Could track this if needed
       currentConfig: { ...this.config },
-      performanceByType
+      performanceByType,
     };
   }
 
@@ -434,7 +444,7 @@ export class RequestTimeoutOptimizer {
     logger.info('🔄 RequestTimeoutOptimizer shutting down', {
       totalRequests: stats.totalRequests,
       timeoutRate: `${(stats.timeoutRate * 100).toFixed(1)}%`,
-      avgDuration: `${stats.averageRequestDuration.toFixed(0)}ms`
+      avgDuration: `${stats.averageRequestDuration.toFixed(0)}ms`,
     });
 
     this.activeRequests.clear();

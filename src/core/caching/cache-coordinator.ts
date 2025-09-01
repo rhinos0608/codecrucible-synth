@@ -260,7 +260,7 @@ export class CacheCoordinator implements ICacheCoordinator {
     this.cacheStats.totalRequests = this.cacheStats.hits + this.cacheStats.misses;
     this.cacheStats.hitRate =
       this.cacheStats.totalRequests > 0
-        ? `${((this.cacheStats.hits / this.cacheStats.totalRequests) * 100).toFixed(1)  }%`
+        ? `${((this.cacheStats.hits / this.cacheStats.totalRequests) * 100).toFixed(1)}%`
         : '0%';
   }
 

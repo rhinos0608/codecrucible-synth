@@ -1,11 +1,11 @@
 /**
  * Context Window Manager - Large Codebase Analysis
- * 
+ *
  * Implements intelligent context window utilization patterns from industry leaders:
  * - Qwen CLI: 256K-512K context windows with hierarchical analysis
  * - Gemini CLI: 1M+ context windows with smart file prioritization
  * - Claude Code: Intelligent chunking and caching strategies
- * 
+ *
  * Enables comprehensive codebase analysis that fits within model context limits
  * while maximizing relevant information density.
  */
@@ -66,24 +66,66 @@ export class ContextWindowManager {
   private tokenCache: Map<string, number> = new Map();
   private analysisCache: Map<string, FileAnalysisResult> = new Map();
 
-  constructor(options: {
-    maxContextTokens?: number;
-    tokenBuffer?: number;
-    supportedExtensions?: string[];
-    excludePatterns?: string[];
-  } = {}) {
+  constructor(
+    options: {
+      maxContextTokens?: number;
+      tokenBuffer?: number;
+      supportedExtensions?: string[];
+      excludePatterns?: string[];
+    } = {}
+  ) {
     // Match Ollama configuration: 256K context window
     this.maxContextTokens = options.maxContextTokens || 256000;
     this.tokenBuffer = options.tokenBuffer || 16000; // Reasonable buffer for model response
-    
-    this.supportedExtensions = new Set(options.supportedExtensions || [
-      '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.h',
-      '.css', '.scss', '.html', '.vue', '.svelte', '.md', '.json', '.yaml',
-      '.yml', '.xml', '.sql', '.sh', '.bat', '.ps1', '.dockerfile', '.env',
-      '.go', '.rs', '.rb', '.php', '.cs', '.swift', '.kt', '.dart', '.r',
-      '.scala', '.clj', '.hs', '.elm', '.f90', '.m', '.pl', '.lua', '.nim'
-    ]);
-    
+
+    this.supportedExtensions = new Set(
+      options.supportedExtensions || [
+        '.js',
+        '.ts',
+        '.jsx',
+        '.tsx',
+        '.py',
+        '.java',
+        '.cpp',
+        '.c',
+        '.h',
+        '.css',
+        '.scss',
+        '.html',
+        '.vue',
+        '.svelte',
+        '.md',
+        '.json',
+        '.yaml',
+        '.yml',
+        '.xml',
+        '.sql',
+        '.sh',
+        '.bat',
+        '.ps1',
+        '.dockerfile',
+        '.env',
+        '.go',
+        '.rs',
+        '.rb',
+        '.php',
+        '.cs',
+        '.swift',
+        '.kt',
+        '.dart',
+        '.r',
+        '.scala',
+        '.clj',
+        '.hs',
+        '.elm',
+        '.f90',
+        '.m',
+        '.pl',
+        '.lua',
+        '.nim',
+      ]
+    );
+
     this.excludePatterns = options.excludePatterns || [
       'node_modules/**',
       '.git/**',
@@ -97,7 +139,7 @@ export class ContextWindowManager {
       'thumbs.db',
       '*.log',
       '.vscode/**',
-      '.idea/**'
+      '.idea/**',
     ];
   }
 
@@ -117,14 +159,16 @@ export class ContextWindowManager {
   ): Promise<CodebaseAnalysisResult> {
     const startTime = Date.now();
     const availableTokens = this.maxContextTokens - this.tokenBuffer;
-    
-    logger.info(`🔍 Starting codebase analysis with ${availableTokens.toLocaleString()} token budget`);
+
+    logger.info(
+      `🔍 Starting codebase analysis with ${availableTokens.toLocaleString()} token budget`
+    );
 
     // Phase 1: Discover all relevant files
     const allFiles = await this.discoverFiles(basePath, {
       maxDepth: options.maxDepth || 5,
       includeTests: options.includeTests ?? true,
-      includeDocs: options.includeDocs ?? true
+      includeDocs: options.includeDocs ?? true,
     });
 
     logger.info(`📁 Discovered ${allFiles.length} files for analysis`);
@@ -134,8 +178,8 @@ export class ContextWindowManager {
 
     // Phase 3: Create context chunks with intelligent grouping
     const chunks = await this.createContextChunks(
-      analyzedFiles, 
-      availableTokens, 
+      analyzedFiles,
+      availableTokens,
       options.chunkStrategy || 'priority'
     );
 
@@ -153,16 +197,16 @@ export class ContextWindowManager {
    * Discover relevant files in the codebase
    */
   private async discoverFiles(
-    basePath: string, 
+    basePath: string,
     options: { maxDepth: number; includeTests: boolean; includeDocs: boolean }
   ): Promise<string[]> {
     const patterns = ['**/*'];
-    
+
     // Add specific patterns based on options
     if (!options.includeTests) {
       this.excludePatterns.push('**/*.test.*', '**/*.spec.*', '**/test/**', '**/tests/**');
     }
-    
+
     if (!options.includeDocs) {
       this.excludePatterns.push('**/docs/**', '**/*.md', '**/README*');
     }
@@ -173,13 +217,11 @@ export class ContextWindowManager {
         ignore: this.excludePatterns,
         nodir: true,
         maxDepth: options.maxDepth,
-        absolute: true
+        absolute: true,
       });
 
       // Filter by supported extensions
-      return files.filter(file => 
-        this.supportedExtensions.has(extname(file).toLowerCase())
-      );
+      return files.filter(file => this.supportedExtensions.has(extname(file).toLowerCase()));
     } catch (error) {
       logger.warn('Failed to discover files:', error);
       return [];
@@ -190,8 +232,8 @@ export class ContextWindowManager {
    * Analyze and prioritize files based on query relevance
    */
   private async analyzeAndPrioritizeFiles(
-    files: string[], 
-    query: string, 
+    files: string[],
+    query: string,
     basePath: string
   ): Promise<FileAnalysisResult[]> {
     const results: FileAnalysisResult[] = [];
@@ -201,18 +243,20 @@ export class ContextWindowManager {
 
     for (let i = 0; i < files.length; i += batchSize) {
       const batch = files.slice(i, i + batchSize);
-      const batchPromises = batch.map(file => this.analyzeFile(file, query, basePath));
-      
+      const batchPromises = batch.map(async file => this.analyzeFile(file, query, basePath));
+
       try {
         const batchResults = await Promise.all(batchPromises);
         const validResults = batchResults.filter(Boolean);
         const filteredCount = batchResults.length - validResults.length;
-        
+
         results.push(...validResults);
-        
+
         // Debug logging to understand filtering
         if (filteredCount > 0) {
-          logger.info(`📋 Batch ${i}-${i + batchSize}: ${validResults.length} valid, ${filteredCount} filtered`);
+          logger.info(
+            `📋 Batch ${i}-${i + batchSize}: ${validResults.length} valid, ${filteredCount} filtered`
+          );
         }
       } catch (error) {
         logger.warn(`Failed to analyze batch ${i}-${i + batchSize}:`, error);
@@ -235,8 +279,8 @@ export class ContextWindowManager {
    * Analyze individual file for relevance and metadata
    */
   private async analyzeFile(
-    filePath: string, 
-    query: string, 
+    filePath: string,
+    query: string,
     basePath: string
   ): Promise<FileAnalysisResult | null> {
     try {
@@ -248,7 +292,7 @@ export class ContextWindowManager {
 
       const stats = await stat(filePath);
       const relativePath = relative(basePath, filePath);
-      
+
       // Skip if file is too large (>1MB)
       if (stats.size > 1024 * 1024) {
         return null;
@@ -256,10 +300,10 @@ export class ContextWindowManager {
 
       const content = await readFile(filePath, 'utf-8');
       const tokens = this.estimateTokens(content);
-      
+
       // Calculate priority based on multiple factors
       const priority = this.calculateFilePriority(content, relativePath, query, stats);
-      
+
       const result: FileAnalysisResult = {
         path: relativePath,
         priority,
@@ -267,24 +311,23 @@ export class ContextWindowManager {
         complexity: this.assessComplexity(content),
         summary: this.generateFileSummary(content, relativePath),
         keyElements: this.extractKeyElements(content),
-        dependencies: this.extractDependencies(content)
+        dependencies: this.extractDependencies(content),
       };
 
       // Cache the result
       this.analysisCache.set(cacheKey, result);
       return result;
-
     } catch (error) {
       // File read error - try to be more permissive
       try {
         // For binary files or encoding issues, still return basic info
         const stats = await stat(filePath);
         const relativePath = relative(basePath, filePath);
-        
+
         if (stats.size > 1024 * 1024) {
           return null; // Still skip very large files
         }
-        
+
         // Return minimal result for files we can't read
         return {
           path: relativePath,
@@ -293,7 +336,7 @@ export class ContextWindowManager {
           complexity: 'low' as const,
           summary: `Binary or unreadable file: ${relativePath}`,
           keyElements: [],
-          dependencies: []
+          dependencies: [],
         };
       } catch (statError) {
         // If we can't even stat the file, skip it
@@ -306,8 +349,8 @@ export class ContextWindowManager {
    * Calculate file priority based on query relevance
    */
   private calculateFilePriority(
-    content: string, 
-    relativePath: string, 
+    content: string,
+    relativePath: string,
     query: string,
     stats: any
   ): number {
@@ -317,9 +360,12 @@ export class ContextWindowManager {
     const contentLower = content.toLowerCase();
 
     // Project analysis queries should include more files by default
-    const isProjectAnalysis = queryLower.includes('project') || queryLower.includes('analyze') || 
-                              queryLower.includes('tell me about') || queryLower.includes('about this');
-    
+    const isProjectAnalysis =
+      queryLower.includes('project') ||
+      queryLower.includes('analyze') ||
+      queryLower.includes('tell me about') ||
+      queryLower.includes('about this');
+
     if (isProjectAnalysis) {
       priority += 0.2; // Boost for project analysis queries
     }
@@ -330,13 +376,23 @@ export class ContextWindowManager {
     if (pathLower.includes('src/')) priority += 0.2;
     if (pathLower.includes('core/') || pathLower.includes('lib/')) priority += 0.2;
     if (pathLower.includes('config') || pathLower.includes('setting')) priority += 0.15;
-    
+
     // Important files for project understanding
     const filename = pathLower.split('/').pop() || '';
-    if (['package.json', 'tsconfig.json', 'readme.md', 'index.ts', 'index.js', 'main.ts', 'app.ts'].includes(filename)) {
+    if (
+      [
+        'package.json',
+        'tsconfig.json',
+        'readme.md',
+        'index.ts',
+        'index.js',
+        'main.ts',
+        'app.ts',
+      ].includes(filename)
+    ) {
       priority += 0.4;
     }
-    
+
     // Content-based scoring (more lenient)
     const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
     for (const word of queryWords) {
@@ -344,24 +400,27 @@ export class ContextWindowManager {
       const matches = (content.match(new RegExp(word, 'gi')) || []).length;
       priority += Math.min(matches * 0.03, 0.15); // Reduced individual impact but still meaningful
     }
-    
+
     // File type scoring (enhanced for code files)
     const ext = extname(relativePath).toLowerCase();
     if (['.ts', '.js'].includes(ext)) priority += 0.2; // TypeScript/JavaScript priority
     if (['.py', '.java', '.cpp', '.go', '.rs'].includes(ext)) priority += 0.15; // Other code files
     if (['.json', '.yaml', '.yml'].includes(ext)) priority += 0.1; // Config files
     if (['.md', '.txt'].includes(ext)) priority += 0.08; // Documentation
-    
+
     // Recency scoring (enhanced)
     const daysSinceModified = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceModified < 1) priority += 0.15; // Very recent
-    else if (daysSinceModified < 7) priority += 0.1; // Recent
+    if (daysSinceModified < 1)
+      priority += 0.15; // Very recent
+    else if (daysSinceModified < 7)
+      priority += 0.1; // Recent
     else if (daysSinceModified < 30) priority += 0.05; // Somewhat recent
-    
+
     // Size penalty for very large files (more lenient)
-    if (content.length > 100000) priority *= 0.7; // Only penalize very large files
+    if (content.length > 100000)
+      priority *= 0.7; // Only penalize very large files
     else if (content.length > 50000) priority *= 0.9; // Light penalty for large files
-    
+
     return Math.min(priority, 1.0);
   }
 
@@ -369,27 +428,27 @@ export class ContextWindowManager {
    * Create intelligent context chunks
    */
   private async createContextChunks(
-    files: FileAnalysisResult[], 
+    files: FileAnalysisResult[],
     availableTokens: number,
     strategy: 'priority' | 'hierarchical' | 'semantic'
   ): Promise<ContextChunk[]> {
     const chunks: ContextChunk[] = [];
-    let currentChunk: FileAnalysisResult[] = [];
-    let currentTokens = 0;
-    let chunkId = 1;
+    const currentChunk: FileAnalysisResult[] = [];
+    const currentTokens = 0;
+    const chunkId = 1;
 
     logger.info(`🧩 Creating context chunks with ${strategy} strategy`);
 
     switch (strategy) {
       case 'priority':
         return this.createPriorityChunks(files, availableTokens);
-        
+
       case 'hierarchical':
         return this.createHierarchicalChunks(files, availableTokens);
-        
+
       case 'semantic':
         return this.createSemanticChunks(files, availableTokens);
-        
+
       default:
         return this.createPriorityChunks(files, availableTokens);
     }
@@ -398,13 +457,16 @@ export class ContextWindowManager {
   /**
    * Create chunks based on priority (highest priority files first)
    */
-  private createPriorityChunks(files: FileAnalysisResult[], availableTokens: number): ContextChunk[] {
+  private createPriorityChunks(
+    files: FileAnalysisResult[],
+    availableTokens: number
+  ): ContextChunk[] {
     const chunks: ContextChunk[] = [];
     const chunkTargetSize = availableTokens * 0.8; // Leave room for metadata
-    
+
     let currentChunk: FileAnalysisResult[] = [];
     let currentTokens = 0;
-    
+
     for (const file of files) {
       if (currentTokens + file.tokens > chunkTargetSize && currentChunk.length > 0) {
         // Create chunk and start new one
@@ -412,16 +474,16 @@ export class ContextWindowManager {
         currentChunk = [];
         currentTokens = 0;
       }
-      
+
       currentChunk.push(file);
       currentTokens += file.tokens;
     }
-    
+
     // Add final chunk if there are remaining files
     if (currentChunk.length > 0) {
       chunks.push(this.finalizeChunk(currentChunk, chunks.length + 1));
     }
-    
+
     logger.info(`✅ Created ${chunks.length} priority-based chunks`);
     return chunks;
   }
@@ -429,51 +491,59 @@ export class ContextWindowManager {
   /**
    * Create chunks based on hierarchical directory structure
    */
-  private createHierarchicalChunks(files: FileAnalysisResult[], availableTokens: number): ContextChunk[] {
+  private createHierarchicalChunks(
+    files: FileAnalysisResult[],
+    availableTokens: number
+  ): ContextChunk[] {
     // Group files by directory
     const dirGroups = new Map<string, FileAnalysisResult[]>();
-    
+
     for (const file of files) {
       const dir = file.path.split('/').slice(0, -1).join('/') || 'root';
       if (!dirGroups.has(dir)) dirGroups.set(dir, []);
       dirGroups.get(dir)!.push(file);
     }
-    
+
     // Create chunks from directory groups
     const chunks: ContextChunk[] = [];
     const chunkTargetSize = availableTokens * 0.8;
-    
+
     for (const [dir, dirFiles] of dirGroups) {
       let currentChunk: FileAnalysisResult[] = [];
       let currentTokens = 0;
-      
+
       // Sort files in directory by priority
       dirFiles.sort((a, b) => b.priority - a.priority);
-      
+
       for (const file of dirFiles) {
         if (currentTokens + file.tokens > chunkTargetSize && currentChunk.length > 0) {
           chunks.push(this.finalizeChunk(currentChunk, chunks.length + 1, `Directory: ${dir}`));
           currentChunk = [];
           currentTokens = 0;
         }
-        
+
         currentChunk.push(file);
         currentTokens += file.tokens;
       }
-      
+
       if (currentChunk.length > 0) {
         chunks.push(this.finalizeChunk(currentChunk, chunks.length + 1, `Directory: ${dir}`));
       }
     }
-    
-    logger.info(`✅ Created ${chunks.length} hierarchical chunks from ${dirGroups.size} directories`);
+
+    logger.info(
+      `✅ Created ${chunks.length} hierarchical chunks from ${dirGroups.size} directories`
+    );
     return chunks;
   }
 
   /**
    * Create chunks based on semantic relationships (dependencies, imports)
    */
-  private createSemanticChunks(files: FileAnalysisResult[], availableTokens: number): ContextChunk[] {
+  private createSemanticChunks(
+    files: FileAnalysisResult[],
+    availableTokens: number
+  ): ContextChunk[] {
     // For now, fallback to priority-based chunking
     // TODO: Implement dependency graph analysis for true semantic chunking
     logger.info(`ℹ️ Semantic chunking not fully implemented, falling back to priority-based`);
@@ -486,14 +556,14 @@ export class ContextWindowManager {
   private finalizeChunk(files: FileAnalysisResult[], id: number, focusArea?: string): ContextChunk {
     const totalTokens = files.reduce((sum, f) => sum + f.tokens, 0);
     const avgPriority = files.reduce((sum, f) => sum + f.priority, 0) / files.length;
-    
+
     return {
       id: `chunk-${id}`,
       files,
       totalTokens,
       focusArea: focusArea || this.determineFocusArea(files),
       summary: this.generateChunkSummary(files),
-      relationships: this.extractChunkRelationships(files)
+      relationships: this.extractChunkRelationships(files),
     };
   }
 
@@ -503,18 +573,18 @@ export class ContextWindowManager {
   private determineFocusArea(files: FileAnalysisResult[]): string {
     const pathParts = files.map(f => f.path.split('/')).flat();
     const commonDirs = this.findMostCommon(pathParts.filter(p => !p.includes('.')));
-    
+
     if (commonDirs.length > 0) {
       return `${commonDirs[0]} module`;
     }
-    
+
     const extensions = files.map(f => extname(f.path));
     const commonExt = this.findMostCommon(extensions);
-    
+
     if (commonExt.length > 0) {
       return `${commonExt[0]} files`;
     }
-    
+
     return 'Mixed files';
   }
 
@@ -522,28 +592,33 @@ export class ContextWindowManager {
    * Generate analysis result with statistics
    */
   private generateAnalysisResult(
-    chunks: ContextChunk[], 
-    totalFiles: number, 
+    chunks: ContextChunk[],
+    totalFiles: number,
     analyzedFiles: FileAnalysisResult[]
   ): CodebaseAnalysisResult {
     const tokensUsed = chunks.reduce((sum, chunk) => sum + chunk.totalTokens, 0);
-    const contextEfficiency = Math.min(tokensUsed / (this.maxContextTokens - this.tokenBuffer), 1.0);
-    
+    const contextEfficiency = Math.min(
+      tokensUsed / (this.maxContextTokens - this.tokenBuffer),
+      1.0
+    );
+
     // Calculate priority distribution
     const highPriority = analyzedFiles.filter(f => f.priority >= 0.7).length;
     const mediumPriority = analyzedFiles.filter(f => f.priority >= 0.3 && f.priority < 0.7).length;
     const lowPriority = analyzedFiles.filter(f => f.priority < 0.3).length;
-    
+
     const recommendations: string[] = [];
-    
+
     if (contextEfficiency < 0.5) {
       recommendations.push('Consider narrowing your query scope for more focused analysis');
     }
-    
+
     if (chunks.length > 5) {
-      recommendations.push('Large codebase detected - analysis will be performed in multiple passes');
+      recommendations.push(
+        'Large codebase detected - analysis will be performed in multiple passes'
+      );
     }
-    
+
     if (highPriority < analyzedFiles.length * 0.1) {
       recommendations.push('No highly relevant files found - consider refining your query');
     }
@@ -557,9 +632,9 @@ export class ContextWindowManager {
       priorityDistribution: {
         high: highPriority,
         medium: mediumPriority,
-        low: lowPriority
+        low: lowPriority,
       },
-      recommendations
+      recommendations,
     };
   }
 
@@ -570,7 +645,7 @@ export class ContextWindowManager {
     if (this.tokenCache.has(cacheKey)) {
       return this.tokenCache.get(cacheKey)!;
     }
-    
+
     const estimated = Math.ceil(text.length / 3.8); // Conservative estimate
     this.tokenCache.set(cacheKey, estimated);
     return estimated;
@@ -578,8 +653,10 @@ export class ContextWindowManager {
 
   private assessComplexity(content: string): 'low' | 'medium' | 'high' {
     const lines = content.split('\n').length;
-    const cyclomaticComplexity = (content.match(/\b(if|else|for|while|switch|catch|&&|\|\|)\b/g) || []).length;
-    
+    const cyclomaticComplexity = (
+      content.match(/\b(if|else|for|while|switch|catch|&&|\|\|)\b/g) || []
+    ).length;
+
     if (lines > 1000 || cyclomaticComplexity > 50) return 'high';
     if (lines > 300 || cyclomaticComplexity > 20) return 'medium';
     return 'low';
@@ -588,39 +665,47 @@ export class ContextWindowManager {
   private generateFileSummary(content: string, path: string): string {
     const lines = content.split('\n');
     const firstNonEmptyLine = lines.find(line => line.trim().length > 0) || '';
-    
+
     // Extract first comment or docstring if available
     if (firstNonEmptyLine.startsWith('/*') || firstNonEmptyLine.startsWith('/**')) {
       const commentEnd = content.indexOf('*/');
       if (commentEnd !== -1) {
-        return content.slice(0, commentEnd + 2).replace(/[/*]/g, '').trim().slice(0, 200);
+        return content
+          .slice(0, commentEnd + 2)
+          .replace(/[/*]/g, '')
+          .trim()
+          .slice(0, 200);
       }
     }
-    
+
     return `${path}: ${lines.length} lines, ${extname(path)} file`;
   }
 
   private extractKeyElements(content: string): string[] {
     const elements: string[] = [];
-    
+
     // Extract function/class names (simple regex-based approach)
-    const functions = content.match(/(?:function|const|let)\s+(\w+)|class\s+(\w+)|export\s+(?:function|class)\s+(\w+)/g);
+    const functions = content.match(
+      /(?:function|const|let)\s+(\w+)|class\s+(\w+)|export\s+(?:function|class)\s+(\w+)/g
+    );
     if (functions) {
       elements.push(...functions.slice(0, 10)); // Limit to 10 key elements
     }
-    
+
     return elements;
   }
 
   private extractDependencies(content: string): string[] {
     const deps: string[] = [];
-    
+
     // Extract import/require statements
-    const imports = content.match(/(?:import.*from\s+['"`]([^'"`]+)['"`]|require\(['"`]([^'"`]+)['"`]\))/g);
+    const imports = content.match(
+      /(?:import.*from\s+['"`]([^'"`]+)['"`]|require\(['"`]([^'"`]+)['"`]\))/g
+    );
     if (imports) {
       deps.push(...imports.slice(0, 15)); // Limit to 15 dependencies
     }
-    
+
     return deps;
   }
 
@@ -628,7 +713,7 @@ export class ContextWindowManager {
     const fileCount = files.length;
     const avgPriority = files.reduce((sum, f) => sum + f.priority, 0) / files.length;
     const complexFiles = files.filter(f => f.complexity === 'high').length;
-    
+
     return `${fileCount} files, avg priority: ${(avgPriority * 100).toFixed(0)}%, ${complexFiles} complex files`;
   }
 
@@ -644,9 +729,9 @@ export class ContextWindowManager {
     for (const item of items) {
       counts.set(item, (counts.get(item) || 0) + 1);
     }
-    
+
     return Array.from(counts.entries())
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 3)
       .map(([item]) => item);
   }
@@ -663,14 +748,17 @@ export class ContextWindowManager {
    * Get current context window utilization stats
    */
   getContextStats(): ContextWindow {
-    const usedTokens = Array.from(this.tokenCache.values()).reduce((sum, tokens) => sum + tokens, 0);
+    const usedTokens = Array.from(this.tokenCache.values()).reduce(
+      (sum, tokens) => sum + tokens,
+      0
+    );
     const availableTokens = this.maxContextTokens - this.tokenBuffer;
-    
+
     return {
       maxTokens: this.maxContextTokens,
       usedTokens,
       availableTokens: Math.max(0, availableTokens - usedTokens),
-      efficiency: Math.min(usedTokens / availableTokens, 1.0)
+      efficiency: Math.min(usedTokens / availableTokens, 1.0),
     };
   }
 }

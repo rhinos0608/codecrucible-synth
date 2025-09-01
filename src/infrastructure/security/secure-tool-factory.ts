@@ -201,7 +201,7 @@ class RestrictedCodeExecutionTool implements BaseTool {
         'restricted-code-tool',
         'Code execution attempted without proper sandboxing',
         { executionId },
-        { code: `${args.code?.substring(0, 200)  }...`, language: args.language }
+        { code: `${args.code?.substring(0, 200)}...`, language: args.language }
       );
 
       // Perform strict validation
@@ -216,7 +216,7 @@ class RestrictedCodeExecutionTool implements BaseTool {
           'code-execution',
           `Code execution blocked: ${validation.reason}`,
           { executionId },
-          { code: `${args.code?.substring(0, 200)  }...`, reason: validation.reason }
+          { code: `${args.code?.substring(0, 200)}...`, reason: validation.reason }
         );
 
         return {
@@ -411,7 +411,7 @@ class SecureE2BCodeExecutionTool implements BaseTool {
             sessionId: this.agentContext.sessionId,
             executionId,
           },
-          { code: `${args.code.substring(0, 200)  }...`, language: args.language }
+          { code: `${args.code.substring(0, 200)}...`, language: args.language }
         );
 
         return {

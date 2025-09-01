@@ -3,7 +3,7 @@
  * Pure business logic for AI workflow templates
  *
  * Living Spiral Council Applied:
- * - Domain-driven design with pure business entities  
+ * - Domain-driven design with pure business entities
  * - No external dependencies or infrastructure concerns
  * - Business rules for workflow template matching and execution
  */
@@ -15,8 +15,10 @@ import { Domain } from './execution-plan.js';
  */
 export class WorkflowStepPriority {
   private static readonly VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const;
-  
-  private constructor(private readonly _value: typeof WorkflowStepPriority.VALID_PRIORITIES[number]) {}
+
+  private constructor(
+    private readonly _value: (typeof WorkflowStepPriority.VALID_PRIORITIES)[number]
+  ) {}
 
   static create(value: string): WorkflowStepPriority {
     const normalizedValue = value.toLowerCase();
@@ -63,11 +65,16 @@ export class WorkflowStepPriority {
    */
   getExecutionWeight(): number {
     switch (this._value) {
-      case 'critical': return 1.0;
-      case 'high': return 0.8;
-      case 'medium': return 0.5;
-      case 'low': return 0.2;
-      default: return 0.5;
+      case 'critical':
+        return 1.0;
+      case 'high':
+        return 0.8;
+      case 'medium':
+        return 0.5;
+      case 'low':
+        return 0.2;
+      default:
+        return 0.5;
     }
   }
 }
@@ -107,10 +114,8 @@ export class RequiredTools {
    * Business rule: Check if all required tools are available in the provided set
    */
   areAvailable(availableTools: string[]): boolean {
-    return this._tools.every(requiredTool => 
-      availableTools.some(available => 
-        available.toLowerCase().includes(requiredTool.toLowerCase())
-      )
+    return this._tools.every(requiredTool =>
+      availableTools.some(available => available.toLowerCase().includes(requiredTool.toLowerCase()))
     );
   }
 
@@ -118,10 +123,11 @@ export class RequiredTools {
    * Business rule: Get missing tools from available set
    */
   getMissingTools(availableTools: string[]): string[] {
-    return this._tools.filter(requiredTool =>
-      !availableTools.some(available => 
-        available.toLowerCase().includes(requiredTool.toLowerCase())
-      )
+    return this._tools.filter(
+      requiredTool =>
+        !availableTools.some(available =>
+          available.toLowerCase().includes(requiredTool.toLowerCase())
+        )
     );
   }
 
@@ -168,17 +174,17 @@ export class TargetResources {
    * Business rule: Check if targets are file paths
    */
   areFilePaths(): boolean {
-    return this._targets.some(target => 
-      target.includes('/') || target.includes('\\') || target.includes('.')
+    return this._targets.some(
+      target => target.includes('/') || target.includes('\\') || target.includes('.')
     );
   }
 
   /**
-   * Business rule: Check if targets are directory paths  
+   * Business rule: Check if targets are directory paths
    */
   areDirectoryPaths(): boolean {
-    return this._targets.some(target => 
-      target.endsWith('/') || target.includes('src') || target.includes('lib')
+    return this._targets.some(
+      target => target.endsWith('/') || target.includes('src') || target.includes('lib')
     );
   }
 }
@@ -193,11 +199,11 @@ export class WorkflowTrigger {
     const validPatterns = patterns
       .filter(pattern => pattern && pattern.trim().length > 0)
       .map(pattern => pattern.toLowerCase().trim());
-    
+
     if (validPatterns.length === 0) {
       throw new Error('Workflow trigger must have at least one pattern');
     }
-    
+
     return new WorkflowTrigger(Object.freeze(validPatterns));
   }
 
@@ -210,9 +216,7 @@ export class WorkflowTrigger {
    */
   matches(prompt: string): boolean {
     const normalizedPrompt = prompt.toLowerCase();
-    return this._patterns.some(pattern => 
-      normalizedPrompt.includes(pattern)
-    );
+    return this._patterns.some(pattern => normalizedPrompt.includes(pattern));
   }
 
   /**
@@ -220,10 +224,8 @@ export class WorkflowTrigger {
    */
   calculateMatchConfidence(prompt: string): number {
     const normalizedPrompt = prompt.toLowerCase();
-    const matches = this._patterns.filter(pattern => 
-      normalizedPrompt.includes(pattern)
-    ).length;
-    
+    const matches = this._patterns.filter(pattern => normalizedPrompt.includes(pattern)).length;
+
     return Math.min(1.0, matches / this._patterns.length);
   }
 
@@ -232,18 +234,18 @@ export class WorkflowTrigger {
    */
   getBestMatch(prompt: string): string | null {
     const normalizedPrompt = prompt.toLowerCase();
-    
+
     // Find longest matching pattern for best specificity
     let bestMatch = null;
     let bestMatchLength = 0;
-    
+
     for (const pattern of this._patterns) {
       if (normalizedPrompt.includes(pattern) && pattern.length > bestMatchLength) {
         bestMatch = pattern;
         bestMatchLength = pattern.length;
       }
     }
-    
+
     return bestMatch;
   }
 }
@@ -270,7 +272,7 @@ export class WorkflowStep {
     isMandatory: boolean = false
   ) {
     this.validateInputs(stepNumber, action, context);
-    
+
     this._stepNumber = stepNumber;
     this._action = action;
     this._requiredTools = requiredTools;
@@ -326,17 +328,17 @@ export class WorkflowStep {
     if (this._isMandatory) {
       return false;
     }
-    
+
     // Skip if tools not available
     if (!this.canExecute(availableTools)) {
       return true;
     }
-    
+
     // Skip optional steps if requested
     if (skipOptional && !this._isMandatory) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -345,16 +347,16 @@ export class WorkflowStep {
    */
   calculateExecutionScore(): number {
     let score = this._priority.getExecutionWeight();
-    
+
     // Mandatory steps get higher priority
     if (this._isMandatory) {
       score += 0.3;
     }
-    
+
     // Steps with fewer tool requirements are easier to execute
     const toolComplexity = Math.min(0.3, this._requiredTools.count * 0.1);
     score -= toolComplexity;
-    
+
     return Math.max(0.1, Math.min(1.0, score));
   }
 
@@ -392,11 +394,11 @@ export class WorkflowStep {
     if (stepNumber < 1) {
       throw new Error('Workflow step number must be positive');
     }
-    
+
     if (!action || action.trim().length === 0) {
       throw new Error('Workflow step action cannot be empty');
     }
-    
+
     if (!context || context.trim().length === 0) {
       throw new Error('Workflow step context cannot be empty');
     }
@@ -421,7 +423,7 @@ export class WorkflowTemplate {
     steps: WorkflowStep[]
   ) {
     this.validateInputs(name, description, steps);
-    
+
     this._name = name;
     this._domain = domain;
     this._description = description;
@@ -486,9 +488,7 @@ export class WorkflowTemplate {
    */
   getAllRequiredTools(): string[] {
     const allTools = new Set<string>();
-    this._steps.forEach(step => 
-      step.requiredTools.tools.forEach(tool => allTools.add(tool))
-    );
+    this._steps.forEach(step => step.requiredTools.tools.forEach(tool => allTools.add(tool)));
     return Array.from(allTools);
   }
 
@@ -497,14 +497,13 @@ export class WorkflowTemplate {
    */
   getMissingTools(availableTools: string[]): string[] {
     const missingTools = new Set<string>();
-    
+
     this._steps.forEach(step => {
       if (step.isMandatory) {
-        step.requiredTools.getMissingTools(availableTools)
-          .forEach(tool => missingTools.add(tool));
+        step.requiredTools.getMissingTools(availableTools).forEach(tool => missingTools.add(tool));
       }
     });
-    
+
     return Array.from(missingTools);
   }
 
@@ -518,13 +517,13 @@ export class WorkflowTemplate {
       const stepTime = Math.min(8, Math.max(2, stepComplexity * 2));
       return total + stepTime;
     }, 0);
-    
+
     // Domain-specific adjustments
     let domainMultiplier = 1.0;
     if (this._domain.requiresHighPrecision()) {
       domainMultiplier = 1.3;
     }
-    
+
     return Math.ceil(baseTimePerStep * domainMultiplier);
   }
 
@@ -535,9 +534,9 @@ export class WorkflowTemplate {
     const totalSteps = this._steps.length;
     const totalTools = this.getAllRequiredTools().length;
     const mandatorySteps = this._steps.filter(step => step.isMandatory).length;
-    
-    const complexityScore = (totalSteps * 0.3) + (totalTools * 0.4) + (mandatorySteps * 0.3);
-    
+
+    const complexityScore = totalSteps * 0.3 + totalTools * 0.4 + mandatorySteps * 0.3;
+
     if (complexityScore > 8) return 'complex';
     if (complexityScore > 4) return 'moderate';
     return 'simple';
@@ -551,24 +550,25 @@ export class WorkflowTemplate {
       // Mandatory steps first
       if (a.isMandatory && !b.isMandatory) return -1;
       if (!a.isMandatory && b.isMandatory) return 1;
-      
+
       // Then by execution score (higher first)
       return b.calculateExecutionScore() - a.calculateExecutionScore();
     });
-    
+
     // Renumber steps to maintain sequential order
-    const renumberedSteps = sortedSteps.map((step, index) => 
-      new WorkflowStep(
-        index + 1,
-        step.action,
-        step.requiredTools,
-        step.targets,
-        step.context,
-        step.priority,
-        step.isMandatory
-      )
+    const renumberedSteps = sortedSteps.map(
+      (step, index) =>
+        new WorkflowStep(
+          index + 1,
+          step.action,
+          step.requiredTools,
+          step.targets,
+          step.context,
+          step.priority,
+          step.isMandatory
+        )
     );
-    
+
     return new WorkflowTemplate(
       this._name,
       this._domain,
@@ -582,15 +582,15 @@ export class WorkflowTemplate {
     if (!name || name.trim().length === 0) {
       throw new Error('Workflow template name cannot be empty');
     }
-    
+
     if (!description || description.trim().length === 0) {
       throw new Error('Workflow template description cannot be empty');
     }
-    
+
     if (!steps || steps.length === 0) {
       throw new Error('Workflow template must have at least one step');
     }
-    
+
     // Validate step numbering
     const stepNumbers = steps.map(step => step.stepNumber).sort((a, b) => a - b);
     for (let i = 0; i < stepNumbers.length; i++) {
@@ -601,13 +601,17 @@ export class WorkflowTemplate {
   }
 
   // Factory methods
-  
+
   static createProjectAnalysisTemplate(): WorkflowTemplate {
     const trigger = WorkflowTrigger.create([
-      'analyze project', 'project structure', 'examine codebase',
-      'review architecture', 'understand project', 'explore codebase'
+      'analyze project',
+      'project structure',
+      'examine codebase',
+      'review architecture',
+      'understand project',
+      'explore codebase',
     ]);
-    
+
     const steps = [
       new WorkflowStep(
         1,
@@ -644,9 +648,9 @@ export class WorkflowTemplate {
         'Read key source files to understand architecture patterns and implementation details',
         WorkflowStepPriority.medium(),
         false
-      )
+      ),
     ];
-    
+
     return new WorkflowTemplate(
       'project_analysis',
       Domain.coding(),
@@ -658,10 +662,14 @@ export class WorkflowTemplate {
 
   static createFileSystemExplorationTemplate(): WorkflowTemplate {
     const trigger = WorkflowTrigger.create([
-      'explore files', 'browse directory', 'show me files',
-      'what\'s in this project', 'file structure', 'directory contents'
+      'explore files',
+      'browse directory',
+      'show me files',
+      "what's in this project",
+      'file structure',
+      'directory contents',
     ]);
-    
+
     const steps = [
       new WorkflowStep(
         1,
@@ -680,9 +688,9 @@ export class WorkflowTemplate {
         'Read key configuration and documentation files',
         WorkflowStepPriority.medium(),
         false
-      )
+      ),
     ];
-    
+
     return new WorkflowTemplate(
       'filesystem_exploration',
       Domain.general(),

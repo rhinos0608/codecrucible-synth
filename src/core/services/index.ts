@@ -1,16 +1,22 @@
 /**
  * Unified Services Export Index
- * 
+ *
  * This file provides a centralized export for all unified services,
- * making it easy to migrate from legacy managers/coordinators to 
+ * making it easy to migrate from legacy managers/coordinators to
  * consolidated services throughout the codebase.
  */
 
 // Import services for internal compatibility mappings
 import { UnifiedCacheService, unifiedCacheService } from './unified-cache-service.js';
 import { UnifiedConfigService, unifiedConfigService } from './unified-config-service.js';
-import { UnifiedMCPConnectionService, unifiedMCPConnectionService } from './unified-mcp-connection-service.js';
-import { UnifiedOrchestrationService, unifiedOrchestrationService } from './unified-orchestration-service.js';
+import {
+  UnifiedMCPConnectionService,
+  unifiedMCPConnectionService,
+} from './unified-mcp-connection-service.js';
+import {
+  UnifiedOrchestrationService,
+  unifiedOrchestrationService,
+} from './unified-orchestration-service.js';
 import { UnifiedErrorService, unifiedErrorService } from './unified-error-service.js';
 
 // Unified Cache Service
@@ -23,7 +29,7 @@ export {
   type CacheStats,
 } from './unified-cache-service.js';
 
-// Unified Configuration Service  
+// Unified Configuration Service
 export {
   UnifiedConfigService,
   unifiedConfigService,
@@ -110,7 +116,7 @@ export {
 
 /**
  * Legacy Import Compatibility Layer
- * 
+ *
  * These exports maintain backward compatibility with existing imports
  * while providing a deprecation path to the unified services.
  */
@@ -118,7 +124,7 @@ export {
 // Cache compatibility exports
 export const CacheManager = UnifiedCacheService;
 export const cacheManager = unifiedCacheService;
-export const CacheCoordinator = UnifiedCacheService; 
+export const CacheCoordinator = UnifiedCacheService;
 export const ResponseCacheManager = UnifiedCacheService;
 export const responseCache = unifiedCacheService;
 
@@ -157,7 +163,7 @@ export function createCacheService(config?: any): UnifiedCacheService {
 /**
  * Create a pre-configured config service instance
  */
-export function createConfigService(options?: any): Promise<UnifiedConfigService> {
+export async function createConfigService(options?: any): Promise<UnifiedConfigService> {
   return UnifiedConfigService.getInstance(options);
 }
 
@@ -254,53 +260,56 @@ export const MIGRATION_GUIDE = {
   cache: {
     from: [
       'core/cache/cache-manager.ts',
-      'core/caching/cache-coordinator.ts', 
-      'core/performance/response-cache-manager.ts'
+      'core/caching/cache-coordinator.ts',
+      'core/performance/response-cache-manager.ts',
     ],
     to: 'core/services/unified-cache-service.ts',
     importChange: "import { unifiedCacheService } from '../services/index.js';",
-    notes: 'All cache functionality consolidated into single service with intelligent caching features'
+    notes:
+      'All cache functionality consolidated into single service with intelligent caching features',
   },
   config: {
     from: [
       'core/config/configuration-manager.ts',
       'core/config/enterprise-config-manager.ts',
-      'config/config-manager.ts'
+      'config/config-manager.ts',
     ],
     to: 'core/services/unified-config-service.ts',
     importChange: "import { unifiedConfigService } from '../services/index.js';",
-    notes: 'All configuration management consolidated with enterprise features and validation'
+    notes: 'All configuration management consolidated with enterprise features and validation',
   },
   mcp: {
     from: [
       'mcp-servers/mcp-server-manager.ts',
       'mcp-servers/enhanced-mcp-client-manager.ts',
-      'core/mcp-server-manager.ts'
+      'core/mcp-server-manager.ts',
     ],
     to: 'core/services/unified-mcp-connection-service.ts',
     importChange: "import { unifiedMCPConnectionService } from '../services/index.js';",
-    notes: 'All MCP connection management consolidated with health monitoring and circuit breakers'
+    notes: 'All MCP connection management consolidated with health monitoring and circuit breakers',
   },
   orchestration: {
     from: [
       'core/tools/advanced-tool-orchestrator.ts',
       'core/workflow/workflow-orchestrator.ts',
-      'core/collaboration/advanced-workflow-orchestrator.ts'
+      'core/collaboration/advanced-workflow-orchestrator.ts',
     ],
     to: 'core/services/unified-orchestration-service.ts',
     importChange: "import { unifiedOrchestrationService } from '../services/index.js';",
-    notes: 'All orchestration functionality consolidated with intelligent tool selection and multi-agent collaboration'
+    notes:
+      'All orchestration functionality consolidated with intelligent tool selection and multi-agent collaboration',
   },
   error: {
     from: [
       'core/error-handling/enterprise-error-handler.ts',
       'core/error-handling/structured-error-system.ts',
-      'core/search/error-handler.ts'
+      'core/search/error-handler.ts',
     ],
     to: 'core/services/unified-error-service.ts',
     importChange: "import { unifiedErrorService } from '../services/index.js';",
-    notes: 'All error handling consolidated with intelligent retry, circuit breakers, and fallback strategies'
-  }
+    notes:
+      'All error handling consolidated with intelligent retry, circuit breakers, and fallback strategies',
+  },
 };
 
 /**
@@ -308,12 +317,12 @@ export const MIGRATION_GUIDE = {
  */
 if (process.env.NODE_ENV === 'development') {
   const deprecationWarnings = new Set<string>();
-  
+
   const warnDeprecated = (oldPath: string, newPath: string) => {
     if (!deprecationWarnings.has(oldPath)) {
       console.warn(
         `⚠️  DEPRECATION WARNING: Import from '${oldPath}' is deprecated. ` +
-        `Use '${newPath}' instead. See MIGRATION_GUIDE for details.`
+          `Use '${newPath}' instead. See MIGRATION_GUIDE for details.`
       );
       deprecationWarnings.add(oldPath);
     }
@@ -328,7 +337,7 @@ if (process.env.NODE_ENV === 'development') {
  */
 export default {
   cache: unifiedCacheService,
-  config: unifiedConfigService, 
+  config: unifiedConfigService,
   mcp: unifiedMCPConnectionService,
   orchestration: unifiedOrchestrationService,
   error: unifiedErrorService,

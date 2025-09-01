@@ -2,7 +2,7 @@
  * Production-Grade AST Complexity Analyzer
  * Implements mathematically correct complexity analysis using TypeScript AST
  * Created: August 26, 2025 - Quality Analyzer Reconstruction Agent
- * 
+ *
  * Features:
  * - AST-based cyclomatic complexity analysis
  * - Mathematically correct Halstead metrics
@@ -32,21 +32,21 @@ export interface ASTComplexityMetrics {
 
 export interface HalsteadMetrics {
   // Basic measurements
-  uniqueOperators: number;        // n1
-  uniqueOperands: number;         // n2
-  totalOperators: number;         // N1
-  totalOperands: number;          // N2
-  
+  uniqueOperators: number; // n1
+  uniqueOperands: number; // n2
+  totalOperators: number; // N1
+  totalOperands: number; // N2
+
   // Derived measurements
-  programVocabulary: number;      // n = n1 + n2
-  programLength: number;          // N = N1 + N2
-  calculatedLength: number;       // N' = n1*log2(n1) + n2*log2(n2)
-  volume: number;                 // V = N * log2(n)
-  difficulty: number;             // D = (n1/2) * (N2/n2)
-  effort: number;                 // E = D * V
-  timeRequired: number;           // T = E / 18 seconds
-  bugsDelivered: number;          // B = E^(2/3) / 3000
-  programLevel: number;           // L = 1 / D
+  programVocabulary: number; // n = n1 + n2
+  programLength: number; // N = N1 + N2
+  calculatedLength: number; // N' = n1*log2(n1) + n2*log2(n2)
+  volume: number; // V = N * log2(n)
+  difficulty: number; // D = (n1/2) * (N2/n2)
+  effort: number; // E = D * V
+  timeRequired: number; // T = E / 18 seconds
+  bugsDelivered: number; // B = E^(2/3) / 3000
+  programLevel: number; // L = 1 / D
 }
 
 /**
@@ -54,28 +54,63 @@ export interface HalsteadMetrics {
  */
 const TYPESCRIPT_OPERATORS = new Set([
   // Arithmetic operators
-  '+', '-', '*', '/', '%', '**',
+  '+',
+  '-',
+  '*',
+  '/',
+  '%',
+  '**',
   // Assignment operators
-  '=', '+=', '-=', '*=', '/=', '%=', '**=', 
-  '&=', '|=', '^=', '<<=', '>>=', '>>>=',
+  '=',
+  '+=',
+  '-=',
+  '*=',
+  '/=',
+  '%=',
+  '**=',
+  '&=',
+  '|=',
+  '^=',
+  '<<=',
+  '>>=',
+  '>>>=',
   // Comparison operators
-  '==', '!=', '===', '!==', '<', '>', '<=', '>=',
+  '==',
+  '!=',
+  '===',
+  '!==',
+  '<',
+  '>',
+  '<=',
+  '>=',
   // Logical operators
-  '&&', '||', '!',
+  '&&',
+  '||',
+  '!',
   // Bitwise operators
-  '&', '|', '^', '~', '<<', '>>', '>>>',
+  '&',
+  '|',
+  '^',
+  '~',
+  '<<',
+  '>>',
+  '>>>',
   // Increment/decrement
-  '++', '--',
+  '++',
+  '--',
   // Conditional operator
-  '?', ':',
+  '?',
+  ':',
   // Type operators
-  'typeof', 'instanceof', 'in',
+  'typeof',
+  'instanceof',
+  'in',
   // Spread/rest
   '...',
   // Optional chaining
   '?.',
   // Nullish coalescing
-  '??'
+  '??',
 ]);
 
 export class ASTComplexityAnalyzer {
@@ -93,11 +128,11 @@ export class ASTComplexityAnalyzer {
    */
   async analyzeComplexity(code: string): Promise<ASTComplexityMetrics> {
     const startTime = performance.now();
-    
+
     try {
       // Reset analysis state
       this.resetAnalysisState();
-      
+
       // Create TypeScript AST
       const sourceFile = ts.createSourceFile(
         'temp.ts',
@@ -106,20 +141,20 @@ export class ASTComplexityAnalyzer {
         true,
         ts.ScriptKind.TS
       );
-      
+
       // Count basic metrics
       const lines = code.split('\n');
       const linesOfCode = lines.length;
       const commentLines = this.countCommentLines(lines);
       const logicalLinesOfCode = this.countLogicalLines(lines);
       const commentRatio = linesOfCode > 0 ? (commentLines / linesOfCode) * 100 : 0;
-      
+
       // Traverse AST for complexity analysis
       this.traverseAST(sourceFile);
-      
+
       // Calculate Halstead metrics
       const halsteadMetrics = this.calculateHalsteadMetrics();
-      
+
       // Calculate maintainability index
       const maintainabilityIndex = this.calculateMaintainabilityIndex(
         this.cyclomaticComplexity,
@@ -127,10 +162,10 @@ export class ASTComplexityAnalyzer {
         halsteadMetrics.volume,
         commentRatio
       );
-      
+
       const duration = performance.now() - startTime;
       logger.debug(`AST complexity analysis completed in ${duration.toFixed(2)}ms`);
-      
+
       return {
         cyclomaticComplexity: this.cyclomaticComplexity,
         cognitiveComplexity: this.cognitiveComplexity,
@@ -142,12 +177,13 @@ export class ASTComplexityAnalyzer {
         linesOfCode,
         logicalLinesOfCode,
         commentLines,
-        commentRatio
+        commentRatio,
       };
-      
     } catch (error) {
       logger.error('AST complexity analysis failed:', error);
-      throw new Error(`AST analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `AST analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -181,53 +217,53 @@ export class ASTComplexityAnalyzer {
       // Decision points that increase cyclomatic complexity
       case ts.SyntaxKind.IfStatement:
         this.cyclomaticComplexity++;
-        this.cognitiveComplexity += (1 + this.nestingLevel);
+        this.cognitiveComplexity += 1 + this.nestingLevel;
         this.withNesting(() => this.traverseDecisionPoint(node));
         break;
-        
+
       case ts.SyntaxKind.WhileStatement:
       case ts.SyntaxKind.DoStatement:
       case ts.SyntaxKind.ForStatement:
       case ts.SyntaxKind.ForInStatement:
       case ts.SyntaxKind.ForOfStatement:
         this.cyclomaticComplexity++;
-        this.cognitiveComplexity += (1 + this.nestingLevel);
+        this.cognitiveComplexity += 1 + this.nestingLevel;
         this.withNesting(() => this.traverseDecisionPoint(node));
         break;
-        
+
       case ts.SyntaxKind.SwitchStatement:
         this.analyzeSwitchStatement(node as ts.SwitchStatement);
         break;
-        
+
       case ts.SyntaxKind.CaseClause:
         this.cyclomaticComplexity++;
         break;
-        
+
       case ts.SyntaxKind.CatchClause:
         this.cyclomaticComplexity++;
-        this.cognitiveComplexity += (1 + this.nestingLevel);
+        this.cognitiveComplexity += 1 + this.nestingLevel;
         break;
-        
+
       case ts.SyntaxKind.ConditionalExpression:
         this.cyclomaticComplexity++;
         this.cognitiveComplexity++;
         break;
-        
+
       case ts.SyntaxKind.BinaryExpression:
         this.analyzeBinaryExpression(node as ts.BinaryExpression);
         break;
-        
+
       case ts.SyntaxKind.FunctionDeclaration:
       case ts.SyntaxKind.MethodDeclaration:
       case ts.SyntaxKind.ArrowFunction:
       case ts.SyntaxKind.FunctionExpression:
         this.functionCount++;
         break;
-        
+
       case ts.SyntaxKind.ClassDeclaration:
         this.classCount++;
         break;
-        
+
       // Collect operators and operands for Halstead metrics
       default:
         this.collectHalsteadTokens(node);
@@ -258,8 +294,8 @@ export class ASTComplexityAnalyzer {
   private analyzeSwitchStatement(switchStmt: ts.SwitchStatement): void {
     // Switch statement itself adds 1 to complexity
     this.cyclomaticComplexity++;
-    this.cognitiveComplexity += (1 + this.nestingLevel);
-    
+    this.cognitiveComplexity += 1 + this.nestingLevel;
+
     this.withNesting(() => {
       ts.forEachChild(switchStmt, child => this.traverseAST(child));
     });
@@ -270,12 +306,14 @@ export class ASTComplexityAnalyzer {
    */
   private analyzeBinaryExpression(binaryExpr: ts.BinaryExpression): void {
     // Logical AND (&&) and OR (||) operators increase complexity
-    if (binaryExpr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
-        binaryExpr.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+    if (
+      binaryExpr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+      binaryExpr.operatorToken.kind === ts.SyntaxKind.BarBarToken
+    ) {
       this.cyclomaticComplexity++;
       this.cognitiveComplexity++;
     }
-    
+
     // Collect operator for Halstead metrics
     this.operators.push(binaryExpr.operatorToken.getText());
   }
@@ -285,20 +323,22 @@ export class ASTComplexityAnalyzer {
    */
   private collectHalsteadTokens(node: ts.Node): void {
     const text = node.getText();
-    
+
     // Identify operators based on node type
     if (this.isOperatorNode(node)) {
       this.operators.push(text);
     }
-    
+
     // Identify operands (identifiers, literals, etc.)
-    if (ts.isIdentifier(node) || 
-        ts.isNumericLiteral(node) || 
-        ts.isStringLiteral(node) ||
-        ts.isNoSubstitutionTemplateLiteral(node)) {
+    if (
+      ts.isIdentifier(node) ||
+      ts.isNumericLiteral(node) ||
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node)
+    ) {
       this.operands.push(text);
     }
-    
+
     // Handle property access
     if (ts.isPropertyAccessExpression(node)) {
       this.operands.push(node.name.text);
@@ -310,10 +350,12 @@ export class ASTComplexityAnalyzer {
    */
   private isOperatorNode(node: ts.Node): boolean {
     const text = node.getText().trim();
-    return TYPESCRIPT_OPERATORS.has(text) || 
-           ts.isBinaryExpression(node) ||
-           ts.isPostfixUnaryExpression(node) ||
-           ts.isPrefixUnaryExpression(node);
+    return (
+      TYPESCRIPT_OPERATORS.has(text) ||
+      ts.isBinaryExpression(node) ||
+      ts.isPostfixUnaryExpression(node) ||
+      ts.isPrefixUnaryExpression(node)
+    );
   }
 
   /**
@@ -321,40 +363,42 @@ export class ASTComplexityAnalyzer {
    */
   private calculateHalsteadMetrics(): HalsteadMetrics {
     // Basic measurements
-    const uniqueOperators = new Set(this.operators).size;        // n1
-    const uniqueOperands = new Set(this.operands).size;          // n2
-    const totalOperators = this.operators.length;               // N1
-    const totalOperands = this.operands.length;                 // N2
-    
+    const uniqueOperators = new Set(this.operators).size; // n1
+    const uniqueOperands = new Set(this.operands).size; // n2
+    const totalOperators = this.operators.length; // N1
+    const totalOperands = this.operands.length; // N2
+
     // Derived measurements
     const programVocabulary = uniqueOperators + uniqueOperands; // n
-    const programLength = totalOperators + totalOperands;       // N
-    
+    const programLength = totalOperators + totalOperands; // N
+
     // Calculated program length: N' = n1*log2(n1) + n2*log2(n2)
-    const calculatedLength = uniqueOperators > 0 && uniqueOperands > 0
-      ? uniqueOperators * Math.log2(uniqueOperators) + uniqueOperands * Math.log2(uniqueOperands)
-      : 0;
-    
+    const calculatedLength =
+      uniqueOperators > 0 && uniqueOperands > 0
+        ? uniqueOperators * Math.log2(uniqueOperators) + uniqueOperands * Math.log2(uniqueOperands)
+        : 0;
+
     // Volume: V = N * log2(n)
     const volume = programVocabulary > 1 ? programLength * Math.log2(programVocabulary) : 0;
-    
+
     // Difficulty: D = (n1/2) * (N2/n2)
-    const difficulty = uniqueOperands > 0 && uniqueOperators > 0
-      ? (uniqueOperators / 2) * (totalOperands / uniqueOperands)
-      : 0;
-    
+    const difficulty =
+      uniqueOperands > 0 && uniqueOperators > 0
+        ? (uniqueOperators / 2) * (totalOperands / uniqueOperands)
+        : 0;
+
     // Effort: E = D * V
     const effort = difficulty * volume;
-    
+
     // Time required: T = E / 18 (Stroud number)
     const timeRequired = effort / 18;
-    
+
     // Bugs delivered: B = E^(2/3) / 3000
-    const bugsDelivered = effort > 0 ? Math.pow(effort, 2/3) / 3000 : 0;
-    
+    const bugsDelivered = effort > 0 ? Math.pow(effort, 2 / 3) / 3000 : 0;
+
     // Program level: L = 1 / D
     const programLevel = difficulty > 0 ? 1 / difficulty : 1;
-    
+
     return {
       uniqueOperators,
       uniqueOperands,
@@ -368,7 +412,7 @@ export class ASTComplexityAnalyzer {
       effort,
       timeRequired,
       bugsDelivered,
-      programLevel
+      programLevel,
     };
   }
 
@@ -383,15 +427,22 @@ export class ASTComplexityAnalyzer {
   ): number {
     // Microsoft Maintainability Index formula:
     // MI = MAX(0, (171 - 5.2 * ln(Halstead Volume) - 0.23 * (Cyclomatic Complexity) - 16.2 * ln(Lines of Code) + 50 * sin(sqrt(2.4 * perCM))) * 100 / 171)
-    
+
     const halsteadVolumeLog = halsteadVolume > 0 ? Math.log(halsteadVolume) : 0;
     const linesOfCodeLog = linesOfCode > 1 ? Math.log(linesOfCode) : 0;
-    const commentFactor = commentRatio > 0 ? Math.sin(Math.sqrt(2.4 * commentRatio / 100)) : 0;
-    
-    const maintainabilityIndex = Math.max(0,
-      (171 - 5.2 * halsteadVolumeLog - 0.23 * cyclomaticComplexity - 16.2 * linesOfCodeLog + 50 * commentFactor) * 100 / 171
+    const commentFactor = commentRatio > 0 ? Math.sin(Math.sqrt((2.4 * commentRatio) / 100)) : 0;
+
+    const maintainabilityIndex = Math.max(
+      0,
+      ((171 -
+        5.2 * halsteadVolumeLog -
+        0.23 * cyclomaticComplexity -
+        16.2 * linesOfCodeLog +
+        50 * commentFactor) *
+        100) /
+        171
     );
-    
+
     return Math.round(maintainabilityIndex * 100) / 100;
   }
 
@@ -401,10 +452,10 @@ export class ASTComplexityAnalyzer {
   private countCommentLines(lines: string[]): number {
     let commentLines = 0;
     let inBlockComment = false;
-    
+
     for (const line of lines) {
       const trimmedLine = line.trim();
-      
+
       // Check for block comment start/end
       if (trimmedLine.includes('/*')) {
         inBlockComment = true;
@@ -414,13 +465,13 @@ export class ASTComplexityAnalyzer {
         commentLines++;
         continue;
       }
-      
+
       // Count lines in block comments or single line comments
       if (inBlockComment || trimmedLine.startsWith('//') || trimmedLine.startsWith('*')) {
         commentLines++;
       }
     }
-    
+
     return commentLines;
   }
 
@@ -430,15 +481,15 @@ export class ASTComplexityAnalyzer {
   private countLogicalLines(lines: string[]): number {
     let logicalLines = 0;
     let inBlockComment = false;
-    
+
     for (const line of lines) {
       const trimmedLine = line.trim();
-      
+
       // Skip empty lines
       if (trimmedLine.length === 0) {
         continue;
       }
-      
+
       // Handle block comments
       if (trimmedLine.includes('/*')) {
         inBlockComment = true;
@@ -447,15 +498,15 @@ export class ASTComplexityAnalyzer {
         inBlockComment = false;
         continue;
       }
-      
+
       // Skip comment lines
       if (inBlockComment || trimmedLine.startsWith('//') || trimmedLine.startsWith('*')) {
         continue;
       }
-      
+
       logicalLines++;
     }
-    
+
     return logicalLines;
   }
 }

@@ -1,6 +1,6 @@
 /**
  * Bootstrap Error System - Enhanced Error Handling for Initialization
- * 
+ *
  * Provides granular error handling for bootstrap processes with:
  * - Specific error types for different failure modes
  * - Recovery suggestions and actionable feedback
@@ -9,7 +9,12 @@
  */
 
 import { logger } from '../logging/logger.js';
-import { ErrorCategory, ErrorSeverity, StructuredError, ErrorFactory } from './structured-error-system.js';
+import {
+  ErrorCategory,
+  ErrorSeverity,
+  StructuredError,
+  ErrorFactory,
+} from './structured-error-system.js';
 import chalk from 'chalk';
 
 export enum BootstrapPhase {
@@ -20,7 +25,7 @@ export enum BootstrapPhase {
   SECURITY_SETUP = 'security_setup',
   PROVIDER_CONNECTION = 'provider_connection',
   TOOL_REGISTRATION = 'tool_registration',
-  READY_CHECK = 'ready_check'
+  READY_CHECK = 'ready_check',
 }
 
 export enum BootstrapErrorType {
@@ -33,7 +38,7 @@ export enum BootstrapErrorType {
   AUTHENTICATION_FAILED = 'authentication_failed',
   RESOURCE_CONSTRAINT = 'resource_constraint',
   CORRUPTION = 'corruption',
-  VERSION_MISMATCH = 'version_mismatch'
+  VERSION_MISMATCH = 'version_mismatch',
 }
 
 export interface BootstrapError extends StructuredError {
@@ -104,7 +109,7 @@ export class BootstrapErrorSystem {
       requirements: options.requirements || this.getDefaultRequirements(errorType, phase),
       actionPlan: options.actionPlan || this.generateActionPlan(errorType, phase, component),
       fallbackOptions: options.fallbackOptions || this.getFallbackOptions(errorType, phase),
-      estimatedRecoveryTime: options.estimatedRecoveryTime || this.estimateRecoveryTime(errorType)
+      estimatedRecoveryTime: options.estimatedRecoveryTime || this.estimateRecoveryTime(errorType),
     };
 
     this.recordError(bootstrapError);
@@ -121,7 +126,7 @@ export class BootstrapErrorSystem {
     logger.error(`Bootstrap Error in ${error.phase}:${error.component}`, {
       errorType: error.errorType,
       severity: error.severity,
-      message: error.message
+      message: error.message,
     });
 
     // Display user-friendly error message
@@ -129,7 +134,7 @@ export class BootstrapErrorSystem {
 
     // Determine response strategy
     const strategy = this.getResponseStrategy(error, context);
-    
+
     // Execute recovery actions if available
     if (error.recoverable && strategy.shouldAttemptRecovery) {
       const recovered = await this.attemptRecovery(error, context);
@@ -147,10 +152,10 @@ export class BootstrapErrorSystem {
 
     // Suggest retry if appropriate
     if (error.retryable && strategy.shouldRetry) {
-      return { 
-        canContinue: false, 
-        degraded: false, 
-        retryAfter: error.estimatedRecoveryTime 
+      return {
+        canContinue: false,
+        degraded: false,
+        retryAfter: error.estimatedRecoveryTime,
       };
     }
 
@@ -166,19 +171,17 @@ export class BootstrapErrorSystem {
     console.log(chalk.red.bold(`❌ Bootstrap Failed: ${error.component}`));
     console.log(chalk.red(`Phase: ${error.phase}`));
     console.log(chalk.red(`Error: ${error.message}`));
-    
+
     if (error.requirements && error.requirements.length > 0) {
       console.log('');
       console.log(chalk.yellow.bold('📋 Requirements:'));
-      error.requirements.forEach(req => 
-        console.log(chalk.yellow(`  • ${req}`))
-      );
+      error.requirements.forEach(req => console.log(chalk.yellow(`  • ${req}`)));
     }
 
     if (error.actionPlan && error.actionPlan.length > 0) {
       console.log('');
       console.log(chalk.cyan.bold('🔧 Action Plan:'));
-      error.actionPlan.forEach((action, index) => 
+      error.actionPlan.forEach((action, index) =>
         console.log(chalk.cyan(`  ${index + 1}. ${action}`))
       );
     }
@@ -186,16 +189,14 @@ export class BootstrapErrorSystem {
     if (error.fallbackOptions && error.fallbackOptions.length > 0) {
       console.log('');
       console.log(chalk.blue.bold('🔄 Fallback Options:'));
-      error.fallbackOptions.forEach(option => 
-        console.log(chalk.blue(`  • ${option}`))
-      );
+      error.fallbackOptions.forEach(option => console.log(chalk.blue(`  • ${option}`)));
     }
 
     if (error.estimatedRecoveryTime) {
       console.log('');
       console.log(chalk.magenta(`⏱️  Estimated recovery time: ${error.estimatedRecoveryTime}ms`));
     }
-    
+
     console.log('');
   }
 
@@ -212,112 +213,111 @@ export class BootstrapErrorSystem {
         `Check if ${component} is installed and accessible`,
         'Verify PATH environment variable includes required binaries',
         'Try reinstalling the missing dependency',
-        'Check system permissions for dependency access'
+        'Check system permissions for dependency access',
       ],
       [BootstrapErrorType.INVALID_CONFIG]: [
         `Validate ${component} configuration file syntax`,
         'Check for required configuration fields',
         'Verify configuration values are within acceptable ranges',
-        'Reset to default configuration if corrupted'
+        'Reset to default configuration if corrupted',
       ],
       [BootstrapErrorType.PERMISSION_DENIED]: [
         `Check file/directory permissions for ${component}`,
         'Ensure current user has appropriate access rights',
         'Try running with elevated privileges if necessary',
-        'Verify ownership of configuration and data directories'
+        'Verify ownership of configuration and data directories',
       ],
       [BootstrapErrorType.SERVICE_UNAVAILABLE]: [
         `Check if ${component} service is running`,
         'Verify network connectivity to service endpoints',
         'Check service health status and logs',
-        'Try restarting the service or switching to backup endpoint'
+        'Try restarting the service or switching to backup endpoint',
       ],
       [BootstrapErrorType.TIMEOUT]: [
         `Increase timeout values for ${component} operations`,
         'Check network latency and connection stability',
         'Verify system resources are not exhausted',
-        'Try initializing with reduced concurrency'
+        'Try initializing with reduced concurrency',
       ],
       [BootstrapErrorType.NETWORK_ERROR]: [
         'Check internet connectivity and DNS resolution',
         `Verify ${component} endpoint URLs are accessible`,
         'Check firewall and proxy settings',
-        'Try using alternative network interface or endpoint'
+        'Try using alternative network interface or endpoint',
       ],
       [BootstrapErrorType.AUTHENTICATION_FAILED]: [
         `Verify ${component} credentials are correct and not expired`,
         'Check API keys, tokens, or certificate validity',
         'Ensure authentication service is accessible',
-        'Try regenerating credentials if possible'
+        'Try regenerating credentials if possible',
       ],
       [BootstrapErrorType.RESOURCE_CONSTRAINT]: [
         'Check available system memory and disk space',
         `Reduce ${component} resource requirements if possible`,
         'Close unnecessary processes to free resources',
-        'Consider upgrading system resources'
+        'Consider upgrading system resources',
       ],
       [BootstrapErrorType.CORRUPTION]: [
         `Backup and recreate ${component} data/configuration`,
         'Check file system integrity',
         'Restore from known good backup if available',
-        'Reinstall component if corruption is extensive'
+        'Reinstall component if corruption is extensive',
       ],
       [BootstrapErrorType.VERSION_MISMATCH]: [
         `Update ${component} to compatible version`,
         'Check version compatibility matrix',
         'Consider downgrading if newer version is incompatible',
-        'Update all related components to matching versions'
-      ]
+        'Update all related components to matching versions',
+      ],
     };
 
-    return plans[errorType] || [
-      `Investigate ${component} specific documentation`,
-      'Check system logs for additional error details',
-      'Try restarting the application',
-      'Contact support with error details'
-    ];
+    return (
+      plans[errorType] || [
+        `Investigate ${component} specific documentation`,
+        'Check system logs for additional error details',
+        'Try restarting the application',
+        'Contact support with error details',
+      ]
+    );
   }
 
   /**
    * Get fallback options for different error scenarios
    */
-  private getFallbackOptions(
-    errorType: BootstrapErrorType,
-    phase: BootstrapPhase
-  ): string[] {
+  private getFallbackOptions(errorType: BootstrapErrorType, phase: BootstrapPhase): string[] {
     const fallbacks: Record<BootstrapPhase, string[]> = {
       [BootstrapPhase.VALIDATION]: [
         'Continue with basic validation only',
-        'Skip optional validations'
+        'Skip optional validations',
       ],
       [BootstrapPhase.DEPENDENCY_CHECK]: [
         'Continue without optional dependencies',
-        'Use built-in alternatives where available'
+        'Use built-in alternatives where available',
       ],
       [BootstrapPhase.CONFIGURATION]: [
         'Use default configuration values',
-        'Continue with minimal configuration'
+        'Continue with minimal configuration',
       ],
       [BootstrapPhase.SERVICE_INITIALIZATION]: [
         'Initialize in single-service mode',
-        'Skip non-essential services'
+        'Skip non-essential services',
       ],
       [BootstrapPhase.SECURITY_SETUP]: [
         'Continue with basic security only',
-        'Defer advanced security features'
+        'Defer advanced security features',
       ],
       [BootstrapPhase.PROVIDER_CONNECTION]: [
         'Use local providers only',
-        'Continue with cached/offline data'
+        'Continue with cached/offline data',
       ],
       [BootstrapPhase.TOOL_REGISTRATION]: [
         'Continue with core tools only',
-        'Skip external tool integrations'
+        'Skip external tool integrations',
       ],
       [BootstrapPhase.READY_CHECK]: [
         'Continue with warnings about incomplete setup',
-        'Retry ready check after manual intervention'
-      ]
+        'Retry ready check after manual intervention',
+      ],
     };
 
     return fallbacks[phase] || ['Continue with reduced functionality'];
@@ -327,15 +327,9 @@ export class BootstrapErrorSystem {
    * Determine error severity based on type and phase
    */
   private getErrorSeverity(errorType: BootstrapErrorType, phase: BootstrapPhase): ErrorSeverity {
-    const criticalErrors = [
-      BootstrapErrorType.CORRUPTION,
-      BootstrapErrorType.PERMISSION_DENIED
-    ];
+    const criticalErrors = [BootstrapErrorType.CORRUPTION, BootstrapErrorType.PERMISSION_DENIED];
 
-    const criticalPhases = [
-      BootstrapPhase.VALIDATION,
-      BootstrapPhase.SECURITY_SETUP
-    ];
+    const criticalPhases = [BootstrapPhase.VALIDATION, BootstrapPhase.SECURITY_SETUP];
 
     if (criticalErrors.includes(errorType) || criticalPhases.includes(phase)) {
       return ErrorSeverity.CRITICAL;
@@ -354,7 +348,7 @@ export class BootstrapErrorSystem {
   private isRecoverable(errorType: BootstrapErrorType, phase: BootstrapPhase): boolean {
     const unrecoverableErrors = [
       BootstrapErrorType.VERSION_MISMATCH,
-      BootstrapErrorType.CORRUPTION
+      BootstrapErrorType.CORRUPTION,
     ];
 
     return !unrecoverableErrors.includes(errorType);
@@ -368,7 +362,7 @@ export class BootstrapErrorSystem {
       BootstrapErrorType.TIMEOUT,
       BootstrapErrorType.NETWORK_ERROR,
       BootstrapErrorType.SERVICE_UNAVAILABLE,
-      BootstrapErrorType.RESOURCE_CONSTRAINT
+      BootstrapErrorType.RESOURCE_CONSTRAINT,
     ];
 
     return retryableErrors.includes(errorType);
@@ -396,7 +390,7 @@ export class BootstrapErrorSystem {
       [BootstrapErrorType.INVALID_CONFIG]: 5000,
       [BootstrapErrorType.PERMISSION_DENIED]: 10000,
       [BootstrapErrorType.CORRUPTION]: 60000,
-      [BootstrapErrorType.VERSION_MISMATCH]: 120000
+      [BootstrapErrorType.VERSION_MISMATCH]: 120000,
     };
 
     return estimations[errorType] || 10000;
@@ -418,8 +412,9 @@ export class BootstrapErrorSystem {
 
     return {
       shouldAttemptRecovery: error.recoverable && retryAttempts < maxRetries,
-      canDegrade: error.phase !== BootstrapPhase.VALIDATION && error.phase !== BootstrapPhase.SECURITY_SETUP,
-      shouldRetry: error.retryable && retryAttempts < maxRetries
+      canDegrade:
+        error.phase !== BootstrapPhase.VALIDATION && error.phase !== BootstrapPhase.SECURITY_SETUP,
+      shouldRetry: error.retryable && retryAttempts < maxRetries,
     };
   }
 
@@ -446,12 +441,12 @@ export class BootstrapErrorSystem {
     const key = `${error.phase}:${error.component}`;
     const history = this.errorHistory.get(key) || [];
     history.push(error);
-    
+
     // Keep only last 10 errors per component/phase
     if (history.length > 10) {
       history.shift();
     }
-    
+
     this.errorHistory.set(key, history);
   }
 
@@ -464,7 +459,7 @@ export class BootstrapErrorSystem {
     }
 
     const allErrors: BootstrapError[] = [];
-    this.errorHistory.forEach((errors) => {
+    this.errorHistory.forEach(errors => {
       allErrors.push(...errors);
     });
 

@@ -837,7 +837,7 @@ export class CommandLineSearchEngine {
       scala: ['scala'],
     };
 
-    return language ? extensions[language] ?? [] : [];
+    return language ? (extensions[language] ?? []) : [];
   }
 
   /**

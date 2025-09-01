@@ -1,9 +1,9 @@
 /**
  * Legacy Config Manager - Backward Compatibility Wrapper
- * 
+ *
  * This is a temporary wrapper around the new UnifiedConfigurationManager
  * to maintain backward compatibility during the architectural migration.
- * 
+ *
  * @deprecated Use UnifiedConfigurationManager from domain/services instead
  */
 
@@ -48,7 +48,7 @@ export interface AppConfig {
  */
 export class ConfigManager {
   private unifiedManager: UnifiedConfigurationManager;
-  
+
   constructor() {
     console.warn('⚠️ ConfigManager is deprecated. Use UnifiedConfigurationManager instead.');
     const configLogger = createLogger('UnifiedConfigurationManager');
@@ -59,7 +59,7 @@ export class ConfigManager {
     try {
       await this.unifiedManager.initialize();
       const unified = this.unifiedManager.getConfiguration();
-      
+
       // Convert unified config to legacy format
       return this.convertToLegacyFormat(unified);
     } catch (error) {
@@ -104,7 +104,7 @@ export class ConfigManager {
 
   private convertProviders(providers: any[]): Record<string, any> {
     const result: Record<string, any> = {};
-    
+
     for (const provider of providers) {
       result[provider.name] = {
         provider: provider.type,
@@ -113,7 +113,7 @@ export class ConfigManager {
         models: provider.models,
       };
     }
-    
+
     return result;
   }
 

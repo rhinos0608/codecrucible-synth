@@ -1,7 +1,7 @@
 /**
  * Spiral Phase Executor
  * Application Layer - Single responsibility phase execution
- * 
+ *
  * Extracted from LivingSpiralCoordinator for clean separation of concerns
  * Handles: Individual phase execution with proper input/output transformation
  * Imports: Domain services only (follows ARCHITECTURE.md)
@@ -70,7 +70,7 @@ export class SpiralPhaseExecutor {
       case 'reflection':
         return await this.executeReflectionPhase(input, startTime);
       default:
-        throw new Error(`Unknown spiral phase: ${input.phase}`);
+        throw new Error('Unknown spiral phase');
     }
   }
 
@@ -84,7 +84,9 @@ export class SpiralPhaseExecutor {
     );
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+    const response = model.generateResponse
+      ? await model.generateResponse(request.prompt)
+      : 'Generated response placeholder';
 
     return {
       content: response,
@@ -98,7 +100,7 @@ export class SpiralPhaseExecutor {
 
   private async executeCouncilPhase(input: PhaseInput, startTime: number): Promise<PhaseOutput> {
     const voiceIds = this.selectCouncilVoices(input.context);
-    
+
     const councilResponse = await this.councilCoordinator.coordinateCouncil({
       prompt: input.content,
       voiceIds,
@@ -126,7 +128,9 @@ export class SpiralPhaseExecutor {
     );
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+    const response = model.generateResponse
+      ? await model.generateResponse(request.prompt)
+      : 'Generated response placeholder';
 
     return {
       content: response,
@@ -148,7 +152,9 @@ export class SpiralPhaseExecutor {
     );
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+    const response = model.generateResponse
+      ? await model.generateResponse(request.prompt)
+      : 'Generated response placeholder';
 
     return {
       content: response,
@@ -170,7 +176,9 @@ export class SpiralPhaseExecutor {
     );
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+    const response = model.generateResponse
+      ? await model.generateResponse(request.prompt)
+      : 'Generated response placeholder';
 
     // Combine original content with reflection insights
     const enhancedContent = `${input.content}\n\n---\n\n## REFLECTION INSIGHTS:\n${response}`;
@@ -188,7 +196,7 @@ export class SpiralPhaseExecutor {
   private selectCouncilVoices(context: Record<string, unknown>): string[] {
     // Default council voices for balanced perspective
     const defaultVoices = ['explorer', 'maintainer', 'analyzer'];
-    
+
     // Customize based on context
     const requestType = context.requestType as string;
     if (requestType) {
@@ -203,7 +211,7 @@ export class SpiralPhaseExecutor {
           return defaultVoices;
       }
     }
-    
+
     return defaultVoices;
   }
 
@@ -254,9 +262,8 @@ Focus on practical, executable solutions that can be immediately implemented.`;
   }
 
   private buildReflectionPrompt(rebirthOutput: string, previousPhases: string[]): string {
-    const phaseHistory = previousPhases.length > 0 
-      ? `\nPrevious phases completed: ${previousPhases.join(' → ')}`
-      : '';
+    const phaseHistory =
+      previousPhases.length > 0 ? `\nPrevious phases completed: ${previousPhases.join(' → ')}` : '';
 
     return `Act as The Guardian archetype. Reflect on this implementation and assess its quality:
 
@@ -272,7 +279,11 @@ Provide critical reflection on:
 Be honest about quality and provide specific guidance for next steps.`;
   }
 
-  private calculateQualityMetrics(content: string): { clarity: number; completeness: number; actionability: number } {
+  private calculateQualityMetrics(content: string): {
+    clarity: number;
+    completeness: number;
+    actionability: number;
+  } {
     // Simplified quality metrics calculation
     let clarity = 0.6; // Base score
     let completeness = 0.6;

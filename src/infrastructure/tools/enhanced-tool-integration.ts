@@ -47,7 +47,7 @@ export class EnhancedToolIntegration extends EventEmitter {
 
   constructor(config?: Partial<EnhancedToolConfig>) {
     super();
-    
+
     this.config = {
       enableCaching: true,
       cacheSize: 1000,
@@ -57,7 +57,7 @@ export class EnhancedToolIntegration extends EventEmitter {
       timeout: 30000, // 30 seconds
       retryAttempts: 2,
       enableIntelligentRouting: true,
-      ...config
+      ...config,
     };
 
     // Create a basic MCP manager for tool integration
@@ -65,44 +65,44 @@ export class EnhancedToolIntegration extends EventEmitter {
       filesystem: {
         enabled: true,
         restrictedPaths: [] as string[],
-        allowedPaths: [process.cwd()]
+        allowedPaths: [process.cwd()],
       },
       git: {
         enabled: false,
         autoCommitMessages: false,
-        safeModeEnabled: true
+        safeModeEnabled: true,
       },
       terminal: {
         enabled: false,
         allowedCommands: [] as string[],
-        blockedCommands: ['rm', 'del', 'rmdir']
+        blockedCommands: ['rm', 'del', 'rmdir'],
       },
       packageManager: {
         enabled: false,
         autoInstall: false,
-        securityScan: true
+        securityScan: true,
       },
       smithery: {
         enabled: !!process.env.SMITHERY_API_KEY,
         apiKey: process.env.SMITHERY_API_KEY,
         enabledServers: [] as string[],
-        autoDiscovery: true
-      }
+        autoDiscovery: true,
+      },
     };
     const mcpManager = new MCPServerManager(mcpConfig);
     this.baseToolIntegration = new ToolIntegration(mcpManager);
     this.orchestrator = new DomainAwareToolOrchestrator();
-    
+
     this.setupCacheCleanup();
   }
 
   async executeToolCall(
-    toolCall: ToolCall, 
+    toolCall: ToolCall,
     context: ToolExecutionContext = { priority: 'medium' }
   ): Promise<any> {
     const startTime = Date.now();
     const executionId = this.generateExecutionId(toolCall, context);
-    
+
     try {
       // Check active executions limit
       if (this.activeExecutions.size >= this.config.maxConcurrentTools) {
@@ -110,7 +110,7 @@ export class EnhancedToolIntegration extends EventEmitter {
       }
 
       this.activeExecutions.add(executionId);
-      
+
       // Check cache first
       if (this.config.enableCaching) {
         const cached = this.getCachedResult(toolCall);
@@ -141,7 +141,6 @@ export class EnhancedToolIntegration extends EventEmitter {
 
       this.recordMetrics(toolCall.function.name, startTime, true, false);
       return result;
-
     } catch (error) {
       this.recordMetrics(toolCall.function.name, startTime, false);
       logger.error(`Enhanced tool execution failed for ${toolCall.function.name}:`, error);
@@ -153,37 +152,37 @@ export class EnhancedToolIntegration extends EventEmitter {
 
   async getAvailableTools(domain?: string): Promise<LLMFunction[]> {
     const baseFunctions = await this.baseToolIntegration.getLLMFunctions();
-    
+
     if (domain && this.config.enableIntelligentRouting) {
       // Use getToolsForPrompt instead since getToolsForDomain is private
       const domainPrompt = `Tools needed for ${domain} domain`;
       const domainTools = this.orchestrator.getToolsForPrompt(domainPrompt, baseFunctions);
       return domainTools.tools || baseFunctions;
     }
-    
+
     return baseFunctions;
   }
 
   async batchExecuteTools(
-    toolCalls: ToolCall[], 
+    toolCalls: ToolCall[],
     context: ToolExecutionContext = { priority: 'medium' }
   ): Promise<any[]> {
     // Execute tools in batches respecting concurrency limits
     const results: any[] = [];
     const batchSize = Math.min(toolCalls.length, this.config.maxConcurrentTools);
-    
+
     for (let i = 0; i < toolCalls.length; i += batchSize) {
       const batch = toolCalls.slice(i, i + batchSize);
-      const batchPromises = batch.map(toolCall => 
-        this.executeToolCall(toolCall, context)
-      );
-      
+      const batchPromises = batch.map(async toolCall => this.executeToolCall(toolCall, context));
+
       const batchResults = await Promise.allSettled(batchPromises);
-      results.push(...batchResults.map(result => 
-        result.status === 'fulfilled' ? result.value : { error: result.reason }
-      ));
+      results.push(
+        ...batchResults.map(result =>
+          result.status === 'fulfilled' ? result.value : { error: result.reason }
+        )
+      );
     }
-    
+
     return results;
   }
 
@@ -196,21 +195,24 @@ export class EnhancedToolIntegration extends EventEmitter {
       return { enabled: false };
     }
 
-    const recentMetrics = this.metrics.filter(m => 
-      Date.now() - m.timestamp < 3600000 // Last hour
+    const recentMetrics = this.metrics.filter(
+      m => Date.now() - m.timestamp < 3600000 // Last hour
     );
 
-    const successRate = recentMetrics.length > 0 
-      ? recentMetrics.filter(m => m.success).length / recentMetrics.length 
-      : 0;
+    const successRate =
+      recentMetrics.length > 0
+        ? recentMetrics.filter(m => m.success).length / recentMetrics.length
+        : 0;
 
-    const avgExecutionTime = recentMetrics.length > 0
-      ? recentMetrics.reduce((sum, m) => sum + m.executionTime, 0) / recentMetrics.length
-      : 0;
+    const avgExecutionTime =
+      recentMetrics.length > 0
+        ? recentMetrics.reduce((sum, m) => sum + m.executionTime, 0) / recentMetrics.length
+        : 0;
 
-    const cacheHitRate = recentMetrics.length > 0
-      ? recentMetrics.filter(m => m.cacheHit).length / recentMetrics.length
-      : 0;
+    const cacheHitRate =
+      recentMetrics.length > 0
+        ? recentMetrics.filter(m => m.cacheHit).length / recentMetrics.length
+        : 0;
 
     return {
       enabled: true,
@@ -219,7 +221,7 @@ export class EnhancedToolIntegration extends EventEmitter {
       avgExecutionTime,
       cacheHitRate,
       cacheSize: this.executionCache.size,
-      activeExecutions: this.activeExecutions.size
+      activeExecutions: this.activeExecutions.size,
     };
   }
 
@@ -234,31 +236,30 @@ export class EnhancedToolIntegration extends EventEmitter {
   }
 
   // Private methods
-  private async executeWithRetry(
-    toolCall: ToolCall, 
-    context: ToolExecutionContext
-  ): Promise<any> {
+  private async executeWithRetry(toolCall: ToolCall, context: ToolExecutionContext): Promise<any> {
     let lastError: any;
-    
+
     for (let attempt = 0; attempt <= this.config.retryAttempts; attempt++) {
       try {
         const result = await Promise.race([
           this.baseToolIntegration.executeToolCall(toolCall),
-          this.createTimeoutPromise()
+          this.createTimeoutPromise(),
         ]);
-        
+
         return result;
       } catch (error) {
         lastError = error;
-        
+
         if (attempt < this.config.retryAttempts) {
           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
           await this.delay(delay);
-          logger.warn(`Tool execution retry ${attempt + 1}/${this.config.retryAttempts} for ${toolCall.function.name}`);
+          logger.warn(
+            `Tool execution retry ${attempt + 1}/${this.config.retryAttempts} for ${toolCall.function.name}`
+          );
         }
       }
     }
-    
+
     throw lastError;
   }
 
@@ -269,15 +270,15 @@ export class EnhancedToolIntegration extends EventEmitter {
   private getCachedResult(toolCall: ToolCall): any | null {
     const cacheKey = this.generateCacheKey(toolCall);
     const cached = this.executionCache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < cached.ttl) {
       return cached.result;
     }
-    
+
     if (cached) {
       this.executionCache.delete(cacheKey);
     }
-    
+
     return null;
   }
 
@@ -287,12 +288,12 @@ export class EnhancedToolIntegration extends EventEmitter {
       const oldestKey = this.executionCache.keys().next().value;
       this.executionCache.delete(oldestKey);
     }
-    
+
     const cacheKey = this.generateCacheKey(toolCall);
     this.executionCache.set(cacheKey, {
       result,
       timestamp: Date.now(),
-      ttl: this.config.cacheTTL
+      ttl: this.config.cacheTTL,
     });
   }
 
@@ -309,28 +310,28 @@ export class EnhancedToolIntegration extends EventEmitter {
   }
 
   private recordMetrics(
-    toolName: string, 
-    startTime: number, 
-    success: boolean, 
+    toolName: string,
+    startTime: number,
+    success: boolean,
     cacheHit: boolean = false
   ): void {
     if (!this.config.enablePerformanceMonitoring) return;
-    
+
     const metric: ToolExecutionMetrics = {
       toolName,
       executionTime: Date.now() - startTime,
       success,
       timestamp: Date.now(),
-      cacheHit
+      cacheHit,
     };
-    
+
     this.metrics.push(metric);
-    
+
     // Keep only last 10000 metrics
     if (this.metrics.length > 10000) {
       this.metrics.shift();
     }
-    
+
     this.emit('toolExecuted', metric);
   }
 
@@ -352,10 +353,13 @@ export class EnhancedToolIntegration extends EventEmitter {
   async getLLMFunctions(): Promise<any[]> {
     try {
       // Delegate to base tool integration
-      if (this.baseToolIntegration && typeof this.baseToolIntegration.getLLMFunctions === 'function') {
+      if (
+        this.baseToolIntegration &&
+        typeof this.baseToolIntegration.getLLMFunctions === 'function'
+      ) {
         return await this.baseToolIntegration.getLLMFunctions();
       }
-      
+
       // Fallback: return empty array if no base implementation
       return [];
     } catch (error) {
@@ -364,13 +368,13 @@ export class EnhancedToolIntegration extends EventEmitter {
     }
   }
 
-  private createTimeoutPromise(): Promise<never> {
+  private async createTimeoutPromise(): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Tool execution timeout')), this.config.timeout);
     });
   }
 
-  private delay(ms: number): Promise<void> {
+  private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -378,7 +382,7 @@ export class EnhancedToolIntegration extends EventEmitter {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
     return hash.toString();

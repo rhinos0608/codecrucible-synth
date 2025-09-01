@@ -1,6 +1,6 @@
 /**
  * Logger Adapter - Infrastructure Layer
- * 
+ *
  * Adapts the concrete logger implementation to the domain logger interface.
  * This allows the domain layer to depend on abstractions rather than concrete implementations.
  */

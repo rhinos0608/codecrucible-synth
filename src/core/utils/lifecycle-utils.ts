@@ -30,7 +30,7 @@ export function createManagedInterval(
       console.error('Error in managed interval:', error);
     }
   }, ms);
-  
+
   managedIntervals.add(intervalId);
   return intervalId;
 }
@@ -55,7 +55,7 @@ async function executeShutdown(): Promise<void> {
 
   // Execute shutdown handlers
   await Promise.allSettled(
-    shutdownHandlers.map(async (handler) => {
+    shutdownHandlers.map(async handler => {
       try {
         await handler();
       } catch (error) {
@@ -75,7 +75,7 @@ async function handleShutdown(signal: string): Promise<void> {
   shutdownInProgress = true;
 
   console.log(`Received ${signal}, initiating graceful shutdown...`);
-  
+
   try {
     await executeShutdown();
     console.log('Graceful shutdown completed');
@@ -86,6 +86,6 @@ async function handleShutdown(signal: string): Promise<void> {
   }
 }
 
-process.on('SIGINT', () => handleShutdown('SIGINT'));
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-process.on('beforeExit', () => handleShutdown('beforeExit'));
+process.on('SIGINT', async () => handleShutdown('SIGINT'));
+process.on('SIGTERM', async () => handleShutdown('SIGTERM'));
+process.on('beforeExit', async () => handleShutdown('beforeExit'));

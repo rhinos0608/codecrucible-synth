@@ -1,9 +1,9 @@
 /**
  * Filesystem Tools - Compatibility Stub
- * 
+ *
  * This is a minimal stub to maintain backward compatibility
  * during the architectural migration.
- * 
+ *
  * @deprecated Use domain tools instead
  */
 
@@ -35,26 +35,26 @@ export class FilesystemTools {
         id: 'read_file',
         name: 'Read File',
         description: 'Read contents of a file',
-        execute: this.readFile.bind(this)
+        execute: this.readFile.bind(this),
       },
       {
-        id: 'write_file', 
+        id: 'write_file',
         name: 'Write File',
         description: 'Write content to a file',
-        execute: this.writeFile.bind(this)
+        execute: this.writeFile.bind(this),
       },
       {
         id: 'list_files',
         name: 'List Files',
         description: 'List files in a directory',
-        execute: this.listFiles.bind(this)
+        execute: this.listFiles.bind(this),
       },
       {
         id: 'file_exists',
         name: 'File Exists',
         description: 'Check if a file exists',
-        execute: this.exists.bind(this)
-      }
+        execute: this.exists.bind(this),
+      },
     ];
   }
 }

@@ -17,90 +17,92 @@ export { ProcessingRequest } from './entities/request.js';
 
 // Execution Domain
 export { ReasoningStep } from './entities/reasoning-step.js';
-export type { 
-  ReasoningStepType, 
-  ConfidenceScore, 
+export type {
+  ReasoningStepType,
+  ConfidenceScore,
   ToolArguments,
-  ReasoningStepConfiguration
+  ReasoningStepConfiguration,
 } from './entities/reasoning-step.js';
 
 export { ExecutionPlan, Goal, Domain } from './entities/execution-plan.js';
-export type { 
-  StepEstimate, 
+export type {
+  StepEstimate,
   SelectedTools,
-  ExecutionPlanConfiguration
+  ExecutionPlanConfiguration,
 } from './entities/execution-plan.js';
 
 export { ToolExecution } from './entities/tool-execution.js';
-export type { 
-  ToolName, 
+export type {
+  ToolName,
   ExecutionStatus,
   ToolResult,
   ExecutionDuration,
-  ToolExecutionConfiguration
+  ToolExecutionConfiguration,
 } from './entities/tool-execution.js';
 
 export { WorkflowTemplate, WorkflowStep, WorkflowTrigger } from './entities/workflow-template.js';
-export type { 
-  RequiredTools, 
-  TargetResources, 
+export type {
+  RequiredTools,
+  TargetResources,
   WorkflowStepPriority,
-  WorkflowTemplateConfiguration
+  WorkflowTemplateConfiguration,
 } from './entities/workflow-template.js';
 
 // Routing Domain
 export { RoutingDecision } from './entities/routing-decision.js';
-export type { 
-  TaskComplexity, 
-  RoutingPriority, 
-  ModelSelectionCriteria, 
-  ModelCapability, 
+export type {
+  TaskComplexity,
+  RoutingPriority,
+  ModelSelectionCriteria,
+  ModelCapability,
   PerformanceProfile,
-  RoutingDecisionConfiguration
+  RoutingDecisionConfiguration,
 } from './entities/routing-decision.js';
 
 // Value Objects
-export type { 
-  VoiceStyle, 
-  VoiceTemperature, 
-  ProviderType, 
-  ModelName, 
-  RequestPriority 
+export type {
+  VoiceStyle,
+  VoiceTemperature,
+  ProviderType,
+  ModelName,
+  RequestPriority,
 } from './value-objects/voice-values.js';
 
-export type { 
-  ExecutionId, 
-  TaskDescription, 
-  ErrorMessage, 
-  Timestamp, 
-  Duration, 
-  ResourceIdentifier, 
-  QualityScore 
+export type {
+  ExecutionId,
+  TaskDescription,
+  ErrorMessage,
+  Timestamp,
+  Duration,
+  ResourceIdentifier,
+  QualityScore,
 } from './value-objects/execution-values.js';
 
 // Repository Interfaces (Pure domain interfaces - no implementations)
-export type { 
-  IModelRepository
-} from './repositories/model-repository.js';
+export type { IModelRepository } from './repositories/model-repository.js';
 
-export type { 
-  IVoiceRepository
-} from './repositories/voice-repository.js';
+export type { IVoiceRepository } from './repositories/voice-repository.js';
 
-export type { ReasoningStepRepository, ExecutionPlanRepository, ToolExecutionRepository, WorkflowTemplateRepository, ExecutionQueryRepository } from './repositories/execution-repository.js';
+export type {
+  ReasoningStepRepository,
+  ExecutionPlanRepository,
+  ToolExecutionRepository,
+  WorkflowTemplateRepository,
+  ExecutionQueryRepository,
+} from './repositories/execution-repository.js';
 export type {
   ExecutionStatistics,
   PlanMetrics,
   ExecutionResults,
   ToolMetrics,
   WorkflowTemplateMatch,
-  ExecutionInsights
+  ExecutionInsights,
 } from './repositories/execution-repository.js';
 
-export type { 
-  RoutingDecisionRepository, 
-  ModelAvailabilityRepository, 
-  RoutingAnalyticsRepository, 
+export type {
+  RoutingDecisionRepository,
+  ModelAvailabilityRepository,
+  RoutingAnalyticsRepository,
   RoutingQueryRepository,
   RoutingMetrics,
   ModelPerformanceHistory,
@@ -112,35 +114,36 @@ export type {
   ModelComparison,
   RoutingInsights,
   OptimalModelCriteria,
-  OptimalModelRecommendation
+  OptimalModelRecommendation,
 } from './repositories/routing-repository.js';
 
 // Domain Services (Pure business logic)
-export { 
-  ModelSelectionService
-} from './services/model-selection-service.js';
+export { ModelSelectionService } from './services/model-selection-service.js';
 
-export { 
-  VoiceOrchestrationService
-} from './services/voice-orchestration-service.js';
+export { VoiceOrchestrationService } from './services/voice-orchestration-service.js';
 
 export { ExecutionOrchestrationService } from './services/execution-orchestration-service.js';
-export type { 
-  ExecutionContext, 
-  ExecutionPreferences, 
+export type {
+  ExecutionContext,
+  ExecutionPreferences,
   ExecutionResult,
   ValidationResult,
-  ContinuationDecision
+  ContinuationDecision,
 } from './services/execution-orchestration-service.js';
 
-export { ModelRoutingService, PerformanceFirstStrategy, QualityFirstStrategy, BalancedRoutingStrategy } from './services/model-routing-service.js';
-export type { 
-  RoutingRequest, 
-  RequestContext, 
-  ModelScoringResult, 
-  RoutingStrategy, 
+export {
+  ModelRoutingService,
+  PerformanceFirstStrategy,
+  QualityFirstStrategy,
+  BalancedRoutingStrategy,
+} from './services/model-routing-service.js';
+export type {
+  RoutingRequest,
+  RequestContext,
+  ModelScoringResult,
+  RoutingStrategy,
   RoutingEvaluation,
-  StrategyOptimization
+  StrategyOptimization,
 } from './services/model-routing-service.js';
 
 // Domain Events (if any exist or are added later)
@@ -188,7 +191,7 @@ export const DOMAIN_CONSTANTS = {
   DEFAULT_CONFIDENCE_THRESHOLD: 0.7,
   MIN_QUALITY_SCORE: 0.5,
   MAX_TOOL_EXECUTION_TIME_MS: 60000,
-  DEFAULT_EXECUTION_TIMEOUT_MS: 300000
+  DEFAULT_EXECUTION_TIMEOUT_MS: 300000,
 } as const;
 
 /**

@@ -1,6 +1,6 @@
 /**
  * Model Client Interfaces
- * 
+ *
  * These interfaces define contracts for AI model interaction,
  * breaking the circular dependency between UnifiedModelClient and other components.
  */
@@ -83,32 +83,32 @@ export interface IModelClient {
    * Send a request to the model
    */
   request(request: ModelRequest): Promise<ModelResponse>;
-  
+
   /**
    * Generate text from a prompt - legacy compatibility method
    */
   generate(prompt: string, options?: any): Promise<string>;
-  
+
   /**
    * Send a streaming request to the model
    */
   stream(request: ModelRequest): AsyncIterableIterator<StreamToken>;
-  
+
   /**
    * Get available models
    */
   getAvailableModels(): Promise<ModelInfo[]>;
-  
+
   /**
    * Check if the client is healthy and ready
    */
   isHealthy(): Promise<boolean>;
-  
+
   /**
    * Initialize the client
    */
   initialize(): Promise<void>;
-  
+
   /**
    * Shutdown the client
    */
@@ -135,17 +135,17 @@ export interface ModelCapability {
 export interface IModelProvider {
   readonly type: string;
   readonly endpoint: string;
-  
+
   /**
    * Send a request to this provider
    */
   request(request: ModelRequest): Promise<ModelResponse>;
-  
+
   /**
    * Check if provider is available
    */
   isAvailable(): Promise<boolean>;
-  
+
   /**
    * Get supported models
    */
@@ -160,7 +160,7 @@ export interface IModelRouter {
    * Route a request to the best available provider
    */
   route(request: ModelRequest): Promise<{ provider: IModelProvider; model: string }>;
-  
+
   /**
    * Get fallback chain for a request
    */

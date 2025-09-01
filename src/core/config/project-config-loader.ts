@@ -1,10 +1,10 @@
 /**
  * Project Configuration Loader - Industry Standard Support
- * 
+ *
  * Supports project-specific configuration files following industry patterns:
  * - CODECRUCIBLE.md - Human-readable project instructions (like GEMINI.md)
  * - .codecrucible.yaml - Machine-readable configuration (like .qwen-config)
- * 
+ *
  * Provides project context, custom instructions, and agent behavior preferences
  * based on analysis of Qwen CLI, Gemini CLI, and other industry leaders.
  */
@@ -42,7 +42,7 @@ export interface ProjectConfiguration {
   language?: string;
   framework?: string;
   type?: 'web' | 'api' | 'cli' | 'library' | 'mobile' | 'desktop' | 'other';
-  
+
   // File handling
   include?: string[];
   exclude?: string[];
@@ -50,7 +50,7 @@ export interface ProjectConfiguration {
   maxFileSize?: number;
   maxTotalSize?: number;
   supportedExtensions?: string[];
-  
+
   // AI behavior configuration
   ai?: {
     model?: string;
@@ -61,7 +61,7 @@ export interface ProjectConfiguration {
     voices?: string[];
     responseFormat?: 'markdown' | 'text' | 'structured';
   };
-  
+
   // Development workflow
   workflow?: {
     methodology?: 'living-spiral' | 'agile' | 'waterfall' | 'custom';
@@ -69,7 +69,7 @@ export interface ProjectConfiguration {
     testingStrategy?: 'unit' | 'integration' | 'e2e' | 'all';
     qualityGates?: string[];
   };
-  
+
   // Tool integrations
   tools?: {
     linter?: string;
@@ -79,7 +79,7 @@ export interface ProjectConfiguration {
     devCommand?: string;
     deployCommand?: string;
   };
-  
+
   // Security and permissions
   security?: {
     allowedCommands?: string[];
@@ -116,10 +116,10 @@ export class ProjectConfigurationLoader {
   async loadProjectConfig(projectPath: string = process.cwd()): Promise<CombinedProjectConfig> {
     const startTime = Date.now();
     const normalizedPath = resolve(projectPath);
-    
+
     // Check cache first
     const cached = this.cache.get(normalizedPath);
-    if (cached && (Date.now() - cached.loadTime) < this.cacheTimeout) {
+    if (cached && Date.now() - cached.loadTime < this.cacheTimeout) {
       return cached;
     }
 
@@ -130,7 +130,7 @@ export class ProjectConfigurationLoader {
       configuration: {},
       sources: {},
       isLoaded: false,
-      loadTime: startTime
+      loadTime: startTime,
     };
 
     try {
@@ -156,9 +156,12 @@ export class ProjectConfigurationLoader {
         // Merge package.json info into configuration
         config.configuration.name = config.configuration.name || packageInfo.name;
         config.configuration.version = config.configuration.version || packageInfo.version;
-        config.configuration.language = config.configuration.language || this.detectLanguageFromPackage(packageInfo);
-        config.configuration.framework = config.configuration.framework || this.detectFrameworkFromPackage(packageInfo);
-        config.configuration.type = config.configuration.type || this.detectProjectTypeFromPackage(packageInfo);
+        config.configuration.language =
+          config.configuration.language || this.detectLanguageFromPackage(packageInfo);
+        config.configuration.framework =
+          config.configuration.framework || this.detectFrameworkFromPackage(packageInfo);
+        config.configuration.type =
+          config.configuration.type || this.detectProjectTypeFromPackage(packageInfo);
       }
 
       config.isLoaded = !!(instructions || configuration || packageInfo);
@@ -174,7 +177,6 @@ export class ProjectConfigurationLoader {
       }
 
       return config;
-
     } catch (error) {
       logger.warn('❌ Failed to load project configuration:', error);
       config.loadTime = Date.now();
@@ -185,10 +187,12 @@ export class ProjectConfigurationLoader {
   /**
    * Load instruction file (CODECRUCIBLE.md)
    */
-  private async loadInstructionFile(projectPath: string): Promise<{content: ProjectInstructions, filePath: string} | null> {
+  private async loadInstructionFile(
+    projectPath: string
+  ): Promise<{ content: ProjectInstructions; filePath: string } | null> {
     for (const fileName of this.instructionFileNames) {
       const filePath = join(projectPath, fileName);
-      
+
       try {
         await access(filePath);
         const content = await readFile(filePath, 'utf-8');
@@ -199,17 +203,19 @@ export class ProjectConfigurationLoader {
         continue;
       }
     }
-    
+
     return null;
   }
 
   /**
    * Load configuration file (.codecrucible.yaml)
    */
-  private async loadConfigurationFile(projectPath: string): Promise<{content: ProjectConfiguration, filePath: string} | null> {
+  private async loadConfigurationFile(
+    projectPath: string
+  ): Promise<{ content: ProjectConfiguration; filePath: string } | null> {
     for (const fileName of this.configFileNames) {
       const filePath = join(projectPath, fileName);
-      
+
       try {
         await access(filePath);
         const content = await readFile(filePath, 'utf-8');
@@ -220,7 +226,7 @@ export class ProjectConfigurationLoader {
         continue;
       }
     }
-    
+
     return null;
   }
 
@@ -243,7 +249,7 @@ export class ProjectConfigurationLoader {
    */
   private parseInstructionFile(content: string, fileName: string): ProjectInstructions {
     const instructions: ProjectInstructions = {};
-    
+
     // Extract title/project name from first heading
     const titleMatch = content.match(/^#\s+(.+)$/m);
     if (titleMatch) {
@@ -261,7 +267,7 @@ export class ProjectConfigurationLoader {
 
     // Parse specific sections if they exist
     const customInstructions = [];
-    
+
     // Look for ## Instructions section
     const instructMatch = content.match(/##?\s+Instructions?\s*\n((?:(?!##).|\n)*)/i);
     if (instructMatch) {
@@ -269,24 +275,30 @@ export class ProjectConfigurationLoader {
     }
 
     // Look for ## Code Style section
-    const styleMatch = content.match(/##?\s+(?:Code\s+Style|Coding\s+Guidelines?)\s*\n((?:(?!##).|\n)*)/i);
+    const styleMatch = content.match(
+      /##?\s+(?:Code\s+Style|Coding\s+Guidelines?)\s*\n((?:(?!##).|\n)*)/i
+    );
     if (styleMatch) {
       instructions.codeStyle = {
-        rules: { customGuidelines: styleMatch[1].trim() }
+        rules: { customGuidelines: styleMatch[1].trim() },
       };
     }
 
-    // Look for ## Preferences section  
+    // Look for ## Preferences section
     const prefMatch = content.match(/##?\s+Preferences?\s*\n((?:(?!##).|\n)*)/i);
     if (prefMatch) {
       const prefText = prefMatch[1].trim().toLowerCase();
       instructions.preferences = {
-        responseStyle: prefText.includes('concise') ? 'concise' : 
-                     prefText.includes('detailed') ? 'detailed' : 
-                     prefText.includes('educational') ? 'educational' : 'detailed',
+        responseStyle: prefText.includes('concise')
+          ? 'concise'
+          : prefText.includes('detailed')
+            ? 'detailed'
+            : prefText.includes('educational')
+              ? 'educational'
+              : 'detailed',
         includeTests: prefText.includes('test'),
         includeComments: prefText.includes('comment'),
-        includeDocumentation: prefText.includes('doc')
+        includeDocumentation: prefText.includes('doc'),
       };
     }
 
@@ -303,13 +315,13 @@ export class ProjectConfigurationLoader {
   private detectLanguageFromPackage(packageJson: any): string {
     if (packageJson.dependencies || packageJson.devDependencies) {
       const deps = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
-      
+
       if (deps.typescript || deps['@types/node']) return 'typescript';
       if (deps.react || deps['@types/react']) return 'javascript';
       if (deps.vue) return 'javascript';
       if (deps.angular || deps['@angular/core']) return 'typescript';
     }
-    
+
     return 'javascript'; // Default
   }
 
@@ -319,7 +331,7 @@ export class ProjectConfigurationLoader {
   private detectFrameworkFromPackage(packageJson: any): string | undefined {
     if (packageJson.dependencies || packageJson.devDependencies) {
       const deps = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
-      
+
       if (deps.react || deps['@types/react']) return 'react';
       if (deps.vue) return 'vue';
       if (deps.angular || deps['@angular/core']) return 'angular';
@@ -329,7 +341,7 @@ export class ProjectConfigurationLoader {
       if (deps.next) return 'nextjs';
       if (deps.nuxt) return 'nuxtjs';
     }
-    
+
     return undefined;
   }
 
@@ -339,11 +351,11 @@ export class ProjectConfigurationLoader {
   private detectProjectTypeFromPackage(packageJson: any): ProjectConfiguration['type'] {
     // Check for CLI tools
     if (packageJson.bin) return 'cli';
-    
+
     // Check for common web frameworks
     if (packageJson.dependencies || packageJson.devDependencies) {
       const deps = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
-      
+
       if (deps.react || deps.vue || deps.angular || deps.svelte) return 'web';
       if (deps.express || deps.fastify || deps.koa) return 'api';
       if (deps.electron) return 'desktop';
@@ -373,7 +385,7 @@ export class ProjectConfigurationLoader {
    */
   async hasProjectConfig(projectPath: string = process.cwd()): Promise<boolean> {
     const normalizedPath = resolve(projectPath);
-    
+
     // Check for instruction files
     for (const fileName of this.instructionFileNames) {
       try {
@@ -383,7 +395,7 @@ export class ProjectConfigurationLoader {
         continue;
       }
     }
-    
+
     // Check for configuration files
     for (const fileName of this.configFileNames) {
       try {
@@ -393,7 +405,7 @@ export class ProjectConfigurationLoader {
         continue;
       }
     }
-    
+
     return false;
   }
 }

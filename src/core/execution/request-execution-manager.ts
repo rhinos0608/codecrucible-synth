@@ -15,13 +15,17 @@ import { logger } from '../logger.js';
 import { getErrorMessage, toError } from '../../utils/error-utils.js';
 import { ModelRequest, ModelResponse } from '../../domain/interfaces/model-client.js';
 import { ProjectContext, ComplexityAnalysis, TaskType } from '../../domain/types/unified-types.js';
-import { ActiveProcess, ActiveProcessManager } from '../performance/active-process-manager.js';
-import { EnhancedToolIntegration, getGlobalEnhancedToolIntegration } from '../../infrastructure/tools/enhanced-tool-integration.js';
+import { ActiveProcess, ActiveProcessManager } from '../../infrastructure/performance/active-process-manager.js';
+import {
+  EnhancedToolIntegration,
+  getGlobalEnhancedToolIntegration,
+} from '../../infrastructure/tools/enhanced-tool-integration.js';
 import { getGlobalToolIntegration } from '../../infrastructure/tools/tool-integration.js';
 import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestrator.js';
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
+import { RustExecutionBackend } from './rust-executor/rust-execution-backend.js';
 
 // EVIDENCE COLLECTION BRIDGE - Global system to capture tool results for evidence collection
 class GlobalEvidenceCollector {
@@ -42,11 +46,11 @@ class GlobalEvidenceCollector {
       hasResult: !!toolResult,
       success: toolResult?.success,
       hasOutput: !!toolResult?.output,
-      collectorCount: this.evidenceCollectors.size
+      collectorCount: this.evidenceCollectors.size,
     });
-    
+
     this.toolResults.push(toolResult);
-    
+
     // Notify all registered evidence collectors
     this.evidenceCollectors.forEach(collector => {
       try {
@@ -63,7 +67,7 @@ class GlobalEvidenceCollector {
     console.log('🚨 DEBUG: registerEvidenceCollector called!');
     this.evidenceCollectors.add(callback);
     logger.info('🔥 GLOBAL EVIDENCE COLLECTOR: Evidence collector registered', {
-      totalCollectors: this.evidenceCollectors.size
+      totalCollectors: this.evidenceCollectors.size,
     });
   }
 
@@ -143,6 +147,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   private processManager: ActiveProcessManager;
   private providerRepository: any;
   private domainOrchestrator: DomainAwareToolOrchestrator;
+  private rustBackend: RustExecutionBackend;
   private isShuttingDown = false;
   private queueProcessor: NodeJS.Timeout | null = null;
 
@@ -156,13 +161,34 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     this.processManager = processManager;
     this.providerRepository = providerRepository;
     this.domainOrchestrator = new DomainAwareToolOrchestrator();
+    this.rustBackend = new RustExecutionBackend({
+      enableProfiling: true,
+      maxConcurrency: 4,
+      timeoutMs: config.defaultTimeout,
+      logLevel: 'info',
+    });
+
+    // Initialize Rust backend asynchronously
+    this.initializeRustBackend();
 
     // Start event-driven queue processor instead of infinite loop
     this.scheduleQueueProcessor();
-    
+
     // Handle shutdown gracefully
     process.once('SIGTERM', async () => this.shutdown());
     process.once('SIGINT', async () => this.shutdown());
+  }
+
+  private async initializeRustBackend(): Promise<void> {
+    try {
+      await this.rustBackend.initialize();
+      logger.info('🚀 RequestExecutionManager: Rust backend initialized', {
+        available: this.rustBackend.isAvailable(),
+        strategy: this.rustBackend.getStrategy(),
+      });
+    } catch (error) {
+      logger.warn('⚠️ RequestExecutionManager: Rust backend initialization failed, using TypeScript fallback:', error);
+    }
   }
 
   /**
@@ -178,9 +204,8 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     );
 
     // Check if request is eligible for batching (non-streaming, non-tool requests)
-    const isBatchEligible = !request.stream && 
-                           (!request.tools || request.tools.length === 0) &&
-                           strategy.mode !== 'fast'; // Fast mode bypasses batching
+    const isBatchEligible =
+      !request.stream && (!request.tools || request.tools.length === 0) && strategy.mode !== 'fast'; // Fast mode bypasses batching
 
     if (isBatchEligible) {
       logger.debug(`Request ${requestId} eligible for batching`);
@@ -195,7 +220,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
             maxTokens: request.maxTokens,
             mode: strategy.mode,
             priority: this.getRequestPriority(request),
-            tools: request.tools
+            tools: request.tools,
           }
         );
 
@@ -205,7 +230,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         adaptiveTuner.recordMetrics(responseTime, 1, errorRate);
 
         logger.info(`✅ Request ${requestId} completed via batching in ${responseTime}ms`);
-        
+
         return {
           id: `batch_${requestId}_${Date.now()}`,
           content: batchResult.content,
@@ -215,11 +240,14 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
             tokens: batchResult.usage?.totalTokens || 0,
             latency: responseTime,
             selectedProvider: strategy.provider,
-            fromBatch: true
-          }
+            fromBatch: true,
+          },
         };
       } catch (error) {
-        logger.warn(`Batching failed for ${requestId}, falling back to individual processing:`, error);
+        logger.warn(
+          `Batching failed for ${requestId}, falling back to individual processing:`,
+          error
+        );
         // Fall through to normal processing
       }
     }
@@ -255,13 +283,16 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       // Mark process as failed
       this.processManager.unregisterProcess(activeProcess.id);
 
-      // Record failed request metrics  
+      // Record failed request metrics
       const responseTime = Date.now() - startTime;
       const throughput = 0; // Failed request
       const errorRate = 1; // 100% error rate for this request
       adaptiveTuner.recordMetrics(responseTime, throughput, errorRate);
 
-      logger.error(`❌ Request ${requestId} failed after ${responseTime}ms:`, getErrorMessage(error));
+      logger.error(
+        `❌ Request ${requestId} failed after ${responseTime}ms:`,
+        getErrorMessage(error)
+      );
       throw toError(error);
     }
   }
@@ -308,13 +339,13 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         // Add tool integration before calling provider
         const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
         const toolIntegration = enhancedToolIntegration || getGlobalToolIntegration();
-        
+
         // DEBUG: Log which tool integration is being used
         logger.info('🔥 REQUEST-EXECUTION-MANAGER: Tool integration selection', {
           hasEnhanced: !!enhancedToolIntegration,
           hasBase: !!getGlobalToolIntegration(),
           usingEnhanced: toolIntegration === enhancedToolIntegration,
-          toolIntegrationType: toolIntegration?.constructor?.name
+          toolIntegrationType: toolIntegration?.constructor?.name,
         });
         const supportsTools = this.modelSupportsTools(
           providerType as ProviderType,
@@ -324,27 +355,27 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         // DOMAIN-AWARE TOOL SELECTION: Smart filtering based on request analysis
         let tools: any[] = [];
         let domainInfo = '';
-        
+
         if (supportsTools && toolIntegration) {
           const allTools = await toolIntegration.getLLMFunctions();
-          
+
           // Use domain orchestrator to select relevant tools only
           const domainResult = this.domainOrchestrator.getToolsForPrompt(
             request.prompt || '',
             allTools
           );
-          
+
           tools = domainResult.tools;
           domainInfo = `${domainResult.analysis.primaryDomain} (${(domainResult.analysis.confidence * 100).toFixed(1)}%)`;
-          
+
           logger.info('🎯 REQUEST-EXECUTION-MANAGER: Domain-aware tool selection', {
-            prompt: `${request.prompt?.substring(0, 80)  }...`,
+            prompt: `${request.prompt?.substring(0, 80)}...`,
             primaryDomain: domainResult.analysis.primaryDomain,
             confidence: domainResult.analysis.confidence.toFixed(2),
             originalToolCount: allTools.length,
             selectedToolCount: tools.length,
             toolNames: tools.map(t => t.function?.name || t.name),
-            reasoning: domainResult.reasoning
+            reasoning: domainResult.reasoning,
           });
         }
 
@@ -357,48 +388,52 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           hasBasic: !!getGlobalToolIntegration(),
           hasIntegration: !!toolIntegration,
           selectedToolCount: tools.length,
-          domainInfo
+          domainInfo,
         });
-        
+
         if (tools.length > 0) {
           logger.info('🎯 DOMAIN-SELECTED TOOLS for request execution', {
             toolNames: tools.map(t => t.function?.name || t.name),
             domain: domainInfo,
-            sampleTool: tools[0]
+            sampleTool: tools[0],
           });
         } else {
           logger.warn('⚠️ NO DOMAIN TOOLS SELECTED for request execution', {
-            domain: domainInfo
+            domain: domainInfo,
           });
         }
 
         // Add tools to request before calling provider
         const requestWithTools = {
           ...request,
-          tools: tools
+          tools: tools,
         };
 
         // Create optimized timeout for this request
-        const requestType = request.stream ? 'streaming' : 
-                          (request.tools && request.tools.length > 0) ? 'tool_execution' : 'regular';
-        
-        const { abortController, timeout: optimizedTimeout } = requestTimeoutOptimizer.createOptimizedTimeout(
-          requestId,
-          requestType,
-          providerType === 'fast' ? 'low' : providerType === 'quality' ? 'high' : 'medium'
-        );
+        const requestType = request.stream
+          ? 'streaming'
+          : request.tools && request.tools.length > 0
+            ? 'tool_execution'
+            : 'regular';
+
+        const { abortController, timeout: optimizedTimeout } =
+          requestTimeoutOptimizer.createOptimizedTimeout(
+            requestId,
+            requestType,
+            providerType === 'fast' ? 'low' : providerType === 'quality' ? 'high' : 'medium'
+          );
 
         // Add abort signal to request
         const requestWithAbort = {
           ...requestWithTools,
-          abortSignal: abortController.signal
+          abortSignal: abortController.signal,
         };
 
         const response = await Promise.race([
           provider.processRequest(requestWithAbort, context),
-          this.createOptimizedTimeoutPromise(optimizedTimeout, abortController)
+          this.createOptimizedTimeoutPromise(optimizedTimeout, abortController),
         ]);
-        
+
         // Mark request as completed successfully
         requestTimeoutOptimizer.completeRequest(requestId);
 
@@ -428,12 +463,16 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                   },
                 };
 
-                logger.info(`🔥 REQUEST-EXECUTION-MANAGER: About to call executeToolCall for ${formattedToolCall.function.name}`);
-                logger.info(`🔥 REQUEST-EXECUTION-MANAGER: toolIntegration type: ${toolIntegration?.constructor?.name}`);
+                logger.info(
+                  `🔥 REQUEST-EXECUTION-MANAGER: About to call executeToolCall for ${formattedToolCall.function.name}`
+                );
+                logger.info(
+                  `🔥 REQUEST-EXECUTION-MANAGER: toolIntegration type: ${toolIntegration?.constructor?.name}`
+                );
                 const result = await toolIntegration.executeToolCall(formattedToolCall);
                 logger.debug('Tool execution result in request execution', { result });
                 toolResults.push(result);
-                
+
                 // CRITICAL FIX: Bridge tool results to evidence collection system
                 const globalCollector = GlobalEvidenceCollector.getInstance();
                 globalCollector.addToolResult(result);
@@ -450,20 +489,28 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
                   response.metadata = {
                     tokens: 0,
                     latency: 0,
-                    ...response.metadata
+                    ...response.metadata,
                   };
-                  
-                  logger.info('🔧 TOOL EXECUTION: Tool successfully executed in request execution', {
-                    toolName: response.toolCalls[0]?.name || response.toolCalls[0]?.function?.name,
-                    resultContent: content
-                  });
+
+                  logger.info(
+                    '🔧 TOOL EXECUTION: Tool successfully executed in request execution',
+                    {
+                      toolName:
+                        response.toolCalls[0]?.name || response.toolCalls[0]?.function?.name,
+                      resultContent: content,
+                    }
+                  );
                 } else if (firstResult.error) {
                   response.content = `Error executing tool: ${firstResult.error}`;
-                  logger.error('Tool execution error in request execution', { error: firstResult.error });
+                  logger.error('Tool execution error in request execution', {
+                    error: firstResult.error,
+                  });
                 }
               }
             } catch (error) {
-              logger.error('Error during tool execution in request execution', { error: getErrorMessage(error) });
+              logger.error('Error during tool execution in request execution', {
+                error: getErrorMessage(error),
+              });
               response.content = `Error executing tools: ${getErrorMessage(error)}`;
             }
           } else {
@@ -495,7 +542,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
           metrics.endTime = Date.now();
           metrics.error = errorMessage;
         }
-        
+
         // Request failed - timeout optimizer handles cleanup automatically
 
         logger.warn(`❌ ${providerType} failed for request ${requestId}: ${errorMessage}`);
@@ -635,7 +682,10 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   /**
    * Create optimized timeout promise with abort controller
    */
-  private async createOptimizedTimeoutPromise(timeoutMs: number, abortController: AbortController): Promise<never> {
+  private async createOptimizedTimeoutPromise(
+    timeoutMs: number,
+    abortController: AbortController
+  ): Promise<never> {
     return new Promise((_, reject) => {
       const timeoutId = setTimeout(() => {
         abortController.abort();
@@ -690,9 +740,9 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     }
 
     const batch = this.requestQueue.splice(0, batchSize);
-    
+
     // Process batch items concurrently
-    const batchPromises = batch.map(async (queueItem) => {
+    const batchPromises = batch.map(async queueItem => {
       try {
         const response = await this.processRequest(queueItem.request, queueItem.context);
         queueItem.resolve(response);
@@ -726,7 +776,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
         reject: reject as (reason?: any) => void,
       });
       logger.info('Request queued due to capacity limit');
-      
+
       // Trigger queue processor
       this.scheduleQueueProcessor();
     });
@@ -756,8 +806,8 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
     // Wait for active requests to complete (with timeout)
     const shutdownTimeout = 10000; // 10 seconds
     const startTime = Date.now();
-    
-    while (this.activeRequests.size > 0 && (Date.now() - startTime) < shutdownTimeout) {
+
+    while (this.activeRequests.size > 0 && Date.now() - startTime < shutdownTimeout) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
@@ -815,7 +865,16 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
       activeRequests: this.activeRequests.size,
       queuedRequests: this.requestQueue.length,
       maxConcurrent: this.config.maxConcurrentRequests,
+      rustBackendAvailable: this.rustBackend.isAvailable(),
+      rustBackendStats: this.rustBackend.getPerformanceStats(),
       config: this.config,
     };
+  }
+
+  /**
+   * Get the Rust execution backend instance
+   */
+  getRustBackend(): RustExecutionBackend {
+    return this.rustBackend;
   }
 }

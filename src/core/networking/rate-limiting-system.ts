@@ -120,7 +120,7 @@ export class RateLimitManager {
               severity: 'medium',
               category: 'system',
               recoverable: true,
-              suggestions: [`Wait ${Math.ceil(remainingTime / 1000)} seconds before retrying`]
+              suggestions: [`Wait ${Math.ceil(remainingTime / 1000)} seconds before retrying`],
             },
             {
               operation: 'checkRateLimit',
@@ -129,8 +129,8 @@ export class RateLimitManager {
               metadata: {
                 identifier,
                 remainingBlockTime: remainingTime,
-                rateLimitConfig
-              }
+                rateLimitConfig,
+              },
             }
           )
         );
@@ -158,13 +158,13 @@ export class RateLimitManager {
               severity: 'medium',
               category: 'system',
               recoverable: true,
-              suggestions: ['Reduce request frequency', 'Wait before retrying']
+              suggestions: ['Reduce request frequency', 'Wait before retrying'],
             },
             {
               operation: 'checkRateLimit',
               timestamp: Date.now(),
               component: 'rate-limiting-system',
-              metadata: { identifier, rateLimitConfig }
+              metadata: { identifier, rateLimitConfig },
             }
           )
         );
@@ -183,13 +183,13 @@ export class RateLimitManager {
             severity: 'high',
             category: 'system',
             recoverable: false,
-            suggestions: ['Try again', 'Contact support if issue persists']
+            suggestions: ['Try again', 'Contact support if issue persists'],
           },
           {
             operation: 'checkRateLimit',
             timestamp: Date.now(),
             component: 'rate-limiting-system',
-            metadata: { identifier }
+            metadata: { identifier },
           },
           error as Error
         )
@@ -387,8 +387,8 @@ export class TimeoutRetryManager {
           suggestions: [
             'Check network connection',
             'Verify service availability',
-            'Try again later'
-          ]
+            'Try again later',
+          ],
         },
         {
           operation: 'executeWithTimeoutAndRetry',
@@ -399,8 +399,8 @@ export class TimeoutRetryManager {
             attempts: attempt,
             lastError: lastError?.message,
             timeoutConfig,
-            retryConfig
-          }
+            retryConfig,
+          },
         },
         lastError
       )
@@ -422,13 +422,13 @@ export class TimeoutRetryManager {
               severity: 'medium',
               category: 'network',
               recoverable: true,
-              suggestions: ['Try again with longer timeout', 'Check network connection']
+              suggestions: ['Try again with longer timeout', 'Check network connection'],
             },
             {
               operation: 'executeWithTimeout',
               timestamp: Date.now(),
               component: 'rate-limiting-system',
-              metadata: { identifier, timeout: config.totalTimeout, isTimeout: true }
+              metadata: { identifier, timeout: config.totalTimeout, isTimeout: true },
             }
           )
         );

@@ -1,10 +1,10 @@
 /**
  * Intelligent MCP-Voice Integration System
- * 
+ *
  * Integrates MCP external services with the Voice Archetype System and Living Spiral methodology:
  * - Voice-specific MCP server routing and optimization
  * - Capability-aware voice selection for external tools
- * - Living Spiral phase-specific MCP tool orchestration  
+ * - Living Spiral phase-specific MCP tool orchestration
  * - Context-aware tool selection and execution
  * - Performance optimization for voice synthesis workflows
  * - Collaborative multi-voice MCP operations
@@ -12,8 +12,15 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../logger.js';
-import { advancedMCPDiscoverySystem, DiscoveredMCPServer, ServerDiscoveryQuery } from './advanced-mcp-discovery-system.js';
-import { intelligentMCPLoadBalancer, LoadBalancingDecision } from './intelligent-mcp-load-balancer.js';
+import {
+  advancedMCPDiscoverySystem,
+  DiscoveredMCPServer,
+  ServerDiscoveryQuery,
+} from './advanced-mcp-discovery-system.js';
+import {
+  intelligentMCPLoadBalancer,
+  LoadBalancingDecision,
+} from './intelligent-mcp-load-balancer.js';
 import { enhancedMCPReliabilitySystem } from './enhanced-mcp-reliability-system.js';
 import { enhancedMCPSecuritySystem } from './enhanced-mcp-security-system.js';
 
@@ -21,19 +28,19 @@ export interface VoiceCapabilityMapping {
   voiceId: string;
   voiceName: string;
   voiceRole: string;
-  
+
   // Preferred capabilities for this voice
   preferredCapabilities: string[];
   expertCapabilities: string[];
-  
+
   // MCP server preferences
   preferredServers: string[];
   avoidedServers: string[];
-  
+
   // Performance optimization
   cachingStrategy: 'aggressive' | 'moderate' | 'minimal';
   parallelismLevel: 'low' | 'medium' | 'high';
-  
+
   // Quality preferences
   reliabilityWeight: number; // 0-1
   performanceWeight: number; // 0-1
@@ -43,19 +50,19 @@ export interface VoiceCapabilityMapping {
 export interface LivingSpiralPhase {
   phase: 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
   description: string;
-  
+
   // Phase-specific MCP requirements
   requiredCapabilities: string[];
   optionalCapabilities: string[];
-  
+
   // Tool orchestration preferences
   executionMode: 'sequential' | 'parallel' | 'adaptive';
   errorTolerance: 'strict' | 'moderate' | 'lenient';
-  
+
   // Collaboration settings
   voiceCollaboration: boolean;
   crossPhaseDataSharing: boolean;
-  
+
   // Performance targets
   maxExecutionTime: number;
   qualityThreshold: number;
@@ -65,21 +72,21 @@ export interface VoiceMCPRequest {
   requestId: string;
   voiceId: string;
   phase: string;
-  
+
   // Tool requirements
   capability: string;
   parameters: any;
   context: any;
-  
+
   // Execution preferences
   priority: 'low' | 'normal' | 'high' | 'critical';
   timeout: number;
   retryPolicy: RetryPolicy;
-  
+
   // Quality requirements
   minReliability: number;
   maxLatency: number;
-  
+
   // Collaboration context
   relatedRequests?: string[];
   dependsOn?: string[];
@@ -97,20 +104,20 @@ export interface RetryPolicy {
 export interface VoiceMCPResponse {
   requestId: string;
   voiceId: string;
-  
+
   success: boolean;
   result: any;
   error?: string;
-  
+
   // Execution metadata
   executionTime: number;
   serverUsed: string;
   capabilityMatched: boolean;
-  
+
   // Quality metrics
   reliabilityScore: number;
   performanceScore: number;
-  
+
   // Collaboration data
   sharedData?: any;
   collaborationMetadata?: any;
@@ -120,23 +127,23 @@ export interface MCPVoiceOrchestrationPlan {
   planId: string;
   phase: string;
   voices: string[];
-  
+
   // Tool execution plan
   toolSequence: MCPToolStep[];
   executionStrategy: 'sequential' | 'parallel' | 'pipeline' | 'adaptive';
-  
+
   // Resource allocation
   serverAllocation: Map<string, string[]>; // serverId -> voiceIds
   loadBalancingStrategy: string;
-  
+
   // Performance optimization
   cacheStrategy: string;
   prefetchingEnabled: boolean;
-  
+
   // Quality assurance
   validationRules: ValidationRule[];
   fallbackStrategies: FallbackStrategy[];
-  
+
   // Collaboration coordination
   dataFlowMap: DataFlowDefinition[];
   synchronizationPoints: SynchronizationPoint[];
@@ -147,16 +154,16 @@ export interface MCPToolStep {
   voiceId: string;
   capability: string;
   parameters: any;
-  
+
   dependencies: string[]; // stepIds this step depends on
   parallel: boolean;
   optional: boolean;
-  
+
   // Execution configuration
   serverId?: string;
   timeout: number;
   retryPolicy: RetryPolicy;
-  
+
   // Quality requirements
   minSuccessRate: number;
   maxResponseTime: number;
@@ -194,14 +201,14 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
   private spiralPhaseDefinitions: Map<string, LivingSpiralPhase> = new Map();
   private activeOrchestrationPlans: Map<string, MCPVoiceOrchestrationPlan> = new Map();
   private voiceExecutionHistory: Map<string, VoiceMCPResponse[]> = new Map();
-  
+
   // Performance optimization
   private capabilityCache: Map<string, DiscoveredMCPServer[]> = new Map();
   private voicePreferenceProfiles: Map<string, any> = new Map();
-  
+
   // Collaboration coordination
   private collaborationSessions: Map<string, CollaborationSession> = new Map();
-  
+
   constructor() {
     super();
     this.initializeDefaultMappings();
@@ -230,7 +237,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
       },
       {
         voiceId: 'maintainer',
-        voiceName: 'Maintainer', 
+        voiceName: 'Maintainer',
         voiceRole: 'Quality and Stability',
         preferredCapabilities: ['testing', 'validation', 'monitoring', 'backup'],
         expertCapabilities: ['testing', 'validation'],
@@ -392,7 +399,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
     // Filter by voice preferences
     if (voiceMapping.preferredServers.length > 0) {
-      const preferred = candidateServers.filter(server => 
+      const preferred = candidateServers.filter(server =>
         voiceMapping.preferredServers.some(pref => server.qualifiedName.includes(pref))
       );
       if (preferred.length > 0) {
@@ -401,8 +408,8 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     }
 
     // Remove avoided servers
-    candidateServers = candidateServers.filter(server => 
-      !voiceMapping.avoidedServers.some(avoided => server.qualifiedName.includes(avoided))
+    candidateServers = candidateServers.filter(
+      server => !voiceMapping.avoidedServers.some(avoided => server.qualifiedName.includes(avoided))
     );
 
     if (candidateServers.length === 0) {
@@ -412,10 +419,10 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
     // Use load balancer to select optimal server
     const poolId = `voice-${voiceId}-${capability}`;
-    
+
     // Ensure connection pool exists
     await this.ensureConnectionPool(poolId, candidateServers, voiceMapping);
-    
+
     // Get optimal connection
     return intelligentMCPLoadBalancer.getConnection(
       poolId,
@@ -503,13 +510,12 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
       // Store execution history
       this.recordVoiceExecution(request.voiceId, response);
-      
+
       this.emit('voice-mcp-success', response);
       return response;
-
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      
+
       // Record failure
       const serverDecision = await this.getOptimalServerForVoice(
         request.voiceId,
@@ -551,7 +557,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
       this.recordVoiceExecution(request.voiceId, response);
       this.emit('voice-mcp-error', response, error);
-      
+
       throw error;
     }
   }
@@ -570,13 +576,9 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     }
 
     const planId = `plan-${phase}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-    
+
     // Analyze requirements and create tool sequence
-    const toolSequence = await this.createToolSequence(
-      phaseDefinition,
-      voices,
-      requirements
-    );
+    const toolSequence = await this.createToolSequence(phaseDefinition, voices, requirements);
 
     // Create server allocation strategy
     const serverAllocation = await this.createServerAllocation(voices, toolSequence);
@@ -602,8 +604,10 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     };
 
     this.activeOrchestrationPlans.set(planId, plan);
-    logger.info(`Created orchestration plan ${planId} for phase ${phase} with ${voices.length} voices`);
-    
+    logger.info(
+      `Created orchestration plan ${planId} for phase ${phase} with ${voices.length} voices`
+    );
+
     this.emit('orchestration-plan-created', plan);
     return plan;
   }
@@ -618,7 +622,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     }
 
     logger.info(`Executing orchestration plan ${planId} for phase ${plan.phase}`);
-    
+
     const results = new Map<string, VoiceMCPResponse>();
     const phaseDefinition = this.spiralPhaseDefinitions.get(plan.phase)!;
 
@@ -651,13 +655,12 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
       this.emit('orchestration-plan-completed', planId, results);
 
       return results;
-
     } catch (error) {
       logger.error(`Orchestration plan ${planId} failed:`, error);
-      
+
       // Apply fallback strategies
       await this.applyFallbackStrategies(plan, error);
-      
+
       this.emit('orchestration-plan-failed', planId, error);
       throw error;
     } finally {
@@ -674,7 +677,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     results: Map<string, VoiceMCPResponse>
   ): Promise<void> {
     const sortedSteps = this.topologicalSort(plan.toolSequence);
-    
+
     for (const step of sortedSteps) {
       const request: VoiceMCPRequest = {
         requestId: `${plan.planId}-${step.stepId}`,
@@ -705,7 +708,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     results: Map<string, VoiceMCPResponse>
   ): Promise<void> {
     const parallelGroups = this.groupParallelSteps(plan.toolSequence);
-    
+
     for (const group of parallelGroups) {
       const groupPromises = group.map(async step => {
         const request: VoiceMCPRequest = {
@@ -728,7 +731,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
       });
 
       const groupResults = await Promise.all(groupPromises);
-      
+
       // Handle data sharing
       for (const { step, response } of groupResults) {
         if (plan.dataFlowMap.some(flow => flow.fromStep === step.stepId)) {
@@ -745,13 +748,14 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     // Pipeline execution - start next step as soon as dependencies are ready
     const completedSteps = new Set<string>();
     const runningSteps = new Map<string, Promise<VoiceMCPResponse>>();
-    
+
     while (completedSteps.size < plan.toolSequence.length) {
       // Find ready steps
-      const readySteps = plan.toolSequence.filter(step => 
-        !completedSteps.has(step.stepId) &&
-        !runningSteps.has(step.stepId) &&
-        step.dependencies.every(dep => completedSteps.has(dep))
+      const readySteps = plan.toolSequence.filter(
+        step =>
+          !completedSteps.has(step.stepId) &&
+          !runningSteps.has(step.stepId) &&
+          step.dependencies.every(dep => completedSteps.has(dep))
       );
 
       // Start ready steps
@@ -802,7 +806,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
   ): Promise<void> {
     // Adaptive execution - choose strategy based on current conditions
     const performanceMetrics = this.getPhasePerformanceMetrics(plan.phase);
-    
+
     if (performanceMetrics.avgLatency > 5000) {
       // High latency - use parallel execution
       await this.executeParallel(plan, results);
@@ -818,16 +822,18 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
   /**
    * Utility methods
    */
-  private async getCachedOrDiscoverServers(query: ServerDiscoveryQuery): Promise<DiscoveredMCPServer[]> {
+  private async getCachedOrDiscoverServers(
+    query: ServerDiscoveryQuery
+  ): Promise<DiscoveredMCPServer[]> {
     const cacheKey = JSON.stringify(query);
-    
+
     if (this.capabilityCache.has(cacheKey)) {
       return this.capabilityCache.get(cacheKey)!;
     }
 
     const servers = advancedMCPDiscoverySystem.searchServers(query);
     this.capabilityCache.set(cacheKey, servers);
-    
+
     // Cache for 5 minutes
     setTimeout(() => {
       this.capabilityCache.delete(cacheKey);
@@ -899,13 +905,13 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
         return result;
       } catch (error) {
         lastError = error as Error;
-        
+
         if (attempt < maxRetries && this.shouldRetry(error, request.retryPolicy)) {
           const delay = this.calculateRetryDelay(attempt, request.retryPolicy);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
-        
+
         throw error;
       }
     }
@@ -920,12 +926,13 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     // Simulate processing time based on capability and server performance
     const baseTime = 100;
     const performanceFactor = serverDecision.expectedPerformance;
-    const processingTime = baseTime + (Math.random() * performanceFactor * 10);
-    
+    const processingTime = baseTime + Math.random() * performanceFactor * 10;
+
     await new Promise(resolve => setTimeout(resolve, processingTime));
-    
+
     // Simulate occasional failures
-    if (Math.random() < 0.05) { // 5% failure rate
+    if (Math.random() < 0.05) {
+      // 5% failure rate
       throw new Error('Simulated MCP execution failure');
     }
 
@@ -939,7 +946,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
   private shouldRetry(error: any, retryPolicy: RetryPolicy): boolean {
     const errorMessage = error.message.toLowerCase();
-    
+
     switch (retryPolicy.retryOn) {
       case 'all':
         return true;
@@ -963,8 +970,11 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
       case 'adaptive':
         // Adaptive strategy based on current system performance
         const systemLoad = this.getSystemLoad();
-        const multiplier = 1 + (systemLoad / 100);
-        return Math.min(retryPolicy.baseDelay * Math.pow(2, attempt) * multiplier, retryPolicy.maxDelay);
+        const multiplier = 1 + systemLoad / 100;
+        return Math.min(
+          retryPolicy.baseDelay * Math.pow(2, attempt) * multiplier,
+          retryPolicy.maxDelay
+        );
       default:
         return retryPolicy.baseDelay;
     }
@@ -979,10 +989,10 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     if (!this.voiceExecutionHistory.has(voiceId)) {
       this.voiceExecutionHistory.set(voiceId, []);
     }
-    
+
     const history = this.voiceExecutionHistory.get(voiceId)!;
     history.push(response);
-    
+
     // Keep only recent history
     if (history.length > 100) {
       history.shift();
@@ -995,13 +1005,13 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     requirements: any
   ): Promise<MCPToolStep[]> {
     const steps: MCPToolStep[] = [];
-    
+
     // Create steps for each required capability
     let stepIndex = 0;
     for (const capability of phaseDefinition.requiredCapabilities) {
       // Find best voice for this capability
       const bestVoice = this.findBestVoiceForCapability(voices, capability);
-      
+
       steps.push({
         stepId: `step-${stepIndex++}`,
         voiceId: bestVoice,
@@ -1064,7 +1074,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
     // Group steps by server requirements
     const serverGroups = new Map<string, MCPToolStep[]>();
-    
+
     for (const step of toolSequence) {
       const voiceMapping = this.voiceCapabilityMappings.get(step.voiceId);
       if (!voiceMapping) continue;
@@ -1113,7 +1123,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     if (phaseDefinition.voiceCollaboration) {
       // Add synchronization point at the end of each voice group
       const voiceGroups = this.groupBy(toolSequence, step => step.voiceId);
-      
+
       for (const [voiceId, steps] of voiceGroups) {
         points.push({
           pointId: `sync-${voiceId}`,
@@ -1164,9 +1174,9 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
     const visit = (step: MCPToolStep) => {
       if (visited.has(step.stepId)) return;
-      
+
       visited.add(step.stepId);
-      
+
       // Visit dependencies first
       for (const depId of step.dependencies) {
         const depStep = steps.find(s => s.stepId === depId);
@@ -1174,7 +1184,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
           visit(depStep);
         }
       }
-      
+
       sorted.push(step);
     };
 
@@ -1199,11 +1209,12 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
       // Find other steps that can run in parallel
       for (const otherStep of steps) {
         if (processed.has(otherStep.stepId)) continue;
-        
+
         // Check if steps can run in parallel (no dependencies)
-        const hasConflict = step.dependencies.includes(otherStep.stepId) ||
-                          otherStep.dependencies.includes(step.stepId);
-        
+        const hasConflict =
+          step.dependencies.includes(otherStep.stepId) ||
+          otherStep.dependencies.includes(step.stepId);
+
         if (!hasConflict) {
           group.push(otherStep);
           processed.add(otherStep.stepId);
@@ -1228,7 +1239,11 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     this.collaborationSessions.set(planId, session);
   }
 
-  private async shareStepData(planId: string, stepId: string, response: VoiceMCPResponse): Promise<void> {
+  private async shareStepData(
+    planId: string,
+    stepId: string,
+    response: VoiceMCPResponse
+  ): Promise<void> {
     const session = this.collaborationSessions.get(planId);
     if (!session) return;
 
@@ -1244,14 +1259,16 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     results: Map<string, VoiceMCPResponse>
   ): Promise<void> {
     const phaseDefinition = this.spiralPhaseDefinitions.get(plan.phase)!;
-    
+
     // Check success rate
     const successful = Array.from(results.values()).filter(r => r.success).length;
     const total = results.size;
     const successRate = successful / total;
 
     if (successRate < phaseDefinition.qualityThreshold) {
-      throw new Error(`Quality threshold not met: ${successRate} < ${phaseDefinition.qualityThreshold}`);
+      throw new Error(
+        `Quality threshold not met: ${successRate} < ${phaseDefinition.qualityThreshold}`
+      );
     }
 
     // Apply validation rules
@@ -1273,7 +1290,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
     error: any
   ): Promise<void> {
     logger.warn(`Applying fallback strategies for plan ${plan.planId}`);
-    
+
     for (const strategy of plan.fallbackStrategies) {
       try {
         await this.executeFallbackStrategy(strategy, plan, error);
@@ -1346,7 +1363,8 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
       const recentHistory = history.slice(-20);
       const successRate = recentHistory.filter(r => r.success).length / recentHistory.length;
-      const avgPerformance = recentHistory.reduce((sum, r) => sum + r.performanceScore, 0) / recentHistory.length;
+      const avgPerformance =
+        recentHistory.reduce((sum, r) => sum + r.performanceScore, 0) / recentHistory.length;
 
       // Update voice mapping based on performance
       const mapping = this.voiceCapabilityMappings.get(voiceId);
@@ -1375,7 +1393,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
   /**
    * Public API methods
    */
-  
+
   getVoiceCapabilityMapping(voiceId: string): VoiceCapabilityMapping | null {
     return this.voiceCapabilityMappings.get(voiceId) || null;
   }
@@ -1401,7 +1419,7 @@ export class IntelligentMCPVoiceIntegration extends EventEmitter {
 
   getIntegrationStats(): any {
     const allHistory = Array.from(this.voiceExecutionHistory.values()).flat();
-    
+
     return {
       totalRequests: allHistory.length,
       successRate: allHistory.filter(r => r.success).length / allHistory.length,

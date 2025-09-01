@@ -1,9 +1,9 @@
 /**
  * Unified Performance System
- * 
+ *
  * Consolidates 11 different performance implementations:
  * - utils/performance.ts
- * - core/performance/adaptive-performance-tuner.ts  
+ * - core/performance/adaptive-performance-tuner.ts
  * - core/search/performance-monitor.ts
  * - core/mcp/mcp-performance-analytics-system.ts
  * - core/analytics/performance-optimizer.ts
@@ -263,7 +263,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
   private operationTimes = new Map<string, number[]>();
   private errorCounts = new Map<string, number>();
   private observer?: PerformanceObserver;
-  
+
   constructor(private eventBus?: IEventBus) {
     super();
     this.setupObserver();
@@ -272,7 +272,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
   startMeasurement(name: string, metadata?: Record<string, any>): string {
     const id = `${name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const startTime = performance.now();
-    
+
     this.startTimes.set(id, startTime);
     this.measurements.set(id, {
       id,
@@ -284,7 +284,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
     });
 
     this.emit('measurementStarted', { id, name, metadata });
-    
+
     return id;
   }
 
@@ -296,7 +296,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
 
     const endTime = performance.now();
     const duration = endTime - startTime;
-    
+
     const measurement = this.measurements.get(measurementId)!;
     measurement.endTime = endTime;
     measurement.duration = duration;
@@ -304,15 +304,15 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
     // Update operation statistics
     const opName = measurement.name;
     this.operationCounts.set(opName, (this.operationCounts.get(opName) || 0) + 1);
-    
+
     const times = this.operationTimes.get(opName) || [];
     times.push(duration);
     this.operationTimes.set(opName, times);
 
     this.startTimes.delete(measurementId);
-    
+
     this.emit('measurementEnded', measurement);
-    
+
     if (this.eventBus) {
       this.eventBus.emit('performance:measurement', measurement);
     }
@@ -323,7 +323,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
   getMetrics(): PerformanceMetrics {
     const now = new Date();
     const measurements = Array.from(this.measurements.values());
-    
+
     return {
       timestamp: now,
       measurements,
@@ -337,7 +337,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
   getReport(): PerformanceReport {
     const metrics = this.getMetrics();
     const analyzer = new UnifiedPerformanceAnalyzer();
-    
+
     return {
       summary: this.generateSummary(metrics),
       details: this.generateDetails(metrics),
@@ -353,12 +353,12 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
     this.operationTimes.clear();
     this.errorCounts.clear();
     this.history = [];
-    
+
     this.emit('reset');
   }
 
   private setupObserver(): void {
-    this.observer = new PerformanceObserver((list) => {
+    this.observer = new PerformanceObserver(list => {
       for (const entry of list.getEntries()) {
         this.emit('performanceEntry', entry);
       }
@@ -371,7 +371,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
     const memUsage = process.memoryUsage();
-    
+
     return {
       cpuUsage: os.loadavg()[0] / os.cpus().length,
       memoryUsage: {
@@ -392,7 +392,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
   private collectProcessMetrics(): ProcessMetrics {
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
-    
+
     return {
       pid: process.pid,
       ppid: process.ppid || 0,
@@ -412,11 +412,11 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
 
   private collectCustomMetrics(): Record<string, number> {
     const custom: Record<string, number> = {};
-    
+
     for (const [name, count] of this.operationCounts) {
       custom[`${name}_count`] = count;
     }
-    
+
     for (const [name, times] of this.operationTimes) {
       if (times.length > 0) {
         custom[`${name}_avg`] = times.reduce((a, b) => a + b, 0) / times.length;
@@ -424,7 +424,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
         custom[`${name}_min`] = Math.min(...times);
       }
     }
-    
+
     return custom;
   }
 
@@ -432,21 +432,22 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
     const allTimes: number[] = [];
     let totalRequests = 0;
     let errorCount = 0;
-    
+
     for (const times of this.operationTimes.values()) {
       allTimes.push(...times);
       totalRequests += times.length;
     }
-    
+
     for (const count of this.errorCounts.values()) {
       errorCount += count;
     }
-    
+
     allTimes.sort((a, b) => a - b);
-    
+
     return {
       totalRequests,
-      averageResponseTime: allTimes.length > 0 ? allTimes.reduce((a, b) => a + b, 0) / allTimes.length : 0,
+      averageResponseTime:
+        allTimes.length > 0 ? allTimes.reduce((a, b) => a + b, 0) / allTimes.length : 0,
       p50ResponseTime: this.percentile(allTimes, 50),
       p95ResponseTime: this.percentile(allTimes, 95),
       p99ResponseTime: this.percentile(allTimes, 99),
@@ -457,16 +458,19 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
 
   private percentile(values: number[], percentile: number): number {
     if (values.length === 0) return 0;
-    
+
     const index = Math.ceil((percentile / 100) * values.length) - 1;
     return values[Math.max(0, index)];
   }
 
   private generateSummary(metrics: PerformanceMetrics): PerformanceSummary {
     const measurements = metrics.measurements;
-    const start = measurements.length > 0 ? new Date(Math.min(...measurements.map(m => m.startTime))) : new Date();
+    const start =
+      measurements.length > 0
+        ? new Date(Math.min(...measurements.map(m => m.startTime)))
+        : new Date();
     const end = new Date();
-    
+
     return {
       period: { start, end },
       totalOperations: measurements.length,
@@ -480,12 +484,12 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
   private generateDetails(metrics: PerformanceMetrics): PerformanceDetails {
     const byOperation: Record<string, OperationMetrics> = {};
     const byComponent: Record<string, ComponentMetrics> = {};
-    
+
     // Group by operation
     for (const [name, times] of this.operationTimes) {
       const errorCount = this.errorCounts.get(name) || 0;
       const count = times.length;
-      
+
       byOperation[name] = {
         count,
         totalTime: times.reduce((a, b) => a + b, 0),
@@ -495,9 +499,9 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
         errorCount,
       };
     }
-    
+
     // Component metrics would require additional grouping logic
-    
+
     return {
       byOperation,
       byComponent,
@@ -508,12 +512,13 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
 
   private identifyBottlenecks(metrics: PerformanceMetrics): Bottleneck[] {
     const bottlenecks: Bottleneck[] = [];
-    
+
     for (const [name, times] of this.operationTimes) {
       const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
       const maxTime = Math.max(...times);
-      
-      if (avgTime > 1000) { // Operations taking more than 1 second on average
+
+      if (avgTime > 1000) {
+        // Operations taking more than 1 second on average
         bottlenecks.push({
           component: 'unknown',
           operation: name,
@@ -524,13 +529,13 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
         });
       }
     }
-    
+
     return bottlenecks;
   }
 
   private detectAnomalies(metrics: PerformanceMetrics): PerformanceAnomaly[] {
     const anomalies: PerformanceAnomaly[] = [];
-    
+
     // Detect memory leaks
     if (metrics.system.memoryUsage.heapUsed > metrics.system.memoryUsage.heapTotal * 0.9) {
       anomalies.push({
@@ -544,7 +549,7 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
         },
       });
     }
-    
+
     // Detect performance degradation
     if (metrics.aggregates.p95ResponseTime > metrics.aggregates.averageResponseTime * 3) {
       anomalies.push({
@@ -558,24 +563,24 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
         },
       });
     }
-    
+
     return anomalies;
   }
 
   private calculateHealthScore(metrics: PerformanceMetrics): number {
     let score = 100;
-    
+
     // Deduct for high latency
     if (metrics.aggregates.averageResponseTime > 1000) score -= 20;
     if (metrics.aggregates.p99ResponseTime > 5000) score -= 30;
-    
+
     // Deduct for errors
     score -= metrics.aggregates.errorRate * 100;
-    
+
     // Deduct for resource usage
     if (metrics.system.cpuUsage > 0.8) score -= 15;
     if (metrics.system.memoryUsage.used / metrics.system.memoryUsage.total > 0.9) score -= 15;
-    
+
     return Math.max(0, Math.min(100, score));
   }
 
@@ -591,21 +596,22 @@ export class UnifiedPerformanceMonitor extends EventEmitter implements IPerforma
 export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
   analyzeBottlenecks(metrics: PerformanceMetrics): Bottleneck[] {
     const bottlenecks: Bottleneck[] = [];
-    
+
     // Analyze measurement durations
     const operationDurations = new Map<string, number[]>();
-    
+
     for (const measurement of metrics.measurements) {
       const durations = operationDurations.get(measurement.name) || [];
       durations.push(measurement.duration);
       operationDurations.set(measurement.name, durations);
     }
-    
+
     for (const [operation, durations] of operationDurations) {
       const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
       const maxDuration = Math.max(...durations);
-      
-      if (avgDuration > 100) { // Operations over 100ms average
+
+      if (avgDuration > 100) {
+        // Operations over 100ms average
         bottlenecks.push({
           component: this.inferComponent(operation),
           operation,
@@ -616,7 +622,7 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
         });
       }
     }
-    
+
     return bottlenecks.sort((a, b) => b.duration * b.frequency - a.duration * a.frequency);
   }
 
@@ -629,12 +635,12 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
         alerts: [],
       };
     }
-    
+
     // Calculate trend direction
     const recentMetrics = history.slice(-10);
     const avgLatencies = recentMetrics.map(m => m.aggregates.averageResponseTime);
     const trend = this.calculateTrend(avgLatencies);
-    
+
     return {
       direction: trend > 0.1 ? 'degrading' : trend < -0.1 ? 'improving' : 'stable',
       changeRate: trend,
@@ -647,13 +653,13 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
     // Simple linear prediction based on workload
     const baseLatency = 50; // Base latency in ms
     const latencyPerRequest = 0.1; // Additional latency per concurrent request
-    
-    const expectedLatency = baseLatency + (workload.requestsPerSecond * latencyPerRequest);
+
+    const expectedLatency = baseLatency + workload.requestsPerSecond * latencyPerRequest;
     const expectedThroughput = Math.min(workload.requestsPerSecond, 1000 / expectedLatency);
-    
+
     const cpuPerRequest = 0.001; // 0.1% CPU per request
     const memoryPerRequest = 0.5; // 0.5MB per request
-    
+
     return {
       expectedLatency,
       expectedThroughput,
@@ -669,7 +675,7 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
 
   generateRecommendations(metrics: PerformanceMetrics): OptimizationRecommendation[] {
     const recommendations: OptimizationRecommendation[] = [];
-    
+
     // Caching recommendation
     if (metrics.aggregates.averageResponseTime > 100) {
       recommendations.push({
@@ -677,7 +683,8 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
         category: 'caching',
         priority: 'high',
         title: 'Enable Response Caching',
-        description: 'High average response time detected. Implementing caching could significantly improve performance.',
+        description:
+          'High average response time detected. Implementing caching could significantly improve performance.',
         expectedImprovement: 0.5,
         effort: 'low',
         actions: [
@@ -687,7 +694,7 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
         ],
       });
     }
-    
+
     // Connection pooling recommendation
     if (metrics.system.activeConnections > 100) {
       recommendations.push({
@@ -705,7 +712,7 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
         ],
       });
     }
-    
+
     // Memory optimization
     if (metrics.system.memoryUsage.heapUsed / metrics.system.memoryUsage.heapTotal > 0.7) {
       recommendations.push({
@@ -723,7 +730,7 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
         ],
       });
     }
-    
+
     return recommendations;
   }
 
@@ -735,7 +742,10 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
     return 'application';
   }
 
-  private calculateImpact(duration: number, frequency: number): 'low' | 'medium' | 'high' | 'critical' {
+  private calculateImpact(
+    duration: number,
+    frequency: number
+  ): 'low' | 'medium' | 'high' | 'critical' {
     const totalImpact = duration * frequency;
     if (totalImpact > 100000) return 'critical';
     if (totalImpact > 50000) return 'high';
@@ -758,24 +768,24 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
 
   private calculateTrend(values: number[]): number {
     if (values.length < 2) return 0;
-    
+
     // Simple linear regression
     const n = values.length;
     const sumX = (n * (n - 1)) / 2;
     const sumY = values.reduce((a, b) => a + b, 0);
     const sumXY = values.reduce((sum, y, x) => sum + x * y, 0);
     const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
-    
+
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
     return slope;
   }
 
   private projectMetrics(history: PerformanceMetrics[]): Record<string, number> {
     if (history.length === 0) return {};
-    
+
     const lastMetric = history[history.length - 1];
     const trend = this.calculateTrend(history.map(m => m.aggregates.averageResponseTime));
-    
+
     return {
       projectedLatency: lastMetric.aggregates.averageResponseTime + trend * 10,
       projectedThroughput: lastMetric.aggregates.throughput,
@@ -785,34 +795,34 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
 
   private generateTrendAlerts(trend: number, metrics: PerformanceMetrics[]): string[] {
     const alerts: string[] = [];
-    
+
     if (trend > 0.5) {
       alerts.push('Performance is degrading rapidly');
     }
-    
+
     const lastMetric = metrics[metrics.length - 1];
     if (lastMetric.aggregates.errorRate > 0.05) {
       alerts.push('Error rate exceeds 5%');
     }
-    
+
     if (lastMetric.system.memoryUsage.heapUsed / lastMetric.system.memoryUsage.heapTotal > 0.9) {
       alerts.push('Memory usage critical - possible memory leak');
     }
-    
+
     return alerts;
   }
 
   private predictBottlenecks(workload: WorkloadProfile): string[] {
     const bottlenecks: string[] = [];
-    
+
     if (workload.requestsPerSecond > 100) {
       bottlenecks.push('Network bandwidth may become a bottleneck');
     }
-    
+
     if (workload.averagePayloadSize > 1000000) {
       bottlenecks.push('Large payload processing may impact performance');
     }
-    
+
     return bottlenecks;
   }
 }
@@ -823,9 +833,9 @@ export class UnifiedPerformanceAnalyzer implements IPerformanceAnalyzer {
 
 export class UnifiedPerformanceOptimizer implements IPerformanceOptimizer {
   private currentTuning: TuningParameters = {};
-  
+
   constructor(private logger: ILogger) {}
-  
+
   async analyze(metrics: PerformanceMetrics): Promise<OptimizationRecommendation[]> {
     const analyzer = new UnifiedPerformanceAnalyzer();
     return analyzer.generateRecommendations(metrics);
@@ -834,26 +844,26 @@ export class UnifiedPerformanceOptimizer implements IPerformanceOptimizer {
   async optimize(target: OptimizationTarget): Promise<OptimizationResult> {
     const actions: string[] = [];
     const improvements: Record<string, number> = {};
-    
+
     switch (target.type) {
       case 'latency':
         actions.push('Enabled response caching');
         actions.push('Optimized database queries');
         improvements.latency = -30; // 30% improvement
         break;
-        
+
       case 'throughput':
         actions.push('Increased connection pool size');
         actions.push('Enabled request batching');
         improvements.throughput = 50; // 50% improvement
         break;
-        
+
       case 'memory':
         actions.push('Enabled streaming for large payloads');
         actions.push('Reduced cache size');
         improvements.memory = -20; // 20% reduction
         break;
-        
+
       case 'balanced':
         actions.push('Applied balanced optimization profile');
         improvements.latency = -15;
@@ -861,7 +871,7 @@ export class UnifiedPerformanceOptimizer implements IPerformanceOptimizer {
         improvements.memory = -10;
         break;
     }
-    
+
     return {
       success: true,
       improvements,
@@ -872,20 +882,20 @@ export class UnifiedPerformanceOptimizer implements IPerformanceOptimizer {
 
   async tune(parameters: TuningParameters): Promise<TuningResult> {
     const beforeMetrics = await this.getCurrentMetrics();
-    
+
     // Apply tuning parameters
     this.currentTuning = { ...this.currentTuning, ...parameters };
-    
+
     // Simulate applying the tuning
     await this.applyTuning(parameters);
-    
+
     const afterMetrics = await this.getCurrentMetrics();
-    
+
     // Calculate improvement
-    const improvement = 
+    const improvement =
       (beforeMetrics.aggregates.averageResponseTime - afterMetrics.aggregates.averageResponseTime) /
       beforeMetrics.aggregates.averageResponseTime;
-    
+
     return {
       applied: true,
       parameters,
@@ -903,7 +913,7 @@ export class UnifiedPerformanceOptimizer implements IPerformanceOptimizer {
   private async applyTuning(parameters: TuningParameters): Promise<void> {
     // In a real implementation, this would apply actual system changes
     this.logger.info('Applying performance tuning', parameters);
-    
+
     // Simulate async operation
     await new Promise(resolve => setTimeout(resolve, 100));
   }
@@ -950,7 +960,7 @@ export class UnifiedPerformanceSystem extends EventEmitter {
     return {
       monitor: this.monitor.getMetrics(),
       autoTuneEnabled: this.autoTuneEnabled,
-      isInitialized: this._isInitialized
+      isInitialized: this._isInitialized,
     };
   }
 
@@ -1007,35 +1017,35 @@ export class UnifiedPerformanceSystem extends EventEmitter {
   // Auto-tuning
   enableAutoTuning(intervalMs: number = 60000): void {
     if (this.autoTuneEnabled) return;
-    
+
     this.autoTuneEnabled = true;
     this.autoTuneInterval = setInterval(async () => {
       await this.performAutoTuning();
     }, intervalMs);
-    
+
     this.logger.info('Auto-tuning enabled');
   }
 
   disableAutoTuning(): void {
     if (!this.autoTuneEnabled) return;
-    
+
     this.autoTuneEnabled = false;
     if (this.autoTuneInterval) {
       clearInterval(this.autoTuneInterval);
       this.autoTuneInterval = undefined;
     }
-    
+
     this.logger.info('Auto-tuning disabled');
   }
 
   private async performAutoTuning(): Promise<void> {
     const metrics = this.getMetrics();
     const recommendations = await this.analyzer.generateRecommendations(metrics);
-    
+
     // Apply high-priority recommendations automatically
     for (const rec of recommendations.filter((r: any) => r.priority === 'critical')) {
       this.logger.info(`Auto-tuning: Applying ${rec.title}`);
-      
+
       // Map recommendation to optimization target
       const target: OptimizationTarget = {
         type: 'balanced',
@@ -1045,7 +1055,7 @@ export class UnifiedPerformanceSystem extends EventEmitter {
           tradeoffs: {},
         },
       };
-      
+
       await this.optimize(target);
     }
   }
@@ -1064,17 +1074,22 @@ export class UnifiedPerformanceSystem extends EventEmitter {
 // Export singleton instance
 let globalPerformanceSystem: UnifiedPerformanceSystem | null = null;
 
-export function getGlobalPerformanceSystem(logger?: ILogger, eventBus?: IEventBus): UnifiedPerformanceSystem {
+export function getGlobalPerformanceSystem(
+  logger?: ILogger,
+  eventBus?: IEventBus
+): UnifiedPerformanceSystem {
   if (!globalPerformanceSystem) {
     // Create a simple logger if none provided
-    const defaultLogger = logger || {
-      info: (msg: string) => console.log(`[INFO] ${msg}`),
-      error: (msg: string, error?: any) => console.error(`[ERROR] ${msg}`, error),
-      warn: (msg: string) => console.warn(`[WARN] ${msg}`),
-      debug: (msg: string) => console.debug(`[DEBUG] ${msg}`),
-      trace: (msg: string) => console.trace(`[TRACE] ${msg}`)
-    } as ILogger;
-    
+    const defaultLogger =
+      logger ||
+      ({
+        info: (msg: string) => console.log(`[INFO] ${msg}`),
+        error: (msg: string, error?: any) => console.error(`[ERROR] ${msg}`, error),
+        warn: (msg: string) => console.warn(`[WARN] ${msg}`),
+        debug: (msg: string) => console.debug(`[DEBUG] ${msg}`),
+        trace: (msg: string) => console.trace(`[TRACE] ${msg}`),
+      } as ILogger);
+
     globalPerformanceSystem = new UnifiedPerformanceSystem(defaultLogger, eventBus);
   }
   return globalPerformanceSystem;

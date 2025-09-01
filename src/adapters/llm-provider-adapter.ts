@@ -1,7 +1,7 @@
 /**
  * LLM Provider Adapter
  * Translates between application layer and infrastructure layer
- * 
+ *
  * Architecture Compliance:
  * - Adapter layer: translates between application and infrastructure
  * - Imports from Application & Domain layers
@@ -12,7 +12,10 @@
 import { EventEmitter } from 'events';
 import { Model } from '../domain/entities/model.js';
 import { ProcessingRequest } from '../domain/entities/request.js';
-import { ModelSelectionService, ModelSelection } from '../domain/services/model-selection-service.js';
+import {
+  ModelSelectionService,
+  ModelSelection,
+} from '../domain/services/model-selection-service.js';
 import { OllamaClient } from '../infrastructure/llm-providers/ollama-client.js';
 import { LMStudioClient } from '../infrastructure/llm-providers/lm-studio-client.js';
 
@@ -103,7 +106,7 @@ export interface ILLMProviderAdapter extends EventEmitter {
   // Chat completion
   chatComplete(modelName: string, request: ChatRequest): Promise<GenerationResponse>;
   chatCompleteStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>>;
-  
+
   // Alias methods for compatibility
   chatCompletion(modelName: string, request: ChatRequest): Promise<GenerationResponse>;
   chatCompletionStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>>;
@@ -125,7 +128,7 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
     super();
     this.client = client;
     this.config = config;
-    
+
     // Ollama capabilities
     this.capabilities = {
       textGeneration: true,
@@ -168,7 +171,7 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
 
   updateConfiguration(config: Partial<ProviderConfiguration>): void {
     this.config = { ...this.config, ...config };
-    
+
     // Update infrastructure client configuration
     this.client.updateConfig({
       endpoint: config.endpoint,
@@ -200,8 +203,10 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
     // This would need to be enhanced with model-specific capability detection
     return {
       ...this.capabilities,
-      multimodal: modelName.toLowerCase().includes('vision') || modelName.toLowerCase().includes('llava'),
-      functionCalling: modelName.toLowerCase().includes('function') || modelName.toLowerCase().includes('tool'),
+      multimodal:
+        modelName.toLowerCase().includes('vision') || modelName.toLowerCase().includes('llava'),
+      functionCalling:
+        modelName.toLowerCase().includes('function') || modelName.toLowerCase().includes('tool'),
     };
   }
 
@@ -212,7 +217,7 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
       await this.client.generateText({
         model: modelName,
         prompt: 'test',
-        options: { num_predict: 1 }
+        options: { num_predict: 1 },
       });
     } catch (error) {
       throw new Error(`Failed to load model ${modelName}: ${error}`);
@@ -227,7 +232,7 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
 
   async generateText(modelName: string, request: GenerationRequest): Promise<GenerationResponse> {
     const startTime = Date.now();
-    
+
     try {
       const response = await this.client.generateText({
         model: modelName,
@@ -260,7 +265,10 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
     }
   }
 
-  async generateTextStream(modelName: string, request: GenerationRequest): Promise<AsyncIterable<string>> {
+  async generateTextStream(
+    modelName: string,
+    request: GenerationRequest
+  ): Promise<AsyncIterable<string>> {
     try {
       const stream = await this.client.generateTextStream({
         model: modelName,
@@ -282,7 +290,7 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
 
   async chatComplete(modelName: string, request: ChatRequest): Promise<GenerationResponse> {
     const startTime = Date.now();
-    
+
     try {
       const response = await this.client.chat({
         model: modelName,
@@ -314,7 +322,10 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
     }
   }
 
-  async chatCompleteStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>> {
+  async chatCompleteStream(
+    modelName: string,
+    request: ChatRequest
+  ): Promise<AsyncIterable<string>> {
     try {
       const stream = await this.client.chatStream({
         model: modelName,
@@ -343,22 +354,25 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
     return await this.chatComplete(modelName, request);
   }
 
-  async chatCompletionStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>> {
+  async chatCompletionStream(
+    modelName: string,
+    request: ChatRequest
+  ): Promise<AsyncIterable<string>> {
     return await this.chatCompleteStream(modelName, request);
   }
 
   // Private helper methods
-  
+
   private setupEventForwarding(): void {
-    this.client.on('connected', (status) => this.emit('connected', status));
+    this.client.on('connected', status => this.emit('connected', status));
     this.client.on('disconnected', () => this.emit('disconnected'));
-    this.client.on('connectionError', (error) => this.emit('connectionError', error));
-    this.client.on('operationError', (data) => this.emit('operationError', data));
-    this.client.on('operationFailed', (error) => this.emit('operationFailed', error));
+    this.client.on('connectionError', error => this.emit('connectionError', error));
+    this.client.on('operationError', data => this.emit('operationError', data));
+    this.client.on('operationFailed', error => this.emit('operationFailed', error));
     this.client.on('recoverySuccess', () => this.emit('recoverySuccess'));
   }
 
-  private async* transformOllamaStream(stream: AsyncIterable<any>): AsyncIterable<string> {
+  private async *transformOllamaStream(stream: AsyncIterable<any>): AsyncIterable<string> {
     for await (const chunk of stream) {
       if (chunk.response) {
         yield chunk.response;
@@ -366,7 +380,7 @@ export class OllamaProviderAdapter extends EventEmitter implements ILLMProviderA
     }
   }
 
-  private async* transformOllamaChatStream(stream: AsyncIterable<any>): AsyncIterable<string> {
+  private async *transformOllamaChatStream(stream: AsyncIterable<any>): AsyncIterable<string> {
     for await (const chunk of stream) {
       if (chunk.message?.content) {
         yield chunk.message.content;
@@ -388,7 +402,7 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
     super();
     this.client = client;
     this.config = config;
-    
+
     // LM Studio capabilities
     this.capabilities = {
       textGeneration: true,
@@ -430,7 +444,7 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
 
   updateConfiguration(config: Partial<ProviderConfiguration>): void {
     this.config = { ...this.config, ...config };
-    
+
     this.client.updateConfig({
       baseUrl: config.endpoint,
       timeout: config.timeout,
@@ -459,7 +473,9 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
   async getModelCapabilities(modelName: string): Promise<LLMProviderCapabilities> {
     return {
       ...this.capabilities,
-      multimodal: modelName.toLowerCase().includes('vision') || modelName.toLowerCase().includes('multimodal'),
+      multimodal:
+        modelName.toLowerCase().includes('vision') ||
+        modelName.toLowerCase().includes('multimodal'),
       functionCalling: !modelName.toLowerCase().includes('base'), // Most instruct models support functions
     };
   }
@@ -482,7 +498,7 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
 
   async generateText(modelName: string, request: GenerationRequest): Promise<GenerationResponse> {
     const startTime = Date.now();
-    
+
     try {
       const response = await this.client.complete({
         modelPath: modelName,
@@ -510,7 +526,10 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
     }
   }
 
-  async generateTextStream(modelName: string, request: GenerationRequest): Promise<AsyncIterable<string>> {
+  async generateTextStream(
+    modelName: string,
+    request: GenerationRequest
+  ): Promise<AsyncIterable<string>> {
     try {
       const stream = await this.client.completeStream({
         modelPath: modelName,
@@ -532,7 +551,7 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
 
   async chatComplete(modelName: string, request: ChatRequest): Promise<GenerationResponse> {
     const startTime = Date.now();
-    
+
     try {
       const response = await this.client.chat({
         modelPath: modelName,
@@ -560,7 +579,10 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
     }
   }
 
-  async chatCompleteStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>> {
+  async chatCompleteStream(
+    modelName: string,
+    request: ChatRequest
+  ): Promise<AsyncIterable<string>> {
     try {
       const stream = await this.client.chatStream({
         modelPath: modelName,
@@ -589,7 +611,10 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
     return await this.chatComplete(modelName, request);
   }
 
-  async chatCompletionStream(modelName: string, request: ChatRequest): Promise<AsyncIterable<string>> {
+  async chatCompletionStream(
+    modelName: string,
+    request: ChatRequest
+  ): Promise<AsyncIterable<string>> {
     return await this.chatCompleteStream(modelName, request);
   }
 
@@ -609,13 +634,13 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
   }
 
   // Private helper methods
-  
+
   private setupEventForwarding(): void {
-    this.client.on('connected', (status) => this.emit('connected', status));
+    this.client.on('connected', status => this.emit('connected', status));
     this.client.on('disconnected', () => this.emit('disconnected'));
-    this.client.on('connectionError', (error) => this.emit('connectionError', error));
-    this.client.on('operationError', (data) => this.emit('operationError', data));
-    this.client.on('operationFailed', (error) => this.emit('operationFailed', error));
+    this.client.on('connectionError', error => this.emit('connectionError', error));
+    this.client.on('operationError', data => this.emit('operationError', data));
+    this.client.on('operationFailed', error => this.emit('operationFailed', error));
     this.client.on('recoverySuccess', () => this.emit('recoverySuccess'));
   }
 
@@ -628,7 +653,7 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
     }
   }
 
-  private async* transformLMStudioStream(stream: AsyncIterable<any>): AsyncIterable<string> {
+  private async *transformLMStudioStream(stream: AsyncIterable<any>): AsyncIterable<string> {
     for await (const chunk of stream) {
       if (chunk.content) {
         yield chunk.content;
@@ -636,7 +661,7 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
     }
   }
 
-  private async* transformLMStudioChatStream(stream: AsyncIterable<any>): AsyncIterable<string> {
+  private async *transformLMStudioChatStream(stream: AsyncIterable<any>): AsyncIterable<string> {
     for await (const chunk of stream) {
       if (chunk.content) {
         yield chunk.content;
@@ -646,7 +671,9 @@ export class LMStudioProviderAdapter extends EventEmitter implements ILLMProvide
 }
 
 // Factory functions for creating adapter instances
-export function createOllamaAdapter(config: Partial<ProviderConfiguration> = {}): OllamaProviderAdapter {
+export function createOllamaAdapter(
+  config: Partial<ProviderConfiguration> = {}
+): OllamaProviderAdapter {
   const defaultConfig: ProviderConfiguration = {
     timeout: 30000,
     retryAttempts: 3,
@@ -655,7 +682,7 @@ export function createOllamaAdapter(config: Partial<ProviderConfiguration> = {})
   };
 
   const finalConfig = { ...defaultConfig, ...config };
-  
+
   const client = new OllamaClient({
     endpoint: config.endpoint || 'http://localhost:11434',
     timeout: finalConfig.timeout,
@@ -668,7 +695,9 @@ export function createOllamaAdapter(config: Partial<ProviderConfiguration> = {})
   return new OllamaProviderAdapter(client, finalConfig);
 }
 
-export function createLMStudioAdapter(config: Partial<ProviderConfiguration> = {}): LMStudioProviderAdapter {
+export function createLMStudioAdapter(
+  config: Partial<ProviderConfiguration> = {}
+): LMStudioProviderAdapter {
   const defaultConfig: ProviderConfiguration = {
     timeout: 30000,
     retryAttempts: 3,
@@ -677,7 +706,7 @@ export function createLMStudioAdapter(config: Partial<ProviderConfiguration> = {
   };
 
   const finalConfig = { ...defaultConfig, ...config };
-  
+
   const client = new LMStudioClient({
     baseUrl: config.endpoint,
     timeout: finalConfig.timeout,

@@ -538,7 +538,9 @@ export class CrossPlatformSearchExecutor {
   /**
    * Execute PowerShell search (Windows)
    */
-  private async executePowerShellSearch(options: CrossPlatformSearchOptions): Promise<SearchResult[]> {
+  private async executePowerShellSearch(
+    options: CrossPlatformSearchOptions
+  ): Promise<SearchResult[]> {
     const { command, args } = this.commandBuilder.buildPowerShellCommand(options);
     const result = await this.platformDetector.executeCommand(command, args, {
       timeout: options.timeout,
@@ -566,7 +568,9 @@ export class CrossPlatformSearchExecutor {
   /**
    * Execute Silver Searcher (ag) search (Unix)
    */
-  private async executeSilverSearcherSearch(options: CrossPlatformSearchOptions): Promise<SearchResult[]> {
+  private async executeSilverSearcherSearch(
+    options: CrossPlatformSearchOptions
+  ): Promise<SearchResult[]> {
     // Similar to ripgrep but with ag command
     const args = ['--json', '--numbers', '--filename'];
 
@@ -590,7 +594,9 @@ export class CrossPlatformSearchExecutor {
   /**
    * Execute find + grep search (Unix fallback)
    */
-  private async executeFindGrepSearch(options: CrossPlatformSearchOptions): Promise<SearchResult[]> {
+  private async executeFindGrepSearch(
+    options: CrossPlatformSearchOptions
+  ): Promise<SearchResult[]> {
     const { command, args } = this.commandBuilder.buildUnixFindCommand(options);
     const result = await this.platformDetector.executeCommand(command, args, {
       timeout: options.timeout,

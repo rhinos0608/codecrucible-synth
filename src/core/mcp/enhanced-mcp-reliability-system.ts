@@ -1,6 +1,6 @@
 /**
  * Enhanced MCP Connection Reliability System
- * 
+ *
  * Provides advanced reliability features for MCP connections including:
  * - Intelligent failover and recovery
  * - Connection health analytics
@@ -57,12 +57,12 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
   private adaptiveTimeouts: Map<string, AdaptiveTimeout> = new Map();
   private circuitBreakers: Map<string, SmartCircuitBreaker> = new Map();
   private performancePredictors: Map<string, PerformancePredictor> = new Map();
-  
+
   // Configuration
   private readonly HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
   private readonly PERFORMANCE_WINDOW = 100; // Number of requests to track
   private readonly PREDICTION_WINDOW = 50; // Requests for prediction
-  
+
   constructor() {
     super();
     this.startGlobalHealthMonitoring();
@@ -81,7 +81,11 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
   /**
    * Initialize connection monitoring
    */
-  async initializeConnection(connectionId: string, serverName: string, config?: any): Promise<void> {
+  async initializeConnection(
+    connectionId: string,
+    serverName: string,
+    config?: any
+  ): Promise<void> {
     const healthMetrics: ConnectionHealthMetrics = {
       connectionId,
       serverName,
@@ -125,8 +129,8 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
    * Create connection pool with intelligent load balancing
    */
   createConnectionPool(
-    poolId: string, 
-    serverIds: string[], 
+    poolId: string,
+    serverIds: string[],
     strategy: ConnectionPool['strategy'] = 'fastest-response',
     weights?: Map<string, number>
   ): void {
@@ -141,7 +145,9 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
     };
 
     this.connectionPools.set(poolId, pool);
-    logger.info(`Connection pool created: ${poolId} with ${serverIds.length} servers using ${strategy} strategy`);
+    logger.info(
+      `Connection pool created: ${poolId} with ${serverIds.length} servers using ${strategy} strategy`
+    );
     this.emit('connection-pool-created', poolId, pool);
   }
 
@@ -205,7 +211,10 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
   }
 
   private getWeightedConnection(pool: ConnectionPool): string {
-    const totalWeight = Array.from(pool.weights?.values() || []).reduce((sum, weight) => sum + weight, 0);
+    const totalWeight = Array.from(pool.weights?.values() || []).reduce(
+      (sum, weight) => sum + weight,
+      0
+    );
     let random = Math.random() * totalWeight;
 
     for (const serverId of pool.servers) {
@@ -244,8 +253,8 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
    * Record request completion
    */
   recordRequestCompletion(
-    connectionId: string, 
-    success: boolean, 
+    connectionId: string,
+    success: boolean,
     responseTime: number,
     poolId?: string,
     error?: Error
@@ -269,7 +278,7 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
 
     // Calculate error rate
     metrics.errorRate = (metrics.failedRequests / metrics.totalRequests) * 100;
-    metrics.availability = ((metrics.successfulRequests / metrics.totalRequests) * 100);
+    metrics.availability = (metrics.successfulRequests / metrics.totalRequests) * 100;
 
     // Update adaptive timeout
     this.updateAdaptiveTimeout(connectionId, success, responseTime);
@@ -303,7 +312,11 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
   /**
    * Update adaptive timeout based on performance
    */
-  private updateAdaptiveTimeout(connectionId: string, success: boolean, responseTime: number): void {
+  private updateAdaptiveTimeout(
+    connectionId: string,
+    success: boolean,
+    responseTime: number
+  ): void {
     const timeout = this.adaptiveTimeouts.get(connectionId);
     if (!timeout) return;
 
@@ -317,8 +330,10 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
     }
 
     // Calculate success rate
-    const successRate = timeout.successHistory.reduce((sum, val) => sum + val, 0) / timeout.successHistory.length;
-    const avgResponseTime = timeout.timeoutHistory.reduce((sum, val) => sum + val, 0) / timeout.timeoutHistory.length;
+    const successRate =
+      timeout.successHistory.reduce((sum, val) => sum + val, 0) / timeout.successHistory.length;
+    const avgResponseTime =
+      timeout.timeoutHistory.reduce((sum, val) => sum + val, 0) / timeout.timeoutHistory.length;
 
     // Adaptive adjustment
     if (successRate > 0.95 && avgResponseTime < timeout.currentTimeout * 0.5) {
@@ -435,14 +450,16 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
 
   private calculateGlobalStats() {
     const allMetrics = Array.from(this.healthMetrics.values());
-    
+
     return {
       totalConnections: allMetrics.length,
       healthyConnections: allMetrics.filter(m => m.errorRate < 5).length,
-      avgResponseTime: allMetrics.reduce((sum, m) => sum + m.avgResponseTime, 0) / allMetrics.length,
+      avgResponseTime:
+        allMetrics.reduce((sum, m) => sum + m.avgResponseTime, 0) / allMetrics.length,
       totalRequests: allMetrics.reduce((sum, m) => sum + m.totalRequests, 0),
       globalErrorRate: allMetrics.reduce((sum, m) => sum + m.errorRate, 0) / allMetrics.length,
-      globalAvailability: allMetrics.reduce((sum, m) => sum + m.availability, 0) / allMetrics.length,
+      globalAvailability:
+        allMetrics.reduce((sum, m) => sum + m.availability, 0) / allMetrics.length,
     };
   }
 
@@ -454,7 +471,7 @@ export class EnhancedMCPReliabilitySystem extends EventEmitter {
     this.adaptiveTimeouts.delete(connectionId);
     this.circuitBreakers.delete(connectionId);
     this.performancePredictors.delete(connectionId);
-    
+
     // Remove from pools
     for (const [poolId, pool] of this.connectionPools) {
       const index = pool.servers.indexOf(connectionId);
@@ -481,7 +498,7 @@ class SmartCircuitBreaker {
   private lastFailureTime = 0;
   private responseTimeHistory: number[] = [];
   private errorPatterns: Map<string, number> = new Map();
-  
+
   // Dynamic thresholds
   private failureThreshold = 5;
   private timeout = 60000; // 1 minute
@@ -491,7 +508,7 @@ class SmartCircuitBreaker {
 
   recordResult(success: boolean, responseTime: number, error?: Error): void {
     this.responseTimeHistory.push(responseTime);
-    
+
     // Keep only recent history
     if (this.responseTimeHistory.length > 50) {
       this.responseTimeHistory.shift();
@@ -509,7 +526,7 @@ class SmartCircuitBreaker {
 
   private onSuccess(): void {
     this.failureCount = 0;
-    
+
     if (this.state === 'half-open') {
       this.successCount++;
       if (this.successCount >= this.successThreshold) {
@@ -532,14 +549,18 @@ class SmartCircuitBreaker {
 
     if (this.failureCount >= this.failureThreshold) {
       this.state = 'open';
-      logger.warn(`Circuit breaker opened for connection: ${this.connectionId} after ${this.failureCount} failures`);
+      logger.warn(
+        `Circuit breaker opened for connection: ${this.connectionId} after ${this.failureCount} failures`
+      );
     }
   }
 
   private adaptThresholds(): void {
     // Adapt based on response time patterns
     if (this.responseTimeHistory.length >= 20) {
-      const avgResponseTime = this.responseTimeHistory.reduce((sum, time) => sum + time, 0) / this.responseTimeHistory.length;
+      const avgResponseTime =
+        this.responseTimeHistory.reduce((sum, time) => sum + time, 0) /
+        this.responseTimeHistory.length;
       const responseTimeVariance = this.calculateVariance(this.responseTimeHistory);
 
       // If response times are highly variable, be more conservative
@@ -623,25 +644,25 @@ class PerformancePredictor {
 
     const recent = this.requestHistory.slice(-20);
     const successRate = recent.filter(r => r.success).length / recent.length;
-    
+
     const avgResponseTime = recent.reduce((sum, r) => sum + r.responseTime, 0) / recent.length;
-    const normalizedResponseTime = Math.max(0, 1 - (avgResponseTime / 10000)); // Normalize against 10s
+    const normalizedResponseTime = Math.max(0, 1 - avgResponseTime / 10000); // Normalize against 10s
 
     // Calculate trend
     const firstHalf = recent.slice(0, 10);
     const secondHalf = recent.slice(10);
-    
+
     const firstHalfSuccess = firstHalf.filter(r => r.success).length / firstHalf.length;
     const secondHalfSuccess = secondHalf.filter(r => r.success).length / secondHalf.length;
-    
+
     const trend = secondHalfSuccess >= firstHalfSuccess ? 1 : 0.5;
 
     // Weighted prediction
-    const prediction = (
-      successRate * this.weights.successRate +
-      normalizedResponseTime * this.weights.avgResponseTime +
-      trend * this.weights.trend
-    ) * 100;
+    const prediction =
+      (successRate * this.weights.successRate +
+        normalizedResponseTime * this.weights.avgResponseTime +
+        trend * this.weights.trend) *
+      100;
 
     return Math.round(Math.max(0, Math.min(100, prediction)));
   }

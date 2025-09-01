@@ -375,7 +375,7 @@ Function signature and implementation:`;
       if (pyLines.length > 1 && !pyLines[1].startsWith('    ')) {
         // Add indentation
         const indentedLines = pyLines.map((line, i) =>
-          i === 0 ? line : line.trim() ? `    ${  line}` : line
+          i === 0 ? line : line.trim() ? `    ${line}` : line
         );
         code = indentedLines.join('\n');
       }
@@ -740,8 +740,24 @@ except Exception as e:
       this.hybridClient = new UnifiedModelClient({
         defaultProvider: 'ollama',
         providers: [
-          { type: 'ollama', name: 'ollama', endpoint: 'http://localhost:11434', models: ['auto'], enabled: true, priority: 1, timeout: 30000 },
-          { type: 'lm-studio', name: 'lm-studio', endpoint: 'http://localhost:1234', models: ['auto'], enabled: true, priority: 2, timeout: 30000 },
+          {
+            type: 'ollama',
+            name: 'ollama',
+            endpoint: 'http://localhost:11434',
+            models: ['auto'],
+            enabled: true,
+            priority: 1,
+            timeout: 30000,
+          },
+          {
+            type: 'lm-studio',
+            name: 'lm-studio',
+            endpoint: 'http://localhost:1234',
+            models: ['auto'],
+            enabled: true,
+            priority: 2,
+            timeout: 30000,
+          },
         ],
         fallbackStrategy: 'priority',
         executionMode: 'auto',
@@ -755,17 +771,12 @@ except Exception as e:
           timeoutMs: 30000,
           maxConcurrentRequests: 3,
         },
+        // Align with SecurityConfig shape used by global types
         security: {
-          enableSandbox: true,
-          sandboxTimeout: 30000,
-          maxInputLength: 10000,
-          enableInputSanitization: true,
-          allowedCommands: ['node', 'python3'],
-          blockedCommands: ['rm', 'del', 'format'],
-          allowedPaths: ['.'],
-          restrictedPaths: ['/etc', '/sys', '/proc'],
-          securityLevel: 'medium' as const,
-          enableAuditLogging: false,
+          enableRateLimit: false,
+          maxRequestsPerMinute: 0,
+          enableCors: false,
+          corsOrigins: [],
         },
       });
 
@@ -795,16 +806,10 @@ except Exception as e:
           maxConcurrentRequests: 1,
         },
         security: {
-          enableSandbox: true,
-          sandboxTimeout: 60000,
-          maxInputLength: 20000,
-          enableInputSanitization: true,
-          allowedCommands: ['node', 'python3'],
-          blockedCommands: ['rm', 'del', 'format'],
-          allowedPaths: ['.'],
-          restrictedPaths: ['/etc', '/sys', '/proc'],
-          securityLevel: 'high' as const,
-          enableAuditLogging: true,
+          enableRateLimit: false,
+          maxRequestsPerMinute: 0,
+          enableCors: false,
+          corsOrigins: [],
         },
       });
 

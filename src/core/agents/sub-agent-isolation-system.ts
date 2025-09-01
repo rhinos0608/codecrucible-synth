@@ -5,9 +5,9 @@
 
 export enum IsolationLevel {
   MINIMAL = 'minimal',
-  STANDARD = 'standard', 
+  STANDARD = 'standard',
   STRICT = 'strict',
-  MAXIMUM = 'maximum'
+  MAXIMUM = 'maximum',
 }
 
 export interface IsolationConfig {
@@ -39,7 +39,7 @@ class SubAgentIsolationSystem {
       maxCpuTime: 30 * 1000, // 30 seconds
       allowedOperations: ['read', 'analyze', 'compute'],
       restrictedPaths: ['/etc', '/root', '/sys'],
-      networkAccess: true
+      networkAccess: true,
     },
     [IsolationLevel.STANDARD]: {
       level: IsolationLevel.STANDARD,
@@ -47,7 +47,7 @@ class SubAgentIsolationSystem {
       maxCpuTime: 15 * 1000, // 15 seconds
       allowedOperations: ['read', 'analyze'],
       restrictedPaths: ['/etc', '/root', '/sys', '/usr/bin'],
-      networkAccess: false
+      networkAccess: false,
     },
     [IsolationLevel.STRICT]: {
       level: IsolationLevel.STRICT,
@@ -55,7 +55,7 @@ class SubAgentIsolationSystem {
       maxCpuTime: 10 * 1000, // 10 seconds
       allowedOperations: ['read'],
       restrictedPaths: ['/etc', '/root', '/sys', '/usr', '/bin'],
-      networkAccess: false
+      networkAccess: false,
     },
     [IsolationLevel.MAXIMUM]: {
       level: IsolationLevel.MAXIMUM,
@@ -63,22 +63,22 @@ class SubAgentIsolationSystem {
       maxCpuTime: 5 * 1000, // 5 seconds
       allowedOperations: [],
       restrictedPaths: ['/*'],
-      networkAccess: false
-    }
+      networkAccess: false,
+    },
   };
 
   createIsolationContext(agentId: string, level: IsolationLevel = IsolationLevel.STANDARD): string {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const context: IsolationContext = {
       agentId,
       sessionId,
       startTime: Date.now(),
       resources: {
         memoryUsed: 0,
-        cpuTime: 0
+        cpuTime: 0,
       },
-      violations: []
+      violations: [],
     };
 
     this.activeContexts.set(sessionId, context);
@@ -92,7 +92,7 @@ class SubAgentIsolationSystem {
     }
 
     const config = this.defaultConfigs[IsolationLevel.STANDARD];
-    
+
     // Check if operation is allowed
     if (config.allowedOperations.length > 0 && !config.allowedOperations.includes(operation)) {
       context.violations.push(`Unauthorized operation: ${operation}`);
@@ -112,7 +112,9 @@ class SubAgentIsolationSystem {
   terminateContext(sessionId: string): boolean {
     const context = this.activeContexts.get(sessionId);
     if (context) {
-      console.log(`Terminating isolation context for agent ${context.agentId}, violations: ${context.violations.length}`);
+      console.log(
+        `Terminating isolation context for agent ${context.agentId}, violations: ${context.violations.length}`
+      );
       this.activeContexts.delete(sessionId);
       return true;
     }
@@ -134,19 +136,23 @@ class SubAgentIsolationSystem {
     }
 
     const config = this.defaultConfigs[IsolationLevel.STANDARD];
-    
+
     // Simulate resource monitoring
     context.resources.memoryUsed = Math.floor(Math.random() * 50 * 1024 * 1024); // Random usage up to 50MB
     context.resources.cpuTime = Date.now() - context.startTime;
 
     // Check limits
     if (context.resources.memoryUsed > config.maxMemory) {
-      context.violations.push(`Memory limit exceeded: ${context.resources.memoryUsed} > ${config.maxMemory}`);
+      context.violations.push(
+        `Memory limit exceeded: ${context.resources.memoryUsed} > ${config.maxMemory}`
+      );
       return false;
     }
 
     if (context.resources.cpuTime > config.maxCpuTime) {
-      context.violations.push(`CPU time limit exceeded: ${context.resources.cpuTime} > ${config.maxCpuTime}`);
+      context.violations.push(
+        `CPU time limit exceeded: ${context.resources.cpuTime} > ${config.maxCpuTime}`
+      );
       return false;
     }
 

@@ -1,15 +1,22 @@
 /**
  * Analyze File Use Case - Application Layer
- * 
+ *
  * Handles file analysis operations following clean architecture principles.
  * Contains application logic for analyzing individual files.
  */
 
 import { performance } from 'perf_hooks';
 import { readFileSync, existsSync, statSync } from 'fs';
-import { extname, basename } from 'path';
-import { IAnalyzeFileUseCase, AnalysisRequest, AnalysisResponse } from '../../domain/interfaces/use-cases.js';
-import { IWorkflowOrchestrator, WorkflowRequest } from '../../domain/interfaces/workflow-orchestrator.js';
+import { extname, basename, dirname } from 'path';
+import {
+  IAnalyzeFileUseCase,
+  AnalysisRequest,
+  AnalysisResponse,
+} from '../../domain/interfaces/use-cases.js';
+import {
+  IWorkflowOrchestrator,
+  WorkflowRequest,
+} from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 
 export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
@@ -17,7 +24,7 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
 
   async execute(request: AnalysisRequest): Promise<AnalysisResponse> {
     const startTime = performance.now();
-    
+
     try {
       // Validate request
       if (!request.filePath && !request.content) {
@@ -25,10 +32,10 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
       }
 
       let fileContent: string;
-      let metadata = {
+      const metadata = {
         duration: 0,
         linesAnalyzed: 0,
-        filesAnalyzed: 1
+        filesAnalyzed: 1,
       };
 
       // Read file content if path provided
@@ -44,7 +51,10 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
 
         fileContent = readFileSync(request.filePath, 'utf-8');
       } else {
-        fileContent = request.content!;
+        if (request.content == null) {
+          throw new Error('No filePath or content provided for analysis');
+        }
+        fileContent = request.content;
       }
 
       metadata.linesAnalyzed = fileContent.split('\n').length;
@@ -64,26 +74,25 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
           prompt: analysisPrompt,
           content: fileContent,
           filePath: request.filePath,
-          options: request.options
+          options: request.options,
         },
         context: {
           sessionId: `analysis-${Date.now()}`,
-          workingDirectory: request.filePath ? 
-            require('path').dirname(request.filePath) : process.cwd(),
+          workingDirectory: request.filePath ? dirname(request.filePath) : process.cwd(),
           permissions: ['read', 'analyze'],
-          securityLevel: 'medium' as const
-        }
+          securityLevel: 'medium' as const,
+        },
       };
 
       const workflowResponse = await this.orchestrator.processRequest(workflowRequest);
-      
+
       if (!workflowResponse.success) {
         throw new Error(workflowResponse.error?.message || 'Analysis failed');
       }
 
       // Parse and structure the analysis result
       const analysisResult = this.parseAnalysisResult(workflowResponse.result);
-      
+
       metadata.duration = performance.now() - startTime;
 
       return {
@@ -91,31 +100,30 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
         analysis: analysisResult,
         metadata,
       };
-
     } catch (error) {
       const duration = performance.now() - startTime;
       logger.error('File analysis failed:', error);
-      
+
       return {
         success: false,
         analysis: {
           summary: 'Analysis failed',
           insights: [],
-          recommendations: ['Check file path and content validity']
+          recommendations: ['Check file path and content validity'],
         },
         metadata: {
           duration,
           linesAnalyzed: 0,
-          filesAnalyzed: 0
+          filesAnalyzed: 0,
         },
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
   private buildAnalysisPrompt(
-    content: string, 
-    filePath?: string, 
+    content: string,
+    filePath?: string,
     options?: AnalysisRequest['options']
   ): string {
     const fileName = filePath ? basename(filePath) : 'file';
@@ -130,10 +138,12 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
 
     prompt += 'Provide a comprehensive analysis including:\n';
     prompt += '1. **Summary**: Brief overview of what this file does\n';
-    prompt += '2. **Key Insights**: Important observations about the code structure, patterns, and functionality\n';
-    prompt += '3. **Code Quality Assessment**: Evaluate readability, maintainability, and best practices\n';
+    prompt +=
+      '2. **Key Insights**: Important observations about the code structure, patterns, and functionality\n';
+    prompt +=
+      '3. **Code Quality Assessment**: Evaluate readability, maintainability, and best practices\n';
     prompt += '4. **Recommendations**: Specific suggestions for improvements\n';
-    
+
     if (options?.focusAreas && options.focusAreas.length > 0) {
       prompt += `5. **Focus Areas**: Pay special attention to: ${options.focusAreas.join(', ')}\n`;
     }
@@ -143,14 +153,14 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
     }
 
     prompt += '\nFormat your response as a structured analysis with clear sections.';
-    
+
     return prompt;
   }
 
   private detectLanguage(extension: string): string {
     const languageMap: Record<string, string> = {
       '.ts': 'typescript',
-      '.js': 'javascript', 
+      '.js': 'javascript',
       '.jsx': 'jsx',
       '.tsx': 'tsx',
       '.py': 'python',
@@ -177,7 +187,7 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
       '.md': 'markdown',
       '.sql': 'sql',
       '.sh': 'bash',
-      '.ps1': 'powershell'
+      '.ps1': 'powershell',
     };
 
     return languageMap[extension.toLowerCase()] || 'text';
@@ -201,7 +211,7 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
         resultText = result.text;
       } else if (result.response) {
         resultText = result.response;
-      } else if (result.message && result.message.content) {
+      } else if (result.message?.content) {
         resultText = result.message.content;
       } else {
         // If no standard content field found, try to stringify but log for debugging
@@ -211,30 +221,39 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
     } else {
       resultText = String(result);
     }
-    
+
     // CRITICAL FIX: Return the actual AI response content instead of generic fallbacks
     const extractedSummary = this.extractSection(resultText, 'Summary');
-    const extractedInsights = this.extractListItems(resultText, 'Key Insights') || this.extractListItems(resultText, 'Insights');
+    const extractedInsights =
+      this.extractListItems(resultText, 'Key Insights') ||
+      this.extractListItems(resultText, 'Insights');
     const extractedRecommendations = this.extractListItems(resultText, 'Recommendations');
-    
+
     // If we can't extract structured sections, return the full AI content as the summary
     // This ensures users see the actual AI response rather than generic messages
-    if (!extractedSummary && !extractedInsights && !extractedRecommendations && resultText.length > 50) {
+    if (
+      !extractedSummary &&
+      !extractedInsights &&
+      !extractedRecommendations &&
+      resultText.length > 50
+    ) {
       return {
         summary: resultText, // Return the full AI response
         insights: [],
         recommendations: [],
         codeQuality: this.extractCodeQuality(resultText),
-        structure: this.extractStructure(resultText)
+        structure: this.extractStructure(resultText),
       };
     }
-    
+
     return {
       summary: extractedSummary || 'Analysis completed successfully',
       insights: extractedInsights || ['Code structure and functionality analyzed'],
-      recommendations: extractedRecommendations || ['Review the analysis for potential improvements'],
+      recommendations: extractedRecommendations || [
+        'Review the analysis for potential improvements',
+      ],
       codeQuality: this.extractCodeQuality(resultText),
-      structure: this.extractStructure(resultText)
+      structure: this.extractStructure(resultText),
     };
   }
 
@@ -250,18 +269,20 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
 
     return sectionText
       .split('\n')
-      .map(line => line.replace(/^[\s\-\*\d\.]+/, '').trim())
+      .map(line => line.replace(/^[-\s*\d.]+/, '').trim())
       .filter(line => line.length > 0);
   }
 
-  private extractCodeQuality(text: string): AnalysisResponse['analysis']['codeQuality'] | undefined {
+  private extractCodeQuality(
+    text: string
+  ): AnalysisResponse['analysis']['codeQuality'] | undefined {
     const qualitySection = this.extractSection(text, 'Code Quality');
     if (!qualitySection) return undefined;
 
     return {
       score: 75, // Default score - could be improved with more sophisticated parsing
       issues: this.extractListItems(text, 'Issues') || [],
-      suggestions: this.extractListItems(text, 'Suggestions') || []
+      suggestions: this.extractListItems(text, 'Suggestions') || [],
     };
   }
 
@@ -271,7 +292,7 @@ export class AnalyzeFileUseCase implements IAnalyzeFileUseCase {
       files: 1,
       classes: 0,
       functions: 0,
-      dependencies: []
+      dependencies: [],
     };
   }
 }

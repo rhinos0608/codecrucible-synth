@@ -48,15 +48,16 @@ export class SequentialDualAgentSystem extends EventEmitter {
         name: 'System Architect',
         specialization: 'High-level design and architecture planning',
         temperature: 0.3,
-        systemPrompt: 'You are a senior system architect focused on scalable, maintainable solutions.'
+        systemPrompt:
+          'You are a senior system architect focused on scalable, maintainable solutions.',
       },
       {
         id: 'implementor',
-        name: 'Implementation Specialist', 
+        name: 'Implementation Specialist',
         specialization: 'Detailed implementation and code generation',
         temperature: 0.2,
-        systemPrompt: 'You are an expert developer focused on practical, working implementations.'
-      }
+        systemPrompt: 'You are an expert developer focused on practical, working implementations.',
+      },
     ];
 
     for (const agent of defaultAgents) {
@@ -66,17 +67,17 @@ export class SequentialDualAgentSystem extends EventEmitter {
 
   async executeSequentialCollaboration(task: CollaborationTask): Promise<CollaborationResult> {
     const startTime = Date.now();
-    
+
     try {
       logger.info(`Starting sequential collaboration for task: ${task.id}`);
       this.activeTasks.set(task.id, task);
 
       // Execute primary agent
       const primaryOutput = await this.executePrimaryAgent(task);
-      
+
       // Execute secondary agent with primary output as context
       const secondaryOutput = await this.executeSecondaryAgent(task, primaryOutput);
-      
+
       // Synthesize final result
       const synthesizedResult = await this.synthesizeResults(primaryOutput, secondaryOutput, task);
 
@@ -86,24 +87,23 @@ export class SequentialDualAgentSystem extends EventEmitter {
         secondaryOutput,
         synthesizedResult,
         executionTime: Date.now() - startTime,
-        success: true
+        success: true,
       };
 
       this.activeTasks.delete(task.id);
       this.emit('collaborationComplete', result);
-      
-      return result;
 
+      return result;
     } catch (error) {
       logger.error(`Sequential collaboration failed for task ${task.id}:`, error);
-      
+
       const result: CollaborationResult = {
         taskId: task.id,
         primaryOutput: null,
         secondaryOutput: null,
         synthesizedResult: { error: error.message },
         executionTime: Date.now() - startTime,
-        success: false
+        success: false,
       };
 
       this.activeTasks.delete(task.id);
@@ -118,14 +118,14 @@ export class SequentialDualAgentSystem extends EventEmitter {
     }
 
     logger.info(`Executing primary agent: ${agent.name}`);
-    
+
     // Simulate agent execution
     return {
       agentId: agent.id,
       agentName: agent.name,
       response: `Primary analysis for: ${task.description}`,
       timestamp: Date.now(),
-      specialization: agent.specialization
+      specialization: agent.specialization,
     };
   }
 
@@ -136,7 +136,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
     }
 
     logger.info(`Executing secondary agent: ${agent.name}`);
-    
+
     // Simulate agent execution with primary context
     return {
       agentId: agent.id,
@@ -144,13 +144,17 @@ export class SequentialDualAgentSystem extends EventEmitter {
       response: `Secondary implementation for: ${task.description}`,
       primaryContext: primaryOutput,
       timestamp: Date.now(),
-      specialization: agent.specialization
+      specialization: agent.specialization,
     };
   }
 
-  private async synthesizeResults(primaryOutput: any, secondaryOutput: any, task: CollaborationTask): Promise<any> {
+  private async synthesizeResults(
+    primaryOutput: any,
+    secondaryOutput: any,
+    task: CollaborationTask
+  ): Promise<any> {
     logger.info(`Synthesizing results for task: ${task.id}`);
-    
+
     return {
       taskId: task.id,
       synthesis: `Combined output from ${primaryOutput.agentName} and ${secondaryOutput.agentName}`,
@@ -158,7 +162,7 @@ export class SequentialDualAgentSystem extends EventEmitter {
       secondaryContribution: secondaryOutput.response,
       finalRecommendation: `Integrated solution for: ${task.description}`,
       confidence: 0.85,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 

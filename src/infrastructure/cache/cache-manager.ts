@@ -61,7 +61,7 @@ export class CacheManager extends EventEmitter {
       checkInterval: 300,
       enableCompression: false,
       enableEncryption: false,
-      ...config
+      ...config,
     };
 
     if (this.config.enableCleanup) {
@@ -69,7 +69,11 @@ export class CacheManager extends EventEmitter {
     }
   }
 
-  async set(key: string, value: any, options?: { ttl?: number; tags?: string[]; metadata?: Record<string, any> }): Promise<void> {
+  async set(
+    key: string,
+    value: any,
+    options?: { ttl?: number; tags?: string[]; metadata?: Record<string, any> }
+  ): Promise<void> {
     try {
       if (this.cache.size >= this.config.maxSize) {
         this.evictOldest();
@@ -81,7 +85,7 @@ export class CacheManager extends EventEmitter {
         timestamp: Date.now(),
         ttl: options?.ttl || this.config.defaultTTL,
         tags: options?.tags,
-        metadata: options?.metadata
+        metadata: options?.metadata,
       };
 
       this.cache.set(key, entry);
@@ -120,13 +124,13 @@ export class CacheManager extends EventEmitter {
   async has(key: string): Promise<boolean> {
     const entry = this.cache.get(key);
     if (!entry) return false;
-    
+
     // Check if entry is expired
     if (Date.now() - entry.timestamp > entry.ttl) {
       this.cache.delete(key);
       return false;
     }
-    
+
     return true;
   }
 
@@ -193,14 +197,14 @@ export class CacheManager extends EventEmitter {
   }> {
     const totalRequests = this.hitCount + this.missCount;
     const hitRate = totalRequests > 0 ? (this.hitCount / totalRequests) * 100 : 0;
-    
+
     return {
       size: this.cache.size,
       hitCount: this.hitCount,
       missCount: this.missCount,
       hitRate,
       maxSize: this.config.maxSize,
-      memoryUsage: `${Math.round((this.cache.size / this.config.maxSize) * 100)}%`
+      memoryUsage: `${Math.round((this.cache.size / this.config.maxSize) * 100)}%`,
     };
   }
 }

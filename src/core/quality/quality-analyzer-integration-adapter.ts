@@ -2,7 +2,7 @@
  * Quality Analyzer Integration Adapter
  * Provides backward compatibility for SequentialDualAgentSystem while migrating to the reconstructed analyzer
  * Created: August 26, 2025 - Quality Analyzer Reconstruction Agent
- * 
+ *
  * This adapter:
  * - Maps old API to new reconstructed analyzer
  * - Provides data transformation between old and new metrics formats
@@ -12,10 +12,10 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../logger.js';
-import { 
-  ReconstructedCodeQualityAnalyzer, 
+import {
+  ReconstructedCodeQualityAnalyzer,
   ReconstructedQualityConfig,
-  AnalysisResult
+  AnalysisResult,
 } from './reconstructed-code-quality-analyzer.js';
 
 // Legacy types from the old analyzer for backward compatibility
@@ -78,7 +78,14 @@ export interface ComprehensiveQualityMetrics {
 }
 
 export interface QualityRecommendation {
-  category: 'complexity' | 'maintainability' | 'linting' | 'formatting' | 'types' | 'duplication' | 'documentation';
+  category:
+    | 'complexity'
+    | 'maintainability'
+    | 'linting'
+    | 'formatting'
+    | 'types'
+    | 'duplication'
+    | 'documentation';
   priority: 'critical' | 'high' | 'medium' | 'low';
   description: string;
   suggestion: string;
@@ -131,7 +138,7 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
 
   constructor(config?: Partial<QualityMetricsConfig>) {
     super();
-    
+
     // Convert legacy config to new format
     this.adapterConfig = {
       cyclomaticComplexity: {
@@ -145,19 +152,19 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
         highThreshold: 100,
       },
       weights: {
-        cyclomaticComplexity: 0.20,
+        cyclomaticComplexity: 0.2,
         maintainabilityIndex: 0.18,
         lintingScore: 0.15,
-        formattingScore: 0.10,
+        formattingScore: 0.1,
         typeCoverage: 0.15,
         documentation: 0.12,
-        duplication: 0.10,
-        halsteadComplexity: 0.10,
+        duplication: 0.1,
+        halsteadComplexity: 0.1,
       },
       eslintConfigPath: 'eslint.config.js',
       prettierConfigPath: '.prettierrc',
       tsconfigPath: 'tsconfig.json',
-      ...config
+      ...config,
     };
 
     // Create reconstructed analyzer with mapped configuration
@@ -173,13 +180,13 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
           cognitiveHigh: 35,
           halsteadEffortLow: 1000,
           halsteadEffortMedium: 5000,
-          halsteadEffortHigh: 10000
+          halsteadEffortHigh: 10000,
         },
         maintainability: {
           excellent: this.adapterConfig.maintainabilityIndex.highThreshold,
           acceptable: this.adapterConfig.maintainabilityIndex.mediumThreshold,
           problematic: this.adapterConfig.maintainabilityIndex.lowThreshold + 25,
-          critical: this.adapterConfig.maintainabilityIndex.lowThreshold
+          critical: this.adapterConfig.maintainabilityIndex.lowThreshold,
         },
         weights: {
           complexity: this.adapterConfig.weights.cyclomaticComplexity,
@@ -188,38 +195,38 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
           formatting: this.adapterConfig.weights.formattingScore,
           typeScript: this.adapterConfig.weights.typeCoverage,
           documentation: this.adapterConfig.weights.documentation,
-          security: 0.05 // Add security weight not present in legacy
-        }
+          security: 0.05, // Add security weight not present in legacy
+        },
       },
       tools: {
         eslintConfigPath: this.adapterConfig.eslintConfigPath,
         prettierConfigPath: this.adapterConfig.prettierConfigPath,
-        tsconfigPath: this.adapterConfig.tsconfigPath
+        tsconfigPath: this.adapterConfig.tsconfigPath,
       },
       performance: {
         maxMemoryMB: 512,
         maxAnalysisTimeMs: 60000,
-        maxConcurrentAnalyses: 3
+        maxConcurrentAnalyses: 3,
       },
       analysis: {
         enableProgressReporting: false, // Disable for compatibility
         enableTrendAnalysis: true,
         enablePerformanceMonitoring: true,
-        enableDetailedRecommendations: true
-      }
+        enableDetailedRecommendations: true,
+      },
     };
 
     this.reconstructedAnalyzer = new ReconstructedCodeQualityAnalyzer(reconstructedConfig);
 
     // Forward events from reconstructed analyzer
-    this.reconstructedAnalyzer.on('analysisComplete', (result) => {
-      this.emit('analysis_complete', { 
-        result: this.transformToLegacyFormat(result), 
-        duration: result.performanceMetrics.totalDuration 
+    this.reconstructedAnalyzer.on('analysisComplete', result => {
+      this.emit('analysis_complete', {
+        result: this.transformToLegacyFormat(result),
+        duration: result.performanceMetrics.totalDuration,
       });
     });
 
-    this.reconstructedAnalyzer.on('performanceAlert', (alert) => {
+    this.reconstructedAnalyzer.on('performanceAlert', alert => {
       logger.warn(`Quality analysis performance alert: ${alert.message}`);
     });
 
@@ -237,23 +244,26 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
   ): Promise<ComprehensiveQualityMetrics> {
     try {
       logger.debug(`Adapter: analyzing code with legacy API compatibility (language: ${language})`);
-      
+
       const analysisResult = await this.reconstructedAnalyzer.analyzeCode(code, language, {
         filename,
         identifier: filename ? this.generateIdentifier(filename) : undefined,
-        enableProgressReporting: false // Disabled for legacy compatibility
+        enableProgressReporting: false, // Disabled for legacy compatibility
       });
 
       // Transform new format to legacy format
       const legacyMetrics = this.transformToLegacyFormat(analysisResult);
-      
-      logger.debug(`Adapter: analysis complete, transformed to legacy format (score: ${legacyMetrics.overallScore})`);
-      
-      return legacyMetrics;
 
+      logger.debug(
+        `Adapter: analysis complete, transformed to legacy format (score: ${legacyMetrics.overallScore})`
+      );
+
+      return legacyMetrics;
     } catch (error) {
       logger.error('Adapter: analysis failed:', error);
-      throw new Error(`Quality analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Quality analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -262,7 +272,7 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
    */
   private transformToLegacyFormat(analysisResult: AnalysisResult): ComprehensiveQualityMetrics {
     const { qualityMetrics, performanceMetrics } = analysisResult;
-    
+
     // Map new AST metrics to legacy complexity format
     const complexity = {
       cyclomaticComplexity: qualityMetrics.astMetrics.cyclomaticComplexity,
@@ -273,13 +283,13 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
         difficulty: qualityMetrics.astMetrics.halsteadMetrics.difficulty,
         effort: qualityMetrics.astMetrics.halsteadMetrics.effort,
         timeRequired: qualityMetrics.astMetrics.halsteadMetrics.timeRequired,
-        bugsDelivered: qualityMetrics.astMetrics.halsteadMetrics.bugsDelivered
+        bugsDelivered: qualityMetrics.astMetrics.halsteadMetrics.bugsDelivered,
       },
       maintainabilityIndex: qualityMetrics.astMetrics.maintainabilityIndex,
       linesOfCode: qualityMetrics.astMetrics.linesOfCode,
       logicalLinesOfCode: qualityMetrics.astMetrics.logicalLinesOfCode,
       commentLines: qualityMetrics.astMetrics.commentLines,
-      commentRatio: qualityMetrics.astMetrics.commentRatio
+      commentRatio: qualityMetrics.astMetrics.commentRatio,
     };
 
     // Map tool results to legacy formats
@@ -289,26 +299,29 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
       totalIssues: qualityMetrics.eslintResults.totalIssues,
       score: qualityMetrics.eslintResults.score,
       errorsByCategory: qualityMetrics.eslintResults.errorsByCategory,
-      fixableIssues: qualityMetrics.eslintResults.fixableIssues
+      fixableIssues: qualityMetrics.eslintResults.fixableIssues,
     };
 
     const formatting = {
       isFormatted: qualityMetrics.prettierResults.isFormatted,
       formattingIssues: qualityMetrics.prettierResults.formattingIssues,
       score: qualityMetrics.prettierResults.score,
-      fixedCode: qualityMetrics.prettierResults.fixedCode
+      fixedCode: qualityMetrics.prettierResults.fixedCode,
     };
 
     // Map TypeScript results to legacy type coverage format
     const typeCoverage = {
-      totalSymbols: qualityMetrics.typescriptResults.totalErrors + qualityMetrics.typescriptResults.totalWarnings + 100, // Estimate
+      totalSymbols:
+        qualityMetrics.typescriptResults.totalErrors +
+        qualityMetrics.typescriptResults.totalWarnings +
+        100, // Estimate
       typedSymbols: Math.max(0, 100 - qualityMetrics.typescriptResults.totalErrors), // Estimate
       coverage: qualityMetrics.typescriptResults.coverage,
       untypedAreas: [] as Array<{
         file: string;
         line: number;
         symbol: string;
-      }>
+      }>,
     };
 
     // Create minimal duplication data (not available from new analyzer by default)
@@ -320,7 +333,7 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
         lines: number;
         tokens: number;
         files: string[];
-      }>
+      }>,
     };
 
     // Transform recommendations to legacy format
@@ -330,7 +343,7 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
       description: rec.description,
       suggestion: rec.suggestion,
       estimatedImpact: rec.estimatedImpact,
-      automated: rec.automated
+      automated: rec.automated,
     }));
 
     // Transform trend data if available
@@ -340,8 +353,11 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
         previousScore: qualityMetrics.trendData.previousScore,
         currentScore: qualityMetrics.trendData.currentScore,
         improvement: qualityMetrics.trendData.scoreDelta,
-        trendDirection: qualityMetrics.trendData.trendDirection === 'volatile' ? 'stable' : qualityMetrics.trendData.trendDirection,
-        improvementRate: qualityMetrics.trendData.improvementRate
+        trendDirection:
+          qualityMetrics.trendData.trendDirection === 'volatile'
+            ? 'stable'
+            : qualityMetrics.trendData.trendDirection,
+        improvementRate: qualityMetrics.trendData.improvementRate,
       };
     }
 
@@ -354,7 +370,7 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
       duplication,
       technicalDebtRatio: qualityMetrics.technicalDebtRatio,
       recommendations,
-      trendData
+      trendData,
     };
   }
 
@@ -363,7 +379,14 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
    */
   private mapRecommendationCategory(
     newCategory: string
-  ): 'complexity' | 'maintainability' | 'linting' | 'formatting' | 'types' | 'duplication' | 'documentation' {
+  ):
+    | 'complexity'
+    | 'maintainability'
+    | 'linting'
+    | 'formatting'
+    | 'types'
+    | 'duplication'
+    | 'documentation' {
     switch (newCategory) {
       case 'typescript':
         return 'types';
@@ -395,37 +418,41 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
    */
   updateConfiguration(updates: Partial<QualityMetricsConfig>): void {
     Object.assign(this.adapterConfig, updates);
-    
+
     // Update the underlying reconstructed analyzer configuration
     const reconstructedUpdates: Partial<ReconstructedQualityConfig> = {
       quality: {
-        complexity: updates.cyclomaticComplexity ? {
-          cyclomaticLow: updates.cyclomaticComplexity.lowThreshold,
-          cyclomaticMedium: updates.cyclomaticComplexity.mediumThreshold,
-          cyclomaticHigh: updates.cyclomaticComplexity.highThreshold,
-          cyclomaticCritical: updates.cyclomaticComplexity.highThreshold + 10,
-          cognitiveLow: 15,
-          cognitiveMedium: 25,
-          cognitiveHigh: 35,
-          halsteadEffortLow: 1000,
-          halsteadEffortMedium: 5000,
-          halsteadEffortHigh: 10000
-        } : undefined,
-        weights: updates.weights ? {
-          complexity: updates.weights.cyclomaticComplexity,
-          maintainability: updates.weights.maintainabilityIndex,
-          linting: updates.weights.lintingScore,
-          formatting: updates.weights.formattingScore,
-          typeScript: updates.weights.typeCoverage,
-          documentation: updates.weights.documentation,
-          security: 0.05 // Maintain security weight
-        } : undefined
+        complexity: updates.cyclomaticComplexity
+          ? {
+              cyclomaticLow: updates.cyclomaticComplexity.lowThreshold,
+              cyclomaticMedium: updates.cyclomaticComplexity.mediumThreshold,
+              cyclomaticHigh: updates.cyclomaticComplexity.highThreshold,
+              cyclomaticCritical: updates.cyclomaticComplexity.highThreshold + 10,
+              cognitiveLow: 15,
+              cognitiveMedium: 25,
+              cognitiveHigh: 35,
+              halsteadEffortLow: 1000,
+              halsteadEffortMedium: 5000,
+              halsteadEffortHigh: 10000,
+            }
+          : undefined,
+        weights: updates.weights
+          ? {
+              complexity: updates.weights.cyclomaticComplexity,
+              maintainability: updates.weights.maintainabilityIndex,
+              linting: updates.weights.lintingScore,
+              formatting: updates.weights.formattingScore,
+              typeScript: updates.weights.typeCoverage,
+              documentation: updates.weights.documentation,
+              security: 0.05, // Maintain security weight
+            }
+          : undefined,
       },
       tools: {
         eslintConfigPath: updates.eslintConfigPath,
         prettierConfigPath: updates.prettierConfigPath,
-        tsconfigPath: updates.tsconfigPath
-      }
+        tsconfigPath: updates.tsconfigPath,
+      },
     };
 
     this.reconstructedAnalyzer.updateConfiguration(reconstructedUpdates);
@@ -437,7 +464,7 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
    */
   getQualityHistory(identifier: string): ComprehensiveQualityMetrics[] {
     const newHistory = this.reconstructedAnalyzer.getQualityHistory(identifier);
-    
+
     // Transform each entry to legacy format
     return newHistory.map(metrics => ({
       overallScore: metrics.overallScore,
@@ -450,13 +477,13 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
           difficulty: metrics.astMetrics.halsteadMetrics.difficulty,
           effort: metrics.astMetrics.halsteadMetrics.effort,
           timeRequired: metrics.astMetrics.halsteadMetrics.timeRequired,
-          bugsDelivered: metrics.astMetrics.halsteadMetrics.bugsDelivered
+          bugsDelivered: metrics.astMetrics.halsteadMetrics.bugsDelivered,
         },
         maintainabilityIndex: metrics.astMetrics.maintainabilityIndex,
         linesOfCode: metrics.astMetrics.linesOfCode,
         logicalLinesOfCode: metrics.astMetrics.logicalLinesOfCode,
         commentLines: metrics.astMetrics.commentLines,
-        commentRatio: metrics.astMetrics.commentRatio
+        commentRatio: metrics.astMetrics.commentRatio,
       },
       linting: {
         totalErrors: metrics.eslintResults.totalErrors,
@@ -464,13 +491,13 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
         totalIssues: metrics.eslintResults.totalIssues,
         score: metrics.eslintResults.score,
         errorsByCategory: metrics.eslintResults.errorsByCategory,
-        fixableIssues: metrics.eslintResults.fixableIssues
+        fixableIssues: metrics.eslintResults.fixableIssues,
       },
       formatting: {
         isFormatted: metrics.prettierResults.isFormatted,
         formattingIssues: metrics.prettierResults.formattingIssues,
         score: metrics.prettierResults.score,
-        fixedCode: metrics.prettierResults.fixedCode
+        fixedCode: metrics.prettierResults.fixedCode,
       },
       typeCoverage: {
         totalSymbols: 100,
@@ -480,7 +507,7 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
           file: string;
           line: number;
           symbol: string;
-        }>
+        }>,
       },
       duplication: {
         duplicatedLines: 0,
@@ -490,7 +517,7 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
           lines: number;
           tokens: number;
           files: string[];
-        }>
+        }>,
       },
       technicalDebtRatio: metrics.technicalDebtRatio,
       recommendations: metrics.recommendations.map(rec => ({
@@ -499,15 +526,20 @@ export class QualityAnalyzerIntegrationAdapter extends EventEmitter {
         description: rec.description,
         suggestion: rec.suggestion,
         estimatedImpact: rec.estimatedImpact,
-        automated: rec.automated
+        automated: rec.automated,
       })),
-      trendData: metrics.trendData ? {
-        previousScore: metrics.trendData.previousScore,
-        currentScore: metrics.trendData.currentScore,
-        improvement: metrics.trendData.scoreDelta,
-        trendDirection: metrics.trendData.trendDirection === 'volatile' ? 'stable' : metrics.trendData.trendDirection,
-        improvementRate: metrics.trendData.improvementRate
-      } : undefined
+      trendData: metrics.trendData
+        ? {
+            previousScore: metrics.trendData.previousScore,
+            currentScore: metrics.trendData.currentScore,
+            improvement: metrics.trendData.scoreDelta,
+            trendDirection:
+              metrics.trendData.trendDirection === 'volatile'
+                ? 'stable'
+                : metrics.trendData.trendDirection,
+            improvementRate: metrics.trendData.improvementRate,
+          }
+        : undefined,
     }));
   }
 

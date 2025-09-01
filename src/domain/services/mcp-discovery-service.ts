@@ -1,7 +1,7 @@
 /**
  * MCP Discovery Domain Service
  * Pure business logic for MCP server discovery, selection, and orchestration
- * 
+ *
  * Architecture Compliance:
  * - Domain layer: pure business logic only
  * - No infrastructure dependencies
@@ -316,16 +316,22 @@ export class MCPDiscoveryService {
     scoredServers.sort((a, b) => b.score - a.score);
 
     // Select primary and fallback servers
-    const primaryServers = scoredServers.slice(0, Math.min(3, scoredServers.length))
+    const primaryServers = scoredServers
+      .slice(0, Math.min(3, scoredServers.length))
       .map(s => s.server);
 
-    const fallbackServers = scoredServers.slice(3, Math.min(6, scoredServers.length))
+    const fallbackServers = scoredServers
+      .slice(3, Math.min(6, scoredServers.length))
       .map(s => s.server);
 
     const alternatives = scoredServers.slice(6).map(s => s.server);
 
     // Generate selection reason
-    const selectionReason = this.generateSelectionReason(primaryServers, query, scoredServers[0].score);
+    const selectionReason = this.generateSelectionReason(
+      primaryServers,
+      query,
+      scoredServers[0].score
+    );
 
     // Calculate estimated performance
     const estimatedPerformance = this.calculateEstimatedPerformance(primaryServers);
@@ -368,7 +374,7 @@ export class MCPDiscoveryService {
     const estimatedCost = this.calculateEstimatedCost(servers, requirements);
 
     // Create scaling plan if needed
-    const scalingPlan = requirements.enableAutoScaling 
+    const scalingPlan = requirements.enableAutoScaling
       ? this.createScalingPlan(servers, requirements)
       : undefined;
 
@@ -428,9 +434,14 @@ export class MCPDiscoveryService {
     const allServers = Array.from(this.serverRegistry.values());
     const activeServers = allServers.filter(s => s.status === ServerProfileStatus.ACTIVE);
 
-    const averageReliability = activeServers.reduce((sum, s) => sum + s.reliability.availabilityScore, 0) / activeServers.length;
-    const averageLatency = activeServers.reduce((sum, s) => sum + s.performance.averageLatency, 0) / activeServers.length;
-    const totalCapabilities = new Set(allServers.flatMap(s => s.capabilities.map(c => c.type))).size;
+    const averageReliability =
+      activeServers.reduce((sum, s) => sum + s.reliability.availabilityScore, 0) /
+      activeServers.length;
+    const averageLatency =
+      activeServers.reduce((sum, s) => sum + s.performance.averageLatency, 0) /
+      activeServers.length;
+    const totalCapabilities = new Set(allServers.flatMap(s => s.capabilities.map(c => c.type)))
+      .size;
 
     const capabilityDistribution = this.calculateCapabilityDistribution(activeServers);
     const vendorDistribution = this.calculateVendorDistribution(activeServers);
@@ -470,7 +481,7 @@ export class MCPDiscoveryService {
   }
 
   private async applyDiscoveryStrategy(
-    strategy: DiscoveryStrategy, 
+    strategy: DiscoveryStrategy,
     query: ServerDiscoveryQuery
   ): Promise<MCPServerProfile[]> {
     // Implementation would depend on the specific strategy
@@ -489,7 +500,10 @@ export class MCPDiscoveryService {
     });
   }
 
-  private filterServersByQuery(servers: MCPServerProfile[], query: ServerDiscoveryQuery): MCPServerProfile[] {
+  private filterServersByQuery(
+    servers: MCPServerProfile[],
+    query: ServerDiscoveryQuery
+  ): MCPServerProfile[] {
     return servers.filter(server => {
       // Check required capabilities
       const hasRequiredCapabilities = query.requiredCapabilities.every(reqCap =>
@@ -523,11 +537,15 @@ export class MCPDiscoveryService {
     });
   }
 
-  private filterEligibleServers(servers: MCPServerProfile[], query: ServerDiscoveryQuery): MCPServerProfile[] {
-    return servers.filter(server => 
-      server.status === ServerProfileStatus.ACTIVE &&
-      server.reliability.availabilityScore > 0.7 && // Minimum reliability threshold
-      server.performance.errorRate < 0.1 // Maximum error rate
+  private filterEligibleServers(
+    servers: MCPServerProfile[],
+    query: ServerDiscoveryQuery
+  ): MCPServerProfile[] {
+    return servers.filter(
+      server =>
+        server.status === ServerProfileStatus.ACTIVE &&
+        server.reliability.availabilityScore > 0.7 && // Minimum reliability threshold
+        server.performance.errorRate < 0.1 // Maximum error rate
     );
   }
 
@@ -571,7 +589,7 @@ export class MCPDiscoveryService {
         server.capabilities.some(cap => cap.type === optCap)
       ).length;
 
-      const optionalBonus = optionalMatches / query.optionalCapabilities.length * 0.3;
+      const optionalBonus = (optionalMatches / query.optionalCapabilities.length) * 0.3;
       score += optionalBonus;
     }
 
@@ -584,11 +602,11 @@ export class MCPDiscoveryService {
     // Latency penalty
     if (query.maxLatency) {
       const latencyPenalty = Math.min(server.performance.averageLatency / query.maxLatency, 1.0);
-      score *= (1 - latencyPenalty * 0.5);
+      score *= 1 - latencyPenalty * 0.5;
     }
 
     // Error rate penalty
-    score *= (1 - server.performance.errorRate);
+    score *= 1 - server.performance.errorRate;
 
     // Throughput bonus
     const throughputBonus = Math.min(server.performance.throughput / 1000, 0.2);
@@ -663,7 +681,8 @@ export class MCPDiscoveryService {
     }
 
     // Performance risk
-    const avgLatency = servers.reduce((sum, s) => sum + s.performance.averageLatency, 0) / servers.length;
+    const avgLatency =
+      servers.reduce((sum, s) => sum + s.performance.averageLatency, 0) / servers.length;
     if (query.maxLatency && avgLatency > query.maxLatency * 0.8) {
       risks.push({
         type: RiskType.PERFORMANCE,
@@ -698,8 +717,8 @@ export class MCPDiscoveryService {
   }
 
   private generateSelectionReason(
-    servers: MCPServerProfile[], 
-    query: ServerDiscoveryQuery, 
+    servers: MCPServerProfile[],
+    query: ServerDiscoveryQuery,
     topScore: number
   ): string {
     const reasons = [
@@ -720,14 +739,14 @@ export class MCPDiscoveryService {
   }
 
   private createServerAllocations(
-    servers: MCPServerProfile[], 
+    servers: MCPServerProfile[],
     requirements: OrchestrationRequirements
   ): ServerAllocation[] {
     return servers.map((server, index) => ({
       server,
-      role: index === 0 ? ServerRole.PRIMARY : 
-            index < 3 ? ServerRole.SECONDARY : ServerRole.FALLBACK,
-      weight: Math.max(1, Math.floor((servers.length - index) / servers.length * 10)),
+      role:
+        index === 0 ? ServerRole.PRIMARY : index < 3 ? ServerRole.SECONDARY : ServerRole.FALLBACK,
+      weight: Math.max(1, Math.floor(((servers.length - index) / servers.length) * 10)),
       maxConnections: server.performance.concurrentConnectionLimit,
       priority: servers.length - index,
       healthCheckInterval: 30000, // 30 seconds
@@ -735,7 +754,7 @@ export class MCPDiscoveryService {
   }
 
   private selectLoadBalancingStrategy(
-    servers: MCPServerProfile[], 
+    servers: MCPServerProfile[],
     requirements: OrchestrationRequirements
   ): LoadBalancingStrategy {
     // Select strategy based on server characteristics and requirements
@@ -749,10 +768,8 @@ export class MCPDiscoveryService {
 
     // Check if servers have similar capabilities
     const capabilitySets = servers.map(s => new Set(s.capabilities.map(c => c.type)));
-    const hasSpecializedServers = capabilitySets.some((set1, i) => 
-      capabilitySets.some((set2, j) => 
-        i !== j && !this.setsEqual(set1, set2)
-      )
+    const hasSpecializedServers = capabilitySets.some((set1, i) =>
+      capabilitySets.some((set2, j) => i !== j && !this.setsEqual(set1, set2))
     );
 
     if (hasSpecializedServers) {
@@ -763,7 +780,7 @@ export class MCPDiscoveryService {
   }
 
   private createFailoverPlan(
-    selectionResult: ServerSelectionResult, 
+    selectionResult: ServerSelectionResult,
     requirements: OrchestrationRequirements
   ): FailoverPlan {
     const triggers: FailoverTrigger[] = [
@@ -794,7 +811,7 @@ export class MCPDiscoveryService {
   }
 
   private createMonitoringPlan(
-    servers: MCPServerProfile[], 
+    servers: MCPServerProfile[],
     requirements: OrchestrationRequirements
   ): MonitoringPlan {
     return {
@@ -811,7 +828,7 @@ export class MCPDiscoveryService {
   }
 
   private createScalingPlan(
-    servers: MCPServerProfile[], 
+    servers: MCPServerProfile[],
     requirements: OrchestrationRequirements
   ): ScalingPlan {
     return {
@@ -824,13 +841,13 @@ export class MCPDiscoveryService {
   }
 
   private calculateEstimatedCost(
-    servers: MCPServerProfile[], 
+    servers: MCPServerProfile[],
     requirements: OrchestrationRequirements
   ): number {
     // Simple cost estimation based on server tiers
     return servers.reduce((total, server) => {
       if (!server.cost) return total;
-      
+
       const baseCost = {
         [CostTier.FREE]: 0,
         [CostTier.BASIC]: 10,
@@ -842,9 +859,11 @@ export class MCPDiscoveryService {
     }, 0);
   }
 
-  private calculateCapabilityDistribution(servers: MCPServerProfile[]): Map<CapabilityType, number> {
+  private calculateCapabilityDistribution(
+    servers: MCPServerProfile[]
+  ): Map<CapabilityType, number> {
     const distribution = new Map<CapabilityType, number>();
-    
+
     servers.forEach(server => {
       server.capabilities.forEach(cap => {
         distribution.set(cap.type, (distribution.get(cap.type) || 0) + 1);
@@ -856,7 +875,7 @@ export class MCPDiscoveryService {
 
   private calculateVendorDistribution(servers: MCPServerProfile[]): Map<string, number> {
     const distribution = new Map<string, number>();
-    
+
     servers.forEach(server => {
       const vendor = server.vendor || 'Unknown';
       distribution.set(vendor, (distribution.get(vendor) || 0) + 1);
@@ -871,7 +890,7 @@ export class MCPDiscoveryService {
     // Check for vendor concentration
     const vendorDistribution = this.calculateVendorDistribution(servers);
     const maxVendorShare = Math.max(...vendorDistribution.values()) / servers.length;
-    
+
     if (maxVendorShare > 0.7) {
       risks.push({
         type: RiskType.VENDOR_LOCK_IN,

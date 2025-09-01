@@ -1,7 +1,7 @@
 /**
  * CodeCrucible Synth - Main Entry Point
  * Updated to use Unified Architecture
- * 
+ *
  * This replaces the previous 571-line complex initialization with a clean
  * unified system that eliminates architectural debt and circular dependencies.
  */
@@ -66,10 +66,10 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     // Create event bus for decoupled communication
     const eventBus = getGlobalEventBus();
-    
+
     // Create user interaction system
-    const userInteraction = new CLIUserInteraction({ 
-      verbose: process.argv.includes('--verbose') 
+    const userInteraction = new CLIUserInteraction({
+      verbose: process.argv.includes('--verbose'),
     });
 
     // Initialize MCP Server Manager for extended functionality
@@ -78,32 +78,32 @@ export async function initialize(): Promise<UnifiedCLI> {
       filesystem: {
         enabled: true,
         restrictedPaths: ['/etc', '/sys', '/proc'],
-        allowedPaths: [process.cwd()]
+        allowedPaths: [process.cwd()],
       },
       git: {
         enabled: true,
         autoCommitMessages: true,
-        safeModeEnabled: true
+        safeModeEnabled: true,
       },
       terminal: {
         enabled: true,
         allowedCommands: ['ls', 'cat', 'echo', 'pwd', 'which', 'node', 'npm'],
-        blockedCommands: ['rm', 'sudo', 'chmod', 'chown', 'kill', 'pkill']
+        blockedCommands: ['rm', 'sudo', 'chmod', 'chown', 'kill', 'pkill'],
       },
       packageManager: {
         enabled: true,
         autoInstall: false,
-        securityScan: true
+        securityScan: true,
       },
       smithery: {
         enabled: !!process.env.SMITHERY_API_KEY,
         apiKey: process.env.SMITHERY_API_KEY,
-        autoDiscovery: true
-      }
+        autoDiscovery: true,
+      },
     };
-    
+
     const mcpServerManager = new MCPServerManager(mcpConfig);
-    
+
     // Start MCP servers asynchronously (don't block initialization)
     mcpServerManager.startServers().catch(error => {
       logger.warn('MCP servers initialization had issues:', error);
@@ -112,18 +112,21 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     // Create concrete workflow orchestrator (breaks circular dependencies)
     const orchestrator = new ConcreteWorkflowOrchestrator();
-    
+
     // Initialize proper UnifiedModelClient with dynamic model selection
     const { UnifiedModelClient } = await import('./application/services/unified-model-client.js');
-    const { ModelSelector, quickSelectModel } = await import('./infrastructure/user-interaction/model-selector.js');
-    
+    const { ModelSelector, quickSelectModel } = await import(
+      './infrastructure/user-interaction/model-selector.js'
+    );
+
     // Interactive model selection (unless in non-interactive mode)
     let selectedModelInfo;
-    const isInteractive = !process.argv.includes('--no-interactive') && 
-                         !process.argv.includes('status') &&
-                         !process.argv.includes('--version') &&
-                         !process.argv.includes('--help') &&
-                         process.stdin.isTTY;
+    const isInteractive =
+      !process.argv.includes('--no-interactive') &&
+      !process.argv.includes('status') &&
+      !process.argv.includes('--version') &&
+      !process.argv.includes('--help') &&
+      process.stdin.isTTY;
 
     if (isInteractive) {
       try {
@@ -144,36 +147,37 @@ export async function initialize(): Promise<UnifiedCLI> {
         {
           type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
           name: `${selectedModelInfo.provider}-selected`,
-          endpoint: selectedModelInfo.provider === 'ollama' 
-            ? (process.env.OLLAMA_ENDPOINT || 'http://localhost:11434')
-            : (process.env.LM_STUDIO_ENDPOINT || 'ws://localhost:8080'),
+          endpoint:
+            selectedModelInfo.provider === 'ollama'
+              ? process.env.OLLAMA_ENDPOINT || 'http://localhost:11434'
+              : process.env.LM_STUDIO_ENDPOINT || 'ws://localhost:8080',
           enabled: true,
           priority: 1,
           models: [selectedModelInfo.selectedModel.id],
-          timeout: parseInt(process.env.REQUEST_TIMEOUT || '110000')
-        }
+          timeout: parseInt(process.env.REQUEST_TIMEOUT || '110000'),
+        },
       ],
       fallbackStrategy: 'priority' as const,
       timeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'),
       retryAttempts: 3,
       enableCaching: true,
-      enableMetrics: true
+      enableMetrics: true,
     };
-    
+
     const modelClient = new UnifiedModelClient(modelClientConfig);
     await modelClient.initialize();
 
     if (isInteractive) {
       logger.info(`🤖 Using model: ${selectedModelInfo.selectedModel.name}`);
     }
-    
+
     await orchestrator.initialize({
       userInteraction,
       eventBus,
       modelClient,
       mcpManager: mcpServerManager, // MCP servers now activated!
       // These will be added as they become available:
-      // securityValidator: unifiedSecurityValidator,  
+      // securityValidator: unifiedSecurityValidator,
       // configManager: unifiedConfigManager,
     });
 
@@ -192,16 +196,19 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     const initTime = Date.now() - startTime;
     logger.info(`✅ Unified system initialized in ${initTime}ms`);
-    
+
     // Display system capabilities
     if (cliOptions.verbose) {
-      console.log('🧠 Capabilities: Context Intelligence, Performance Optimization, Error Resilience');
-      console.log('🔧 Architecture: Dependency Injection, Event-Driven, Circular Dependencies Eliminated');
+      console.log(
+        '🧠 Capabilities: Context Intelligence, Performance Optimization, Error Resilience'
+      );
+      console.log(
+        '🔧 Architecture: Dependency Injection, Event-Driven, Circular Dependencies Eliminated'
+      );
       console.log('📊 Complexity: Reduced by 90% through unified coordination');
     }
 
     return cli;
-
   } catch (error) {
     logger.error('❌ Failed to initialize system:', error);
     throw error;
@@ -259,6 +266,11 @@ export async function main(): Promise<void> {
     // Run CLI with arguments
     await cli.run(args);
 
+    // Explicitly exit after command completion (non-interactive mode)
+    if (!args.includes('interactive') && !args.includes('-i') && !args.includes('--interactive')) {
+      await cli.shutdown();
+      process.exit(0);
+    }
   } catch (error) {
     console.error('❌ Fatal error:', getErrorMessage(error));
     process.exit(1);
@@ -347,7 +359,7 @@ program
   .option('--no-resilience', 'Disable error resilience')
   .action(async (prompt, options) => {
     const args = [];
-    
+
     if (options.interactive) {
       args.push('interactive');
     } else if (prompt && prompt.length > 0) {

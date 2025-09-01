@@ -1,7 +1,7 @@
 /**
  * Application Layer Index
  * Clean exports following ARCHITECTURE.md principles
- * 
+ *
  * Exports: Use cases, services, and facade only
  * No infrastructure dependencies exposed
  */
@@ -39,4 +39,7 @@ export type {
 
 export type { CouncilRequest, CouncilResponse } from './services/simple-council-coordinator.js';
 export type { PhaseInput, PhaseOutput } from './services/spiral-phase-executor.js';
-export type { IterationResult, ConvergenceAnalysis } from './services/spiral-convergence-analyzer.js';
+export type {
+  IterationResult,
+  ConvergenceAnalysis,
+} from './services/spiral-convergence-analyzer.js';

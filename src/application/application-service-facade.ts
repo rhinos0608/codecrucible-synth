@@ -1,17 +1,37 @@
 /**
  * Application Service Facade
  * Application Layer - Clean interface for all use cases
- * 
+ *
  * Provides: Clean separation from infrastructure with proper input/output transformation
  * Handles: Use case orchestration without infrastructure dependencies
  * Imports: Domain services and application use cases only (follows ARCHITECTURE.md)
  */
 
-import { ProcessAIRequestUseCase, AIRequestInput, AIRequestOutput } from './use-cases/process-ai-request-use-case.js';
-import { MultiVoiceSynthesisUseCase, MultiVoiceSynthesisInput, MultiVoiceSynthesisOutput } from './use-cases/multi-voice-synthesis-use-case.js';
-import { LivingSpiralProcessUseCase, LivingSpiralInput, LivingSpiralOutput } from './use-cases/living-spiral-process-use-case.js';
-import { AnalyzeCodebaseUseCase, CodebaseAnalysisInput, CodebaseAnalysisOutput } from './use-cases/analyze-codebase-use-case.js';
-import { SimplifiedLivingSpiralCoordinator, SimplifiedSpiralInput, SimplifiedSpiralOutput } from './coordinators/simplified-living-spiral-coordinator.js';
+import {
+  ProcessAIRequestUseCase,
+  AIRequestInput,
+  AIRequestOutput,
+} from './use-cases/process-ai-request-use-case.js';
+import {
+  MultiVoiceSynthesisUseCase,
+  MultiVoiceSynthesisInput,
+  MultiVoiceSynthesisOutput,
+} from './use-cases/multi-voice-synthesis-use-case.js';
+import {
+  LivingSpiralProcessUseCase,
+  LivingSpiralInput,
+  LivingSpiralOutput,
+} from './use-cases/living-spiral-process-use-case.js';
+import {
+  AnalyzeCodebaseUseCase,
+  CodebaseAnalysisInput,
+  CodebaseAnalysisOutput,
+} from './use-cases/analyze-codebase-use-case.js';
+import {
+  SimplifiedLivingSpiralCoordinator,
+  SimplifiedSpiralInput,
+  SimplifiedSpiralOutput,
+} from './coordinators/simplified-living-spiral-coordinator.js';
 import { VoiceOrchestrationService } from '../domain/services/voice-orchestration-service.js';
 import { ModelSelectionService } from '../domain/services/model-selection-service.js';
 
@@ -36,22 +56,22 @@ export class ApplicationServiceFacade {
       modelSelectionService,
       voiceOrchestrationService
     );
-    
+
     this.multiVoiceSynthesisUseCase = new MultiVoiceSynthesisUseCase(
       voiceOrchestrationService,
       modelSelectionService
     );
-    
+
     this.livingSpiralProcessUseCase = new LivingSpiralProcessUseCase(
       voiceOrchestrationService,
       modelSelectionService
     );
-    
+
     this.analyzeCodebaseUseCase = new AnalyzeCodebaseUseCase(
       modelSelectionService,
       voiceOrchestrationService
     );
-    
+
     this.simplifiedLivingSpiralCoordinator = new SimplifiedLivingSpiralCoordinator(
       voiceOrchestrationService,
       modelSelectionService
@@ -70,7 +90,9 @@ export class ApplicationServiceFacade {
    * Execute multi-voice synthesis
    * Use case: Complex problem solving with multiple perspectives
    */
-  async executeMultiVoiceSynthesis(input: MultiVoiceSynthesisInput): Promise<MultiVoiceSynthesisOutput> {
+  async executeMultiVoiceSynthesis(
+    input: MultiVoiceSynthesisInput
+  ): Promise<MultiVoiceSynthesisOutput> {
     return await this.multiVoiceSynthesisUseCase.execute(input);
   }
 
@@ -86,7 +108,9 @@ export class ApplicationServiceFacade {
    * Execute Simplified Living Spiral process (new interface)
    * Use case: Clean iterative development with better separation of concerns
    */
-  async executeSimplifiedSpiralProcess(input: SimplifiedSpiralInput): Promise<SimplifiedSpiralOutput> {
+  async executeSimplifiedSpiralProcess(
+    input: SimplifiedSpiralInput
+  ): Promise<SimplifiedSpiralOutput> {
     return await this.simplifiedLivingSpiralCoordinator.executeSpiralProcess(input);
   }
 
@@ -158,12 +182,16 @@ export class ApplicationServiceFacade {
       services.processAIRequest = this.processAIRequestUseCase ? 'available' : 'unavailable';
       services.multiVoiceSynthesis = this.multiVoiceSynthesisUseCase ? 'available' : 'unavailable';
       services.livingSpiralProcess = this.livingSpiralProcessUseCase ? 'available' : 'unavailable';
-      services.simplifiedSpiralProcess = this.simplifiedLivingSpiralCoordinator ? 'available' : 'unavailable';
+      services.simplifiedSpiralProcess = this.simplifiedLivingSpiralCoordinator
+        ? 'available'
+        : 'unavailable';
       services.codebaseAnalysis = this.analyzeCodebaseUseCase ? 'available' : 'unavailable';
 
-      const unavailableCount = Object.values(services).filter(status => status === 'unavailable').length;
-      const status = unavailableCount === 0 ? 'healthy' : 
-                   unavailableCount < 3 ? 'degraded' : 'unhealthy';
+      const unavailableCount = Object.values(services).filter(
+        status => status === 'unavailable'
+      ).length;
+      const status =
+        unavailableCount === 0 ? 'healthy' : unavailableCount < 3 ? 'degraded' : 'unhealthy';
 
       return {
         status,

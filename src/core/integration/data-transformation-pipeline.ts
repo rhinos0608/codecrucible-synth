@@ -1,8 +1,8 @@
 /**
  * Data Transformation Pipeline
- * 
+ *
  * Addresses Issue #4: Data Transformation Mismatches
- * 
+ *
  * This pipeline handles all data transformations between the 4 major systems,
  * ensuring consistent data formats and preventing transformation errors
  * that could break system integration.
@@ -32,24 +32,24 @@ import {
  */
 export class DataTransformationPipeline extends EventEmitter implements TransformationRegistry {
   private static instance: DataTransformationPipeline | null = null;
-  
+
   // Transformer registry
   private transformers: Map<string, DataTransformer> = new Map();
   private transformationMatrix: Map<string, Map<string, DataTransformer>> = new Map();
-  
+
   // Transformation tracking
   private transformationHistory: Map<string, DataTransformation[]> = new Map();
   private transformationCache: Map<string, CachedTransformation> = new Map();
-  
+
   // Pipeline metrics
   private pipelineMetrics: TransformationMetrics;
-  
+
   // Built-in transformers
   private builtInTransformers: Map<string, DataTransformer> = new Map();
-  
+
   private constructor() {
     super();
-    
+
     this.pipelineMetrics = {
       totalTransformations: 0,
       successfulTransformations: 0,
@@ -59,18 +59,18 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       transformerPerformance: new Map(),
       systemPairPerformance: new Map(),
     };
-    
+
     this.initializeBuiltInTransformers();
     this.setupTransformationMatrix();
   }
-  
+
   static getInstance(): DataTransformationPipeline {
     if (!DataTransformationPipeline.instance) {
       DataTransformationPipeline.instance = new DataTransformationPipeline();
     }
     return DataTransformationPipeline.instance;
   }
-  
+
   /**
    * Register a custom transformer
    */
@@ -81,13 +81,13 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
   ): void {
     const key = `${sourceSystem}->${targetSystem}`;
     this.transformers.set(key, transformer);
-    
+
     // Update transformation matrix
     if (!this.transformationMatrix.has(sourceSystem)) {
       this.transformationMatrix.set(sourceSystem, new Map());
     }
     this.transformationMatrix.get(sourceSystem)!.set(targetSystem, transformer);
-    
+
     logger.info('Data transformer registered', {
       transformerId: transformer.transformerId,
       sourceSystem,
@@ -95,10 +95,10 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       sourceFormat: transformer.sourceFormat,
       targetFormat: transformer.targetFormat,
     });
-    
+
     this.emit('transformer-registered', { sourceSystem, targetSystem, transformer });
   }
-  
+
   /**
    * Get transformer for system pair
    */
@@ -106,7 +106,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
     const key = `${sourceSystem}->${targetSystem}`;
     return this.transformers.get(key) || null;
   }
-  
+
   /**
    * Main transformation method
    */
@@ -118,7 +118,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
   ): Promise<TransformationResult<U>> {
     const transformationId = this.generateTransformationId();
     const startTime = Date.now();
-    
+
     try {
       logger.debug('Starting data transformation', {
         transformationId,
@@ -126,35 +126,37 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
         targetSystem,
         requestId: context.requestId,
       });
-      
+
       // Check cache first
       const cacheKey = this.generateCacheKey(data, sourceSystem, targetSystem);
       const cached = this.transformationCache.get(cacheKey);
-      
+
       if (cached && this.isCacheValid(cached)) {
         logger.debug('Using cached transformation', { transformationId, cacheKey });
         return this.createCachedResult(cached, transformationId);
       }
-      
+
       // Get appropriate transformer
       const transformer = this.getTransformer(sourceSystem, targetSystem);
       if (!transformer) {
         throw new Error(`No transformer found for ${sourceSystem} -> ${targetSystem}`);
       }
-      
+
       // Validate input data
       const validation = transformer.validate(data);
       if (!validation.valid) {
-        throw new Error(`Input validation failed: ${validation.errors.map(e => e.message).join(', ')}`);
+        throw new Error(
+          `Input validation failed: ${validation.errors.map(e => e.message).join(', ')}`
+        );
       }
-      
+
       // Perform transformation
       const transformationResult = await transformer.transform(data, context);
-      
+
       if (!transformationResult.success) {
         throw new Error(`Transformation failed: ${transformationResult.error}`);
       }
-      
+
       // Create transformation record
       const transformationRecord = this.createTransformationRecord(
         transformationId,
@@ -164,7 +166,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
         validation,
         startTime
       );
-      
+
       // Update metrics
       const executionTime = Date.now() - startTime;
       this.updateTransformationMetrics(
@@ -172,16 +174,16 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
         executionTime,
         transformationResult.metadata.dataIntegrity
       );
-      
+
       // Cache successful transformation
       this.cacheTransformation(cacheKey, transformationResult, transformationRecord);
-      
+
       // Store transformation history
       this.storeTransformationHistory(context.requestId, transformationRecord);
-      
+
       const result: TransformationResult<U> = {
         success: true,
-        data: transformationResult.data,
+        data: transformationResult.data as U,
         metadata: {
           ...transformationResult.metadata,
           transformationId,
@@ -192,7 +194,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
         validationResult: validation,
         transformationRecord,
       };
-      
+
       logger.info('Data transformation completed successfully', {
         transformationId,
         sourceSystem,
@@ -200,14 +202,13 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
         executionTime,
         dataIntegrity: transformationResult.metadata.dataIntegrity,
       });
-      
+
       this.emit('transformation-completed', result);
       return result;
-      
     } catch (error) {
       const executionTime = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       logger.error('Data transformation failed', {
         transformationId,
         sourceSystem,
@@ -215,10 +216,10 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
         error: errorMessage,
         executionTime,
       });
-      
+
       // Update failure metrics
       this.pipelineMetrics.failedTransformations++;
-      
+
       const result: TransformationResult<U> = {
         success: false,
         error: errorMessage,
@@ -232,7 +233,9 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
         },
         validationResult: {
           valid: false,
-          errors: [{ field: 'data', message: errorMessage, severity: 'error', code: 'TRANSFORM_FAILED' }],
+          errors: [
+            { field: 'data', message: errorMessage, severity: 'error', code: 'TRANSFORM_FAILED' },
+          ],
           warnings: [],
           confidence: 0,
         },
@@ -244,12 +247,12 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
           startTime
         ),
       };
-      
+
       this.emit('transformation-failed', result, error);
       return result;
     }
   }
-  
+
   /**
    * Transform routing decision to voice system format
    */
@@ -264,7 +267,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       context
     );
   }
-  
+
   /**
    * Transform voice result to MCP system format
    */
@@ -279,7 +282,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       context
     );
   }
-  
+
   /**
    * Transform MCP result to orchestration system format
    */
@@ -294,7 +297,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       context
     );
   }
-  
+
   /**
    * Batch transform multiple system results
    */
@@ -304,7 +307,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
   ): Promise<BatchTransformationResult> {
     const results: TransformationResult<any>[] = [];
     let allSuccessful = true;
-    
+
     for (const request of transformations) {
       try {
         const result = await this.transform(
@@ -313,7 +316,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
           request.targetSystem,
           context
         );
-        
+
         results.push(result);
         if (!result.success) {
           allSuccessful = false;
@@ -321,7 +324,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       } catch (error) {
         allSuccessful = false;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        
+
         results.push({
           success: false,
           error: errorMessage,
@@ -335,7 +338,9 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
           },
           validationResult: {
             valid: false,
-            errors: [{ field: 'data', message: errorMessage, severity: 'error', code: 'BATCH_FAILED' }],
+            errors: [
+              { field: 'data', message: errorMessage, severity: 'error', code: 'BATCH_FAILED' },
+            ],
             warnings: [],
             confidence: 0,
           },
@@ -349,7 +354,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
         });
       }
     }
-    
+
     return {
       success: allSuccessful,
       results,
@@ -358,7 +363,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       failedTransformations: results.filter(r => !r.success).length,
     };
   }
-  
+
   /**
    * Validate transformation pipeline health
    */
@@ -370,54 +375,61 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       recommendations: [],
       metrics: this.pipelineMetrics,
     };
-    
+
     // Check transformer health
     for (const [key, transformer] of this.transformers) {
-      const performance = this.pipelineMetrics.transformerPerformance.get(transformer.transformerId);
-      
+      const performance = this.pipelineMetrics.transformerPerformance.get(
+        transformer.transformerId
+      );
+
       if (!performance) {
         report.transformerStatus.set(key, 'untested');
         continue;
       }
-      
+
       if (performance.successRate < 0.8) {
         report.transformerStatus.set(key, 'unhealthy');
         report.overall = 'degraded';
-        report.recommendations.push(`Transformer ${key} has low success rate: ${(performance.successRate * 100).toFixed(1)}%`);
+        report.recommendations.push(
+          `Transformer ${key} has low success rate: ${(performance.successRate * 100).toFixed(1)}%`
+        );
       } else if (performance.averageTime > 5000) {
         report.transformerStatus.set(key, 'slow');
-        report.recommendations.push(`Transformer ${key} is slow: ${performance.averageTime.toFixed(0)}ms average`);
+        report.recommendations.push(
+          `Transformer ${key} is slow: ${performance.averageTime.toFixed(0)}ms average`
+        );
       } else {
         report.transformerStatus.set(key, 'healthy');
       }
     }
-    
+
     // Check data integrity trends
     const recentIntegrityScores = this.pipelineMetrics.dataIntegrityScores.slice(-10);
-    const averageIntegrity = recentIntegrityScores.reduce((a, b) => a + b, 0) / recentIntegrityScores.length;
-    
+    const averageIntegrity =
+      recentIntegrityScores.reduce((a, b) => a + b, 0) / recentIntegrityScores.length;
+
     if (averageIntegrity < 0.8) {
       report.overall = 'critical';
       report.recommendations.push('Data integrity is below acceptable threshold');
     }
-    
+
     return report;
   }
-  
+
   /**
    * Get transformation history for a request
    */
   getTransformationHistory(requestId: string): DataTransformation[] {
     return this.transformationHistory.get(requestId) || [];
   }
-  
+
   /**
    * Get pipeline metrics
    */
   getMetrics(): TransformationMetrics {
     return { ...this.pipelineMetrics };
   }
-  
+
   /**
    * Clear transformation cache
    */
@@ -425,50 +437,50 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
     this.transformationCache.clear();
     logger.info('Transformation cache cleared');
   }
-  
+
   // ========================================
   // PRIVATE IMPLEMENTATION METHODS
   // ========================================
-  
+
   private initializeBuiltInTransformers(): void {
     // Routing -> Voice transformer
     this.builtInTransformers.set('routing->voice', new RoutingToVoiceTransformer());
-    
+
     // Voice -> MCP transformer
     this.builtInTransformers.set('voice->mcp', new VoiceToMCPTransformer());
-    
+
     // MCP -> Orchestration transformer
     this.builtInTransformers.set('mcp->orchestration', new MCPToOrchestrationTransformer());
-    
+
     logger.info('Built-in transformers initialized', {
       count: this.builtInTransformers.size,
       transformers: Array.from(this.builtInTransformers.keys()),
     });
   }
-  
+
   private setupTransformationMatrix(): void {
     // Register built-in transformers
     this.registerTransformation(
       'intelligent-routing',
-      'voice-optimization', 
+      'voice-optimization',
       this.builtInTransformers.get('routing->voice')!
     );
-    
+
     this.registerTransformation(
       'voice-optimization',
       'mcp-enhancement',
       this.builtInTransformers.get('voice->mcp')!
     );
-    
+
     this.registerTransformation(
       'mcp-enhancement',
       'unified-orchestration',
       this.builtInTransformers.get('mcp->orchestration')!
     );
-    
+
     logger.info('Transformation matrix setup complete');
   }
-  
+
   private createTransformationRecord(
     transformationId: string,
     sourceSystem: string,
@@ -492,7 +504,7 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       dataLossDetails: validation.warnings.length > 0 ? validation.warnings : undefined,
     };
   }
-  
+
   private createFailedTransformationRecord(
     transformationId: string,
     sourceSystem: string,
@@ -520,8 +532,11 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       dataLossDetails: [error],
     };
   }
-  
-  private determineTransformationType(sourceSystem: string, targetSystem: string): TransformationType {
+
+  private determineTransformationType(
+    sourceSystem: string,
+    targetSystem: string
+  ): TransformationType {
     // Determine transformation type based on system pair
     if (sourceSystem === 'intelligent-routing' && targetSystem === 'voice-optimization') {
       return 'context_adaptation';
@@ -530,40 +545,40 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
     } else if (sourceSystem === 'mcp-enhancement' && targetSystem === 'unified-orchestration') {
       return 'data_reduction';
     }
-    
+
     return 'format_conversion';
   }
-  
+
   private getTransformationRules(transformer: DataTransformer): TransformationRule[] {
     // Extract transformation rules from transformer (if available)
     // This would be specific to each transformer implementation
     return [];
   }
-  
+
   private updateTransformationMetrics(
     transformationRecord: DataTransformation,
     executionTime: number,
     dataIntegrity: number
   ): void {
     this.pipelineMetrics.totalTransformations++;
-    
+
     if (transformationRecord.validationResults.valid) {
       this.pipelineMetrics.successfulTransformations++;
     } else {
       this.pipelineMetrics.failedTransformations++;
     }
-    
+
     // Update running average
     const alpha = 0.1;
     this.pipelineMetrics.averageTransformationTime =
       (1 - alpha) * this.pipelineMetrics.averageTransformationTime + alpha * executionTime;
-    
+
     // Track data integrity
     this.pipelineMetrics.dataIntegrityScores.push(dataIntegrity);
     if (this.pipelineMetrics.dataIntegrityScores.length > 100) {
       this.pipelineMetrics.dataIntegrityScores.shift(); // Keep only recent scores
     }
-    
+
     // Update transformer performance
     const transformerId = transformationRecord.transformationId;
     const current = this.pipelineMetrics.transformerPerformance.get(transformerId) || {
@@ -572,17 +587,17 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       averageTime: 0,
       successRate: 0,
     };
-    
+
     current.totalTransformations++;
     if (transformationRecord.validationResults.valid) {
       current.successfulTransformations++;
     }
     current.averageTime = (current.averageTime + executionTime) / 2;
     current.successRate = current.successfulTransformations / current.totalTransformations;
-    
+
     this.pipelineMetrics.transformerPerformance.set(transformerId, current);
   }
-  
+
   private cacheTransformation(
     cacheKey: string,
     result: TransformationResult<any>,
@@ -595,66 +610,66 @@ export class DataTransformationPipeline extends EventEmitter implements Transfor
       timestamp: Date.now(),
       accessCount: 0,
     };
-    
+
     this.transformationCache.set(cacheKey, cached);
-    
+
     // Clean old cache entries
     this.cleanupCache();
   }
-  
+
   private cleanupCache(): void {
     const maxAge = 300000; // 5 minutes
     const now = Date.now();
-    
+
     for (const [key, cached] of this.transformationCache) {
       if (now - cached.timestamp > maxAge) {
         this.transformationCache.delete(key);
       }
     }
   }
-  
+
   private storeTransformationHistory(requestId: string, record: DataTransformation): void {
     const history = this.transformationHistory.get(requestId) || [];
     history.push(record);
     this.transformationHistory.set(requestId, history);
-    
+
     // Clean up old history after request completion
     setTimeout(() => {
       this.transformationHistory.delete(requestId);
     }, 600000); // 10 minutes
   }
-  
+
   private generateTransformationId(): string {
     return `transform_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
-  
+
   private generateCacheKey(data: any, sourceSystem: string, targetSystem: string): string {
     // Generate a hash-based cache key
     const dataStr = JSON.stringify(data);
     const keyStr = `${sourceSystem}->${targetSystem}:${dataStr}`;
-    
+
     // Simple hash function
     let hash = 0;
     for (let i = 0; i < keyStr.length; i++) {
       const char = keyStr.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    
+
     return `cache_${Math.abs(hash).toString(16)}`;
   }
-  
+
   private isCacheValid(cached: CachedTransformation): boolean {
     const maxAge = 300000; // 5 minutes
-    return (Date.now() - cached.timestamp) < maxAge;
+    return Date.now() - cached.timestamp < maxAge;
   }
-  
+
   private createCachedResult<T>(
     cached: CachedTransformation,
     newTransformationId: string
   ): TransformationResult<T> {
     cached.accessCount++;
-    
+
     return {
       ...cached.result,
       metadata: {
@@ -673,7 +688,7 @@ class RoutingToVoiceTransformer implements DataTransformer {
   transformerId = 'routing-to-voice-v1';
   sourceFormat = 'UnifiedRoutingDecision';
   targetFormat = 'VoiceTransformationInput';
-  
+
   async transform(
     data: UnifiedRoutingDecision,
     context: UnifiedRequestContext
@@ -696,7 +711,7 @@ class RoutingToVoiceTransformer implements DataTransformer {
           maxCost: data.data.estimatedCost,
         },
       };
-      
+
       return {
         success: true,
         data: voiceInput,
@@ -728,10 +743,10 @@ class RoutingToVoiceTransformer implements DataTransformer {
       };
     }
   }
-  
+
   validate(data: any): ValidationResult {
     const errors: any[] = [];
-    
+
     if (!data.systemId || data.systemId !== 'intelligent-routing') {
       errors.push({
         field: 'systemId',
@@ -740,7 +755,7 @@ class RoutingToVoiceTransformer implements DataTransformer {
         code: 'INVALID_SYSTEM_ID',
       });
     }
-    
+
     if (!data.data?.selectedVoices) {
       errors.push({
         field: 'data.selectedVoices',
@@ -749,7 +764,7 @@ class RoutingToVoiceTransformer implements DataTransformer {
         code: 'MISSING_VOICES',
       });
     }
-    
+
     return {
       valid: errors.length === 0,
       errors,
@@ -763,7 +778,7 @@ class VoiceToMCPTransformer implements DataTransformer {
   transformerId = 'voice-to-mcp-v1';
   sourceFormat = 'UnifiedVoiceResult';
   targetFormat = 'MCPTransformationInput';
-  
+
   async transform(
     data: UnifiedVoiceResult,
     context: UnifiedRequestContext
@@ -773,21 +788,23 @@ class VoiceToMCPTransformer implements DataTransformer {
         requestId: context.requestId,
         voiceResult: data,
         requiredCapabilities: context.mcpRequirements.capabilities,
-        voiceIntegrationRequests: data.data.primaryVoice ? [
-          {
-            voiceId: data.data.primaryVoice.voiceId,
-            content: data.data.primaryVoice.content,
-            capabilities: this.extractRequiredCapabilities(data.data.primaryVoice.content),
-            priority: 'high',
-          }
-        ] : [],
+        voiceIntegrationRequests: data.data.primaryVoice
+          ? [
+              {
+                voiceId: data.data.primaryVoice.voiceId,
+                content: data.data.primaryVoice.content,
+                capabilities: this.extractRequiredCapabilities(data.data.primaryVoice.content),
+                priority: 'high',
+              },
+            ]
+          : [],
         constraints: {
           maxLatency: context.mcpRequirements.maxLatency,
           minReliability: context.mcpRequirements.minReliability,
           securityLevel: context.mcpRequirements.securityLevel,
         },
       };
-      
+
       return {
         success: true,
         data: mcpInput,
@@ -819,10 +836,10 @@ class VoiceToMCPTransformer implements DataTransformer {
       };
     }
   }
-  
+
   validate(data: any): ValidationResult {
     const errors: any[] = [];
-    
+
     if (!data.systemId || data.systemId !== 'voice-optimization') {
       errors.push({
         field: 'systemId',
@@ -831,7 +848,7 @@ class VoiceToMCPTransformer implements DataTransformer {
         code: 'INVALID_SYSTEM_ID',
       });
     }
-    
+
     return {
       valid: errors.length === 0,
       errors,
@@ -839,23 +856,27 @@ class VoiceToMCPTransformer implements DataTransformer {
       confidence: errors.length === 0 ? 1.0 : 0.0,
     };
   }
-  
+
   private extractRequiredCapabilities(content: string): string[] {
     // Extract MCP capabilities from voice content
     const capabilities: string[] = [];
-    
+
     if (content.includes('file') || content.includes('read') || content.includes('write')) {
       capabilities.push('filesystem');
     }
-    
+
     if (content.includes('git') || content.includes('commit') || content.includes('branch')) {
       capabilities.push('git');
     }
-    
-    if (content.includes('terminal') || content.includes('command') || content.includes('execute')) {
+
+    if (
+      content.includes('terminal') ||
+      content.includes('command') ||
+      content.includes('execute')
+    ) {
       capabilities.push('terminal');
     }
-    
+
     return capabilities;
   }
 }
@@ -864,7 +885,7 @@ class MCPToOrchestrationTransformer implements DataTransformer {
   transformerId = 'mcp-to-orchestration-v1';
   sourceFormat = 'UnifiedMCPResult';
   targetFormat = 'OrchestrationTransformationInput';
-  
+
   async transform(
     data: UnifiedMCPResult,
     context: UnifiedRequestContext
@@ -882,7 +903,7 @@ class MCPToOrchestrationTransformer implements DataTransformer {
         },
         finalOutputFormat: 'comprehensive',
       };
-      
+
       return {
         success: true,
         data: orchestrationInput,
@@ -914,10 +935,10 @@ class MCPToOrchestrationTransformer implements DataTransformer {
       };
     }
   }
-  
+
   validate(data: any): ValidationResult {
     const errors: any[] = [];
-    
+
     if (!data.systemId || data.systemId !== 'mcp-enhancement') {
       errors.push({
         field: 'systemId',
@@ -926,7 +947,7 @@ class MCPToOrchestrationTransformer implements DataTransformer {
         code: 'INVALID_SYSTEM_ID',
       });
     }
-    
+
     return {
       valid: errors.length === 0,
       errors,
@@ -934,7 +955,7 @@ class MCPToOrchestrationTransformer implements DataTransformer {
       confidence: errors.length === 0 ? 1.0 : 0.0,
     };
   }
-  
+
   private determineSynthesisMethod(context: UnifiedRequestContext): string {
     if (context.phase === 'council') {
       return 'collaborative';

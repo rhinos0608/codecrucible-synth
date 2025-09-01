@@ -1,7 +1,7 @@
 /**
  * Analyze Codebase Use Case
  * Application Layer - Clean codebase analysis orchestration
- * 
+ *
  * Handles: Code analysis with proper input/output transformation
  * Imports: Domain services only (follows ARCHITECTURE.md)
  */
@@ -71,17 +71,17 @@ export class AnalyzeCodebaseUseCase {
 
   async execute(input: CodebaseAnalysisInput): Promise<CodebaseAnalysisOutput> {
     const startTime = Date.now();
-    
+
     // Input validation and transformation
     const request = this.transformToProcessingRequest(input);
-    
+
     // Domain orchestration - Select appropriate voices for analysis type
     const voiceSelection = await this.selectAnalysisVoices(input.analysisType);
     const selectedModel = await this.modelSelectionService.selectOptimalModel(request);
-    
+
     // Gather codebase information (this would interface with infrastructure later)
     const codebaseInfo = await this.gatherCodebaseInformation(input);
-    
+
     // Generate analysis from selected voices
     const analysisResponses = await this.generateAnalysisResponses(
       voiceSelection,
@@ -89,12 +89,13 @@ export class AnalyzeCodebaseUseCase {
       request,
       codebaseInfo
     );
-    
+
     // Synthesize multi-voice analysis if multiple voices used
-    const synthesizedAnalysis = voiceSelection.length > 1
-      ? await this.synthesizeAnalysisResponses(analysisResponses)
-      : analysisResponses[0];
-    
+    const synthesizedAnalysis =
+      voiceSelection.length > 1
+        ? await this.synthesizeAnalysisResponses(analysisResponses)
+        : analysisResponses[0];
+
     // Transform to structured output
     return this.transformToOutput(
       synthesizedAnalysis,
@@ -107,7 +108,7 @@ export class AnalyzeCodebaseUseCase {
 
   private transformToProcessingRequest(input: CodebaseAnalysisInput): ProcessingRequest {
     const analysisPrompt = this.buildAnalysisPrompt(input);
-    
+
     return ProcessingRequest.create(
       analysisPrompt,
       'code-analysis' as any,
@@ -162,7 +163,7 @@ export class AnalyzeCodebaseUseCase {
     codebaseInfo: any
   ): Promise<any[]> {
     const responses = [];
-    
+
     for (const voiceId of voices) {
       try {
         const enhancedRequest = ProcessingRequest.create(
@@ -174,7 +175,7 @@ export class AnalyzeCodebaseUseCase {
         );
 
         const response = await model.generateResponse(enhancedRequest, { id: voiceId });
-        
+
         responses.push({
           voiceId,
           content: response.content,
@@ -185,7 +186,7 @@ export class AnalyzeCodebaseUseCase {
         console.warn(`Voice ${voiceId} failed analysis:`, error);
       }
     }
-    
+
     return responses;
   }
 
@@ -307,7 +308,7 @@ Create a cohesive analysis that:
   private extractSummary(content: string): string {
     // Extract first paragraph as summary (simplified extraction)
     const lines = content.split('\n').filter(line => line.trim());
-    return lines.slice(0, 3).join(' ').substring(0, 300) + '...';
+    return `${lines.slice(0, 3).join(' ').substring(0, 300)  }...`;
   }
 
   private extractFindings(content: string): AnalysisFinding[] {

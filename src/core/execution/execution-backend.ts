@@ -190,7 +190,7 @@ export class DockerBackend extends ExecutionBackend {
             suggestedActions: ['Wait for current executions to complete'],
             recoverable: true,
             retryable: true,
-            context: { operation: 'executeCode', component: 'execution-backend' }
+            context: { operation: 'executeCode', component: 'execution-backend' },
           }
         )
       );
@@ -227,11 +227,11 @@ export class DockerBackend extends ExecutionBackend {
                 userMessage: 'Working directory is not safe',
                 suggestedActions: ['Use a directory within the current project'],
                 recoverable: false,
-                context: { 
-                  operation: 'validateWorkingDirectory', 
+                context: {
+                  operation: 'validateWorkingDirectory',
                   component: 'docker-backend',
-                  workingDirectory: options.workingDirectory 
-                }
+                  workingDirectory: options.workingDirectory,
+                },
               }
             )
           );
@@ -284,7 +284,7 @@ export class DockerBackend extends ExecutionBackend {
               suggestedActions: ['Increase timeout', 'Optimize command'],
               recoverable: true,
               retryable: true,
-              context: { command, timeout: options.timeout, component: 'docker-backend' }
+              context: { command, timeout: options.timeout, component: 'docker-backend' },
             }
           )
         );
@@ -300,7 +300,7 @@ export class DockerBackend extends ExecutionBackend {
             suggestedActions: [
               'Check Docker daemon status',
               'Verify image availability',
-              'Try E2B or local execution'
+              'Try E2B or local execution',
             ],
             recoverable: true,
             retryable: true,
@@ -312,9 +312,9 @@ export class DockerBackend extends ExecutionBackend {
               exitCode: error.code || 1,
               duration,
               backend: 'docker',
-              component: 'docker-backend'
+              component: 'docker-backend',
             },
-            originalError: error
+            originalError: error,
           }
         )
       );
@@ -392,10 +392,10 @@ export class E2BBackend extends ExecutionBackend {
             context: {
               operation: 'e2bExecute',
               timestamp: Date.now(),
-              component: 'e2b-backend'
+              component: 'e2b-backend',
             },
             recoverable: true,
-            suggestedActions: ['Wait for current executions to complete']
+            suggestedActions: ['Wait for current executions to complete'],
           }
         )
       );
@@ -420,8 +420,8 @@ export class E2BBackend extends ExecutionBackend {
               context: {
                 operation: 'e2bExecute',
                 timestamp: Date.now(),
-                component: 'e2b-backend'
-              }
+                component: 'e2b-backend',
+              },
             }
           )
         );
@@ -476,8 +476,8 @@ export class E2BBackend extends ExecutionBackend {
               timestamp: Date.now(),
               component: 'e2b-backend',
               metadata: { sandboxId, command },
-              error
-            }
+              error,
+            },
           }
         )
       );
@@ -594,10 +594,10 @@ export class FirecrackerBackend extends ExecutionBackend {
             context: {
               operation: 'firecrackerExecute',
               timestamp: Date.now(),
-              component: 'firecracker-backend'
+              component: 'firecracker-backend',
             },
             recoverable: true,
-            suggestedActions: ['Wait for current executions to complete']
+            suggestedActions: ['Wait for current executions to complete'],
           }
         )
       );
@@ -824,10 +824,10 @@ export class PodmanBackend extends ExecutionBackend {
             context: {
               operation: 'podmanExecute',
               timestamp: Date.now(),
-              component: 'podman-backend'
+              component: 'podman-backend',
             },
             recoverable: true,
-            suggestedActions: ['Wait for current executions to complete']
+            suggestedActions: ['Wait for current executions to complete'],
           }
         )
       );
@@ -1076,13 +1076,13 @@ export class LocalProcessBackend extends ExecutionBackend {
                 operation: 'localProcessExecute',
                 timestamp: Date.now(),
                 component: 'local-process-backend',
-                metadata: { command, blocked: safety.reason }
+                metadata: { command, blocked: safety.reason },
               },
               recoverable: false,
               suggestedActions: [
                 'Use Docker or E2B backend for dangerous commands',
-                'Disable safeguards if you understand the risks'
-              ]
+                'Disable safeguards if you understand the risks',
+              ],
             }
           )
         );

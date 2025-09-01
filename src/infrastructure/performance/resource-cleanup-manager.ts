@@ -37,13 +37,9 @@ export class ResourceCleanupManager extends EventEmitter {
   /**
    * Register an interval for managed cleanup
    */
-  registerInterval(
-    interval: NodeJS.Timeout,
-    source: string,
-    description?: string
-  ): string {
+  registerInterval(interval: NodeJS.Timeout, source: string, description?: string): string {
     const id = this.generateId('interval', source);
-    
+
     this.resources.set(id, {
       id,
       type: 'interval',
@@ -53,23 +49,21 @@ export class ResourceCleanupManager extends EventEmitter {
       cleanup: () => {
         clearInterval(interval);
         logger.debug(`Cleared interval ${id} from ${source}`);
-      }
+      },
     });
 
-    logger.debug(`Registered interval ${id} from ${source}${description ? `: ${description}` : ''}`);
+    logger.debug(
+      `Registered interval ${id} from ${source}${description ? `: ${description}` : ''}`
+    );
     return id;
   }
 
   /**
    * Register a timeout for managed cleanup
    */
-  registerTimeout(
-    timeout: NodeJS.Timeout,
-    source: string,
-    description?: string
-  ): string {
+  registerTimeout(timeout: NodeJS.Timeout, source: string, description?: string): string {
     const id = this.generateId('timeout', source);
-    
+
     this.resources.set(id, {
       id,
       type: 'timeout',
@@ -79,7 +73,7 @@ export class ResourceCleanupManager extends EventEmitter {
       cleanup: () => {
         clearTimeout(timeout);
         logger.debug(`Cleared timeout ${id} from ${source}`);
-      }
+      },
     });
 
     logger.debug(`Registered timeout ${id} from ${source}${description ? `: ${description}` : ''}`);
@@ -96,7 +90,7 @@ export class ResourceCleanupManager extends EventEmitter {
     source: string
   ): string {
     const id = this.generateId('listener', source);
-    
+
     this.resources.set(id, {
       id,
       type: 'listener',
@@ -106,7 +100,7 @@ export class ResourceCleanupManager extends EventEmitter {
       cleanup: () => {
         emitter.removeListener(event, listener);
         logger.debug(`Removed listener ${id} from ${source} (${event})`);
-      }
+      },
     });
 
     logger.debug(`Registered listener ${id} from ${source} (${event})`);
@@ -123,17 +117,19 @@ export class ResourceCleanupManager extends EventEmitter {
     description?: string
   ): string {
     const id = this.generateId('connection', source);
-    
+
     this.resources.set(id, {
       id,
       type: 'connection',
       resource: connection,
       source,
       createdAt: Date.now(),
-      cleanup: cleanupFn
+      cleanup: cleanupFn,
     });
 
-    logger.debug(`Registered connection ${id} from ${source}${description ? `: ${description}` : ''}`);
+    logger.debug(
+      `Registered connection ${id} from ${source}${description ? `: ${description}` : ''}`
+    );
     return id;
   }
 
@@ -178,13 +174,12 @@ export class ResourceCleanupManager extends EventEmitter {
   /**
    * Cleanup old resources (older than maxAge milliseconds)
    */
-  cleanupOldResources(maxAge: number = 5 * 60 * 1000): number { // 5 minutes default
+  cleanupOldResources(maxAge: number = 5 * 60 * 1000): number {
+    // 5 minutes default
     const now = Date.now();
     let cleanedCount = 0;
-    
-    const toCleanup = Array.from(this.resources.values()).filter(
-      r => (now - r.createdAt) > maxAge
-    );
+
+    const toCleanup = Array.from(this.resources.values()).filter(r => now - r.createdAt > maxAge);
 
     for (const resource of toCleanup) {
       if (this.cleanup(resource.id)) {
@@ -202,7 +197,8 @@ export class ResourceCleanupManager extends EventEmitter {
   /**
    * Schedule periodic cleanup of old resources
    */
-  schedulePeriodicCleanup(interval: number = 2 * 60 * 1000): void { // 2 minutes default
+  schedulePeriodicCleanup(interval: number = 2 * 60 * 1000): void {
+    // 2 minutes default
     if (this.cleanupScheduled) {
       return;
     }
@@ -212,7 +208,7 @@ export class ResourceCleanupManager extends EventEmitter {
         clearInterval(cleanupInterval);
         return;
       }
-      
+
       this.cleanupOldResources();
     }, interval);
 
@@ -254,7 +250,7 @@ export class ResourceCleanupManager extends EventEmitter {
       totalResources: this.resources.size,
       byType,
       bySource,
-      oldest
+      oldest,
     };
   }
 
@@ -283,7 +279,9 @@ export class ResourceCleanupManager extends EventEmitter {
     }
 
     this.resources.clear();
-    logger.info(`✅ Resource cleanup manager shutdown complete. Cleaned ${cleanedCount} resources.`);
+    logger.info(
+      `✅ Resource cleanup manager shutdown complete. Cleaned ${cleanedCount} resources.`
+    );
   }
 
   private generateId(type: string, source: string): string {

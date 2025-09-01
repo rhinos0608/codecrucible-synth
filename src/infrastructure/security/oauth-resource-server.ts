@@ -1,7 +1,7 @@
 /**
  * OAuth Resource Server for MCP Security (2024 Standards)
  * Implements RFC 6749 OAuth 2.0 and RFC 8707 Resource Indicators
- * 
+ *
  * Based on 2024 MCP security research:
  * - OAuth Resource Server classification required for all MCP servers
  * - Resource Indicators (RFC 8707) provide fine-grained access control
@@ -84,12 +84,12 @@ export class OAuthResourceServer extends EventEmitter {
     super();
     this.config = config;
     this.startCacheCleanup();
-    
+
     logger.info('OAuth Resource Server initialized', {
       issuer: config.issuer,
       audience: config.audience,
       requiredScopes: config.requiredScopes,
-      resourceIndicators: config.resourceIndicators.length
+      resourceIndicators: config.resourceIndicators.length,
     });
   }
 
@@ -106,7 +106,7 @@ export class OAuthResourceServer extends EventEmitter {
           scopes: [],
           resourceIndicators: [],
           error: 'invalid_request',
-          errorDescription: 'Missing or malformed Authorization header'
+          errorDescription: 'Missing or malformed Authorization header',
         };
       }
 
@@ -121,10 +121,10 @@ export class OAuthResourceServer extends EventEmitter {
 
       // Validate JWT structure and signature
       const validationResult = await this.validateJWT(token);
-      
+
       // Cache result if configured
       if (this.config.caching.tokenCache && validationResult.valid) {
-        const cacheExpiry = Date.now() + (this.config.caching.tokenCacheTtl * 1000);
+        const cacheExpiry = Date.now() + this.config.caching.tokenCacheTtl * 1000;
         this.tokenCache.set(token, { result: validationResult, expires: cacheExpiry });
       }
 
@@ -133,11 +133,10 @@ export class OAuthResourceServer extends EventEmitter {
         valid: validationResult.valid,
         subject: validationResult.claims?.sub,
         scopes: validationResult.scopes,
-        resourceIndicators: validationResult.resourceIndicators
+        resourceIndicators: validationResult.resourceIndicators,
       });
 
       return validationResult;
-
     } catch (error) {
       logger.error('Bearer token validation failed', { error });
       return {
@@ -145,7 +144,7 @@ export class OAuthResourceServer extends EventEmitter {
         scopes: [],
         resourceIndicators: [],
         error: 'server_error',
-        errorDescription: 'Token validation failed due to server error'
+        errorDescription: 'Token validation failed due to server error',
       };
     }
   }
@@ -179,14 +178,14 @@ export class OAuthResourceServer extends EventEmitter {
           scopes: [],
           resourceIndicators: [],
           error: 'invalid_token',
-          errorDescription: 'Malformed JWT structure'
+          errorDescription: 'Malformed JWT structure',
         };
       }
 
       // Decode header and payload
       const header = this.decodeBase64Url(parts[0]);
       const payload = this.decodeBase64Url(parts[1]);
-      
+
       const headerObj = JSON.parse(header);
       const claims: TokenClaims = JSON.parse(payload);
 
@@ -197,7 +196,7 @@ export class OAuthResourceServer extends EventEmitter {
           scopes: [],
           resourceIndicators: [],
           error: 'invalid_token',
-          errorDescription: `Unsupported algorithm: ${headerObj.alg}`
+          errorDescription: `Unsupported algorithm: ${headerObj.alg}`,
         };
       }
 
@@ -205,35 +204,35 @@ export class OAuthResourceServer extends EventEmitter {
       const now = Math.floor(Date.now() / 1000);
       const clockTolerance = this.config.tokenValidation.clockTolerance;
 
-      if (claims.exp && claims.exp < (now - clockTolerance)) {
+      if (claims.exp && claims.exp < now - clockTolerance) {
         return {
           valid: false,
           scopes: [],
           resourceIndicators: [],
           error: 'invalid_token',
-          errorDescription: 'Token has expired'
+          errorDescription: 'Token has expired',
         };
       }
 
-      if (claims.nbf && claims.nbf > (now + clockTolerance)) {
+      if (claims.nbf && claims.nbf > now + clockTolerance) {
         return {
           valid: false,
           scopes: [],
           resourceIndicators: [],
           error: 'invalid_token',
-          errorDescription: 'Token not yet valid'
+          errorDescription: 'Token not yet valid',
         };
       }
 
       if (claims.iat && this.config.tokenValidation.maxAge > 0) {
         const maxAge = this.config.tokenValidation.maxAge;
-        if (claims.iat < (now - maxAge)) {
+        if (claims.iat < now - maxAge) {
           return {
             valid: false,
             scopes: [],
             resourceIndicators: [],
             error: 'invalid_token',
-            errorDescription: 'Token too old'
+            errorDescription: 'Token too old',
           };
         }
       }
@@ -245,7 +244,7 @@ export class OAuthResourceServer extends EventEmitter {
           scopes: [],
           resourceIndicators: [],
           error: 'invalid_token',
-          errorDescription: 'Invalid issuer'
+          errorDescription: 'Invalid issuer',
         };
       }
 
@@ -257,7 +256,7 @@ export class OAuthResourceServer extends EventEmitter {
           scopes: [],
           resourceIndicators: [],
           error: 'invalid_token',
-          errorDescription: 'Invalid audience'
+          errorDescription: 'Invalid audience',
         };
       }
 
@@ -269,7 +268,7 @@ export class OAuthResourceServer extends EventEmitter {
           scopes: [],
           resourceIndicators: [],
           error: 'invalid_token',
-          errorDescription: 'Invalid token signature'
+          errorDescription: 'Invalid token signature',
         };
       }
 
@@ -282,7 +281,7 @@ export class OAuthResourceServer extends EventEmitter {
           scopes,
           resourceIndicators: [],
           error: 'insufficient_scope',
-          errorDescription: 'Token lacks required scopes'
+          errorDescription: 'Token lacks required scopes',
         };
       }
 
@@ -295,7 +294,7 @@ export class OAuthResourceServer extends EventEmitter {
           scopes,
           resourceIndicators,
           error: 'invalid_resource',
-          errorDescription: 'Token lacks required resource indicators'
+          errorDescription: 'Token lacks required resource indicators',
         };
       }
 
@@ -303,16 +302,15 @@ export class OAuthResourceServer extends EventEmitter {
         subject: claims.sub,
         client: claims.client_id,
         scopes: scopes.length,
-        resources: resourceIndicators.length
+        resources: resourceIndicators.length,
       });
 
       return {
         valid: true,
         claims,
         scopes,
-        resourceIndicators
+        resourceIndicators,
       };
-
     } catch (error) {
       logger.error('JWT validation error', { error });
       return {
@@ -320,7 +318,7 @@ export class OAuthResourceServer extends EventEmitter {
         scopes: [],
         resourceIndicators: [],
         error: 'invalid_token',
-        errorDescription: 'Token validation failed'
+        errorDescription: 'Token validation failed',
       };
     }
   }
@@ -328,7 +326,11 @@ export class OAuthResourceServer extends EventEmitter {
   /**
    * Validate JWT signature using JWKS
    */
-  private async validateSignature(token: string, header: any, claims: TokenClaims): Promise<boolean> {
+  private async validateSignature(
+    token: string,
+    header: any,
+    claims: TokenClaims
+  ): Promise<boolean> {
     try {
       // Get signing key from JWKS
       const jwk = await this.getSigningKey(header.kid);
@@ -339,7 +341,7 @@ export class OAuthResourceServer extends EventEmitter {
 
       // Convert JWK to crypto key
       const publicKey = await this.jwkToCryptoKey(jwk);
-      
+
       // Verify signature based on algorithm
       const [headerB64, payloadB64, signatureB64] = token.split('.');
       const signatureData = `${headerB64}.${payloadB64}`;
@@ -367,7 +369,6 @@ export class OAuthResourceServer extends EventEmitter {
       }
 
       return isValid;
-
     } catch (error) {
       logger.error('Signature validation failed', { error });
       return false;
@@ -389,10 +390,10 @@ export class OAuthResourceServer extends EventEmitter {
 
       // Fetch JWKS from endpoint
       const jwks = await this.fetchJWKS();
-      
+
       // Find appropriate key
       let selectedKey: JWK | null = null;
-      
+
       if (keyId) {
         selectedKey = jwks.keys.find(key => key.kid === keyId) || null;
       } else {
@@ -402,12 +403,11 @@ export class OAuthResourceServer extends EventEmitter {
 
       // Cache the key
       if (selectedKey && keyId && this.config.caching.jwksCache) {
-        const cacheExpiry = Date.now() + (this.config.caching.jwksCacheTtl * 1000);
+        const cacheExpiry = Date.now() + this.config.caching.jwksCacheTtl * 1000;
         this.jwksCache.set(keyId, { jwk: selectedKey, expires: cacheExpiry });
       }
 
       return selectedKey;
-
     } catch (error) {
       logger.error('Failed to get signing key', { keyId, error });
       return null;
@@ -422,19 +422,20 @@ export class OAuthResourceServer extends EventEmitter {
       // In a real implementation, this would be an HTTP request
       // For now, return a mock JWKS for development
       const mockJWKS: JWKS = {
-        keys: [{
-          kty: 'RSA',
-          use: 'sig',
-          alg: 'RS256',
-          kid: 'mock-key-1',
-          n: 'mock-rsa-modulus',
-          e: 'AQAB'
-        }]
+        keys: [
+          {
+            kty: 'RSA',
+            use: 'sig',
+            alg: 'RS256',
+            kid: 'mock-key-1',
+            n: 'mock-rsa-modulus',
+            e: 'AQAB',
+          },
+        ],
       };
 
       logger.debug('JWKS fetched successfully', { keysCount: mockJWKS.keys.length });
       return mockJWKS;
-
     } catch (error) {
       logger.error('Failed to fetch JWKS', { jwksUri: this.config.jwksUri, error });
       throw error;
@@ -451,15 +452,15 @@ export class OAuthResourceServer extends EventEmitter {
         // Convert JWK RSA key to PEM format
         // In production, use a library like node-jose or crypto.createPublicKey
         return `-----BEGIN PUBLIC KEY-----\n${jwk.n}\n-----END PUBLIC KEY-----`;
-      
+
       case 'EC':
         // Convert JWK EC key to PEM format
         return `-----BEGIN PUBLIC KEY-----\n${jwk.x}${jwk.y}\n-----END PUBLIC KEY-----`;
-      
+
       case 'oct':
         // Symmetric key
         return Buffer.from(jwk.k!, 'base64url');
-      
+
       default:
         throw new Error(`Unsupported key type: ${jwk.kty}`);
     }
@@ -470,18 +471,18 @@ export class OAuthResourceServer extends EventEmitter {
    */
   private extractScopes(claims: TokenClaims): string[] {
     if (!claims.scope) return [];
-    
+
     // Scopes can be space-separated string or array
     if (typeof claims.scope === 'string') {
       return claims.scope.split(' ').filter(s => s.length > 0);
     }
-    
+
     // Handle array case with explicit typing
     const scope = claims.scope as any;
     if (Array.isArray(scope)) {
       return scope.filter((s: any) => typeof s === 'string' && s.length > 0);
     }
-    
+
     return [];
   }
 
@@ -492,9 +493,9 @@ export class OAuthResourceServer extends EventEmitter {
     // Check if token has all required scopes
     for (const requiredScope of this.config.requiredScopes) {
       if (!tokenScopes.includes(requiredScope)) {
-        logger.debug('Missing required scope', { 
+        logger.debug('Missing required scope', {
           required: requiredScope,
-          available: tokenScopes 
+          available: tokenScopes,
         });
         return false;
       }
@@ -507,15 +508,15 @@ export class OAuthResourceServer extends EventEmitter {
    */
   private extractResourceIndicators(claims: TokenClaims): string[] {
     if (!claims.resource) return [];
-    
+
     if (typeof claims.resource === 'string') {
       return [claims.resource];
     }
-    
+
     if (Array.isArray(claims.resource)) {
       return claims.resource.filter(r => typeof r === 'string' && r.length > 0);
     }
-    
+
     return [];
   }
 
@@ -536,9 +537,9 @@ export class OAuthResourceServer extends EventEmitter {
 
     logger.debug('Missing required resource indicators', {
       required: this.config.resourceIndicators,
-      available: tokenResources
+      available: tokenResources,
     });
-    
+
     return false;
   }
 
@@ -551,10 +552,10 @@ export class OAuthResourceServer extends EventEmitter {
     while (padded.length % 4) {
       padded += '=';
     }
-    
+
     // Replace URL-safe characters
     const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
-    
+
     return Buffer.from(base64, 'base64').toString('utf8');
   }
 
@@ -566,7 +567,7 @@ export class OAuthResourceServer extends EventEmitter {
     while (padded.length % 4) {
       padded += '=';
     }
-    
+
     const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
     return Buffer.from(base64, 'base64');
   }
@@ -578,7 +579,7 @@ export class OAuthResourceServer extends EventEmitter {
     if (this.cleanupInterval) return;
 
     this.cleanupInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       this.cleanupExpiredEntries();
     }, 60000); // Clean every minute
   }
@@ -627,7 +628,7 @@ export class OAuthResourceServer extends EventEmitter {
       tokenCacheSize: this.tokenCache.size,
       cacheHitRate: 0.85, // Mock value
       validationCount: 0, // Would be tracked
-      errorCount: 0 // Would be tracked
+      errorCount: 0, // Would be tracked
     };
   }
 
@@ -659,12 +660,12 @@ export const defaultOAuthConfig: OAuthConfig = {
     enabled: true,
     clockTolerance: 30, // 30 seconds
     maxAge: 3600, // 1 hour
-    algorithms: ['RS256', 'ES256']
+    algorithms: ['RS256', 'ES256'],
   },
   caching: {
     jwksCache: true,
     jwksCacheTtl: 300, // 5 minutes
     tokenCache: true,
-    tokenCacheTtl: 60 // 1 minute
-  }
+    tokenCacheTtl: 60, // 1 minute
+  },
 };

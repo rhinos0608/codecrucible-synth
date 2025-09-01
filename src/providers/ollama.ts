@@ -33,11 +33,11 @@ export class OllamaProvider {
       model: config.model, // Will be set by autonomous detection
       timeout: config.timeout || 110000, // 110s - legacy timeout for backwards compatibility
       timeouts: config.timeouts || {
-        connection: 5000,      // 5s for connection establishment
-        coldStart: 60000,      // 60s for cold model loading with function calling
-        generation: 120000,    // 2 minutes for complex generation
-        healthCheck: 3000      // 3s for quick health checks
-      }
+        connection: 5000, // 5s for connection establishment
+        coldStart: 60000, // 60s for cold model loading with function calling
+        generation: 120000, // 2 minutes for complex generation
+        healthCheck: 3000, // 3s for quick health checks
+      },
     };
 
     this.model = this.config.model || 'auto-detect'; // Mark for autonomous detection
@@ -45,26 +45,26 @@ export class OllamaProvider {
 
     // Initialize official Ollama client
     this.client = new Ollama({
-      host: this.config.endpoint || 'http://localhost:11434'
+      host: this.config.endpoint || 'http://localhost:11434',
     });
 
     logger.debug('OllamaProvider initialized successfully', {
       endpoint: this.config.endpoint,
-      model: this.model
+      model: this.model,
     });
   }
 
   async isServiceAvailable(): Promise<boolean> {
     try {
       logger.debug('OllamaProvider checking service availability');
-      
+
       // Use official Ollama client to check availability
       const models = await this.client.list();
       this.isAvailable = models.models.length > 0;
-      
+
       logger.info('OllamaProvider availability check result', {
         available: this.isAvailable,
-        modelCount: models.models.length
+        modelCount: models.models.length,
       });
 
       return this.isAvailable;
@@ -72,7 +72,7 @@ export class OllamaProvider {
       this.isAvailable = false;
       logger.warn('OllamaProvider service availability check failed', {
         error: getErrorMessage(error),
-        endpoint: this.config.endpoint
+        endpoint: this.config.endpoint,
       });
       return false;
     }
@@ -83,12 +83,12 @@ export class OllamaProvider {
       logger.debug('OllamaProvider generateText called', {
         promptLength: prompt.length,
         model: this.model,
-        hasOptions: Object.keys(options).length > 0
+        hasOptions: Object.keys(options).length > 0,
       });
 
       // Determine model to use
       const modelToUse = this.model === 'auto-detect' ? await this.detectBestModel() : this.model;
-      
+
       if (!modelToUse) {
         throw new Error('No model available for text generation');
       }
@@ -101,8 +101,8 @@ export class OllamaProvider {
         options: {
           temperature: options.temperature || 0.7,
           num_ctx: options.num_ctx || 4096,
-          ...options
-        }
+          ...options,
+        },
       });
 
       logger.info('OllamaProvider generateText completed', {
@@ -110,7 +110,7 @@ export class OllamaProvider {
         responseLength: response.response.length,
         promptTokens: response.prompt_eval_count,
         responseTokens: response.eval_count,
-        totalDuration: response.total_duration
+        totalDuration: response.total_duration,
       });
 
       return response.response;
@@ -118,7 +118,7 @@ export class OllamaProvider {
       logger.error('OllamaProvider generateText failed', {
         error: getErrorMessage(error),
         model: this.model,
-        endpoint: this.config.endpoint
+        endpoint: this.config.endpoint,
       });
       throw error;
     }
@@ -128,11 +128,11 @@ export class OllamaProvider {
     try {
       logger.debug('OllamaProvider generateTextStreaming called', {
         promptLength: prompt.length,
-        model: this.model
+        model: this.model,
       });
 
       const modelToUse = this.model === 'auto-detect' ? await this.detectBestModel() : this.model;
-      
+
       if (!modelToUse) {
         throw new Error('No model available for streaming generation');
       }
@@ -145,8 +145,8 @@ export class OllamaProvider {
         options: {
           temperature: options.temperature || 0.7,
           num_ctx: options.num_ctx || 4096,
-          ...options
-        }
+          ...options,
+        },
       });
 
       return (async function* () {
@@ -159,7 +159,7 @@ export class OllamaProvider {
     } catch (error) {
       logger.error('OllamaProvider generateTextStreaming failed', {
         error: getErrorMessage(error),
-        model: this.model
+        model: this.model,
       });
       throw error;
     }
@@ -169,11 +169,11 @@ export class OllamaProvider {
     try {
       logger.debug('OllamaProvider chat called', {
         messageCount: messages.length,
-        model: this.model
+        model: this.model,
       });
 
       const modelToUse = this.model === 'auto-detect' ? await this.detectBestModel() : this.model;
-      
+
       if (!modelToUse) {
         throw new Error('No model available for chat');
       }
@@ -185,20 +185,20 @@ export class OllamaProvider {
         options: {
           temperature: options.temperature || 0.7,
           num_ctx: options.num_ctx || 4096,
-          ...options
-        }
+          ...options,
+        },
       });
 
       logger.info('OllamaProvider chat completed', {
         model: modelToUse,
-        responseLength: response.message.content.length
+        responseLength: response.message.content.length,
       });
 
       return response.message.content;
     } catch (error) {
       logger.error('OllamaProvider chat failed', {
         error: getErrorMessage(error),
-        model: this.model
+        model: this.model,
       });
       throw error;
     }
@@ -207,15 +207,14 @@ export class OllamaProvider {
   private async detectBestModel(): Promise<string> {
     try {
       const models = await this.client.list();
-      
+
       if (models.models.length === 0) {
         throw new Error('No models available');
       }
 
       // Prefer coding models for CodeCrucible
-      const codingModels = models.models.filter(m => 
-        m.name.toLowerCase().includes('coder') || 
-        m.name.toLowerCase().includes('code')
+      const codingModels = models.models.filter(
+        m => m.name.toLowerCase().includes('coder') || m.name.toLowerCase().includes('code')
       );
 
       if (codingModels.length > 0) {
@@ -226,7 +225,7 @@ export class OllamaProvider {
       return models.models[0].name;
     } catch (error) {
       logger.error('OllamaProvider model detection failed', {
-        error: getErrorMessage(error)
+        error: getErrorMessage(error),
       });
       throw error;
     }
@@ -238,7 +237,7 @@ export class OllamaProvider {
       return models.models.length > 0;
     } catch (error) {
       logger.debug('OllamaProvider health check failed', {
-        error: getErrorMessage(error)
+        error: getErrorMessage(error),
       });
       return false;
     }
@@ -260,7 +259,7 @@ export class OllamaProvider {
   // Legacy compatibility methods
   async processRequest(request: any): Promise<any> {
     logger.debug('OllamaProvider processRequest called (legacy compatibility)');
-    
+
     if (request.messages) {
       return this.chat(request.messages, request.options || {});
     } else if (request.prompt) {

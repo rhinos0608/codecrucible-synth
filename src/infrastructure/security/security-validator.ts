@@ -6,6 +6,4 @@
 export * from '../../domain/services/unified-security-validator.js';
 
 // Named export alias for backward compatibility
-export { 
-  UnifiedSecurityValidator as SecurityValidator 
-} from '../../domain/services/unified-security-validator.js';
+export { UnifiedSecurityValidator as SecurityValidator } from '../../domain/services/unified-security-validator.js';

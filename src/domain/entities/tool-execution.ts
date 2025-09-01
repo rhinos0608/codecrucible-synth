@@ -4,7 +4,7 @@
  *
  * Living Spiral Council Applied:
  * - Domain-driven design with pure business entities
- * - No external dependencies or infrastructure concerns  
+ * - No external dependencies or infrastructure concerns
  * - Business rules for tool execution validation and result processing
  */
 
@@ -59,14 +59,16 @@ export class ToolName {
     if (!name || name.trim().length === 0) {
       throw new Error('Tool name cannot be empty');
     }
-    
+
     if (name.length > 100) {
       throw new Error('Tool name too long (max 100 characters)');
     }
-    
+
     // Basic validation for tool name format
     if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(name)) {
-      throw new Error('Tool name must start with letter and contain only letters, numbers, underscore, or dash');
+      throw new Error(
+        'Tool name must start with letter and contain only letters, numbers, underscore, or dash'
+      );
     }
   }
 }
@@ -75,13 +77,21 @@ export class ToolName {
  * Execution Status Value Object
  */
 export class ExecutionStatus {
-  private static readonly VALID_STATUSES = ['pending', 'running', 'success', 'failure', 'timeout'] as const;
-  
-  private constructor(private readonly _value: typeof ExecutionStatus.VALID_STATUSES[number]) {}
+  private static readonly VALID_STATUSES = [
+    'pending',
+    'running',
+    'success',
+    'failure',
+    'timeout',
+  ] as const;
+
+  private constructor(private readonly _value: (typeof ExecutionStatus.VALID_STATUSES)[number]) {}
 
   static create(value: string): ExecutionStatus {
     if (!this.VALID_STATUSES.includes(value as any)) {
-      throw new Error(`Invalid execution status: ${value}. Must be one of: ${this.VALID_STATUSES.join(', ')}`);
+      throw new Error(
+        `Invalid execution status: ${value}. Must be one of: ${this.VALID_STATUSES.join(', ')}`
+      );
     }
     return new ExecutionStatus(value as any);
   }
@@ -178,7 +188,7 @@ export class ExecutionDuration {
    * Business rule: Check if execution duration indicates timeout risk
    */
   isNearTimeout(timeoutMs: number): boolean {
-    return this._milliseconds > (timeoutMs * 0.8); // > 80% of timeout
+    return this._milliseconds > timeoutMs * 0.8; // > 80% of timeout
   }
 
   add(other: ExecutionDuration): ExecutionDuration {
@@ -230,15 +240,15 @@ export class ToolArguments {
     if (toolName.isFileSystemTool()) {
       return this.hasArgument('path') || this.hasArgument('filename');
     }
-    
+
     if (toolName.isGitTool()) {
       return this.hasArgument('repository') || this.hasArgument('command');
     }
-    
+
     if (toolName.isTerminalTool()) {
       return this.hasArgument('command') || this.hasArgument('script');
     }
-    
+
     return true; // For unknown tool types, assume valid
   }
 }
@@ -290,19 +300,19 @@ export class ToolResult {
    */
   hasMeaningfulOutput(): boolean {
     if (!this.hasOutput()) return false;
-    
+
     if (typeof this._output === 'string') {
       return this._output.trim().length > 0;
     }
-    
+
     if (Array.isArray(this._output)) {
       return this._output.length > 0;
     }
-    
+
     if (typeof this._output === 'object') {
       return Object.keys(this._output).length > 0;
     }
-    
+
     return true;
   }
 
@@ -311,18 +321,18 @@ export class ToolResult {
    */
   isRecoverableFailure(): boolean {
     if (this._success) return false;
-    
+
     // Check for common recoverable errors
     const recoverablePatterns = [
       'file not found',
       'permission denied',
       'connection timeout',
       'rate limit',
-      'temporary error'
+      'temporary error',
     ];
-    
+
     if (!this._errorMessage) return false;
-    
+
     const errorLower = this._errorMessage.toLowerCase();
     return recoverablePatterns.some(pattern => errorLower.includes(pattern));
   }
@@ -348,7 +358,7 @@ export class ToolExecution {
     startTime: Date = new Date()
   ) {
     this.validateInputs(executionId);
-    
+
     this._executionId = executionId;
     this._toolName = toolName;
     this._arguments = arguments_;
@@ -399,7 +409,7 @@ export class ToolExecution {
     if (!this._status.isPending()) {
       throw new Error(`Cannot start execution in ${this._status.value} state`);
     }
-    
+
     const newExecution = this.clone();
     newExecution._status = ExecutionStatus.running();
     return newExecution;
@@ -412,7 +422,7 @@ export class ToolExecution {
     if (!this._status.isRunning()) {
       throw new Error(`Cannot complete execution in ${this._status.value} state`);
     }
-    
+
     const newExecution = this.clone();
     newExecution._status = ExecutionStatus.success();
     newExecution._result = ToolResult.success(result);
@@ -420,7 +430,7 @@ export class ToolExecution {
     newExecution._duration = ExecutionDuration.create(
       newExecution._endTime.getTime() - this._startTime.getTime()
     );
-    
+
     return newExecution;
   }
 
@@ -431,7 +441,7 @@ export class ToolExecution {
     if (!this._status.isRunning()) {
       throw new Error(`Cannot complete execution in ${this._status.value} state`);
     }
-    
+
     const newExecution = this.clone();
     newExecution._status = ExecutionStatus.failure();
     newExecution._result = ToolResult.failure(errorMessage, output);
@@ -439,7 +449,7 @@ export class ToolExecution {
     newExecution._duration = ExecutionDuration.create(
       newExecution._endTime.getTime() - this._startTime.getTime()
     );
-    
+
     return newExecution;
   }
 
@@ -450,7 +460,7 @@ export class ToolExecution {
     if (this._status.isCompleted()) {
       return this; // Already completed
     }
-    
+
     const newExecution = this.clone();
     newExecution._status = ExecutionStatus.timeout();
     newExecution._result = ToolResult.failure('Execution timed out');
@@ -458,7 +468,7 @@ export class ToolExecution {
     newExecution._duration = ExecutionDuration.create(
       newExecution._endTime.getTime() - this._startTime.getTime()
     );
-    
+
     return newExecution;
   }
 
@@ -469,7 +479,7 @@ export class ToolExecution {
     if (!this._status.isRunning()) {
       return false;
     }
-    
+
     const currentDuration = new Date().getTime() - this._startTime.getTime();
     return currentDuration > maxDurationMs;
   }
@@ -478,9 +488,11 @@ export class ToolExecution {
    * Business rule: Check if execution is successful and meaningful
    */
   isSuccessfulWithMeaningfulOutput(): boolean {
-    return this._status.isSuccessful() && 
-           this._result?.isSuccess() === true && 
-           this._result.hasMeaningfulOutput();
+    return (
+      this._status.isSuccessful() &&
+      this._result?.isSuccess() === true &&
+      this._result.hasMeaningfulOutput()
+    );
   }
 
   /**
@@ -497,24 +509,24 @@ export class ToolExecution {
     if (!this._status.isCompleted()) {
       return 0;
     }
-    
+
     let score = 0;
-    
+
     // Success contributes heavily to efficiency
     if (this._status.isSuccessful()) {
       score += 0.6;
     }
-    
+
     // Meaningful output adds to efficiency
     if (this._result?.hasMeaningfulOutput()) {
       score += 0.2;
     }
-    
+
     // Fast execution adds to efficiency
     if (!this._duration.isSlowExecution()) {
       score += 0.2;
     }
-    
+
     return score;
   }
 
@@ -523,31 +535,31 @@ export class ToolExecution {
    */
   getExecutionInsights(): string[] {
     const insights: string[] = [];
-    
+
     if (this._status.isSuccessful()) {
       if (this._duration.isSlowExecution()) {
         insights.push('Execution was slow - consider optimization');
       }
-      
+
       if (this._result && !this._result.hasMeaningfulOutput()) {
         insights.push('Tool succeeded but provided no meaningful output');
       }
     }
-    
+
     if (this._status.isFailed()) {
       if (this.isRecoverableFailure()) {
         insights.push('Failure appears recoverable - retry may succeed');
       }
-      
+
       if (this._status.value === 'timeout') {
         insights.push('Execution timed out - consider increasing timeout or optimizing tool');
       }
     }
-    
+
     if (!this._arguments.areValidFor(this._toolName)) {
       insights.push('Arguments may not be appropriate for this tool type');
     }
-    
+
     return insights;
   }
 
@@ -562,7 +574,7 @@ export class ToolExecution {
     newExecution._endTime = this._endTime;
     newExecution._result = this._result;
     newExecution._duration = this._duration;
-    
+
     return newExecution;
   }
 
@@ -573,7 +585,7 @@ export class ToolExecution {
   }
 
   // Factory methods
-  
+
   static createPending(toolName: string, arguments_: Record<string, any>): ToolExecution {
     const executionId = `exec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     return new ToolExecution(

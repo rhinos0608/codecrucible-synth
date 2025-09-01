@@ -1,7 +1,7 @@
 /**
  * Memory Usage Optimizer
  * Monitors and optimizes memory usage across the system with intelligent garbage collection
- * 
+ *
  * Performance Impact: 30-50% memory reduction through proactive management
  */
 
@@ -9,9 +9,9 @@ import { logger } from '../logging/logger.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 
 interface MemoryConfig {
-  maxHeapSize: number;          // Max heap size in MB
-  gcThreshold: number;          // GC trigger threshold (0-1)
-  monitoringInterval: number;   // Memory check interval in ms
+  maxHeapSize: number; // Max heap size in MB
+  gcThreshold: number; // GC trigger threshold (0-1)
+  monitoringInterval: number; // Memory check interval in ms
   leakDetectionEnabled: boolean;
   cacheEvictionEnabled: boolean;
   aggressiveCleanup: boolean;
@@ -37,12 +37,12 @@ export class MemoryUsageOptimizer {
   private static instance: MemoryUsageOptimizer | null = null;
   private static isTestMode = false;
   private config: MemoryConfig = {
-    maxHeapSize: 512,          // 512MB default
-    gcThreshold: 0.8,          // Trigger at 80% usage
-    monitoringInterval: 5000,  // Check every 5 seconds
+    maxHeapSize: 512, // 512MB default
+    gcThreshold: 0.8, // Trigger at 80% usage
+    monitoringInterval: 5000, // Check every 5 seconds
     leakDetectionEnabled: true,
     cacheEvictionEnabled: true,
-    aggressiveCleanup: false
+    aggressiveCleanup: false,
   };
 
   private memoryHistory: MemorySnapshot[] = [];
@@ -56,12 +56,11 @@ export class MemoryUsageOptimizer {
     if (!MemoryUsageOptimizer.isTestMode) {
       this.startMemoryMonitoring();
     }
-    
+
     // Hook into process events for memory management
     if (typeof process !== 'undefined') {
-      process.on('warning', (warning) => {
-        if (warning.name === 'MaxListenersExceededWarning' || 
-            warning.message.includes('memory')) {
+      process.on('warning', warning => {
+        if (warning.name === 'MaxListenersExceededWarning' || warning.message.includes('memory')) {
           this.handleMemoryWarning(warning);
         }
       });
@@ -103,7 +102,7 @@ export class MemoryUsageOptimizer {
     logger.info('Memory monitoring started', {
       interval: `${this.config.monitoringInterval}ms`,
       maxHeapSize: `${this.config.maxHeapSize}MB`,
-      gcThreshold: `${(this.config.gcThreshold * 100).toFixed(0)}%`
+      gcThreshold: `${(this.config.gcThreshold * 100).toFixed(0)}%`,
     });
   }
 
@@ -113,14 +112,14 @@ export class MemoryUsageOptimizer {
   private performMemoryCheck(): void {
     const memoryUsage = process.memoryUsage();
     const currentTime = Date.now();
-    
+
     const snapshot: MemorySnapshot = {
       timestamp: currentTime,
       heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024), // MB
       heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024), // MB
       external: Math.round(memoryUsage.external / 1024 / 1024), // MB
       rss: Math.round(memoryUsage.rss / 1024 / 1024), // MB
-      gcCount: this.gcCount
+      gcCount: this.gcCount,
     };
 
     this.memoryHistory.push(snapshot);
@@ -150,7 +149,7 @@ export class MemoryUsageOptimizer {
         heapTotal: `${snapshot.heapTotal}MB`,
         rss: `${snapshot.rss}MB`,
         external: `${snapshot.external}MB`,
-        usage: `${(heapUsageRatio * 100).toFixed(1)}%`
+        usage: `${(heapUsageRatio * 100).toFixed(1)}%`,
       });
     }
   }
@@ -163,7 +162,7 @@ export class MemoryUsageOptimizer {
       heapUsed: `${snapshot.heapUsed}MB`,
       heapTotal: `${snapshot.heapTotal}MB`,
       usage: `${(heapUsageRatio * 100).toFixed(1)}%`,
-      rss: `${snapshot.rss}MB`
+      rss: `${snapshot.rss}MB`,
     });
 
     // Force garbage collection if available
@@ -193,15 +192,15 @@ export class MemoryUsageOptimizer {
         const beforeGC = process.memoryUsage();
         global.gc();
         const afterGC = process.memoryUsage();
-        
+
         this.gcCount++;
         this.lastGcTime = Date.now();
-        
+
         const freed = Math.round((beforeGC.heapUsed - afterGC.heapUsed) / 1024 / 1024);
         logger.info('Forced garbage collection completed', {
           memoryFreed: `${freed}MB`,
           heapBefore: `${Math.round(beforeGC.heapUsed / 1024 / 1024)}MB`,
-          heapAfter: `${Math.round(afterGC.heapUsed / 1024 / 1024)}MB`
+          heapAfter: `${Math.round(afterGC.heapUsed / 1024 / 1024)}MB`,
         });
       } else {
         logger.debug('Garbage collection not available (run with --expose-gc)');
@@ -219,10 +218,10 @@ export class MemoryUsageOptimizer {
 
     // Clear require cache for non-essential modules
     if (typeof require !== 'undefined' && require.cache) {
-      const nonEssentialModules = Object.keys(require.cache).filter(id => 
-        !id.includes('node_modules') && 
-        !id.includes('core') && 
-        id.includes('temp') || id.includes('cache')
+      const nonEssentialModules = Object.keys(require.cache).filter(
+        id =>
+          (!id.includes('node_modules') && !id.includes('core') && id.includes('temp')) ||
+          id.includes('cache')
       );
 
       nonEssentialModules.forEach(id => {
@@ -284,13 +283,14 @@ export class MemoryUsageOptimizer {
         component: 'system',
         growthRate,
         threshold: 0.2,
-        samples: recent.slice()
+        samples: recent.slice(),
       };
 
       // Only add if not already detected recently
-      const existingLeak = this.detectedLeaks.find(l => 
-        l.component === leak.component && 
-        Date.now() - l.samples[l.samples.length - 1].timestamp < 60000
+      const existingLeak = this.detectedLeaks.find(
+        l =>
+          l.component === leak.component &&
+          Date.now() - l.samples[l.samples.length - 1].timestamp < 60000
       );
 
       if (!existingLeak) {
@@ -299,7 +299,7 @@ export class MemoryUsageOptimizer {
           component: leak.component,
           growthRate: `${(growthRate * 100).toFixed(1)}%`,
           recentAvg: `${recentAvg.toFixed(1)}MB`,
-          olderAvg: `${olderAvg.toFixed(1)}MB`
+          olderAvg: `${olderAvg.toFixed(1)}MB`,
         });
       }
     }
@@ -312,21 +312,24 @@ export class MemoryUsageOptimizer {
     logger.warn('Memory warning received', {
       name: warning.name,
       message: warning.message,
-      stack: warning.stack?.split('\n')[0]
+      stack: warning.stack?.split('\n')[0],
     });
 
     // Trigger immediate optimization
     const currentMemory = process.memoryUsage();
     const heapUsageRatio = currentMemory.heapUsed / currentMemory.heapTotal;
-    
-    this.triggerMemoryOptimization({
-      timestamp: Date.now(),
-      heapUsed: Math.round(currentMemory.heapUsed / 1024 / 1024),
-      heapTotal: Math.round(currentMemory.heapTotal / 1024 / 1024),
-      external: Math.round(currentMemory.external / 1024 / 1024),
-      rss: Math.round(currentMemory.rss / 1024 / 1024),
-      gcCount: this.gcCount
-    }, heapUsageRatio);
+
+    this.triggerMemoryOptimization(
+      {
+        timestamp: Date.now(),
+        heapUsed: Math.round(currentMemory.heapUsed / 1024 / 1024),
+        heapTotal: Math.round(currentMemory.heapTotal / 1024 / 1024),
+        external: Math.round(currentMemory.external / 1024 / 1024),
+        rss: Math.round(currentMemory.rss / 1024 / 1024),
+        gcCount: this.gcCount,
+      },
+      heapUsageRatio
+    );
   }
 
   /**
@@ -336,10 +339,10 @@ export class MemoryUsageOptimizer {
     if (!this.componentMemoryMap.has(componentName)) {
       this.componentMemoryMap.set(componentName, []);
     }
-    
+
     const usage = this.componentMemoryMap.get(componentName)!;
     usage.push(memoryUsage);
-    
+
     // Keep only last 20 measurements
     if (usage.length > 20) {
       this.componentMemoryMap.set(componentName, usage.slice(-10));
@@ -368,12 +371,13 @@ export class MemoryUsageOptimizer {
     recommendations: string[];
   } {
     const current = this.getCurrentMemorySnapshot();
-    
+
     let averageUsage = 0;
     let maxUsage = 0;
-    
+
     if (this.memoryHistory.length > 0) {
-      averageUsage = this.memoryHistory.reduce((sum, s) => sum + s.heapUsed, 0) / this.memoryHistory.length;
+      averageUsage =
+        this.memoryHistory.reduce((sum, s) => sum + s.heapUsed, 0) / this.memoryHistory.length;
       maxUsage = Math.max(...this.memoryHistory.map(s => s.heapUsed));
     }
 
@@ -382,11 +386,12 @@ export class MemoryUsageOptimizer {
     if (this.memoryHistory.length >= 5) {
       const recent3 = this.memoryHistory.slice(-3);
       const older3 = this.memoryHistory.slice(-6, -3);
-      
+
       if (older3.length > 0) {
         const recentAvg = recent3.reduce((sum, s) => sum + s.heapUsed, 0) / recent3.length;
-        const olderAvg = older3.reduce((sum: number, s: any) => sum + s.heapUsed, 0) / older3.length;
-        
+        const olderAvg =
+          older3.reduce((sum: number, s: any) => sum + s.heapUsed, 0) / older3.length;
+
         if (recentAvg > olderAvg * 1.1) {
           memoryTrend = 'increasing';
         } else if (recentAvg < olderAvg * 0.9) {
@@ -396,7 +401,12 @@ export class MemoryUsageOptimizer {
     }
 
     // Generate recommendations
-    const recommendations = this.generateMemoryRecommendations(current, averageUsage, maxUsage, memoryTrend);
+    const recommendations = this.generateMemoryRecommendations(
+      current,
+      averageUsage,
+      maxUsage,
+      memoryTrend
+    );
 
     return {
       current,
@@ -405,7 +415,7 @@ export class MemoryUsageOptimizer {
       gcCount: this.gcCount,
       leaksDetected: this.detectedLeaks.length,
       memoryTrend,
-      recommendations
+      recommendations,
     };
   }
 
@@ -413,8 +423,8 @@ export class MemoryUsageOptimizer {
    * Generate memory optimization recommendations
    */
   private generateMemoryRecommendations(
-    current: MemorySnapshot, 
-    averageUsage: number, 
+    current: MemorySnapshot,
+    averageUsage: number,
     maxUsage: number,
     trend: 'increasing' | 'decreasing' | 'stable'
   ): string[] {
@@ -422,7 +432,9 @@ export class MemoryUsageOptimizer {
     const heapUsageRatio = current.heapUsed / current.heapTotal;
 
     if (heapUsageRatio > 0.9) {
-      recommendations.push('Critical: Memory usage >90% - increase heap size or reduce memory usage');
+      recommendations.push(
+        'Critical: Memory usage >90% - increase heap size or reduce memory usage'
+      );
     } else if (heapUsageRatio > 0.8) {
       recommendations.push('Warning: High memory usage - monitor for memory leaks');
     }
@@ -436,7 +448,9 @@ export class MemoryUsageOptimizer {
     }
 
     if (this.detectedLeaks.length > 0) {
-      recommendations.push(`${this.detectedLeaks.length} potential memory leaks detected - investigate components`);
+      recommendations.push(
+        `${this.detectedLeaks.length} potential memory leaks detected - investigate components`
+      );
     }
 
     if (maxUsage > averageUsage * 1.5) {
@@ -465,7 +479,7 @@ export class MemoryUsageOptimizer {
       heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
       external: Math.round(memoryUsage.external / 1024 / 1024),
       rss: Math.round(memoryUsage.rss / 1024 / 1024),
-      gcCount: this.gcCount
+      gcCount: this.gcCount,
     };
   }
 
@@ -507,7 +521,7 @@ export class MemoryUsageOptimizer {
       maxUsage: `${stats.maxUsage}MB`,
       avgUsage: `${stats.averageUsage}MB`,
       gcCount: stats.gcCount,
-      leaksDetected: stats.leaksDetected
+      leaksDetected: stats.leaksDetected,
     });
 
     this.memoryHistory.length = 0;

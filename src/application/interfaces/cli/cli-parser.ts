@@ -17,11 +17,14 @@ export interface CLIParserInterface {
 }
 
 export class CLIParser implements CLIParserInterface {
-  private commands = new Map<string, {
-    description: string;
-    args: string[];
-    options: Record<string, string>;
-  }>();
+  private commands = new Map<
+    string,
+    {
+      description: string;
+      args: string[];
+      options: Record<string, string>;
+    }
+  >();
 
   constructor() {
     this.setupCommands();
@@ -33,8 +36,8 @@ export class CLIParser implements CLIParserInterface {
       args: ['file'],
       options: {
         '--format': 'Output format (json, text)',
-        '--depth': 'Analysis depth (shallow, deep)'
-      }
+        '--depth': 'Analysis depth (shallow, deep)',
+      },
     });
 
     this.commands.set('generate', {
@@ -42,20 +45,20 @@ export class CLIParser implements CLIParserInterface {
       args: ['prompt'],
       options: {
         '--output': 'Output file',
-        '--model': 'AI model to use'
-      }
+        '--model': 'AI model to use',
+      },
     });
 
     this.commands.set('status', {
       description: 'Show system status',
       args: [],
-      options: {}
+      options: {},
     });
   }
 
   parse(input: string[] | string): CLIParseResult {
     const args = Array.isArray(input) ? input : input.split(' ').filter(Boolean);
-    
+
     if (args.length === 0) {
       return {
         command: '',
@@ -63,7 +66,7 @@ export class CLIParser implements CLIParserInterface {
         options: {},
         flags: [],
         isValid: false,
-        errors: ['No command provided']
+        errors: ['No command provided'],
       };
     }
 
@@ -74,7 +77,7 @@ export class CLIParser implements CLIParserInterface {
 
     for (let i = 1; i < args.length; i++) {
       const arg = args[i];
-      
+
       if (arg.startsWith('--')) {
         if (arg.includes('=')) {
           const [key, value] = arg.split('=', 2);
@@ -100,7 +103,7 @@ export class CLIParser implements CLIParserInterface {
       options,
       flags,
       isValid,
-      errors: isValid ? undefined : [`Unknown command: ${command}`]
+      errors: isValid ? undefined : [`Unknown command: ${command}`],
     };
   }
 
@@ -123,7 +126,7 @@ export class CLIParser implements CLIParserInterface {
       }
 
       const usage = [`Usage: ${command}`];
-      
+
       if (commandInfo.args.length > 0) {
         usage.push(commandInfo.args.map(arg => `<${arg}>`).join(' '));
       }

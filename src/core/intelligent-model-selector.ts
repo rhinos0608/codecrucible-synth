@@ -10,100 +10,100 @@ interface RoutingMetric {
 
 /**
  * IntelligentModelSelector - Hybrid LLM Routing Engine
- * 
+ *
  * Following Living Spiral Methodology - Council Perspectives Applied:
  * - **Explorer**: Discovers optimal routing paths between LM Studio and Ollama
  * - **Performance Engineer**: Optimizes response times with intelligent caching and routing
  * - **Reliability Guardian**: Implements health checks, fallback strategies, and error recovery
  * - **Data Analyst**: Tracks routing metrics and learns from historical performance
  * - **Architecture Engineer**: Provides clean abstraction for hybrid model management
- * 
+ *
  * Core Routing Intelligence:
  * - **Multi-Provider Support**: Seamless routing between LM Studio and Ollama
  * - **Health-Aware Routing**: Real-time provider health monitoring with 30s cache TTL
  * - **Task-Optimized Selection**: Intelligent routing based on task type and complexity
  * - **Performance Learning**: Historical success rate tracking for continuous optimization
  * - **Fallback Strategies**: Automatic failover when primary providers are unavailable
- * 
+ *
  * Decision Matrix Factors:
  * - Task Type: code-generation, text-analysis, creative-writing, technical-documentation
  * - Complexity Level: simple (lightweight), medium (balanced), complex (high-quality)
  * - Performance Requirements: speed priority, accuracy priority, streaming capability
  * - Provider Availability: real-time health status and response times
  * - Historical Success Rates: learned performance patterns per task type
- * 
+ *
  * Performance Characteristics:
  * - Health check caching: 30s TTL to minimize API overhead
  * - Routing decision: <10ms typical response time
  * - Memory footprint: <1MB for metrics storage
  * - Concurrent requests: Thread-safe routing with no blocking
- * 
+ *
  * Routing Algorithm:
  * 1. **Health Assessment**: Check provider availability (cached)
- * 2. **Task Analysis**: Analyze task type and complexity requirements  
+ * 2. **Task Analysis**: Analyze task type and complexity requirements
  * 3. **Historical Lookup**: Review past performance for similar tasks
  * 4. **Decision Matrix**: Apply weighted scoring algorithm
  * 5. **Quality Confidence**: Calculate confidence score (0-100%)
  * 6. **Metrics Recording**: Update success/failure rates for learning
- * 
+ *
  * @example Basic Usage
  * ```typescript
  * const selector = new IntelligentModelSelector('http://localhost:11434');
- * 
+ *
  * const decision = await selector.selectOptimalLLM('code-generation', 'complex', {
  *   speed: 'medium',
- *   accuracy: 'high', 
+ *   accuracy: 'high',
  *   streaming: true
  * });
- * 
+ *
  * console.log(`Route to: ${decision.llm}`);
  * console.log(`Model: ${decision.model}`);
  * console.log(`Confidence: ${decision.confidence}%`);
  * console.log(`Reasoning: ${decision.reasoning}`);
  * ```
- * 
+ *
  * @example Advanced Monitoring
  * ```typescript
  * const selector = new IntelligentModelSelector();
- * 
+ *
  * // Get routing performance metrics
  * const metrics = selector.getRoutingMetrics();
  * console.log(`LM Studio success rate: ${metrics.lmStudioSuccess/metrics.lmStudioAttempts}`);
  * console.log(`Ollama success rate: ${metrics.ollamaSuccess/metrics.ollamaAttempts}`);
- * 
+ *
  * // Check current provider health
  * const lmStudioHealthy = await selector.checkLMStudioHealth();
  * const ollamaHealthy = await selector.checkOllamaHealth();
  * ```
- * 
+ *
  * Provider Optimization:
  * - **LM Studio**: Optimized for speed, model variety, and quick responses
  * - **Ollama**: Optimized for code generation, privacy, and consistency
  * - **Fallback Logic**: Always maintains at least one working provider
  * - **Load Balancing**: Distributes requests based on performance characteristics
- * 
+ *
  * Security & Reliability:
  * - Health check timeouts prevent hanging requests
  * - Provider isolation ensures single provider failure doesn't affect others
  * - Metrics-based routing prevents cascading failures
  * - No sensitive data exposed in routing decisions
- * 
+ *
  * @since 3.0.0
  * @example Production Configuration
  * ```typescript
  * const selector = new IntelligentModelSelector('http://production-ollama:11434');
- * 
+ *
  * // Production-grade routing with error handling
  * try {
  *   const decision = await selector.selectOptimalLLM(taskType, complexity, {
  *     speed: 'fast',
  *     accuracy: 'high'
  *   });
- *   
+ *
  *   if (decision.confidence < 70) {
  *     logger.warn(`Low confidence routing: ${decision.confidence}%`);
  *   }
- *   
+ *
  *   return decision;
  * } catch (error) {
  *   logger.error('Routing selection failed:', error);
@@ -114,11 +114,11 @@ interface RoutingMetric {
 export class IntelligentModelSelector {
   /** Historical routing metrics for performance analysis and optimization */
   private routingMetrics = new Map<string, RoutingMetric>();
-  
+
   /** Primary endpoint URL for Ollama service */
   private endpoint: string;
 
-  /** 
+  /**
    * Optimized health check cache to reduce redundant API calls
    * TTL: 30 seconds to balance responsiveness with performance
    */
@@ -127,20 +127,20 @@ export class IntelligentModelSelector {
 
   /**
    * Creates a new IntelligentModelSelector instance
-   * 
+   *
    * Initializes the hybrid routing engine with intelligent defaults:
    * - Primary endpoint configuration for Ollama
    * - Health check caching with 30-second TTL
    * - Routing metrics collection for continuous learning
    * - Thread-safe concurrent request handling
-   * 
+   *
    * @param endpoint - Primary Ollama endpoint URL (default: http://localhost:11434)
-   * 
+   *
    * @example
    * ```typescript
    * // Local development setup
    * const selector = new IntelligentModelSelector();
-   * 
+   *
    * // Production setup with custom endpoint
    * const prodSelector = new IntelligentModelSelector('https://ollama.company.com:11434');
    * ```

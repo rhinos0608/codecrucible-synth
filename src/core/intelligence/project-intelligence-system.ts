@@ -406,27 +406,27 @@ export interface ProjectStats {
 
 /**
  * ProjectIntelligenceSystem - Comprehensive Codebase Analysis Engine
- * 
+ *
  * Following Living Spiral Methodology - Council Perspectives Applied:
  * - **Explorer**: Discovers project structure, patterns, and architectural insights
  * - **Analyzer**: Deep analysis of dependencies, code quality, and technical debt
  * - **Maintainer**: Identifies maintenance patterns, test coverage, and documentation gaps
  * - **Security**: Analyzes security patterns and vulnerability surfaces
  * - **Performance**: Evaluates codebase complexity and performance characteristics
- * 
+ *
  * Core Capabilities:
  * - **Structural Analysis**: Complete project tree mapping with purpose classification
  * - **Dependency Graphing**: Advanced dependency relationship analysis
  * - **Pattern Recognition**: Identifies architectural patterns and anti-patterns
  * - **Intelligence Caching**: Optimized analysis with intelligent cache strategies
  * - **Real-time Insights**: Live codebase monitoring and change detection
- * 
+ *
  * Performance Characteristics:
  * - Processes 10K+ files efficiently with lazy loading
  * - Implements intelligent caching (5min TTL, LRU eviction)
  * - Memory-optimized for large codebases (streaming analysis)
  * - Concurrent analysis prevention (single active analysis per path)
- * 
+ *
  * Usage Patterns:
  * ```typescript
  * const intelligence = new ProjectIntelligenceSystem();
@@ -435,13 +435,13 @@ export interface ProjectStats {
  *   analyzePatterns: true,
  *   cacheTTL: 300000
  * });
- * 
+ *
  * // Access structured insights
  * console.log(analysis.insights.codeQuality);
  * console.log(analysis.patterns.architecturalStyle);
  * console.log(analysis.recommendations.improvements);
  * ```
- * 
+ *
  * Events Emitted:
  * - `analysis-started`: When project analysis begins
  * - `analysis-progress`: Progress updates during analysis
@@ -449,22 +449,22 @@ export interface ProjectStats {
  * - `analysis-error`: When analysis encounters errors
  * - `cache-hit`: When cached intelligence is returned
  * - `pattern-discovered`: When new architectural patterns are found
- * 
+ *
  * Security Considerations:
  * - Path traversal prevention through normalized path validation
  * - File access permissions respected
  * - Sensitive file exclusion (credentials, keys, secrets)
  * - Configurable file size limits to prevent DoS
- * 
+ *
  * @example Advanced Usage
  * ```typescript
  * const intelligence = new ProjectIntelligenceSystem();
- * 
+ *
  * // Listen for real-time insights
  * intelligence.on('pattern-discovered', (pattern) => {
  *   console.log(`Found pattern: ${pattern.type}`);
  * });
- * 
+ *
  * // Perform comprehensive analysis
  * const fullAnalysis = await intelligence.analyzeProject(projectRoot, {
  *   includeTests: true,
@@ -474,9 +474,9 @@ export interface ProjectStats {
  *   excludePatterns: ['node_modules', '.git', 'dist']
  * });
  * ```
- * 
+ *
  * @fires ProjectIntelligenceSystem#analysis-started
- * @fires ProjectIntelligenceSystem#analysis-progress  
+ * @fires ProjectIntelligenceSystem#analysis-progress
  * @fires ProjectIntelligenceSystem#analysis-completed
  * @fires ProjectIntelligenceSystem#analysis-error
  * @fires ProjectIntelligenceSystem#cache-hit
@@ -488,13 +488,13 @@ export class ProjectIntelligenceSystem extends EventEmitter {
 
   /**
    * Creates a new ProjectIntelligenceSystem instance
-   * 
+   *
    * Initializes the intelligence system with optimized defaults:
    * - Event emitter with unlimited listeners (for large projects)
    * - Logger with structured output for analysis tracing
    * - Concurrent analysis tracking to prevent resource conflicts
    * - Cache integration with intelligent TTL strategies
-   * 
+   *
    * @example
    * ```typescript
    * const intelligence = new ProjectIntelligenceSystem();
@@ -1133,9 +1133,9 @@ export class ProjectIntelligenceSystem extends EventEmitter {
 
   private updateDirectoryFileCounts(directories: DirectoryNode[], files: FileNode[]): void {
     for (const dir of directories) {
-      dir.fileCount = files.filter(file => file.path.startsWith(`${dir.path  }/`)).length;
+      dir.fileCount = files.filter(file => file.path.startsWith(`${dir.path}/`)).length;
       dir.childDirectories = directories
-        .filter(d => d.path.startsWith(`${dir.path  }/`) && d.depth === dir.depth + 1)
+        .filter(d => d.path.startsWith(`${dir.path}/`) && d.depth === dir.depth + 1)
         .map(d => d.path);
     }
   }

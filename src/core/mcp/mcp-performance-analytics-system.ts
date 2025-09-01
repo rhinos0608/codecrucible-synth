@@ -95,7 +95,7 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
     errorRate: 10, // 10%
     connectionTimeout: 30000, // 30 seconds
     memoryThreshold: 85, // 85%
-    cpuThreshold: 90 // 90%
+    cpuThreshold: 90, // 90%
   };
 
   constructor() {
@@ -110,8 +110,8 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       systemUptime: 0,
       resourceUsage: {
         memory: 0,
-        cpu: 0
-      }
+        cpu: 0,
+      },
     };
   }
 
@@ -121,10 +121,10 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
     }
 
     logger.info('Starting MCP performance analytics monitoring');
-    
+
     this.monitoringInterval = setInterval(() => {
       this.collectMetrics()
-        .then(() => this.analyzePerformance())
+        .then(async () => this.analyzePerformance())
         .catch(error => {
           logger.error('MCP performance monitoring error:', error);
         });
@@ -139,7 +139,11 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
     }
   }
 
-  recordServerMetrics(serverId: string, serverName: string, metrics: Partial<MCPServerMetrics>): void {
+  recordServerMetrics(
+    serverId: string,
+    serverName: string,
+    metrics: Partial<MCPServerMetrics>
+  ): void {
     const existing = this.serverMetrics.get(serverId);
     const updated: MCPServerMetrics = {
       serverId,
@@ -147,7 +151,7 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       responseTime: metrics.responseTime || 0,
       requestCount: (existing?.requestCount || 0) + (metrics.requestCount || 0),
       errorCount: (existing?.errorCount || 0) + (metrics.errorCount || 0),
-      uptime: metrics.uptime || (existing?.uptime || 0),
+      uptime: metrics.uptime || existing?.uptime || 0,
       lastActivity: Date.now(),
       connectionStatus: metrics.connectionStatus || existing?.connectionStatus || 'disconnected',
       throughput: metrics.throughput || 0,
@@ -155,16 +159,20 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       errorRate: this.calculateErrorRate(
         (existing?.requestCount || 0) + (metrics.requestCount || 0),
         (existing?.errorCount || 0) + (metrics.errorCount || 0)
-      )
+      ),
     };
 
     this.serverMetrics.set(serverId, updated);
     this.emit('serverMetricsUpdated', updated);
   }
 
-  recordServerConnection(serverId: string, serverName: string, status: MCPServerMetrics['connectionStatus']): void {
+  recordServerConnection(
+    serverId: string,
+    serverName: string,
+    status: MCPServerMetrics['connectionStatus']
+  ): void {
     this.recordServerMetrics(serverId, serverName, { connectionStatus: status });
-    
+
     if (status === 'connected') {
       logger.info(`MCP Server connected: ${serverName} (${serverId})`);
     } else if (status === 'disconnected' || status === 'error') {
@@ -180,13 +188,17 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
     this.recordServerMetrics(serverId, server.serverName, {
       responseTime,
       requestCount: 1,
-      errorCount: success ? 0 : 1
+      errorCount: success ? 0 : 1,
     });
 
     // Check for performance issues
     if (responseTime > this.thresholds.responseTime) {
-      this.createAlert('warning', 'performance', 
-        `Slow response from ${server.serverName}: ${responseTime}ms`, serverId);
+      this.createAlert(
+        'warning',
+        'performance',
+        `Slow response from ${server.serverName}: ${responseTime}ms`,
+        serverId
+      );
     }
   }
 
@@ -194,18 +206,23 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
     try {
       this.systemMetrics = {
         totalServers: this.serverMetrics.size,
-        activeConnections: Array.from(this.serverMetrics.values())
-          .filter(s => s.connectionStatus === 'connected').length,
-        totalRequests: Array.from(this.serverMetrics.values())
-          .reduce((sum, s) => sum + s.requestCount, 0),
-        totalErrors: Array.from(this.serverMetrics.values())
-          .reduce((sum, s) => sum + s.errorCount, 0),
+        activeConnections: Array.from(this.serverMetrics.values()).filter(
+          s => s.connectionStatus === 'connected'
+        ).length,
+        totalRequests: Array.from(this.serverMetrics.values()).reduce(
+          (sum, s) => sum + s.requestCount,
+          0
+        ),
+        totalErrors: Array.from(this.serverMetrics.values()).reduce(
+          (sum, s) => sum + s.errorCount,
+          0
+        ),
         averageResponseTime: this.calculateSystemAverageResponseTime(),
         systemUptime: Date.now() - this.systemStartTime,
         resourceUsage: {
           memory: this.getMemoryUsage(),
-          cpu: await this.getCpuUsage()
-        }
+          cpu: await this.getCpuUsage(),
+        },
       };
 
       this.emit('systemMetricsUpdated', this.systemMetrics);
@@ -217,27 +234,43 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
   async analyzePerformance(): Promise<void> {
     // Check overall system performance
     if (this.systemMetrics.resourceUsage.memory > this.thresholds.memoryThreshold) {
-      this.createAlert('warning', 'resource', 
-        `High memory usage: ${this.systemMetrics.resourceUsage.memory}%`);
+      this.createAlert(
+        'warning',
+        'resource',
+        `High memory usage: ${this.systemMetrics.resourceUsage.memory}%`
+      );
     }
 
     if (this.systemMetrics.resourceUsage.cpu > this.thresholds.cpuThreshold) {
-      this.createAlert('warning', 'resource', 
-        `High CPU usage: ${this.systemMetrics.resourceUsage.cpu}%`);
+      this.createAlert(
+        'warning',
+        'resource',
+        `High CPU usage: ${this.systemMetrics.resourceUsage.cpu}%`
+      );
     }
 
     // Check individual server performance
     for (const [serverId, metrics] of this.serverMetrics) {
       if (metrics.errorRate > this.thresholds.errorRate) {
-        this.createAlert('error', 'error_rate', 
-          `High error rate for ${metrics.serverName}: ${metrics.errorRate.toFixed(1)}%`, serverId);
+        this.createAlert(
+          'error',
+          'error_rate',
+          `High error rate for ${metrics.serverName}: ${metrics.errorRate.toFixed(1)}%`,
+          serverId
+        );
       }
 
       // Check for stale connections
-      if (Date.now() - metrics.lastActivity > this.thresholds.connectionTimeout && 
-          metrics.connectionStatus === 'connected') {
-        this.createAlert('warning', 'connection', 
-          `Stale connection for ${metrics.serverName}`, serverId);
+      if (
+        Date.now() - metrics.lastActivity > this.thresholds.connectionTimeout &&
+        metrics.connectionStatus === 'connected'
+      ) {
+        this.createAlert(
+          'warning',
+          'connection',
+          `Stale connection for ${metrics.serverName}`,
+          serverId
+        );
       }
     }
 
@@ -271,7 +304,7 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       status: server.connectionStatus,
       responseTime: server.averageResponseTime,
       errorRate: server.errorRate,
-      requestCount: server.requestCount
+      requestCount: server.requestCount,
     }));
 
     return {
@@ -279,11 +312,13 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       servers: serverSummary,
       alerts: this.getAlerts(),
       summary: {
-        healthyServers: serverSummary.filter(s => s.status === 'connected' && s.errorRate < 5).length,
-        problematicServers: serverSummary.filter(s => s.status !== 'connected' || s.errorRate >= 5).length,
+        healthyServers: serverSummary.filter(s => s.status === 'connected' && s.errorRate < 5)
+          .length,
+        problematicServers: serverSummary.filter(s => s.status !== 'connected' || s.errorRate >= 5)
+          .length,
         totalAlerts: this.alerts.length,
-        criticalAlerts: this.getAlerts('critical').length
-      }
+        criticalAlerts: this.getAlerts('critical').length,
+      },
     };
   }
 
@@ -293,12 +328,18 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
   }
 
   // Private helper methods
-  private calculateAverageResponseTime(existing: MCPServerMetrics | undefined, newResponseTime: number): number {
+  private calculateAverageResponseTime(
+    existing: MCPServerMetrics | undefined,
+    newResponseTime: number
+  ): number {
     if (!existing || existing.requestCount === 0) {
       return newResponseTime;
     }
-    
-    return ((existing.averageResponseTime * existing.requestCount) + newResponseTime) / (existing.requestCount + 1);
+
+    return (
+      (existing.averageResponseTime * existing.requestCount + newResponseTime) /
+      (existing.requestCount + 1)
+    );
   }
 
   private calculateErrorRate(totalRequests: number, totalErrors: number): number {
@@ -309,18 +350,20 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
   private calculateSystemAverageResponseTime(): number {
     const servers = Array.from(this.serverMetrics.values());
     if (servers.length === 0) return 0;
-    
-    const totalResponseTime = servers.reduce((sum, server) => 
-      sum + (server.averageResponseTime * server.requestCount), 0);
+
+    const totalResponseTime = servers.reduce(
+      (sum, server) => sum + server.averageResponseTime * server.requestCount,
+      0
+    );
     const totalRequests = servers.reduce((sum, server) => sum + server.requestCount, 0);
-    
+
     return totalRequests > 0 ? totalResponseTime / totalRequests : 0;
   }
 
   private createAlert(
-    severity: PerformanceAlert['severity'], 
-    type: PerformanceAlert['type'], 
-    message: string, 
+    severity: PerformanceAlert['severity'],
+    type: PerformanceAlert['type'],
+    message: string,
     serverId?: string
   ): void {
     const alert: PerformanceAlert = {
@@ -330,12 +373,12 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       type,
       serverId,
       message,
-      metrics: serverId ? this.serverMetrics.get(serverId) || {} : this.systemMetrics
+      metrics: serverId ? this.serverMetrics.get(serverId) || {} : this.systemMetrics,
     };
 
     this.alerts.push(alert);
     this.emit('alertCreated', alert);
-    
+
     logger[severity === 'critical' ? 'error' : 'warn'](`MCP Alert: ${message}`);
   }
 
@@ -357,9 +400,9 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       name,
       value,
       timestamp: Date.now(),
-      unit
+      unit,
     };
-    
+
     // Store metric or process as needed
     logger.debug(`Performance metric recorded: ${name} = ${value}${unit}`);
     this.emit('metric-recorded', metric);
@@ -374,7 +417,7 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       systemMetrics: this.systemMetrics,
       alertCount: this.alerts.length,
       averageResponseTime: this.calculateSystemAverageResponseTime(),
-      systemUptime: Date.now() - this.systemStartTime
+      systemUptime: Date.now() - this.systemStartTime,
     };
   }
 
@@ -387,13 +430,13 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
       responseTimeTrend: servers.map(s => ({
         serverId: s.serverId,
         averageResponseTime: s.averageResponseTime,
-        trend: 'stable' // Simplified trend analysis
+        trend: 'stable', // Simplified trend analysis
       })),
       errorRateTrend: servers.map(s => ({
         serverId: s.serverId,
         errorRate: s.errorRate,
-        trend: s.errorRate > this.thresholds.errorRate ? 'increasing' : 'stable'
-      }))
+        trend: s.errorRate > this.thresholds.errorRate ? 'increasing' : 'stable',
+      })),
     };
   }
 
@@ -419,37 +462,39 @@ export class MCPPerformanceAnalyticsSystem extends EventEmitter {
   generateCapacityPlan(): any {
     const servers = Array.from(this.serverMetrics.values());
     const totalCapacity = servers.length * 100; // Simplified capacity calculation
-    const usedCapacity = servers.reduce((sum, server) => sum + (server.requestCount / 1000), 0);
-    
+    const usedCapacity = servers.reduce((sum, server) => sum + server.requestCount / 1000, 0);
+
     return {
       currentCapacity: {
         total: totalCapacity,
         used: usedCapacity,
         available: totalCapacity - usedCapacity,
-        utilizationPercentage: (usedCapacity / totalCapacity) * 100
+        utilizationPercentage: (usedCapacity / totalCapacity) * 100,
       },
       recommendations: this.generateCapacityRecommendations(servers),
       projections: {
         nextMonth: {
           expectedLoad: usedCapacity * 1.1,
-          recommendedCapacity: totalCapacity * 1.2
-        }
-      }
+          recommendedCapacity: totalCapacity * 1.2,
+        },
+      },
     };
   }
 
   private generateCapacityRecommendations(servers: MCPServerMetrics[]): string[] {
     const recommendations: string[] = [];
-    
+
     const highLoadServers = servers.filter(s => s.errorRate > 5 || s.averageResponseTime > 1000);
     if (highLoadServers.length > 0) {
-      recommendations.push(`Consider scaling servers: ${highLoadServers.map(s => s.serverName).join(', ')}`);
+      recommendations.push(
+        `Consider scaling servers: ${highLoadServers.map(s => s.serverName).join(', ')}`
+      );
     }
-    
+
     if (servers.length < 2) {
       recommendations.push('Consider adding redundant MCP servers for high availability');
     }
-    
+
     return recommendations;
   }
 }

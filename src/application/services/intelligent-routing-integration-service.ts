@@ -1,7 +1,7 @@
 /**
  * Intelligent Routing Integration Service
  * Application Layer - Integrates intelligent routing with CLI and Living Spiral processes
- * 
+ *
  * Handles: CLI command routing, Living Spiral phase-aware routing, performance monitoring
  * Imports: Domain services and core routing systems (follows ARCHITECTURE.md)
  */
@@ -14,19 +14,22 @@ import { IModelSelectionService } from '../../domain/services/model-selection-se
 import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
 
 // Core imports
-import { 
+import {
   IIntelligentRoutingCoordinator,
   IntelligentRoutingDecision,
   RoutingContext,
   RoutingPreferences,
-  RoutingPerformance
+  RoutingPerformance,
 } from '../../core/routing/intelligent-routing-coordinator.js';
 import { IProviderSelectionStrategy } from '../../core/providers/provider-selection-strategy.js';
 import { HybridLLMRouter } from '../../core/hybrid/hybrid-llm-router.js';
 import { PerformanceMonitor } from '../../utils/performance.js';
 
 // Use case imports
-import { LivingSpiralProcessUseCase, SpiralIteration } from '../use-cases/living-spiral-process-use-case.js';
+import {
+  LivingSpiralProcessUseCase,
+  SpiralIteration,
+} from '../use-cases/living-spiral-process-use-case.js';
 
 export interface CLIRoutingRequest {
   command: string;
@@ -80,11 +83,11 @@ export interface IIntelligentRoutingIntegrationService {
   // CLI Integration
   routeCLICommand(request: CLIRoutingRequest): Promise<CLIRoutingResponse>;
   executePlan(plan: ExecutionPlan): Promise<string>;
-  
+
   // Living Spiral Integration
   routeLivingSpiralPhase(context: LivingSpiralRoutingContext): Promise<IntelligentRoutingDecision>;
   optimizeIterativeProcess(iterations: SpiralIteration[]): Promise<RoutingPreferences>;
-  
+
   // Performance Monitoring
   recordExecutionPerformance(trackingId: string, performance: RoutingPerformance): void;
   getRoutingAnalytics(): Promise<any>;
@@ -99,7 +102,7 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
   private routingCoordinator: IIntelligentRoutingCoordinator;
   private livingSpiralUseCase: LivingSpiralProcessUseCase;
   private executionTracking: Map<string, { plan: ExecutionPlan; startTime: number }> = new Map();
-  
+
   constructor(
     routingCoordinator: IIntelligentRoutingCoordinator,
     livingSpiralUseCase: LivingSpiralProcessUseCase
@@ -112,33 +115,33 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
    * Route CLI commands through intelligent routing system
    */
   async routeCLICommand(request: CLIRoutingRequest): Promise<CLIRoutingResponse> {
-    logger.info('Routing CLI command through intelligent system', { 
+    logger.info('Routing CLI command through intelligent system', {
       command: request.command,
-      promptLength: request.prompt.length 
+      promptLength: request.prompt.length,
     });
 
     try {
       // Analyze command and create processing request
       const processingRequest = this.createProcessingRequestFromCLI(request);
-      
+
       // Build routing context
       const routingContext = this.buildRoutingContextFromCLI(processingRequest, request);
-      
+
       // Get routing decision
       const routingDecision = await this.routingCoordinator.routeRequest(routingContext);
-      
+
       // Create execution plan
       const executionPlan = this.createExecutionPlan(routingDecision, request);
-      
+
       // Generate tracking ID
       const trackingId = this.generateTrackingId(request.command);
-      
+
       // Store execution tracking
       this.executionTracking.set(trackingId, {
         plan: executionPlan,
         startTime: Date.now(),
       });
-      
+
       const response: CLIRoutingResponse = {
         routingDecision,
         executionPlan,
@@ -153,7 +156,6 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
       });
 
       return response;
-
     } catch (error) {
       logger.error('Error routing CLI command', { error, command: request.command });
       throw new Error(`Failed to route CLI command: ${error}`);
@@ -164,9 +166,9 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
    * Execute a routing-optimized execution plan
    */
   async executePlan(plan: ExecutionPlan): Promise<string> {
-    logger.info('Executing routing-optimized plan', { 
+    logger.info('Executing routing-optimized plan', {
       steps: plan.steps.length,
-      parallelizable: plan.parallelizable 
+      parallelizable: plan.parallelizable,
     });
 
     try {
@@ -184,25 +186,27 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
   /**
    * Route specific Living Spiral phases with intelligent routing
    */
-  async routeLivingSpiralPhase(context: LivingSpiralRoutingContext): Promise<IntelligentRoutingDecision> {
-    logger.info('Routing Living Spiral phase', { 
+  async routeLivingSpiralPhase(
+    context: LivingSpiralRoutingContext
+  ): Promise<IntelligentRoutingDecision> {
+    logger.info('Routing Living Spiral phase', {
       phase: context.phase,
-      iteration: context.currentIteration 
+      iteration: context.currentIteration,
     });
 
     try {
       // Create processing request for the phase
       const processingRequest = this.createProcessingRequestFromSpiral(context);
-      
+
       // Build phase-specific routing context
       const routingContext = this.buildSpiralRoutingContext(processingRequest, context);
-      
+
       // Get intelligent routing decision
       const decision = await this.routingCoordinator.routeRequest(routingContext);
-      
+
       // Apply spiral-specific optimizations
       this.applySpiralOptimizations(decision, context);
-      
+
       logger.info('Living Spiral phase routing completed', {
         phase: context.phase,
         strategy: decision.routingStrategy,
@@ -210,12 +214,11 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
       });
 
       return decision;
-
     } catch (error) {
-      logger.error('Error routing Living Spiral phase', { 
-        error, 
+      logger.error('Error routing Living Spiral phase', {
+        error,
         phase: context.phase,
-        iteration: context.currentIteration 
+        iteration: context.currentIteration,
       });
       throw new Error(`Living Spiral phase routing failed: ${error}`);
     }
@@ -229,10 +232,10 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
 
     try {
       const preferences: RoutingPreferences = {};
-      
+
       // Analyze phase performance
       const phaseAnalysis = this.analyzePhasePerformance(iterations);
-      
+
       // Optimize based on quality trends
       if (this.isQualityImproving(iterations)) {
         preferences.prioritizeQuality = true;
@@ -241,7 +244,7 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
         preferences.prioritizeSpeed = true;
         preferences.maxLatency = 10000; // Prioritize speed to break stagnation
       }
-      
+
       // Optimize voice usage based on phase effectiveness
       if (phaseAnalysis.councilPhaseEffective) {
         preferences.enableMultiVoice = true;
@@ -250,16 +253,15 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
         preferences.enableMultiVoice = false;
         preferences.maxVoices = 1;
       }
-      
+
       // Cost optimization for long processes
       if (iterations.length > 5) {
         preferences.optimizeForCost = true;
         preferences.maxCostPerRequest = 0.02;
       }
-      
+
       logger.info('Iterative process optimization completed', { preferences });
       return preferences;
-
     } catch (error) {
       logger.error('Error optimizing iterative process', { error });
       throw new Error(`Iterative process optimization failed: ${error}`);
@@ -276,16 +278,16 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
       const execution = this.executionTracking.get(trackingId);
       if (execution) {
         const duration = Date.now() - execution.startTime;
-        
+
         // Record performance with routing coordinator
         this.routingCoordinator.recordPerformance(trackingId, {
           ...performance,
           actualLatency: duration,
         });
-        
+
         // Clean up tracking
         this.executionTracking.delete(trackingId);
-        
+
         logger.debug('Performance recorded successfully', { trackingId, duration });
       } else {
         logger.warn('Execution tracking not found for performance recording', { trackingId });
@@ -301,14 +303,14 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
   async getRoutingAnalytics(): Promise<any> {
     try {
       const coreAnalytics = this.routingCoordinator.getAnalytics();
-      
+
       // Add integration-specific analytics
       const integrationAnalytics = {
         cliRequests: this.getCLIAnalytics(),
         spiralProcesses: this.getSpiralAnalytics(),
         executionTracking: this.getExecutionAnalytics(),
       };
-      
+
       return {
         ...coreAnalytics,
         integration: integrationAnalytics,
@@ -329,11 +331,11 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
     try {
       // Run core routing optimization
       await this.routingCoordinator.optimizeRouting();
-      
+
       // Add integration-specific optimizations
       await this.optimizeCLIRouting();
       await this.optimizeSpiralRouting();
-      
+
       logger.info('Routing optimization completed successfully');
     } catch (error) {
       logger.error('Error during routing optimization', { error });
@@ -346,7 +348,7 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
   private createProcessingRequestFromCLI(request: CLIRoutingRequest): ProcessingRequest {
     // Infer request type from command
     let requestType: string;
-    
+
     switch (request.command) {
       case 'analyze':
         requestType = 'code-analysis';
@@ -402,7 +404,9 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
     };
   }
 
-  private createProcessingRequestFromSpiral(context: LivingSpiralRoutingContext): ProcessingRequest {
+  private createProcessingRequestFromSpiral(
+    context: LivingSpiralRoutingContext
+  ): ProcessingRequest {
     // Phase-specific request types
     const phaseRequestTypes = {
       collapse: 'problem-decomposition',
@@ -416,7 +420,7 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
       context.initialPrompt,
       phaseRequestTypes[context.phase] as any,
       'medium',
-      { 
+      {
         iteration: context.currentIteration,
         previousIterations: context.previousIterations,
       },
@@ -436,11 +440,13 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
         ...spiralContext.preferences,
         // Spiral-specific optimizations
         enableMultiVoice: spiralContext.phase === 'council',
-        prioritizeQuality: spiralContext.phase === 'synthesis' || spiralContext.phase === 'reflection',
+        prioritizeQuality:
+          spiralContext.phase === 'synthesis' || spiralContext.phase === 'reflection',
         prioritizeSpeed: spiralContext.phase === 'collapse',
       },
       metrics: {
-        requiresDeepAnalysis: spiralContext.phase === 'council' || spiralContext.phase === 'reflection',
+        requiresDeepAnalysis:
+          spiralContext.phase === 'council' || spiralContext.phase === 'reflection',
         estimatedProcessingTime: this.estimatePhaseProcessingTime(spiralContext.phase),
       },
     };
@@ -491,7 +497,7 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
         dependencies: ['primary_execution'],
         estimatedDuration: Math.round(decision.estimatedLatency * 0.2),
       };
-      
+
       steps.push(synthesisStep);
       totalTime += synthesisStep.estimatedDuration;
     }
@@ -515,7 +521,7 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
     // Adjust based on routing strategy
     const multipliers = {
       'single-model': 1.0,
-      'hybrid': 1.3,
+      hybrid: 1.3,
       'multi-voice': 1.5,
       'load-balanced': 1.2,
     };
@@ -532,7 +538,7 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
 
   private async executeSequentialPlan(plan: ExecutionPlan): Promise<string> {
     logger.debug('Executing sequential plan', { steps: plan.steps.length });
-    
+
     let result = '';
     for (const step of plan.steps) {
       logger.debug('Executing step', { stepId: step.stepId });
@@ -540,32 +546,32 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
       // For now, return a placeholder
       result += `Step ${step.stepId} completed with ${step.routingDecision.routingStrategy} strategy.\n`;
     }
-    
+
     return result;
   }
 
   private async executeParallelPlan(plan: ExecutionPlan): Promise<string> {
     logger.debug('Executing parallel plan', { steps: plan.steps.length });
-    
+
     // Execute independent steps in parallel
     const parallelSteps = plan.steps.filter(step => step.dependencies.length === 0);
     const sequentialSteps = plan.steps.filter(step => step.dependencies.length > 0);
-    
+
     // Execute parallel steps
     const parallelResults = await Promise.all(
-      parallelSteps.map(async (step) => {
+      parallelSteps.map(async step => {
         logger.debug('Executing parallel step', { stepId: step.stepId });
         return `Step ${step.stepId} completed in parallel.`;
       })
     );
-    
+
     // Execute sequential steps
     let sequentialResult = '';
     for (const step of sequentialSteps) {
       logger.debug('Executing sequential step', { stepId: step.stepId });
       sequentialResult += `Step ${step.stepId} completed after dependencies.\n`;
     }
-    
+
     return [...parallelResults, sequentialResult].join('\n');
   }
 
@@ -576,8 +582,10 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
     // Apply phase-specific optimizations
     if (context.currentIteration > 1) {
       // Learn from previous iterations
-      const avgQuality = context.previousIterations.reduce((sum, iter) => sum + iter.quality, 0) / context.previousIterations.length;
-      
+      const avgQuality =
+        context.previousIterations.reduce((sum, iter) => sum + iter.quality, 0) /
+        context.previousIterations.length;
+
       if (avgQuality < context.qualityThreshold) {
         // Boost confidence for quality-focused routing
         decision.confidence = Math.min(decision.confidence * 1.1, 1.0);
@@ -591,12 +599,15 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
     }
   }
 
-  private analyzePhasePerformance(iterations: SpiralIteration[]): { councilPhaseEffective: boolean } {
+  private analyzePhasePerformance(iterations: SpiralIteration[]): {
+    councilPhaseEffective: boolean;
+  } {
     const councilIterations = iterations.filter(iter => iter.phase === 'council');
-    const avgCouncilQuality = councilIterations.length > 0 
-      ? councilIterations.reduce((sum, iter) => sum + iter.quality, 0) / councilIterations.length 
-      : 0;
-    
+    const avgCouncilQuality =
+      councilIterations.length > 0
+        ? councilIterations.reduce((sum, iter) => sum + iter.quality, 0) / councilIterations.length
+        : 0;
+
     return {
       councilPhaseEffective: avgCouncilQuality > 0.7,
     };
@@ -604,24 +615,24 @@ export class IntelligentRoutingIntegrationService implements IIntelligentRouting
 
   private isQualityImproving(iterations: SpiralIteration[]): boolean {
     if (iterations.length < 2) return true;
-    
+
     const recent = iterations.slice(-3); // Last 3 iterations
     const older = iterations.slice(-6, -3); // Previous 3 iterations
-    
+
     if (older.length === 0) return true;
-    
+
     const recentAvg = recent.reduce((sum, iter) => sum + iter.quality, 0) / recent.length;
     const olderAvg = older.reduce((sum, iter) => sum + iter.quality, 0) / older.length;
-    
+
     return recentAvg > olderAvg;
   }
 
   private estimatePhaseProcessingTime(phase: string): number {
     const phaseTimes = {
-      collapse: 5000,   // 5 seconds - quick problem breakdown
-      council: 15000,   // 15 seconds - multi-voice discussion
+      collapse: 5000, // 5 seconds - quick problem breakdown
+      council: 15000, // 15 seconds - multi-voice discussion
       synthesis: 10000, // 10 seconds - unified solution
-      rebirth: 12000,   // 12 seconds - implementation planning
+      rebirth: 12000, // 12 seconds - implementation planning
       reflection: 8000, // 8 seconds - quality assessment
     };
 

@@ -1,6 +1,6 @@
 /**
  * Core User Interaction Interfaces
- * 
+ *
  * These interfaces break circular dependencies by providing abstractions
  * that tools can depend on instead of depending directly on CLI
  */
@@ -10,22 +10,22 @@ export interface IUserOutput {
    * Display a message to the user
    */
   display(message: string, options?: DisplayOptions): Promise<void>;
-  
+
   /**
    * Display a warning message
    */
   warn(message: string): Promise<void>;
-  
+
   /**
    * Display an error message
    */
   error(message: string): Promise<void>;
-  
+
   /**
    * Display a success message
    */
   success(message: string): Promise<void>;
-  
+
   /**
    * Display progress information
    */
@@ -37,12 +37,12 @@ export interface IUserInput {
    * Prompt the user for input
    */
   prompt(question: string, options?: PromptOptions): Promise<string>;
-  
+
   /**
    * Prompt the user for confirmation (yes/no)
    */
   confirm(question: string): Promise<boolean>;
-  
+
   /**
    * Present the user with multiple choices
    */

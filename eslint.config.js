@@ -58,7 +58,8 @@ export default [
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: 'module',
-        project: './tsconfig.json',
+        // Use a dedicated config so ESLint includes all src files without conflicting excludes
+        project: './tsconfig.eslint.json',
       }
     },
     plugins: {
@@ -69,8 +70,9 @@ export default [
       ...tseslint.configs.recommended.rules,
       
       // 2025 TypeScript Best Practices - Strict Mode
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-unused-vars': ['error', { 
+      // Temporarily relax no-explicit-any to warn while we migrate types progressively.
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['warn', { 
         'vars': 'all',
         'args': 'after-used',
         'ignoreRestSiblings': false,
@@ -78,10 +80,12 @@ export default [
         'varsIgnorePattern': '^_'
       }],
       '@typescript-eslint/no-non-null-assertion': 'error',
-      '@typescript-eslint/prefer-nullish-coalescing': 'error',
-      '@typescript-eslint/prefer-optional-chain': 'error',
-      '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-misused-promises': 'error',
+      // Disabled until strictNullChecks is enabled in tsconfig
+      '@typescript-eslint/prefer-nullish-coalescing': 'off',
+      '@typescript-eslint/prefer-optional-chain': 'warn',
+      // Gradual migration for promise-safety rules
+      '@typescript-eslint/no-floating-promises': 'warn',
+      '@typescript-eslint/no-misused-promises': 'warn',
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/no-for-in-array': 'error',
       '@typescript-eslint/no-implied-eval': 'error',

@@ -1,6 +1,6 @@
 /**
  * Domain Interfaces Index
- * 
+ *
  * Centralized exports for all domain interfaces
  */
 

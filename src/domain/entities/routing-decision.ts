@@ -14,9 +14,16 @@ import { ConfidenceScore } from './reasoning-step.js';
  * Task Complexity Value Object
  */
 export class TaskComplexity {
-  private static readonly VALID_COMPLEXITIES = ['simple', 'moderate', 'complex', 'advanced'] as const;
-  
-  private constructor(private readonly _value: typeof TaskComplexity.VALID_COMPLEXITIES[number]) {}
+  private static readonly VALID_COMPLEXITIES = [
+    'simple',
+    'moderate',
+    'complex',
+    'advanced',
+  ] as const;
+
+  private constructor(
+    private readonly _value: (typeof TaskComplexity.VALID_COMPLEXITIES)[number]
+  ) {}
 
   static create(value: string): TaskComplexity {
     const normalizedValue = value.toLowerCase();
@@ -47,26 +54,38 @@ export class TaskComplexity {
    */
   static fromTaskDescription(description: string): TaskComplexity {
     const lowerDesc = description.toLowerCase();
-    
+
     // Simple tasks
-    if (lowerDesc.includes('list') || lowerDesc.includes('show') || 
-        lowerDesc.includes('read') || lowerDesc.includes('get')) {
+    if (
+      lowerDesc.includes('list') ||
+      lowerDesc.includes('show') ||
+      lowerDesc.includes('read') ||
+      lowerDesc.includes('get')
+    ) {
       return TaskComplexity.simple();
     }
-    
+
     // Advanced tasks
-    if (lowerDesc.includes('implement') || lowerDesc.includes('design') ||
-        lowerDesc.includes('architect') || lowerDesc.includes('optimize') ||
-        lowerDesc.includes('refactor')) {
+    if (
+      lowerDesc.includes('implement') ||
+      lowerDesc.includes('design') ||
+      lowerDesc.includes('architect') ||
+      lowerDesc.includes('optimize') ||
+      lowerDesc.includes('refactor')
+    ) {
       return TaskComplexity.advanced();
     }
-    
+
     // Complex tasks
-    if (lowerDesc.includes('analyze') || lowerDesc.includes('debug') ||
-        lowerDesc.includes('solve') || lowerDesc.includes('create')) {
+    if (
+      lowerDesc.includes('analyze') ||
+      lowerDesc.includes('debug') ||
+      lowerDesc.includes('solve') ||
+      lowerDesc.includes('create')
+    ) {
       return TaskComplexity.complex();
     }
-    
+
     return TaskComplexity.moderate();
   }
 
@@ -99,11 +118,16 @@ export class TaskComplexity {
    */
   getComplexityScore(): number {
     switch (this._value) {
-      case 'simple': return 0.2;
-      case 'moderate': return 0.5;
-      case 'complex': return 0.8;
-      case 'advanced': return 1.0;
-      default: return 0.5;
+      case 'simple':
+        return 0.2;
+      case 'moderate':
+        return 0.5;
+      case 'complex':
+        return 0.8;
+      case 'advanced':
+        return 1.0;
+      default:
+        return 0.5;
     }
   }
 
@@ -127,15 +151,23 @@ export class TaskComplexity {
  */
 export class ModelCapability {
   private static readonly VALID_CAPABILITIES = [
-    'text-generation', 'code-generation', 'analysis', 'reasoning',
-    'conversation', 'debugging', 'refactoring', 'documentation',
-    'image-analysis', 'multimodal-reasoning', 'function-calling'
+    'text-generation',
+    'code-generation',
+    'analysis',
+    'reasoning',
+    'conversation',
+    'debugging',
+    'refactoring',
+    'documentation',
+    'image-analysis',
+    'multimodal-reasoning',
+    'function-calling',
   ] as const;
-  
+
   private constructor(private readonly _capabilities: readonly string[]) {}
 
   static create(capabilities: string[]): ModelCapability {
-    const validCapabilities = capabilities.filter(cap => 
+    const validCapabilities = capabilities.filter(cap =>
       this.VALID_CAPABILITIES.includes(cap as any)
     );
     return new ModelCapability(Object.freeze(validCapabilities));
@@ -151,8 +183,13 @@ export class ModelCapability {
 
   static advanced(): ModelCapability {
     return new ModelCapability([
-      'code-generation', 'analysis', 'reasoning', 'debugging', 
-      'refactoring', 'multimodal-reasoning', 'function-calling'
+      'code-generation',
+      'analysis',
+      'reasoning',
+      'debugging',
+      'refactoring',
+      'multimodal-reasoning',
+      'function-calling',
     ]);
   }
 
@@ -176,11 +213,11 @@ export class ModelCapability {
    */
   calculateMatchScore(requiredCapabilities: string[]): number {
     if (requiredCapabilities.length === 0) return 1.0;
-    
-    const matchingCapabilities = requiredCapabilities.filter(required => 
+
+    const matchingCapabilities = requiredCapabilities.filter(required =>
       this.hasCapability(required)
     );
-    
+
     return matchingCapabilities.length / requiredCapabilities.length;
   }
 
@@ -252,14 +289,14 @@ export class PerformanceProfile {
    */
   calculatePerformanceScore(preferSpeed: boolean = false): number {
     // Normalize metrics to 0-1 scale
-    const latencyScore = Math.max(0, 1 - (this._latency / 10000)); // 10s max
+    const latencyScore = Math.max(0, 1 - this._latency / 10000); // 10s max
     const throughputScore = Math.min(1, this._throughput / 100); // 100 tokens/s max
     const reliabilityScore = this._reliability;
-    
+
     if (preferSpeed) {
-      return (latencyScore * 0.5) + (throughputScore * 0.3) + (reliabilityScore * 0.2);
+      return latencyScore * 0.5 + throughputScore * 0.3 + reliabilityScore * 0.2;
     } else {
-      return (reliabilityScore * 0.5) + (throughputScore * 0.3) + (latencyScore * 0.2);
+      return reliabilityScore * 0.5 + throughputScore * 0.3 + latencyScore * 0.2;
     }
   }
 
@@ -287,8 +324,8 @@ export class PerformanceProfile {
  */
 export class RoutingPriority {
   private static readonly VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const;
-  
-  private constructor(private readonly _value: typeof RoutingPriority.VALID_PRIORITIES[number]) {}
+
+  private constructor(private readonly _value: (typeof RoutingPriority.VALID_PRIORITIES)[number]) {}
 
   static create(value: string): RoutingPriority {
     const normalizedValue = value.toLowerCase();
@@ -327,11 +364,16 @@ export class RoutingPriority {
    */
   getWeight(): number {
     switch (this._value) {
-      case 'critical': return 1.0;
-      case 'high': return 0.8;
-      case 'medium': return 0.5;
-      case 'low': return 0.2;
-      default: return 0.5;
+      case 'critical':
+        return 1.0;
+      case 'high':
+        return 0.8;
+      case 'medium':
+        return 0.5;
+      case 'low':
+        return 0.2;
+      default:
+        return 0.5;
     }
   }
 
@@ -393,13 +435,7 @@ export class ModelSelectionCriteria {
   }
 
   static forAnalysis(): ModelSelectionCriteria {
-    return new ModelSelectionCriteria(
-      ['analysis', 'reasoning'],
-      undefined,
-      0.9,
-      false,
-      true
-    );
+    return new ModelSelectionCriteria(['analysis', 'reasoning'], undefined, 0.9, false, true);
   }
 
   get requiredCapabilities(): readonly string[] {
@@ -434,17 +470,17 @@ export class ModelSelectionCriteria {
     if (!capabilities.matchesTaskRequirements([...this._requiredCapabilities])) {
       return false;
     }
-    
+
     // Check performance requirements
     if (!performance.meetsRequirements(this._maxLatency, undefined, undefined)) {
       return false;
     }
-    
+
     // Check quality requirements
     if (this._minQuality && qualityScore < this._minQuality) {
       return false;
     }
-    
+
     return true;
   }
 
@@ -459,21 +495,21 @@ export class ModelSelectionCriteria {
     if (!this.isSatisfiedBy(capabilities, performance, qualityScore)) {
       return 0; // Doesn't meet basic requirements
     }
-    
+
     let score = 0;
-    
+
     // Capability matching (40% weight)
     const capabilityScore = capabilities.calculateMatchScore([...this._requiredCapabilities]);
     score += capabilityScore * 0.4;
-    
+
     // Performance score (30% weight)
     const performanceScore = performance.calculatePerformanceScore(this._preferSpeed);
     score += performanceScore * 0.3;
-    
+
     // Quality score (30% weight)
     const normalizedQuality = Math.min(1.0, qualityScore);
     score += normalizedQuality * 0.3;
-    
+
     return score;
   }
 }
@@ -504,7 +540,7 @@ export class RoutingDecision {
     decisionTime: Date = new Date()
   ) {
     this.validateInputs(requestId, selectedModelId, reasoning);
-    
+
     this._requestId = requestId;
     this._selectedModelId = selectedModelId;
     this._taskComplexity = taskComplexity;
@@ -566,8 +602,9 @@ export class RoutingDecision {
    * Business rule: Check if decision should be reviewed
    */
   shouldBeReviewed(): boolean {
-    return this._confidence.isLow() || 
-           (this._priority.isHighPriority() && !this._confidence.isHigh());
+    return (
+      this._confidence.isLow() || (this._priority.isHighPriority() && !this._confidence.isHigh())
+    );
   }
 
   /**
@@ -578,12 +615,12 @@ export class RoutingDecision {
     if (this._taskComplexity.canUseSimpleModel() && this.isHighCapabilityModel()) {
       return false;
     }
-    
+
     // Complex tasks should use high-capability models (quality assurance)
     if (this._taskComplexity.requiresHighCapabilityModel() && !this.isHighCapabilityModel()) {
       return false;
     }
-    
+
     return true;
   }
 
@@ -592,22 +629,22 @@ export class RoutingDecision {
    */
   calculateDecisionQuality(): number {
     let qualityScore = this._confidence.value * 0.4; // Base confidence
-    
+
     // Task-model alignment
     if (this.hasAppropriateTaskModelAlignment()) {
       qualityScore += 0.3;
     }
-    
+
     // Priority handling
     if (this._priority.isHighPriority() && this._confidence.isHigh()) {
       qualityScore += 0.2;
     }
-    
+
     // Alternative consideration (having alternatives shows thorough evaluation)
     if (this._alternatives.length > 0) {
       qualityScore += 0.1;
     }
-    
+
     return Math.min(1.0, qualityScore);
   }
 
@@ -616,7 +653,7 @@ export class RoutingDecision {
    */
   getRoutingInsights(): string[] {
     const insights: string[] = [];
-    
+
     if (!this.hasAppropriateTaskModelAlignment()) {
       if (this._taskComplexity.canUseSimpleModel() && this.isHighCapabilityModel()) {
         insights.push('Consider using a faster, simpler model for this task type');
@@ -624,19 +661,19 @@ export class RoutingDecision {
         insights.push('Task complexity may require a more capable model');
       }
     }
-    
+
     if (this._confidence.isLow()) {
       insights.push('Low confidence decision - consider adding more routing criteria');
     }
-    
+
     if (this._alternatives.length === 0) {
       insights.push('No alternative models considered - routing may be too rigid');
     }
-    
+
     if (this._priority.isHighPriority() && !this._confidence.isHigh()) {
       insights.push('High priority task with low confidence routing - review criteria');
     }
-    
+
     return insights;
   }
 
@@ -661,26 +698,30 @@ export class RoutingDecision {
     // This is a simplified check - in real implementation, this would check model capabilities
     // For now, assume models with certain naming patterns are high-capability
     const modelName = this._selectedModelId.toLowerCase();
-    return modelName.includes('large') || modelName.includes('advanced') || 
-           modelName.includes('gpt-4') || modelName.includes('claude');
+    return (
+      modelName.includes('large') ||
+      modelName.includes('advanced') ||
+      modelName.includes('gpt-4') ||
+      modelName.includes('claude')
+    );
   }
 
   private validateInputs(requestId: string, selectedModelId: string, reasoning: string): void {
     if (!requestId || requestId.trim().length === 0) {
       throw new Error('Request ID cannot be empty');
     }
-    
+
     if (!selectedModelId || selectedModelId.trim().length === 0) {
       throw new Error('Selected model ID cannot be empty');
     }
-    
+
     if (!reasoning || reasoning.trim().length === 0) {
       throw new Error('Routing decision reasoning cannot be empty');
     }
   }
 
   // Factory methods
-  
+
   static createHighConfidenceDecision(
     requestId: string,
     selectedModelId: string,

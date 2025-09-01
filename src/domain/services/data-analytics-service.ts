@@ -1,7 +1,7 @@
 /**
  * Data Analytics Domain Service
  * Pure business logic for data processing and analytics
- * 
+ *
  * Architecture Compliance:
  * - Domain layer: pure business logic only
  * - No infrastructure dependencies
@@ -35,9 +35,9 @@ export interface ConfidenceTrend {
 }
 
 export interface ConfidenceDistribution {
-  low: number;      // 0-0.3
-  medium: number;   // 0.3-0.7
-  high: number;     // 0.7-1.0
+  low: number; // 0-0.3
+  medium: number; // 0.3-0.7
+  high: number; // 0.7-1.0
 }
 
 export interface TokenUsagePattern {
@@ -65,9 +65,9 @@ export interface QualityTrend {
 }
 
 export interface QualityDistribution {
-  poor: number;     // 0-0.4
-  fair: number;     // 0.4-0.6
-  good: number;     // 0.6-0.8
+  poor: number; // 0-0.4
+  fair: number; // 0.4-0.6
+  good: number; // 0.6-0.8
   excellent: number; // 0.8-1.0
 }
 
@@ -131,7 +131,6 @@ export interface ConnectionPoolAnalytic {
  * Processes raw data to generate business insights and analytics
  */
 export class DataAnalyticsService {
-  
   /**
    * Analyze voice interaction patterns and performance
    */
@@ -191,10 +190,7 @@ export class DataAnalyticsService {
     );
 
     // Analysis type distribution
-    const analysisTypeDistribution = this.calculateDistribution(
-      analyses,
-      a => a.analysisType
-    );
+    const analysisTypeDistribution = this.calculateDistribution(analyses, a => a.analysisType);
 
     // Quality trends over time
     const qualityTrends = this.analyzeQualityTrends(analyses, 7); // Last 7 days
@@ -268,7 +264,7 @@ export class DataAnalyticsService {
 
     // Sort by impact and priority
     return recommendations.sort((a, b) => {
-      const impactOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+      const impactOrder = { high: 3, medium: 2, low: 1 };
       return impactOrder[b.impact] - impactOrder[a.impact];
     });
   }
@@ -433,9 +429,10 @@ export class DataAnalyticsService {
         .filter(a => a.qualityScore != null)
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-      const qualityImprovement = sortedAnalyses.length > 1
-        ? sortedAnalyses[sortedAnalyses.length - 1].qualityScore - sortedAnalyses[0].qualityScore
-        : 0;
+      const qualityImprovement =
+        sortedAnalyses.length > 1
+          ? sortedAnalyses[sortedAnalyses.length - 1].qualityScore - sortedAnalyses[0].qualityScore
+          : 0;
 
       const riskAreas = this.identifyRiskAreas(projectAnalyses);
 
@@ -488,10 +485,10 @@ export class DataAnalyticsService {
       const averageLatency = this.calculateMean(latencies);
       const executionCount = queryMetrics.length;
       const peakLatency = Math.max(...latencies);
-      
+
       // Simple optimization potential calculation
-      const optimizationPotential = peakLatency > averageLatency * 2 ? 0.8 : 
-                                   averageLatency > 1000 ? 0.6 : 0.3;
+      const optimizationPotential =
+        peakLatency > averageLatency * 2 ? 0.8 : averageLatency > 1000 ? 0.6 : 0.3;
 
       patterns.push({
         queryType,
@@ -517,13 +514,15 @@ export class DataAnalyticsService {
 
     const avgRetrievalTime = this.calculateMean(metrics.map(m => m.latency));
 
-    return [{
-      cacheType: 'query-cache',
-      hitRate,
-      missRate,
-      averageRetrievalTime: avgRetrievalTime,
-      recommendedTTL: this.calculateOptimalTTL(hitRate, avgRetrievalTime),
-    }];
+    return [
+      {
+        cacheType: 'query-cache',
+        hitRate,
+        missRate,
+        averageRetrievalTime: avgRetrievalTime,
+        recommendedTTL: this.calculateOptimalTTL(hitRate, avgRetrievalTime),
+      },
+    ];
   }
 
   private analyzeConnectionPoolUsage(
@@ -550,9 +549,7 @@ export class DataAnalyticsService {
     return analytics;
   }
 
-  private generateIndexRecommendations(
-    patterns: QueryPerformancePattern[]
-  ): IndexRecommendation[] {
+  private generateIndexRecommendations(patterns: QueryPerformancePattern[]): IndexRecommendation[] {
     const recommendations: IndexRecommendation[] = [];
 
     patterns.forEach(pattern => {
@@ -663,7 +660,7 @@ export class DataAnalyticsService {
     interactions: Array<{ confidence: number }>
   ): ConfidenceDistribution {
     const distribution = { low: 0, medium: 0, high: 0 };
-    
+
     interactions.forEach(i => {
       if (i.confidence < 0.3) distribution.low++;
       else if (i.confidence < 0.7) distribution.medium++;
@@ -677,7 +674,7 @@ export class DataAnalyticsService {
     analyses: Array<{ qualityScore: number }>
   ): QualityDistribution {
     const distribution = { poor: 0, fair: 0, good: 0, excellent: 0 };
-    
+
     analyses.forEach(a => {
       if (a.qualityScore < 0.4) distribution.poor++;
       else if (a.qualityScore < 0.6) distribution.fair++;
@@ -710,7 +707,7 @@ export class DataAnalyticsService {
     const baseTTL = 300; // 5 minutes
     const hitRateMultiplier = hitRate + 0.5; // 0.5 to 1.5
     const latencyMultiplier = avgLatency < 100 ? 1.5 : avgLatency < 500 ? 1.0 : 0.5;
-    
+
     return Math.round(baseTTL * hitRateMultiplier * latencyMultiplier);
   }
 

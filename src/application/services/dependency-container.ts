@@ -1,18 +1,18 @@
 /**
  * Dependency Injection Container - Application Layer
- * 
+ *
  * Simple dependency injection container following clean architecture principles.
  * Manages creation and lifecycle of application services and use cases.
  */
 
 import { IWorkflowOrchestrator } from '../../domain/interfaces/workflow-orchestrator.js';
-import { 
-  IAnalyzeFileUseCase, 
-  IGenerateCodeUseCase, 
+import {
+  IAnalyzeFileUseCase,
+  IGenerateCodeUseCase,
   IAnalyzeDirectoryUseCase,
   AnalyzeFileUseCase,
   GenerateCodeUseCase,
-  AnalyzeDirectoryUseCase
+  AnalyzeDirectoryUseCase,
 } from '../use-cases/index.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 
@@ -87,7 +87,7 @@ export class DependencyContainer {
     return {
       analyzeFileUseCase: new AnalyzeFileUseCase(this._orchestrator),
       generateCodeUseCase: new GenerateCodeUseCase(this._orchestrator),
-      analyzeDirectoryUseCase: new AnalyzeDirectoryUseCase(this._orchestrator)
+      analyzeDirectoryUseCase: new AnalyzeDirectoryUseCase(this._orchestrator),
     };
   }
 
@@ -124,7 +124,9 @@ export function getDependencyContainer(): DependencyContainer {
 /**
  * Initialize the global dependency container
  */
-export function initializeDependencyContainer(orchestrator: IWorkflowOrchestrator): DependencyContainer {
+export function initializeDependencyContainer(
+  orchestrator: IWorkflowOrchestrator
+): DependencyContainer {
   const container = getDependencyContainer();
   container.initialize(orchestrator);
   return container;

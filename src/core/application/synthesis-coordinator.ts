@@ -28,7 +28,11 @@ import {
   PERFORMANCE_MONITOR_TOKEN,
 } from '../di/service-tokens.js';
 import { logger } from '../logger.js';
-import { ModelRequest, ModelResponse, RequestContext } from '../../domain/interfaces/model-client.js';
+import {
+  ModelRequest,
+  ModelResponse,
+  RequestContext,
+} from '../../domain/interfaces/model-client.js';
 
 export interface ApplicationRequest {
   id?: string;

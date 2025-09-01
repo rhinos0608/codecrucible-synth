@@ -1,6 +1,6 @@
 /**
  * Unified Logger System
- * 
+ *
  * Consolidates 6 different logging implementations into one comprehensive system.
  * Replaces: core/logger.ts, structured-logger.ts, security-audit-logger.ts, etc.
  */
@@ -56,7 +56,10 @@ export class UnifiedLogger extends EventEmitter {
   private fileStream?: fs.WriteStream;
   private auditStream?: fs.WriteStream;
 
-  constructor(config?: Partial<LoggerConfig>, private eventBus?: IEventBus) {
+  constructor(
+    config?: Partial<LoggerConfig>,
+    private eventBus?: IEventBus
+  ) {
     super();
     this.config = {
       level: LogLevel.INFO,
@@ -67,9 +70,9 @@ export class UnifiedLogger extends EventEmitter {
       maxFileSize: 10 * 1024 * 1024, // 10MB
       maxFiles: 5,
       enableAudit: false,
-      ...config
+      ...config,
     };
-    
+
     this.initialize();
   }
 
@@ -77,7 +80,7 @@ export class UnifiedLogger extends EventEmitter {
     if (this.config.enableFile && this.config.filePath) {
       this.fileStream = fs.createWriteStream(this.config.filePath, { flags: 'a' });
     }
-    
+
     if (this.config.enableAudit && this.config.auditPath) {
       this.auditStream = fs.createWriteStream(this.config.auditPath, { flags: 'a' });
     }
@@ -118,9 +121,9 @@ export class UnifiedLogger extends EventEmitter {
       timestamp: new Date(),
       level: LogLevel.AUDIT,
       message: `AUDIT: ${action} - ${result}`,
-      metadata: { ...metadata, action, result }
+      metadata: { ...metadata, action, result },
     };
-    
+
     this.writeAudit(entry);
   }
 
@@ -132,7 +135,7 @@ export class UnifiedLogger extends EventEmitter {
       level,
       message,
       metadata,
-      context: this.getContext()
+      context: this.getContext(),
     };
 
     this.writeLog(entry);
@@ -140,20 +143,20 @@ export class UnifiedLogger extends EventEmitter {
 
   private writeLog(entry: LogEntry): void {
     const formatted = this.format(entry);
-    
+
     if (this.config.enableConsole) {
       this.writeToConsole(entry, formatted);
     }
-    
+
     if (this.config.enableFile && this.fileStream) {
-      this.fileStream.write(formatted + '\n');
+      this.fileStream.write(`${formatted}\n`);
     }
-    
+
     // Emit to event bus
     if (this.eventBus) {
       this.eventBus.emit('log:entry', entry);
     }
-    
+
     // Emit local event
     this.emit('log', entry);
   }
@@ -161,9 +164,9 @@ export class UnifiedLogger extends EventEmitter {
   private writeAudit(entry: LogEntry): void {
     if (this.auditStream) {
       const formatted = this.format(entry);
-      this.auditStream.write(formatted + '\n');
+      this.auditStream.write(`${formatted}\n`);
     }
-    
+
     // Always write audit logs to main log as well
     this.writeLog(entry);
   }
@@ -196,16 +199,16 @@ export class UnifiedLogger extends EventEmitter {
   private writeToConsole(entry: LogEntry, formatted: string): void {
     const colors = {
       [LogLevel.DEBUG]: '\x1b[90m', // gray
-      [LogLevel.INFO]: '\x1b[36m',  // cyan
-      [LogLevel.WARN]: '\x1b[33m',  // yellow
+      [LogLevel.INFO]: '\x1b[36m', // cyan
+      [LogLevel.WARN]: '\x1b[33m', // yellow
       [LogLevel.ERROR]: '\x1b[31m', // red
       [LogLevel.FATAL]: '\x1b[35m', // magenta
       [LogLevel.AUDIT]: '\x1b[32m', // green
     };
-    
+
     const resetColor = '\x1b[0m';
     const color = colors[entry.level] || resetColor;
-    
+
     if (entry.level >= LogLevel.ERROR) {
       console.error(`${color}${formatted}${resetColor}`);
     } else {
@@ -217,7 +220,7 @@ export class UnifiedLogger extends EventEmitter {
     // Get calling context from stack trace
     const stack = new Error().stack;
     if (!stack) return 'unknown';
-    
+
     const lines = stack.split('\n');
     const callerLine = lines[3]; // Skip Error, this method, and log method
     const match = callerLine?.match(/at\s+(\S+)/);

@@ -45,7 +45,7 @@ export class PerformanceOptimizer extends EventEmitter {
 
   constructor(config?: Partial<OptimizationConfig>) {
     super();
-    
+
     this.config = {
       enableAutoOptimization: true,
       optimizationInterval: 30000, // 30 seconds
@@ -53,15 +53,15 @@ export class PerformanceOptimizer extends EventEmitter {
         highLoad: 80,
         highMemory: 85,
         slowResponse: 2000,
-        highErrorRate: 5
+        highErrorRate: 5,
       },
       strategies: {
         loadBalancing: true,
         caching: true,
         requestThrottling: true,
-        resourcePooling: true
+        resourcePooling: true,
       },
-      ...config
+      ...config,
     };
 
     this.metrics = {
@@ -69,7 +69,7 @@ export class PerformanceOptimizer extends EventEmitter {
       memoryUsage: 0,
       responseTime: 0,
       throughput: 0,
-      errorRate: 0
+      errorRate: 0,
     };
   }
 
@@ -79,10 +79,10 @@ export class PerformanceOptimizer extends EventEmitter {
     }
 
     logger.info('Starting performance optimization monitoring');
-    
+
     this.monitoringInterval = setInterval(() => {
       this.collectMetrics()
-        .then(() => this.performOptimization())
+        .then(async () => this.performOptimization())
         .catch(error => {
           logger.error('Performance optimization error:', error);
         });
@@ -104,7 +104,7 @@ export class PerformanceOptimizer extends EventEmitter {
         memoryUsage: await this.getMemoryUsage(),
         responseTime: await this.getAverageResponseTime(),
         throughput: await this.getThroughput(),
-        errorRate: await this.getErrorRate()
+        errorRate: await this.getErrorRate(),
       };
 
       this.emit('metricsCollected', this.metrics);
@@ -128,7 +128,7 @@ export class PerformanceOptimizer extends EventEmitter {
         await this.optimizeLoadBalancing();
         optimizations.push('load balancing');
       }
-      
+
       if (this.config.strategies.requestThrottling) {
         await this.enableRequestThrottling();
         optimizations.push('request throttling');
@@ -147,7 +147,7 @@ export class PerformanceOptimizer extends EventEmitter {
         await this.optimizeCaching();
         optimizations.push('caching optimization');
       }
-      
+
       if (this.config.strategies.resourcePooling) {
         await this.optimizeResourcePooling();
         optimizations.push('resource pooling');
@@ -163,12 +163,12 @@ export class PerformanceOptimizer extends EventEmitter {
     if (optimizations.length > 0) {
       const optimizationResult = `Applied optimizations: ${optimizations.join(', ')}`;
       logger.info(optimizationResult);
-      
+
       this.optimizationHistory.push({
         timestamp: Date.now(),
         strategy: optimizations.join(', '),
         result: 'success',
-        improvement: this.calculateImprovement()
+        improvement: this.calculateImprovement(),
       });
 
       this.emit('optimizationApplied', { optimizations, metrics: this.metrics });
@@ -181,7 +181,7 @@ export class PerformanceOptimizer extends EventEmitter {
       config: this.config,
       optimizationHistory: this.optimizationHistory,
       isMonitoring: this.monitoringInterval !== null,
-      totalOptimizations: this.optimizationHistory.length
+      totalOptimizations: this.optimizationHistory.length,
     };
   }
 
@@ -277,7 +277,7 @@ export class PerformanceOptimizer extends EventEmitter {
     return this.calculateImprovement();
   }
 
-  executeOptimized(task: () => Promise<any>): Promise<any> {
+  async executeOptimized(task: () => Promise<any>): Promise<any> {
     // Execute task with performance optimizations applied
     return task();
   }
@@ -288,7 +288,7 @@ export class PerformanceOptimizer extends EventEmitter {
     }
 
     logger.info('Starting performance monitoring');
-    
+
     this.monitoringInterval = setInterval(async () => {
       try {
         await this.updateMetrics();

@@ -223,7 +223,7 @@ export class RBACPolicyEngine {
     if (pattern === value) return true;
 
     if (pattern.includes('*')) {
-      const regex = new RegExp(`^${  pattern.replace(/\*/g, '.*')  }$`);
+      const regex = new RegExp(`^${pattern.replace(/\*/g, '.*')}$`);
       return regex.test(value);
     }
 

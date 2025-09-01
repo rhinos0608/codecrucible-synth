@@ -95,7 +95,7 @@ export class InputSanitizer {
         }
       }
     }
-    
+
     // Additional validation using policy loader
     try {
       const validation = await InputSanitizer.policyLoader.validatePattern(args);
@@ -166,7 +166,7 @@ export class InputSanitizer {
     // Context detection - skip security checks for build/compilation contexts
     const isBuildContext = this.isBuildOrCompilationContext(sanitized);
     const isConfigContext = this.isConfigurationContext(sanitized);
-    
+
     if (isBuildContext || isConfigContext) {
       // For build contexts, only check for actual security threats, not compilation flags
       return this.sanitizeBuildContext(sanitized);
@@ -227,21 +227,27 @@ export class InputSanitizer {
 
     // CRITICAL: Preprocess AI-generated placeholder paths BEFORE security validation
     const originalPath = sanitized;
-    
+
     // Handle placeholder paths like "/path/to/filename.ext"
     if (sanitized.includes('/path/to/') || sanitized.startsWith('/path/')) {
       sanitized = sanitized.split('/').pop() || sanitized;
-      console.log(`🔧 SECURITY: Converting AI placeholder path "${originalPath}" to filename "${sanitized}"`);
+      console.log(
+        `🔧 SECURITY: Converting AI placeholder path "${originalPath}" to filename "${sanitized}"`
+      );
     }
     // Handle simple absolute paths like "/README.md"
     else if (sanitized.startsWith('/') && !sanitized.includes('/', 1)) {
       sanitized = sanitized.substring(1);
-      console.log(`🔧 SECURITY: Converting AI-generated absolute path "${originalPath}" to relative "${sanitized}"`);
+      console.log(
+        `🔧 SECURITY: Converting AI-generated absolute path "${originalPath}" to relative "${sanitized}"`
+      );
     }
     // Handle any other absolute-looking paths by extracting filename
     else if (sanitized.startsWith('/') && sanitized.split('/').length > 2) {
       sanitized = sanitized.split('/').pop() || sanitized;
-      console.log(`🔧 SECURITY: Converting complex absolute path "${originalPath}" to filename "${sanitized}"`);
+      console.log(
+        `🔧 SECURITY: Converting complex absolute path "${originalPath}" to filename "${sanitized}"`
+      );
     }
 
     // Check for directory traversal
@@ -286,7 +292,7 @@ export class InputSanitizer {
         sanitized: '',
         isValid: false,
         violations,
-        originalCommand: token
+        originalCommand: token,
       };
     }
 
@@ -322,7 +328,7 @@ export class InputSanitizer {
       sanitized,
       isValid: violations.length === 0,
       violations,
-      originalCommand: token
+      originalCommand: token,
     };
   }
 
@@ -350,7 +356,10 @@ export class InputSanitizer {
       if (matches) {
         violations.push(`${type} detected in code`);
         // Redact the secrets
-        sanitized = sanitized.replace(pattern, `[REDACTED_${type.toUpperCase().replace(/\s/g, '_')}]`);
+        sanitized = sanitized.replace(
+          pattern,
+          `[REDACTED_${type.toUpperCase().replace(/\s/g, '_')}]`
+        );
       }
     }
 
@@ -358,7 +367,7 @@ export class InputSanitizer {
       sanitized,
       isValid: violations.length === 0,
       violations,
-      originalCommand: code
+      originalCommand: code,
     };
   }
 

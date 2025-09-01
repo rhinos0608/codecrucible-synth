@@ -1,10 +1,12 @@
 import { logger } from '../logging/logger.js';
 import { ResponseNormalizer } from '../../core/response-normalizer.js';
 import { DomainAwareToolOrchestrator, DomainAnalysis } from './domain-aware-tool-orchestrator.js';
+import { PerformanceProfiler } from '../../core/performance/profiler.js';
+import { RustExecutionBackend } from '../../core/execution/rust-executor/rust-execution-backend.js';
 
 /**
  * Sequential Tool Executor with Chain-of-Thought Reasoning
- * 
+ *
  * Implements ReAct pattern (Reasoning + Acting):
  * 1. Thought: What do I need to do?
  * 2. Action: Execute specific tool
@@ -55,9 +57,18 @@ export class SequentialToolExecutor {
   private domainOrchestrator: DomainAwareToolOrchestrator;
   private maxReasoningSteps: number = 10;
   private currentExecutionId: string = '';
+  private performanceProfiler?: PerformanceProfiler;
+  private rustBackend?: RustExecutionBackend;
 
-  constructor() {
+  constructor(performanceProfiler?: PerformanceProfiler, rustBackend?: RustExecutionBackend) {
     this.domainOrchestrator = new DomainAwareToolOrchestrator();
+    this.performanceProfiler = performanceProfiler;
+    this.rustBackend = rustBackend;
+    
+    logger.info('SequentialToolExecutor initialized', {
+      rustBackendEnabled: !!this.rustBackend,
+      rustAvailable: this.rustBackend?.isAvailable() || false,
+    });
   }
 
   /**
@@ -70,7 +81,13 @@ export class SequentialToolExecutor {
     maxSteps: number = 8,
     streamingCallbacks?: StreamingCallbacks
   ): Promise<ExecutionResult> {
-    return this.executeWithReasoning(prompt, availableTools, modelClient, maxSteps, streamingCallbacks);
+    return this.executeWithReasoning(
+      prompt,
+      availableTools,
+      modelClient,
+      maxSteps,
+      streamingCallbacks
+    );
   }
 
   /**
@@ -87,38 +104,61 @@ export class SequentialToolExecutor {
     this.currentExecutionId = `exec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     this.maxReasoningSteps = maxSteps;
 
+    // Start profiling session for tool execution
+    let profilingSessionId: string | undefined;
+    
+    if (this.performanceProfiler) {
+      profilingSessionId = this.performanceProfiler.startSession(`tool_execution_${this.currentExecutionId}`);
+      
+      // Profile the overall tool execution workflow
+      this.performanceProfiler.startOperation(
+        profilingSessionId,
+        'tool_execution_workflow',
+        'tool_execution',
+        {
+          executionId: this.currentExecutionId,
+          promptLength: prompt.length,
+          maxSteps,
+          availableToolCount: availableTools.length,
+          toolNames: availableTools.map(t => t.function?.name || t.name).join(','),
+          executionMode: 'sequential',
+        }
+      );
+    }
+
     logger.info('Starting sequential tool execution with reasoning', {
       executionId: this.currentExecutionId,
       promptLength: prompt.length,
       maxSteps,
-      availableToolCount: availableTools.length
+      availableToolCount: availableTools.length,
     });
 
     const reasoningChain: ReasoningStep[] = [];
-    
+
     try {
       // Step 1: Domain analysis and planning
       const domainResult = this.domainOrchestrator.getToolsForPrompt(prompt, availableTools);
-      
+
       const executionPlan: ExecutionPlan = {
-        goal: prompt.length > 100 ? `${prompt.substring(0, 100)  }...` : prompt,
+        goal: prompt.length > 100 ? `${prompt.substring(0, 100)}...` : prompt,
         domain: domainResult.analysis.primaryDomain,
         estimatedSteps: this.estimateSteps(prompt, domainResult.analysis),
         selectedTools: domainResult.tools.map(t => t.function?.name || t.name),
-        reasoning: domainResult.reasoning
+        reasoning: domainResult.reasoning,
       };
 
       // Step 2: Initial reasoning
-      const initialThought = `I need to: ${prompt}. Based on analysis, this is a ${executionPlan.domain} task. ` +
-                            `I have ${executionPlan.selectedTools.length} relevant tools available. ` +
-                            `I'll work through this step by step.`;
-      
+      const initialThought =
+        `I need to: ${prompt}. Based on analysis, this is a ${executionPlan.domain} task. ` +
+        `I have ${executionPlan.selectedTools.length} relevant tools available. ` +
+        `I'll work through this step by step.`;
+
       reasoningChain.push({
         step: 1,
         type: 'thought',
         content: initialThought,
         confidence: domainResult.analysis.confidence,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
 
       // STREAMING: Notify about initial reasoning
@@ -130,7 +170,7 @@ export class SequentialToolExecutor {
       let currentStep = 2;
       let taskCompleted = false;
       let accumulatedContext = prompt;
-      
+
       while (currentStep <= maxSteps && !taskCompleted) {
         // Reasoning step: What should I do next?
         const reasoningResult = await this.generateReasoning(
@@ -145,7 +185,7 @@ export class SequentialToolExecutor {
           type: 'thought',
           content: reasoningResult.thought,
           confidence: reasoningResult.confidence,
-          timestamp: new Date()
+          timestamp: new Date(),
         });
 
         // STREAMING: Notify about reasoning step
@@ -159,7 +199,7 @@ export class SequentialToolExecutor {
             type: 'conclusion',
             content: reasoningResult.conclusion || 'Task completed based on reasoning.',
             confidence: reasoningResult.confidence,
-            timestamp: new Date()
+            timestamp: new Date(),
           });
           taskCompleted = true;
           break;
@@ -168,15 +208,38 @@ export class SequentialToolExecutor {
         // Action step: Execute selected tool
         if (reasoningResult.selectedTool) {
           // STREAMING: Notify about tool execution
-          const toolName = reasoningResult.selectedTool.function?.name || reasoningResult.selectedTool.name;
+          const toolName =
+            reasoningResult.selectedTool.function?.name || reasoningResult.selectedTool.name;
           streamingCallbacks?.onStepStart?.(currentStep + 1, 'action', `Executing ${toolName}`);
           streamingCallbacks?.onToolExecution?.(toolName, reasoningResult.toolArgs);
-          
+
+          // Start individual tool profiling
+          let toolOperationId: string | undefined;
+          if (this.performanceProfiler && profilingSessionId) {
+            toolOperationId = this.performanceProfiler.startOperation(
+              profilingSessionId,
+              `individual_tool_${toolName}`,
+              'tool_execution',
+              {
+                toolName,
+                toolType: reasoningResult.selectedTool.type || 'unknown',
+                arguments: reasoningResult.toolArgs,
+                step: currentStep + 1,
+                executionMode: 'individual',
+              }
+            );
+          }
+
           const actionResult = await this.executeTool(
             reasoningResult.selectedTool,
             reasoningResult.toolArgs,
             domainResult.tools
           );
+
+          // End individual tool profiling
+          if (this.performanceProfiler && profilingSessionId && toolOperationId) {
+            this.performanceProfiler.endOperation(profilingSessionId, toolOperationId);
+          }
 
           reasoningChain.push({
             step: currentStep + 1,
@@ -186,19 +249,22 @@ export class SequentialToolExecutor {
             toolArgs: reasoningResult.toolArgs,
             toolResult: actionResult.result,
             confidence: 0.9,
-            timestamp: new Date()
+            timestamp: new Date(),
           });
 
           // Observation step: Process tool result
           const normalizedResult = ResponseNormalizer.normalizeToString(actionResult.result);
-          const observation = this.generateObservation(normalizedResult, reasoningResult.selectedTool.name);
+          const observation = this.generateObservation(
+            normalizedResult,
+            reasoningResult.selectedTool.name
+          );
 
           reasoningChain.push({
             step: currentStep + 2,
             type: 'observation',
             content: observation.content,
             confidence: observation.confidence,
-            timestamp: new Date()
+            timestamp: new Date(),
           });
 
           // STREAMING: Notify about observation
@@ -216,7 +282,7 @@ export class SequentialToolExecutor {
               type: 'conclusion',
               content: observation.completionReason || 'Task completed successfully.',
               confidence: observation.confidence,
-              timestamp: new Date()
+              timestamp: new Date(),
             });
             taskCompleted = true;
           }
@@ -229,7 +295,7 @@ export class SequentialToolExecutor {
             type: 'conclusion',
             content: 'No specific tool action needed. Providing direct response.',
             confidence: reasoningResult.confidence,
-            timestamp: new Date()
+            timestamp: new Date(),
           });
           taskCompleted = true;
           currentStep += 2;
@@ -245,7 +311,7 @@ export class SequentialToolExecutor {
         reasoningChain,
         executionPlan,
         totalSteps: reasoningChain.length,
-        executionTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
       };
 
       logger.info('Sequential execution completed', {
@@ -253,17 +319,28 @@ export class SequentialToolExecutor {
         success: result.success,
         totalSteps: result.totalSteps,
         executionTime: result.executionTime,
-        domain: executionPlan.domain
+        domain: executionPlan.domain,
       });
 
-      return result;
+      // End profiling session on success
+      if (this.performanceProfiler && profilingSessionId) {
+        this.performanceProfiler.endOperation(profilingSessionId, 'tool_execution_workflow');
+        this.performanceProfiler.endSession(profilingSessionId);
+      }
 
+      return result;
     } catch (error) {
       logger.error('Sequential execution failed', {
         executionId: this.currentExecutionId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        completedSteps: reasoningChain.length
+        completedSteps: reasoningChain.length,
       });
+
+      // End profiling session on error
+      if (this.performanceProfiler && profilingSessionId) {
+        this.performanceProfiler.endOperation(profilingSessionId, 'tool_execution_workflow', error as Error);
+        this.performanceProfiler.endSession(profilingSessionId);
+      }
 
       return {
         success: false,
@@ -274,10 +351,10 @@ export class SequentialToolExecutor {
           domain: 'error',
           estimatedSteps: 0,
           selectedTools: [],
-          reasoning: 'Execution failed'
+          reasoning: 'Execution failed',
         },
         totalSteps: reasoningChain.length,
-        executionTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
       };
     }
   }
@@ -299,13 +376,13 @@ export class SequentialToolExecutor {
     conclusion?: string;
   }> {
     const recentSteps = previousSteps.slice(-3); // Last 3 steps for context
-    const stepsSummary = recentSteps.map(step => 
-      `${step.type.toUpperCase()}: ${step.content}`
-    ).join('\n');
+    const stepsSummary = recentSteps
+      .map(step => `${step.type.toUpperCase()}: ${step.content}`)
+      .join('\n');
 
-    const toolOptions = availableTools.map(tool => 
-      `- ${tool.function.name}: ${tool.function.description}`
-    ).join('\n');
+    const toolOptions = availableTools
+      .map(tool => `- ${tool.function.name}: ${tool.function.description}`)
+      .join('\n');
 
     const reasoningPrompt = `You are an AI assistant working step-by-step to help the user.
 
@@ -333,21 +410,20 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
       const response = await modelClient.generateText(reasoningPrompt, {
         temperature: 0.3, // Lower temperature for more focused reasoning
         maxTokens: 512,
-        tools: [] // No tools for the reasoning step itself
+        tools: [], // No tools for the reasoning step itself
       });
 
       const responseText = ResponseNormalizer.normalizeToString(response);
       return this.parseReasoningResponse(responseText, availableTools);
-
     } catch (error) {
       logger.warn('Reasoning generation failed, using fallback', {
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
-      
+
       return {
         thought: 'Unable to generate detailed reasoning. Proceeding with available information.',
         confidence: 0.5,
-        shouldStop: false
+        shouldStop: false,
       };
     }
   }
@@ -355,7 +431,10 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
   /**
    * Parse structured reasoning response from LLM
    */
-  private parseReasoningResponse(response: string, availableTools: any[]): {
+  private parseReasoningResponse(
+    response: string,
+    availableTools: any[]
+  ): {
     thought: string;
     selectedTool?: any;
     toolArgs?: any;
@@ -364,7 +443,7 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
     conclusion?: string;
   } {
     const lines = response.split('\n').map(line => line.trim());
-    
+
     let thought = '';
     let actionName = '';
     let argsText = '';
@@ -394,9 +473,7 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
     let toolArgs: any = undefined;
 
     if (actionName && actionName !== 'NONE' && actionName !== 'N/A') {
-      selectedTool = availableTools.find(tool => 
-        (tool.function?.name || tool.name) === actionName
-      );
+      selectedTool = availableTools.find(tool => (tool.function?.name || tool.name) === actionName);
 
       if (selectedTool && argsText && argsText !== 'N/A') {
         try {
@@ -405,7 +482,7 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
           logger.warn('Failed to parse tool arguments', {
             actionName,
             argsText,
-            error: error instanceof Error ? error.message : 'Parse error'
+            error: error instanceof Error ? error.message : 'Parse error',
           });
           toolArgs = {};
         }
@@ -418,14 +495,18 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
       toolArgs: toolArgs || {},
       confidence,
       shouldStop,
-      conclusion: shouldStop ? conclusion : undefined
+      conclusion: shouldStop ? conclusion : undefined,
     };
   }
 
   /**
    * Execute a specific tool with given arguments - NOW WITH REAL MCP INTEGRATION
    */
-  private async executeTool(tool: any, args: any, availableTools: any[]): Promise<{
+  private async executeTool(
+    tool: any,
+    args: any,
+    availableTools: any[]
+  ): Promise<{
     result: any;
     success: boolean;
     error?: string;
@@ -434,90 +515,89 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
     logger.info('🔧 SEQUENTIAL-EXECUTOR: Executing real MCP tool', {
       toolName,
       args,
-      toolType: typeof tool
+      toolType: typeof tool,
     });
 
     try {
       // CRITICAL: Use actual MCP tool execution instead of simulation
       const { getGlobalEnhancedToolIntegration } = await import('./enhanced-tool-integration.js');
       const toolIntegration = getGlobalEnhancedToolIntegration();
-      
+
       if (toolIntegration) {
         // Format tool call for MCP execution
         const formattedToolCall = {
           function: {
             name: toolName,
-            arguments: JSON.stringify(args)
-          }
+            arguments: JSON.stringify(args),
+          },
         };
-        
+
         logger.info('🔧 SEQUENTIAL-EXECUTOR: Calling enhanced tool integration', {
-          toolCall: formattedToolCall
+          toolCall: formattedToolCall,
         });
-        
+
         const mcpResult = await toolIntegration.executeToolCall(formattedToolCall);
-        
+
         logger.info('🔧 SEQUENTIAL-EXECUTOR: MCP tool execution result', {
           toolName,
           success: mcpResult.success,
           hasOutput: !!mcpResult.output,
-          outputType: typeof mcpResult.output
+          outputType: typeof mcpResult.output,
         });
-        
+
         if (mcpResult.success && mcpResult.output) {
           return {
             result: mcpResult.output.content || mcpResult.output,
-            success: true
+            success: true,
           };
         } else {
           return {
             result: `Tool execution failed: ${mcpResult.error || 'Unknown error'}`,
             success: false,
-            error: mcpResult.error
+            error: mcpResult.error,
           };
         }
       }
-      
+
       // Fallback to basic tool integration
       logger.warn('🔧 SEQUENTIAL-EXECUTOR: Enhanced integration not available, trying basic');
       const { getGlobalToolIntegration } = await import('./tool-integration.js');
       const basicToolIntegration = getGlobalToolIntegration();
-      
+
       if (basicToolIntegration) {
         const formattedToolCall = {
           function: {
             name: toolName,
-            arguments: JSON.stringify(args)
-          }
+            arguments: JSON.stringify(args),
+          },
         };
-        
+
         const basicResult = await basicToolIntegration.executeToolCall(formattedToolCall);
-        
+
         if (basicResult.success && basicResult.output) {
           return {
             result: basicResult.output.content || basicResult.output,
-            success: true
+            success: true,
           };
         }
       }
-      
+
       // Last resort: return descriptive failure
       return {
         result: `Tool ${toolName} execution failed - no MCP integration available`,
         success: false,
-        error: 'No MCP tool integration available'
+        error: 'No MCP tool integration available',
       };
-      
     } catch (error) {
       logger.error('🔧 SEQUENTIAL-EXECUTOR: Tool execution error', {
         toolName,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
-      
+
       return {
         result: `Tool ${toolName} execution error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -525,7 +605,10 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
   /**
    * Generate observation from tool result
    */
-  private generateObservation(result: string, toolName: string): {
+  private generateObservation(
+    result: string,
+    toolName: string
+  ): {
     content: string;
     confidence: number;
     taskComplete: boolean;
@@ -533,10 +616,11 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
   } {
     // Simple heuristics for determining task completion
     const resultLower = result.toLowerCase();
-    const taskComplete = resultLower.includes('success') || 
-                         resultLower.includes('completed') || 
-                         resultLower.includes('found') ||
-                         result.length > 100; // Substantial result
+    const taskComplete =
+      resultLower.includes('success') ||
+      resultLower.includes('completed') ||
+      resultLower.includes('found') ||
+      result.length > 100; // Substantial result
 
     const content = `Tool ${toolName} returned: ${result.substring(0, 200)}${result.length > 200 ? '...' : ''}`;
 
@@ -544,7 +628,7 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
       content,
       confidence: 0.8,
       taskComplete,
-      completionReason: taskComplete ? 'Tool execution provided substantial result' : undefined
+      completionReason: taskComplete ? 'Tool execution provided substantial result' : undefined,
     };
   }
 
@@ -553,18 +637,19 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
    */
   private estimateSteps(prompt: string, analysis: DomainAnalysis): number {
     const baseSteps = {
-      'coding': 4,
-      'research': 3,
-      'system': 5,
-      'planning': 3,
-      'mixed': 6
+      coding: 4,
+      research: 3,
+      system: 5,
+      planning: 3,
+      mixed: 6,
     };
 
     const domainSteps = baseSteps[analysis.primaryDomain as keyof typeof baseSteps] || 4;
-    
+
     // Adjust based on complexity indicators
     let complexity = 1;
-    if (prompt.includes('and') || prompt.includes('then') || prompt.includes('also')) complexity += 1;
+    if (prompt.includes('and') || prompt.includes('then') || prompt.includes('also'))
+      complexity += 1;
     if (prompt.length > 200) complexity += 1;
     if (analysis.secondaryDomains.length > 1) complexity += 1;
 
@@ -577,11 +662,11 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
   private synthesizeFinalResult(steps: ReasoningStep[], originalPrompt: string): string {
     const conclusions = steps.filter(step => step.type === 'conclusion');
     const observations = steps.filter(step => step.type === 'observation');
-    
+
     if (conclusions.length > 0) {
       return conclusions[conclusions.length - 1].content;
     }
-    
+
     if (observations.length > 0) {
       const lastObservation = observations[observations.length - 1];
       return `Based on the analysis: ${lastObservation.content}`;
@@ -596,12 +681,12 @@ Be specific and focused. Choose the most relevant tool for the immediate next st
   getExecutionStats(): {
     currentExecutionId: string;
     maxSteps: number;
-    availableDomains: Array<{name: string; description: string}>;
+    availableDomains: Array<{ name: string; description: string }>;
   } {
     return {
       currentExecutionId: this.currentExecutionId,
       maxSteps: this.maxReasoningSteps,
-      availableDomains: this.domainOrchestrator.getAvailableDomains()
+      availableDomains: this.domainOrchestrator.getAvailableDomains(),
     };
   }
 }

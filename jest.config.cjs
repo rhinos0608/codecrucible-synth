@@ -11,12 +11,11 @@ module.exports = {
   transform: {
     '^.+\\.ts$': ['ts-jest', {
       useESM: true,
-      // isolatedModules setting moved to tsconfig.json to avoid deprecation warning
       tsconfig: {
         module: 'ES2022',
         target: 'ES2022',
         moduleResolution: 'node',
-        isolatedModules: true // PERFORMANCE FIX: Disable type-checking during tests
+        isolatedModules: true
       }
     }],
   },
@@ -52,45 +51,44 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov', 'html'],
   coverageDirectory: 'coverage',
-  // Enforce coverage thresholds to maintain code quality
+  // Enhanced coverage thresholds - Build system optimization 2025
   coverageThreshold: {
     global: {
-      lines: 70,
-      functions: 65,
-      branches: 60,
-      statements: 70
+      lines: 80,
+      functions: 75,
+      branches: 70,
+      statements: 80
     },
     // Critical components require higher coverage
     './src/core/security/': {
-      lines: 80,
-      functions: 75,
-      branches: 70,
-      statements: 80
+      lines: 90,
+      functions: 85,
+      branches: 80,
+      statements: 90
     },
     './src/core/client.ts': {
-      lines: 80,
-      functions: 75,
-      branches: 70,
-      statements: 80
+      lines: 85,
+      functions: 80,
+      branches: 75,
+      statements: 85
     },
     './src/core/agent.ts': {
+      lines: 85,
+      functions: 80,
+      branches: 75,
+      statements: 85
+    },
+    './src/core/cli.ts': {
       lines: 80,
       functions: 75,
       branches: 70,
       statements: 80
-    },
-    './src/core/cli.ts': {
-      lines: 75,
-      functions: 70,
-      branches: 65,
-      statements: 75
     }
   },
   testTimeout: 180000, // Increased to 3 minutes for heavy initialization
   verbose: true,
-  // Prevent hanging tests
-  forceExit: true,
-  detectOpenHandles: true,
   // Optimize workers for better parallelization (use 50% of CPU cores)
-  maxWorkers: "50%"
+  maxWorkers: "50%",
+  // Modern Jest 30 configuration for better resource management
+  openHandlesTimeout: 10000
 };

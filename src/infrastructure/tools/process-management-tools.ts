@@ -269,7 +269,7 @@ export class AdvancedProcessTool extends BaseTool {
 
     try {
       // Send input to process
-      session.process.stdin?.write(`${args.input  }\n`);
+      session.process.stdin?.write(`${args.input}\n`);
       session.lastActivity = Date.now();
 
       // Wait for response

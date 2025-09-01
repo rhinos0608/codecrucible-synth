@@ -12,6 +12,10 @@ import {
   ValidationResult,
 } from '../infrastructure/security/advanced-security-validator.js';
 import { InputSanitizer } from '../infrastructure/security/input-sanitizer.js';
+import {
+  getApprovalManager,
+  ApprovalModesManager,
+} from '../infrastructure/security/approval-modes-manager.js';
 
 export interface MCPServerConfig {
   filesystem: {
@@ -105,7 +109,7 @@ export class MCPServerManager {
   private smitheryServer?: SmitheryMCPServer;
   private isInitialized = false;
   private securityValidator: AdvancedSecurityValidator;
-  
+
   // Enhanced resilience configuration
   private readonly CIRCUIT_BREAKER_THRESHOLD = 5;
   private readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
@@ -173,38 +177,48 @@ export class MCPServerManager {
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           // Progressive timeout: 3s, 5s, 8s
-          const timeout = 3000 + (attempt * 2000);
-          
+          const timeout = 3000 + attempt * 2000;
+
           // Race between server startup and timeout
           await Promise.race([
             this.startServer(server.name),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error(`Server ${server.name} startup timeout (attempt ${attempt + 1})`)), timeout)
-            )
+            new Promise((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(`Server ${server.name} startup timeout (attempt ${attempt + 1})`)
+                  ),
+                timeout
+              )
+            ),
           ]);
-          
+
           const duration = Date.now() - serverStartTime;
-          logger.info(`✅ MCP server ${server.name} started successfully in ${duration}ms (attempt ${attempt + 1})`);
+          logger.info(
+            `✅ MCP server ${server.name} started successfully in ${duration}ms (attempt ${attempt + 1})`
+          );
           return; // Success - exit retry loop
-          
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
           const duration = Date.now() - serverStartTime;
-          
+
           if (attempt < maxRetries) {
-            logger.warn(`⚠️ MCP server ${server.name} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying...`, {
-              error: lastError.message,
-              duration
-            });
+            logger.warn(
+              `⚠️ MCP server ${server.name} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying...`,
+              {
+                error: lastError.message,
+                duration,
+              }
+            );
             await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Progressive delay
           } else {
             logger.error(`❌ MCP server ${server.name} failed after ${maxRetries + 1} attempts`, {
               error: lastError.message,
-              totalDuration: duration
+              totalDuration: duration,
             });
             server.status = 'error';
             server.lastError = lastError.message;
-            
+
             // Attempt graceful degradation
             await this.handleServerFailure(server.name, lastError);
           }
@@ -219,7 +233,7 @@ export class MCPServerManager {
     const totalTime = Date.now() - startTime;
     const runningServers = Array.from(this.servers.values()).filter(s => s.status === 'running');
     const failedServers = Array.from(this.servers.values()).filter(s => s.status === 'error');
-    
+
     console.log(chalk.green(`✅ MCP initialization complete in ${totalTime}ms`));
     console.log(chalk.green(`   • ${runningServers.length} servers running`));
     if (failedServers.length > 0) {
@@ -230,7 +244,7 @@ export class MCPServerManager {
     logger.info('🔧 MCP servers initialization completed', {
       running: runningServers.length,
       failed: failedServers.length,
-      totalTime
+      totalTime,
     });
   }
 
@@ -434,23 +448,30 @@ export class MCPServerManager {
 
       this.smitheryServer = new SmitheryMCPServer(smitheryConfig);
       await this.smitheryServer.getServer(); // Initialize the server
-      
+
       logger.info('Smithery: MCP server initialized successfully');
-      
+
       // Log discovered servers for debugging
       const availableServers = this.smitheryServer.getAvailableServers();
       const availableTools = this.smitheryServer.getAvailableTools();
-      
-      logger.info(`Smithery: Discovered ${availableServers.length} servers with ${availableTools.length} tools`);
-      
+
+      logger.info(
+        `Smithery: Discovered ${availableServers.length} servers with ${availableTools.length} tools`
+      );
+
       if (availableServers.length > 0) {
-        logger.debug('Smithery servers:', availableServers.map(s => s.qualifiedName));
+        logger.debug(
+          'Smithery servers:',
+          availableServers.map(s => s.qualifiedName)
+        );
       }
-      
+
       if (availableTools.length > 0) {
-        logger.debug('Smithery tools:', availableTools.map(t => t.name));
+        logger.debug(
+          'Smithery tools:',
+          availableTools.map(t => t.name)
+        );
       }
-      
     } catch (error) {
       logger.error('Failed to initialize Smithery server:', error);
       throw error;
@@ -468,8 +489,10 @@ export class MCPServerManager {
 
     let processedPath = filePath;
     if (!pathValidation.isValid) {
-      logger.warn(`Path validation failed for "${filePath}": ${pathValidation.violations.join(', ')} - attempting with processed path "${pathValidation.sanitized}"`);
-      
+      logger.warn(
+        `Path validation failed for "${filePath}": ${pathValidation.violations.join(', ')} - attempting with processed path "${pathValidation.sanitized}"`
+      );
+
       // Try with the processed path instead of blocking
       if (pathValidation.sanitized && pathValidation.sanitized !== filePath) {
         processedPath = pathValidation.sanitized;
@@ -571,6 +594,17 @@ export class MCPServerManager {
     // Additional security checks
     this.validateCommandSecurity(sanitizedCommand, sanitizedArgs);
 
+    // Check approval for command execution
+    const approvalRequest = await this.createCommandApprovalRequest(
+      sanitizedCommand,
+      sanitizedArgs
+    );
+    const approvalResponse = await getApprovalManager().requestApproval(approvalRequest);
+
+    if (!approvalResponse.approved) {
+      throw new Error(`Command execution not approved: ${approvalResponse.reason}`);
+    }
+
     return new Promise((resolve, reject) => {
       const child = spawn(sanitizedCommand, sanitizedArgs, {
         cwd: this.getSafeCwd(),
@@ -629,6 +663,75 @@ export class MCPServerManager {
   }
 
   /**
+   * Create approval request for command execution
+   */
+  private async createCommandApprovalRequest(command: string, args: string[]) {
+    // Determine risk level based on command type
+    let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+
+    // Low risk commands (read-only operations)
+    const lowRiskCommands = [
+      'ls',
+      'cat',
+      'head',
+      'tail',
+      'grep',
+      'find',
+      'git log',
+      'git status',
+      'git diff',
+    ];
+    // High risk commands (system modifications)
+    const highRiskCommands = ['rm', 'del', 'sudo', 'chmod', 'chown', 'systemctl', 'service'];
+    // Critical risk commands (potentially destructive)
+    const criticalCommands = ['format', 'fdisk', 'dd', 'mkfs', 'rm -rf'];
+
+    const fullCommand = `${command} ${args.join(' ')}`;
+
+    if (lowRiskCommands.some(cmd => command.toLowerCase().includes(cmd))) {
+      riskLevel = 'low';
+    } else if (highRiskCommands.some(cmd => fullCommand.toLowerCase().includes(cmd))) {
+      riskLevel = 'high';
+    } else if (criticalCommands.some(cmd => fullCommand.toLowerCase().includes(cmd))) {
+      riskLevel = 'critical';
+    }
+
+    // Determine required permissions
+    const permissions = [];
+
+    // Commands that modify files need write permissions
+    const writeCommands = ['cp', 'mv', 'mkdir', 'touch', 'echo', 'git add', 'git commit'];
+    if (writeCommands.some(cmd => fullCommand.toLowerCase().includes(cmd))) {
+      permissions.push(ApprovalModesManager.permissions.writeWorkingDir());
+    } else {
+      permissions.push(ApprovalModesManager.permissions.readWorkingDir());
+    }
+
+    // All commands need execute permission
+    permissions.push(ApprovalModesManager.permissions.executeWorkingDir());
+
+    // Network commands need network permission
+    const networkCommands = ['curl', 'wget', 'ssh', 'scp', 'rsync', 'ping'];
+    if (networkCommands.some(cmd => command.toLowerCase().includes(cmd))) {
+      permissions.push(ApprovalModesManager.permissions.networkAccess());
+      riskLevel = 'high'; // Network operations are inherently higher risk
+    }
+
+    return ApprovalModesManager.createRequest(
+      'mcp_command_execution',
+      `Execute MCP command: ${command} ${args.join(' ')}`,
+      permissions,
+      {
+        workingDirectory: this.getSafeCwd(),
+        systemCommands: [fullCommand],
+        enterpriseCompliance: true,
+        auditRequired: riskLevel !== 'low',
+      },
+      riskLevel
+    );
+  }
+
+  /**
    * Sanitize command input to prevent injection
    */
   private async sanitizeCommandInput(input: string): Promise<string> {
@@ -644,7 +747,7 @@ export class MCPServerManager {
 
     if (!validationResult.isValid || validationResult.riskLevel === 'critical') {
       logger.warn('Command blocked due to security violations:', {
-        input: `${input.substring(0, 100)  }...`,
+        input: `${input.substring(0, 100)}...`,
         violations: validationResult.violations,
         riskLevel: validationResult.riskLevel,
       });
@@ -655,7 +758,7 @@ export class MCPServerManager {
 
     if (validationResult.riskLevel === 'high') {
       logger.warn('High-risk command detected but allowed:', {
-        input: `${input.substring(0, 100)  }...`,
+        input: `${input.substring(0, 100)}...`,
         violations: validationResult.violations,
       });
     }
@@ -737,7 +840,7 @@ export class MCPServerManager {
       if (pattern.test(fullCommand)) {
         logger.error('SECURITY VIOLATION: Dangerous command blocked', {
           command: command,
-          args: args.map(arg => (arg.length > 50 ? `${arg.substring(0, 50)  }...` : arg)),
+          args: args.map(arg => (arg.length > 50 ? `${arg.substring(0, 50)}...` : arg)),
           pattern: pattern.source,
           timestamp: new Date().toISOString(),
         });
@@ -860,7 +963,7 @@ export class MCPServerManager {
     if (!this.smitheryServer) {
       return {
         enabled: false,
-        error: 'Smithery server not initialized'
+        error: 'Smithery server not initialized',
       };
     }
 
@@ -868,7 +971,7 @@ export class MCPServerManager {
       const health = await this.smitheryServer.getRegistryHealth();
       const servers = this.smitheryServer.getAvailableServers();
       const tools = this.smitheryServer.getAvailableTools();
-      
+
       return {
         enabled: true,
         health,
@@ -877,17 +980,17 @@ export class MCPServerManager {
         serversList: servers.map(s => ({
           name: s.qualifiedName,
           displayName: s.displayName,
-          toolCount: s.tools?.length || 0
+          toolCount: s.tools?.length || 0,
         })),
         toolsList: tools.map(t => ({
           name: t.name,
-          description: t.description
-        }))
+          description: t.description,
+        })),
       };
     } catch (error) {
       return {
         enabled: true,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -899,7 +1002,7 @@ export class MCPServerManager {
     if (!this.smitheryServer) {
       throw new Error('Smithery server not initialized');
     }
-    
+
     await this.smitheryServer.refreshServers();
     logger.info('Smithery servers refreshed');
   }
@@ -953,7 +1056,7 @@ export class MCPServerManager {
       // Check allowed paths if they exist
       if (this.config.filesystem.allowedPaths.length > 0) {
         for (const allowedPath of this.config.filesystem.allowedPaths) {
-          const expandedPath = allowedPath.replace('~/', `${process.env.HOME || ''  }/`);
+          const expandedPath = allowedPath.replace('~/', `${process.env.HOME || ''}/`);
           const resolvedAllowed = path.resolve(expandedPath);
           if (normalizedPath.startsWith(resolvedAllowed)) {
             return true;
@@ -1016,7 +1119,7 @@ export class MCPServerManager {
     // Check blocked commands (config + defaults)
     const allBlockedCommands = [...this.config.terminal.blockedCommands, ...defaultBlockedCommands];
     for (const blockedCommand of allBlockedCommands) {
-      if (command === blockedCommand || command.startsWith(`${blockedCommand  } `)) {
+      if (command === blockedCommand || command.startsWith(`${blockedCommand} `)) {
         return false;
       }
     }
@@ -1024,7 +1127,7 @@ export class MCPServerManager {
     // Check allowed commands - use whitelist approach for security
     if (this.config.terminal.allowedCommands.length > 0) {
       return this.config.terminal.allowedCommands.some(
-        allowedCommand => command === allowedCommand || command.startsWith(`${allowedCommand  } `)
+        allowedCommand => command === allowedCommand || command.startsWith(`${allowedCommand} `)
       );
     }
 
@@ -1052,7 +1155,7 @@ export class MCPServerManager {
     ];
 
     return defaultSafeCommands.some(
-      safeCommand => command === safeCommand || command.startsWith(`${safeCommand  } `)
+      safeCommand => command === safeCommand || command.startsWith(`${safeCommand} `)
     );
   }
 
@@ -1152,11 +1255,13 @@ export class MCPServerManager {
       case 'smithery':
         if (this.smitheryServer) {
           const smitheryTools = this.smitheryServer.getAvailableTools();
-          tools.push(...smitheryTools.map(tool => ({
-            name: tool.name,
-            description: tool.description,
-            inputSchema: tool.inputSchema || {}
-          })));
+          tools.push(
+            ...smitheryTools.map(tool => ({
+              name: tool.name,
+              description: tool.description,
+              inputSchema: tool.inputSchema || {},
+            }))
+          );
         }
         break;
     }
@@ -1226,7 +1331,6 @@ export class MCPServerManager {
     return health;
   }
 
-
   /**
    * Enhanced MCP Connection Resilience Methods
    * Implements circuit breaker pattern and automatic reconnection
@@ -1243,8 +1347,10 @@ export class MCPServerManager {
 
     if (server.circuitBreakerState === 'open') {
       // Check if timeout has passed to attempt half-open
-      if (server.lastFailureTime && 
-          Date.now() - server.lastFailureTime.getTime() > this.CIRCUIT_BREAKER_TIMEOUT) {
+      if (
+        server.lastFailureTime &&
+        Date.now() - server.lastFailureTime.getTime() > this.CIRCUIT_BREAKER_TIMEOUT
+      ) {
         server.circuitBreakerState = 'half-open';
         logger.info(`Circuit breaker half-open for server ${server.name}`);
         return false;
@@ -1265,8 +1371,10 @@ export class MCPServerManager {
 
     if (server.consecutiveFailures >= this.CIRCUIT_BREAKER_THRESHOLD) {
       server.circuitBreakerState = 'open';
-      logger.warn(`Circuit breaker opened for server ${server.name} after ${server.consecutiveFailures} failures`);
-      
+      logger.warn(
+        `Circuit breaker opened for server ${server.name} after ${server.consecutiveFailures} failures`
+      );
+
       // Schedule circuit breaker reset
       setTimeout(() => {
         if (server.circuitBreakerState === 'open') {
@@ -1309,12 +1417,12 @@ export class MCPServerManager {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.recordServerFailure(server, err);
-      
+
       // Schedule automatic reconnection if circuit breaker isn't open
       if (!this.isCircuitBreakerOpen(server)) {
         this.scheduleReconnection(server);
       }
-      
+
       return false;
     }
   }
@@ -1334,11 +1442,13 @@ export class MCPServerManager {
       server.retryCount = retryCount;
       server.status = 'reconnecting';
 
-      logger.info(`Scheduling reconnection for ${server.name} in ${delay}ms (attempt ${retryCount}/${this.MAX_RECONNECT_ATTEMPTS})`);
+      logger.info(
+        `Scheduling reconnection for ${server.name} in ${delay}ms (attempt ${retryCount}/${this.MAX_RECONNECT_ATTEMPTS})`
+      );
 
       server.reconnectTimeout = setTimeout(async () => {
         logger.info(`Attempting to reconnect ${server.name} (attempt ${retryCount})`);
-        
+
         const success = await this.startServerResilient(server.name);
         if (success) {
           server.retryCount = 0;
@@ -1346,7 +1456,9 @@ export class MCPServerManager {
         } else if (retryCount < this.MAX_RECONNECT_ATTEMPTS) {
           this.scheduleReconnection(server);
         } else {
-          logger.error(`Failed to reconnect ${server.name} after ${this.MAX_RECONNECT_ATTEMPTS} attempts`);
+          logger.error(
+            `Failed to reconnect ${server.name} after ${this.MAX_RECONNECT_ATTEMPTS} attempts`
+          );
           server.status = 'error';
         }
       }, delay);
@@ -1370,7 +1482,7 @@ export class MCPServerManager {
         if (!isHealthy) {
           logger.warn(`Health check failed for ${server.name}`);
           this.recordServerFailure(server, new Error('Health check failed'));
-          
+
           // Attempt restart if circuit breaker allows
           if (!this.isCircuitBreakerOpen(server)) {
             await this.startServerResilient(server.name);
@@ -1418,7 +1530,7 @@ export class MCPServerManager {
         default:
           return true; // Unknown server type, assume healthy
       }
-      
+
       server.lastHealthCheck = new Date();
       return true;
     } catch (error) {
@@ -1439,7 +1551,7 @@ export class MCPServerManager {
         clearInterval(server.healthCheckInterval);
         server.healthCheckInterval = undefined;
       }
-      
+
       if (server.reconnectTimeout) {
         clearTimeout(server.reconnectTimeout);
         server.reconnectTimeout = undefined;

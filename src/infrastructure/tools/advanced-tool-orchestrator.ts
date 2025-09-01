@@ -14,7 +14,10 @@ import { SecurityAuditLogger } from '../security/security-audit-logger.js';
 import { SecretsManager } from '../security/secrets-manager.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import { getTelemetryProvider } from '../../core/observability/observability-system.js';
-import { AIPoweredParameterGenerator, ParameterGenerationContext } from './ai-powered-parameter-generator.js';
+import {
+  AIPoweredParameterGenerator,
+  ParameterGenerationContext,
+} from './ai-powered-parameter-generator.js';
 
 // AI SDK v5.0 Streaming Interfaces
 export interface StreamChunk {
@@ -483,7 +486,7 @@ export class AdvancedToolOrchestrator extends EventEmitter {
     runtimeContext?: any
   ): Promise<string> {
     try {
-      this.logger.info('Processing prompt with tools:', `${prompt.slice(0, 100)  }...`);
+      this.logger.info('Processing prompt with tools:', `${prompt.slice(0, 100)}...`);
 
       // Create enhanced context with system prompt and runtime information
       const context: ToolContext = {
@@ -582,7 +585,7 @@ Please provide a clear, helpful response based on these tool results. If there w
     try {
       // Get MCP tools that are actually integrated and working
       const mcpTools = await this.getMCPCompatibleTools();
-      
+
       if (mcpTools.length === 0) {
         this.logger.warn('No MCP tools available, falling back to legacy tool registry');
         return this.legacyToolSelection(objective, context, constraints);
@@ -590,19 +593,19 @@ Please provide a clear, helpful response based on these tool results. If there w
 
       // Use domain-aware orchestrator to select relevant tools
       const domainResult = this.domainOrchestrator.getToolsForPrompt(objective, mcpTools);
-      
+
       this.logger.info('🎯 ADVANCED-ORCHESTRATOR: Domain-aware tool selection', {
-        objective: `${objective.substring(0, 80)  }...`,
+        objective: `${objective.substring(0, 80)}...`,
         primaryDomain: domainResult.analysis.primaryDomain,
         confidence: domainResult.analysis.confidence.toFixed(2),
         originalToolCount: mcpTools.length,
         selectedToolCount: domainResult.tools.length,
-        toolNames: domainResult.tools.map(t => t.function?.name || t.name)
+        toolNames: domainResult.tools.map(t => t.function?.name || t.name),
       });
 
       // Convert domain-selected tools to ToolCall format with AI-powered parameter generation
       const toolCalls: ToolCall[] = [];
-      
+
       for (const tool of domainResult.tools) {
         // Build parameter generation context
         const paramContext: ParameterGenerationContext = {
@@ -613,12 +616,12 @@ Please provide a clear, helpful response based on these tool results. If there w
           domainContext: domainResult.analysis.primaryDomain,
           taskType: this.inferTaskType(objective, domainResult.analysis.primaryDomain),
           fileContext: [], // TODO: Add file context from environment
-          codebaseContext: context.systemPrompt || '' // Use system prompt as codebase context
+          codebaseContext: context.systemPrompt || '', // Use system prompt as codebase context
         };
-        
+
         // Generate parameters using AI-powered approach
         const generatedParams = await this.parameterGenerator.generateParameters(paramContext);
-        
+
         toolCalls.push({
           id: `call_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
           toolId: tool.function?.name || tool.name,
@@ -629,11 +632,11 @@ Please provide a clear, helpful response based on these tool results. If there w
             backoffStrategy: 'exponential' as const,
             initialDelay: 1000,
             maxDelay: 10000,
-            retryableErrors: ['TIMEOUT', 'NETWORK_ERROR', 'RATE_LIMITED']
+            retryableErrors: ['TIMEOUT', 'NETWORK_ERROR', 'RATE_LIMITED'],
           },
           fallbackTools: [],
           timeout: 30000,
-          dependsOn: []
+          dependsOn: [],
         });
 
         this.logger.info('🧠 AI-powered parameter generation completed', {
@@ -641,17 +644,16 @@ Please provide a clear, helpful response based on these tool results. If there w
           confidence: generatedParams.confidence,
           parametersCount: Object.keys(generatedParams.parameters).length,
           reasoning: generatedParams.reasoning.substring(0, 100),
-          fallbackUsed: generatedParams.fallbackUsed
+          fallbackUsed: generatedParams.fallbackUsed,
         });
       }
 
       this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Converted to ToolCall format', {
         toolCallCount: toolCalls.length,
-        sampleCall: toolCalls[0]
+        sampleCall: toolCalls[0],
       });
 
       return toolCalls;
-
     } catch (error) {
       this.logger.error('Domain-aware tool selection failed, using fallback', error);
       return this.legacyToolSelection(objective, context, constraints);
@@ -667,39 +669,42 @@ Please provide a clear, helpful response based on these tool results. If there w
       // Try to get tools from the enhanced tool integration (our working MCP tools)
       const { getGlobalEnhancedToolIntegration } = await import('./enhanced-tool-integration.js');
       const toolIntegration = getGlobalEnhancedToolIntegration();
-      
+
       if (toolIntegration) {
         const mcpTools = await toolIntegration.getLLMFunctions();
-        this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Retrieved MCP tools from enhanced integration', {
-          toolCount: mcpTools.length,
-          toolNames: mcpTools.map((t: any) => t.function?.name || t.name).slice(0, 5),
-          hasToolIntegration: !!toolIntegration,
-          toolIntegrationType: toolIntegration.constructor.name
-        });
+        this.logger.info(
+          '🔧 ADVANCED-ORCHESTRATOR: Retrieved MCP tools from enhanced integration',
+          {
+            toolCount: mcpTools.length,
+            toolNames: mcpTools.map((t: any) => t.function?.name || t.name).slice(0, 5),
+            hasToolIntegration: !!toolIntegration,
+            toolIntegrationType: toolIntegration.constructor.name,
+          }
+        );
         return mcpTools;
       } else {
         this.logger.warn('🔧 ADVANCED-ORCHESTRATOR: Enhanced tool integration not initialized');
       }
-      
+
       // Fallback: Try to get from basic tool integration
       const { getGlobalToolIntegration } = await import('./tool-integration.js');
       const basicToolIntegration = getGlobalToolIntegration();
-      
+
       if (basicToolIntegration && typeof basicToolIntegration.getLLMFunctions === 'function') {
         const basicTools = await basicToolIntegration.getLLMFunctions();
         this.logger.info('🔧 ADVANCED-ORCHESTRATOR: Retrieved tools from basic integration', {
           toolCount: basicTools.length,
-          toolNames: basicTools.map((t: any) => t.function?.name || t.name).slice(0, 5)
+          toolNames: basicTools.map((t: any) => t.function?.name || t.name).slice(0, 5),
         });
         return basicTools;
       }
-      
+
       this.logger.warn('🔧 ADVANCED-ORCHESTRATOR: No tool integration available');
       return [];
     } catch (error) {
       this.logger.error('🔧 ADVANCED-ORCHESTRATOR: Failed to get MCP tools', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       return [];
     }
@@ -708,28 +713,55 @@ Please provide a clear, helpful response based on these tool results. If there w
   /**
    * Infer task type from objective and domain context
    */
-  private inferTaskType(objective: string, domain: string): 'file_analysis' | 'code_generation' | 'system_operation' | 'research' | 'mixed' {
+  private inferTaskType(
+    objective: string,
+    domain: string
+  ): 'file_analysis' | 'code_generation' | 'system_operation' | 'research' | 'mixed' {
     const objectiveLower = objective.toLowerCase();
-    
+
     if (domain === 'coding') {
-      if (objectiveLower.includes('generate') || objectiveLower.includes('create') || objectiveLower.includes('build')) {
+      if (
+        objectiveLower.includes('generate') ||
+        objectiveLower.includes('create') ||
+        objectiveLower.includes('build')
+      ) {
         return 'code_generation';
-      } else if (objectiveLower.includes('read') || objectiveLower.includes('analyze') || objectiveLower.includes('show')) {
+      } else if (
+        objectiveLower.includes('read') ||
+        objectiveLower.includes('analyze') ||
+        objectiveLower.includes('show')
+      ) {
         return 'file_analysis';
       }
       return 'code_generation';
     }
-    
+
     if (domain === 'system') return 'system_operation';
     if (domain === 'research') return 'research';
     if (domain === 'mixed') return 'mixed';
-    
+
     // Default inference based on keywords
-    if (objectiveLower.includes('read') || objectiveLower.includes('analyze')) return 'file_analysis';
-    if (objectiveLower.includes('execute') || objectiveLower.includes('run') || objectiveLower.includes('command')) return 'system_operation';
-    if (objectiveLower.includes('search') || objectiveLower.includes('find') || objectiveLower.includes('research')) return 'research';
-    if (objectiveLower.includes('create') || objectiveLower.includes('generate') || objectiveLower.includes('write')) return 'code_generation';
-    
+    if (objectiveLower.includes('read') || objectiveLower.includes('analyze'))
+      return 'file_analysis';
+    if (
+      objectiveLower.includes('execute') ||
+      objectiveLower.includes('run') ||
+      objectiveLower.includes('command')
+    )
+      return 'system_operation';
+    if (
+      objectiveLower.includes('search') ||
+      objectiveLower.includes('find') ||
+      objectiveLower.includes('research')
+    )
+      return 'research';
+    if (
+      objectiveLower.includes('create') ||
+      objectiveLower.includes('generate') ||
+      objectiveLower.includes('write')
+    )
+      return 'code_generation';
+
     return 'mixed';
   }
 
@@ -740,22 +772,24 @@ Please provide a clear, helpful response based on these tool results. If there w
   private inferParametersFromObjective(objective: string, tool: any): any {
     const toolName = tool.function?.name || tool.name;
     const objectiveLower = objective.toLowerCase();
-    
+
     // Simple parameter inference based on common patterns
     if (toolName === 'filesystem_read_file') {
       // Look for file mentions in objective
       if (objectiveLower.includes('readme')) return { filePath: 'README.md' };
       if (objectiveLower.includes('package.json')) return { filePath: 'package.json' };
-      if (objectiveLower.includes('.ts')) return { filePath: objective.match(/\w+\.ts/)?.[0] || 'index.ts' };
+      if (objectiveLower.includes('.ts'))
+        return { filePath: objective.match(/\w+\.ts/)?.[0] || 'index.ts' };
       return { filePath: 'README.md' }; // Default
     }
-    
+
     if (toolName === 'filesystem_list_directory') {
       return { path: '.' }; // Default to current directory
     }
 
     if (toolName === 'mcp_execute_command') {
-      if (objectiveLower.includes('ls') || objectiveLower.includes('list')) return { command: 'ls -la' };
+      if (objectiveLower.includes('ls') || objectiveLower.includes('list'))
+        return { command: 'ls -la' };
       if (objectiveLower.includes('git')) return { command: 'git status' };
       return { command: 'pwd' }; // Safe default
     }
@@ -769,7 +803,7 @@ Please provide a clear, helpful response based on these tool results. If there w
    */
   private async legacyToolSelection(
     objective: string,
-    context: ToolContext, 
+    context: ToolContext,
     constraints?: ToolConstraints
   ): Promise<ToolCall[]> {
     const analysisPrompt = `

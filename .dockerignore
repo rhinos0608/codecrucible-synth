@@ -1,0 +1,85 @@
+# Docker ignore file for CodeCrucible Synth
+# Optimizes build context and reduces image size
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Development files
+src/
+tests/
+coverage/
+.nyc_output/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Documentation (except critical ones)
+README.md
+CHANGELOG.md
+docs/
+Docs/
+*.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Docker files (don't need in container)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs and cache
+logs/
+cache/
+temp/
+*.log
+
+# Testing
+jest.config.js
+.jest/
+
+# Linting
+.eslintrc*
+.prettierrc*
+
+# Package manager lockfiles (except package-lock.json for npm ci)
+yarn.lock
+pnpm-lock.yaml
+
+# TypeScript source maps
+*.map
+
+# Miscellaneous
+*.tgz
+*.tar.gz

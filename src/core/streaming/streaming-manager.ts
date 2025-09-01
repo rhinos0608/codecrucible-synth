@@ -1,6 +1,6 @@
 /**
  * Core Streaming Manager - Replaced with Infrastructure Implementation
- * 
+ *
  * @deprecated Use StreamingManager from infrastructure/streaming instead
  * This provides backward compatibility during architectural migration.
  */

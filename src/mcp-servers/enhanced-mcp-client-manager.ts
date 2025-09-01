@@ -37,22 +37,26 @@ export class EnhancedMCPClientManager extends EventEmitter {
 
   constructor(config?: Partial<ClientConfig>) {
     super();
-    
+
     this.config = {
       maxConnections: 10,
       connectionTimeout: 30000,
       retryAttempts: 3,
       healthCheckInterval: 60000,
       enableLoadBalancing: true,
-      ...config
+      ...config,
     };
 
     // Create default MCP server config for the base manager
     const defaultMCPConfig = {
       filesystem: { enabled: true, restrictedPaths: [] as string[], allowedPaths: [] as string[] },
       git: { enabled: true, autoCommitMessages: false, safeModeEnabled: true },
-      terminal: { enabled: false, allowedCommands: [] as string[], blockedCommands: [] as string[] },
-      packageManager: { enabled: false, autoInstall: false, securityScan: true }
+      terminal: {
+        enabled: false,
+        allowedCommands: [] as string[],
+        blockedCommands: [] as string[],
+      },
+      packageManager: { enabled: false, autoInstall: false, securityScan: true },
     };
     this.baseManager = new MCPServerManager(defaultMCPConfig);
     this.startHealthMonitoring();
@@ -85,7 +89,7 @@ export class EnhancedMCPClientManager extends EventEmitter {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;
     }
-    
+
     await this.baseManager.shutdown();
     logger.info('Enhanced MCP Client Manager shutdown complete');
   }

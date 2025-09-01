@@ -21,17 +21,17 @@ export interface IModelSelectionService {
     request: ProcessingRequest,
     preferences?: ModelSelectionPreferences
   ): Promise<ModelSelection>;
-  
+
   selectHybridModels(
     request: ProcessingRequest,
     preferences?: HybridSelectionPreferences
   ): Promise<HybridModelSelection>;
-  
+
   selectLoadBalancedModels(
     requests: ProcessingRequest[],
     preferences?: LoadBalancingPreferences
   ): Promise<LoadBalancingPlan>;
-  
+
   handleModelFailure(
     failedModel: Model,
     request: ProcessingRequest,

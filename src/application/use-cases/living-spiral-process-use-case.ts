@@ -1,7 +1,7 @@
 /**
  * Living Spiral Process Use Case
  * Application Layer - Simplified iterative development methodology
- * 
+ *
  * Handles: 5-phase iterative process with clean separation of concerns
  * Imports: Domain services only (follows ARCHITECTURE.md)
  */
@@ -55,13 +55,9 @@ export class LivingSpiralProcessUseCase {
 
     while (iterationCount < config.maxIterations && !convergenceAchieved) {
       iterationCount++;
-      
-      const iteration = await this.executeSingleSpiral(
-        currentInput, 
-        iterationCount, 
-        config
-      );
-      
+
+      const iteration = await this.executeSingleSpiral(currentInput, iterationCount, config);
+
       iterations.push(iteration);
 
       // Check convergence
@@ -87,23 +83,21 @@ export class LivingSpiralProcessUseCase {
     config: any
   ): Promise<SpiralIteration> {
     const startTime = Date.now();
-    
+
     // Phase 1: Collapse - Problem decomposition
     const collapsed = await this.collapsePhase(input);
-    
-    // Phase 2: Council - Multi-voice perspective gathering  
+
+    // Phase 2: Council - Multi-voice perspective gathering
     const councilResult = await this.councilPhase(collapsed);
-    
+
     // Phase 3: Synthesis - Unified design creation
     const synthesized = await this.synthesisPhase(councilResult);
-    
+
     // Phase 4: Rebirth - Implementation
     const reborn = await this.rebirthPhase(synthesized);
-    
+
     // Phase 5: Reflection (optional)
-    const final = config.enableReflection 
-      ? await this.reflectionPhase(reborn)
-      : reborn;
+    const final = config.enableReflection ? await this.reflectionPhase(reborn) : reborn;
 
     const duration = Date.now() - startTime;
     const quality = this.calculateQuality(final.output);
@@ -129,7 +123,9 @@ export class LivingSpiralProcessUseCase {
     );
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+    const response = model.generateResponse
+      ? await model.generateResponse(request.prompt)
+      : 'Generated response placeholder';
 
     return {
       output: response,
@@ -137,7 +133,10 @@ export class LivingSpiralProcessUseCase {
     };
   }
 
-  private async councilPhase(collapsed: { output: string; voices: string[] }): Promise<{ output: string; voices: string[] }> {
+  private async councilPhase(collapsed: {
+    output: string;
+    voices: string[];
+  }): Promise<{ output: string; voices: string[] }> {
     const request = ProcessingRequest.create(
       collapsed.output,
       'multi-perspective-analysis' as any,
@@ -155,11 +154,13 @@ export class LivingSpiralProcessUseCase {
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
     const allVoices = [voiceSelection.primaryVoice, ...voiceSelection.supportingVoices];
-    
+
     // Generate responses from multiple voices
     const responses = [];
     for (const voice of allVoices) {
-      const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+      const response = model.generateResponse
+        ? await Promise.resolve(model.generateResponse(request.prompt))
+        : 'Generated response placeholder';
       responses.push({
         voiceId: voice.id,
         content: response,
@@ -179,7 +180,10 @@ export class LivingSpiralProcessUseCase {
     };
   }
 
-  private async synthesisPhase(council: { output: string; voices: string[] }): Promise<{ output: string; voices: string[] }> {
+  private async synthesisPhase(council: {
+    output: string;
+    voices: string[];
+  }): Promise<{ output: string; voices: string[] }> {
     const request = ProcessingRequest.create(
       this.buildSynthesisPrompt(council.output),
       'solution-synthesis' as any,
@@ -189,7 +193,9 @@ export class LivingSpiralProcessUseCase {
     );
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+    const response = model.generateResponse
+      ? await model.generateResponse(request.prompt)
+      : 'Generated response placeholder';
 
     return {
       output: response,
@@ -197,7 +203,10 @@ export class LivingSpiralProcessUseCase {
     };
   }
 
-  private async rebirthPhase(synthesis: { output: string; voices: string[] }): Promise<{ output: string; voices: string[] }> {
+  private async rebirthPhase(synthesis: {
+    output: string;
+    voices: string[];
+  }): Promise<{ output: string; voices: string[] }> {
     const request = ProcessingRequest.create(
       this.buildRebirthPrompt(synthesis.output),
       'implementation-planning' as any,
@@ -207,7 +216,9 @@ export class LivingSpiralProcessUseCase {
     );
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+    const response = model.generateResponse
+      ? await model.generateResponse(request.prompt)
+      : 'Generated response placeholder';
 
     return {
       output: response,
@@ -215,7 +226,10 @@ export class LivingSpiralProcessUseCase {
     };
   }
 
-  private async reflectionPhase(rebirth: { output: string; voices: string[] }): Promise<{ output: string; voices: string[] }> {
+  private async reflectionPhase(rebirth: {
+    output: string;
+    voices: string[];
+  }): Promise<{ output: string; voices: string[] }> {
     const request = ProcessingRequest.create(
       this.buildReflectionPrompt(rebirth.output),
       'quality-assessment' as any,
@@ -225,7 +239,9 @@ export class LivingSpiralProcessUseCase {
     );
 
     const model = await this.modelSelectionService.selectOptimalModel(request);
-    const response = model.generateResponse ? await model.generateResponse(request.prompt) : 'Generated response placeholder';
+    const response = model.generateResponse
+      ? await model.generateResponse(request.prompt)
+      : 'Generated response placeholder';
 
     const enhancedOutput = `${rebirth.output}\n\n---\n\n## REFLECTION INSIGHTS:\n${response}`;
 

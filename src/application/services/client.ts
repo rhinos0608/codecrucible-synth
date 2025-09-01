@@ -3,11 +3,11 @@
  * Application layer service that coordinates multiple AI model providers
  */
 
-export { 
-  UnifiedModelClient, 
+export {
+  UnifiedModelClient,
   createUnifiedModelClient,
   type UnifiedModelClientConfig,
-  type ProviderConfig
+  type ProviderConfig,
 } from './unified-model-client.js';
 
 // Use the local UnifiedClientConfig from types.ts

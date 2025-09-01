@@ -1,7 +1,7 @@
 /**
  * File Security Domain Service
  * Pure business logic for file validation and security policies
- * 
+ *
  * Architecture Compliance:
  * - Domain layer: pure business logic only
  * - No infrastructure dependencies
@@ -98,7 +98,18 @@ export class FileSecurityService {
 
   constructor(policy?: Partial<FileSecurityPolicy>) {
     this.defaultPolicy = {
-      allowedExtensions: ['.txt', '.md', '.json', '.yaml', '.yml', '.js', '.ts', '.py', '.html', '.css'],
+      allowedExtensions: [
+        '.txt',
+        '.md',
+        '.json',
+        '.yaml',
+        '.yml',
+        '.js',
+        '.ts',
+        '.py',
+        '.html',
+        '.css',
+      ],
       forbiddenExtensions: ['.exe', '.bat', '.cmd', '.com', '.scr', '.pif', '.vbs', '.jar'],
       maxFileSize: 50 * 1024 * 1024, // 50MB
       maxPathLength: 260, // Windows limitation
@@ -181,7 +192,9 @@ export class FileSecurityService {
           description: 'Path is not in any allowed directory',
           originalValue: path,
         });
-        recommendations.push(`Access files only in: ${effectivePolicy.allowedDirectories.join(', ')}`);
+        recommendations.push(
+          `Access files only in: ${effectivePolicy.allowedDirectories.join(', ')}`
+        );
       }
     }
 
@@ -207,7 +220,11 @@ export class FileSecurityService {
   /**
    * Validate file extension and content type
    */
-  validateFile(filePath: string, fileSize?: number, policy?: Partial<FileSecurityPolicy>): FileValidationResult {
+  validateFile(
+    filePath: string,
+    fileSize?: number,
+    policy?: Partial<FileSecurityPolicy>
+  ): FileValidationResult {
     const effectivePolicy = { ...this.defaultPolicy, ...policy };
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
@@ -237,15 +254,20 @@ export class FileSecurityService {
     }
 
     // Check allowed extensions (if specified)
-    if (extension && effectivePolicy.allowedExtensions.length > 0 && 
-        !effectivePolicy.allowedExtensions.includes(extension)) {
+    if (
+      extension &&
+      effectivePolicy.allowedExtensions.length > 0 &&
+      !effectivePolicy.allowedExtensions.includes(extension)
+    ) {
       violations.push({
         type: ViolationType.FORBIDDEN_EXTENSION,
         severity: ViolationSeverity.HIGH,
         description: `File extension ${extension} is not in allowed list`,
         originalValue: filePath,
       });
-      recommendations.push(`Use only allowed extensions: ${effectivePolicy.allowedExtensions.join(', ')}`);
+      recommendations.push(
+        `Use only allowed extensions: ${effectivePolicy.allowedExtensions.join(', ')}`
+      );
     }
 
     // Check file size
@@ -273,13 +295,19 @@ export class FileSecurityService {
   /**
    * Validate file access request based on user permissions
    */
-  validateFileAccess(request: FileAccessRequest, policy?: Partial<FileSecurityPolicy>): FileValidationResult {
+  validateFileAccess(
+    request: FileAccessRequest,
+    policy?: Partial<FileSecurityPolicy>
+  ): FileValidationResult {
     const pathValidation = this.validatePath(request.path, policy);
     const fileValidation = this.validateFile(request.path, undefined, policy);
 
     // Combine violations
     const allViolations = [...pathValidation.violations, ...fileValidation.violations];
-    const allRecommendations = [...pathValidation.recommendations, ...fileValidation.recommendations];
+    const allRecommendations = [
+      ...pathValidation.recommendations,
+      ...fileValidation.recommendations,
+    ];
 
     // Add operation-specific validations
     const operationViolations = this.validateOperation(request);
@@ -329,7 +357,7 @@ export class FileSecurityService {
     const sanitizedBase = this.sanitizeFilename(originalName);
     const extension = this.extractExtension(sanitizedBase);
     const baseName = sanitizedBase.replace(extension, '');
-    
+
     let secureName = baseName;
 
     if (includeTimestamp) {
@@ -350,8 +378,10 @@ export class FileSecurityService {
   scanFileContent(content: string | Buffer, filename: string): FileValidationResult {
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
-    
-    const stringContent = Buffer.isBuffer(content) ? content.toString('utf8', 0, Math.min(content.length, 10000)) : content;
+
+    const stringContent = Buffer.isBuffer(content)
+      ? content.toString('utf8', 0, Math.min(content.length, 10000))
+      : content;
 
     // Check for script injection patterns
     const scriptPatterns = [
@@ -377,12 +407,7 @@ export class FileSecurityService {
     }
 
     // Check for SQL injection patterns
-    const sqlPatterns = [
-      /union\s+select/gi,
-      /drop\s+table/gi,
-      /exec\s*\(/gi,
-      /xp_cmdshell/gi,
-    ];
+    const sqlPatterns = [/union\s+select/gi, /drop\s+table/gi, /exec\s*\(/gi, /xp_cmdshell/gi];
 
     for (const pattern of sqlPatterns) {
       if (pattern.test(stringContent)) {
@@ -400,11 +425,11 @@ export class FileSecurityService {
     // Check for executable signatures (simplified)
     if (Buffer.isBuffer(content)) {
       const executableSignatures = [
-        [0x4D, 0x5A], // PE executable (MZ header)
-        [0x7F, 0x45, 0x4C, 0x46], // ELF executable
-        [0xCA, 0xFE, 0xBA, 0xBE], // Java class file
-        [0xFE, 0xED, 0xFA, 0xCE], // Mach-O executable (32-bit)
-        [0xFE, 0xED, 0xFA, 0xCF], // Mach-O executable (64-bit)
+        [0x4d, 0x5a], // PE executable (MZ header)
+        [0x7f, 0x45, 0x4c, 0x46], // ELF executable
+        [0xca, 0xfe, 0xba, 0xbe], // Java class file
+        [0xfe, 0xed, 0xfa, 0xce], // Mach-O executable (32-bit)
+        [0xfe, 0xed, 0xfa, 0xcf], // Mach-O executable (64-bit)
       ];
 
       for (const signature of executableSignatures) {
@@ -448,7 +473,22 @@ export class FileSecurityService {
       case PolicyUseCase.CODE_FILES:
         return {
           ...this.defaultPolicy,
-          allowedExtensions: ['.js', '.ts', '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.rs', '.php', '.rb', '.swift'],
+          allowedExtensions: [
+            '.js',
+            '.ts',
+            '.py',
+            '.java',
+            '.c',
+            '.cpp',
+            '.h',
+            '.hpp',
+            '.cs',
+            '.go',
+            '.rs',
+            '.php',
+            '.rb',
+            '.swift',
+          ],
           maxFileSize: 10 * 1024 * 1024, // 10MB
           requireExtension: true,
           scanForMalware: true,
@@ -457,7 +497,16 @@ export class FileSecurityService {
       case PolicyUseCase.CONFIG_FILES:
         return {
           ...this.defaultPolicy,
-          allowedExtensions: ['.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.config', '.env'],
+          allowedExtensions: [
+            '.json',
+            '.yaml',
+            '.yml',
+            '.toml',
+            '.ini',
+            '.conf',
+            '.config',
+            '.env',
+          ],
           maxFileSize: 1 * 1024 * 1024, // 1MB
           requireExtension: true,
           allowHiddenFiles: true, // Config files are often hidden
@@ -474,7 +523,18 @@ export class FileSecurityService {
       case PolicyUseCase.MEDIA_FILES:
         return {
           ...this.defaultPolicy,
-          allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.mp4', '.mp3', '.wav', '.avi'],
+          allowedExtensions: [
+            '.jpg',
+            '.jpeg',
+            '.png',
+            '.gif',
+            '.bmp',
+            '.webp',
+            '.mp4',
+            '.mp3',
+            '.wav',
+            '.avi',
+          ],
           maxFileSize: 500 * 1024 * 1024, // 500MB
           scanForMalware: false, // Media files rarely contain script-based malware
         };
@@ -514,20 +574,20 @@ export class FileSecurityService {
 
   private findForbiddenDirectory(path: string, forbiddenDirs: string[]): string | null {
     const normalizedPath = path.toLowerCase().replace(/\\/g, '/');
-    
+
     for (const forbiddenDir of forbiddenDirs) {
       const normalizedForbidden = forbiddenDir.toLowerCase().replace(/\\/g, '/');
       if (normalizedPath.includes(normalizedForbidden)) {
         return forbiddenDir;
       }
     }
-    
+
     return null;
   }
 
   private isInAllowedDirectory(path: string, allowedDirs: string[]): boolean {
     const normalizedPath = path.toLowerCase().replace(/\\/g, '/');
-    
+
     return allowedDirs.some(allowedDir => {
       const normalizedAllowed = allowedDir.toLowerCase().replace(/\\/g, '/');
       return normalizedPath.startsWith(normalizedAllowed);
@@ -542,29 +602,29 @@ export class FileSecurityService {
   private extractExtension(filePath: string): string {
     const lastDot = filePath.lastIndexOf('.');
     const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
-    
+
     if (lastDot > lastSlash && lastDot !== -1) {
       return filePath.substring(lastDot);
     }
-    
+
     return '';
   }
 
   private sanitizeFilename(filename: string): string {
     // Remove path components
     let sanitized = filename.replace(/^.*[\\\/]/, '');
-    
+
     // Remove invalid characters
     sanitized = this.removeInvalidCharacters(sanitized);
-    
+
     // Remove leading dots (except for extensions)
     sanitized = sanitized.replace(/^\.+/, '');
-    
+
     // Ensure filename is not empty
     if (!sanitized) {
       sanitized = 'unnamed_file';
     }
-    
+
     return sanitized;
   }
 
@@ -607,13 +667,16 @@ export class FileSecurityService {
     }
   }
 
-  private validateOperation(request: FileAccessRequest): { violations: SecurityViolation[]; recommendations: string[] } {
+  private validateOperation(request: FileAccessRequest): {
+    violations: SecurityViolation[];
+    recommendations: string[];
+  } {
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
 
     // Add operation-specific validation logic here
     // For example, checking if user has permission for specific operations
-    
+
     return { violations, recommendations };
   }
 

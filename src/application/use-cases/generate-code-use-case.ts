@@ -1,6 +1,6 @@
 /**
  * Generate Code Use Case - Application Layer
- * 
+ *
  * Handles code generation operations following clean architecture principles.
  * Contains application logic for generating code based on user prompts and context.
  */
@@ -8,8 +8,15 @@
 import { performance } from 'perf_hooks';
 import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname, extname, join } from 'path';
-import { IGenerateCodeUseCase, GenerationRequest, GenerationResponse } from '../../domain/interfaces/use-cases.js';
-import { IWorkflowOrchestrator, WorkflowRequest } from '../../domain/interfaces/workflow-orchestrator.js';
+import {
+  IGenerateCodeUseCase,
+  GenerationRequest,
+  GenerationResponse,
+} from '../../domain/interfaces/use-cases.js';
+import {
+  IWorkflowOrchestrator,
+  WorkflowRequest,
+} from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 
 export class GenerateCodeUseCase implements IGenerateCodeUseCase {
@@ -17,7 +24,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
 
   async execute(request: GenerationRequest): Promise<GenerationResponse> {
     const startTime = performance.now();
-    
+
     try {
       // Validate request
       if (!request.prompt) {
@@ -34,62 +41,84 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
         payload: {
           prompt: generationPrompt,
           context: request.context,
-          options: request.options
+          options: request.options,
         },
         context: {
           sessionId: `generation-${Date.now()}`,
           workingDirectory: process.cwd(),
           permissions: ['read', 'write', 'generate'],
-          securityLevel: 'high' as const
-        }
+          securityLevel: 'high' as const,
+        },
       };
 
       const workflowResponse = await this.orchestrator.processRequest(workflowRequest);
-      
+
       if (!workflowResponse.success) {
         throw new Error(workflowResponse.error?.message || 'Code generation failed');
       }
 
       // Parse and structure the generation result
       const generatedFiles = this.parseGenerationResult(workflowResponse.result, request);
-      
-      // Save files if not dry run
-      if (!request.options?.dryRun) {
-        await this.saveGeneratedFiles(generatedFiles);
+
+      console.log(
+        `🐛 [DEBUG] dryRun option: ${request.options?.dryRun}, will save files: ${!request.options?.dryRun}`
+      );
+
+      // Check if AI chose inline display
+      const inlineFiles = generatedFiles.filter(f => f.path.startsWith('__INLINE_DISPLAY__'));
+      const actualFiles = generatedFiles.filter(f => !f.path.startsWith('__INLINE_DISPLAY__'));
+
+      let smartFiles: GenerationResponse['generated']['files'] = [];
+
+      if (inlineFiles.length > 0) {
+        console.log(`🧠 [AI-GUIDED] AI chose inline display - skipping file creation`);
+        smartFiles = []; // Empty array indicates inline display
+      } else if (actualFiles.length > 0) {
+        console.log(`🧠 [AI-GUIDED] AI chose file creation - using provided paths`);
+        smartFiles = actualFiles; // Use AI-provided file paths directly
+      }
+
+      // Save files if not dry run and files were intended to be saved
+      if (!request.options?.dryRun && smartFiles.length > 0) {
+        console.log(`🧠 [AI-GUIDED] Saving ${smartFiles.length} AI-placed files`);
+        await this.saveGeneratedFiles(smartFiles);
+      } else if (inlineFiles.length > 0 || smartFiles.length === 0) {
+        console.log(`🧠 [AI-GUIDED] Content will be displayed inline - no files to save`);
+      } else {
+        console.log(`🐛 [DEBUG] Skipping file save due to dryRun=true`);
       }
 
       const metadata = {
         duration: performance.now() - startTime,
         tokensGenerated: this.estimateTokens(generatedFiles),
-        filesCreated: generatedFiles.length
+        filesCreated: smartFiles.length,
       };
 
       return {
         success: true,
         generated: {
-          files: generatedFiles,
-          summary: this.buildSummary(generatedFiles, request),
-          changes: this.buildChangesSummary(generatedFiles)
+          files: smartFiles,
+          summary: this.buildSummary(smartFiles, request, inlineFiles),
+          changes: this.buildChangesSummary(smartFiles),
         },
-        metadata
+        metadata,
       };
-
     } catch (error) {
       const duration = performance.now() - startTime;
       logger.error('Code generation failed:', error);
-      
+
       return {
         success: false,
         generated: {
           files: [],
-          summary: 'Code generation failed'
+          summary: 'Code generation failed',
         },
         metadata: {
           duration,
           tokensGenerated: 0,
-          filesCreated: 0
+          filesCreated: 0,
         },
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -134,36 +163,61 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
       prompt += '\n';
     }
 
+    // AI-Guided File Placement Questions
+    prompt += `**CRITICAL: File Placement Decision**:\n`;
+    prompt += `Before generating code, you MUST consider these questions and respond accordingly:\n\n`;
+    prompt += `1. **Should this be displayed inline or saved as files?**\n`;
+    prompt += `   - Is this a simple example, interface, or type that can be shown in the chat? → Use INLINE_DISPLAY format\n`;
+    prompt += `   - Does the request lack clear context about WHERE files should go? → Use INLINE_DISPLAY format\n`;
+    prompt += `   - Is this a complete implementation that belongs in a project structure? → Use FILE format\n\n`;
+    prompt += `2. **What should the filename be?**\n`;
+    prompt += `   - Extract the main entity name from the request (e.g., "User" from "Create interface for User")\n`;
+    prompt += `   - Use appropriate suffixes: .interface.ts, .types.ts, .component.tsx, .service.ts\n`;
+    prompt += `   - If no clear entity name exists, ask for clarification or use INLINE_DISPLAY\n\n`;
+    prompt += `3. **Where should files be placed?**\n`;
+    prompt += `   - Analyze project structure to determine appropriate directories\n`;
+    prompt += `   - Use src/types/ for interfaces/types, src/components/ for components, etc.\n`;
+    prompt += `   - If uncertain about project structure, use current directory or ask for clarification\n\n`;
+
     prompt += `**Instructions**:\n`;
     prompt += `1. Generate clean, production-ready code following best practices\n`;
     prompt += `2. Include appropriate error handling and validation\n`;
     prompt += `3. Follow consistent naming conventions and code style\n`;
     prompt += `4. Add clear comments explaining complex logic\n`;
     prompt += `5. Ensure code is modular and maintainable\n`;
-    
+
     if (request.options?.includeTests) {
       prompt += `6. Include comprehensive test coverage with different scenarios\n`;
     }
-    
+
     if (request.options?.includeDocumentation) {
       prompt += `7. Include README or documentation explaining usage\n`;
     }
 
-    prompt += `\n**Output Format**:\n`;
-    prompt += `Provide the generated code in a structured format with clear file names and paths. `;
-    prompt += `For each file, use the following format:\n\n`;
+    prompt += `\n**Output Format Options**:\n`;
+    prompt += `\n**Option A - INLINE_DISPLAY (for simple examples, unclear context):**\n`;
+    prompt += `Just provide the code directly in a markdown code block without filename headers:\n`;
+    prompt += `\`\`\`typescript\n[code here]\n\`\`\`\n\n`;
+
+    prompt += `**Option B - FILE (for complete implementations with clear placement):**\n`;
+    prompt += `Use this format for each file:\n`;
     prompt += `\`\`\`filename: path/to/file.ext\n[file content here]\n\`\`\`\n\n`;
+
+    prompt += `**Decision Logic:**\n`;
+    prompt += `- Choose INLINE_DISPLAY if: simple request, no clear file location, example code, or uncertain context\n`;
+    prompt += `- Choose FILE if: complete implementation, clear entity names, obvious project structure fit\n\n`;
+
     prompt += `Also provide a brief summary of what was generated and key features implemented.`;
 
     return prompt;
   }
 
   private parseGenerationResult(
-    result: any, 
+    result: any,
     request: GenerationRequest
   ): GenerationResponse['generated']['files'] {
     const files: GenerationResponse['generated']['files'] = [];
-    
+
     let resultText: string;
     if (typeof result === 'string') {
       resultText = result;
@@ -175,7 +229,7 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
         resultText = result.text;
       } else if (result.response) {
         resultText = result.response;
-      } else if (result.message && result.message.content) {
+      } else if (result.message?.content) {
         resultText = result.message.content;
       } else {
         // If no standard content field found, try to stringify but log for debugging
@@ -185,44 +239,76 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     } else {
       resultText = String(result);
     }
-    
-    // Extract files from code blocks with filenames
-    const fileBlockRegex = /```(?:filename:\s*(.+?)\n)?([\s\S]*?)```/g;
-    let match;
-    let fileIndex = 0;
 
-    while ((match = fileBlockRegex.exec(resultText)) !== null) {
-      let filePath = match[1]?.trim();
-      const content = match[2]?.trim();
-      
-      if (!content) continue;
+    // DEBUG: Log the result being parsed
+    console.log('🐛 [DEBUG] parseGenerationResult input:');
+    console.log('🐛 Result type:', typeof result);
+    console.log('🐛 Result text length:', resultText.length);
+    console.log('🐛 First 500 chars of resultText:', resultText.substring(0, 500));
 
-      // Generate filename if not provided
-      if (!filePath) {
-        const extension = this.inferFileExtension(content, request);
-        filePath = `generated-file-${fileIndex}${extension}`;
-        fileIndex++;
+    // Check if AI chose INLINE_DISPLAY format (code blocks without filename headers)
+    const inlineCodeRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    const fileCodeRegex = /```filename:\s*(.+?)\n([\s\S]*?)```/g;
+
+    const hasFileHeaders = fileCodeRegex.test(resultText);
+    fileCodeRegex.lastIndex = 0; // Reset regex
+
+    if (hasFileHeaders) {
+      // AI chose FILE format - extract files with explicit paths
+      console.log('🧠 [AI-GUIDED] AI chose FILE format - extracting files with explicit paths');
+      let match;
+      while ((match = fileCodeRegex.exec(resultText)) !== null) {
+        const filePath = match[1]?.trim();
+        const content = match[2]?.trim();
+
+        console.log(`🧠 [AI-GUIDED] Found file: ${filePath} (${content?.length} chars)`);
+
+        if (content && filePath) {
+          const fileType = this.determineFileType(filePath, content);
+          files.push({
+            path: filePath,
+            content,
+            type: fileType,
+          });
+        }
       }
+    } else {
+      // AI chose INLINE_DISPLAY format - extract code blocks without filenames
+      console.log('🧠 [AI-GUIDED] AI chose INLINE_DISPLAY format - code will be displayed inline');
+      let match;
+      while ((match = inlineCodeRegex.exec(resultText)) !== null) {
+        const language = match[1] || 'typescript';
+        const content = match[2]?.trim();
 
-      // Determine file type
-      const fileType = this.determineFileType(filePath, content);
+        console.log(
+          `🧠 [AI-GUIDED] Found inline code block: ${language} (${content?.length} chars)`
+        );
 
-      files.push({
-        path: filePath,
-        content,
-        type: fileType
-      });
+        if (content) {
+          // Mark as inline display by using special path
+          files.push({
+            path: `__INLINE_DISPLAY__.${language}`,
+            content,
+            type: 'inline',
+          });
+        }
+      }
     }
 
-    // If no structured files found, create a single file from the entire result
+    // Fallback: if no code blocks found, treat entire result as inline display
     if (files.length === 0 && resultText.trim()) {
-      const extension = this.inferFileExtension(resultText, request);
+      console.log('🧠 [AI-GUIDED] No code blocks found, treating entire result as inline display');
       files.push({
-        path: `generated-code${extension}`,
-        content: resultText,
-        type: 'source'
+        path: '__INLINE_DISPLAY__.txt',
+        content: resultText.trim(),
+        type: 'inline',
       });
     }
+
+    console.log(
+      `🧠 [AI-GUIDED] Parsed ${files.length} files:`,
+      files.map(f => ({ path: f.path, type: f.type, contentLength: f.content.length }))
+    );
 
     return files;
   }
@@ -231,25 +317,29 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     // Check context language first
     if (request.context?.language) {
       const langMap: Record<string, string> = {
-        'typescript': '.ts',
-        'javascript': '.js',
-        'python': '.py',
-        'java': '.java',
-        'cpp': '.cpp',
-        'c': '.c',
-        'csharp': '.cs',
-        'go': '.go',
-        'rust': '.rs',
-        'ruby': '.rb',
-        'php': '.php'
+        typescript: '.ts',
+        javascript: '.js',
+        python: '.py',
+        java: '.java',
+        cpp: '.cpp',
+        c: '.c',
+        csharp: '.cs',
+        go: '.go',
+        rust: '.rs',
+        ruby: '.rb',
+        php: '.php',
       };
-      
+
       const ext = langMap[request.context.language.toLowerCase()];
       if (ext) return ext;
     }
 
     // Analyze content for language hints
-    if (content.includes('interface ') || content.includes('type ') || content.includes('import ')) {
+    if (
+      content.includes('interface ') ||
+      content.includes('type ') ||
+      content.includes('import ')
+    ) {
       return '.ts';
     }
     if (content.includes('function ') || content.includes('const ') || content.includes('let ')) {
@@ -266,67 +356,118 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
   }
 
   private determineFileType(
-    filePath: string, 
+    filePath: string,
     content: string
   ): GenerationResponse['generated']['files'][0]['type'] {
     const fileName = filePath.toLowerCase();
-    
+
     if (fileName.includes('test') || fileName.includes('spec')) {
       return 'test';
     }
-    if (fileName.includes('readme') || fileName.includes('doc') || 
-        fileName.endsWith('.md') || fileName.endsWith('.txt')) {
+    if (
+      fileName.includes('readme') ||
+      fileName.includes('doc') ||
+      fileName.endsWith('.md') ||
+      fileName.endsWith('.txt')
+    ) {
       return 'documentation';
     }
-    if (fileName.includes('config') || fileName.includes('settings') ||
-        fileName.endsWith('.json') || fileName.endsWith('.yaml') || 
-        fileName.endsWith('.yml') || fileName.endsWith('.xml')) {
+    if (
+      fileName.includes('config') ||
+      fileName.includes('settings') ||
+      fileName.endsWith('.json') ||
+      fileName.endsWith('.yaml') ||
+      fileName.endsWith('.yml') ||
+      fileName.endsWith('.xml')
+    ) {
       return 'config';
     }
-    
+
     return 'source';
   }
 
   private async saveGeneratedFiles(files: GenerationResponse['generated']['files']): Promise<void> {
+    console.log(`🐛 [DEBUG] saveGeneratedFiles called with ${files.length} files`);
+
     for (const file of files) {
       try {
+        console.log(`🐛 [DEBUG] Saving file: ${file.path} (${file.content.length} chars)`);
+
         // Ensure directory exists
         const dir = dirname(file.path);
+        console.log(`🐛 [DEBUG] Directory: ${dir}, exists: ${existsSync(dir)}`);
         if (!existsSync(dir)) {
           mkdirSync(dir, { recursive: true });
+          console.log(`🐛 [DEBUG] Created directory: ${dir}`);
         }
 
         // Write file
         writeFileSync(file.path, file.content, 'utf-8');
+        console.log(`🐛 [DEBUG] Successfully wrote file: ${file.path}`);
         logger.info(`Generated file saved: ${file.path}`);
       } catch (error) {
+        console.error(`🐛 [DEBUG] Error saving file ${file.path}:`, error);
         logger.error(`Failed to save file ${file.path}:`, error);
         throw new Error(`Failed to save file ${file.path}: ${error}`);
       }
     }
+    console.log(`🐛 [DEBUG] saveGeneratedFiles completed`);
   }
 
   private buildSummary(
     files: GenerationResponse['generated']['files'],
-    request: GenerationRequest
+    request: GenerationRequest,
+    inlineFiles?: GenerationResponse['generated']['files']
   ): string {
-    let summary = `Generated ${files.length} file(s) based on: "${request.prompt}"\n\n`;
-    
-    const filesByType = files.reduce((acc, file) => {
-      acc[file.type] = (acc[file.type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    // Handle inline display case
+    if (inlineFiles && inlineFiles.length > 0) {
+      let summary = `Generated code (AI chose inline display):\n\n`;
 
-    summary += 'Files created:\n';
-    Object.entries(filesByType).forEach(([type, count]) => {
-      summary += `- ${count} ${type} file(s)\n`;
-    });
+      for (const file of inlineFiles) {
+        // Extract language from the special path
+        const language = file.path.split('.').pop() || 'typescript';
+        summary += `\`\`\`${language}\n${file.content}\n\`\`\`\n\n`;
+      }
 
-    if (request.context?.language) {
-      summary += `\nLanguage: ${request.context.language}`;
+      summary += `Based on: "${request.prompt}"\n`;
+      if (request.context?.language) {
+        summary += `Language: ${request.context.language}`;
+      }
+
+      return summary;
     }
-    if (request.context?.framework) {
-      summary += `\nFramework: ${request.context.framework}`;
+
+    // Handle file creation case
+    let summary = `Generated ${files.length} file(s) based on: "${request.prompt}"\n\n`;
+
+    const filesByType = files.reduce(
+      (acc, file) => {
+        acc[file.type] = (acc[file.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    if (files.length > 0) {
+      summary += 'Files created:\n';
+      Object.entries(filesByType).forEach(([type, count]) => {
+        summary += `- ${count} ${type} file(s)\n`;
+      });
+
+      if (request.context?.language) {
+        summary += `\nLanguage: ${request.context.language}`;
+      }
+      if (request.context?.framework) {
+        summary += `\nFramework: ${request.context.framework}`;
+      }
+
+      // Show file locations
+      summary += `\n\nFiles:\n`;
+      files.forEach(file => {
+        summary += `- ${file.path} (${file.type}, ${file.content.length} chars)\n`;
+      });
+    } else {
+      summary += 'AI determined this should be displayed inline rather than saved as files.';
     }
 
     return summary;
@@ -340,4 +481,8 @@ export class GenerateCodeUseCase implements IGenerateCodeUseCase {
     // Rough estimation: ~4 characters per token
     return files.reduce((total, file) => total + Math.ceil(file.content.length / 4), 0);
   }
+
+  // Note: File placement logic has been replaced with AI-guided decision making.
+  // The AI now decides whether to display code inline or create files with appropriate names and locations.
+  // This approach leverages the AI's understanding rather than brittle rule-based logic.
 }

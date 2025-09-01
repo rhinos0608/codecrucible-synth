@@ -1,12 +1,12 @@
 /**
  * Agentic Workflow Display - Transparent AI Process Visualization
- * 
+ *
  * Shows users the AI's thinking process in real-time:
  * - Plan: What the AI will do
  * - Execute: Current actions being performed
  * - Test: Validation and verification steps
  * - Iterate: Learning and refinement
- * 
+ *
  * Based on modern AI transparency principles and user experience research.
  */
 
@@ -67,10 +67,12 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   private sessionHistory: WorkflowSession[] = [];
   private displayEnabled: boolean = true;
 
-  constructor(options: {
-    displayEnabled?: boolean;
-    maxHistorySize?: number;
-  } = {}) {
+  constructor(
+    options: {
+      displayEnabled?: boolean;
+      maxHistorySize?: number;
+    } = {}
+  ) {
     super();
     this.displayEnabled = options.displayEnabled ?? true;
   }
@@ -80,7 +82,7 @@ export class AgenticWorkflowDisplay extends EventEmitter {
    */
   startSession(userQuery: string, complexity: 'simple' | 'medium' | 'complex' = 'medium'): string {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const session: WorkflowSession = {
       id: sessionId,
       title: this.generateSessionTitle(userQuery),
@@ -91,20 +93,20 @@ export class AgenticWorkflowDisplay extends EventEmitter {
       metadata: {
         userQuery,
         complexity,
-        confidenceScore: 0.5
+        confidenceScore: 0.5,
       },
-      status: 'active'
+      status: 'active',
     };
 
     this.activeSessions.set(sessionId, session);
-    
+
     if (this.displayEnabled) {
       this.displaySessionStart(session);
     }
-    
+
     this.emit('sessionStarted', session);
     logger.info(`🎯 Started agentic workflow session: ${sessionId}`);
-    
+
     return sessionId;
   }
 
@@ -125,7 +127,7 @@ export class AgenticWorkflowDisplay extends EventEmitter {
       description,
       status: 'pending',
       progress: 0,
-      startTime: new Date()
+      startTime: new Date(),
     };
 
     session.steps.push(step);
@@ -171,7 +173,7 @@ export class AgenticWorkflowDisplay extends EventEmitter {
       phase: step.phase,
       progress,
       message: message || '',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.emit('progressUpdate', update);
@@ -250,15 +252,16 @@ export class AgenticWorkflowDisplay extends EventEmitter {
     }
 
     this.emit('sessionCompleted', session);
-    logger.info(`✅ Completed agentic workflow session: ${sessionId} in ${session.totalDuration}ms`);
+    logger.info(
+      `✅ Completed agentic workflow session: ${sessionId} in ${session.totalDuration}ms`
+    );
   }
 
   /**
    * Get current session status
    */
   getSession(sessionId: string): WorkflowSession | undefined {
-    return this.activeSessions.get(sessionId) || 
-           this.sessionHistory.find(s => s.id === sessionId);
+    return this.activeSessions.get(sessionId) || this.sessionHistory.find(s => s.id === sessionId);
   }
 
   /**
@@ -283,8 +286,8 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   private displaySessionStart(session: WorkflowSession): void {
     const complexityIcon = {
       simple: '🟢',
-      medium: '🟡', 
-      complex: '🔴'
+      medium: '🟡',
+      complex: '🔴',
     }[session.metadata.complexity];
 
     console.log(`\n🤖 Starting AI Analysis ${complexityIcon}`);
@@ -304,7 +307,7 @@ export class AgenticWorkflowDisplay extends EventEmitter {
       executing: '⚡',
       testing: '🧪',
       iterating: '🔄',
-      completed: '✅'
+      completed: '✅',
     };
 
     const icon = phaseIcons[step.phase];
@@ -317,11 +320,18 @@ export class AgenticWorkflowDisplay extends EventEmitter {
    */
   private displayProgress(session: WorkflowSession, step: WorkflowStep, message?: string): void {
     const progressBar = this.createProgressBar(step.progress);
-    const statusIcon = step.status === 'in_progress' ? '⏳' : 
-                      step.status === 'completed' ? '✅' : 
-                      step.status === 'failed' ? '❌' : '⏸️';
+    const statusIcon =
+      step.status === 'in_progress'
+        ? '⏳'
+        : step.status === 'completed'
+          ? '✅'
+          : step.status === 'failed'
+            ? '❌'
+            : '⏸️';
 
-    console.log(`   ${statusIcon} ${progressBar} ${step.progress.toFixed(0)}%${message ? ` - ${message}` : ''}`);
+    console.log(
+      `   ${statusIcon} ${progressBar} ${step.progress.toFixed(0)}%${message ? ` - ${message}` : ''}`
+    );
   }
 
   /**
@@ -344,7 +354,9 @@ export class AgenticWorkflowDisplay extends EventEmitter {
    * Display session completion
    */
   private displaySessionCompletion(session: WorkflowSession): void {
-    const duration = session.totalDuration ? `${(session.totalDuration / 1000).toFixed(1)}s` : 'unknown';
+    const duration = session.totalDuration
+      ? `${(session.totalDuration / 1000).toFixed(1)}s`
+      : 'unknown';
     const completedSteps = session.steps.filter(s => s.status === 'completed').length;
     const totalSteps = session.steps.length;
 
@@ -353,15 +365,15 @@ export class AgenticWorkflowDisplay extends EventEmitter {
     console.log(`⏱️ Duration: ${duration}`);
     console.log(`📊 Steps: ${completedSteps}/${totalSteps} completed`);
     console.log(`🎯 Success rate: ${((completedSteps / totalSteps) * 100).toFixed(0)}%`);
-    
+
     if (session.metadata.tokensUsed) {
       console.log(`🔤 Tokens used: ${session.metadata.tokensUsed.toLocaleString()}`);
     }
-    
+
     if (session.metadata.confidenceScore) {
       console.log(`📈 Confidence: ${(session.metadata.confidenceScore * 100).toFixed(0)}%`);
     }
-    
+
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
   }
 
@@ -379,14 +391,31 @@ export class AgenticWorkflowDisplay extends EventEmitter {
    */
   private generateSessionTitle(query: string): string {
     const words = query.toLowerCase().split(' ');
-    
+
     // Extract key action words
-    const actionWords = ['analyze', 'create', 'fix', 'implement', 'refactor', 'optimize', 'test', 'review'];
-    const targetWords = ['component', 'function', 'code', 'file', 'project', 'system', 'architecture'];
-    
+    const actionWords = [
+      'analyze',
+      'create',
+      'fix',
+      'implement',
+      'refactor',
+      'optimize',
+      'test',
+      'review',
+    ];
+    const targetWords = [
+      'component',
+      'function',
+      'code',
+      'file',
+      'project',
+      'system',
+      'architecture',
+    ];
+
     const action = words.find(w => actionWords.includes(w)) || 'process';
     const target = words.find(w => targetWords.includes(w)) || 'request';
-    
+
     return `${action.charAt(0).toUpperCase() + action.slice(1)} ${target}`;
   }
 
@@ -410,15 +439,17 @@ export class AgenticWorkflowDisplay extends EventEmitter {
     const completed = this.sessionHistory.filter(s => s.status === 'completed');
     const totalDuration = completed.reduce((sum, s) => sum + (s.totalDuration || 0), 0);
     const totalSteps = this.sessionHistory.reduce((sum, s) => sum + s.steps.length, 0);
-    const completedSteps = this.sessionHistory.reduce((sum, s) => 
-      sum + s.steps.filter(step => step.status === 'completed').length, 0);
+    const completedSteps = this.sessionHistory.reduce(
+      (sum, s) => sum + s.steps.filter(step => step.status === 'completed').length,
+      0
+    );
 
     return {
       activeSessions: this.activeSessions.size,
       completedSessions: completed.length,
       averageDuration: completed.length > 0 ? totalDuration / completed.length : 0,
       successRate: totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0,
-      totalStepsCompleted: completedSteps
+      totalStepsCompleted: completedSteps,
     };
   }
 }

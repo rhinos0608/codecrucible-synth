@@ -1,10 +1,10 @@
 /**
  * Unified Service Contracts and Interface Standards
- * 
+ *
  * ADDRESSES CRITICAL ARCHITECTURE ISSUES:
  * - Issue #3: Interface Misalignment (standardized contracts across all systems)
  * - Issue #2: Inconsistent Architectural Patterns (enforced interfaces)
- * 
+ *
  * PURPOSE: Define standardized contracts that all services must implement
  * to ensure architectural consistency and enable proper integration
  */
@@ -16,15 +16,15 @@ export interface IBaseService {
   readonly serviceName: string;
   readonly version: string;
   readonly category: ServiceCategory;
-  
+
   // Lifecycle methods
   initialize?(): Promise<void>;
   cleanup?(): Promise<void>;
-  
+
   // Health monitoring
   getHealth(): ServiceHealth;
-  
-  // Performance monitoring 
+
+  // Performance monitoring
   getMetrics(): ServiceMetrics;
 }
 
@@ -58,11 +58,11 @@ export interface IConfigurationService extends IBaseService {
   // Config loading and validation
   loadConfig<T>(key: string): Promise<T>;
   validateConfig(config: unknown): ConfigValidationResult;
-  
+
   // Config watching and updates
   watchConfig(key: string, callback: (newValue: any) => void): void;
   updateConfig(key: string, value: any): Promise<void>;
-  
+
   // Environment and feature flags
   getEnvironment(): string;
   isFeatureEnabled(feature: string): boolean;
@@ -82,11 +82,11 @@ export interface ICacheService extends IBaseService {
   set<T>(key: string, value: T, options?: CacheOptions): Promise<void>;
   delete(key: string): Promise<boolean>;
   clear(): Promise<void>;
-  
+
   // Advanced operations
   getMultiple<T>(keys: string[]): Promise<Map<string, T>>;
   setMultiple<T>(entries: Map<string, T>, options?: CacheOptions): Promise<void>;
-  
+
   // Cache management
   getCacheStats(): CacheStats;
   evictExpired(): Promise<number>;
@@ -110,15 +110,15 @@ export interface IMCPService extends IBaseService {
   // Connection management
   connect(serverConfig: MCPServerConfig): Promise<MCPConnection>;
   disconnect(serverId: string): Promise<void>;
-  
+
   // Tool operations
   listTools(serverId?: string): Promise<MCPTool[]>;
   executeTool(toolName: string, parameters: any, serverId?: string): Promise<any>;
-  
+
   // Resource operations
   listResources(serverId?: string): Promise<MCPResource[]>;
   readResource(uri: string, serverId?: string): Promise<any>;
-  
+
   // Health and monitoring
   getConnectionStatus(): MCPConnectionStatus;
 }
@@ -157,14 +157,14 @@ export interface MCPConnectionStatus {
   lastRefresh: Date;
 }
 
-// Error Service Contract  
+// Error Service Contract
 export interface IErrorService extends IBaseService {
   // Error handling
   handleError(error: Error, context?: ErrorContext): Promise<ErrorHandlingResult>;
-  
+
   // Error recovery
   attemptRecovery(error: Error, strategy: RecoveryStrategy): Promise<boolean>;
-  
+
   // Error reporting and monitoring
   getErrorStats(): ErrorStats;
   getRecentErrors(limit?: number): ServiceError[];
@@ -202,13 +202,13 @@ export interface ErrorStats {
 export interface IOrchestrationService extends IBaseService {
   // Tool orchestration
   orchestrateTools(request: OrchestrationRequest): Promise<OrchestrationResult>;
-  
+
   // Workflow management
   executeWorkflow(workflow: WorkflowDefinition): Promise<WorkflowResult>;
-  
+
   // Agent collaboration
   coordinateAgents(request: AgentCoordinationRequest): Promise<AgentCoordinationResult>;
-  
+
   // Performance optimization
   getOptimizationRecommendations(): OptimizationRecommendation[];
 }
@@ -299,11 +299,11 @@ export interface OptimizationRecommendation {
 export interface IModelSelectionService extends IBaseService {
   // Model selection
   selectModel(request: ModelSelectionRequest): Promise<ModelSelection>;
-  
+
   // Model management
   listAvailableModels(): Promise<ModelInfo[]>;
   validateModelCapabilities(modelId: string, capabilities: string[]): Promise<boolean>;
-  
+
   // Performance optimization
   getModelPerformanceMetrics(modelId: string): Promise<ModelPerformanceMetrics>;
 }
@@ -372,11 +372,11 @@ export interface IVoiceOrchestrationService extends IBaseService {
   // Voice selection and coordination
   selectVoices(request: VoiceSelectionRequest): Promise<VoiceSelection>;
   orchestrateMultiVoice(request: MultiVoiceRequest): Promise<MultiVoiceResult>;
-  
+
   // Voice management
   listAvailableVoices(): Promise<VoiceInfo[]>;
   getVoiceCapabilities(voiceId: string): Promise<VoiceCapabilities>;
-  
+
   // Performance optimization
   getVoicePerformanceMetrics(): Promise<VoicePerformanceMetrics>;
 }
@@ -473,10 +473,10 @@ export interface VoiceQualityMetrics {
 export interface IIntegrationCoordinator extends IBaseService {
   // System integration
   coordinateRequest(request: IntegratedRequest): Promise<IntegratedResponse>;
-  
+
   // Health monitoring
   getSystemsHealth(): SystemsHealthReport;
-  
+
   // Resource coordination
   acquireResource(resourceId: string, requesterId: string): Promise<ResourceLock>;
   releaseResource(lock: ResourceLock): Promise<void>;
@@ -539,40 +539,37 @@ export interface ResourceLock {
 // Contract Validation Utilities
 export class ContractValidator {
   static validateService<T extends IBaseService>(
-    service: any, 
+    service: any,
     contract: new (...args: any[]) => T
   ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
-    
+
     // Check required properties
     if (!service.serviceName) errors.push('Missing serviceName property');
     if (!service.version) errors.push('Missing version property');
     if (!service.category) errors.push('Missing category property');
-    
+
     // Check required methods
     if (typeof service.getHealth !== 'function') errors.push('Missing getHealth method');
     if (typeof service.getMetrics !== 'function') errors.push('Missing getMetrics method');
-    
+
     // Additional contract-specific validation would go here
-    
+
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
-  
-  static ensureContract<T extends IBaseService>(
-    service: any,
-    contractName: string
-  ): service is T {
+
+  static ensureContract<T extends IBaseService>(service: any, contractName: string): service is T {
     const validation = this.validateService(service, Object as any);
-    
+
     if (!validation.valid) {
       throw new Error(
         `Service does not implement ${contractName} contract: ${validation.errors.join(', ')}`
       );
     }
-    
+
     return true;
   }
 }
@@ -583,7 +580,7 @@ export function EnforceContract(contractName: string) {
     return class extends constructor {
       constructor(...args: any[]) {
         super(...args);
-        
+
         // Validate contract compliance after construction
         const validation = ContractValidator.validateService(this, constructor);
         if (!validation.valid) {

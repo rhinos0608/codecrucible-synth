@@ -15,25 +15,51 @@ llm:
         response: 30000      # 30s for response generation
         status_check: 3000   # 3s for health checks
       models:
-        # Preferred models in priority order
+        # Preferred models in priority order (INTELLIGENT ROUTING)
         preferred: 
-          - "qwen2.5-coder:7b"
-          - "qwen2.5-coder:3b"
-          - "deepseek-coder:8b"
+          - "gpt-oss:20b"          # Latest GPT model with function calling
+          - "llama3.1:8b"          # Best overall for function calling  
+          - "qwen2.5-coder:7b"     # Excellent function calling + coding
+          - "qwen2.5-coder:14b"    # Best function calling if available
+          - "qwen2.5:32b"          # Most reliable function calling
+          - "deepseek-coder:8b"    # Decent function calling
         # Fallback models if preferred not available
         fallback:
-          - "llama3.2:latest"
-          - "gemma:latest"
-        # Model-specific settings
+          - "qwen2.5-coder:3b"     # Limited function calling
+          - "llama3.2:latest"      # Basic capabilities
+          - "gemma:latest"         # Basic capabilities
+        # Model-specific settings (OPTIMIZED FOR FUNCTION CALLING)
         settings:
+          "gpt-oss:20b":
+            temperature: 0.1         # Low temp for precise function calls
+            max_tokens: 128000
+            context_window: 128000
+            function_calling: true   # Latest GPT with function calling
+          "llama3.1:8b":
+            temperature: 0.1         # Low temp for precise function calls
+            max_tokens: 128000
+            context_window: 128000
+            function_calling: true   # Enable function calling capability
           "qwen2.5-coder:7b":
-            temperature: 0.1
+            temperature: 0.1         # Low temp for precise function calls  
             max_tokens: 128000
             context_window: 128000
+            function_calling: true   # Enable function calling capability
+          "qwen2.5-coder:14b":
+            temperature: 0.1         # Low temp for precise function calls
+            max_tokens: 128000 
+            context_window: 128000
+            function_calling: true   # Enable function calling capability
+          "qwen2.5:32b":
+            temperature: 0.1         # Low temp for precise function calls
+            max_tokens: 128000
+            context_window: 128000
+            function_calling: true   # Enable function calling capability
           "deepseek-coder:8b":
-            temperature: 0.2
+            temperature: 0.1         # Function calling optimized
             max_tokens: 128000
             context_window: 128000
+            function_calling: true   # Enable function calling capability
       # Task routing preferences
       optimal_for:
         - "analysis"

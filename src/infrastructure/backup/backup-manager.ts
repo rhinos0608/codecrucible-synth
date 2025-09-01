@@ -896,7 +896,7 @@ export class BackupManager {
     const DAILY_MS = 24 * 60 * 60 * 1000;
 
     this.scheduleTimer = setInterval(async () => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       try {
         await this.performFullBackup();
       } catch (error) {

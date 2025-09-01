@@ -15,11 +15,18 @@ import { ConfidenceScore } from './reasoning-step.js';
  */
 export class Domain {
   private static readonly VALID_DOMAINS = [
-    'coding', 'analysis', 'debugging', 'documentation', 
-    'testing', 'deployment', 'research', 'creative', 'general'
+    'coding',
+    'analysis',
+    'debugging',
+    'documentation',
+    'testing',
+    'deployment',
+    'research',
+    'creative',
+    'general',
   ] as const;
-  
-  private constructor(private readonly _value: typeof Domain.VALID_DOMAINS[number]) {}
+
+  private constructor(private readonly _value: (typeof Domain.VALID_DOMAINS)[number]) {}
 
   static create(value: string): Domain {
     const normalizedValue = value.toLowerCase();
@@ -84,8 +91,8 @@ export class Goal {
   }
 
   get truncatedDescription(): string {
-    return this._description.length > 100 
-      ? `${this._description.substring(0, 100)}...` 
+    return this._description.length > 100
+      ? `${this._description.substring(0, 100)}...`
       : this._description;
   }
 
@@ -94,18 +101,26 @@ export class Goal {
    */
   estimateComplexity(): 'simple' | 'moderate' | 'complex' {
     const description = this._description.toLowerCase();
-    
+
     // Simple tasks - single operations
-    if (description.includes('list') || description.includes('show') || description.includes('read')) {
+    if (
+      description.includes('list') ||
+      description.includes('show') ||
+      description.includes('read')
+    ) {
       return 'simple';
     }
-    
+
     // Complex tasks - multiple operations or analysis
-    if (description.includes('analyze') || description.includes('implement') || 
-        description.includes('refactor') || description.includes('optimize')) {
+    if (
+      description.includes('analyze') ||
+      description.includes('implement') ||
+      description.includes('refactor') ||
+      description.includes('optimize')
+    ) {
       return 'complex';
     }
-    
+
     // Default to moderate
     return 'moderate';
   }
@@ -123,7 +138,7 @@ export class Goal {
     if (!description || description.trim().length === 0) {
       throw new Error('Goal description cannot be empty');
     }
-    
+
     if (description.length > 1000) {
       throw new Error('Goal description too long (max 1000 characters)');
     }
@@ -179,24 +194,24 @@ export class SelectedTools {
    */
   estimateComplexity(): number {
     if (this.isEmpty()) return 0;
-    
+
     let complexity = this._tools.length * 0.2; // Base complexity per tool
-    
+
     // File system operations add moderate complexity
     if (this.hasFileSystemTools()) {
       complexity += 0.3;
     }
-    
+
     // Code operations add higher complexity
     if (this.hasCodeTools()) {
       complexity += 0.5;
     }
-    
+
     // Analysis operations add highest complexity
     if (this.hasAnalysisTools()) {
       complexity += 0.7;
     }
-    
+
     return Math.min(1.0, complexity);
   }
 
@@ -204,11 +219,11 @@ export class SelectedTools {
     if (!toolName || toolName.trim().length === 0) {
       return this;
     }
-    
+
     if (this._tools.includes(toolName)) {
       return this;
     }
-    
+
     return new SelectedTools(Object.freeze([...this._tools, toolName]));
   }
 }
@@ -227,10 +242,14 @@ export class StepEstimate {
 
   static fromComplexity(complexity: 'simple' | 'moderate' | 'complex'): StepEstimate {
     switch (complexity) {
-      case 'simple': return new StepEstimate(2);
-      case 'moderate': return new StepEstimate(4);
-      case 'complex': return new StepEstimate(8);
-      default: return new StepEstimate(4);
+      case 'simple':
+        return new StepEstimate(2);
+      case 'moderate':
+        return new StepEstimate(4);
+      case 'complex':
+        return new StepEstimate(8);
+      default:
+        return new StepEstimate(4);
     }
   }
 
@@ -268,7 +287,7 @@ export class StepEstimate {
     if (steps < 1) {
       throw new Error('Estimated steps must be at least 1');
     }
-    
+
     if (steps > 20) {
       throw new Error('Estimated steps cannot exceed 20 (task too complex)');
     }
@@ -297,7 +316,7 @@ export class ExecutionPlan {
     createdAt: Date = new Date()
   ) {
     this.validateInputs(reasoning);
-    
+
     this._goal = goal;
     this._domain = domain;
     this._stepEstimate = stepEstimate;
@@ -357,27 +376,27 @@ export class ExecutionPlan {
    */
   calculateRisk(): 'low' | 'medium' | 'high' {
     let riskScore = 0;
-    
+
     // Low confidence increases risk
     if (this._confidence.isLow()) {
       riskScore += 0.4;
     }
-    
+
     // Complex tasks increase risk
     if (this._stepEstimate.isComplex()) {
       riskScore += 0.3;
     }
-    
+
     // High-precision domains increase risk
     if (this._domain.requiresHighPrecision()) {
       riskScore += 0.2;
     }
-    
+
     // No tool selection increases risk
     if (this._selectedTools.isEmpty()) {
       riskScore += 0.5;
     }
-    
+
     if (riskScore >= 0.7) return 'high';
     if (riskScore >= 0.4) return 'medium';
     return 'low';
@@ -388,16 +407,16 @@ export class ExecutionPlan {
    */
   estimateTotalExecutionTime(): number {
     let baseTime = this._stepEstimate.estimateExecutionTime();
-    
+
     // Domain adjustments
     if (this._domain.requiresHighPrecision()) {
       baseTime *= 1.3; // 30% more time for precision-critical tasks
     }
-    
+
     // Tool complexity adjustments
     const toolComplexity = this._selectedTools.estimateComplexity();
-    baseTime *= (1 + toolComplexity);
-    
+    baseTime *= 1 + toolComplexity;
+
     return Math.ceil(baseTime);
   }
 
@@ -410,7 +429,7 @@ export class ExecutionPlan {
       // Too many tools, might be over-optimization
       return this;
     }
-    
+
     return new ExecutionPlan(
       this._goal,
       this._domain,
@@ -448,7 +467,7 @@ export class ExecutionPlan {
       selectedTools: [...this._selectedTools.tools],
       reasoning: this._reasoning,
       confidence: this._confidence.value,
-      createdAt: this._createdAt.toISOString()
+      createdAt: this._createdAt.toISOString(),
     };
   }
 
@@ -478,7 +497,7 @@ export class ExecutionPlan {
     const goal = Goal.create(goalDescription);
     const domainObj = Domain.create(domain);
     const selectedTools = SelectedTools.create(tools);
-    
+
     return new ExecutionPlan(
       goal,
       domainObj,
@@ -495,7 +514,7 @@ export class ExecutionPlan {
     reasoning: string
   ): ExecutionPlan {
     const goal = Goal.create(goalDescription);
-    
+
     return new ExecutionPlan(
       goal,
       Domain.analysis(),

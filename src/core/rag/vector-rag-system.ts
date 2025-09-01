@@ -12,7 +12,10 @@ import chokidar from 'chokidar';
 import { createLogger } from '../logger.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { UnifiedModelClient } from '../../application/services/client.js';
-import { HybridSearchCoordinator, HybridSearchConfig } from '../search/hybrid-search-coordinator.js';
+import {
+  HybridSearchCoordinator,
+  HybridSearchConfig,
+} from '../search/hybrid-search-coordinator.js';
 import { CommandLineSearchEngine } from '../search/command-line-search-engine.js';
 
 // Core RAG Interfaces
@@ -182,7 +185,11 @@ export class VectorRAGSystem extends EventEmitter {
   private performanceMetrics: RAGMetrics;
   private hybridCoordinator?: HybridSearchCoordinator;
 
-  constructor(config: RAGConfig, modelClient: UnifiedModelClient, hybridConfig?: HybridSearchConfig) {
+  constructor(
+    config: RAGConfig,
+    modelClient: UnifiedModelClient,
+    hybridConfig?: HybridSearchConfig
+  ) {
     super();
     this.logger = createLogger('VectorRAGSystem');
     this.config = config;
@@ -191,7 +198,7 @@ export class VectorRAGSystem extends EventEmitter {
 
     // Initialize components based on config
     this.initializeComponents();
-    
+
     // Initialize hybrid search coordinator if enabled
     if (hybridConfig?.featureFlags?.enableHybridRouting) {
       this.initializeHybridSearch(hybridConfig);
@@ -400,11 +407,7 @@ export class VectorRAGSystem extends EventEmitter {
   private initializeHybridSearch(hybridConfig: HybridSearchConfig): void {
     try {
       const commandSearch = new CommandLineSearchEngine(process.cwd());
-      this.hybridCoordinator = new HybridSearchCoordinator(
-        commandSearch,
-        hybridConfig,
-        this
-      );
+      this.hybridCoordinator = new HybridSearchCoordinator(commandSearch, hybridConfig, this);
       this.logger.info('🔄 Hybrid search coordinator initialized');
     } catch (error) {
       this.logger.warn('Failed to initialize hybrid search coordinator:', error);
@@ -807,7 +810,11 @@ export class QueryRewriter {
 export class SelfCorrectingRAG extends VectorRAGSystem {
   private queryRewriter: QueryRewriter;
 
-  constructor(config: RAGConfig, modelClient: UnifiedModelClient, hybridConfig?: HybridSearchConfig) {
+  constructor(
+    config: RAGConfig,
+    modelClient: UnifiedModelClient,
+    hybridConfig?: HybridSearchConfig
+  ) {
     super(config, modelClient, hybridConfig);
     this.queryRewriter = new QueryRewriter(modelClient);
   }
@@ -837,7 +844,7 @@ export class SelfCorrectingRAG extends VectorRAGSystem {
     const prompt = `Critique the following RAG result. If it is correct, respond with "CORRECT". Otherwise, provide a corrected query.
 
     Result:
-    ${result.documents.map((doc) => doc.document.content).join('\n\n')}
+    ${result.documents.map(doc => doc.document.content).join('\n\n')}
     `;
 
     try {
@@ -913,7 +920,7 @@ class LanceDBVectorStore implements VectorStore {
     let lancedb: any;
     try {
       // Optional import of lancedb
-      lancedb = await Function('return import("lancedb")')() as any;
+      lancedb = (await Function('return import("lancedb")')()) as any;
     } catch (error) {
       throw new Error('lancedb module not found. Please install lancedb: npm install lancedb');
     }
@@ -931,7 +938,7 @@ class LanceDBVectorStore implements VectorStore {
   }
 
   async addDocuments(documents: VectorDocument[]): Promise<void> {
-    const data = documents.map((doc) => ({
+    const data = documents.map(doc => ({
       vector: doc.embedding,
       text: doc.content,
       metadata: doc.metadata,
@@ -940,14 +947,11 @@ class LanceDBVectorStore implements VectorStore {
   }
 
   async updateDocument(document: VectorDocument): Promise<void> {
-    await this.table.update(
-      `id = '${document.id}'`,
-      {
-        vector: document.embedding,
-        text: document.content,
-        metadata: document.metadata,
-      }
-    );
+    await this.table.update(`id = '${document.id}'`, {
+      vector: document.embedding,
+      text: document.content,
+      metadata: document.metadata,
+    });
   }
 
   async deleteDocument(id: string): Promise<void> {
@@ -993,7 +997,7 @@ class LanceDBVectorStore implements VectorStore {
 
     const combinedResults: ScoredDocument[] = [...vectorResults];
     for (const textResult of textResults) {
-      if (!combinedResults.some((r) => r.document.id === textResult.id)) {
+      if (!combinedResults.some(r => r.document.id === textResult.id)) {
         combinedResults.push({
           document: {
             id: textResult.id,

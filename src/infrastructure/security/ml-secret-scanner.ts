@@ -1,7 +1,7 @@
 /**
  * ML-Enhanced Secret Scanner
  * Advanced secret detection using machine learning techniques and pattern analysis
- * 
+ *
  * Based on 2024 security research:
  * - 35% improvement in secret detection accuracy with ML-based approaches
  * - Context-aware analysis reduces false positives by 50%
@@ -93,7 +93,7 @@ export class MLSecretScanner extends EventEmitter {
   private contextWeight = 0.3; // Weight for contextual analysis in ML score
   private patternWeight = 0.4; // Weight for pattern matching in ML score
   private entropyWeight = 0.3; // Weight for entropy analysis in ML score
-  
+
   // ML-like features for pattern learning
   private knownFalsePositives: Set<string> = new Set();
   private contextualLearning: Map<string, number> = new Map(); // Context -> confidence multiplier
@@ -117,10 +117,10 @@ export class MLSecretScanner extends EventEmitter {
         context: {
           variableNames: ['aws_access_key_id', 'access_key', 'aws_key'],
           keywords: ['aws', 'amazon', 's3', 'ec2'],
-          fileExtensions: ['.env', '.config', '.yml', '.yaml', '.json']
+          fileExtensions: ['.env', '.config', '.yml', '.yaml', '.json'],
         },
         severity: 'critical',
-        confidence: 0.95
+        confidence: 0.95,
       },
       {
         name: 'aws_secret_key',
@@ -130,10 +130,10 @@ export class MLSecretScanner extends EventEmitter {
         context: {
           variableNames: ['aws_secret_access_key', 'secret_key', 'aws_secret'],
           keywords: ['aws', 'secret', 'access'],
-          fileExtensions: ['.env', '.config', '.yml', '.yaml']
+          fileExtensions: ['.env', '.config', '.yml', '.yaml'],
         },
         severity: 'critical',
-        confidence: 0.85
+        confidence: 0.85,
       },
       {
         name: 'github_token',
@@ -143,10 +143,10 @@ export class MLSecretScanner extends EventEmitter {
         context: {
           variableNames: ['github_token', 'gh_token', 'personal_access_token'],
           keywords: ['github', 'git', 'repo'],
-          fileExtensions: ['.env', '.yml', '.yaml']
+          fileExtensions: ['.env', '.yml', '.yaml'],
         },
         severity: 'high',
-        confidence: 0.98
+        confidence: 0.98,
       },
       {
         name: 'openai_api_key',
@@ -156,10 +156,10 @@ export class MLSecretScanner extends EventEmitter {
         context: {
           variableNames: ['openai_api_key', 'openai_key', 'ai_key'],
           keywords: ['openai', 'gpt', 'chatgpt', 'ai'],
-          fileExtensions: ['.env', '.config']
+          fileExtensions: ['.env', '.config'],
         },
         severity: 'high',
-        confidence: 0.99
+        confidence: 0.99,
       },
       {
         name: 'jwt_token',
@@ -169,10 +169,10 @@ export class MLSecretScanner extends EventEmitter {
         context: {
           variableNames: ['jwt', 'token', 'auth_token', 'access_token'],
           keywords: ['jwt', 'auth', 'bearer'],
-          fileExtensions: ['.env', '.json', '.js', '.ts']
+          fileExtensions: ['.env', '.json', '.js', '.ts'],
         },
         severity: 'medium',
-        confidence: 0.75
+        confidence: 0.75,
       },
       {
         name: 'generic_api_key',
@@ -182,10 +182,10 @@ export class MLSecretScanner extends EventEmitter {
         context: {
           variableNames: ['api_key', 'apikey', 'key', 'secret'],
           keywords: ['api', 'key', 'secret'],
-          fileExtensions: ['.env', '.config', '.json', '.yml']
+          fileExtensions: ['.env', '.config', '.json', '.yml'],
         },
         severity: 'medium',
-        confidence: 0.70
+        confidence: 0.7,
       },
       {
         name: 'database_connection',
@@ -195,10 +195,10 @@ export class MLSecretScanner extends EventEmitter {
         context: {
           variableNames: ['database_url', 'db_url', 'connection_string'],
           keywords: ['database', 'db', 'mongo', 'sql'],
-          fileExtensions: ['.env', '.config', '.yml']
+          fileExtensions: ['.env', '.config', '.yml'],
         },
         severity: 'high',
-        confidence: 0.90
+        confidence: 0.9,
       },
       {
         name: 'private_key',
@@ -208,16 +208,16 @@ export class MLSecretScanner extends EventEmitter {
         context: {
           variableNames: ['private_key', 'priv_key', 'key'],
           keywords: ['private', 'key', 'rsa', 'certificate'],
-          fileExtensions: ['.pem', '.key', '.crt', '.env']
+          fileExtensions: ['.pem', '.key', '.crt', '.env'],
         },
         severity: 'critical',
-        confidence: 0.99
-      }
+        confidence: 0.99,
+      },
     ];
 
     logger.info('ML Secret Scanner patterns initialized', {
       patternCount: this.secretPatterns.length,
-      entropyThreshold: this.entropyThreshold
+      entropyThreshold: this.entropyThreshold,
     });
   }
 
@@ -241,7 +241,7 @@ export class MLSecretScanner extends EventEmitter {
 
     logger.debug('ML features initialized', {
       falsePositives: this.knownFalsePositives.size,
-      contextualRules: this.contextualLearning.size
+      contextualRules: this.contextualLearning.size,
     });
   }
 
@@ -263,7 +263,7 @@ export class MLSecretScanner extends EventEmitter {
     logger.info('Starting ML-enhanced secret scan', {
       contentLength: content.length,
       filename: context.filename,
-      language: context.language
+      language: context.language,
     });
 
     // Split content into lines for better context analysis
@@ -276,7 +276,7 @@ export class MLSecretScanner extends EventEmitter {
     }
 
     const mlAnalysisStart = Date.now();
-    
+
     // Apply ML-enhanced analysis to all findings
     for (const finding of findings) {
       await this.enhanceWithMLAnalysis(finding, content, context);
@@ -289,8 +289,8 @@ export class MLSecretScanner extends EventEmitter {
     const statistics = this.calculateScanStatistics(findings);
 
     // Filter out low-confidence false positives
-    const filteredFindings = findings.filter(f => 
-      f.confidence > 0.3 && f.falsePositiveProbability < 0.8
+    const filteredFindings = findings.filter(
+      f => f.confidence > 0.3 && f.falsePositiveProbability < 0.8
     );
 
     const result: ScanResult = {
@@ -300,7 +300,7 @@ export class MLSecretScanner extends EventEmitter {
       findings: filteredFindings,
       scanTime: totalScanTime,
       mlAnalysisTime,
-      statistics
+      statistics,
     };
 
     // Emit scan completed event
@@ -310,15 +310,15 @@ export class MLSecretScanner extends EventEmitter {
       performance: {
         totalTime: totalScanTime,
         mlTime: mlAnalysisTime,
-        linesProcessed: lines.length
-      }
+        linesProcessed: lines.length,
+      },
     });
 
     logger.info('ML secret scan completed', {
       totalFindings: result.totalFindings,
       criticalFindings: result.criticalFindings,
       scanTime: totalScanTime,
-      mlAnalysisTime
+      mlAnalysisTime,
     });
 
     return result;
@@ -328,15 +328,15 @@ export class MLSecretScanner extends EventEmitter {
    * Scan individual line with pattern matching
    */
   private async scanLine(
-    line: string, 
-    lineNumber: number, 
+    line: string,
+    lineNumber: number,
     context: any
   ): Promise<MLSecretFinding[]> {
     const findings: MLSecretFinding[] = [];
 
     for (const pattern of this.secretPatterns) {
       const matches = line.matchAll(pattern.regex);
-      
+
       for (const match of matches) {
         if (!match[0]) continue;
 
@@ -355,21 +355,21 @@ export class MLSecretScanner extends EventEmitter {
           location: {
             line: lineNumber,
             column: match.index,
-            context: line.trim()
+            context: line.trim(),
           },
           secret: {
             value: this.redactSecret(match[0]),
             hash: crypto.createHash('sha256').update(match[0]).digest('hex'),
-            entropy: 0 // Will be calculated
+            entropy: 0, // Will be calculated
           },
           analysis: {
             patternMatch: true,
             entropyAnalysis: await this.analyzeEntropy(match[0]),
             contextualAnalysis: await this.analyzeContext(line, context),
-            mlScore: 0 // Will be calculated
+            mlScore: 0, // Will be calculated
           },
           mitigation: this.generateMitigation(pattern),
-          falsePositiveProbability: 0 // Will be calculated
+          falsePositiveProbability: 0, // Will be calculated
         };
 
         // Apply entropy filtering if required by pattern
@@ -399,7 +399,7 @@ export class MLSecretScanner extends EventEmitter {
       hasHighEntropy: entropy >= this.entropyThreshold,
       isRandomString: entropy >= 4.0 && this.isLikelyRandom(value),
       characterDistribution: charDistribution,
-      patterns
+      patterns,
     };
   }
 
@@ -408,7 +408,7 @@ export class MLSecretScanner extends EventEmitter {
    */
   private calculateShannonEntropy(str: string): number {
     const charCounts: Record<string, number> = {};
-    
+
     // Count character frequencies
     for (const char of str) {
       charCounts[char] = (charCounts[char] || 0) + 1;
@@ -417,7 +417,7 @@ export class MLSecretScanner extends EventEmitter {
     // Calculate entropy
     let entropy = 0;
     const length = str.length;
-    
+
     for (const count of Object.values(charCounts)) {
       const probability = count / length;
       entropy -= probability * Math.log2(probability);
@@ -435,7 +435,7 @@ export class MLSecretScanner extends EventEmitter {
       lowercase: 0,
       digits: 0,
       special: 0,
-      base64: 0 // Base64-like characters
+      base64: 0, // Base64-like characters
     };
 
     for (const char of str) {
@@ -454,7 +454,7 @@ export class MLSecretScanner extends EventEmitter {
       lowercase: distribution.lowercase / total,
       digits: distribution.digits / total,
       special: distribution.special / total,
-      base64: distribution.base64 / total
+      base64: distribution.base64 / total,
     };
   }
 
@@ -526,7 +526,7 @@ export class MLSecretScanner extends EventEmitter {
       suspiciousVariables,
       contextKeywords,
       fileContext: fileContext.filename || 'unknown',
-      codeStructure
+      codeStructure,
     };
   }
 
@@ -535,8 +535,18 @@ export class MLSecretScanner extends EventEmitter {
    */
   private isSuspiciousVariableName(name: string): boolean {
     const suspiciousPatterns = [
-      'key', 'secret', 'token', 'password', 'pass', 'pwd', 'auth',
-      'credential', 'cred', 'api_key', 'private_key', 'access_key'
+      'key',
+      'secret',
+      'token',
+      'password',
+      'pass',
+      'pwd',
+      'auth',
+      'credential',
+      'cred',
+      'api_key',
+      'private_key',
+      'access_key',
     ];
 
     return suspiciousPatterns.some(pattern => name.includes(pattern));
@@ -546,8 +556,8 @@ export class MLSecretScanner extends EventEmitter {
    * Enhance finding with ML analysis
    */
   private async enhanceWithMLAnalysis(
-    finding: MLSecretFinding, 
-    fullContent: string, 
+    finding: MLSecretFinding,
+    fullContent: string,
     context: any
   ): Promise<void> {
     // Calculate ML confidence score
@@ -558,11 +568,13 @@ export class MLSecretScanner extends EventEmitter {
     mlScore += patternScore;
 
     // Entropy analysis contribution
-    const entropyScore = Math.min(finding.analysis.entropyAnalysis.entropy / 6, 1) * this.entropyWeight;
+    const entropyScore =
+      Math.min(finding.analysis.entropyAnalysis.entropy / 6, 1) * this.entropyWeight;
     mlScore += entropyScore;
 
     // Contextual analysis contribution
-    const contextScore = this.calculateContextScore(finding.analysis.contextualAnalysis) * this.contextWeight;
+    const contextScore =
+      this.calculateContextScore(finding.analysis.contextualAnalysis) * this.contextWeight;
     mlScore += contextScore;
 
     // Apply contextual learning weights
@@ -595,10 +607,18 @@ export class MLSecretScanner extends EventEmitter {
 
     // Code structure affects confidence
     switch (contextAnalysis.codeStructure) {
-      case 'assignment': score += 0.3; break;
-      case 'configuration': score += 0.4; break;
-      case 'function_call': score += 0.1; break;
-      case 'comment': score -= 0.2; break; // Comments often have examples
+      case 'assignment':
+        score += 0.3;
+        break;
+      case 'configuration':
+        score += 0.4;
+        break;
+      case 'function_call':
+        score += 0.1;
+        break;
+      case 'comment':
+        score -= 0.2;
+        break; // Comments often have examples
     }
 
     // File context affects confidence
@@ -617,8 +637,10 @@ export class MLSecretScanner extends EventEmitter {
 
     // Check learned contextual patterns
     for (const [pattern, weight] of this.contextualLearning.entries()) {
-      if (context.toLowerCase().includes(pattern) || 
-          fileContext.filename?.toLowerCase().includes(pattern)) {
+      if (
+        context.toLowerCase().includes(pattern) ||
+        fileContext.filename?.toLowerCase().includes(pattern)
+      ) {
         multiplier *= weight;
       }
     }
@@ -664,7 +686,7 @@ export class MLSecretScanner extends EventEmitter {
     const baseRecommendations = [
       'Remove secret from source code',
       'Use environment variables for sensitive data',
-      'Implement secure credential management system'
+      'Implement secure credential management system',
     ];
 
     // Pattern-specific recommendations
@@ -674,13 +696,10 @@ export class MLSecretScanner extends EventEmitter {
       openai_api_key: ['Store in secure environment variables', 'Use service account patterns'],
       jwt_token: ['Use short-lived tokens', 'Implement token refresh mechanisms'],
       database_connection: ['Use connection pooling services', 'Encrypt connection strings'],
-      private_key: ['Use certificate management systems', 'Store in HSM or secure vault']
+      private_key: ['Use certificate management systems', 'Store in HSM or secure vault'],
     };
 
-    return [
-      ...baseRecommendations,
-      ...(specificRecommendations[pattern.name] || [])
-    ];
+    return [...baseRecommendations, ...(specificRecommendations[pattern.name] || [])];
   }
 
   /**
@@ -690,11 +709,11 @@ export class MLSecretScanner extends EventEmitter {
     if (secret.length <= 8) {
       return '[REDACTED]';
     }
-    
+
     const start = secret.substring(0, 4);
     const end = secret.substring(secret.length - 4);
     const middle = '*'.repeat(Math.min(secret.length - 8, 20));
-    
+
     return `${start}${middle}${end}`;
   }
 
@@ -707,24 +726,27 @@ export class MLSecretScanner extends EventEmitter {
         averageEntropy: 0,
         suspiciousPatternCount: 0,
         contextualHits: 0,
-        falsePositiveRate: 0
+        falsePositiveRate: 0,
       };
     }
 
     const averageEntropy = findings.reduce((sum, f) => sum + f.secret.entropy, 0) / findings.length;
-    const suspiciousPatternCount = findings.reduce((sum, f) => 
-      sum + f.analysis.entropyAnalysis.patterns.length, 0
+    const suspiciousPatternCount = findings.reduce(
+      (sum, f) => sum + f.analysis.entropyAnalysis.patterns.length,
+      0
     );
-    const contextualHits = findings.reduce((sum, f) => 
-      sum + f.analysis.contextualAnalysis.suspiciousVariables.length, 0
+    const contextualHits = findings.reduce(
+      (sum, f) => sum + f.analysis.contextualAnalysis.suspiciousVariables.length,
+      0
     );
-    const falsePositiveRate = findings.reduce((sum, f) => sum + f.falsePositiveProbability, 0) / findings.length;
+    const falsePositiveRate =
+      findings.reduce((sum, f) => sum + f.falsePositiveProbability, 0) / findings.length;
 
     return {
       averageEntropy,
       suspiciousPatternCount,
       contextualHits,
-      falsePositiveRate
+      falsePositiveRate,
     };
   }
 
@@ -758,7 +780,7 @@ export class MLSecretScanner extends EventEmitter {
       mlAnalysisOverhead: 0.25, // 25% overhead for ML analysis
       patternCount: this.secretPatterns.length,
       falsePositiveRate: 0.15, // Mock value
-      accuracy: 0.92 // Mock value
+      accuracy: 0.92, // Mock value
     };
   }
 }

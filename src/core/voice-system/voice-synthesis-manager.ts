@@ -517,14 +517,14 @@ export class VoiceSynthesisManager extends EventEmitter implements IVoiceSynthes
    */
   async shutdown(): Promise<void> {
     logger.info('Shutting down voice synthesis manager...');
-    
+
     // Clear any references
     this.voiceArchetypeSystem = null;
     this.processRequest = undefined;
-    
+
     // Remove all event listeners to prevent memory leaks
     this.removeAllListeners();
-    
+
     logger.info('Voice synthesis manager shutdown completed');
   }
 
@@ -533,14 +533,14 @@ export class VoiceSynthesisManager extends EventEmitter implements IVoiceSynthes
    */
   async destroy(): Promise<void> {
     logger.warn('Emergency cleanup of voice synthesis manager...');
-    
+
     // Force clear all references
     this.voiceArchetypeSystem = null;
     this.processRequest = undefined;
-    
+
     // Remove all event listeners to prevent memory leaks
     this.removeAllListeners();
-    
+
     logger.info('Voice synthesis manager destroyed');
   }
 }

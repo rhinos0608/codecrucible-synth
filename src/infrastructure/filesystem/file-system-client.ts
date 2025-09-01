@@ -1,7 +1,7 @@
 /**
  * Pure File System Infrastructure Client
  * Handles only file system operations and I/O
- * 
+ *
  * Architecture Compliance:
  * - Infrastructure layer: concrete implementation only
  * - No business logic for validation or security policies
@@ -123,10 +123,10 @@ export class FileSystemClient extends EventEmitter {
 
     try {
       await this.checkFileAccess(absolutePath, constants.R_OK);
-      
+
       const content = await fs.readFile(absolutePath, encoding);
       const stats = await fs.stat(absolutePath);
-      
+
       operation.success = true;
       operation.size = stats.size;
       this.recordOperation(operation);
@@ -151,11 +151,11 @@ export class FileSystemClient extends EventEmitter {
    */
   async readFileBuffer(filePath: string): Promise<Buffer> {
     const absolutePath = this.resolveAbsolutePath(filePath);
-    
+
     try {
       await this.checkFileAccess(absolutePath, constants.R_OK);
       const buffer = await fs.readFile(absolutePath);
-      
+
       this.emit('fileRead', {
         path: absolutePath,
         size: buffer.length,
@@ -172,7 +172,11 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Write file contents
    */
-  async writeFile(filePath: string, content: string | Buffer, encoding: BufferEncoding = 'utf8'): Promise<void> {
+  async writeFile(
+    filePath: string,
+    content: string | Buffer,
+    encoding: BufferEncoding = 'utf8'
+  ): Promise<void> {
     const absolutePath = this.resolveAbsolutePath(filePath);
     const operation: FileOperation = {
       type: 'write',
@@ -195,7 +199,7 @@ export class FileSystemClient extends EventEmitter {
       }
 
       await fs.writeFile(absolutePath, content, encoding);
-      
+
       operation.success = true;
       this.recordOperation(operation);
 
@@ -215,7 +219,11 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Append content to file
    */
-  async appendFile(filePath: string, content: string | Buffer, encoding: BufferEncoding = 'utf8'): Promise<void> {
+  async appendFile(
+    filePath: string,
+    content: string | Buffer,
+    encoding: BufferEncoding = 'utf8'
+  ): Promise<void> {
     const absolutePath = this.resolveAbsolutePath(filePath);
 
     try {
@@ -249,7 +257,7 @@ export class FileSystemClient extends EventEmitter {
     try {
       const stats = await fs.stat(absolutePath);
       await fs.unlink(absolutePath);
-      
+
       operation.success = true;
       operation.size = stats.size;
       this.recordOperation(operation);
@@ -286,7 +294,7 @@ export class FileSystemClient extends EventEmitter {
 
       const stats = await fs.stat(absoluteSource);
       await fs.copyFile(absoluteSource, absoluteTarget);
-      
+
       operation.success = true;
       operation.size = stats.size;
       this.recordOperation(operation);
@@ -324,7 +332,7 @@ export class FileSystemClient extends EventEmitter {
 
       const stats = await fs.stat(absoluteSource);
       await fs.rename(absoluteSource, absoluteTarget);
-      
+
       operation.success = true;
       operation.size = stats.size;
       this.recordOperation(operation);
@@ -468,7 +476,10 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Find files matching pattern
    */
-  async findFiles(pattern: string, options: { cwd?: string; maxResults?: number } = {}): Promise<string[]> {
+  async findFiles(
+    pattern: string,
+    options: { cwd?: string; maxResults?: number } = {}
+  ): Promise<string[]> {
     const searchPath = options.cwd ? this.resolveAbsolutePath(options.cwd) : this.config.rootPath;
 
     try {
@@ -476,11 +487,9 @@ export class FileSystemClient extends EventEmitter {
         cwd: searchPath,
         absolute: true,
       });
-      
+
       // Apply maxResults limit manually
-      const matches = options.maxResults 
-        ? allMatches.slice(0, options.maxResults)
-        : allMatches;
+      const matches = options.maxResults ? allMatches.slice(0, options.maxResults) : allMatches;
 
       this.emit('filesFound', {
         pattern,
@@ -500,7 +509,10 @@ export class FileSystemClient extends EventEmitter {
   /**
    * Create read stream for large files
    */
-  createReadStream(filePath: string, options?: { start?: number; end?: number }): NodeJS.ReadableStream {
+  createReadStream(
+    filePath: string,
+    options?: { start?: number; end?: number }
+  ): NodeJS.ReadableStream {
     const absolutePath = this.resolveAbsolutePath(filePath);
     return createReadStream(absolutePath, options);
   }
@@ -671,7 +683,7 @@ export class FileSystemClient extends EventEmitter {
 
   private async createFileMetadata(filePath: string, stats: Stats): Promise<FileMetadata> {
     const relativePath = relative(this.config.rootPath, filePath);
-    
+
     // Check permissions
     let readable = false;
     let writable = false;
@@ -712,7 +724,7 @@ export class FileSystemClient extends EventEmitter {
 
   private recordOperation(operation: FileOperation): void {
     this.operationHistory.push(operation);
-    
+
     // Keep only last 1000 operations to prevent memory leaks
     if (this.operationHistory.length > 1000) {
       this.operationHistory = this.operationHistory.slice(-1000);
@@ -721,7 +733,9 @@ export class FileSystemClient extends EventEmitter {
 }
 
 // Factory function for creating configured file system clients
-export function createFileSystemClient(config: Partial<FileSystemConfig> & { rootPath: string }): FileSystemClient {
+export function createFileSystemClient(
+  config: Partial<FileSystemConfig> & { rootPath: string }
+): FileSystemClient {
   const defaultConfig: FileSystemConfig = {
     rootPath: config.rootPath,
     maxFileSize: 100 * 1024 * 1024, // 100MB

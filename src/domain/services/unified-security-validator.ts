@@ -1,6 +1,6 @@
 /**
  * Unified Security Validator
- * 
+ *
  * Consolidates all security validation functionality from:
  * - /core/security.ts (SecurityUtils)
  * - /infrastructure/security/security-validator.ts (ISecurityValidator)
@@ -21,49 +21,49 @@ export interface UnifiedSecurityConfig {
   // Basic settings
   enabled: boolean;
   securityLevel: 'low' | 'medium' | 'high' | 'strict';
-  
+
   // Input validation
   maxInputLength: number;
   enableInputSanitization: boolean;
   enablePatternMatching: boolean;
-  
+
   // Sandbox settings
   enableSandbox: boolean;
   sandboxTimeout: number;
-  
+
   // Command validation
   allowedCommands: string[];
   blockedCommands: string[];
   allowedShells: string[];
-  
+
   // File system access
   allowedPaths: string[];
   restrictedPaths: string[];
   allowFileSystemWrite: boolean;
   allowFileSystemRead: boolean;
-  
+
   // Process control
   allowProcessSpawning: boolean;
   allowProcessKilling: boolean;
   maxProcesses: number;
-  
+
   // Network access
   allowNetworkAccess: boolean;
   allowedDomains: string[];
   blockedDomains: string[];
   allowedPorts: number[];
-  
+
   // Environment access
   allowEnvironmentAccess: boolean;
   allowEnvironmentModification: boolean;
   protectedEnvironmentVars: string[];
-  
+
   // Code execution
   allowedLanguages: string[];
   blockedLanguages: string[];
   allowCodeEvaluation: boolean;
   allowDynamicImports: boolean;
-  
+
   // Audit settings
   enableAuditLogging: boolean;
   auditLogPath?: string;
@@ -92,7 +92,7 @@ export interface SecurityViolation {
   suggestedFix?: string;
 }
 
-export type SecurityViolationType = 
+export type SecurityViolationType =
   | 'command_injection'
   | 'file_system_abuse'
   | 'privilege_escalation'
@@ -130,26 +130,44 @@ export interface SecurityValidationContext {
  */
 export interface IUnifiedSecurityValidator {
   // Core validation methods
-  validateInput(input: string, context: SecurityValidationContext): Promise<SecurityValidationResult>;
-  validateCommand(command: string, context: SecurityValidationContext): Promise<SecurityValidationResult>;
-  validateCode(code: string, language: string, context: SecurityValidationContext): Promise<SecurityValidationResult>;
-  validateFileOperation(operation: string, path: string, context: SecurityValidationContext): Promise<SecurityValidationResult>;
-  validateNetworkRequest(url: string, method: string, context: SecurityValidationContext): Promise<SecurityValidationResult>;
-  
+  validateInput(
+    input: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult>;
+  validateCommand(
+    command: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult>;
+  validateCode(
+    code: string,
+    language: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult>;
+  validateFileOperation(
+    operation: string,
+    path: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult>;
+  validateNetworkRequest(
+    url: string,
+    method: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult>;
+
   // Batch validation
   validateBatch(requests: SecurityValidationRequest[]): Promise<SecurityValidationResult[]>;
-  
+
   // Configuration management
   updateConfig(config: Partial<UnifiedSecurityConfig>): void;
   getConfig(): UnifiedSecurityConfig;
-  
+
   // Security analysis
   analyzeRisk(input: string, context: SecurityValidationContext): Promise<RiskAnalysis>;
   detectThreats(input: string): ThreatDetectionResult[];
-  
+
   // Sanitization
   sanitizeInput(input: string, options?: SanitizationOptions): string;
-  
+
   // Audit and logging
   logSecurityEvent(event: SecurityEvent): void;
   getSecurityMetrics(): SecurityMetrics;
@@ -334,8 +352,32 @@ const DEFAULT_SECURITY_CONFIG: UnifiedSecurityConfig = {
   enablePatternMatching: true,
   enableSandbox: true,
   sandboxTimeout: 30000,
-  allowedCommands: ['ls', 'cat', 'echo', 'pwd', 'grep', 'find', 'head', 'tail', 'wc', 'git', 'npm', 'node'],
-  blockedCommands: ['rm', 'rmdir', 'sudo', 'su', 'chmod', 'chown', 'mount', 'umount', 'kill', 'killall'],
+  allowedCommands: [
+    'ls',
+    'cat',
+    'echo',
+    'pwd',
+    'grep',
+    'find',
+    'head',
+    'tail',
+    'wc',
+    'git',
+    'npm',
+    'node',
+  ],
+  blockedCommands: [
+    'rm',
+    'rmdir',
+    'sudo',
+    'su',
+    'chmod',
+    'chown',
+    'mount',
+    'umount',
+    'kill',
+    'killall',
+  ],
   allowedShells: ['bash', 'sh', 'zsh'],
   allowedPaths: [process.cwd()],
   restrictedPaths: ['/etc', '/proc', '/sys', '/dev', '/root', '/boot'],
@@ -373,7 +415,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
   constructor(
     private logger: ILogger,
-    config?: Partial<UnifiedSecurityConfig>, 
+    config?: Partial<UnifiedSecurityConfig>,
     eventBus?: IEventBus
   ) {
     super();
@@ -404,7 +446,10 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     return this._isInitialized;
   }
 
-  async validateInput(input: string, context: SecurityValidationContext): Promise<SecurityValidationResult> {
+  async validateInput(
+    input: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult> {
     const startTime = Date.now();
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
@@ -441,10 +486,11 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
       // Determine overall risk level
       const riskLevel = this.calculateRiskLevel(violations);
-      
+
       // Create result
       const result: SecurityValidationResult = {
-        isValid: violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
+        isValid:
+          violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
         riskLevel,
         violations,
         recommendations,
@@ -473,24 +519,28 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
       this.updateMetrics(result, Date.now() - startTime);
       return result;
-
     } catch (error) {
       this.logger.error('Security validation error:', error);
       return {
         isValid: false,
         riskLevel: 'critical',
-        violations: [{
-          type: 'unknown_threat',
-          severity: 'critical',
-          message: 'Security validation failed due to internal error',
-        }],
+        violations: [
+          {
+            type: 'unknown_threat',
+            severity: 'critical',
+            message: 'Security validation failed due to internal error',
+          },
+        ],
         recommendations: ['Contact system administrator'],
         metadata: { error: String(error) },
       };
     }
   }
 
-  async validateCommand(command: string, context: SecurityValidationContext): Promise<SecurityValidationResult> {
+  async validateCommand(
+    command: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult> {
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
 
@@ -508,7 +558,10 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     }
 
     // Check allowed commands (if allowlist is used)
-    if (this.config.allowedCommands.length > 0 && !this.config.allowedCommands.includes(commandWord)) {
+    if (
+      this.config.allowedCommands.length > 0 &&
+      !this.config.allowedCommands.includes(commandWord)
+    ) {
       violations.push({
         type: 'blocked_command',
         severity: 'high',
@@ -523,7 +576,8 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     recommendations.push(...baseResult.recommendations);
 
     return {
-      isValid: violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
+      isValid:
+        violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
       riskLevel: this.calculateRiskLevel(violations),
       violations,
       recommendations,
@@ -531,7 +585,11 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     };
   }
 
-  async validateCode(code: string, language: string, context: SecurityValidationContext): Promise<SecurityValidationResult> {
+  async validateCode(
+    code: string,
+    language: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult> {
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
 
@@ -544,7 +602,10 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
       });
     }
 
-    if (this.config.allowedLanguages.length > 0 && !this.config.allowedLanguages.includes(language.toLowerCase())) {
+    if (
+      this.config.allowedLanguages.length > 0 &&
+      !this.config.allowedLanguages.includes(language.toLowerCase())
+    ) {
       violations.push({
         type: 'blocked_language',
         severity: 'high',
@@ -573,7 +634,8 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     recommendations.push(...baseResult.recommendations);
 
     return {
-      isValid: violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
+      isValid:
+        violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
       riskLevel: this.calculateRiskLevel(violations),
       violations,
       recommendations,
@@ -581,10 +643,14 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     };
   }
 
-  async validateFileOperation(operation: string, path: string, context: SecurityValidationContext): Promise<SecurityValidationResult> {
+  async validateFileOperation(
+    operation: string,
+    path: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult> {
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
-    
+
     const normalizedPath = this.normalizePath(path);
 
     // Check restricted paths
@@ -600,7 +666,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
     // Check allowed paths
     if (this.config.allowedPaths.length > 0) {
-      const isAllowed = this.config.allowedPaths.some(allowedPath => 
+      const isAllowed = this.config.allowedPaths.some(allowedPath =>
         normalizedPath.startsWith(allowedPath)
       );
       if (!isAllowed) {
@@ -630,7 +696,8 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     }
 
     return {
-      isValid: violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
+      isValid:
+        violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
       riskLevel: this.calculateRiskLevel(violations),
       violations,
       recommendations,
@@ -638,7 +705,11 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     };
   }
 
-  async validateNetworkRequest(url: string, method: string, context: SecurityValidationContext): Promise<SecurityValidationResult> {
+  async validateNetworkRequest(
+    url: string,
+    method: string,
+    context: SecurityValidationContext
+  ): Promise<SecurityValidationResult> {
     const violations: SecurityViolation[] = [];
     const recommendations: string[] = [];
 
@@ -652,7 +723,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
     try {
       const urlObj = new URL(url);
-      
+
       // Check blocked domains
       if (this.config.blockedDomains.includes(urlObj.hostname)) {
         violations.push({
@@ -663,7 +734,10 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
       }
 
       // Check allowed domains
-      if (this.config.allowedDomains.length > 0 && !this.config.allowedDomains.includes(urlObj.hostname)) {
+      if (
+        this.config.allowedDomains.length > 0 &&
+        !this.config.allowedDomains.includes(urlObj.hostname)
+      ) {
         violations.push({
           type: 'network_access_violation',
           severity: 'medium',
@@ -672,7 +746,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
       }
 
       // Check allowed ports
-      const port = urlObj.port ? parseInt(urlObj.port) : (urlObj.protocol === 'https:' ? 443 : 80);
+      const port = urlObj.port ? parseInt(urlObj.port) : urlObj.protocol === 'https:' ? 443 : 80;
       if (this.config.allowedPorts.length > 0 && !this.config.allowedPorts.includes(port)) {
         violations.push({
           type: 'network_access_violation',
@@ -680,7 +754,6 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
           message: `Port ${port} is not in allowed ports`,
         });
       }
-
     } catch (error) {
       violations.push({
         type: 'network_access_violation',
@@ -690,7 +763,8 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     }
 
     return {
-      isValid: violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
+      isValid:
+        violations.filter(v => v.severity === 'critical' || v.severity === 'high').length === 0,
       riskLevel: this.calculateRiskLevel(violations),
       violations,
       recommendations,
@@ -700,10 +774,10 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
   async validateBatch(requests: SecurityValidationRequest[]): Promise<SecurityValidationResult[]> {
     const results: SecurityValidationResult[] = [];
-    
+
     for (const request of requests) {
       let result: SecurityValidationResult;
-      
+
       switch (request.type) {
         case 'input':
           result = await this.validateInput(request.content, request.context);
@@ -712,26 +786,30 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
           result = await this.validateCommand(request.content, request.context);
           break;
         case 'code':
-          result = await this.validateCode(request.content, request.context.language || 'unknown', request.context);
+          result = await this.validateCode(
+            request.content,
+            request.context.language || 'unknown',
+            request.context
+          );
           break;
         default:
           result = await this.validateInput(request.content, request.context);
       }
-      
+
       results.push(result);
     }
-    
+
     return results;
   }
 
   updateConfig(config: Partial<UnifiedSecurityConfig>): void {
     this.config = { ...this.config, ...config };
     this.emit('configUpdated', this.config);
-    
+
     if (this.eventBus) {
       this.eventBus.emit('security:config-updated', { config: this.config });
     }
-    
+
     this.logger.info('Security configuration updated');
   }
 
@@ -751,7 +829,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
         description: threat.description,
         weight: threat.confidence,
       });
-      
+
       if (!threatCategories.includes(threat.threatType)) {
         threatCategories.push(threat.threatType);
       }
@@ -760,7 +838,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     // Calculate overall risk
     const totalWeight = riskFactors.reduce((sum, factor) => sum + factor.weight, 0);
     const averageWeight = totalWeight / (riskFactors.length || 1);
-    
+
     let overallRisk: 'none' | 'low' | 'medium' | 'high' | 'critical';
     if (averageWeight < 0.2) overallRisk = 'none';
     else if (averageWeight < 0.4) overallRisk = 'low';
@@ -821,7 +899,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
     if (options.escapeSpecialChars !== false) {
       // Escape special characters
-      sanitized = sanitized.replace(/[<>&"']/g, (char) => {
+      sanitized = sanitized.replace(/[<>&"']/g, char => {
         const escapes: Record<string, string> = {
           '<': '&lt;',
           '>': '&gt;',
@@ -844,7 +922,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
         /\$\(.*\)/g,
         /`.*`/g,
       ];
-      
+
       for (const pattern of dangerousPatterns) {
         sanitized = sanitized.replace(pattern, '[REMOVED_DANGEROUS_PATTERN]');
       }
@@ -869,10 +947,10 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     const logLevel = event.severity === 'critical' || event.severity === 'high' ? 'error' : 'warn';
     if (logLevel === 'error') {
       this.logger.error(`Security event: ${event.type}`, {
-      id: event.id,
-      severity: event.severity,
-      sessionId: event.context.sessionId,
-      operationType: event.context.operationType,
+        id: event.id,
+        severity: event.severity,
+        sessionId: event.context.sessionId,
+        operationType: event.context.operationType,
         violations: event.result.violations.length,
         riskLevel: event.result.riskLevel,
       });
@@ -889,10 +967,10 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
     // Emit events
     this.emit('securityEvent', event);
-    
+
     if (this.eventBus) {
       this.eventBus.emit('security:event', event);
-      
+
       if (event.severity === 'critical' && this.config.alertOnCriticalViolations) {
         this.eventBus.emit('security:critical-violation', event);
       }
@@ -929,7 +1007,9 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     // Add more threat definitions...
   }
 
-  private calculateRiskLevel(violations: SecurityViolation[]): 'none' | 'low' | 'medium' | 'high' | 'critical' {
+  private calculateRiskLevel(
+    violations: SecurityViolation[]
+  ): 'none' | 'low' | 'medium' | 'high' | 'critical' {
     if (violations.some(v => v.severity === 'critical')) return 'critical';
     if (violations.some(v => v.severity === 'high')) return 'high';
     if (violations.some(v => v.severity === 'medium')) return 'medium';
@@ -950,16 +1030,16 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
   private mapCategoryToThreatType(category: string): SecurityViolationType {
     const mapping: Record<string, SecurityViolationType> = {
-      'COMMAND_INJECTION': 'command_injection',
-      'FILE_SYSTEM_ABUSE': 'file_system_abuse',
-      'PRIVILEGE_ESCALATION': 'privilege_escalation',
-      'NETWORK_ACCESS': 'network_access_violation',
-      'PROCESS_MANIPULATION': 'process_manipulation',
-      'ENVIRONMENT_MANIPULATION': 'environment_manipulation',
-      'PYTHON_CODE_INJECTION': 'code_injection',
-      'JAVASCRIPT_CODE_INJECTION': 'code_injection',
+      COMMAND_INJECTION: 'command_injection',
+      FILE_SYSTEM_ABUSE: 'file_system_abuse',
+      PRIVILEGE_ESCALATION: 'privilege_escalation',
+      NETWORK_ACCESS: 'network_access_violation',
+      PROCESS_MANIPULATION: 'process_manipulation',
+      ENVIRONMENT_MANIPULATION: 'environment_manipulation',
+      PYTHON_CODE_INJECTION: 'code_injection',
+      JAVASCRIPT_CODE_INJECTION: 'code_injection',
     };
-    
+
     return mapping[category] || 'unknown_threat';
   }
 
@@ -968,13 +1048,13 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
     const baseConfidence = 0.7;
     const matchCount = matches.length;
     const patternComplexity = pattern.toString().length / 50; // Normalized complexity
-    
-    return Math.min(baseConfidence + (matchCount * 0.1) + (patternComplexity * 0.1), 1.0);
+
+    return Math.min(baseConfidence + matchCount * 0.1 + patternComplexity * 0.1, 1.0);
   }
 
   private validatePythonCode(code: string): SecurityViolation[] {
     const violations: SecurityViolation[] = [];
-    
+
     for (const pattern of SECURITY_THREAT_PATTERNS.PYTHON_CODE_INJECTION) {
       if (pattern.test(code)) {
         violations.push({
@@ -985,13 +1065,13 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
         });
       }
     }
-    
+
     return violations;
   }
 
   private validateJavaScriptCode(code: string): SecurityViolation[] {
     const violations: SecurityViolation[] = [];
-    
+
     for (const pattern of SECURITY_THREAT_PATTERNS.JAVASCRIPT_CODE_INJECTION) {
       if (pattern.test(code)) {
         violations.push({
@@ -1002,7 +1082,7 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
         });
       }
     }
-    
+
     return violations;
   }
 
@@ -1012,52 +1092,52 @@ export class UnifiedSecurityValidator extends EventEmitter implements IUnifiedSe
 
   private getSafeCommandAlternative(command: string): string {
     const alternatives: Record<string, string> = {
-      'rm': 'Use file management operations instead',
-      'sudo': 'Operations run in isolated environment',
-      'chmod': 'File permissions managed automatically',
-      'chown': 'File ownership managed automatically',
-      'mount': 'Filesystem managed automatically',
-      'kill': 'Process management not available',
+      rm: 'Use file management operations instead',
+      sudo: 'Operations run in isolated environment',
+      chmod: 'File permissions managed automatically',
+      chown: 'File ownership managed automatically',
+      mount: 'Filesystem managed automatically',
+      kill: 'Process management not available',
     };
-    
+
     return alternatives[command] || 'Use alternative approach';
   }
 
   private generateRiskRecommendations(riskFactors: RiskFactor[]): string[] {
     const recommendations: string[] = [];
-    
+
     if (riskFactors.some(f => f.category === 'command_injection')) {
       recommendations.push('Sanitize command inputs and use parameterized queries');
     }
-    
+
     if (riskFactors.some(f => f.category === 'file_system_abuse')) {
       recommendations.push('Restrict file system access and validate paths');
     }
-    
+
     if (riskFactors.some(f => f.category === 'privilege_escalation')) {
       recommendations.push('Run operations with minimal privileges');
     }
-    
+
     return recommendations;
   }
 
   private updateMetrics(result: SecurityValidationResult, validationTime: number): void {
     this.metrics.totalValidations++;
-    this.metrics.averageValidationTime = 
-      (this.metrics.averageValidationTime * (this.metrics.totalValidations - 1) + validationTime) / 
+    this.metrics.averageValidationTime =
+      (this.metrics.averageValidationTime * (this.metrics.totalValidations - 1) + validationTime) /
       this.metrics.totalValidations;
-    
+
     if (result.violations.length > 0) {
       this.metrics.violationsDetected++;
     }
-    
+
     if (result.riskLevel === 'critical' || result.riskLevel === 'high') {
       this.metrics.threatsBlocked++;
     }
-    
-    this.metrics.riskLevelDistribution[result.riskLevel] = 
+
+    this.metrics.riskLevelDistribution[result.riskLevel] =
       (this.metrics.riskLevelDistribution[result.riskLevel] || 0) + 1;
-    
+
     this.metrics.lastUpdated = new Date();
   }
 

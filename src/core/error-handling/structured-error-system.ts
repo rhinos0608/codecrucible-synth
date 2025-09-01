@@ -14,7 +14,16 @@ export interface ErrorDetails {
   code: string;
   message: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
-  category: 'user' | 'system' | 'network' | 'security' | 'validation' | 'authorization' | 'tool_execution' | 'configuration' | 'external_api';
+  category:
+    | 'user'
+    | 'system'
+    | 'network'
+    | 'security'
+    | 'validation'
+    | 'authorization'
+    | 'tool_execution'
+    | 'configuration'
+    | 'external_api';
   recoverable: boolean;
   suggestions?: string[];
 }
@@ -22,7 +31,16 @@ export interface ErrorDetails {
 export interface StructuredError extends Error {
   code: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
-  category: 'user' | 'system' | 'network' | 'security' | 'validation' | 'authorization' | 'tool_execution' | 'configuration' | 'external_api';
+  category:
+    | 'user'
+    | 'system'
+    | 'network'
+    | 'security'
+    | 'validation'
+    | 'authorization'
+    | 'tool_execution'
+    | 'configuration'
+    | 'external_api';
   context: ErrorContext;
   details: ErrorDetails;
   recoverable: boolean;
@@ -50,7 +68,11 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
   private maxHistorySize = 1000;
   private errorCounts = new Map<string, number>();
 
-  createError(details: ErrorDetails, context: ErrorContext, originalError?: Error): StructuredError {
+  createError(
+    details: ErrorDetails,
+    context: ErrorContext,
+    originalError?: Error
+  ): StructuredError {
     const structuredError = Object.assign(new Error(details.message), {
       code: details.code,
       severity: details.severity,
@@ -59,7 +81,7 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
       details,
       recoverable: details.recoverable,
       timestamp: Date.now(),
-      name: 'StructuredError'
+      name: 'StructuredError',
     }) as StructuredError;
 
     if (originalError) {
@@ -83,12 +105,12 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
           message: error.message,
           severity: 'medium',
           category: 'system',
-          recoverable: false
+          recoverable: false,
         },
         context || {
           operation: 'unknown',
           timestamp: Date.now(),
-          component: 'error-handler'
+          component: 'error-handler',
         },
         error
       );
@@ -99,7 +121,7 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
       stackTrace: structuredError.stack || 'No stack trace available',
       context: structuredError.context,
       suggestions: this.generateSuggestions(structuredError),
-      relatedErrors: this.findRelatedErrors(structuredError)
+      relatedErrors: this.findRelatedErrors(structuredError),
     };
 
     // Add to history
@@ -115,7 +137,7 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
   }
 
   async reportError(error: StructuredError): Promise<void> {
-    // In a real implementation, this would send to logging service, 
+    // In a real implementation, this would send to logging service,
     // monitoring service, etc.
     console.error('Structured Error Report:', {
       code: error.code,
@@ -123,7 +145,7 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
       category: error.category,
       message: error.message,
       context: error.context,
-      timestamp: new Date(error.timestamp).toISOString()
+      timestamp: new Date(error.timestamp).toISOString(),
     });
 
     // Could also send to external monitoring services
@@ -181,7 +203,7 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
       totalErrors: this.errorHistory.length,
       errorsByCategory,
       errorsBySeverity,
-      mostFrequentErrors
+      mostFrequentErrors,
     };
   }
 
@@ -195,7 +217,7 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
     return {
       success: false,
       error: error,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -203,7 +225,7 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
     return {
       success: true,
       data: data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -217,7 +239,11 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
 
     switch (error.category) {
       case 'network':
-        suggestions.push('Check network connectivity', 'Retry the operation', 'Verify server endpoints');
+        suggestions.push(
+          'Check network connectivity',
+          'Retry the operation',
+          'Verify server endpoints'
+        );
         break;
       case 'validation':
         suggestions.push('Check input format', 'Verify required fields', 'Review validation rules');
@@ -229,19 +255,36 @@ export class StructuredErrorSystem implements StructuredErrorSystemInterface {
         suggestions.push('Check user input', 'Verify user permissions', 'Review user workflow');
         break;
       case 'system':
-        suggestions.push('Check system resources', 'Review configuration', 'Check logs for more details');
+        suggestions.push(
+          'Check system resources',
+          'Review configuration',
+          'Check logs for more details'
+        );
         break;
       case 'authorization':
         suggestions.push('Check permissions', 'Verify authentication', 'Review access policies');
         break;
       case 'tool_execution':
-        suggestions.push('Check tool configuration', 'Verify tool availability', 'Review execution environment');
+        suggestions.push(
+          'Check tool configuration',
+          'Verify tool availability',
+          'Review execution environment'
+        );
         break;
       case 'configuration':
-        suggestions.push('Check configuration files', 'Verify environment variables', 'Review settings');
+        suggestions.push(
+          'Check configuration files',
+          'Verify environment variables',
+          'Review settings'
+        );
         break;
       case 'external_api':
-        suggestions.push('Check API connectivity', 'Verify API keys', 'Check rate limits', 'Retry request');
+        suggestions.push(
+          'Check API connectivity',
+          'Verify API keys',
+          'Check rate limits',
+          'Retry request'
+        );
         break;
     }
 
@@ -288,7 +331,16 @@ export const structuredErrorSystem = new StructuredErrorSystem();
 
 // Export type aliases for backward compatibility
 export type ErrorFactory = StructuredErrorSystem;
-export type ErrorCategory = 'user' | 'system' | 'network' | 'security' | 'validation' | 'authorization' | 'tool_execution' | 'configuration' | 'external_api';
+export type ErrorCategory =
+  | 'user'
+  | 'system'
+  | 'network'
+  | 'security'
+  | 'validation'
+  | 'authorization'
+  | 'tool_execution'
+  | 'configuration'
+  | 'external_api';
 export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 // Error category constants (for use as values)
@@ -301,7 +353,7 @@ export const ErrorCategory = {
   AUTHORIZATION: 'authorization' as const,
   TOOL_EXECUTION: 'tool_execution' as const,
   CONFIGURATION: 'configuration' as const,
-  EXTERNAL_API: 'external_api' as const
+  EXTERNAL_API: 'external_api' as const,
 } as const;
 
 // Error severity constants (for use as values)
@@ -309,7 +361,7 @@ export const ErrorSeverity = {
   LOW: 'low' as const,
   MEDIUM: 'medium' as const,
   HIGH: 'high' as const,
-  CRITICAL: 'critical' as const
+  CRITICAL: 'critical' as const,
 } as const;
 export type ServiceResponse<T = any> = {
   success: boolean;

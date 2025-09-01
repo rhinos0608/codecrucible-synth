@@ -1,28 +1,36 @@
 /**
  * Streaming Workflow Integration - Real-time AI Progress Display
- * 
- * Integrates StreamingManager with AgenticWorkflowDisplay to show 
+ *
+ * Integrates StreamingManager with AgenticWorkflowDisplay to show
  * users exactly what the AI is doing in real-time with progress indicators
  * and token-by-token generation visualization.
- * 
+ *
  * Features:
  * - Real-time token streaming progress
- * - Live response generation display  
+ * - Live response generation display
  * - Tool execution streaming
  * - Performance metrics integration
  * - User-friendly progress visualization
  */
 
 import { EventEmitter } from 'events';
-import { StreamingManager, StreamChunk, StreamConfig } from '../../infrastructure/streaming/streaming-manager.js';
+import {
+  StreamingManager,
+  StreamChunk,
+  StreamConfig,
+} from '../../infrastructure/streaming/streaming-manager.js';
 import { StreamToken } from '../../domain/types/core-types.js';
-import { AgenticWorkflowDisplay, WorkflowPhase, ProgressUpdate } from './agentic-workflow-display.js';
+import {
+  AgenticWorkflowDisplay,
+  WorkflowPhase,
+  ProgressUpdate,
+} from './agentic-workflow-display.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
 export interface StreamingWorkflowConfig extends StreamConfig {
   showTokens?: boolean;
   showProgress?: boolean;
-  updateInterval?: number;  // ms between progress updates
+  updateInterval?: number; // ms between progress updates
   maxDisplayTokens?: number; // limit tokens shown in real-time
 }
 
@@ -47,7 +55,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
   private progressIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(
-    streamingManager: StreamingManager, 
+    streamingManager: StreamingManager,
     workflowDisplay: AgenticWorkflowDisplay,
     config: StreamingWorkflowConfig = {}
   ) {
@@ -59,7 +67,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
       showProgress: true,
       updateInterval: 500,
       maxDisplayTokens: 100,
-      ...config
+      ...config,
     };
   }
 
@@ -73,11 +81,11 @@ export class StreamingWorkflowIntegration extends EventEmitter {
     operationType: string = 'AI Response Generation'
   ): Promise<string> {
     logger.info(`🌊 Starting streaming workflow for ${operationType}`);
-    
+
     const startTime = Date.now();
-    let tokensGenerated = 0;
-    let currentContent = '';
-    let lastUpdate = Date.now();
+    const tokensGenerated = 0;
+    const currentContent = '';
+    const lastUpdate = Date.now();
 
     // Initialize streaming progress tracking
     const streamProgress: StreamingProgress = {
@@ -87,7 +95,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
       estimatedTotal: this.estimateTokensNeeded(content),
       currentContent: '',
       throughput: 0,
-      elapsedTime: 0
+      elapsedTime: 0,
     };
 
     this.activeStreams.set(stepId, streamProgress);
@@ -113,40 +121,39 @@ export class StreamingWorkflowIntegration extends EventEmitter {
       // Complete the streaming workflow
       clearInterval(progressInterval);
       this.progressIntervals.delete(stepId);
-      
+
       const finalElapsed = Date.now() - startTime;
       const finalThroughput = tokensGenerated > 0 ? (tokensGenerated / finalElapsed) * 1000 : 0;
-      
+
       this.workflowDisplay.updateStepProgress(
-        sessionId, 
-        stepId, 
-        100, 
+        sessionId,
+        stepId,
+        100,
         `Complete: ${tokensGenerated} tokens in ${(finalElapsed / 1000).toFixed(1)}s (${finalThroughput.toFixed(1)} tok/s)`
       );
 
       this.activeStreams.delete(stepId);
-      
+
       logger.info(`✅ Streaming complete: ${tokensGenerated} tokens in ${finalElapsed}ms`);
-      
+
       this.emit('streamingComplete', {
         sessionId,
         stepId,
         tokensGenerated,
         duration: finalElapsed,
         throughput: finalThroughput,
-        result
+        result,
       });
 
       return result;
-
     } catch (error) {
       // Handle streaming errors
       clearInterval(progressInterval);
       this.progressIntervals.delete(stepId);
       this.activeStreams.delete(stepId);
-      
+
       logger.error(`❌ Streaming failed: ${(error as Error).message}`);
-      
+
       this.workflowDisplay.updateStepProgress(
         sessionId,
         stepId,
@@ -161,7 +168,11 @@ export class StreamingWorkflowIntegration extends EventEmitter {
   /**
    * Handle individual stream chunks and update progress
    */
-  private handleStreamChunk(chunk: StreamChunk, progress: StreamingProgress, startTime: number): void {
+  private handleStreamChunk(
+    chunk: StreamChunk,
+    progress: StreamingProgress,
+    startTime: number
+  ): void {
     const now = Date.now();
     progress.elapsedTime = now - startTime;
 
@@ -180,9 +191,12 @@ export class StreamingWorkflowIntegration extends EventEmitter {
         if (chunk.delta) {
           progress.currentContent += chunk.delta;
           progress.tokensGenerated += this.estimateTokensInDelta(chunk.delta);
-          
+
           // Show live content if enabled
-          if (this.config.showTokens && progress.currentContent.length <= this.config.maxDisplayTokens!) {
+          if (
+            this.config.showTokens &&
+            progress.currentContent.length <= this.config.maxDisplayTokens!
+          ) {
             console.log(chunk.delta, { end: '' }); // Real-time token display
           }
         }
@@ -196,7 +210,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
         this.workflowDisplay.updateStepProgress(
           progress.sessionId,
           progress.stepId,
-          progress.tokensGenerated / progress.estimatedTotal * 80,
+          (progress.tokensGenerated / progress.estimatedTotal) * 80,
           `Executing tool: ${chunk.toolName || 'unknown'}`
         );
         break;
@@ -227,7 +241,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
   private updateStreamingProgress(progress: StreamingProgress, startTime: number): void {
     const now = Date.now();
     progress.elapsedTime = now - startTime;
-    
+
     if (progress.elapsedTime > 0 && progress.tokensGenerated > 0) {
       progress.throughput = (progress.tokensGenerated / progress.elapsedTime) * 1000;
     }
@@ -239,9 +253,9 @@ export class StreamingWorkflowIntegration extends EventEmitter {
     );
 
     // Create progress message
-    const throughputText = progress.throughput > 0 ? 
-      ` (${progress.throughput.toFixed(1)} tok/s)` : '';
-    
+    const throughputText =
+      progress.throughput > 0 ? ` (${progress.throughput.toFixed(1)} tok/s)` : '';
+
     const message = `Generating: ${progress.tokensGenerated}/${progress.estimatedTotal} tokens${throughputText}`;
 
     this.workflowDisplay.updateStepProgress(
@@ -293,7 +307,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
       clearInterval(interval);
       this.progressIntervals.delete(stepId);
     }
-    
+
     this.activeStreams.delete(stepId);
     logger.info(`🛑 Stopped streaming for step: ${stepId}`);
   }
@@ -303,7 +317,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
    */
   updateConfig(config: Partial<StreamingWorkflowConfig>): void {
     this.config = { ...this.config, ...config };
-    
+
     // Update streaming manager config too
     if (config.chunkSize || config.bufferSize || config.timeout) {
       this.streamingManager.updateConfig(config);
@@ -319,13 +333,13 @@ export class StreamingWorkflowIntegration extends EventEmitter {
       clearInterval(interval);
       logger.debug(`🧹 Cleared progress interval for ${stepId}`);
     }
-    
+
     this.progressIntervals.clear();
     this.activeStreams.clear();
-    
+
     // Cleanup streaming manager
     await this.streamingManager.cleanup();
-    
+
     logger.info('🧹 Streaming workflow integration cleanup complete');
   }
 }

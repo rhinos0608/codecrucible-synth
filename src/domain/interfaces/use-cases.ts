@@ -1,6 +1,6 @@
 /**
  * Use Case Interfaces - Domain Layer
- * 
+ *
  * Defines contracts for application use cases following clean architecture principles.
  * These interfaces define business operations without implementation details.
  */
@@ -71,7 +71,7 @@ export interface GenerationResponse {
     files: Array<{
       path: string;
       content: string;
-      type: 'source' | 'test' | 'documentation' | 'config';
+      type: 'source' | 'test' | 'documentation' | 'config' | 'inline';
     }>;
     summary: string;
     changes?: string[];

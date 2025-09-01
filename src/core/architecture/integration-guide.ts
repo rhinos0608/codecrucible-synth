@@ -1,23 +1,23 @@
 /**
  * Integration Guide for Unified Architecture
- * 
+ *
  * PURPOSE: Provide code examples and guidance for integrating with the
  * unified dependency injection architecture and resource coordination system
- * 
- * ADDRESSES: 
+ *
+ * ADDRESSES:
  * - Developer onboarding with new architecture
  * - Migration patterns from legacy systems
  * - Best practices for service integration
  */
 
-import { 
+import {
   container,
   SERVICE_TOKENS,
   ServiceToken,
   ServiceRegistration,
   ServiceFactory,
   resolveService,
-  registerService
+  registerService,
 } from '../di/unified-dependency-container.js';
 
 import {
@@ -25,7 +25,7 @@ import {
   requestResource,
   releaseResource,
   ResourceAccessRequest,
-  ResourceLock
+  ResourceLock,
 } from '../coordination/resource-coordination-manager.js';
 
 import {
@@ -35,7 +35,7 @@ import {
   IModelSelectionService,
   IVoiceOrchestrationService,
   ServiceHealth,
-  ServiceMetrics
+  ServiceMetrics,
 } from '../contracts/service-contracts.js';
 
 import { logger } from '../logger.js';
@@ -55,39 +55,37 @@ export class MyCustomService implements IMyCustomService {
   readonly serviceName = 'MyCustomService';
   readonly version = '1.0.0';
   readonly category = 'domain';
-  
+
   private totalRequests = 0;
   private successfulRequests = 0;
   private startTime = Date.now();
-  
+
   // Injected dependencies
   private cacheService: ICacheService;
   private configService: IConfigurationService;
-  
-  constructor(
-    cacheService: ICacheService,
-    configService: IConfigurationService
-  ) {
+
+  constructor(cacheService: ICacheService, configService: IConfigurationService) {
     this.cacheService = cacheService;
     this.configService = configService;
   }
-  
+
   async initialize(): Promise<void> {
     logger.info('🚀 Initializing MyCustomService');
     // Initialization logic here
   }
-  
+
   async cleanup(): Promise<void> {
     logger.info('🧹 Cleaning up MyCustomService');
     // Cleanup logic here
   }
-  
+
   getHealth(): ServiceHealth {
     const uptime = Date.now() - this.startTime;
-    const errorRate = this.totalRequests > 0 
-      ? (this.totalRequests - this.successfulRequests) / this.totalRequests 
-      : 0;
-    
+    const errorRate =
+      this.totalRequests > 0
+        ? (this.totalRequests - this.successfulRequests) / this.totalRequests
+        : 0;
+
     return {
       status: errorRate < 0.1 ? 'healthy' : 'degraded',
       lastChecked: new Date(),
@@ -95,11 +93,11 @@ export class MyCustomService implements IMyCustomService {
       details: {
         totalRequests: this.totalRequests,
         successRate: this.successfulRequests / Math.max(this.totalRequests, 1),
-        errorRate
-      }
+        errorRate,
+      },
     };
   }
-  
+
   getMetrics(): ServiceMetrics {
     return {
       requestCount: this.totalRequests,
@@ -107,46 +105,45 @@ export class MyCustomService implements IMyCustomService {
       errorRate: (this.totalRequests - this.successfulRequests) / Math.max(this.totalRequests, 1),
       lastResetTime: new Date(this.startTime),
       customMetrics: {
-        processingSuccessRate: this.successfulRequests / Math.max(this.totalRequests, 1)
-      }
+        processingSuccessRate: this.successfulRequests / Math.max(this.totalRequests, 1),
+      },
     };
   }
-  
+
   async processRequest(data: any): Promise<any> {
     this.totalRequests++;
-    
+
     try {
       // Use cache service
       const cacheKey = `request_${JSON.stringify(data)}`;
       const cached = await this.cacheService.get(cacheKey);
-      
+
       if (cached) {
         this.successfulRequests++;
         return cached;
       }
-      
+
       // Process request
       const result = await this.doProcessing(data);
-      
+
       // Cache result
       await this.cacheService.set(cacheKey, result, { ttl: 300000 });
-      
+
       this.successfulRequests++;
       return result;
-      
     } catch (error) {
       logger.error('MyCustomService processing failed:', error);
       throw error;
     }
   }
-  
+
   getProcessingStats(): { totalRequests: number; successRate: number } {
     return {
       totalRequests: this.totalRequests,
-      successRate: this.successfulRequests / Math.max(this.totalRequests, 1)
+      successRate: this.successfulRequests / Math.max(this.totalRequests, 1),
     };
   }
-  
+
   private async doProcessing(data: any): Promise<any> {
     // Actual processing logic
     return { processed: data, timestamp: Date.now() };
@@ -157,12 +154,14 @@ export class MyCustomService implements IMyCustomService {
 export class MyCustomServiceFactory implements ServiceFactory<IMyCustomService> {
   async create(dependencies: Map<string, any>): Promise<IMyCustomService> {
     const cacheService = dependencies.get(SERVICE_TOKENS.CACHE_SERVICE.name) as ICacheService;
-    const configService = dependencies.get(SERVICE_TOKENS.CONFIG_SERVICE.name) as IConfigurationService;
-    
+    const configService = dependencies.get(
+      SERVICE_TOKENS.CONFIG_SERVICE.name
+    ) as IConfigurationService;
+
     if (!cacheService || !configService) {
       throw new Error('MyCustomService requires CacheService and ConfigService');
     }
-    
+
     return new MyCustomService(cacheService, configService);
   }
 }
@@ -180,10 +179,10 @@ export function registerMyCustomService(): void {
       description: 'Custom service demonstrating proper DI integration',
       category: 'domain',
       priority: 60,
-      healthCheckInterval: 45000
-    }
+      healthCheckInterval: 45000,
+    },
   };
-  
+
   registerService(registration);
 }
 
@@ -195,41 +194,42 @@ export class ApplicationController {
   private modelSelectionService: IModelSelectionService | null = null;
   private voiceOrchestrationService: IVoiceOrchestrationService | null = null;
   private customService: IMyCustomService | null = null;
-  
+
   async initialize(): Promise<void> {
     // Resolve services from DI container
     this.modelSelectionService = await resolveService(SERVICE_TOKENS.MODEL_SELECTION_SERVICE);
-    this.voiceOrchestrationService = await resolveService(SERVICE_TOKENS.VOICE_ORCHESTRATION_SERVICE);
+    this.voiceOrchestrationService = await resolveService(
+      SERVICE_TOKENS.VOICE_ORCHESTRATION_SERVICE
+    );
     this.customService = await resolveService(MY_CUSTOM_SERVICE_TOKEN);
-    
+
     logger.info('✅ ApplicationController initialized with all dependencies');
   }
-  
+
   async processUserRequest(request: any): Promise<any> {
     if (!this.modelSelectionService || !this.voiceOrchestrationService || !this.customService) {
       throw new Error('Services not initialized');
     }
-    
+
     try {
       // Use services through their interfaces
       const modelSelection = await this.modelSelectionService.selectModel({
         taskType: 'general',
-        requirements: { capabilities: ['text-generation'] }
+        requirements: { capabilities: ['text-generation'] },
       });
-      
+
       const voiceSelection = await this.voiceOrchestrationService.selectVoices({
         taskType: 'analysis',
-        requirements: { expertise: ['analysis'] }
+        requirements: { expertise: ['analysis'] },
       });
-      
+
       const customResult = await this.customService.processRequest(request);
-      
+
       return {
         model: modelSelection,
         voices: voiceSelection,
-        customProcessing: customResult
+        customProcessing: customResult,
       };
-      
     } catch (error) {
       logger.error('Request processing failed:', error);
       throw error;
@@ -245,26 +245,26 @@ export class ResourceAwareService implements IBaseService {
   readonly serviceName = 'ResourceAwareService';
   readonly version = '1.0.0';
   readonly category = 'infrastructure';
-  
+
   private startTime = Date.now();
-  
+
   getHealth(): ServiceHealth {
     return {
       status: 'healthy',
       lastChecked: new Date(),
-      uptime: Date.now() - this.startTime
+      uptime: Date.now() - this.startTime,
     };
   }
-  
+
   getMetrics(): ServiceMetrics {
     return {
       requestCount: 0,
       averageResponseTime: 0,
       errorRate: 0,
-      lastResetTime: new Date(this.startTime)
+      lastResetTime: new Date(this.startTime),
     };
   }
-  
+
   async performCacheOperation(data: any): Promise<any> {
     // Request access to cache resource
     const resourceRequest: ResourceAccessRequest = {
@@ -273,25 +273,23 @@ export class ResourceAwareService implements IBaseService {
       resourceId: 'unified_cache_memory',
       accessType: 'write',
       priority: 'user',
-      timeoutMs: 10000
+      timeoutMs: 10000,
     };
-    
+
     let resourceLock: ResourceLock | null = null;
-    
+
     try {
       // Acquire resource lock
       resourceLock = await requestResource(resourceRequest);
       logger.debug(`🔓 Acquired cache resource lock: ${resourceLock.id}`);
-      
+
       // Perform cache operation
       const result = await this.doCacheOperation(data);
-      
+
       return result;
-      
     } catch (error) {
       logger.error('Cache operation failed:', error);
       throw error;
-      
     } finally {
       // Always release resource lock
       if (resourceLock) {
@@ -300,7 +298,7 @@ export class ResourceAwareService implements IBaseService {
       }
     }
   }
-  
+
   private async doCacheOperation(data: any): Promise<any> {
     // Simulate cache operation
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -321,39 +319,41 @@ interface LegacyVoiceService {
 // Migration adapter that bridges legacy code to new architecture
 export class LegacyVoiceServiceAdapter implements LegacyVoiceService {
   private voiceOrchestrationService: IVoiceOrchestrationService | null = null;
-  
+
   async initialize(): Promise<void> {
     // Resolve new service through DI
-    this.voiceOrchestrationService = await resolveService(SERVICE_TOKENS.VOICE_ORCHESTRATION_SERVICE);
+    this.voiceOrchestrationService = await resolveService(
+      SERVICE_TOKENS.VOICE_ORCHESTRATION_SERVICE
+    );
   }
-  
+
   selectVoice(criteria: any): any {
     if (!this.voiceOrchestrationService) {
       throw new Error('Adapter not initialized');
     }
-    
+
     // Adapt legacy interface to new service interface
     return this.voiceOrchestrationService.selectVoices({
       taskType: criteria.taskType || 'general',
       requirements: {
         expertise: criteria.expertise || [],
-        complexity: criteria.complexity || 'medium'
-      }
+        complexity: criteria.complexity || 'medium',
+      },
     });
   }
-  
+
   async processWithVoice(voice: any, input: string): Promise<string> {
     if (!this.voiceOrchestrationService) {
       throw new Error('Adapter not initialized');
     }
-    
+
     // Adapt to new multi-voice interface
     const result = await this.voiceOrchestrationService.orchestrateMultiVoice({
       prompt: input,
       voices: [voice],
-      synthesisMode: 'sequential'
+      synthesisMode: 'sequential',
     });
-    
+
     return result.synthesis;
   }
 }
@@ -366,43 +366,43 @@ export class MockCacheService implements ICacheService {
   readonly serviceName = 'MockCacheService';
   readonly version = '1.0.0';
   readonly category = 'core';
-  
+
   private cache = new Map<string, any>();
   private startTime = Date.now();
-  
+
   getHealth(): ServiceHealth {
     return {
       status: 'healthy',
       lastChecked: new Date(),
-      uptime: Date.now() - this.startTime
+      uptime: Date.now() - this.startTime,
     };
   }
-  
+
   getMetrics(): ServiceMetrics {
     return {
       requestCount: this.cache.size,
       averageResponseTime: 1,
       errorRate: 0,
-      lastResetTime: new Date(this.startTime)
+      lastResetTime: new Date(this.startTime),
     };
   }
-  
+
   async get<T>(key: string): Promise<T | null> {
     return this.cache.get(key) || null;
   }
-  
+
   async set<T>(key: string, value: T): Promise<void> {
     this.cache.set(key, value);
   }
-  
+
   async delete(key: string): Promise<boolean> {
     return this.cache.delete(key);
   }
-  
+
   async clear(): Promise<void> {
     this.cache.clear();
   }
-  
+
   async getMultiple<T>(keys: string[]): Promise<Map<string, T>> {
     const result = new Map<string, T>();
     for (const key of keys) {
@@ -413,22 +413,22 @@ export class MockCacheService implements ICacheService {
     }
     return result;
   }
-  
+
   async setMultiple<T>(entries: Map<string, T>): Promise<void> {
     for (const [key, value] of entries) {
       this.cache.set(key, value);
     }
   }
-  
+
   getCacheStats() {
     return {
       size: this.cache.size,
       hitRate: 0.85,
       memoryUsage: this.cache.size * 100,
-      evictionCount: 0
+      evictionCount: 0,
     };
   }
-  
+
   async evictExpired(): Promise<number> {
     return 0;
   }
@@ -440,9 +440,9 @@ export async function setupTestEnvironment(): Promise<void> {
   const mockCacheFactory: ServiceFactory<ICacheService> = {
     async create(): Promise<ICacheService> {
       return new MockCacheService();
-    }
+    },
   };
-  
+
   const mockRegistration: ServiceRegistration<ICacheService> = {
     token: SERVICE_TOKENS.CACHE_SERVICE,
     factory: mockCacheFactory,
@@ -451,10 +451,10 @@ export async function setupTestEnvironment(): Promise<void> {
     metadata: {
       description: 'Mock cache service for testing',
       category: 'core',
-      priority: 100
-    }
+      priority: 100,
+    },
   };
-  
+
   registerService(mockRegistration);
 }
 
@@ -468,40 +468,40 @@ export const INTEGRATION_BEST_PRACTICES = {
     'Implement health checks that reflect actual service state',
     'Use dependency injection instead of direct imports',
     'Make services stateless where possible',
-    'Use async/await for all service operations'
+    'Use async/await for all service operations',
   ],
-  
+
   resourceManagement: [
     'Always acquire resource locks before accessing shared resources',
     'Use try/finally blocks to ensure resource locks are released',
     'Set appropriate timeouts for resource requests',
     'Monitor resource contention and optimize accordingly',
-    'Use priority levels to ensure critical operations get resources first'
+    'Use priority levels to ensure critical operations get resources first',
   ],
-  
+
   errorHandling: [
     'Let the unified error service handle error recovery',
     'Provide meaningful error context in service methods',
     'Use structured errors with appropriate severity levels',
     'Implement graceful degradation for non-critical failures',
-    'Monitor error rates through service health metrics'
+    'Monitor error rates through service health metrics',
   ],
-  
+
   testing: [
     'Use mock services that implement proper contracts',
     'Test service initialization and cleanup lifecycle',
     'Validate dependency injection configuration',
     'Test resource coordination under contention scenarios',
-    'Verify service health and metrics accuracy'
+    'Verify service health and metrics accuracy',
   ],
-  
+
   migration: [
     'Create adapter classes to bridge legacy interfaces',
     'Migrate services incrementally rather than all at once',
     'Maintain backward compatibility during migration',
     'Use feature flags to control new architecture adoption',
-    'Monitor performance during migration to catch regressions'
-  ]
+    'Monitor performance during migration to catch regressions',
+  ],
 } as const;
 
 /**
@@ -517,9 +517,9 @@ export async function createServiceWithExternalAPI(): Promise<void> {
     resourceId: 'external_api',
     accessType: 'read',
     priority: 'user',
-    timeoutMs: 15000
+    timeoutMs: 15000,
   };
-  
+
   const lock = await requestResource(apiRequest);
   try {
     // Make API call
@@ -535,19 +535,19 @@ export async function serviceWithCaching<T>(
   ttlMs = 300000
 ): Promise<T> {
   const cacheService = await resolveService(SERVICE_TOKENS.CACHE_SERVICE);
-  
+
   // Try cache first
-  const cached = await cacheService.get(cacheKey) as T | null;
+  const cached = (await cacheService.get(cacheKey)) as T | null;
   if (cached !== null) {
     return cached;
   }
-  
+
   // Fetch data
   const data = await dataFetcher();
-  
+
   // Cache result
   await cacheService.set(cacheKey, data, { ttl: ttlMs });
-  
+
   return data;
 }
 
@@ -555,11 +555,11 @@ export async function serviceWithCaching<T>(
 export function monitorServiceHealth(service: IBaseService): void {
   setInterval(() => {
     const health = service.getHealth();
-    
+
     if (health.status !== 'healthy') {
       logger.warn(`⚠️ Service health issue: ${service.serviceName}`, {
         status: health.status,
-        details: health.details
+        details: health.details,
       });
     }
   }, 30000);
@@ -574,14 +574,14 @@ export default {
     ApplicationController,
     ResourceAwareService,
     LegacyVoiceServiceAdapter,
-    MockCacheService
+    MockCacheService,
   },
   patterns: {
     serviceWithCaching,
     monitorServiceHealth,
-    createServiceWithExternalAPI
+    createServiceWithExternalAPI,
   },
   testing: {
-    setupTestEnvironment
-  }
+    setupTestEnvironment,
+  },
 };

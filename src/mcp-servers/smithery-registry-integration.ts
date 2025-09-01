@@ -35,14 +35,14 @@ export interface SmitheryServer {
 
 /**
  * SmitheryRegistryIntegration - External MCP Server Discovery Engine
- * 
+ *
  * Following Living Spiral Methodology - Council Perspectives Applied:
  * - **Explorer**: Discovers new MCP servers and capabilities from the Smithery ecosystem
  * - **Integration Engineer**: Seamlessly connects external tools with internal systems
  * - **Security Guardian**: Validates external servers and implements secure authentication
  * - **Performance Engineer**: Optimizes discovery with intelligent caching and retry strategies
  * - **Reliability Engineer**: Ensures robust connection handling and graceful degradation
- * 
+ *
  * **Core Integration Capabilities:**
  * - **Server Discovery**: Automatic discovery of 10+ external MCP servers via Smithery.ai registry
  * - **Bearer Authentication**: Secure API key-based authentication with the Smithery registry
@@ -50,28 +50,28 @@ export interface SmitheryServer {
  * - **Retry Strategies**: Exponential backoff retry logic for resilient network connectivity
  * - **Tool Enumeration**: Comprehensive tool discovery and schema validation for external servers
  * - **Health Monitoring**: Connection health checks and automatic failover capabilities
- * 
+ *
  * **Smithery Registry Features:**
  * - **Centralized Discovery**: Access to curated MCP server registry with community tools
  * - **Usage Analytics**: Server popularity and reliability metrics for intelligent selection
  * - **Schema Validation**: Automatic tool schema discovery and validation
  * - **Version Management**: Support for multiple server versions and compatibility checking
  * - **Community Ecosystem**: Access to community-contributed tools and integrations
- * 
+ *
  * **Performance Characteristics:**
  * - **Discovery Time**: <2 seconds for registry query with 10+ servers
  * - **Cache Efficiency**: 95% cache hit rate for repeated server lookups
  * - **Connection Resilience**: Automatic retry with exponential backoff (1s → 5s → 25s)
  * - **Memory Footprint**: <5MB for cached server metadata
  * - **Concurrent Connections**: Support for parallel server discovery and validation
- * 
+ *
  * **Retry Strategy Configuration:**
  * - **Initial Interval**: 1000ms (configurable)
  * - **Max Interval**: 5000ms with exponential backoff
  * - **Backoff Exponent**: 1.5x multiplier per retry
  * - **Max Elapsed Time**: 30 second total timeout
  * - **Connection Error Retry**: Automatic retry on network failures
- * 
+ *
  * @example Basic Integration Setup
  * ```typescript
  * const smitheryIntegration = new SmitheryRegistryIntegration({
@@ -87,39 +87,39 @@ export interface SmitheryServer {
  *     retryConnectionErrors: true
  *   }
  * });
- * 
+ *
  * // Discover available MCP servers
  * const servers = await smitheryIntegration.discoverServers();
  * console.log(`Found ${servers.length} MCP servers`);
- * 
+ *
  * // Get specific server details
  * const weatherServer = await smitheryIntegration.getServer('weather-tools');
  * console.log(`Weather server has ${weatherServer.tools.length} tools`);
  * ```
- * 
+ *
  * @example Advanced Server Discovery with Filtering
  * ```typescript
  * const integration = new SmitheryRegistryIntegration({ apiKey: apiKey });
- * 
+ *
  * // Discover servers with specific capabilities
  * const servers = await integration.discoverServers({
  *   categories: ['productivity', 'development'],
  *   minUseCount: 100,
  *   hasTools: ['file_operations', 'git_integration']
  * });
- * 
+ *
  * // Filter by tool requirements
  * const developmentServers = servers.filter(server =>
  *   server.tools.some(tool => tool.name.includes('code') || tool.name.includes('git'))
  * );
- * 
+ *
  * console.log(`Found ${developmentServers.length} development-focused servers`);
  * ```
- * 
+ *
  * @example Connection Health Monitoring
  * ```typescript
  * const integration = new SmitheryRegistryIntegration({ apiKey: apiKey });
- * 
+ *
  * // Monitor server health and connectivity
  * const healthCheck = await integration.checkServerHealth('file-manager');
  * if (healthCheck.healthy) {
@@ -127,38 +127,38 @@ export interface SmitheryServer {
  * } else {
  *   console.log(`Server unavailable: ${healthCheck.error}`);
  * }
- * 
+ *
  * // Get cached server info with freshness check
  * const serverInfo = await integration.getServerWithHealthCheck('file-manager');
  * if (serverInfo.cacheAge > 300000) { // 5 minutes
  *   console.log('Server info may be stale, consider refresh');
  * }
  * ```
- * 
+ *
  * **Security Considerations:**
  * - **API Key Protection**: Secure storage and transmission of Smithery API keys
  * - **Server Validation**: Validation of external server certificates and endpoints
  * - **Tool Schema Verification**: Validation of tool schemas before integration
  * - **Rate Limiting**: Built-in rate limiting to prevent API abuse
  * - **Error Sanitization**: Careful error message sanitization to prevent data leaks
- * 
+ *
  * **Error Handling:**
  * - **Network Failures**: Automatic retry with exponential backoff
  * - **Authentication Errors**: Clear error messages for API key issues
  * - **Rate Limiting**: Graceful handling of API rate limits with retry delays
  * - **Server Unavailability**: Fallback to cached data when servers are unreachable
  * - **Schema Validation Errors**: Detailed error reporting for tool schema issues
- * 
+ *
  * **Integration Architecture:**
  * - **Registry Client**: Smithery SDK integration with bearer authentication
  * - **Cache Layer**: Intelligent caching with TTL and freshness validation
  * - **Retry Engine**: Configurable retry strategies with circuit breaker patterns
  * - **Health Monitor**: Continuous health checking with degraded service detection
  * - **Tool Validator**: Schema validation and compatibility checking for external tools
- * 
+ *
  * @since 3.0.0
  * @external SmitheryRegistry
- * 
+ *
  * @example Production Configuration
  * ```typescript
  * const productionConfig = {
@@ -174,9 +174,9 @@ export interface SmitheryServer {
  *     retryConnectionErrors: true
  *   }
  * };
- * 
+ *
  * const integration = new SmitheryRegistryIntegration(productionConfig);
- * 
+ *
  * // Production-grade error handling
  * try {
  *   const servers = await integration.discoverServers();
@@ -192,11 +192,11 @@ export interface SmitheryServer {
 export class SmitheryRegistryIntegration {
   /** Smithery registry client with bearer authentication and retry configuration */
   private registry: SmitheryRegistry;
-  
+
   /** Configuration for API authentication and retry behavior */
   private config: SmitheryConfig;
-  
-  /** 
+
+  /**
    * Intelligent cache for server metadata to reduce API calls
    * Key: server qualified name, Value: server details with metadata
    */
@@ -204,22 +204,22 @@ export class SmitheryRegistryIntegration {
 
   /**
    * Creates a new SmitheryRegistryIntegration instance
-   * 
+   *
    * Initializes the Smithery registry client with:
    * - Bearer token authentication for secure API access
    * - Configurable retry strategies with exponential backoff
    * - Intelligent caching system for performance optimization
    * - Connection health monitoring and circuit breaker patterns
-   * 
+   *
    * The integration automatically discovers and caches available MCP servers
    * from the Smithery registry, providing seamless access to external tools
    * and capabilities while maintaining security and reliability standards.
-   * 
+   *
    * @param config - Smithery configuration with API key and retry settings
-   * 
+   *
    * @throws {Error} When API key is missing or invalid
    * @throws {NetworkError} When unable to connect to Smithery registry
-   * 
+   *
    * @example
    * ```typescript
    * const integration = new SmitheryRegistryIntegration({

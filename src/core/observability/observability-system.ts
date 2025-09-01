@@ -649,7 +649,7 @@ export class ObservabilitySystem extends EventEmitter {
   private startSystemMonitoring(): void {
     // Monitor system metrics every 30 seconds
     const metricsInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       if (!this.isRunning) return;
 
       this.collectSystemMetrics();

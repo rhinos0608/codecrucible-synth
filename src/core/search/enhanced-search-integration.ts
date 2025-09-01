@@ -330,7 +330,10 @@ export class SmartCodeAnalysisTool extends BaseTool {
     }
   }
 
-  private async analyzeFunctions(targetName?: string, language?: string): Promise<Record<string, unknown>> {
+  private async analyzeFunctions(
+    targetName?: string,
+    language?: string
+  ): Promise<Record<string, unknown>> {
     const query = targetName ?? '[a-zA-Z_][a-zA-Z0-9_]*';
     const pattern = CodePatternGenerator.generateFunctionPattern(query, language);
 
@@ -353,7 +356,10 @@ export class SmartCodeAnalysisTool extends BaseTool {
     };
   }
 
-  private async analyzeClasses(targetName?: string, language?: string): Promise<Record<string, unknown>> {
+  private async analyzeClasses(
+    targetName?: string,
+    language?: string
+  ): Promise<Record<string, unknown>> {
     const query = targetName ?? '[A-Z][a-zA-Z0-9_]*';
     const pattern = CodePatternGenerator.generateClassPattern(query, language);
 
@@ -376,7 +382,10 @@ export class SmartCodeAnalysisTool extends BaseTool {
     };
   }
 
-  private async analyzeImports(targetName?: string, language?: string): Promise<Record<string, unknown>> {
+  private async analyzeImports(
+    targetName?: string,
+    language?: string
+  ): Promise<Record<string, unknown>> {
     const query = targetName ?? '\\w+';
     const pattern = CodePatternGenerator.generateImportPattern(query, language);
 
@@ -489,7 +498,7 @@ export class SmartCodeAnalysisTool extends BaseTool {
     };
 
     const filesToCheck = language
-      ? packageFiles[language] ?? []
+      ? (packageFiles[language] ?? [])
       : Object.values(packageFiles).flat();
 
     const results = await this.searchEngine.searchFiles(
@@ -612,7 +621,7 @@ export class SmartCodeAnalysisTool extends BaseTool {
       go: ['go'],
     };
 
-    return language ? extensions[language] ?? [] : [];
+    return language ? (extensions[language] ?? []) : [];
   }
 
   private getDependencyFileType(filename: string): string {

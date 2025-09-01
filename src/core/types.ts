@@ -1,9 +1,9 @@
 /**
  * Legacy Core Types - Compatibility Stub
- * 
+ *
  * This is a minimal stub to maintain backward compatibility
  * during the architectural migration.
- * 
+ *
  * @deprecated These types have been moved to domain/types
  */
 
@@ -78,8 +78,12 @@ export enum CLIExitCode {
   TimeoutError = 8,
   InternalError = 9,
   AUTHENTICATION_REQUIRED = 10,
-  AUTHENTICATION_FAILED = 11
+  AUTHENTICATION_FAILED = 11,
 }
 
 // Re-export from domain types for compatibility
-export type { UnifiedConfiguration, ModelRequest, ModelResponse } from '../domain/types/unified-types.js';
+export type {
+  UnifiedConfiguration,
+  ModelRequest,
+  ModelResponse,
+} from '../domain/types/unified-types.js';

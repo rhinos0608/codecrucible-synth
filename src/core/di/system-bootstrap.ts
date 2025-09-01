@@ -103,7 +103,9 @@ export class SystemBootstrap {
 
       // Execute optimized startup
       const startupResult = await startupOptimizer.executeOptimizedStartup();
-      logger.info(`🚀 Startup optimization completed: ${startupResult.successCount}/${startupResult.totalTime}ms`);
+      logger.info(
+        `🚀 Startup optimization completed: ${startupResult.successCount}/${startupResult.totalTime}ms`
+      );
 
       // Phase 1: Core infrastructure (no dependencies)
       await this.initializeCoreInfrastructure();
@@ -146,14 +148,14 @@ export class SystemBootstrap {
       const initializationTime = Date.now() - this.initializationStartTime;
 
       logger.info(`✅ System bootstrap completed in ${initializationTime}ms`);
-      
+
       // Mark as successfully bootstrapped
       this.isBootstrapped = true;
-      
+
       // Generate startup performance report
       const startupAnalytics = startupOptimizer.getStartupAnalytics();
       const recommendations = startupOptimizer.getOptimizationRecommendations();
-      
+
       if (recommendations.length > 0) {
         logger.info('📊 Startup optimization recommendations:');
         recommendations.forEach((rec: string) => logger.info(`   - ${rec}`));
@@ -258,7 +260,9 @@ export class SystemBootstrap {
     this.container.register(
       SECURITY_VALIDATOR_TOKEN,
       async container => {
-        const { SecurityValidator } = await import('../../infrastructure/security/security-validator.js');
+        const { SecurityValidator } = await import(
+          '../../infrastructure/security/security-validator.js'
+        );
         const config = container.resolve(CLIENT_CONFIG_TOKEN);
         return new SecurityValidator(config.security);
       },
@@ -391,7 +395,9 @@ export class SystemBootstrap {
       CLIENT_TOKEN,
       async container => {
         // Import client class dynamically to avoid circular imports
-        const { UnifiedModelClient } = await import('../../application/services/unified-model-client.js');
+        const { UnifiedModelClient } = await import(
+          '../../application/services/unified-model-client.js'
+        );
 
         // Resolve all dependencies (await async ones properly)
         const config = container.resolve(CLIENT_CONFIG_TOKEN);
@@ -502,14 +508,14 @@ export class SystemBootstrap {
       name: 'core_infrastructure',
       priority: 'critical',
       timeout: 5000,
-      task: async () => await this.initializeCoreInfrastructure()
+      task: async () => await this.initializeCoreInfrastructure(),
     });
 
     startupOptimizer.registerTask({
       name: 'configuration',
       priority: 'critical',
       timeout: 5000,
-      task: async () => await this.initializeConfiguration()
+      task: async () => await this.initializeConfiguration(),
     });
 
     // High priority parallel tasks
@@ -517,21 +523,21 @@ export class SystemBootstrap {
       name: 'security_services',
       priority: 'high',
       timeout: 10000,
-      task: async () => await this.initializeSecurity()
+      task: async () => await this.initializeSecurity(),
     });
 
     startupOptimizer.registerTask({
       name: 'cache_services',
       priority: 'high',
       timeout: 10000,
-      task: async () => await this.initializeCache()
+      task: async () => await this.initializeCache(),
     });
 
     startupOptimizer.registerTask({
       name: 'monitoring_services',
       priority: 'high',
       timeout: 10000,
-      task: async () => await this.initializeMonitoring()
+      task: async () => await this.initializeMonitoring(),
     });
 
     // Medium priority tasks
@@ -539,21 +545,21 @@ export class SystemBootstrap {
       name: 'provider_services',
       priority: 'medium',
       timeout: 15000,
-      task: async () => await this.initializeProviders()
+      task: async () => await this.initializeProviders(),
     });
 
     startupOptimizer.registerTask({
       name: 'routing_services',
       priority: 'medium',
       timeout: 15000,
-      task: async () => await this.initializeRouting()
+      task: async () => await this.initializeRouting(),
     });
 
     startupOptimizer.registerTask({
       name: 'streaming_services',
       priority: 'medium',
       timeout: 15000,
-      task: async () => await this.initializeStreaming()
+      task: async () => await this.initializeStreaming(),
     });
 
     // Low priority (can fail without blocking)
@@ -561,14 +567,14 @@ export class SystemBootstrap {
       name: 'client_initialization',
       priority: 'low',
       timeout: 20000,
-      task: async () => await this.initializeClient()
+      task: async () => await this.initializeClient(),
     });
 
     startupOptimizer.registerTask({
       name: 'synthesis_coordinator',
       priority: 'low',
       timeout: 20000,
-      task: async () => await this.initializeSynthesisCoordinator()
+      task: async () => await this.initializeSynthesisCoordinator(),
     });
   }
 

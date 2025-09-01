@@ -20,10 +20,10 @@ import { resourceManager } from '../../infrastructure/performance/resource-clean
 
 // Core error types
 export enum ErrorSeverity {
-  LOW = 'low',          // Recoverable, continue with degraded performance
-  MEDIUM = 'medium',    // Significant issue, attempt fallback
-  HIGH = 'high',        // Critical failure, immediate fallback required
-  CRITICAL = 'critical' // System failure, emergency fallback only
+  LOW = 'low', // Recoverable, continue with degraded performance
+  MEDIUM = 'medium', // Significant issue, attempt fallback
+  HIGH = 'high', // Critical failure, immediate fallback required
+  CRITICAL = 'critical', // System failure, emergency fallback only
 }
 
 export enum ErrorCategory {
@@ -35,29 +35,29 @@ export enum ErrorCategory {
   DISK_IO_ERROR = 'disk_io_error',
   PROCESS_ERROR = 'process_error',
   NETWORK_ERROR = 'network_error',
-  
+
   // Application errors
   VALIDATION_ERROR = 'validation_error',
   AUTHENTICATION_ERROR = 'authentication_error',
   AUTHORIZATION_ERROR = 'authorization_error',
   CONFIGURATION_ERROR = 'configuration_error',
   PARSING_ERROR = 'parsing_error',
-  
+
   // Business logic errors
   INVALID_INPUT = 'invalid_input',
   INVALID_PATTERN = 'invalid_pattern',
   RESOURCE_NOT_FOUND = 'resource_not_found',
   OPERATION_FAILED = 'operation_failed',
   CONCURRENT_MODIFICATION = 'concurrent_modification',
-  
+
   // Service errors
   SERVICE_UNAVAILABLE = 'service_unavailable',
   RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
   CIRCUIT_BREAKER_OPEN = 'circuit_breaker_open',
   DEPENDENCY_FAILURE = 'dependency_failure',
-  
+
   // Unknown
-  UNKNOWN = 'unknown'
+  UNKNOWN = 'unknown',
 }
 
 export interface ErrorContext {
@@ -65,29 +65,29 @@ export interface ErrorContext {
   requestId?: string;
   sessionId?: string;
   userId?: string;
-  
+
   // Operation context
   operation?: string;
   service?: string;
   resource?: string;
   method?: string;
-  
+
   // Network context
   ipAddress?: string;
   userAgent?: string;
   endpoint?: string;
-  
+
   // Runtime context
   attempt?: number;
   maxAttempts?: number;
   startTime?: number;
   fallbacksUsed?: string[];
-  
+
   // Platform context
   platform?: string;
   shell?: string;
   environment?: Record<string, any>;
-  
+
   // Additional metadata
   metadata?: Record<string, any>;
 }
@@ -126,7 +126,7 @@ export class StructuredError extends Error {
   ) {
     super(message);
     this.name = 'StructuredError';
-    
+
     this.id = `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     this.category = category;
     this.severity = severity;
@@ -163,7 +163,7 @@ export class StructuredError extends Error {
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
       const char = key.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(36);
@@ -179,11 +179,13 @@ export class StructuredError extends Error {
       context: this.context,
       metadata: this.metadata,
       isRetryable: this.isRetryable,
-      originalError: this.originalError ? {
-        name: this.originalError.name,
-        message: this.originalError.message,
-        stack: this.originalError.stack,
-      } : undefined,
+      originalError: this.originalError
+        ? {
+            name: this.originalError.name,
+            message: this.originalError.message,
+            stack: this.originalError.stack,
+          }
+        : undefined,
     };
   }
 }
@@ -269,18 +271,18 @@ export interface UnifiedErrorConfig {
 export class UnifiedErrorService extends EventEmitter {
   private static instance: UnifiedErrorService | null = null;
   private config: UnifiedErrorConfig;
-  
+
   // Error tracking
   private errorMetrics: Map<string, ErrorMetrics> = new Map();
   private errorHistory: StructuredError[] = [];
   private fallbackStrategies: FallbackStrategy[] = [];
-  
+
   // Circuit breaker states
   private circuitBreakers: Map<string, CircuitBreakerState> = new Map();
-  
+
   // Rate limiting states
   private rateLimiters: Map<string, RateLimiterState> = new Map();
-  
+
   // Cleanup management
   private cleanupIntervalId: string | null = null;
   private metricsIntervalId: string | null = null;
@@ -343,9 +345,8 @@ export class UnifiedErrorService extends EventEmitter {
     context: ErrorContext = {}
   ): Promise<StructuredError> {
     // Convert to structured error if needed
-    const structuredError = error instanceof StructuredError 
-      ? error 
-      : this.createStructuredError(error, context as any);
+    const structuredError =
+      error instanceof StructuredError ? error : this.createStructuredError(error, context as any);
 
     // Update context with runtime information
     structuredError.context.startTime = structuredError.context.startTime || Date.now();
@@ -355,7 +356,6 @@ export class UnifiedErrorService extends EventEmitter {
       // Process error through pipeline
       await this.processError(structuredError);
       return structuredError;
-
     } catch (processingError) {
       // Even error processing failed - log and return original
       logger.error('Error processing failed:', processingError);
@@ -378,7 +378,7 @@ export class UnifiedErrorService extends EventEmitter {
   ): Promise<T> {
     const maxAttempts = options.maxAttempts || this.config.maxRetryAttempts;
     let lastError: StructuredError | null = null;
-    
+
     // Check circuit breaker
     if (options.circuitBreakerKey && this.config.enableCircuitBreaker) {
       const circuitBreaker = this.getCircuitBreaker(options.circuitBreakerKey);
@@ -409,7 +409,7 @@ export class UnifiedErrorService extends EventEmitter {
       try {
         context.attempt = attempt;
         context.maxAttempts = maxAttempts;
-        
+
         const result = await operation();
 
         // Reset circuit breaker on success
@@ -418,7 +418,6 @@ export class UnifiedErrorService extends EventEmitter {
         }
 
         return result;
-
       } catch (error) {
         lastError = await this.handleError(error as any, context);
 
@@ -451,13 +450,12 @@ export class UnifiedErrorService extends EventEmitter {
         try {
           logger.info(`Attempting fallback strategy: ${strategy.name}`);
           const result = await strategy.execute(context, operation);
-          
+
           // Update fallback success metrics
           this.updateFallbackMetrics(strategy.name, true);
           this.emit('fallback-success', strategy, context);
-          
-          return result;
 
+          return result;
         } catch (fallbackError) {
           this.updateFallbackMetrics(strategy.name, false);
           logger.warn(`Fallback strategy failed: ${strategy.name}`, fallbackError);
@@ -509,7 +507,7 @@ export class UnifiedErrorService extends EventEmitter {
 
     // Remove existing strategy with same name
     this.fallbackStrategies = this.fallbackStrategies.filter(s => s.name !== strategy.name);
-    
+
     // Add new strategy
     this.fallbackStrategies.push(strategy);
     this.fallbackStrategies.sort((a, b) => a.priority - b.priority);
@@ -541,7 +539,7 @@ export class UnifiedErrorService extends EventEmitter {
       categoryStats[metrics.category] = (categoryStats[metrics.category] || 0) + metrics.count;
       severityStats[metrics.severity] = (severityStats[metrics.severity] || 0) + metrics.count;
       totalResolutionTime += metrics.avgResolutionTime * metrics.count;
-      successfulRetries += Math.floor(metrics.retrySuccessRate * metrics.count / 100);
+      successfulRetries += Math.floor((metrics.retrySuccessRate * metrics.count) / 100);
       totalRetries += metrics.count;
     }
 
@@ -608,7 +606,11 @@ export class UnifiedErrorService extends EventEmitter {
     }
 
     // Network errors
-    if (message.includes('network') || message.includes('connection') || message.includes('econnrefused')) {
+    if (
+      message.includes('network') ||
+      message.includes('connection') ||
+      message.includes('econnrefused')
+    ) {
       return ErrorCategory.NETWORK_ERROR;
     }
 
@@ -630,31 +632,37 @@ export class UnifiedErrorService extends EventEmitter {
     const cat = category || this.categorizeError(error);
 
     // Critical errors
-    if ([
-      ErrorCategory.MEMORY_LIMIT,
-      ErrorCategory.DISK_IO_ERROR,
-      ErrorCategory.PROCESS_ERROR,
-    ].includes(cat)) {
+    if (
+      [
+        ErrorCategory.MEMORY_LIMIT,
+        ErrorCategory.DISK_IO_ERROR,
+        ErrorCategory.PROCESS_ERROR,
+      ].includes(cat)
+    ) {
       return ErrorSeverity.CRITICAL;
     }
 
     // High severity errors
-    if ([
-      ErrorCategory.AUTHENTICATION_ERROR,
-      ErrorCategory.AUTHORIZATION_ERROR,
-      ErrorCategory.SERVICE_UNAVAILABLE,
-      ErrorCategory.DEPENDENCY_FAILURE,
-    ].includes(cat)) {
+    if (
+      [
+        ErrorCategory.AUTHENTICATION_ERROR,
+        ErrorCategory.AUTHORIZATION_ERROR,
+        ErrorCategory.SERVICE_UNAVAILABLE,
+        ErrorCategory.DEPENDENCY_FAILURE,
+      ].includes(cat)
+    ) {
       return ErrorSeverity.HIGH;
     }
 
     // Medium severity errors
-    if ([
-      ErrorCategory.TIMEOUT,
-      ErrorCategory.NETWORK_ERROR,
-      ErrorCategory.RATE_LIMIT_EXCEEDED,
-      ErrorCategory.CONFIGURATION_ERROR,
-    ].includes(cat)) {
+    if (
+      [
+        ErrorCategory.TIMEOUT,
+        ErrorCategory.NETWORK_ERROR,
+        ErrorCategory.RATE_LIMIT_EXCEEDED,
+        ErrorCategory.CONFIGURATION_ERROR,
+      ].includes(cat)
+    ) {
       return ErrorSeverity.MEDIUM;
     }
 
@@ -683,7 +691,7 @@ export class UnifiedErrorService extends EventEmitter {
 
     // Add to history
     this.errorHistory.push(error);
-    
+
     // Limit history size
     if (this.errorHistory.length > this.config.maxErrorHistorySize) {
       this.errorHistory.shift();
@@ -734,9 +742,7 @@ export class UnifiedErrorService extends EventEmitter {
     error: StructuredError,
     requestedStrategies?: string[]
   ): FallbackStrategy[] {
-    let strategies = this.fallbackStrategies.filter(strategy => 
-      strategy.condition(error)
-    );
+    let strategies = this.fallbackStrategies.filter(strategy => strategy.condition(error));
 
     // Filter by requested strategies if provided
     if (requestedStrategies) {
@@ -786,7 +792,7 @@ export class UnifiedErrorService extends EventEmitter {
   private resetCircuitBreaker(key: string): void {
     const breaker = this.getCircuitBreaker(key);
     breaker.successCount++;
-    
+
     if (breaker.successCount >= this.config.circuitBreakerRecoveryThreshold) {
       breaker.isOpen = false;
       breaker.failureCount = 0;
@@ -800,7 +806,7 @@ export class UnifiedErrorService extends EventEmitter {
   // Rate limiting methods
   private isRateLimited(key: string): boolean {
     const now = Date.now();
-    
+
     if (!this.rateLimiters.has(key)) {
       this.rateLimiters.set(key, {
         requests: 0,
@@ -810,7 +816,7 @@ export class UnifiedErrorService extends EventEmitter {
     }
 
     const limiter = this.rateLimiters.get(key)!;
-    
+
     // Reset window if needed
     if (now - limiter.windowStart >= this.config.rateLimitWindowMs) {
       limiter.requests = 0;
@@ -845,7 +851,7 @@ export class UnifiedErrorService extends EventEmitter {
     this.registerFallbackStrategy({
       name: 'simple-retry',
       description: 'Simple retry with exponential backoff',
-      condition: (error) => error.isRetryable && error.severity !== ErrorSeverity.CRITICAL,
+      condition: error => error.isRetryable && error.severity !== ErrorSeverity.CRITICAL,
       execute: async (context, operation) => {
         const delay = this.calculateRetryDelay(context.attempt || 1);
         await this.delay(delay);
@@ -860,14 +866,15 @@ export class UnifiedErrorService extends EventEmitter {
     this.registerFallbackStrategy({
       name: 'graceful-degradation',
       description: 'Return partial or cached results when possible',
-      condition: (error) => [
-        ErrorCategory.TIMEOUT,
-        ErrorCategory.SERVICE_UNAVAILABLE,
-        ErrorCategory.NETWORK_ERROR,
-      ].includes(error.category),
+      condition: error =>
+        [
+          ErrorCategory.TIMEOUT,
+          ErrorCategory.SERVICE_UNAVAILABLE,
+          ErrorCategory.NETWORK_ERROR,
+        ].includes(error.category),
       execute: async (context, operation) => {
         // This would return cached or partial results
-        return { 
+        return {
           message: 'Partial results due to service degradation',
           context,
           degraded: true,
@@ -878,14 +885,12 @@ export class UnifiedErrorService extends EventEmitter {
       delayMs: 0,
     });
 
-    // Alternative method strategy  
+    // Alternative method strategy
     this.registerFallbackStrategy({
       name: 'alternative-method',
       description: 'Use alternative implementation when primary fails',
-      condition: (error) => [
-        ErrorCategory.TOOL_NOT_FOUND,
-        ErrorCategory.PROCESS_ERROR,
-      ].includes(error.category),
+      condition: error =>
+        [ErrorCategory.TOOL_NOT_FOUND, ErrorCategory.PROCESS_ERROR].includes(error.category),
       execute: async (context, operation) => {
         // This would use alternative implementation
         return {
@@ -925,12 +930,10 @@ export class UnifiedErrorService extends EventEmitter {
   }
 
   private cleanupOldMetrics(): void {
-    const cutoff = Date.now() - (this.config.metricsRetentionDays * 24 * 60 * 60 * 1000);
-    
+    const cutoff = Date.now() - this.config.metricsRetentionDays * 24 * 60 * 60 * 1000;
+
     // Clean error history
-    this.errorHistory = this.errorHistory.filter(
-      error => error.metadata.timestamp > cutoff
-    );
+    this.errorHistory = this.errorHistory.filter(error => error.metadata.timestamp > cutoff);
 
     // Clean metrics that haven't been updated recently
     for (const [key, metrics] of this.errorMetrics) {
@@ -983,14 +986,14 @@ export function createStructuredError(
   return new StructuredError(message, category, severity, context);
 }
 
-export function handleError(
+export async function handleError(
   error: Error | StructuredError,
   context: ErrorContext = {}
 ): Promise<StructuredError> {
   return unifiedErrorService.handleError(error, context);
 }
 
-export function handleErrorWithRecovery<T>(
+export async function handleErrorWithRecovery<T>(
   operation: () => Promise<T>,
   context: ErrorContext = {},
   options: {

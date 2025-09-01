@@ -386,7 +386,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
         development: foundKeywords.development,
         system: foundKeywords.system,
         context: { isDevelopmentContext, isSQLContext, isSystemContext },
-        content: `${content.substring(0, 200)  }...`,
+        content: `${content.substring(0, 200)}...`,
       });
     }
 
@@ -410,7 +410,7 @@ export class ClaudeCodeSecurity extends EventEmitter {
         reason: 'System device manipulation detected',
         risk: 'high',
       },
-      
+
       // AI-specific prompt injection patterns (2024 threats)
       {
         pattern: /ignore\s+(?:all\s+)?(?:previous|above)\s+instructions?/i,
@@ -418,7 +418,8 @@ export class ClaudeCodeSecurity extends EventEmitter {
         risk: 'high',
       },
       {
-        pattern: /forget\s+(everything|all|previous)(?:\s+(?:and\s+)?(?:start\s+over|instructions?|prompts?))?/i,
+        pattern:
+          /forget\s+(everything|all|previous)(?:\s+(?:and\s+)?(?:start\s+over|instructions?|prompts?))?/i,
         reason: 'Memory manipulation attempt detected',
         risk: 'high',
       },

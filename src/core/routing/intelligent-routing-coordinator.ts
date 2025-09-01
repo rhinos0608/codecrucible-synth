@@ -1,14 +1,14 @@
 /**
  * Intelligent Routing Coordinator
  * Central system that orchestrates smart routing decisions across all models and voice archetypes
- * 
+ *
  * Integrates:
  * - Model Selection Service (domain logic)
- * - Voice Orchestration Service (domain logic) 
+ * - Voice Orchestration Service (domain logic)
  * - Provider Selection Strategy (core logic)
  * - Hybrid LLM Router (performance-optimized routing)
  * - Living Spiral Process coordination
- * 
+ *
  * Living Spiral Council Applied:
  * - Architect: Clean routing architecture with proper separation of concerns
  * - Performance Engineer: Optimized routing decisions based on metrics
@@ -22,13 +22,27 @@ import { ProviderType } from '../interfaces/provider-interfaces.js';
 import { logger } from '../logger.js';
 
 // Domain imports
-import { IModelSelectionService, ModelSelection } from '../../domain/services/model-selection-service.js';
-import { IVoiceOrchestrationService, VoiceSelection } from '../../domain/services/voice-orchestration-service.js';
+import {
+  IModelSelectionService,
+  ModelSelection,
+} from '../../domain/services/model-selection-service.js';
+import {
+  IVoiceOrchestrationService,
+  VoiceSelection,
+} from '../../domain/services/voice-orchestration-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
 
 // Core imports
-import { IProviderSelectionStrategy, SelectionContext, SelectionResult } from '../providers/provider-selection-strategy.js';
-import { HybridLLMRouter, RoutingDecision, TaskComplexityMetrics } from '../hybrid/hybrid-llm-router.js';
+import {
+  IProviderSelectionStrategy,
+  SelectionContext,
+  SelectionResult,
+} from '../providers/provider-selection-strategy.js';
+import {
+  HybridLLMRouter,
+  RoutingDecision,
+  TaskComplexityMetrics,
+} from '../hybrid/hybrid-llm-router.js';
 import { PerformanceMonitor } from '../../utils/performance.js';
 
 export interface RoutingContext {
@@ -44,20 +58,20 @@ export interface RoutingPreferences {
   prioritizeSpeed?: boolean;
   prioritizeQuality?: boolean;
   maxLatency?: number;
-  
+
   // Cost preferences
   optimizeForCost?: boolean;
   maxCostPerRequest?: number;
-  
+
   // Voice preferences
   preferredVoices?: string[];
   maxVoices?: number;
   enableMultiVoice?: boolean;
-  
+
   // Provider preferences
   preferredProviders?: string[];
   excludeProviders?: string[];
-  
+
   // Advanced preferences
   enableHybridRouting?: boolean;
   enableLoadBalancing?: boolean;
@@ -70,24 +84,24 @@ export interface IntelligentRoutingDecision {
   voiceSelection: VoiceSelection;
   providerSelection: SelectionResult;
   hybridRouting?: RoutingDecision;
-  
+
   // Routing metadata
   routingStrategy: 'single-model' | 'hybrid' | 'multi-voice' | 'load-balanced';
   confidence: number;
   reasoning: string;
-  
+
   // Performance estimates
   estimatedCost: number;
   estimatedLatency: number;
   estimatedQuality: number;
-  
+
   // Fallback information
   fallbackChain: Array<{
     type: 'model' | 'voice' | 'provider';
     option: string;
     reason: string;
   }>;
-  
+
   // Analytics
   routingId: string;
   timestamp: number;
@@ -100,21 +114,27 @@ export interface RoutingAnalytics {
   averageLatency: number;
   averageCost: number;
   routingAccuracy: number;
-  
+
   // By strategy
-  strategyPerformance: Map<string, {
-    requests: number;
-    successRate: number;
-    avgLatency: number;
-    avgCost: number;
-  }>;
-  
+  strategyPerformance: Map<
+    string,
+    {
+      requests: number;
+      successRate: number;
+      avgLatency: number;
+      avgCost: number;
+    }
+  >;
+
   // By phase (for Living Spiral)
-  phasePerformance: Map<string, {
-    requests: number;
-    avgQuality: number;
-    preferredStrategy: string;
-  }>;
+  phasePerformance: Map<
+    string,
+    {
+      requests: number;
+      avgQuality: number;
+      preferredStrategy: string;
+    }
+  >;
 }
 
 export interface IIntelligentRoutingCoordinator {
@@ -137,18 +157,22 @@ export interface RoutingPerformance {
  * Intelligent Routing Coordinator
  * Orchestrates all routing decisions with context-aware optimization
  */
-export class IntelligentRoutingCoordinator extends EventEmitter implements IIntelligentRoutingCoordinator {
+export class IntelligentRoutingCoordinator
+  extends EventEmitter
+  implements IIntelligentRoutingCoordinator
+{
   private modelSelectionService: IModelSelectionService;
   private voiceOrchestrationService: IVoiceOrchestrationService;
   private providerSelectionStrategy: IProviderSelectionStrategy;
   private hybridRouter: HybridLLMRouter;
   private performanceMonitor: PerformanceMonitor;
-  
+
   // Analytics and learning
   private routingHistory: Map<string, IntelligentRoutingDecision> = new Map();
   private performanceHistory: Map<string, RoutingPerformance> = new Map();
-  private routingCache: Map<string, { decision: IntelligentRoutingDecision; timestamp: number }> = new Map();
-  
+  private routingCache: Map<string, { decision: IntelligentRoutingDecision; timestamp: number }> =
+    new Map();
+
   // Configuration
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_HISTORY_SIZE = 10000;
@@ -167,7 +191,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     this.providerSelectionStrategy = providerSelectionStrategy;
     this.hybridRouter = hybridRouter;
     this.performanceMonitor = performanceMonitor;
-    
+
     this.setupEventHandlers();
   }
 
@@ -178,47 +202,46 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   async routeRequest(context: RoutingContext): Promise<IntelligentRoutingDecision> {
     const startTime = Date.now();
     const routingId = this.generateRoutingId();
-    
+
     try {
       logger.debug('Starting intelligent routing', { routingId, context });
-      
+
       // Check cache first
       const cached = this.getCachedDecision(context);
       if (cached) {
         logger.debug('Using cached routing decision', { routingId });
         return this.cloneDecisionWithNewId(cached, routingId);
       }
-      
+
       // Analyze request context and determine routing strategy
       const routingStrategy = this.determineRoutingStrategy(context);
-      
+
       // Execute routing based on strategy
       const decision = await this.executeRoutingStrategy(routingStrategy, context, routingId);
-      
+
       // Apply learning and optimization
       if (this.LEARNING_ENABLED) {
         this.applyLearningOptimizations(decision, context);
       }
-      
+
       // Cache decision
       this.cacheDecision(context, decision);
-      
+
       // Store for analytics
       this.routingHistory.set(routingId, decision);
       this.cleanupHistory();
-      
+
       // Emit routing event
       this.emit('routingDecision', decision);
-      
+
       const duration = Date.now() - startTime;
-      logger.info('Routing decision completed', { 
-        routingId, 
-        strategy: decision.routingStrategy, 
-        duration: `${duration}ms`
+      logger.info('Routing decision completed', {
+        routingId,
+        strategy: decision.routingStrategy,
+        duration: `${duration}ms`,
       });
-      
+
       return decision;
-      
     } catch (error) {
       logger.error('Error in intelligent routing', { routingId, error });
       return this.createFailsafeDecision(context, routingId);
@@ -230,19 +253,19 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
    */
   recordPerformance(routingId: string, performance: RoutingPerformance): void {
     this.performanceHistory.set(routingId, performance);
-    
+
     const decision = this.routingHistory.get(routingId);
     if (decision) {
       // Update analytics
       this.updateAnalytics(decision, performance);
-      
+
       // Learn from performance
       this.learnFromPerformance(decision, performance);
-      
+
       // Emit performance event
       this.emit('performanceRecorded', { routingId, decision, performance });
     }
-    
+
     logger.debug('Performance recorded', { routingId, performance });
   }
 
@@ -252,7 +275,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   getAnalytics(): RoutingAnalytics {
     const allDecisions = Array.from(this.routingHistory.values());
     const allPerformance = Array.from(this.performanceHistory.values());
-    
+
     const analytics: RoutingAnalytics = {
       totalRequests: allDecisions.length,
       successRate: this.calculateSuccessRate(allPerformance),
@@ -262,7 +285,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
       strategyPerformance: this.calculateStrategyPerformance(allDecisions, allPerformance),
       phasePerformance: this.calculatePhasePerformance(allDecisions, allPerformance),
     };
-    
+
     return analytics;
   }
 
@@ -271,21 +294,21 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
    */
   async optimizeRouting(): Promise<void> {
     logger.info('Starting routing optimization');
-    
+
     const analytics = this.getAnalytics();
-    
+
     // Optimize provider selection strategy
     await this.optimizeProviderStrategy(analytics);
-    
+
     // Optimize hybrid routing parameters
     this.optimizeHybridRouting(analytics);
-    
+
     // Optimize voice selection preferences
     await this.optimizeVoiceSelection(analytics);
-    
+
     // Clean up old data
     this.performanceCleanup();
-    
+
     this.emit('routingOptimized', analytics);
     logger.info('Routing optimization completed');
   }
@@ -294,7 +317,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
 
   private determineRoutingStrategy(context: RoutingContext): string {
     const { request, preferences, phase } = context;
-    
+
     // Phase-specific routing for Living Spiral
     if (phase) {
       switch (phase) {
@@ -310,10 +333,10 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
           return 'single-voice-analytical'; // Guardian archetype, analytical review
       }
     }
-    
+
     // Request complexity-based routing
     const complexity = request.calculateComplexity();
-    
+
     if (complexity > 0.8) {
       return preferences?.enableHybridRouting ? 'hybrid-quality' : 'single-model-quality';
     } else if (complexity < 0.3) {
@@ -329,7 +352,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request } = context;
-    
+
     switch (strategy) {
       case 'single-voice-fast':
         return this.executeSingleVoiceFastStrategy(context, routingId);
@@ -362,25 +385,25 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Select fast provider
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       prioritizeSpeed: true,
       complexity: 'simple',
     });
-    
+
     // Select appropriate model (prefer fast models)
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request, {
       prioritize: 'speed',
       maxLatency: 5000,
     });
-    
+
     // Select single voice (Explorer for collapse phase)
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 1,
       preferredVoices: context.phase === 'collapse' ? ['explorer'] : undefined,
     });
-    
+
     return this.buildRoutingDecision(
       'single-model',
       modelSelection,
@@ -399,25 +422,25 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Select quality-focused provider
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'complex',
       prioritizeSpeed: false,
     });
-    
+
     // Select high-quality model
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request, {
       prioritize: 'quality',
       minQuality: 0.8,
     });
-    
+
     // Select single voice (Architect for synthesis phase)
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 1,
       preferredVoices: context.phase === 'synthesis' ? ['architect'] : undefined,
     });
-    
+
     return this.buildRoutingDecision(
       'single-model',
       modelSelection,
@@ -436,25 +459,25 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Select analytical-capable provider
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'complex',
       taskType: 'analysis',
     });
-    
+
     // Select analytical model
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request, {
       prioritize: 'quality',
       minQuality: 0.7,
     });
-    
+
     // Select Guardian voice for reflection
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 1,
       preferredVoices: ['guardian'],
     });
-    
+
     return this.buildRoutingDecision(
       'single-model',
       modelSelection,
@@ -473,18 +496,18 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Select balanced provider for multi-voice coordination
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'medium',
       selectionStrategy: 'balanced',
     });
-    
+
     // Select balanced model for multi-voice synthesis
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request, {
       prioritize: 'reliability',
     });
-    
+
     // Select multiple voices for collaborative synthesis
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 3,
@@ -492,7 +515,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
       synthesisMode: 'COLLABORATIVE' as any,
       diversityWeight: 0.7,
     });
-    
+
     return this.buildRoutingDecision(
       'multi-voice',
       modelSelection,
@@ -511,22 +534,22 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Select balanced provider
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'medium',
       selectionStrategy: 'balanced',
     });
-    
+
     // Select balanced model
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request);
-    
+
     // Select optimal voice set for balanced approach
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: preferences?.maxVoices || 2,
       synthesisMode: 'WEIGHTED' as any,
     });
-    
+
     return this.buildRoutingDecision(
       'multi-voice',
       modelSelection,
@@ -545,31 +568,31 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Use hybrid router for quality-focused routing
     const hybridDecision = await this.hybridRouter.routeTask(
       request.type,
       request.prompt,
       context.metrics
     );
-    
+
     // Select model optimized for quality
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request, {
       prioritize: 'quality',
       minQuality: 0.8,
     });
-    
+
     // Select provider based on hybrid routing
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'complex',
       prioritizeSpeed: false,
     });
-    
+
     // Single voice for focused quality output
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 1,
     });
-    
+
     return this.buildRoutingDecision(
       'hybrid',
       modelSelection,
@@ -588,29 +611,29 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Use hybrid router for balanced routing
     const hybridDecision = await this.hybridRouter.routeTask(
       request.type,
       request.prompt,
       context.metrics
     );
-    
+
     // Select balanced model
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request);
-    
+
     // Select provider based on hybrid routing decision
     const providerType = hybridDecision.selectedLLM === 'lm-studio' ? 'lm-studio' : 'ollama';
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'medium',
       selectionStrategy: 'balanced',
     });
-    
+
     // Select voice based on preferences or single voice
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: preferences?.enableMultiVoice ? 2 : 1,
     });
-    
+
     return this.buildRoutingDecision(
       'hybrid',
       modelSelection,
@@ -629,32 +652,31 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Use hybrid router with implementation focus
-    const hybridDecision = await this.hybridRouter.routeTask(
-      'implementation',
-      request.prompt,
-      { ...context.metrics, requiresDeepAnalysis: false }
-    );
-    
+    const hybridDecision = await this.hybridRouter.routeTask('implementation', request.prompt, {
+      ...context.metrics,
+      requiresDeepAnalysis: false,
+    });
+
     // Select model good for implementation
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request, {
       prioritize: 'speed',
       maxLatency: 15000,
     });
-    
+
     // Provider selection based on hybrid decision
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'medium',
       prioritizeSpeed: true,
     });
-    
+
     // Implementor voice for rebirth phase
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 1,
       preferredVoices: ['implementor'],
     });
-    
+
     return this.buildRoutingDecision(
       'hybrid',
       modelSelection,
@@ -673,24 +695,24 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Fast provider selection
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       prioritizeSpeed: true,
       complexity: 'simple',
     });
-    
+
     // Fast model selection
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request, {
       prioritize: 'speed',
       maxLatency: 3000,
     });
-    
+
     // Single voice for speed
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 1,
     });
-    
+
     return this.buildRoutingDecision(
       'single-model',
       modelSelection,
@@ -709,24 +731,24 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     routingId: string
   ): Promise<IntelligentRoutingDecision> {
     const { request, preferences } = context;
-    
+
     // Quality-focused provider selection
     const providerSelection = this.providerSelectionStrategy.selectProvider({
       complexity: 'complex',
       selectionStrategy: 'most-capable',
     });
-    
+
     // Quality model selection
     const modelSelection = await this.modelSelectionService.selectOptimalModel(request, {
       prioritize: 'quality',
       minQuality: 0.8,
     });
-    
+
     // Single voice for focused output
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(request, {
       maxVoices: 1,
     });
-    
+
     return this.buildRoutingDecision(
       'single-model',
       modelSelection,
@@ -754,9 +776,13 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     const estimatedCost = this.estimateCost(modelSelection, voiceSelection, strategy);
     const estimatedLatency = this.estimateLatency(modelSelection, providerSelection, strategy);
     const estimatedQuality = this.estimateQuality(modelSelection, voiceSelection, strategy);
-    
-    const fallbackChain = this.buildFallbackChain(modelSelection, voiceSelection, providerSelection);
-    
+
+    const fallbackChain = this.buildFallbackChain(
+      modelSelection,
+      voiceSelection,
+      providerSelection
+    );
+
     return {
       modelSelection,
       voiceSelection,
@@ -781,19 +807,19 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     strategy: string
   ): number {
     let baseCost = modelSelection.estimatedCost || 0.01;
-    
+
     // Multi-voice multiplier
     const voiceCount = 1 + voiceSelection.supportingVoices.length;
     baseCost *= voiceCount;
-    
+
     // Strategy multiplier
     const strategyMultipliers = {
       'single-model': 1.0,
-      'hybrid': 1.3,
+      hybrid: 1.3,
       'multi-voice': 1.5,
       'load-balanced': 1.2,
     };
-    
+
     return baseCost * (strategyMultipliers[strategy as keyof typeof strategyMultipliers] || 1.0);
   }
 
@@ -803,7 +829,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     strategy: string
   ): number {
     let baseLatency = modelSelection.estimatedLatency || 5000;
-    
+
     // Strategy adjustments
     switch (strategy) {
       case 'multi-voice':
@@ -816,7 +842,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
         baseLatency *= 0.9; // Better resource utilization
         break;
     }
-    
+
     return Math.round(baseLatency);
   }
 
@@ -826,28 +852,31 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     strategy: string
   ): number {
     let baseQuality = 0.7; // Base quality score
-    
+
     // Model quality contribution
     if (modelSelection.primaryModel.parameters.qualityRating) {
-      baseQuality = Math.max(baseQuality, modelSelection.primaryModel.parameters.qualityRating * 0.8);
+      baseQuality = Math.max(
+        baseQuality,
+        modelSelection.primaryModel.parameters.qualityRating * 0.8
+      );
     }
-    
+
     // Multi-voice quality boost
     const voiceCount = 1 + voiceSelection.supportingVoices.length;
     if (voiceCount > 1) {
       baseQuality += Math.min(0.2, voiceCount * 0.05);
     }
-    
+
     // Strategy quality adjustments
     const strategyBoosts = {
       'single-model': 0,
-      'hybrid': 0.05,
+      hybrid: 0.05,
       'multi-voice': 0.1,
       'load-balanced': 0.02,
     };
-    
+
     baseQuality += strategyBoosts[strategy as keyof typeof strategyBoosts] || 0;
-    
+
     return Math.min(1.0, baseQuality);
   }
 
@@ -856,8 +885,12 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     voiceSelection: VoiceSelection,
     providerSelection: SelectionResult
   ): Array<{ type: 'model' | 'voice' | 'provider'; option: string; reason: string }> {
-    const fallbackChain: Array<{ type: 'model' | 'voice' | 'provider'; option: string; reason: string }> = [];
-    
+    const fallbackChain: Array<{
+      type: 'model' | 'voice' | 'provider';
+      option: string;
+      reason: string;
+    }> = [];
+
     // Model fallbacks
     modelSelection.fallbackModels.forEach((model, index) => {
       fallbackChain.push({
@@ -866,7 +899,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
         reason: `Fallback model ${index + 1}`,
       });
     });
-    
+
     // Provider fallbacks
     providerSelection.fallbackChain.forEach((provider, index) => {
       fallbackChain.push({
@@ -875,7 +908,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
         reason: `Fallback provider ${index + 1}`,
       });
     });
-    
+
     // Voice fallbacks (supporting voices can be fallbacks for primary)
     voiceSelection.supportingVoices.forEach((voice, index) => {
       fallbackChain.push({
@@ -884,7 +917,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
         reason: `Supporting voice as fallback`,
       });
     });
-    
+
     return fallbackChain;
   }
 
@@ -897,15 +930,15 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   private getCachedDecision(context: RoutingContext): IntelligentRoutingDecision | null {
     const cacheKey = this.generateCacheKey(context);
     const cached = this.routingCache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
       return cached.decision;
     }
-    
+
     if (cached) {
       this.routingCache.delete(cacheKey);
     }
-    
+
     return null;
   }
 
@@ -923,7 +956,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
       priority,
       JSON.stringify(preferences || {}),
     ];
-    
+
     return keyParts.join('|');
   }
 
@@ -983,7 +1016,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   ): void {
     // Apply historical performance learning to adjust confidence
     const historicalPerformance = this.getHistoricalPerformance(decision.routingStrategy, context);
-    
+
     if (historicalPerformance.sampleSize > 10) {
       const performanceMultiplier = historicalPerformance.successRate;
       decision.confidence *= performanceMultiplier;
@@ -998,18 +1031,19 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     const relevantHistory = Array.from(this.routingHistory.values())
       .filter(decision => decision.routingStrategy === strategy)
       .filter(decision => this.performanceHistory.has(decision.routingId));
-    
+
     if (relevantHistory.length === 0) {
       return { successRate: 0.8, avgLatency: 10000, sampleSize: 0 };
     }
-    
+
     const performances = relevantHistory
       .map(decision => this.performanceHistory.get(decision.routingId))
       .filter(Boolean);
-    
+
     const successCount = performances.filter(p => p!.success).length;
-    const avgLatency = performances.reduce((sum, p) => sum + p!.actualLatency, 0) / performances.length;
-    
+    const avgLatency =
+      performances.reduce((sum, p) => sum + p!.actualLatency, 0) / performances.length;
+
     return {
       successRate: successCount / performances.length,
       avgLatency,
@@ -1017,7 +1051,10 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     };
   }
 
-  private updateAnalytics(decision: IntelligentRoutingDecision, performance: RoutingPerformance): void {
+  private updateAnalytics(
+    decision: IntelligentRoutingDecision,
+    performance: RoutingPerformance
+  ): void {
     // Analytics updates are handled in the getAnalytics method
     // This method could be extended for real-time metric updates
     logger.debug('Analytics updated for routing decision', {
@@ -1056,17 +1093,20 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     // Calculate how often our routing decisions led to successful outcomes
     const decisions = Array.from(this.routingHistory.values());
     const performanceDecisions = decisions.filter(d => this.performanceHistory.has(d.routingId));
-    
+
     if (performanceDecisions.length === 0) return 0;
-    
+
     const accurateDecisions = performanceDecisions.filter(decision => {
       const performance = this.performanceHistory.get(decision.routingId)!;
-      const latencyAccurate = Math.abs(performance.actualLatency - decision.estimatedLatency) / decision.estimatedLatency < 0.5;
+      const latencyAccurate =
+        Math.abs(performance.actualLatency - decision.estimatedLatency) /
+          decision.estimatedLatency <
+        0.5;
       const qualityAccurate = Math.abs(performance.qualityScore - decision.estimatedQuality) < 0.3;
-      
+
       return performance.success && latencyAccurate && qualityAccurate;
     });
-    
+
     return accurateDecisions.length / performanceDecisions.length;
   }
 
@@ -1075,15 +1115,15 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     performances: RoutingPerformance[]
   ): Map<string, { requests: number; successRate: number; avgLatency: number; avgCost: number }> {
     const strategyPerformance = new Map();
-    
+
     const strategies = Array.from(new Set(decisions.map(d => d.routingStrategy)));
-    
+
     for (const strategy of strategies) {
       const strategyDecisions = decisions.filter(d => d.routingStrategy === strategy);
       const strategyPerformances = strategyDecisions
         .map(d => this.performanceHistory.get(d.routingId))
         .filter(Boolean);
-      
+
       if (strategyPerformances.length > 0) {
         strategyPerformance.set(strategy, {
           requests: strategyDecisions.length,
@@ -1093,7 +1133,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
         });
       }
     }
-    
+
     return strategyPerformance;
   }
 
@@ -1102,32 +1142,36 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
     performances: RoutingPerformance[]
   ): Map<string, { requests: number; avgQuality: number; preferredStrategy: string }> {
     const phasePerformance = new Map();
-    
+
     const phases = Array.from(new Set(decisions.map(d => d.context.phase).filter(Boolean)));
-    
+
     for (const phase of phases) {
       const phaseDecisions = decisions.filter(d => d.context.phase === phase);
       const phasePerformances = phaseDecisions
         .map(d => this.performanceHistory.get(d.routingId))
         .filter(Boolean);
-      
+
       if (phasePerformances.length > 0) {
-        const avgQuality = phasePerformances.reduce((sum, p) => sum + p!.qualityScore, 0) / phasePerformances.length;
-        
+        const avgQuality =
+          phasePerformances.reduce((sum, p) => sum + p!.qualityScore, 0) / phasePerformances.length;
+
         // Find most common successful strategy for this phase
         const successfulDecisions = phaseDecisions.filter(d => {
           const perf = this.performanceHistory.get(d.routingId);
           return perf?.success;
         });
-        
-        const strategyCounts = successfulDecisions.reduce((counts, d) => {
-          counts[d.routingStrategy] = (counts[d.routingStrategy] || 0) + 1;
-          return counts;
-        }, {} as Record<string, number>);
-        
-        const preferredStrategy = Object.entries(strategyCounts)
-          .sort(([, a], [, b]) => b - a)[0]?.[0] || 'unknown';
-        
+
+        const strategyCounts = successfulDecisions.reduce(
+          (counts, d) => {
+            counts[d.routingStrategy] = (counts[d.routingStrategy] || 0) + 1;
+            return counts;
+          },
+          {} as Record<string, number>
+        );
+
+        const preferredStrategy =
+          Object.entries(strategyCounts).sort(([, a], [, b]) => b - a)[0]?.[0] || 'unknown';
+
         phasePerformance.set(phase, {
           requests: phaseDecisions.length,
           avgQuality,
@@ -1135,17 +1179,20 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
         });
       }
     }
-    
+
     return phasePerformance;
   }
 
   private async optimizeProviderStrategy(analytics: RoutingAnalytics): Promise<void> {
     // Analyze provider performance and update strategy
-    const bestStrategy = Array.from(analytics.strategyPerformance.entries())
-      .sort(([, a], [, b]) => b.successRate - a.successRate)[0];
-    
+    const bestStrategy = Array.from(analytics.strategyPerformance.entries()).sort(
+      ([, a], [, b]) => b.successRate - a.successRate
+    )[0];
+
     if (bestStrategy && bestStrategy[1].successRate > 0.85) {
-      logger.info('Optimizing provider strategy based on performance', { bestStrategy: bestStrategy[0] });
+      logger.info('Optimizing provider strategy based on performance', {
+        bestStrategy: bestStrategy[0],
+      });
       // Could update provider selection strategy here
     }
   }
@@ -1153,7 +1200,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   private optimizeHybridRouting(analytics: RoutingAnalytics): void {
     // Optimize hybrid router parameters based on analytics
     const hybridPerformance = analytics.strategyPerformance.get('hybrid');
-    
+
     if (hybridPerformance && hybridPerformance.successRate < 0.7) {
       logger.warn('Hybrid routing performance below threshold, consider parameter adjustment');
       // Could adjust hybrid router parameters here
@@ -1163,7 +1210,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   private async optimizeVoiceSelection(analytics: RoutingAnalytics): Promise<void> {
     // Analyze voice selection performance and optimize
     const multiVoicePerformance = analytics.strategyPerformance.get('multi-voice');
-    
+
     if (multiVoicePerformance && multiVoicePerformance.avgLatency > 20000) {
       logger.info('Multi-voice latency high, consider optimizing voice selection');
       // Could optimize voice selection logic here
@@ -1172,9 +1219,10 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
 
   private cleanupHistory(): void {
     if (this.routingHistory.size > this.MAX_HISTORY_SIZE) {
-      const sortedEntries = Array.from(this.routingHistory.entries())
-        .sort(([, a], [, b]) => a.timestamp - b.timestamp);
-      
+      const sortedEntries = Array.from(this.routingHistory.entries()).sort(
+        ([, a], [, b]) => a.timestamp - b.timestamp
+      );
+
       const toDelete = sortedEntries.slice(0, Math.floor(this.MAX_HISTORY_SIZE * 0.2));
       toDelete.forEach(([id]) => {
         this.routingHistory.delete(id);
@@ -1184,15 +1232,15 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   }
 
   private performanceCleanup(): void {
-    const cutoffTime = Date.now() - (7 * 24 * 60 * 60 * 1000); // 7 days
-    
+    const cutoffTime = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7 days
+
     for (const [id, decision] of this.routingHistory.entries()) {
       if (decision.timestamp < cutoffTime) {
         this.routingHistory.delete(id);
         this.performanceHistory.delete(id);
       }
     }
-    
+
     // Clean cache
     for (const [key, cached] of this.routingCache.entries()) {
       if (Date.now() - cached.timestamp > this.CACHE_TTL) {
@@ -1203,15 +1251,18 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
 
   private setupEventHandlers(): void {
     // Listen for provider health changes
-    this.performanceMonitor.on('providerHealthChange', (event: { type: ProviderType; isHealthy: boolean }) => {
-      logger.info('Provider health changed, routing may be affected', event);
-    });
-    
+    this.performanceMonitor.on(
+      'providerHealthChange',
+      (event: { type: ProviderType; isHealthy: boolean }) => {
+        logger.info('Provider health changed, routing may be affected', event);
+      }
+    );
+
     // Listen for hybrid router events
-    this.hybridRouter.on('routing-decision', (event) => {
+    this.hybridRouter.on('routing-decision', event => {
       logger.debug('Hybrid router decision received', event);
     });
-    
+
     // Cleanup on process exit
     process.on('SIGINT', () => this.cleanup());
     process.on('SIGTERM', () => this.cleanup());
@@ -1225,7 +1276,7 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   }
 
   // Public getters for system monitoring
-  
+
   getCacheStatus(): { size: number; hitRate: number } {
     return {
       size: this.routingCache.size,
@@ -1249,10 +1300,10 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
   async initialize(): Promise<void> {
     // Initialize performance monitoring
     this.emit('coordinator:initializing');
-    
+
     // Warm up routing cache with common patterns
     await this.warmupCache();
-    
+
     this.emit('coordinator:initialized');
   }
 
@@ -1265,10 +1316,10 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
       // Convert parameters to internal format
       const routingContext: RoutingContext = {
         request: {
-          id: context.requestId || 'integration-' + Date.now(),
+          id: context.requestId || `integration-${Date.now()}`,
           content,
           priority: context.priority || 'medium',
-          calculateComplexity: () => this.calculateContentComplexity(content)
+          calculateComplexity: () => this.calculateContentComplexity(content),
         } as unknown as ProcessingRequest,
         priority: context.priority || 'medium',
         phase: context.phase,
@@ -1278,16 +1329,15 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
           enableHybridRouting: context.enableHybridRouting !== false,
           enableMultiVoice: context.enableMultiVoice !== false,
           maxLatency: context.maxLatency || 30000,
-          learningEnabled: true
-        }
+          learningEnabled: true,
+        },
       };
 
       // Use existing routing logic
       return await this.routeRequest(routingContext);
-      
     } catch (error) {
       logger.error('Failed to decide routing strategy:', error);
-      
+
       // Return fallback routing decision
       return this.createFallbackRoutingDecision(content, context);
     }
@@ -1298,31 +1348,38 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
    */
   private calculateContentComplexity(content: string): number {
     let complexity = 0.0;
-    
+
     // Length-based complexity
     if (content.length > 5000) complexity += 0.3;
     else if (content.length > 1000) complexity += 0.2;
     else if (content.length > 500) complexity += 0.1;
-    
+
     // Technical complexity indicators
     const technicalTerms = [
-      'algorithm', 'architecture', 'optimization', 'performance', 
-      'security', 'database', 'api', 'framework', 'integration'
+      'algorithm',
+      'architecture',
+      'optimization',
+      'performance',
+      'security',
+      'database',
+      'api',
+      'framework',
+      'integration',
     ];
     const technicalScore = technicalTerms.reduce((score, term) => {
       return score + (content.toLowerCase().includes(term) ? 0.1 : 0);
     }, 0);
     complexity += Math.min(technicalScore, 0.4);
-    
+
     // Code-like patterns
     if (content.includes('function') || content.includes('class') || content.includes('import')) {
       complexity += 0.2;
     }
-    
+
     // Multiple questions or requirements
     const questionCount = (content.match(/[?]/g) || []).length;
     complexity += Math.min(questionCount * 0.1, 0.2);
-    
+
     return Math.min(complexity, 1.0);
   }
 
@@ -1330,8 +1387,8 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
    * Create fallback routing decision when primary routing fails
    */
   private createFallbackRoutingDecision(content: string, context: any): IntelligentRoutingDecision {
-    const routingId = 'fallback-' + Date.now();
-    
+    const routingId = `fallback-${Date.now()}`;
+
     return {
       modelSelection: {
         primaryModel: { name: 'default' as any, capabilities: [] } as any,
@@ -1339,19 +1396,19 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
         selectionReason: 'Fallback model selection',
         routingStrategy: 'single' as any,
         estimatedCost: 0.01,
-        estimatedLatency: 5000
+        estimatedLatency: 5000,
       },
       voiceSelection: {
         primaryVoice: { id: 'maintainer', name: 'Maintainer', style: 'maintainer' as any } as any,
         supportingVoices: [],
         synthesisMode: 'single' as any,
-        reasoning: 'Fallback to stable voice'
+        reasoning: 'Fallback to stable voice',
       },
       providerSelection: {
         provider: 'ollama' as any,
         confidence: 0.5,
         reason: 'Fallback provider selection',
-        fallbackChain: []
+        fallbackChain: [],
       },
       routingStrategy: 'single-model',
       confidence: 0.5,
@@ -1363,8 +1420,8 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
         {
           type: 'model',
           option: 'default',
-          reason: 'Primary routing failed'
-        }
+          reason: 'Primary routing failed',
+        },
       ],
       routingId,
       timestamp: Date.now(),
@@ -1373,21 +1430,17 @@ export class IntelligentRoutingCoordinator extends EventEmitter implements IInte
           id: context.requestId || routingId,
           content,
           priority: 'medium',
-          calculateComplexity: () => 0.5
+          calculateComplexity: () => 0.5,
         } as unknown as ProcessingRequest,
         priority: 'medium',
-        phase: context.phase
-      }
+        phase: context.phase,
+      },
     };
   }
 
   private async warmupCache(): Promise<void> {
     // Pre-cache common routing decisions
-    const commonPatterns = [
-      'simple_generation',
-      'complex_analysis', 
-      'multi_voice_synthesis'
-    ];
+    const commonPatterns = ['simple_generation', 'complex_analysis', 'multi_voice_synthesis'];
 
     for (const pattern of commonPatterns) {
       // Pre-calculate routing for common patterns

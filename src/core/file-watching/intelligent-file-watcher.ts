@@ -173,12 +173,12 @@ export class IntelligentFileWatcher extends EventEmitter {
               severity: 'medium',
               category: 'system',
               recoverable: true,
-              suggestions: ['Stop current watcher before starting new one']
+              suggestions: ['Stop current watcher before starting new one'],
             },
             {
               operation: 'startWatching',
               timestamp: Date.now(),
-              component: 'intelligent-file-watcher'
+              component: 'intelligent-file-watcher',
             }
           )
         );
@@ -219,13 +219,13 @@ export class IntelligentFileWatcher extends EventEmitter {
             suggestions: [
               'Check file permissions',
               'Verify watch paths exist',
-              'Try with fewer paths'
-            ]
+              'Try with fewer paths',
+            ],
           },
           {
             operation: 'startWatching',
             timestamp: Date.now(),
-            component: 'intelligent-file-watcher'
+            component: 'intelligent-file-watcher',
           },
           error as Error
         )

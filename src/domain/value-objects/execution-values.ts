@@ -38,7 +38,7 @@ export class ExecutionId {
     if (!id || id.trim().length === 0) {
       throw new Error('Execution ID cannot be empty');
     }
-    
+
     if (id.length > 100) {
       throw new Error('Execution ID too long (max 100 characters)');
     }
@@ -66,9 +66,7 @@ export class TaskDescription {
   }
 
   get truncated(): string {
-    return this._value.length > 100 
-      ? `${this._value.substring(0, 100)}...` 
-      : this._value;
+    return this._value.length > 100 ? `${this._value.substring(0, 100)}...` : this._value;
   }
 
   equals(other: TaskDescription): boolean {
@@ -90,7 +88,10 @@ export class TaskDescription {
  * Error Message Value Object
  */
 export class ErrorMessage {
-  private constructor(private readonly _message: string, private readonly _code?: string) {
+  private constructor(
+    private readonly _message: string,
+    private readonly _code?: string
+  ) {
     this.validateMessage(_message);
   }
 
@@ -123,10 +124,16 @@ export class ErrorMessage {
    */
   isRecoverable(): boolean {
     const recoverablePatterns = [
-      'timeout', 'network', 'temporary', 'retry', 'rate limit',
-      'connection', 'unavailable', 'busy'
+      'timeout',
+      'network',
+      'temporary',
+      'retry',
+      'rate limit',
+      'connection',
+      'unavailable',
+      'busy',
     ];
-    
+
     const lowerMessage = this._message.toLowerCase();
     return recoverablePatterns.some(pattern => lowerMessage.includes(pattern));
   }
@@ -136,10 +143,16 @@ export class ErrorMessage {
    */
   isUserInputError(): boolean {
     const inputErrorPatterns = [
-      'invalid', 'missing', 'required', 'format', 'syntax',
-      'not found', 'permission denied', 'unauthorized'
+      'invalid',
+      'missing',
+      'required',
+      'format',
+      'syntax',
+      'not found',
+      'permission denied',
+      'unauthorized',
     ];
-    
+
     const lowerMessage = this._message.toLowerCase();
     return inputErrorPatterns.some(pattern => lowerMessage.includes(pattern));
   }
@@ -200,17 +213,19 @@ export class Timestamp {
   /**
    * Business rule: Check if timestamp is recent (within given milliseconds)
    */
-  isRecent(withinMs: number = 300000): boolean { // Default 5 minutes
+  isRecent(withinMs: number = 300000): boolean {
+    // Default 5 minutes
     const now = Date.now();
-    return (now - this._date.getTime()) <= withinMs;
+    return now - this._date.getTime() <= withinMs;
   }
 
   /**
    * Business rule: Check if timestamp indicates a stale operation
    */
-  isStale(staleAfterMs: number = 3600000): boolean { // Default 1 hour
+  isStale(staleAfterMs: number = 3600000): boolean {
+    // Default 1 hour
     const now = Date.now();
-    return (now - this._date.getTime()) > staleAfterMs;
+    return now - this._date.getTime() > staleAfterMs;
   }
 
   /**
@@ -311,7 +326,7 @@ export class Duration {
    * Business rule: Check if duration indicates a timeout risk
    */
   isNearTimeout(timeoutMs: number, threshold: number = 0.8): boolean {
-    return this._milliseconds > (timeoutMs * threshold);
+    return this._milliseconds > timeoutMs * threshold;
   }
 
   toString(): string {
@@ -396,11 +411,11 @@ export class ResourceIdentifier {
     if (!type || type.trim().length === 0) {
       throw new Error('Resource type cannot be empty');
     }
-    
+
     if (!id || id.trim().length === 0) {
       throw new Error('Resource ID cannot be empty');
     }
-    
+
     const validTypes = ['tool', 'model', 'execution', 'plan', 'workflow', 'step'];
     if (!validTypes.includes(type.toLowerCase())) {
       throw new Error(`Invalid resource type: ${type}. Must be one of: ${validTypes.join(', ')}`);
@@ -471,10 +486,10 @@ export class QualityScore {
     if (thisWeight < 0 || thisWeight > 1) {
       throw new Error('Weight must be between 0 and 1');
     }
-    
+
     const otherWeight = 1 - thisWeight;
-    const average = (this._value * thisWeight) + (other._value * otherWeight);
-    
+    const average = this._value * thisWeight + other._value * otherWeight;
+
     return new QualityScore(average);
   }
 

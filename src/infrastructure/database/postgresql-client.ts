@@ -1,7 +1,7 @@
 /**
  * Pure PostgreSQL Infrastructure Client
  * Handles only database connections and query execution
- * 
+ *
  * Architecture Compliance:
  * - Infrastructure layer: concrete implementation only
  * - No business logic for query optimization or data processing
@@ -144,7 +144,7 @@ export class PostgreSQLClient extends EventEmitter {
 
       // Get client from pool
       const client = await pool.connect();
-      
+
       try {
         // Set statement timeout if specified
         if (options.timeout) {
@@ -153,7 +153,7 @@ export class PostgreSQLClient extends EventEmitter {
 
         // Execute query
         const result = await client.query<T>(sql, params);
-        
+
         // Update metrics
         const latency = Date.now() - startTime;
         this.updateLatencyMetrics(latency);
@@ -173,7 +173,7 @@ export class PostgreSQLClient extends EventEmitter {
     } catch (error) {
       this.metrics.failedQueries++;
       const latency = Date.now() - startTime;
-      
+
       this.emit('queryError', {
         sql: sql.substring(0, 100),
         error: error instanceof Error ? error.message : String(error),
@@ -187,9 +187,7 @@ export class PostgreSQLClient extends EventEmitter {
   /**
    * Execute multiple queries in a transaction
    */
-  async transaction<T>(
-    callback: (ctx: TransactionContext) => Promise<T>
-  ): Promise<T> {
+  async transaction<T>(callback: (ctx: TransactionContext) => Promise<T>): Promise<T> {
     if (!this.masterPool) {
       throw new Error('Master connection not available');
     }
@@ -202,7 +200,10 @@ export class PostgreSQLClient extends EventEmitter {
       await client.query('BEGIN');
 
       const transactionContext: TransactionContext = {
-        query: async <R extends QueryResultRow = QueryResultRow>(sql: string, params: any[] = []) => {
+        query: async <R extends QueryResultRow = QueryResultRow>(
+          sql: string,
+          params: any[] = []
+        ) => {
           if (hasCommitted || hasRolledBack) {
             throw new Error('Transaction has already been committed or rolled back');
           }
@@ -564,10 +565,9 @@ export class PostgreSQLClient extends EventEmitter {
   private updateLatencyMetrics(latency: number): void {
     const totalQueries = this.metrics.totalQueries;
     const currentAverage = this.metrics.averageLatency;
-    
+
     // Calculate new running average
-    this.metrics.averageLatency = 
-      ((currentAverage * (totalQueries - 1)) + latency) / totalQueries;
+    this.metrics.averageLatency = (currentAverage * (totalQueries - 1) + latency) / totalQueries;
   }
 
   private startHealthMonitoring(): void {

@@ -1,13 +1,13 @@
 /**
  * Unified CLI Coordinator - Application Layer
- * 
+ *
  * Coordinates and orchestrates all CLI specialized capabilities:
  * - Context intelligence and project analysis
  * - Performance optimization with lazy loading
  * - Error resilience and recovery systems
  * - User interface and interaction management
  * - Session management and workflow coordination
- * 
+ *
  * This eliminates the need for multiple CLI implementations by
  * providing a single coordinated interface that leverages all
  * specialized capabilities as needed.
@@ -16,21 +16,50 @@
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { randomUUID } from 'crypto';
-import { IWorkflowOrchestrator, WorkflowRequest, WorkflowResponse, WorkflowContext } from '../../domain/interfaces/workflow-orchestrator.js';
+import {
+  IWorkflowOrchestrator,
+  WorkflowRequest,
+  WorkflowResponse,
+  WorkflowContext,
+} from '../../domain/interfaces/workflow-orchestrator.js';
 import { IUserInteraction } from '../../domain/interfaces/user-interaction.js';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 import { getDependencyContainer, UseCaseDependencies } from './dependency-container.js';
 import { AnalysisRequest, GenerationRequest } from '../use-cases/index.js';
 import { FileReferenceParser } from '../../core/cli/file-reference-parser.js';
-import { projectConfigurationLoader, CombinedProjectConfig } from '../../core/config/project-config-loader.js';
-import { contextWindowManager, CodebaseAnalysisResult } from '../../core/context/context-window-manager.js';
-import { naturalLanguageInterface, ParsedCommand } from '../../core/cli/natural-language-interface.js';
-import { agenticWorkflowDisplay, WorkflowPhase } from '../../core/workflow/agentic-workflow-display.js';
+import {
+  projectConfigurationLoader,
+  CombinedProjectConfig,
+} from '../../core/config/project-config-loader.js';
+import {
+  contextWindowManager,
+  CodebaseAnalysisResult,
+} from '../../core/context/context-window-manager.js';
+import {
+  naturalLanguageInterface,
+  ParsedCommand,
+} from '../../core/cli/natural-language-interface.js';
+import {
+  agenticWorkflowDisplay,
+  WorkflowPhase,
+} from '../../core/workflow/agentic-workflow-display.js';
 import { streamingWorkflowIntegration } from '../../core/workflow/streaming-workflow-integration.js';
-import { EnterpriseSecurityFramework, SecurityContext, SecurityValidationResult } from '../../core/security/enterprise-security-framework.js';
-import { AdaptivePerformanceTuner, PerformanceMetrics, TuningConfiguration } from '../../core/performance/adaptive-performance-tuner.js';
-import { ObservabilitySystem, MetricPoint, TraceSpan } from '../../core/observability/observability-system.js';
+import {
+  EnterpriseSecurityFramework,
+  SecurityContext,
+  SecurityValidationResult,
+} from '../../core/security/enterprise-security-framework.js';
+import {
+  AdaptivePerformanceTuner,
+  PerformanceMetrics,
+  TuningConfiguration,
+} from '../../core/performance/adaptive-performance-tuner.js';
+import {
+  ObservabilitySystem,
+  MetricPoint,
+  TraceSpan,
+} from '../../core/observability/observability-system.js';
 
 // LEGACY IMPORTS REMOVED - replaced with simple interfaces
 // Define minimal types for backward compatibility
@@ -61,7 +90,7 @@ interface QuickContextInfo {
   confidence: number;
 }
 
-// Performance Optimization Integration  
+// Performance Optimization Integration
 // import {
 //   OptimizedContextAwareCLI,
 //   OptimizedContextOptions,
@@ -82,7 +111,7 @@ interface SmartSuggestion {
 import {
   ResilientCLIWrapper,
   ResilientOptions,
-  OperationResult
+  OperationResult,
 } from '../../core/resilience/resilient-cli-wrapper.js';
 
 // Session and Performance Types
@@ -146,27 +175,27 @@ export class UnifiedCLICoordinator extends EventEmitter {
   private orchestrator!: IWorkflowOrchestrator;
   private userInteraction!: IUserInteraction;
   private eventBus!: IEventBus;
-  
+
   // Use Cases (via Dependency Injection)
   private useCases!: UseCaseDependencies;
-  
+
   // Security Framework
   private securityFramework: EnterpriseSecurityFramework;
-  
+
   // Performance & Observability Systems
   private performanceTuner: AdaptivePerformanceTuner;
   private observabilitySystem: ObservabilitySystem;
-  
+
   // Specialized CLI Components (legacy components disabled)
   // private contextAwareCLI: ContextAwareCLIIntegration;
   // private optimizedContextCLI: OptimizedContextAwareCLI;
   private resilientWrapper: ResilientCLIWrapper;
-  
+
   // Session Management
   private activeSessions: Map<string, CLISession> = new Map();
   private defaultOptions: UnifiedCLIOptions;
   private isInitialized = false;
-  
+
   // Performance Tracking
   private operationCount = 0;
   private startTime = Date.now(); // For calculating request rates
@@ -174,15 +203,15 @@ export class UnifiedCLICoordinator extends EventEmitter {
     commandsExecuted: 0,
     contextEnhancements: 0,
     errorsRecovered: 0,
-    totalProcessingTime: 0
+    totalProcessingTime: 0,
   };
 
   constructor(options: Partial<UnifiedCLIOptions> = {}) {
     super();
-    
+
     // Initialize Security Framework
     this.securityFramework = new EnterpriseSecurityFramework();
-    
+
     // Initialize Performance & Observability Systems
     this.performanceTuner = new AdaptivePerformanceTuner();
     this.observabilitySystem = new ObservabilitySystem({
@@ -191,18 +220,23 @@ export class UnifiedCLICoordinator extends EventEmitter {
       logging: { level: 'info', outputs: [], structured: true, includeStackTrace: true },
       health: { checkInterval: 30000, timeoutMs: 5000, retryAttempts: 3 },
       alerting: { enabled: true, rules: [], defaultCooldown: 300000 },
-      storage: { dataPath: './data/observability', maxFileSize: 100 * 1024 * 1024, compressionEnabled: true, encryptionEnabled: false }
+      storage: {
+        dataPath: './data/observability',
+        maxFileSize: 100 * 1024 * 1024,
+        compressionEnabled: true,
+        encryptionEnabled: false,
+      },
     });
-    
+
     // LEGACY COMPONENTS DISABLED - Use new unified architecture instead
     // this.contextAwareCLI = new ContextAwareCLIIntegration();
     // this.optimizedContextCLI = new OptimizedContextAwareCLI();
     this.resilientWrapper = new ResilientCLIWrapper();
-    
+
     // Set default options - legacy context systems disabled
     this.defaultOptions = {
-      enableContextIntelligence: false,  // Disabled legacy system
-      enablePerformanceOptimization: false, // Disabled legacy system  
+      enableContextIntelligence: false, // Disabled legacy system
+      enablePerformanceOptimization: false, // Disabled legacy system
       enableErrorResilience: true,
       sessionTimeout: 300000, // 5 minutes
       maxConcurrentOperations: 10,
@@ -211,7 +245,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       timeoutMs: 30000,
       fallbackMode: 'basic',
       errorNotification: true,
-      ...options
+      ...options,
     };
 
     this.setupComponentIntegration();
@@ -237,13 +271,14 @@ export class UnifiedCLICoordinator extends EventEmitter {
 
       // Initialize all specialized components
       await this.initializeComponents();
-      
+
       this.isInitialized = true;
       this.emit('initialized');
-      
-      await this.userInteraction.display('Unified CLI Coordinator initialized successfully', { type: 'success' });
+
+      await this.userInteraction.display('Unified CLI Coordinator initialized successfully', {
+        type: 'success',
+      });
       logger.info('UnifiedCLICoordinator initialized with all capabilities enabled');
-      
     } catch (error) {
       logger.error('Failed to initialize UnifiedCLICoordinator:', error);
       throw error;
@@ -267,15 +302,18 @@ export class UnifiedCLICoordinator extends EventEmitter {
 
     try {
       traceSpan = this.observabilitySystem.startSpan('cli-operation');
-      
+
       // 🔐 SECURITY: Validate operation before execution
       const securityValidation = await this.securityFramework.validateOperation(
-        JSON.stringify(request.input), 
+        JSON.stringify(request.input),
         { operationType: request.type, sessionId: request.session?.id }
       );
-      
+
       if (!securityValidation.allowed) {
-        logger.warn(`🚫 Security validation failed for operation ${operationId}:`, securityValidation.violations);
+        logger.warn(
+          `🚫 Security validation failed for operation ${operationId}:`,
+          securityValidation.violations
+        );
         return {
           id: operationId,
           success: false,
@@ -283,43 +321,54 @@ export class UnifiedCLICoordinator extends EventEmitter {
           metrics: {
             processingTime: performance.now() - startTime,
             contextConfidence: 0,
-            systemHealth: this.calculateSystemHealth()
-          }
+            systemHealth: this.calculateSystemHealth(),
+          },
         };
       }
-      
-      logger.info(`🔐 Security validation passed (Risk score: ${securityValidation.riskScore.toFixed(2)})`);
-      
+
+      logger.info(
+        `🔐 Security validation passed (Risk score: ${securityValidation.riskScore.toFixed(2)})`
+      );
+
       // Use resilient execution wrapper for error handling
       const resilientResult = await this.resilientWrapper.executeWithRecovery(
-        () => this.executeWithCoordination(request, options),
+        async () => this.executeWithCoordination(request, options),
         {
           name: `CLI-${request.type}`,
           component: 'UnifiedCLICoordinator',
-          critical: request.type === 'execute'
+          critical: request.type === 'execute',
         },
         {
           enableGracefulDegradation: options.enableGracefulDegradation,
           retryAttempts: options.retryAttempts,
           timeoutMs: options.timeoutMs,
           fallbackMode: options.fallbackMode,
-          errorNotification: options.errorNotification
+          errorNotification: options.errorNotification,
         }
       );
 
       const processingTime = performance.now() - startTime;
-      
+
       // 📊 PERFORMANCE: Record metrics and complete tracing
-      this.recordOperationMetrics(operationId, request.type, processingTime, resilientResult.success);
+      this.recordOperationMetrics(
+        operationId,
+        request.type,
+        processingTime,
+        resilientResult.success
+      );
       if (traceSpan) {
-        this.observabilitySystem.finishSpan(traceSpan, { 
+        this.observabilitySystem.finishSpan(traceSpan, {
           status: resilientResult.success ? 'ok' : 'error',
-          'operation.duration': processingTime.toString() 
+          'operation.duration': processingTime.toString(),
         });
       }
-      
+
       // Update metrics
-      this.updateMetrics(request.session?.id, processingTime, resilientResult.metrics?.recoveryActions || 0);
+      this.updateMetrics(
+        request.session?.id,
+        processingTime,
+        resilientResult.metrics?.recoveryActions || 0
+      );
 
       return {
         id: operationId,
@@ -329,23 +378,22 @@ export class UnifiedCLICoordinator extends EventEmitter {
         enhancements: {
           contextAdded: true, // We always try to add context
           performanceOptimized: true, // We always optimize
-          errorsRecovered: resilientResult.metrics?.recoveryActions || 0
+          errorsRecovered: resilientResult.metrics?.recoveryActions || 0,
         },
         metrics: {
           processingTime,
           contextConfidence: 0.8, // Will be calculated dynamically
-          systemHealth: this.calculateSystemHealth()
-        }
+          systemHealth: this.calculateSystemHealth(),
+        },
       };
-
     } catch (error) {
       const processingTime = performance.now() - startTime;
-      
+
       // 📊 PERFORMANCE: Record error metrics
       this.recordOperationMetrics(operationId, request.type, processingTime, false);
-      
+
       logger.error(`CLI operation ${operationId} failed:`, error);
-      
+
       return {
         id: operationId,
         success: false,
@@ -353,8 +401,8 @@ export class UnifiedCLICoordinator extends EventEmitter {
         metrics: {
           processingTime,
           contextConfidence: 0,
-          systemHealth: this.calculateSystemHealth()
-        }
+          systemHealth: this.calculateSystemHealth(),
+        },
       };
     }
   }
@@ -367,7 +415,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
     options: UnifiedCLIOptions
   ): Promise<any> {
     let result: any;
-    let contextEnhancement: ContextualPromptEnhancement | null = null;
+    const contextEnhancement: ContextualPromptEnhancement | null = null;
 
     // Phase 1: Context Intelligence (DISABLED - using direct orchestrator approach)
     // Legacy context enhancement systems disabled to prevent interference
@@ -383,7 +431,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
         result = {
           ...result,
           suggestions: [],
-          contextConfidence: 0.5
+          contextConfidence: 0.5,
         };
       } catch (error) {
         logger.warn('Failed to generate suggestions:', error);
@@ -402,235 +450,243 @@ export class UnifiedCLICoordinator extends EventEmitter {
     options: UnifiedCLIOptions
   ): Promise<any> {
     const workingDir = request.session?.workingDirectory || process.cwd();
-    
+
     // Start transparent agentic workflow display
     const sessionId = agenticWorkflowDisplay.startSession(
-      request.input as string, 
+      request.input as string,
       this.determineComplexity(request.input as string)
     );
-    
+
     try {
       // PHASE 1: PLANNING - Parse and understand the request
       const planStepId = agenticWorkflowDisplay.addStep(
-        sessionId, 'planning', 'Understanding Request', 'Analyzing user intent and requirements'
+        sessionId,
+        'planning',
+        'Understanding Request',
+        'Analyzing user intent and requirements'
       );
-      
+
       // Parse natural language command if input is string
       let parsedCommand: ParsedCommand | null = null;
       if (typeof request.input === 'string') {
         parsedCommand = naturalLanguageInterface.parseCommand(request.input);
-        
+
         agenticWorkflowDisplay.updateStepProgress(
-          sessionId, planStepId, 50, `Intent: ${parsedCommand.intent} (${(parsedCommand.confidence * 100).toFixed(0)}% confidence)`
+          sessionId,
+          planStepId,
+          50,
+          `Intent: ${parsedCommand.intent} (${(parsedCommand.confidence * 100).toFixed(0)}% confidence)`
         );
-        
+
         // Log natural language understanding for transparency
         if (parsedCommand.confidence > 0.7) {
-          logger.info(`🎯 Command understood: ${parsedCommand.intent} (${(parsedCommand.confidence * 100).toFixed(0)}% confidence)`);
+          logger.info(
+            `🎯 Command understood: ${parsedCommand.intent} (${(parsedCommand.confidence * 100).toFixed(0)}% confidence)`
+          );
         }
       }
-      
-      agenticWorkflowDisplay.completeStep(sessionId, planStepId, { 
-        intent: parsedCommand?.intent, 
-        confidence: parsedCommand?.confidence 
-      });
-    
-    // Load project configuration for context-aware responses
-    let projectConfig: CombinedProjectConfig | null = null;
-    try {
-      projectConfig = await projectConfigurationLoader.loadProjectConfig(workingDir);
-      if (projectConfig.isLoaded) {
-        logger.info(`🏗️ Loaded project config: ${projectConfig.configuration.name || 'Unknown'} (${projectConfig.configuration.language || 'Unknown'})`);
-      }
-    } catch (error) {
-      logger.warn('⚠️ Failed to load project configuration:', error);
-    }
-    
-    // Process @ syntax file references
-    let processedInput = request.input;
-    if (typeof request.input === 'string' && request.input.includes('@')) {
-      try {
-        const parser = new FileReferenceParser();
-        const parsed = await parser.parseFileReferences(request.input, workingDir);
-        
-        if (parsed.references.length > 0) {
-          processedInput = parsed.enhancedPrompt;
-          logger.info(`📁 Processed ${parsed.references.length} file references: ${parsed.contextSummary}`);
-        }
-      } catch (error) {
-        logger.warn('❌ Failed to process @ file references:', error);
-        // Continue with original input on parsing failure
-      }
-    }
-    
-    // Check if this requires large codebase analysis
-    let codebaseAnalysis: CodebaseAnalysisResult | null = null;
-    if (typeof processedInput === 'string' && this.requiresCodebaseAnalysis(processedInput)) {
-      try {
-        logger.info(`🧠 Detected large codebase analysis request`);
-        codebaseAnalysis = await contextWindowManager.analyzeCodebase(workingDir, processedInput, {
-          maxDepth: projectConfig?.configuration.security?.restrictedPaths ? 3 : 5,
-          includeTests: projectConfig?.instructions.preferences?.includeTests ?? true,
-          includeDocs: projectConfig?.instructions.preferences?.includeDocumentation ?? true,
-          chunkStrategy: 'priority'
-        });
-        
-        logger.info(`📊 Codebase analysis: ${codebaseAnalysis.analyzedFiles}/${codebaseAnalysis.totalFiles} files, ${(codebaseAnalysis.contextEfficiency * 100).toFixed(1)}% context efficiency`);
-        
-        if (codebaseAnalysis.recommendations.length > 0) {
-          logger.info(`💡 Recommendations: ${codebaseAnalysis.recommendations.join(', ')}`);
-        }
-      } catch (error) {
-        logger.warn('⚠️ Large codebase analysis failed:', error);
-      }
-    }
 
-    // Enhance input with project context if available
-    let contextEnhancedInput = processedInput;
-    if (projectConfig && projectConfig.isLoaded && typeof processedInput === 'string') {
-      contextEnhancedInput = this.enhanceInputWithProjectContext(processedInput, projectConfig);
-    }
-    
-    // Further enhance with codebase analysis if available
-    if (codebaseAnalysis && typeof contextEnhancedInput === 'string') {
-      contextEnhancedInput = this.enhanceInputWithCodebaseAnalysis(contextEnhancedInput, codebaseAnalysis);
-    }
-    
-    const enhancedInput = contextEnhancement?.enhancedPrompt || contextEnhancedInput;
-    
-    // Use natural language intent to refine operation type if confidence is high
-    let effectiveOperationType: 'analyze' | 'prompt' | 'execute' | 'navigate' | 'suggest' = request.type;
-    if (parsedCommand && parsedCommand.confidence > 0.5) {
-      // Map natural language intents to operation types
-      const intentToOperationMap: Record<string, 'analyze' | 'prompt' | 'execute' | 'navigate' | 'suggest'> = {
-        'analyze': 'analyze',
-        'review': 'analyze',
-        'explain': 'analyze', // Explanation should be analysis, not code generation
-        'generate': 'prompt', // Code generation goes through prompt system
-        'fix': 'prompt',
-        'refactor': 'prompt', 
-        'optimize': 'prompt',
-        'test': 'prompt',
-        'document': 'prompt',
-        'help': 'suggest',
-        'chat': 'prompt'
-      };
-      
-      const mappedOperation = intentToOperationMap[parsedCommand.intent];
-      if (mappedOperation && mappedOperation !== request.type) {
-        logger.info(`🔄 Routing: ${request.type} → ${mappedOperation} based on natural language intent`);
-        effectiveOperationType = mappedOperation;
+      agenticWorkflowDisplay.completeStep(sessionId, planStepId, {
+        intent: parsedCommand?.intent,
+        confidence: parsedCommand?.confidence,
+      });
+
+      // Load project configuration for context-aware responses
+      let projectConfig: CombinedProjectConfig | null = null;
+      try {
+        projectConfig = await projectConfigurationLoader.loadProjectConfig(workingDir);
+        if (projectConfig.isLoaded) {
+          logger.info(
+            `🏗️ Loaded project config: ${projectConfig.configuration.name || 'Unknown'} (${projectConfig.configuration.language || 'Unknown'})`
+          );
+        }
+      } catch (error) {
+        logger.warn('⚠️ Failed to load project configuration:', error);
       }
-    }
-    
-    switch (effectiveOperationType) {
-      case 'analyze': {
-        // Determine if it's file or directory analysis
-        if (typeof request.input === 'string' && request.input.includes('/') && 
-            !request.input.includes(' ')) {
-          // Likely a file or directory path
-          const analysisRequest: AnalysisRequest = {
-            filePath: request.input.endsWith('/') ? undefined : request.input,
-            directoryPath: request.input.endsWith('/') ? request.input : undefined,
-            options: {
-              depth: 3,
-              includeTests: options.includeTests,
-              includeDocumentation: options.includeDocumentation,
-              outputFormat: 'structured'
-            }
-          };
-          
-          if (analysisRequest.directoryPath) {
-            return await this.executeUseCaseWithWorkflow(
-              sessionId,
-              () => this.useCases.analyzeDirectoryUseCase.execute(analysisRequest),
-              'directory analysis'
-            );
-          } else {
-            return await this.executeUseCaseWithWorkflow(
-              sessionId,
-              () => this.useCases.analyzeFileUseCase.execute(analysisRequest),
-              'file analysis'
+
+      // Process @ syntax file references
+      let processedInput = request.input;
+      if (typeof request.input === 'string' && request.input.includes('@')) {
+        try {
+          const parser = new FileReferenceParser();
+          const parsed = await parser.parseFileReferences(request.input, workingDir);
+
+          if (parsed.references.length > 0) {
+            processedInput = parsed.enhancedPrompt;
+            logger.info(
+              `📁 Processed ${parsed.references.length} file references: ${parsed.contextSummary}`
             );
           }
-        } else {
-          // Check if this is a simple question that should go directly to AI
-          const inputStr = enhancedInput as string;
-          const isSimpleQuestion = this.isSimpleQuestion(inputStr);
-          
-          if (isSimpleQuestion) {
-            // Route simple questions directly to orchestrator for real AI responses
-            logger.info('🎯 Routing simple question directly to AI orchestrator');
-            return await this.executeUseCaseWithWorkflow(
-              sessionId,
-              () => this.executeViaOrchestrator(request, enhancedInput, options),
-              'AI response'
-            );
-          } else {
-            // General analysis request - use file analysis with content
+        } catch (error) {
+          logger.warn('❌ Failed to process @ file references:', error);
+          // Continue with original input on parsing failure
+        }
+      }
+
+      // AI-driven tool selection: Let the model decide between MCP tools and codebase analysis
+      // based on context and available tools rather than hardcoded routing logic
+      const codebaseAnalysis: CodebaseAnalysisResult | null = null;
+
+      // Enhance input with project context if available
+      let contextEnhancedInput = processedInput;
+      if (projectConfig && projectConfig.isLoaded && typeof processedInput === 'string') {
+        contextEnhancedInput = this.enhanceInputWithProjectContext(processedInput, projectConfig);
+      }
+
+      // Further enhance with codebase analysis if available
+      if (codebaseAnalysis && typeof contextEnhancedInput === 'string') {
+        contextEnhancedInput = this.enhanceInputWithCodebaseAnalysis(
+          contextEnhancedInput,
+          codebaseAnalysis
+        );
+      }
+
+      const enhancedInput = contextEnhancement?.enhancedPrompt || contextEnhancedInput;
+
+      // Use natural language intent to refine operation type if confidence is high
+      let effectiveOperationType: 'analyze' | 'prompt' | 'execute' | 'navigate' | 'suggest' =
+        request.type;
+      if (parsedCommand && parsedCommand.confidence > 0.5) {
+        // Map natural language intents to operation types
+        const intentToOperationMap: Record<
+          string,
+          'analyze' | 'prompt' | 'execute' | 'navigate' | 'suggest'
+        > = {
+          analyze: 'analyze',
+          review: 'analyze',
+          explain: 'analyze', // Explanation should be analysis, not code generation
+          generate: 'prompt', // Code generation goes through prompt system
+          fix: 'prompt',
+          refactor: 'prompt',
+          optimize: 'prompt',
+          test: 'prompt',
+          document: 'prompt',
+          help: 'suggest',
+          chat: 'prompt',
+        };
+
+        const mappedOperation = intentToOperationMap[parsedCommand.intent];
+        if (mappedOperation && mappedOperation !== request.type) {
+          logger.info(
+            `🔄 Routing: ${request.type} → ${mappedOperation} based on natural language intent`
+          );
+          effectiveOperationType = mappedOperation;
+        }
+      }
+
+      switch (effectiveOperationType) {
+        case 'analyze': {
+          // Determine if it's file or directory analysis
+          if (
+            typeof request.input === 'string' &&
+            request.input.includes('/') &&
+            !request.input.includes(' ')
+          ) {
+            // Likely a file or directory path
             const analysisRequest: AnalysisRequest = {
-              content: enhancedInput as string,
+              filePath: request.input.endsWith('/') ? undefined : request.input,
+              directoryPath: request.input.endsWith('/') ? request.input : undefined,
+              options: {
+                depth: 3,
+                includeTests: options.includeTests,
+                includeDocumentation: options.includeDocumentation,
+                outputFormat: 'structured',
+              },
+            };
+
+            if (analysisRequest.directoryPath) {
+              return await this.executeUseCaseWithWorkflow(
+                sessionId,
+                async () => this.useCases.analyzeDirectoryUseCase.execute(analysisRequest),
+                'directory analysis'
+              );
+            } else {
+              return await this.executeUseCaseWithWorkflow(
+                sessionId,
+                async () => this.useCases.analyzeFileUseCase.execute(analysisRequest),
+                'file analysis'
+              );
+            }
+          } else {
+            // Check if this is a simple question that should go directly to AI
+            const inputStr = enhancedInput as string;
+            const isSimpleQuestion = this.isSimpleQuestion(inputStr);
+
+            if (isSimpleQuestion) {
+              // Route simple questions directly to orchestrator for real AI responses
+              logger.info('🎯 Routing simple question directly to AI orchestrator');
+              return await this.executeUseCaseWithWorkflow(
+                sessionId,
+                async () => this.executeViaOrchestrator(request, enhancedInput, options),
+                'AI response'
+              );
+            } else {
+              // General analysis request - use file analysis with content
+              const analysisRequest: AnalysisRequest = {
+                content: enhancedInput as string,
+                options: {
+                  includeTests: options.includeTests,
+                  includeDocumentation: options.includeDocumentation,
+                  outputFormat: 'structured',
+                },
+              };
+              return await this.executeUseCaseWithWorkflow(
+                sessionId,
+                async () => this.useCases.analyzeFileUseCase.execute(analysisRequest),
+                'content analysis'
+              );
+            }
+          }
+        }
+
+        case 'prompt': {
+          // Check if this is a code generation request using ORIGINAL user input, not enhanced context
+          const originalInput = request.input as string;
+          if (this.isCodeGenerationRequest(originalInput)) {
+            const generationRequest: GenerationRequest = {
+              prompt: enhancedInput as string,
+              context: this.extractGenerationContext(request),
               options: {
                 includeTests: options.includeTests,
                 includeDocumentation: options.includeDocumentation,
-                outputFormat: 'structured'
-              }
+                // For explicit code generation requests, default to actually writing files
+                // Only dry-run if explicitly requested via options
+                dryRun: options.dryRun ?? false,
+              },
             };
             return await this.executeUseCaseWithWorkflow(
               sessionId,
-              () => this.useCases.analyzeFileUseCase.execute(analysisRequest),
-              'content analysis'
+              async () => this.useCases.generateCodeUseCase.execute(generationRequest),
+              'code generation'
+            );
+          } else {
+            // Regular prompt - fallback to orchestrator
+            return await this.executeUseCaseWithWorkflow(
+              sessionId,
+              async () => this.executeViaOrchestrator(request, enhancedInput, options),
+              'prompt processing'
             );
           }
         }
-      }
 
-      case 'prompt': {
-        // Check if this is a code generation request
-        if (this.isCodeGenerationRequest(enhancedInput as string)) {
-          const generationRequest: GenerationRequest = {
-            prompt: enhancedInput as string,
-            context: this.extractGenerationContext(request),
-            options: {
-              includeTests: options.includeTests,
-              includeDocumentation: options.includeDocumentation,
-              dryRun: options.dryRun || false
-            }
-          };
+        case 'execute':
+        case 'navigate':
+        case 'suggest':
+        default: {
+          // Fallback to orchestrator for other operation types
           return await this.executeUseCaseWithWorkflow(
             sessionId,
-            () => this.useCases.generateCodeUseCase.execute(generationRequest),
-            'code generation'
-          );
-        } else {
-          // Regular prompt - fallback to orchestrator
-          return await this.executeUseCaseWithWorkflow(
-            sessionId,
-            () => this.executeViaOrchestrator(request, enhancedInput, options),
-            'prompt processing'
+            async () => this.executeViaOrchestrator(request, enhancedInput, options),
+            request.type
           );
         }
       }
-
-      case 'execute':
-      case 'navigate':
-      case 'suggest':
-      default: {
-        // Fallback to orchestrator for other operation types
-        return await this.executeUseCaseWithWorkflow(
-          sessionId,
-          () => this.executeViaOrchestrator(request, enhancedInput, options),
-          request.type
-        );
-      }
-    }
-    
     } catch (error) {
       // Handle workflow errors
       agenticWorkflowDisplay.failStep(sessionId, 'current-step', (error as Error).message);
-      agenticWorkflowDisplay.completeSession(sessionId, { 
-        success: false, 
-        error: (error as Error).message 
+      agenticWorkflowDisplay.completeSession(sessionId, {
+        success: false,
+        error: (error as Error).message,
       });
       throw error;
     }
@@ -646,31 +702,48 @@ export class UnifiedCLICoordinator extends EventEmitter {
   ): Promise<any> {
     // PHASE 2: EXECUTING - Run the actual use case with streaming
     const executeStepId = agenticWorkflowDisplay.addStep(
-      sessionId, 'executing', `Executing ${operationType}`, `Running ${operationType} operation with AI models`
+      sessionId,
+      'executing',
+      `Executing ${operationType}`,
+      `Running ${operationType} operation with AI models`
     );
-    
-    agenticWorkflowDisplay.updateStepProgress(sessionId, executeStepId, 5, 'Initializing AI models...');
-    
+
+    agenticWorkflowDisplay.updateStepProgress(
+      sessionId,
+      executeStepId,
+      5,
+      'Initializing AI models...'
+    );
+
     let result: any;
     try {
       // Check if this is an operation that benefits from streaming display
       if (this.shouldUseStreaming(operationType)) {
         logger.info(`🌊 Using streaming workflow for ${operationType}`);
-        
+
         // Execute use case with streaming display wrapper
         result = await this.executeWithStreaming(sessionId, executeStepId, useCase, operationType);
-        
       } else {
         // Standard non-streaming execution
-        agenticWorkflowDisplay.updateStepProgress(sessionId, executeStepId, 50, 'Processing request...');
+        agenticWorkflowDisplay.updateStepProgress(
+          sessionId,
+          executeStepId,
+          50,
+          'Processing request...'
+        );
         result = await useCase();
-        agenticWorkflowDisplay.updateStepProgress(sessionId, executeStepId, 75, 'Generating response...');
+        agenticWorkflowDisplay.updateStepProgress(
+          sessionId,
+          executeStepId,
+          75,
+          'Generating response...'
+        );
       }
-      
-      agenticWorkflowDisplay.completeStep(sessionId, executeStepId, { 
-        operationType, 
+
+      agenticWorkflowDisplay.completeStep(sessionId, executeStepId, {
+        operationType,
         hasResult: !!result,
-        streaming: this.shouldUseStreaming(operationType)
+        streaming: this.shouldUseStreaming(operationType),
       });
     } catch (error) {
       agenticWorkflowDisplay.failStep(sessionId, executeStepId, (error as Error).message);
@@ -679,18 +752,26 @@ export class UnifiedCLICoordinator extends EventEmitter {
 
     // PHASE 3: TESTING - Validate the response
     const testStepId = agenticWorkflowDisplay.addStep(
-      sessionId, 'testing', 'Validating Response', 'Checking response quality and completeness'
+      sessionId,
+      'testing',
+      'Validating Response',
+      'Checking response quality and completeness'
     );
-    
-    agenticWorkflowDisplay.updateStepProgress(sessionId, testStepId, 33, 'Analyzing response structure...');
-    
-    let testResults = {
+
+    agenticWorkflowDisplay.updateStepProgress(
+      sessionId,
+      testStepId,
+      33,
+      'Analyzing response structure...'
+    );
+
+    const testResults = {
       isValid: true,
       hasContent: !!result,
       isComplete: true,
-      qualityScore: 0.8
+      qualityScore: 0.8,
     };
-    
+
     try {
       // Basic validation
       if (!result) {
@@ -700,29 +781,47 @@ export class UnifiedCLICoordinator extends EventEmitter {
         testResults.isComplete = false;
         testResults.qualityScore = 0.4;
       }
-      
-      agenticWorkflowDisplay.updateStepProgress(sessionId, testStepId, 66, `Quality: ${(testResults.qualityScore * 100).toFixed(0)}%`);
-      
+
+      agenticWorkflowDisplay.updateStepProgress(
+        sessionId,
+        testStepId,
+        66,
+        `Quality: ${(testResults.qualityScore * 100).toFixed(0)}%`
+      );
+
       agenticWorkflowDisplay.updateStepProgress(sessionId, testStepId, 100, 'Validation complete');
       agenticWorkflowDisplay.completeStep(sessionId, testStepId, testResults);
     } catch (error) {
       agenticWorkflowDisplay.failStep(sessionId, testStepId, (error as Error).message);
     }
 
-    // PHASE 4: ITERATING - Learning and improvement  
+    // PHASE 4: ITERATING - Learning and improvement
     const iterateStepId = agenticWorkflowDisplay.addStep(
-      sessionId, 'iterating', 'Learning & Optimization', 'Analyzing performance and preparing for future requests'
+      sessionId,
+      'iterating',
+      'Learning & Optimization',
+      'Analyzing performance and preparing for future requests'
     );
-    
-    agenticWorkflowDisplay.updateStepProgress(sessionId, iterateStepId, 50, 'Recording performance metrics...');
-    
+
+    agenticWorkflowDisplay.updateStepProgress(
+      sessionId,
+      iterateStepId,
+      50,
+      'Recording performance metrics...'
+    );
+
     const iterationResults = {
       performanceGood: testResults.qualityScore > 0.7,
       canImprove: testResults.qualityScore < 0.9,
-      learningRecorded: true
+      learningRecorded: true,
     };
-    
-    agenticWorkflowDisplay.updateStepProgress(sessionId, iterateStepId, 100, 'Optimization complete');
+
+    agenticWorkflowDisplay.updateStepProgress(
+      sessionId,
+      iterateStepId,
+      100,
+      'Optimization complete'
+    );
     agenticWorkflowDisplay.completeStep(sessionId, iterateStepId, iterationResults);
 
     // Complete the entire workflow session
@@ -731,7 +830,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       qualityScore: testResults.qualityScore,
       operationType,
       tokensUsed: this.estimateTokensUsed(result),
-      confidenceScore: testResults.qualityScore
+      confidenceScore: testResults.qualityScore,
     });
 
     return result;
@@ -751,7 +850,6 @@ export class UnifiedCLICoordinator extends EventEmitter {
       // Not by simulating streaming with static text
       const result = await useCase();
       return result;
-        
     } catch (error) {
       // Ensure streaming is stopped on error
       streamingWorkflowIntegration.stopStreaming(stepId);
@@ -762,35 +860,28 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Record operation performance metrics
    */
-  private recordOperationMetrics(operationId: string, operationType: string, processingTime: number, success: boolean): void {
+  private recordOperationMetrics(
+    operationId: string,
+    operationType: string,
+    processingTime: number,
+    success: boolean
+  ): void {
     // Record operation duration
-    this.observabilitySystem.recordTimer(
-      'cli.operation.duration',
-      processingTime,
-      {
-        operationType,
-        operationId,
-        success: success.toString()
-      }
-    );
+    this.observabilitySystem.recordTimer('cli.operation.duration', processingTime, {
+      operationType,
+      operationId,
+      success: success.toString(),
+    });
 
     // Record operation count
-    this.observabilitySystem.incrementCounter(
-      'cli.operation.count',
-      {
-        operationType,
-        success: success.toString()
-      }
-    );
+    this.observabilitySystem.incrementCounter('cli.operation.count', {
+      operationType,
+      success: success.toString(),
+    });
 
     // Record system metrics
     const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024; // Convert to MB
-    this.observabilitySystem.recordMetric(
-      'system.memory.used',
-      memoryUsage,
-      {},
-      'MB'
-    );
+    this.observabilitySystem.recordMetric('system.memory.used', memoryUsage, {}, 'MB');
 
     this.observabilitySystem.recordMetric(
       'system.sessions.active',
@@ -800,7 +891,9 @@ export class UnifiedCLICoordinator extends EventEmitter {
     );
 
     // Log performance information
-    logger.info(`📊 Operation ${operationId} metrics: ${processingTime.toFixed(2)}ms, Success: ${success}, Memory: ${memoryUsage.toFixed(2)}MB`);
+    logger.info(
+      `📊 Operation ${operationId} metrics: ${processingTime.toFixed(2)}ms, Success: ${success}, Memory: ${memoryUsage.toFixed(2)}MB`
+    );
   }
 
   /**
@@ -809,7 +902,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
   private calculateRequestRate(): number {
     const now = Date.now();
     const windowMs = 60000; // 1 minute window
-    
+
     // Simple request rate calculation (operations per minute)
     return this.operationCount / ((now - this.startTime) / windowMs) || 0;
   }
@@ -824,12 +917,12 @@ export class UnifiedCLICoordinator extends EventEmitter {
       isolation: {
         level: 'medium',
         allowedResources: ['filesystem', 'memory'],
-        maxExecutionTime: 60000 // 1 minute
+        maxExecutionTime: 60000, // 1 minute
       },
       audit: {
         trackActions: true,
-        logLevel: 'basic'
-      }
+        logLevel: 'basic',
+      },
     };
   }
 
@@ -840,12 +933,12 @@ export class UnifiedCLICoordinator extends EventEmitter {
     // Operations that typically involve AI model generation benefit from streaming
     const streamingOperations = [
       'code generation',
-      'prompt processing', 
+      'prompt processing',
       'content analysis',
       'file analysis',
-      'directory analysis'
+      'directory analysis',
     ];
-    
+
     return streamingOperations.includes(operationType.toLowerCase());
   }
 
@@ -854,7 +947,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
    */
   private estimateTokensUsed(result: any): number {
     if (!result) return 0;
-    
+
     const resultString = typeof result === 'string' ? result : JSON.stringify(result);
     // Rough estimate: 1 token ≈ 4 characters
     return Math.ceil(resultString.length / 4);
@@ -865,24 +958,28 @@ export class UnifiedCLICoordinator extends EventEmitter {
    */
   private isSimpleQuestion(input: string): boolean {
     if (typeof input !== 'string') return false;
-    
+
     const inputLower = input.toLowerCase().trim();
-    
+
     // Simple math questions
-    if (/^\s*\d+\s*[\+\-\*\/]\s*\d+[\s\?]*$/.test(inputLower)) return true;
-    
+    if (/^\s*\d+\s*[+\-*\/]\s*\d+[\s?]*$/.test(inputLower)) return true;
+
     // Simple "what is" questions
     if (inputLower.startsWith('what is') && inputLower.length < 50) return true;
-    
+
     // Simple questions with question words
     const questionWords = ['what', 'who', 'when', 'where', 'why', 'how'];
-    const startsWithQuestion = questionWords.some(word => inputLower.startsWith(word + ' '));
-    
+    const startsWithQuestion = questionWords.some(word => inputLower.startsWith(`${word} `));
+
     // Direct questions under 100 characters that don't mention files or code
     const isShort = inputLower.length < 100;
-    const noFileReferences = !inputLower.includes('.') && !inputLower.includes('/') && !inputLower.includes('\\');
-    const noCodeKeywords = !inputLower.includes('function') && !inputLower.includes('class') && !inputLower.includes('import');
-    
+    const noFileReferences =
+      !inputLower.includes('.') && !inputLower.includes('/') && !inputLower.includes('\\');
+    const noCodeKeywords =
+      !inputLower.includes('function') &&
+      !inputLower.includes('class') &&
+      !inputLower.includes('import');
+
     return startsWithQuestion && isShort && noFileReferences && noCodeKeywords;
   }
 
@@ -891,27 +988,27 @@ export class UnifiedCLICoordinator extends EventEmitter {
    */
   private determineComplexity(input: string): 'simple' | 'medium' | 'complex' {
     if (!input) return 'simple';
-    
+
     const complexityIndicators = {
       simple: ['help', 'status', 'version', 'list', 'show'],
       medium: ['analyze', 'generate', 'create', 'fix', 'refactor'],
-      complex: ['implement', 'architecture', 'design', 'optimize', 'comprehensive']
+      complex: ['implement', 'architecture', 'design', 'optimize', 'comprehensive'],
     };
-    
+
     const lowerInput = input.toLowerCase();
-    
+
     if (complexityIndicators.complex.some(keyword => lowerInput.includes(keyword))) {
       return 'complex';
     }
-    
+
     if (complexityIndicators.medium.some(keyword => lowerInput.includes(keyword))) {
       return 'medium';
     }
-    
+
     // Also consider length as complexity factor
     if (input.length > 200) return 'complex';
     if (input.length > 50) return 'medium';
-    
+
     return 'simple';
   }
 
@@ -919,13 +1016,72 @@ export class UnifiedCLICoordinator extends EventEmitter {
    * Check if a prompt is requesting code generation
    */
   private isCodeGenerationRequest(prompt: string): boolean {
-    const generationKeywords = [
-      'create', 'generate', 'write', 'build', 'implement', 'code', 'function',
-      'class', 'component', 'module', 'script', 'program', 'develop'
-    ];
-    
     const lowerPrompt = prompt.toLowerCase();
-    return generationKeywords.some(keyword => lowerPrompt.includes(keyword));
+
+    // EXCLUDE: Help/advice/explanation questions should NEVER generate code files
+    const helpPatterns = [
+      'how do i',
+      'how to',
+      'help me',
+      'explain',
+      'what is',
+      'what are',
+      'why',
+      'when',
+      'where',
+      'fix',
+      'debug',
+      'solve',
+      'resolve',
+      'error',
+      'issue',
+      'problem',
+      'trouble',
+      'advice',
+      'suggest',
+      'recommend',
+      'best practice',
+      'should i',
+      'can you',
+      'could you',
+    ];
+
+    // If it's a help/advice question, definitely not code generation
+    if (helpPatterns.some(pattern => lowerPrompt.includes(pattern))) {
+      return false;
+    }
+
+    // INCLUDE: Only explicit code creation requests with strong intent
+    const strongGenerationKeywords = [
+      'create a',
+      'generate a',
+      'write a',
+      'build a',
+      'implement a',
+      'create class',
+      'create function',
+      'create component',
+      'create module',
+      'generate code',
+      'write code',
+      'build app',
+      'implement feature',
+    ];
+
+    // Check for strong generation patterns first
+    if (strongGenerationKeywords.some(keyword => lowerPrompt.includes(keyword))) {
+      return true;
+    }
+
+    // Weaker keywords only if they appear with creation context
+    const weakKeywords = ['function', 'class', 'component', 'module'];
+    const creationContext = ['new', 'create', 'make', 'add', 'build'];
+
+    return weakKeywords.some(
+      keyword =>
+        lowerPrompt.includes(keyword) &&
+        creationContext.some(context => lowerPrompt.includes(context))
+    );
   }
 
   /**
@@ -936,7 +1092,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       projectType: 'general',
       language: 'typescript', // Default, could be enhanced with project detection
       framework: undefined,
-      existingFiles: []
+      existingFiles: [],
     };
   }
 
@@ -954,7 +1110,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       payload: {
         input: enhancedInput,
         originalInput: request.input,
-        options
+        options,
       },
       context: request.session?.context,
       metadata: {
@@ -962,13 +1118,13 @@ export class UnifiedCLICoordinator extends EventEmitter {
         capabilities: {
           contextIntelligence: options.enableContextIntelligence,
           performanceOptimized: options.enablePerformanceOptimization,
-          errorResilience: options.enableErrorResilience
-        }
-      }
+          errorResilience: options.enableErrorResilience,
+        },
+      },
     };
 
     const workflowResponse = await this.orchestrator.processRequest(workflowRequest);
-    
+
     if (!workflowResponse.success) {
       throw workflowResponse.error || new Error('Workflow execution failed');
     }
@@ -985,7 +1141,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       sessionId,
       workingDirectory,
       permissions: ['read', 'write', 'execute'],
-      securityLevel: 'medium'
+      securityLevel: 'medium',
     };
 
     const session: CLISession = {
@@ -997,12 +1153,12 @@ export class UnifiedCLICoordinator extends EventEmitter {
         commandsExecuted: 0,
         contextEnhancements: 0,
         errorsRecovered: 0,
-        totalProcessingTime: 0
-      }
+        totalProcessingTime: 0,
+      },
     };
 
     this.activeSessions.set(sessionId, session);
-    
+
     // Legacy context intelligence initialization removed
     // Session initialized with basic capabilities only
 
@@ -1025,7 +1181,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
     if (session) {
       const duration = performance.now() - session.startTime;
       logger.info(`Closing CLI session ${sessionId} after ${duration.toFixed(2)}ms`);
-      
+
       this.activeSessions.delete(sessionId);
       this.eventBus.emit('session:closed', { sessionId, duration });
     }
@@ -1039,18 +1195,18 @@ export class UnifiedCLICoordinator extends EventEmitter {
     return [
       {
         command: 'analyze',
-        description: 'Analyze code or files', 
+        description: 'Analyze code or files',
         examples: ['analyze src/'],
         contextRelevance: 0.8,
-        suggestedArgs: []
+        suggestedArgs: [],
       },
       {
         command: 'help',
         description: 'Show help information',
         examples: ['help'],
-        contextRelevance: 0.6, 
-        suggestedArgs: []
-      }
+        contextRelevance: 0.6,
+        suggestedArgs: [],
+      },
     ];
   }
 
@@ -1063,7 +1219,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       relatedFiles: [],
       suggestedFiles: [],
       keyDirectories: [],
-      navigationHistory: []
+      navigationHistory: [],
     };
   }
 
@@ -1075,117 +1231,92 @@ export class UnifiedCLICoordinator extends EventEmitter {
       available: true,
       basic: {
         type: 'TypeScript',
-        language: 'TypeScript'
+        language: 'TypeScript',
       },
       fullLoaded: false,
       loading: false,
-      confidence: 0.8
+      confidence: 0.8,
     };
   }
 
-  /**
-   * Detect if query requires large codebase analysis
-   */
-  private requiresCodebaseAnalysis(input: string): boolean {
-    const analysisKeywords = [
-      'analyze', 'review', 'audit', 'overview', 'summary', 'architecture',
-      'structure', 'codebase', 'project', 'entire', 'whole', 'all files',
-      'patterns', 'issues', 'dependencies', 'refactor', 'improve',
-      'security', 'performance', 'best practices', 'code quality',
-      'documentation', 'technical debt', 'complexity', 'maintainability'
-    ];
-    
-    const inputLower = input.toLowerCase();
-    
-    // Check for analysis keywords
-    const hasAnalysisKeywords = analysisKeywords.some(keyword => 
-      inputLower.includes(keyword)
-    );
-    
-    // Check for scope indicators (entire project, all files, etc.)
-    const hasScopeIndicators = [
-      'entire', 'whole', 'all', 'complete', 'full', 'comprehensive',
-      'across', 'throughout', 'globally', 'overall'
-    ].some(scope => inputLower.includes(scope));
-    
-    // Check for directory references without specific file names
-    const hasDirectoryReferences = /\b(src|lib|core|components|modules|packages|app)\b/.test(inputLower) && 
-                                  !inputLower.includes('@') && // Not a file reference
-                                  !inputLower.includes('/') && // Not a specific path
-                                  !inputLower.includes('.');   // Not a specific file
-    
-    // Trigger codebase analysis if:
-    // 1. Has analysis keywords AND (scope indicators OR directory references)
-    // 2. OR explicitly mentions "codebase", "project", "architecture"
-    const triggerKeywords = ['codebase', 'project architecture', 'system design', 'code structure'];
-    const hasExplicitTriggers = triggerKeywords.some(trigger => inputLower.includes(trigger));
-    
-    return hasExplicitTriggers || (hasAnalysisKeywords && (hasScopeIndicators || hasDirectoryReferences));
-  }
+  // Removed requiresCodebaseAnalysis method - letting AI decide based on system prompt and available tools
 
   /**
    * Enhance input with codebase analysis results
    */
-  private enhanceInputWithCodebaseAnalysis(input: string, analysis: CodebaseAnalysisResult): string {
+  private enhanceInputWithCodebaseAnalysis(
+    input: string,
+    analysis: CodebaseAnalysisResult
+  ): string {
     if (analysis.chunks.length === 0) {
       return input;
     }
 
     const contextParts: string[] = [];
-    
+
     // Add codebase overview
     contextParts.push(`=== CODEBASE ANALYSIS ===`);
     contextParts.push(`Files analyzed: ${analysis.analyzedFiles}/${analysis.totalFiles}`);
     contextParts.push(`Context efficiency: ${(analysis.contextEfficiency * 100).toFixed(1)}%`);
-    contextParts.push(`Priority distribution: ${analysis.priorityDistribution.high} high, ${analysis.priorityDistribution.medium} medium, ${analysis.priorityDistribution.low} low priority files`);
-    
+    contextParts.push(
+      `Priority distribution: ${analysis.priorityDistribution.high} high, ${analysis.priorityDistribution.medium} medium, ${analysis.priorityDistribution.low} low priority files`
+    );
+
     if (analysis.recommendations.length > 0) {
       contextParts.push(`Recommendations: ${analysis.recommendations.join(', ')}`);
     }
-    
+
     // Add information from top priority chunks
     contextParts.push(`\n=== HIGH PRIORITY FILES ===`);
     const topChunks = analysis.chunks.slice(0, 2); // Focus on top 2 chunks
-    
+
     for (const chunk of topChunks) {
       contextParts.push(`\n[${chunk.focusArea}] - ${chunk.summary}`);
-      
+
       // Add top files from this chunk
       const topFiles = chunk.files
         .filter(f => f.priority >= 0.5)
         .slice(0, 5) // Limit to top 5 files per chunk
-        .map(f => `  • ${f.path} (priority: ${(f.priority * 100).toFixed(0)}%, complexity: ${f.complexity})${f.summary ? ` - ${f.summary}` : ''}`);
-      
+        .map(
+          f =>
+            `  • ${f.path} (priority: ${(f.priority * 100).toFixed(0)}%, complexity: ${f.complexity})${f.summary ? ` - ${f.summary}` : ''}`
+        );
+
       if (topFiles.length > 0) {
         contextParts.push(...topFiles);
       }
-      
+
       // Add key relationships if any
       if (chunk.relationships.length > 0) {
         contextParts.push(`  Dependencies: ${chunk.relationships.slice(0, 3).join(', ')}`);
       }
     }
-    
+
     // Add token usage information
     const tokensUsed = analysis.tokensUsed.toLocaleString();
     contextParts.push(`\nContext tokens used: ${tokensUsed}`);
-    
+
     // Build enhanced prompt
-    const contextHeader = contextParts.join('\n') + '\n\n=== USER REQUEST ===\n';
+    const contextHeader = `${contextParts.join('\n')}\n\n=== USER REQUEST ===\n`;
     return contextHeader + input;
   }
 
   /**
    * Enhance input with project configuration context
    */
-  private enhanceInputWithProjectContext(input: string, projectConfig: CombinedProjectConfig): string {
+  private enhanceInputWithProjectContext(
+    input: string,
+    projectConfig: CombinedProjectConfig
+  ): string {
     const contextParts: string[] = [];
-    
+
     // Add project overview
     if (projectConfig.configuration.name || projectConfig.instructions.projectName) {
-      contextParts.push(`Project: ${projectConfig.configuration.name || projectConfig.instructions.projectName}`);
+      contextParts.push(
+        `Project: ${projectConfig.configuration.name || projectConfig.instructions.projectName}`
+      );
     }
-    
+
     // Add language and framework info
     if (projectConfig.configuration.language) {
       let techStack = `Language: ${projectConfig.configuration.language}`;
@@ -1194,24 +1325,33 @@ export class UnifiedCLICoordinator extends EventEmitter {
       }
       contextParts.push(techStack);
     }
-    
+
     // Add project type
     if (projectConfig.configuration.type) {
       contextParts.push(`Type: ${projectConfig.configuration.type}`);
     }
-    
+
     // Add custom instructions from CODECRUCIBLE.md
-    if (projectConfig.instructions.instructions && projectConfig.instructions.instructions.length > 0) {
-      contextParts.push('Custom Project Instructions:\n' + projectConfig.instructions.instructions);
+    if (
+      projectConfig.instructions.instructions &&
+      projectConfig.instructions.instructions.length > 0
+    ) {
+      contextParts.push(`Custom Project Instructions:\n${projectConfig.instructions.instructions}`);
     }
-    
+
     // Add code style preferences
     if (projectConfig.instructions.codeStyle?.rules) {
-      contextParts.push('Code Style Requirements:\n' + JSON.stringify(projectConfig.instructions.codeStyle.rules, null, 2));
+      contextParts.push(
+        `Code Style Requirements:\n${JSON.stringify(
+          projectConfig.instructions.codeStyle.rules,
+          null,
+          2
+        )}`
+      );
     }
-    
+
     // Add AI preferences from configuration
-    let aiPreferences: string[] = [];
+    const aiPreferences: string[] = [];
     if (projectConfig.configuration.ai?.responseFormat) {
       aiPreferences.push(`Format: ${projectConfig.configuration.ai.responseFormat}`);
     }
@@ -1227,16 +1367,19 @@ export class UnifiedCLICoordinator extends EventEmitter {
     if (projectConfig.instructions.preferences?.includeDocumentation) {
       aiPreferences.push('Include documentation');
     }
-    
+
     if (aiPreferences.length > 0) {
-      contextParts.push('Response Preferences: ' + aiPreferences.join(', '));
+      contextParts.push(`Response Preferences: ${aiPreferences.join(', ')}`);
     }
-    
+
     // Add voice archetype preferences
-    if (projectConfig.configuration.ai?.voices && projectConfig.configuration.ai.voices.length > 0) {
+    if (
+      projectConfig.configuration.ai?.voices &&
+      projectConfig.configuration.ai.voices.length > 0
+    ) {
       contextParts.push(`Preferred Voices: ${projectConfig.configuration.ai.voices.join(', ')}`);
     }
-    
+
     // Add tools and workflow info
     if (projectConfig.configuration.tools) {
       const tools = Object.entries(projectConfig.configuration.tools)
@@ -1247,13 +1390,13 @@ export class UnifiedCLICoordinator extends EventEmitter {
         contextParts.push(`Project Tools: ${tools}`);
       }
     }
-    
+
     // Build enhanced prompt
     if (contextParts.length === 0) {
       return input;
     }
-    
-    const contextHeader = '=== PROJECT CONTEXT ===\n' + contextParts.join('\n') + '\n=== USER REQUEST ===\n';
+
+    const contextHeader = `=== PROJECT CONTEXT ===\n${contextParts.join('\n')}\n=== USER REQUEST ===\n`;
     return contextHeader + input;
   }
 
@@ -1270,7 +1413,7 @@ export class UnifiedCLICoordinator extends EventEmitter {
       coordinator: {
         activeSessions: this.activeSessions.size,
         operationCount: this.operationCount,
-        globalMetrics: this.globalMetrics
+        globalMetrics: this.globalMetrics,
       },
       systemHealth,
       contextIntelligence: contextMetrics,
@@ -1278,8 +1421,8 @@ export class UnifiedCLICoordinator extends EventEmitter {
       capabilities: {
         contextIntelligence: this.defaultOptions.enableContextIntelligence,
         performanceOptimization: this.defaultOptions.enablePerformanceOptimization,
-        errorResilience: this.defaultOptions.enableErrorResilience
-      }
+        errorResilience: this.defaultOptions.enableErrorResilience,
+      },
     };
   }
 
@@ -1289,13 +1432,13 @@ export class UnifiedCLICoordinator extends EventEmitter {
   private async initializeComponents(): Promise<void> {
     // Legacy component initialization disabled
     // Resilient wrapper is already initialized in constructor
-    
+
     // Only setup resilient wrapper events (legacy context components disabled)
-    this.resilientWrapper.on('critical_error', (data) => {
+    this.resilientWrapper.on('critical_error', data => {
       this.emit('error:critical', data);
     });
-    
-    this.resilientWrapper.on('system_overload', (data) => {
+
+    this.resilientWrapper.on('system_overload', data => {
       this.emit('error:overload', data);
     });
   }
@@ -1313,11 +1456,11 @@ export class UnifiedCLICoordinator extends EventEmitter {
    */
   private mapOperationType(type: CLIOperationRequest['type']): WorkflowRequest['type'] {
     const mapping: Record<CLIOperationRequest['type'], WorkflowRequest['type']> = {
-      'prompt': 'prompt',
-      'analyze': 'analysis',
-      'execute': 'tool-execution',
-      'navigate': 'analysis',
-      'suggest': 'analysis'
+      prompt: 'prompt',
+      analyze: 'analysis',
+      execute: 'tool-execution',
+      navigate: 'analysis',
+      suggest: 'analysis',
     };
     return mapping[type] || 'prompt';
   }
@@ -1325,7 +1468,11 @@ export class UnifiedCLICoordinator extends EventEmitter {
   /**
    * Update session and global metrics
    */
-  private updateMetrics(sessionId?: string, processingTime?: number, errorsRecovered?: number): void {
+  private updateMetrics(
+    sessionId?: string,
+    processingTime?: number,
+    errorsRecovered?: number
+  ): void {
     if (sessionId) {
       const session = this.activeSessions.get(sessionId);
       if (session) {
@@ -1350,14 +1497,14 @@ export class UnifiedCLICoordinator extends EventEmitter {
     const systemHealth = this.resilientWrapper.getSystemHealth();
     // Legacy context status removed - using simplified status
     const contextStatus = { isInitialized: true };
-    
+
     // Combine various health indicators
     let health = 1.0;
-    
+
     if (systemHealth.errorStats?.recentErrors > 5) health -= 0.2;
     if (this.activeSessions.size > this.defaultOptions.maxConcurrentOperations!) health -= 0.1;
     if (contextStatus?.isInitialized === false) health -= 0.1;
-    
+
     return Math.max(0, health);
   }
 
@@ -1366,18 +1513,18 @@ export class UnifiedCLICoordinator extends EventEmitter {
    */
   async shutdown(): Promise<void> {
     logger.info('Shutting down UnifiedCLICoordinator');
-    
+
     // Close all active sessions
     const sessionIds = Array.from(this.activeSessions.keys());
-    await Promise.all(sessionIds.map(id => this.closeSession(id)));
-    
+    await Promise.all(sessionIds.map(async id => this.closeSession(id)));
+
     // Shutdown specialized components
     this.resilientWrapper.shutdown();
     // Legacy context CLI shutdown removed
-    
+
     // Clear caches and cleanup (legacy cache clearing removed)
     this.removeAllListeners();
-    
+
     this.isInitialized = false;
   }
 }

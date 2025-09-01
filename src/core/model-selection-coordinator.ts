@@ -35,11 +35,17 @@ export class ModelSelectionCoordinator extends EventEmitter {
   private providerCapabilities: Map<string, ProviderCapabilities> = new Map();
   private routingHistory: ModelSelectionConfig[] = [];
 
-  // Unified configuration (single source of truth)
+  // Unified configuration (INTELLIGENT FUNCTION CALLING ROUTING)
   private readonly modelPriority = {
     ollama: {
-      preferred: ['qwen2.5-coder:7b', 'qwen2.5-coder:3b', 'deepseek-coder:8b'],
-      fallback: ['llama3.2:latest', 'gemma:latest'],
+      preferred: [
+        'gpt-oss:20b',
+        'llama3.1:8b',
+        'qwen2.5-coder:7b',
+        'qwen2.5-coder:14b',
+        'qwen2.5:32b',
+      ], // Function calling capable models prioritized
+      fallback: ['qwen2.5-coder:3b', 'deepseek-coder:8b', 'llama3.2:latest', 'gemma:latest'],
       taskTypes: ['analysis', 'planning', 'complex', 'multi-file'],
     },
     'lm-studio': {

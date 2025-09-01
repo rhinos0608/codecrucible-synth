@@ -1,7 +1,7 @@
 /**
  * Database Adapter
  * Translates between application layer and database infrastructure
- * 
+ *
  * Architecture Compliance:
  * - Adapter layer: translates between application and infrastructure
  * - Imports from Application & Domain layers
@@ -135,7 +135,7 @@ export class DatabaseAdapter extends EventEmitter {
    */
   async getSessionHistory(query: SessionHistoryQuery): Promise<VoiceInteractionRecord[]> {
     const cacheKey = `session_history:${query.sessionId}:${query.limit}:${query.offset}`;
-    
+
     // Try cache first
     const cached = await this.client.getCachedResult(cacheKey);
     if (cached) {
@@ -183,9 +183,9 @@ export class DatabaseAdapter extends EventEmitter {
       // Cache results for 1 minute
       await this.client.setCachedResult(cacheKey, interactions, 60);
 
-      this.emit('sessionHistoryRetrieved', { 
-        sessionId: query.sessionId, 
-        count: interactions.length 
+      this.emit('sessionHistoryRetrieved', {
+        sessionId: query.sessionId,
+        count: interactions.length,
       });
 
       return interactions;
@@ -200,7 +200,7 @@ export class DatabaseAdapter extends EventEmitter {
    */
   async getVoiceAnalytics(query: AnalyticsQuery = {}): Promise<any> {
     const cacheKey = `voice_analytics:${JSON.stringify(query)}`;
-    
+
     // Try cache first
     const cached = await this.client.getCachedResult(cacheKey);
     if (cached) {
@@ -238,7 +238,7 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(sql, params, { readReplica: true });
-      
+
       // Use domain service to analyze the data
       const analytics = this.analyticsService.analyzeVoiceInteractions(
         result.rows.map(row => ({
@@ -254,9 +254,9 @@ export class DatabaseAdapter extends EventEmitter {
       // Cache for 5 minutes
       await this.client.setCachedResult(cacheKey, analytics, 300);
 
-      this.emit('voiceAnalyticsGenerated', { 
+      this.emit('voiceAnalyticsGenerated', {
         totalInteractions: analytics.totalInteractions,
-        voiceCount: analytics.voicePerformance.size 
+        voiceCount: analytics.voicePerformance.size,
       });
 
       return analytics;
@@ -305,7 +305,7 @@ export class DatabaseAdapter extends EventEmitter {
    */
   async getCodeAnalysisAnalytics(query: AnalyticsQuery = {}): Promise<any> {
     const cacheKey = `code_analytics:${JSON.stringify(query)}`;
-    
+
     const cached = await this.client.getCachedResult(cacheKey);
     if (cached) {
       return cached;
@@ -346,7 +346,7 @@ export class DatabaseAdapter extends EventEmitter {
 
     try {
       const result = await this.client.query(sql, params, { readReplica: true });
-      
+
       const analytics = this.analyticsService.analyzeCodeAnalysisResults(
         result.rows.map(row => ({
           projectId: row.project_id,
@@ -360,9 +360,9 @@ export class DatabaseAdapter extends EventEmitter {
 
       await this.client.setCachedResult(cacheKey, analytics, 300);
 
-      this.emit('codeAnalyticsGenerated', { 
+      this.emit('codeAnalyticsGenerated', {
         totalAnalyses: analytics.totalAnalyses,
-        avgQuality: analytics.averageQualityScore 
+        avgQuality: analytics.averageQualityScore,
       });
 
       return analytics;
@@ -377,7 +377,9 @@ export class DatabaseAdapter extends EventEmitter {
   /**
    * Create a new project
    */
-  async createProject(project: Omit<ProjectRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> {
+  async createProject(
+    project: Omit<ProjectRecord, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<number> {
     const query = `
       INSERT INTO projects (name, description, repository_url, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5)
@@ -413,7 +415,7 @@ export class DatabaseAdapter extends EventEmitter {
    */
   async getProjects(): Promise<ProjectRecord[]> {
     const cacheKey = 'projects_all';
-    
+
     const cached = await this.client.getCachedResult(cacheKey);
     if (cached) {
       return cached;
@@ -449,10 +451,12 @@ export class DatabaseAdapter extends EventEmitter {
     const query = `
       INSERT INTO voice_interactions 
       (session_id, voice_name, prompt, response, confidence, tokens_used, response_time, created_at)
-      VALUES ${interactions.map((_, i) => {
-        const base = i * 8 + 1;
-        return `($${base}, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
-      }).join(', ')}
+      VALUES ${interactions
+        .map((_, i) => {
+          const base = i * 8 + 1;
+          return `($${base}, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
+        })
+        .join(', ')}
     `;
 
     const params = interactions.flatMap(interaction => [
@@ -467,13 +471,17 @@ export class DatabaseAdapter extends EventEmitter {
     ]);
 
     try {
-      await this.client.transaction(async (trx) => {
+      await this.client.transaction(async trx => {
         await trx.query(query, params);
       });
 
       this.emit('bulkVoiceInteractionsInserted', { count: interactions.length });
     } catch (error) {
-      this.emit('bulkInsertError', { error, type: 'voice_interactions', count: interactions.length });
+      this.emit('bulkInsertError', {
+        error,
+        type: 'voice_interactions',
+        count: interactions.length,
+      });
       throw new Error(`Failed to bulk insert voice interactions: ${error}`);
     }
   }
@@ -487,10 +495,12 @@ export class DatabaseAdapter extends EventEmitter {
     const query = `
       INSERT INTO code_analysis 
       (project_id, file_path, analysis_type, results, quality_score, created_at)
-      VALUES ${analyses.map((_, i) => {
-        const base = i * 6 + 1;
-        return `($${base}, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
-      }).join(', ')}
+      VALUES ${analyses
+        .map((_, i) => {
+          const base = i * 6 + 1;
+          return `($${base}, $${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+        })
+        .join(', ')}
     `;
 
     const params = analyses.flatMap(analysis => [
@@ -503,7 +513,7 @@ export class DatabaseAdapter extends EventEmitter {
     ]);
 
     try {
-      await this.client.transaction(async (trx) => {
+      await this.client.transaction(async trx => {
         await trx.query(query, params);
       });
 
@@ -521,7 +531,7 @@ export class DatabaseAdapter extends EventEmitter {
    */
   async getHealth(): Promise<DatabaseHealth> {
     const startTime = Date.now();
-    
+
     try {
       const connectionStatus = await this.client.healthCheck();
       const metrics = this.client.getMetrics();
@@ -583,11 +593,11 @@ export class DatabaseAdapter extends EventEmitter {
   // Private helper methods
 
   private setupEventForwarding(): void {
-    this.client.on('initialized', (data) => this.emit('databaseInitialized', data));
-    this.client.on('queryExecuted', (data) => this.emit('queryExecuted', data));
-    this.client.on('queryError', (data) => this.emit('queryError', data));
-    this.client.on('transactionCompleted', (data) => this.emit('transactionCompleted', data));
-    this.client.on('healthCheckCompleted', (data) => this.emit('healthCheckCompleted', data));
+    this.client.on('initialized', data => this.emit('databaseInitialized', data));
+    this.client.on('queryExecuted', data => this.emit('queryExecuted', data));
+    this.client.on('queryError', data => this.emit('queryError', data));
+    this.client.on('transactionCompleted', data => this.emit('transactionCompleted', data));
+    this.client.on('healthCheckCompleted', data => this.emit('healthCheckCompleted', data));
   }
 
   private mapToVoiceInteractionRecords(rows: any[]): VoiceInteractionRecord[] {

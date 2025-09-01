@@ -1,7 +1,7 @@
 /**
  * Pure MCP Connection Infrastructure Client
  * Handles only MCP protocol communication and connection management
- * 
+ *
  * Architecture Compliance:
  * - Infrastructure layer: concrete implementation only
  * - No business logic for service discovery or server selection
@@ -98,11 +98,14 @@ export class MCPConnectionClient extends EventEmitter {
   private serverInfo: MCPServerInfo;
   private connectionStatus: MCPConnectionStatus;
   private messageId: number = 1;
-  private pendingRequests: Map<string | number, {
-    resolve: (value: any) => void;
-    reject: (error: Error) => void;
-    timeout: NodeJS.Timeout;
-  }> = new Map();
+  private pendingRequests: Map<
+    string | number,
+    {
+      resolve: (value: any) => void;
+      reject: (error: Error) => void;
+      timeout: NodeJS.Timeout;
+    }
+  > = new Map();
   private heartbeatTimer?: NodeJS.Timeout;
   private reconnectTimer?: NodeJS.Timeout;
 
@@ -135,17 +138,17 @@ export class MCPConnectionClient extends EventEmitter {
     try {
       // Start server process
       await this.startServerProcess();
-      
+
       // Initialize connection with handshake
       await this.performHandshake();
-      
+
       // Start heartbeat monitoring
       this.startHeartbeat();
-      
+
       this.connectionStatus.status = MCPServerStatus.CONNECTED;
       this.connectionStatus.connected = true;
       this.connectionStatus.uptime = Date.now();
-      
+
       this.emit('connected', {
         server: this.serverInfo.name,
         capabilities: this.serverInfo.capabilities,
@@ -153,12 +156,12 @@ export class MCPConnectionClient extends EventEmitter {
     } catch (error) {
       this.connectionStatus.status = MCPServerStatus.ERROR;
       this.connectionStatus.errors++;
-      
+
       this.emit('connectionError', {
         server: this.serverInfo.name,
         error,
       });
-      
+
       throw error;
     }
   }
@@ -168,34 +171,34 @@ export class MCPConnectionClient extends EventEmitter {
    */
   async disconnect(): Promise<void> {
     this.connectionStatus.status = MCPServerStatus.SHUTTING_DOWN;
-    
+
     // Clear timers
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = undefined;
     }
-    
+
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
-    
+
     // Reject pending requests
     for (const [id, request] of this.pendingRequests) {
       clearTimeout(request.timeout);
       request.reject(new Error('Connection closed'));
     }
     this.pendingRequests.clear();
-    
+
     // Close server process
     if (this.serverProcess) {
       this.serverProcess.kill();
       this.serverProcess = undefined;
     }
-    
+
     this.connectionStatus.status = MCPServerStatus.DISCONNECTED;
     this.connectionStatus.connected = false;
-    
+
     this.emit('disconnected', { server: this.serverInfo.name });
   }
 
@@ -317,7 +320,9 @@ export class MCPConnectionClient extends EventEmitter {
   /**
    * Set logging level
    */
-  async setLoggingLevel(level: 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency'): Promise<void> {
+  async setLoggingLevel(
+    level: 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency'
+  ): Promise<void> {
     await this.sendRequest('logging/setLevel', { level });
   }
 
@@ -384,7 +389,7 @@ export class MCPConnectionClient extends EventEmitter {
       this.serverInfo.pid = this.serverProcess.pid;
 
       // Handle process events
-      this.serverProcess.on('error', (error) => {
+      this.serverProcess.on('error', error => {
         this.handleProcessError(error);
         reject(error);
       });
@@ -414,13 +419,13 @@ export class MCPConnectionClient extends EventEmitter {
 
     this.serverProcess.stdout.on('data', (data: Buffer) => {
       buffer += data.toString();
-      
+
       // Process complete JSON-RPC messages
       let newlineIndex;
       while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
-        
+
         if (line.trim()) {
           this.handleIncomingMessage(line.trim());
         }
@@ -483,8 +488,8 @@ export class MCPConnectionClient extends EventEmitter {
       throw new Error('Server process not available');
     }
 
-    const messageStr = JSON.stringify(message) + '\n';
-    
+    const messageStr = `${JSON.stringify(message)}\n`;
+
     if (Buffer.byteLength(messageStr) > this.config.maxMessageSize) {
       throw new Error(`Message too large: ${Buffer.byteLength(messageStr)} bytes`);
     }
@@ -506,7 +511,9 @@ export class MCPConnectionClient extends EventEmitter {
       });
 
       // Extract server capabilities
-      this.serverInfo.capabilities = initResult.capabilities ? Object.keys(initResult.capabilities) : [];
+      this.serverInfo.capabilities = initResult.capabilities
+        ? Object.keys(initResult.capabilities)
+        : [];
       this.serverInfo.version = initResult.serverInfo?.version;
 
       // Send initialized notification
@@ -534,7 +541,7 @@ export class MCPConnectionClient extends EventEmitter {
   private handleProcessError(error: Error): void {
     this.connectionStatus.status = MCPServerStatus.ERROR;
     this.connectionStatus.errors++;
-    
+
     this.emit('processError', {
       server: this.serverInfo.name,
       error,
@@ -547,7 +554,7 @@ export class MCPConnectionClient extends EventEmitter {
   private handleProcessExit(code: number | null, signal: NodeJS.Signals | null): void {
     this.connectionStatus.status = MCPServerStatus.DISCONNECTED;
     this.connectionStatus.connected = false;
-    
+
     this.emit('processExit', {
       server: this.serverInfo.name,
       code,

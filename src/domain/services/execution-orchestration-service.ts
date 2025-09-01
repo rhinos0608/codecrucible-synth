@@ -8,8 +8,19 @@
  * - Encapsulates business rules that don't belong in entities
  */
 
-import { ExecutionPlan, Goal, Domain, StepEstimate, SelectedTools } from '../entities/execution-plan.js';
-import { ReasoningStep, ReasoningStepType, ConfidenceScore, ToolArguments } from '../entities/reasoning-step.js';
+import {
+  ExecutionPlan,
+  Goal,
+  Domain,
+  StepEstimate,
+  SelectedTools,
+} from '../entities/execution-plan.js';
+import {
+  ReasoningStep,
+  ReasoningStepType,
+  ConfidenceScore,
+  ToolArguments,
+} from '../entities/reasoning-step.js';
 import { ToolExecution, ToolName, ExecutionStatus } from '../entities/tool-execution.js';
 import { WorkflowTemplate, WorkflowStep } from '../entities/workflow-template.js';
 
@@ -44,12 +55,24 @@ export class ExecutionContext {
     );
   }
 
-  get executionId(): string { return this._executionId; }
-  get originalPrompt(): string { return this._originalPrompt; }
-  get availableTools(): readonly string[] { return this._availableTools; }
-  get maxSteps(): number { return this._maxSteps; }
-  get timeoutMs(): number { return this._timeoutMs; }
-  get userPreferences(): ExecutionPreferences { return this._userPreferences; }
+  get executionId(): string {
+    return this._executionId;
+  }
+  get originalPrompt(): string {
+    return this._originalPrompt;
+  }
+  get availableTools(): readonly string[] {
+    return this._availableTools;
+  }
+  get maxSteps(): number {
+    return this._maxSteps;
+  }
+  get timeoutMs(): number {
+    return this._timeoutMs;
+  }
+  get userPreferences(): ExecutionPreferences {
+    return this._userPreferences;
+  }
 
   hasAvailableTool(toolName: string): boolean {
     return this._availableTools.includes(toolName);
@@ -96,11 +119,21 @@ export class ExecutionPreferences {
     return new ExecutionPreferences(false, true, true, 600000, 0.8);
   }
 
-  get preferSpeed(): boolean { return this._preferSpeed; }
-  get preferQuality(): boolean { return this._preferQuality; }
-  get allowOptionalSteps(): boolean { return this._allowOptionalSteps; }
-  get maxExecutionTime(): number { return this._maxExecutionTime; }
-  get confidenceThreshold(): number { return this._confidenceThreshold; }
+  get preferSpeed(): boolean {
+    return this._preferSpeed;
+  }
+  get preferQuality(): boolean {
+    return this._preferQuality;
+  }
+  get allowOptionalSteps(): boolean {
+    return this._allowOptionalSteps;
+  }
+  get maxExecutionTime(): number {
+    return this._maxExecutionTime;
+  }
+  get confidenceThreshold(): number {
+    return this._confidenceThreshold;
+  }
 }
 
 /**
@@ -142,15 +175,33 @@ export class ExecutionResult {
     );
   }
 
-  get success(): boolean { return this._success; }
-  get finalResult(): string { return this._finalResult; }
-  get reasoningChain(): readonly ReasoningStep[] { return this._reasoningChain; }
-  get executionPlan(): ExecutionPlan { return this._executionPlan; }
-  get totalSteps(): number { return this._totalSteps; }
-  get executionTime(): number { return this._executionTime; }
-  get tokensUsed(): number { return this._tokensUsed; }
-  get streamed(): boolean { return this._streamed; }
-  get insights(): readonly string[] { return this._insights; }
+  get success(): boolean {
+    return this._success;
+  }
+  get finalResult(): string {
+    return this._finalResult;
+  }
+  get reasoningChain(): readonly ReasoningStep[] {
+    return this._reasoningChain;
+  }
+  get executionPlan(): ExecutionPlan {
+    return this._executionPlan;
+  }
+  get totalSteps(): number {
+    return this._totalSteps;
+  }
+  get executionTime(): number {
+    return this._executionTime;
+  }
+  get tokensUsed(): number {
+    return this._tokensUsed;
+  }
+  get streamed(): boolean {
+    return this._streamed;
+  }
+  get insights(): readonly string[] {
+    return this._insights;
+  }
 
   /**
    * Business rule: Check if execution was efficient
@@ -169,17 +220,17 @@ export class ExecutionResult {
     let score = 0.4; // Base success score
 
     // High-confidence steps contribute to quality
-    const highConfidenceSteps = this._reasoningChain.filter(step => 
+    const highConfidenceSteps = this._reasoningChain.filter(step =>
       step.confidence.isHigh()
     ).length;
     score += (highConfidenceSteps / this._totalSteps) * 0.3;
 
     // Successful tool executions contribute to quality
-    const successfulToolSteps = this._reasoningChain.filter(step =>
-      step.isToolStep() && step.isSuccessful()
+    const successfulToolSteps = this._reasoningChain.filter(
+      step => step.isToolStep() && step.isSuccessful()
     ).length;
     const totalToolSteps = this._reasoningChain.filter(step => step.isToolStep()).length;
-    
+
     if (totalToolSteps > 0) {
       score += (successfulToolSteps / totalToolSteps) * 0.3;
     } else {
@@ -194,7 +245,6 @@ export class ExecutionResult {
  * Execution Orchestration Domain Service
  */
 export class ExecutionOrchestrationService {
-  
   /**
    * Business rule: Create execution plan from user prompt
    */
@@ -206,11 +256,11 @@ export class ExecutionOrchestrationService {
     const goal = Goal.create(prompt);
     const domain = this.inferDomainFromPrompt(prompt);
     const complexity = goal.estimateComplexity();
-    
+
     if (workflowTemplate && workflowTemplate.matches(prompt)) {
       return this.createWorkflowBasedPlan(goal, domain, workflowTemplate, availableTools);
     }
-    
+
     return this.createHeuristicPlan(goal, domain, complexity, availableTools);
   }
 
@@ -222,10 +272,8 @@ export class ExecutionOrchestrationService {
     const warnings: string[] = [];
 
     // Check tool availability
-    const missingTools = plan.selectedTools.tools.filter(tool => 
-      !context.hasAvailableTool(tool)
-    );
-    
+    const missingTools = plan.selectedTools.tools.filter(tool => !context.hasAvailableTool(tool));
+
     if (missingTools.length > 0) {
       issues.push(`Missing required tools: ${missingTools.join(', ')}`);
     }
@@ -233,12 +281,16 @@ export class ExecutionOrchestrationService {
     // Check execution time constraints
     const estimatedTime = plan.estimateTotalExecutionTime() * 60 * 1000; // Convert to ms
     if (estimatedTime > context.userPreferences.maxExecutionTime) {
-      warnings.push(`Estimated execution time (${Math.round(estimatedTime/60000)}min) exceeds preference (${Math.round(context.userPreferences.maxExecutionTime/60000)}min)`);
+      warnings.push(
+        `Estimated execution time (${Math.round(estimatedTime / 60000)}min) exceeds preference (${Math.round(context.userPreferences.maxExecutionTime / 60000)}min)`
+      );
     }
 
     // Check step count against limits
     if (plan.stepEstimate.value > context.maxSteps) {
-      issues.push(`Plan requires ${plan.stepEstimate.value} steps but limit is ${context.maxSteps}`);
+      issues.push(
+        `Plan requires ${plan.stepEstimate.value} steps but limit is ${context.maxSteps}`
+      );
     }
 
     // Check plan viability
@@ -252,10 +304,7 @@ export class ExecutionOrchestrationService {
   /**
    * Business rule: Optimize execution plan based on preferences
    */
-  optimizeExecutionPlan(
-    plan: ExecutionPlan,
-    context: ExecutionContext
-  ): ExecutionPlan {
+  optimizeExecutionPlan(plan: ExecutionPlan, context: ExecutionContext): ExecutionPlan {
     let optimizedPlan = plan;
 
     // Speed optimization: reduce optional tools
@@ -268,10 +317,10 @@ export class ExecutionOrchestrationService {
 
     // Quality optimization: add analysis tools if available
     if (context.userPreferences.preferQuality && plan.domain.isAnalyticalDomain()) {
-      const analysisTools = context.availableTools.filter(tool => 
-        tool.includes('analysis') || tool.includes('research')
+      const analysisTools = context.availableTools.filter(
+        tool => tool.includes('analysis') || tool.includes('research')
       );
-      
+
       if (analysisTools.length > 0) {
         const enhancedTools = [...plan.selectedTools.tools, ...analysisTools];
         optimizedPlan = plan.withOptimizedTools(SelectedTools.create(enhancedTools));
@@ -367,7 +416,7 @@ export class ExecutionOrchestrationService {
     const success = this.determineExecutionSuccess(reasoningChain, plan);
     const finalResult = this.extractFinalResult(reasoningChain, plan);
     const insights = this.generateExecutionInsights(reasoningChain, plan, context);
-    
+
     return ExecutionResult.create(
       success,
       finalResult,
@@ -384,22 +433,34 @@ export class ExecutionOrchestrationService {
 
   private inferDomainFromPrompt(prompt: string): Domain {
     const lowerPrompt = prompt.toLowerCase();
-    
-    if (lowerPrompt.includes('code') || lowerPrompt.includes('function') || 
-        lowerPrompt.includes('program') || lowerPrompt.includes('debug')) {
+
+    if (
+      lowerPrompt.includes('code') ||
+      lowerPrompt.includes('function') ||
+      lowerPrompt.includes('program') ||
+      lowerPrompt.includes('debug')
+    ) {
       return Domain.coding();
     }
-    
-    if (lowerPrompt.includes('analyze') || lowerPrompt.includes('research') ||
-        lowerPrompt.includes('study') || lowerPrompt.includes('examine')) {
+
+    if (
+      lowerPrompt.includes('analyze') ||
+      lowerPrompt.includes('research') ||
+      lowerPrompt.includes('study') ||
+      lowerPrompt.includes('examine')
+    ) {
       return Domain.analysis();
     }
-    
-    if (lowerPrompt.includes('bug') || lowerPrompt.includes('error') ||
-        lowerPrompt.includes('fix') || lowerPrompt.includes('debug')) {
+
+    if (
+      lowerPrompt.includes('bug') ||
+      lowerPrompt.includes('error') ||
+      lowerPrompt.includes('fix') ||
+      lowerPrompt.includes('debug')
+    ) {
       return Domain.debugging();
     }
-    
+
     return Domain.general();
   }
 
@@ -411,7 +472,7 @@ export class ExecutionOrchestrationService {
   ): ExecutionPlan {
     const executableSteps = template.getExecutableSteps(availableTools);
     const allRequiredTools = template.getAllRequiredTools();
-    
+
     return new ExecutionPlan(
       goal,
       domain,
@@ -430,7 +491,7 @@ export class ExecutionOrchestrationService {
   ): ExecutionPlan {
     const relevantTools = this.selectRelevantTools(domain, availableTools);
     const stepEstimate = StepEstimate.fromComplexity(complexity);
-    
+
     return new ExecutionPlan(
       goal,
       domain,
@@ -443,29 +504,33 @@ export class ExecutionOrchestrationService {
 
   private selectRelevantTools(domain: Domain, availableTools: string[]): string[] {
     if (domain.isCodingDomain()) {
-      return availableTools.filter(tool =>
-        tool.includes('filesystem') || tool.includes('git') || 
-        tool.includes('code') || tool.includes('analysis')
+      return availableTools.filter(
+        tool =>
+          tool.includes('filesystem') ||
+          tool.includes('git') ||
+          tool.includes('code') ||
+          tool.includes('analysis')
       );
     }
-    
+
     if (domain.isAnalyticalDomain()) {
-      return availableTools.filter(tool =>
-        tool.includes('research') || tool.includes('analysis') ||
-        tool.includes('filesystem') || tool.includes('search')
+      return availableTools.filter(
+        tool =>
+          tool.includes('research') ||
+          tool.includes('analysis') ||
+          tool.includes('filesystem') ||
+          tool.includes('search')
       );
     }
-    
+
     return availableTools.slice(0, 5); // Default selection
   }
 
   private identifyCoreTools(tools: readonly string[], domain: Domain): string[] {
     if (domain.isCodingDomain()) {
-      return tools.filter(tool => 
-        tool.includes('filesystem') || tool.includes('code')
-      );
+      return tools.filter(tool => tool.includes('filesystem') || tool.includes('code'));
     }
-    
+
     return tools.slice(0, Math.ceil(tools.length * 0.7)); // Keep 70% of tools
   }
 
@@ -478,7 +543,7 @@ export class ExecutionOrchestrationService {
     if (content.toLowerCase().includes('conclusion') || content.toLowerCase().includes('result')) {
       return ReasoningStep.createConclusionStep(stepNumber, content, ConfidenceScore.high());
     }
-    
+
     if (content.toLowerCase().includes('action') || content.toLowerCase().includes('execute')) {
       return ReasoningStep.createActionStep(
         stepNumber,
@@ -488,17 +553,21 @@ export class ExecutionOrchestrationService {
         ConfidenceScore.medium()
       );
     }
-    
+
     return ReasoningStep.createThoughtStep(stepNumber, content, ConfidenceScore.medium());
   }
 
-  private processToolResult(stepNumber: number, toolResult: any, context: ExecutionContext): ReasoningStep {
+  private processToolResult(
+    stepNumber: number,
+    toolResult: any,
+    context: ExecutionContext
+  ): ReasoningStep {
     const hasError = toolResult?.error || toolResult?.success === false;
-    
+
     if (hasError) {
       return ReasoningStep.createErrorStep(stepNumber, toolResult.error || 'Tool execution failed');
     }
-    
+
     const observation = `Tool executed successfully. Result: ${JSON.stringify(toolResult).substring(0, 200)}`;
     return ReasoningStep.createObservationStep(stepNumber, observation, ConfidenceScore.high());
   }
@@ -517,9 +586,9 @@ export class ExecutionOrchestrationService {
         ConfidenceScore.high()
       );
     }
-    
+
     const lastStep = currentChain[currentChain.length - 1];
-    
+
     if (lastStep.type.value === 'thought') {
       // After thought, usually comes action
       return ReasoningStep.createActionStep(
@@ -530,7 +599,7 @@ export class ExecutionOrchestrationService {
         ConfidenceScore.medium()
       );
     }
-    
+
     return ReasoningStep.createConclusionStep(
       stepNumber,
       'Execution completed',
@@ -542,26 +611,25 @@ export class ExecutionOrchestrationService {
     // Simplified goal achievement check
     const successfulSteps = currentChain.filter(step => step.isSuccessful()).length;
     const totalSteps = currentChain.length;
-    
+
     return successfulSteps >= totalSteps * 0.8 && totalSteps >= 3;
   }
 
   private calculateRecentConfidence(recentSteps: ReasoningStep[]): ConfidenceScore {
     if (recentSteps.length === 0) return ConfidenceScore.medium();
-    
-    const avgConfidence = recentSteps.reduce((sum, step) => 
-      sum + step.confidence.value, 0
-    ) / recentSteps.length;
-    
+
+    const avgConfidence =
+      recentSteps.reduce((sum, step) => sum + step.confidence.value, 0) / recentSteps.length;
+
     return ConfidenceScore.create(avgConfidence);
   }
 
   private determineExecutionSuccess(reasoningChain: ReasoningStep[], plan: ExecutionPlan): boolean {
     if (reasoningChain.length === 0) return false;
-    
+
     const successfulSteps = reasoningChain.filter(step => step.isSuccessful()).length;
     const errorSteps = reasoningChain.filter(step => step.hasError()).length;
-    
+
     return successfulSteps > errorSteps && successfulSteps >= reasoningChain.length * 0.6;
   }
 
@@ -571,13 +639,13 @@ export class ExecutionOrchestrationService {
     if (conclusionSteps.length > 0) {
       return conclusionSteps[conclusionSteps.length - 1].content;
     }
-    
+
     // Fallback to last successful step
     const successfulSteps = reasoningChain.filter(step => step.isSuccessful());
     if (successfulSteps.length > 0) {
       return successfulSteps[successfulSteps.length - 1].content;
     }
-    
+
     return 'Execution completed with mixed results';
   }
 
@@ -587,24 +655,26 @@ export class ExecutionOrchestrationService {
     context: ExecutionContext
   ): string[] {
     const insights: string[] = [];
-    
+
     // Efficiency insights
     if (reasoningChain.length > plan.stepEstimate.value * 1.5) {
-      insights.push('Execution took more steps than estimated - plan estimation may need improvement');
+      insights.push(
+        'Execution took more steps than estimated - plan estimation may need improvement'
+      );
     }
-    
+
     // Tool usage insights
     const toolSteps = reasoningChain.filter(step => step.isToolStep());
     if (toolSteps.length === 0) {
       insights.push('No tools were executed - task may have been purely analytical');
     }
-    
+
     // Confidence insights
     const lowConfidenceSteps = reasoningChain.filter(step => step.confidence.isLow());
     if (lowConfidenceSteps.length > reasoningChain.length * 0.3) {
       insights.push('Many steps had low confidence - execution may benefit from better guidance');
     }
-    
+
     return insights;
   }
 }
@@ -624,9 +694,15 @@ export class ValidationResult {
     return new ValidationResult(isValid, Object.freeze([...issues]), Object.freeze([...warnings]));
   }
 
-  get isValid(): boolean { return this._isValid; }
-  get issues(): readonly string[] { return this._issues; }
-  get warnings(): readonly string[] { return this._warnings; }
+  get isValid(): boolean {
+    return this._isValid;
+  }
+  get issues(): readonly string[] {
+    return this._issues;
+  }
+  get warnings(): readonly string[] {
+    return this._warnings;
+  }
 }
 
 export class ContinuationDecision {
@@ -648,7 +724,13 @@ export class ContinuationDecision {
     return new ContinuationDecision(false, reason, true);
   }
 
-  get shouldContinue(): boolean { return this._shouldContinue; }
-  get reason(): string { return this._reason; }
-  get needsReview(): boolean { return this._needsReview; }
+  get shouldContinue(): boolean {
+    return this._shouldContinue;
+  }
+  get reason(): string {
+    return this._reason;
+  }
+  get needsReview(): boolean {
+    return this._needsReview;
+  }
 }

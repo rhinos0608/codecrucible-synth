@@ -1,6 +1,6 @@
 /**
  * Enhanced MCP Security and Authentication System
- * 
+ *
  * Provides enterprise-grade security for MCP connections including:
  * - Multi-factor authentication and authorization
  * - Advanced threat detection and prevention
@@ -18,46 +18,46 @@ export interface SecurityPolicy {
   policyId: string;
   name: string;
   description: string;
-  
+
   // Authentication requirements
   authenticationMethods: AuthenticationMethod[];
   requireMFA: boolean;
   sessionTimeout: number; // milliseconds
   maxConcurrentSessions: number;
-  
+
   // Authorization rules
   allowedCapabilities: string[];
   deniedCapabilities: string[];
   ipWhitelist?: string[];
   ipBlacklist?: string[];
   timeRestrictions?: TimeRestriction[];
-  
+
   // Communication security
   requireEncryption: boolean;
   allowedCipherSuites: string[];
   certificateValidation: 'strict' | 'lenient' | 'disabled';
-  
+
   // Rate limiting
   requestsPerSecond: number;
   requestsPerMinute: number;
   requestsPerHour: number;
-  
+
   // Content filtering
   inputValidation: ValidationRule[];
   outputFiltering: FilteringRule[];
-  
+
   // Threat detection
   anomalyDetectionEnabled: boolean;
   bruteForceProtection: boolean;
   suspiciousActivityThreshold: number;
-  
+
   // Compliance
   auditLevel: 'minimal' | 'standard' | 'comprehensive';
   dataRetentionPeriod: number; // days
   piiHandling: 'allow' | 'mask' | 'deny';
 }
 
-export type AuthenticationMethod = 
+export type AuthenticationMethod =
   | 'api-key'
   | 'oauth2'
   | 'jwt'
@@ -94,21 +94,21 @@ export interface SecurityContext {
   serverId: string;
   userId?: string;
   sessionId: string;
-  
+
   // Authentication state
   authenticatedMethods: AuthenticationMethod[];
   authenticationTime: Date;
   lastActivity: Date;
-  
+
   // Authorization state
   grantedCapabilities: string[];
   effectivePolicy: SecurityPolicy;
-  
+
   // Security metrics
   riskScore: number; // 0-100
   trustLevel: 'low' | 'medium' | 'high';
   anomalyScore: number;
-  
+
   // Session info
   ipAddress: string;
   userAgent?: string;
@@ -137,7 +137,7 @@ export interface SecurityEvent {
   resolvedAt?: Date;
 }
 
-export type SecurityEventType = 
+export type SecurityEventType =
   | 'authentication-success'
   | 'authentication-failure'
   | 'authorization-denied'
@@ -152,23 +152,23 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   private securityPolicies: Map<string, SecurityPolicy> = new Map();
   private securityContexts: Map<string, SecurityContext> = new Map();
   private securityEvents: SecurityEvent[] = [];
-  
+
   // Authentication providers
   private authProviders: Map<AuthenticationMethod, any> = new Map();
-  
+
   // Rate limiting
   private rateLimits: Map<string, RateLimiter> = new Map();
-  
+
   // Threat detection
   private threatDetector: ThreatDetector = new ThreatDetector();
   private anomalyDetector: AnomalyDetector = new AnomalyDetector();
-  
+
   // Session management
   private activeSessions: Map<string, Set<string>> = new Map(); // userId -> sessionIds
-  
+
   // Encryption
   private encryptionKeys: Map<string, Buffer> = new Map();
-  
+
   constructor() {
     super();
     this.initializeDefaultPolicies();
@@ -183,23 +183,23 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
       policyId: 'default',
       name: 'Default Security Policy',
       description: 'Standard security policy for MCP connections',
-      
+
       authenticationMethods: ['api-key'],
       requireMFA: false,
       sessionTimeout: 3600000, // 1 hour
       maxConcurrentSessions: 5,
-      
+
       allowedCapabilities: ['*'],
       deniedCapabilities: [],
-      
+
       requireEncryption: true,
       allowedCipherSuites: ['AES-256-GCM', 'ChaCha20-Poly1305'],
       certificateValidation: 'strict',
-      
+
       requestsPerSecond: 10,
       requestsPerMinute: 600,
       requestsPerHour: 36000,
-      
+
       inputValidation: [
         {
           field: 'query',
@@ -211,15 +211,15 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
           field: 'parameters',
           type: 'object',
           required: false,
-        }
+        },
       ],
-      
+
       outputFiltering: [],
-      
+
       anomalyDetectionEnabled: true,
       bruteForceProtection: true,
       suspiciousActivityThreshold: 85,
-      
+
       auditLevel: 'standard',
       dataRetentionPeriod: 90,
       piiHandling: 'mask',
@@ -233,15 +233,15 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
       policyId: 'enterprise',
       name: 'Enterprise Security Policy',
       description: 'Enhanced security policy for enterprise environments',
-      
+
       authenticationMethods: ['oauth2', 'mutual-tls'],
       requireMFA: true,
       sessionTimeout: 1800000, // 30 minutes
-      
+
       requestsPerSecond: 5,
       requestsPerMinute: 300,
       requestsPerHour: 18000,
-      
+
       outputFiltering: [
         {
           field: 'sensitive_data',
@@ -250,9 +250,9 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
         {
           field: 'credentials',
           action: 'remove',
-        }
+        },
       ],
-      
+
       auditLevel: 'comprehensive',
       dataRetentionPeriod: 365,
     };
@@ -285,10 +285,16 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
       // Perform authentication
       const authResult = await this.performAuthentication(authMethod, credentials);
       if (!authResult.success) {
-        await this.recordSecurityEvent(connectionId, 'authentication-failure', 'medium', 'Authentication failed', {
-          method: authMethod,
-          reason: authResult.reason,
-        });
+        await this.recordSecurityEvent(
+          connectionId,
+          'authentication-failure',
+          'medium',
+          'Authentication failed',
+          {
+            method: authMethod,
+            reason: authResult.reason,
+          }
+        );
         throw new Error(`Authentication failed: ${authResult.reason}`);
       }
 
@@ -299,18 +305,18 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
         serverId,
         userId: authResult.userId,
         sessionId,
-        
+
         authenticatedMethods: [authMethod],
         authenticationTime: new Date(),
         lastActivity: new Date(),
-        
+
         grantedCapabilities: this.calculateGrantedCapabilities(policy, authResult.permissions),
         effectivePolicy: policy,
-        
+
         riskScore: await this.calculateRiskScore(requestInfo, authResult),
         trustLevel: this.calculateTrustLevel(authResult),
         anomalyScore: 0,
-        
+
         ipAddress: requestInfo.ipAddress,
         userAgent: requestInfo.userAgent,
         location: await this.getGeolocation(requestInfo.ipAddress),
@@ -324,17 +330,22 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
       await this.manageUserSessions(securityContext);
 
       // Record successful authentication
-      await this.recordSecurityEvent(connectionId, 'authentication-success', 'low', 'Authentication successful', {
-        method: authMethod,
-        userId: authResult.userId,
-        riskScore: securityContext.riskScore,
-      });
+      await this.recordSecurityEvent(
+        connectionId,
+        'authentication-success',
+        'low',
+        'Authentication successful',
+        {
+          method: authMethod,
+          userId: authResult.userId,
+          riskScore: securityContext.riskScore,
+        }
+      );
 
       logger.info(`Connection ${connectionId} authenticated successfully`);
       this.emit('authentication-success', securityContext);
 
       return securityContext;
-
     } catch (error) {
       logger.error(`Authentication failed for connection ${connectionId}:`, error);
       throw error;
@@ -344,25 +355,28 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   /**
    * Perform authentication based on method
    */
-  private async performAuthentication(method: AuthenticationMethod, credentials: any): Promise<any> {
+  private async performAuthentication(
+    method: AuthenticationMethod,
+    credentials: any
+  ): Promise<any> {
     const provider = this.authProviders.get(method);
-    
+
     switch (method) {
       case 'api-key':
         return this.authenticateApiKey(credentials.apiKey);
-      
+
       case 'oauth2':
         return this.authenticateOAuth2(credentials.token);
-      
+
       case 'jwt':
         return this.authenticateJWT(credentials.token);
-      
+
       case 'mutual-tls':
         return this.authenticateMutualTLS(credentials.certificate);
-      
+
       case 'certificate':
         return this.authenticateCertificate(credentials.certificate);
-      
+
       default:
         if (provider) {
           return provider.authenticate(credentials);
@@ -379,10 +393,10 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
 
     // Hash the API key for lookup
     const hashedKey = createHash('sha256').update(apiKey).digest('hex');
-    
+
     // Mock validation - in real implementation, check against database
     const isValid = hashedKey.length === 64; // Simple validation
-    
+
     return {
       success: isValid,
       userId: isValid ? `user-${hashedKey.substring(0, 8)}` : null,
@@ -448,19 +462,31 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
 
     // Check session validity
     if (this.isSessionExpired(context)) {
-      await this.recordSecurityEvent(connectionId, 'authorization-denied', 'medium', 'Session expired', {
-        capability,
-        sessionAge: Date.now() - context.authenticationTime.getTime(),
-      });
+      await this.recordSecurityEvent(
+        connectionId,
+        'authorization-denied',
+        'medium',
+        'Session expired',
+        {
+          capability,
+          sessionAge: Date.now() - context.authenticationTime.getTime(),
+        }
+      );
       return false;
     }
 
     // Check capability authorization
     if (!this.isCapabilityAllowed(context, capability)) {
-      await this.recordSecurityEvent(connectionId, 'authorization-denied', 'medium', 'Capability not authorized', {
-        capability,
-        grantedCapabilities: context.grantedCapabilities,
-      });
+      await this.recordSecurityEvent(
+        connectionId,
+        'authorization-denied',
+        'medium',
+        'Capability not authorized',
+        {
+          capability,
+          grantedCapabilities: context.grantedCapabilities,
+        }
+      );
       return false;
     }
 
@@ -468,20 +494,32 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
     try {
       await this.checkRateLimit(connectionId, 'request');
     } catch (error) {
-      await this.recordSecurityEvent(connectionId, 'rate-limit-exceeded', 'high', 'Rate limit exceeded', {
-        capability,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      await this.recordSecurityEvent(
+        connectionId,
+        'rate-limit-exceeded',
+        'high',
+        'Rate limit exceeded',
+        {
+          capability,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
       return false;
     }
 
     // Validate input
     const validationResult = await this.validateInput(context.effectivePolicy, requestData);
     if (!validationResult.valid) {
-      await this.recordSecurityEvent(connectionId, 'policy-violation', 'medium', 'Input validation failed', {
-        capability,
-        violations: validationResult.violations,
-      });
+      await this.recordSecurityEvent(
+        connectionId,
+        'policy-violation',
+        'medium',
+        'Input validation failed',
+        {
+          capability,
+          violations: validationResult.violations,
+        }
+      );
       return false;
     }
 
@@ -490,19 +528,25 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
     context.anomalyScore = anomalyScore;
 
     if (anomalyScore > context.effectivePolicy.suspiciousActivityThreshold) {
-      await this.recordSecurityEvent(connectionId, 'anomaly-detected', 'high', 'Suspicious activity detected', {
-        capability,
-        anomalyScore,
-        threshold: context.effectivePolicy.suspiciousActivityThreshold,
-      });
-      
+      await this.recordSecurityEvent(
+        connectionId,
+        'anomaly-detected',
+        'high',
+        'Suspicious activity detected',
+        {
+          capability,
+          anomalyScore,
+          threshold: context.effectivePolicy.suspiciousActivityThreshold,
+        }
+      );
+
       // Don't block but increase monitoring
       this.increaseMonitoring(connectionId);
     }
 
     // Update activity
     context.lastActivity = new Date();
-    
+
     return true;
   }
 
@@ -571,7 +615,9 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   private maskValue(value: any): string {
     if (typeof value === 'string') {
       if (value.length <= 4) return '***';
-      return value.substring(0, 2) + '*'.repeat(value.length - 4) + value.substring(value.length - 2);
+      return (
+        value.substring(0, 2) + '*'.repeat(value.length - 4) + value.substring(value.length - 2)
+      );
     }
     return '***';
   }
@@ -591,7 +637,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   private handlePII(data: any, handling: 'mask' | 'deny'): any {
     // Simple PII detection - would be more sophisticated in production
     const piiFields = ['email', 'phone', 'ssn', 'credit_card', 'password', 'token'];
-    
+
     if (typeof data !== 'object' || data === null) {
       return data;
     }
@@ -621,7 +667,10 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   /**
    * Validate input data
    */
-  private async validateInput(policy: SecurityPolicy, data: any): Promise<{ valid: boolean; violations: string[] }> {
+  private async validateInput(
+    policy: SecurityPolicy,
+    data: any
+  ): Promise<{ valid: boolean; violations: string[] }> {
     const violations: string[] = [];
 
     for (const rule of policy.inputValidation) {
@@ -646,10 +695,14 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
       // Length validation for strings
       if (rule.type === 'string' && typeof fieldValue === 'string') {
         if (rule.minLength && fieldValue.length < rule.minLength) {
-          violations.push(`Field '${rule.field}' is too short (minimum ${rule.minLength} characters)`);
+          violations.push(
+            `Field '${rule.field}' is too short (minimum ${rule.minLength} characters)`
+          );
         }
         if (rule.maxLength && fieldValue.length > rule.maxLength) {
-          violations.push(`Field '${rule.field}' is too long (maximum ${rule.maxLength} characters)`);
+          violations.push(
+            `Field '${rule.field}' is too long (maximum ${rule.maxLength} characters)`
+          );
         }
       }
 
@@ -694,14 +747,20 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   private async checkRateLimit(connectionId: string, operation: string): Promise<void> {
     const rateLimiter = this.getRateLimiter(connectionId);
     const context = this.securityContexts.get(connectionId);
-    
+
     if (!context) {
       throw new Error('Security context not found');
     }
 
     const policy = context.effectivePolicy;
-    
-    if (!rateLimiter.isAllowed(policy.requestsPerSecond, policy.requestsPerMinute, policy.requestsPerHour)) {
+
+    if (
+      !rateLimiter.isAllowed(
+        policy.requestsPerSecond,
+        policy.requestsPerMinute,
+        policy.requestsPerHour
+      )
+    ) {
       throw new Error('Rate limit exceeded');
     }
   }
@@ -756,7 +815,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
 
     // Geolocation risk
     const location = await this.getGeolocation(requestInfo.ipAddress);
-    if (location && await this.isHighRiskLocation(location)) {
+    if (location && (await this.isHighRiskLocation(location))) {
       riskScore += 25;
     }
 
@@ -814,7 +873,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
     };
 
     this.securityEvents.push(event);
-    
+
     // Emit event for real-time monitoring
     this.emit('security-event', event);
 
@@ -841,7 +900,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
     if (policy.allowedCapabilities.includes('*')) {
       return permissions;
     }
-    
+
     return policy.allowedCapabilities.filter(cap => permissions.includes(cap));
   }
 
@@ -853,7 +912,10 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
 
     // Enforce max concurrent sessions
     if (userSessions.size > context.effectivePolicy.maxConcurrentSessions) {
-      const oldestSessions = Array.from(userSessions).slice(0, -context.effectivePolicy.maxConcurrentSessions);
+      const oldestSessions = Array.from(userSessions).slice(
+        0,
+        -context.effectivePolicy.maxConcurrentSessions
+      );
       oldestSessions.forEach(sessionId => {
         this.terminateSession(sessionId);
         userSessions.delete(sessionId);
@@ -881,7 +943,9 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   }
 
   private isCapabilityAllowed(context: SecurityContext, capability: string): boolean {
-    return context.grantedCapabilities.includes('*') || context.grantedCapabilities.includes(capability);
+    return (
+      context.grantedCapabilities.includes('*') || context.grantedCapabilities.includes(capability)
+    );
   }
 
   private increaseMonitoring(connectionId: string): void {
@@ -920,7 +984,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
           sessionAge: Date.now() - context.authenticationTime.getTime(),
         });
       }
-      
+
       this.securityContexts.delete(connectionId);
       this.rateLimits.delete(connectionId);
     });
@@ -931,11 +995,11 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   }
 
   private cleanupOldEvents(): void {
-    const cutoffTime = Date.now() - (7 * 24 * 60 * 60 * 1000); // 7 days
+    const cutoffTime = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7 days
     const initialCount = this.securityEvents.length;
-    
-    this.securityEvents = this.securityEvents.filter(event => 
-      event.timestamp.getTime() > cutoffTime
+
+    this.securityEvents = this.securityEvents.filter(
+      event => event.timestamp.getTime() > cutoffTime
     );
 
     const removedCount = initialCount - this.securityEvents.length;
@@ -947,7 +1011,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   /**
    * Public API methods
    */
-  
+
   getSecurityContext(connectionId: string): SecurityContext | null {
     return this.securityContexts.get(connectionId) || null;
   }
@@ -996,7 +1060,10 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
     };
   }
 
-  private groupBy<T, K extends string | number>(array: T[], keyFn: (item: T) => K): Record<K, number> {
+  private groupBy<T, K extends string | number>(
+    array: T[],
+    keyFn: (item: T) => K
+  ): Record<K, number> {
     const result = {} as Record<K, number>;
     array.forEach(item => {
       const key = keyFn(item);
@@ -1014,10 +1081,10 @@ class RateLimiter {
 
   isAllowed(perSecond: number, perMinute: number, perHour: number): boolean {
     const now = Date.now();
-    
+
     // Clean old requests
     this.requestTimes = this.requestTimes.filter(time => now - time < 3600000); // Keep last hour
-    
+
     // Check limits
     const lastSecond = this.requestTimes.filter(time => now - time < 1000);
     const lastMinute = this.requestTimes.filter(time => now - time < 60000);
@@ -1037,7 +1104,10 @@ class RateLimiter {
  * Threat Detector
  */
 class ThreatDetector {
-  detectThreats(context: SecurityContext, requestData: any): { threats: string[]; riskLevel: number } {
+  detectThreats(
+    context: SecurityContext,
+    requestData: any
+  ): { threats: string[]; riskLevel: number } {
     const threats: string[] = [];
     let riskLevel = 0;
 
@@ -1073,24 +1143,14 @@ class ThreatDetector {
   }
 
   private containsXSS(data: any): boolean {
-    const xssPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /onerror\s*=/i,
-      /onload\s*=/i,
-    ];
+    const xssPatterns = [/<script/i, /javascript:/i, /onerror\s*=/i, /onload\s*=/i];
 
     const text = JSON.stringify(data);
     return xssPatterns.some(pattern => pattern.test(text));
   }
 
   private containsCommandInjection(data: any): boolean {
-    const commandPatterns = [
-      /;\s*(rm|del|format)/i,
-      /\|\s*(nc|netcat)/i,
-      /`[^`]*`/,
-      /\$\([^)]*\)/,
-    ];
+    const commandPatterns = [/;\s*(rm|del|format)/i, /\|\s*(nc|netcat)/i, /`[^`]*`/, /\$\([^)]*\)/];
 
     const text = JSON.stringify(data);
     return commandPatterns.some(pattern => pattern.test(text));
@@ -1103,10 +1163,14 @@ class ThreatDetector {
 class AnomalyDetector {
   private requestHistory: Map<string, any[]> = new Map();
 
-  async checkRequest(context: SecurityContext, capability: string, requestData: any): Promise<number> {
+  async checkRequest(
+    context: SecurityContext,
+    capability: string,
+    requestData: any
+  ): Promise<number> {
     const connectionId = context.connectionId;
     const history = this.requestHistory.get(connectionId) || [];
-    
+
     // Add current request to history
     history.push({
       capability,
@@ -1134,8 +1198,10 @@ class AnomalyDetector {
     // Check unusual capabilities
     const capabilityCounts = this.groupBy(history, req => req.capability);
     const currentCapabilityCount = capabilityCounts[capability] || 0;
-    const avgCapabilityCount = Object.values(capabilityCounts).reduce((sum: number, count: number) => sum + count, 0) / Object.keys(capabilityCounts).length;
-    
+    const avgCapabilityCount =
+      Object.values(capabilityCounts).reduce((sum: number, count: number) => sum + count, 0) /
+      Object.keys(capabilityCounts).length;
+
     if (currentCapabilityCount > avgCapabilityCount * 3) {
       anomalyScore += 25;
     }
@@ -1144,7 +1210,7 @@ class AnomalyDetector {
     const currentHour = new Date().getHours();
     const hourCounts = this.groupBy(history, req => req.hour);
     const typicalHours = Object.keys(hourCounts).filter(hour => hourCounts[hour] > 2);
-    
+
     if (typicalHours.length > 0 && !typicalHours.includes(currentHour.toString())) {
       anomalyScore += 20;
     }
@@ -1153,7 +1219,7 @@ class AnomalyDetector {
     const dataSizes = history.map(req => req.dataSize);
     const avgDataSize = dataSizes.reduce((sum, size) => sum + size, 0) / dataSizes.length;
     const currentDataSize = JSON.stringify(requestData).length;
-    
+
     if (currentDataSize > avgDataSize * 5) {
       anomalyScore += 35;
     }
@@ -1161,7 +1227,10 @@ class AnomalyDetector {
     return Math.min(100, anomalyScore);
   }
 
-  private groupBy<T, K extends string | number>(array: T[], keyFn: (item: T) => K): Record<K, number> {
+  private groupBy<T, K extends string | number>(
+    array: T[],
+    keyFn: (item: T) => K
+  ): Record<K, number> {
     const result = {} as Record<K, number>;
     array.forEach(item => {
       const key = keyFn(item);

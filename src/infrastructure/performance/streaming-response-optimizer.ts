@@ -2,7 +2,7 @@
  * Streaming Response Optimizer (ENHANCED)
  * Optimizes streaming responses for maximum throughput and minimal latency
  * Enhanced with 2024 Node.js WebStreams performance improvements (100%+ gains)
- * 
+ *
  * Performance Impact: 50-70% faster streaming with intelligent buffering
  * Reduces perceived latency through predictive token processing
  * Now includes V8 memory optimization and modern WebStreams API
@@ -44,7 +44,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
   private activeStreams = new Map<string, StreamBuffer>();
   private streamMetrics = new Map<string, StreamingMetrics>();
   private processingQueue: string[] = [];
-  
+
   // Optimization settings (enhanced with 2024 WebStreams research)
   private readonly BUFFER_SIZE = 50; // tokens
   private readonly FLUSH_INTERVAL = 25; // ms (optimized for modern V8)
@@ -54,21 +54,21 @@ export class StreamingResponseOptimizer extends EventEmitter {
   // 2024 WebStreams optimizations
   private readonly WEB_STREAMS_ENABLED = true; // Use modern WebStreams API
   private readonly V8_MEMORY_OPTIMIZATION = true; // Enable V8 memory tuning
-  
+
   // Performance tracking
   private cleanupIntervalId: string | null = null;
-  
+
   private constructor() {
     super();
     if (!StreamingResponseOptimizer.isTestMode) {
       this.startStreamProcessor();
-      
+
       // Setup cleanup interval
       const cleanupInterval = setInterval(() => {
-      // TODO: Store interval ID and call clearInterval in cleanup
+        // TODO: Store interval ID and call clearInterval in cleanup
         this.cleanupExpiredStreams();
       }, 30000); // 30 seconds
-      
+
       this.cleanupIntervalId = resourceManager.registerInterval(
         cleanupInterval,
         'StreamingResponseOptimizer',
@@ -108,7 +108,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
       objectMode: false,
       highWaterMark: this.WEB_STREAMS_ENABLED ? 64 * 1024 : 16 * 1024, // 2024: 4x larger buffers
       enableBackpressure: true,
-      ...options
+      ...options,
     };
 
     if (this.V8_MEMORY_OPTIMIZATION) {
@@ -118,73 +118,87 @@ export class StreamingResponseOptimizer extends EventEmitter {
 
     switch (options.type) {
       case 'readable':
-        return new ReadableStream({
-          start(controller) {
-            logger.debug('WebStreams ReadableStream started with 2024 optimizations');
+        return new ReadableStream(
+          {
+            start(controller) {
+              logger.debug('WebStreams ReadableStream started with 2024 optimizations');
+            },
+            async pull(controller) {
+              // 2024: Optimized pulling strategy for better throughput
+              if (
+                config.enableBackpressure &&
+                controller.desiredSize !== null &&
+                controller.desiredSize <= 0
+              ) {
+                return Promise.resolve(); // Wait for backpressure to clear
+              }
+              return Promise.resolve();
+            },
+            cancel(reason) {
+              logger.debug('WebStreams ReadableStream cancelled', { reason });
+            },
           },
-          async pull(controller) {
-            // 2024: Optimized pulling strategy for better throughput
-            if (config.enableBackpressure && controller.desiredSize !== null && controller.desiredSize <= 0) {
-              return Promise.resolve(); // Wait for backpressure to clear
-            }
-            return Promise.resolve();
-          },
-          cancel(reason) {
-            logger.debug('WebStreams ReadableStream cancelled', { reason });
+          {
+            highWaterMark: config.highWaterMark,
+            size(chunk) {
+              return typeof chunk === 'string' ? chunk.length : 1;
+            },
           }
-        }, {
-          highWaterMark: config.highWaterMark,
-          size(chunk) {
-            return typeof chunk === 'string' ? chunk.length : 1;
-          }
-        });
+        );
 
       case 'writable':
-        return new WritableStream({
-          start(controller) {
-            logger.debug('WebStreams WritableStream started with 2024 optimizations');
+        return new WritableStream(
+          {
+            start(controller) {
+              logger.debug('WebStreams WritableStream started with 2024 optimizations');
+            },
+            async write(chunk, controller) {
+              // 2024: Optimized write handling with memory management
+              if (config.enableBackpressure && typeof chunk === 'object') {
+                // Use structured clone for better V8 memory optimization
+                return Promise.resolve(structuredClone(chunk));
+              }
+              return Promise.resolve();
+            },
+            close() {
+              logger.debug('WebStreams WritableStream closed');
+            },
+            abort(reason) {
+              logger.debug('WebStreams WritableStream aborted', { reason });
+            },
           },
-          async write(chunk, controller) {
-            // 2024: Optimized write handling with memory management
-            if (config.enableBackpressure && typeof chunk === 'object') {
-              // Use structured clone for better V8 memory optimization
-              return Promise.resolve(structuredClone(chunk));
-            }
-            return Promise.resolve();
-          },
-          close() {
-            logger.debug('WebStreams WritableStream closed');
-          },
-          abort(reason) {
-            logger.debug('WebStreams WritableStream aborted', { reason });
+          {
+            highWaterMark: config.highWaterMark,
+            size(chunk) {
+              return typeof chunk === 'string' ? chunk.length : 1;
+            },
           }
-        }, {
-          highWaterMark: config.highWaterMark,
-          size(chunk) {
-            return typeof chunk === 'string' ? chunk.length : 1;
-          }
-        });
+        );
 
       case 'transform':
       default:
-        return new TransformStream({
-          start(controller) {
-            logger.debug('WebStreams TransformStream started with 2024 optimizations');
+        return new TransformStream(
+          {
+            start(controller) {
+              logger.debug('WebStreams TransformStream started with 2024 optimizations');
+            },
+            async transform(chunk, controller) {
+              // 2024: Enhanced transform with predictive processing
+              const optimized = chunk; // Simplified for TypeScript compatibility
+              controller.enqueue(optimized);
+              return Promise.resolve();
+            },
+            flush(controller) {
+              logger.debug('WebStreams TransformStream flushed');
+            },
           },
-          async transform(chunk, controller) {
-            // 2024: Enhanced transform with predictive processing
-            const optimized = chunk; // Simplified for TypeScript compatibility
-            controller.enqueue(optimized);
-            return Promise.resolve();
+          {
+            highWaterMark: config.highWaterMark,
           },
-          flush(controller) {
-            logger.debug('WebStreams TransformStream flushed');
+          {
+            highWaterMark: config.highWaterMark,
           }
-        }, {
-          highWaterMark: config.highWaterMark
-        }, {
-          highWaterMark: config.highWaterMark
-        });
+        );
     }
   }
 
@@ -211,24 +225,27 @@ export class StreamingResponseOptimizer extends EventEmitter {
   /**
    * Create a new optimized stream
    */
-  createStream(streamId: string, options: {
-    bufferSize?: number;
-    flushInterval?: number;
-    enablePrediction?: boolean;
-    enableCompression?: boolean;
-    useWebStreams?: boolean;
-  } = {}): string {
+  createStream(
+    streamId: string,
+    options: {
+      bufferSize?: number;
+      flushInterval?: number;
+      enablePrediction?: boolean;
+      enableCompression?: boolean;
+      useWebStreams?: boolean;
+    } = {}
+  ): string {
     const buffer: StreamBuffer = {
       streamId,
       chunks: [],
       lastFlush: Date.now(),
       totalTokens: 0,
       processingTime: 0,
-      subscribers: new Set()
+      subscribers: new Set(),
     };
-    
+
     this.activeStreams.set(streamId, buffer);
-    
+
     // Initialize metrics
     this.streamMetrics.set(streamId, {
       streamId,
@@ -237,15 +254,15 @@ export class StreamingResponseOptimizer extends EventEmitter {
       throughput: 0,
       latency: 0,
       bufferUtilization: 0,
-      compressionRatio: 1.0
+      compressionRatio: 1.0,
     });
-    
-    logger.debug('Created optimized stream', { 
+
+    logger.debug('Created optimized stream', {
       streamId,
       bufferSize: options.bufferSize || this.BUFFER_SIZE,
-      enablePrediction: options.enablePrediction ?? true
+      enablePrediction: options.enablePrediction ?? true,
     });
-    
+
     return streamId;
   }
 
@@ -258,32 +275,32 @@ export class StreamingResponseOptimizer extends EventEmitter {
       logger.warn('Stream not found', { streamId });
       return;
     }
-    
+
     const chunk: StreamChunk = {
       id: this.generateChunkId(),
       content,
       timestamp: Date.now(),
-      metadata
+      metadata,
     };
-    
+
     buffer.chunks.push(chunk);
     buffer.totalTokens += this.estimateTokens(content);
-    
+
     // Update metrics
     const metrics = this.streamMetrics.get(streamId)!;
     metrics.totalChunks++;
     metrics.averageChunkSize = buffer.totalTokens / metrics.totalChunks;
-    
+
     // Check if we should flush immediately
     if (this.shouldFlush(buffer)) {
       this.flushStream(streamId);
     }
-    
+
     logger.debug('Added content to stream', {
       streamId,
       contentLength: content.length,
       bufferSize: buffer.chunks.length,
-      totalTokens: buffer.totalTokens
+      totalTokens: buffer.totalTokens,
     });
   }
 
@@ -296,9 +313,9 @@ export class StreamingResponseOptimizer extends EventEmitter {
       logger.warn('Cannot subscribe to non-existent stream', { streamId });
       return () => {};
     }
-    
+
     buffer.subscribers.add(callback);
-    
+
     // Return unsubscribe function
     return () => {
       buffer.subscribers.delete(callback);
@@ -312,7 +329,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
     const now = Date.now();
     const timeSinceLastFlush = now - buffer.lastFlush;
     const bufferTokens = buffer.totalTokens;
-    
+
     return (
       bufferTokens >= this.BUFFER_SIZE ||
       timeSinceLastFlush >= this.MAX_BUFFER_TIME ||
@@ -326,12 +343,12 @@ export class StreamingResponseOptimizer extends EventEmitter {
   private flushStream(streamId: string): void {
     const buffer = this.activeStreams.get(streamId);
     if (!buffer || buffer.chunks.length === 0) return;
-    
+
     const startTime = Date.now();
-    
+
     // Optimize chunks before flushing
     const optimizedChunks = this.optimizeChunks(buffer.chunks);
-    
+
     // Send optimized chunks to subscribers
     for (const chunk of optimizedChunks) {
       for (const subscriber of buffer.subscribers) {
@@ -342,26 +359,26 @@ export class StreamingResponseOptimizer extends EventEmitter {
         }
       }
     }
-    
+
     // Update buffer state
     buffer.chunks.length = 0;
     buffer.totalTokens = 0;
     buffer.lastFlush = Date.now();
     buffer.processingTime += Date.now() - startTime;
-    
+
     // Update metrics
     const metrics = this.streamMetrics.get(streamId)!;
     metrics.latency = Date.now() - startTime;
     metrics.throughput = buffer.totalTokens / ((Date.now() - buffer.lastFlush) / 1000);
     metrics.bufferUtilization = optimizedChunks.length / this.BUFFER_SIZE;
-    
+
     this.emit('streamFlushed', { streamId, chunkCount: optimizedChunks.length });
-    
+
     logger.debug('Stream flushed', {
       streamId,
       chunkCount: optimizedChunks.length,
       processingTime: Date.now() - startTime,
-      throughput: metrics.throughput.toFixed(1)
+      throughput: metrics.throughput.toFixed(1),
     });
   }
 
@@ -370,13 +387,13 @@ export class StreamingResponseOptimizer extends EventEmitter {
    */
   private optimizeChunks(chunks: StreamChunk[]): StreamChunk[] {
     if (chunks.length <= 1) return chunks;
-    
+
     const optimized: StreamChunk[] = [];
     let currentMerge: StreamChunk | null = null;
-    
+
     for (const chunk of chunks) {
       const tokenCount = this.estimateTokens(chunk.content);
-      
+
       // Merge small chunks together
       if (tokenCount < this.CHUNK_MERGE_THRESHOLD) {
         if (currentMerge) {
@@ -391,17 +408,17 @@ export class StreamingResponseOptimizer extends EventEmitter {
           optimized.push(currentMerge);
           currentMerge = null;
         }
-        
+
         // Add the chunk as-is (it's large enough)
         optimized.push(chunk);
       }
     }
-    
+
     // Add final merge if any
     if (currentMerge) {
       optimized.push(currentMerge);
     }
-    
+
     return optimized;
   }
 
@@ -411,19 +428,19 @@ export class StreamingResponseOptimizer extends EventEmitter {
   predictNextContent(streamId: string, currentContent: string): string | null {
     const buffer = this.activeStreams.get(streamId);
     if (!buffer) return null;
-    
+
     // Simple prediction based on recent patterns
     const recentChunks = buffer.chunks.slice(-5);
     if (recentChunks.length < 2) return null;
-    
+
     // Look for patterns in recent content
     const patterns = this.analyzeContentPatterns(recentChunks.map(c => c.content));
-    
+
     if (patterns.length > 0) {
       // Return the most likely next pattern
       return patterns[0];
     }
-    
+
     return null;
   }
 
@@ -432,27 +449,27 @@ export class StreamingResponseOptimizer extends EventEmitter {
    */
   private analyzeContentPatterns(contents: string[]): string[] {
     const patterns: string[] = [];
-    
+
     // Simple pattern analysis - look for repeated sequences
     for (let i = 0; i < contents.length - 1; i++) {
       const current = contents[i];
       const next = contents[i + 1];
-      
+
       // Look for common word transitions
       const currentWords = current.split(/\s+/);
       const nextWords = next.split(/\s+/);
-      
+
       if (currentWords.length > 0 && nextWords.length > 0) {
         const lastWord = currentWords[currentWords.length - 1];
         const firstWord = nextWords[0];
-        
+
         // This is a very simplified pattern - in reality you'd use more sophisticated NLP
         if (lastWord && firstWord) {
           patterns.push(`${lastWord} ${firstWord}`);
         }
       }
     }
-    
+
     return [...new Set(patterns)]; // Remove duplicates
   }
 
@@ -461,15 +478,15 @@ export class StreamingResponseOptimizer extends EventEmitter {
    */
   private startStreamProcessor(): void {
     const processorInterval = setInterval(() => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       this.processStreams();
     }, this.FLUSH_INTERVAL);
-    
+
     // Don't let processor interval keep process alive
     if (processorInterval.unref) {
       processorInterval.unref();
     }
-    
+
     resourceManager.registerInterval(
       processorInterval,
       'StreamingResponseOptimizer',
@@ -482,7 +499,8 @@ export class StreamingResponseOptimizer extends EventEmitter {
    */
   private processStreams(): void {
     // Apply V8 memory optimizations periodically
-    if (this.V8_MEMORY_OPTIMIZATION && Math.random() < 0.1) { // 10% chance per cycle
+    if (this.V8_MEMORY_OPTIMIZATION && Math.random() < 0.1) {
+      // 10% chance per cycle
       this.applyV8MemoryOptimizations();
     }
 
@@ -506,20 +524,20 @@ export class StreamingResponseOptimizer extends EventEmitter {
   private cleanupExpiredStreams(): void {
     const now = Date.now();
     const expiredStreams: string[] = [];
-    
+
     for (const [streamId, buffer] of this.activeStreams.entries()) {
       const timeSinceLastFlush = now - buffer.lastFlush;
-      
+
       // Mark streams as expired if inactive for 5 minutes
       if (timeSinceLastFlush > 5 * 60 * 1000 && buffer.subscribers.size === 0) {
         expiredStreams.push(streamId);
       }
     }
-    
+
     for (const streamId of expiredStreams) {
       this.closeStream(streamId);
     }
-    
+
     if (expiredStreams.length > 0) {
       logger.debug('Cleaned up expired streams', { count: expiredStreams.length });
     }
@@ -531,15 +549,15 @@ export class StreamingResponseOptimizer extends EventEmitter {
   closeStream(streamId: string): void {
     const buffer = this.activeStreams.get(streamId);
     if (!buffer) return;
-    
+
     // Flush any remaining content
     if (buffer.chunks.length > 0) {
       this.flushStream(streamId);
     }
-    
+
     // Cleanup
     this.activeStreams.delete(streamId);
-    
+
     // Keep metrics for analysis
     const metrics = this.streamMetrics.get(streamId);
     if (metrics) {
@@ -547,10 +565,10 @@ export class StreamingResponseOptimizer extends EventEmitter {
         streamId,
         totalChunks: metrics.totalChunks,
         avgThroughput: metrics.throughput.toFixed(1),
-        avgLatency: metrics.latency.toFixed(1)
+        avgLatency: metrics.latency.toFixed(1),
       });
     }
-    
+
     this.emit('streamClosed', { streamId });
   }
 
@@ -582,7 +600,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
 
       logger.debug('V8 memory optimizations applied', {
         activeStreams: this.activeStreams.size,
-        memoryPressure: this.getMemoryPressure()
+        memoryPressure: this.getMemoryPressure(),
       });
     } catch (error) {
       logger.warn('V8 optimization failed', { error });
@@ -594,7 +612,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
    */
   private optimizeStringInternalization(): void {
     const commonPhrases = new Set<string>();
-    
+
     // Collect common phrases from active streams
     for (const buffer of this.activeStreams.values()) {
       for (const chunk of buffer.chunks) {
@@ -618,7 +636,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
     try {
       const memUsage = process.memoryUsage();
       const heapRatio = memUsage.heapUsed / memUsage.heapTotal;
-      
+
       if (heapRatio > 0.8) return 'high';
       if (heapRatio > 0.6) return 'medium';
       return 'low';
@@ -636,16 +654,16 @@ export class StreamingResponseOptimizer extends EventEmitter {
     try {
       // 2024: Use worker threads for CPU-intensive stream processing
       const { Worker, isMainThread, parentPort } = await import('worker_threads');
-      
+
       if (isMainThread) {
         // Simple worker pool implementation for streaming
         const worker = new Worker(__filename);
-        
+
         return new Promise((resolve, reject) => {
           worker.postMessage(data);
           worker.on('message', resolve);
           worker.on('error', reject);
-          worker.on('exit', (code) => {
+          worker.on('exit', code => {
             if (code !== 0) {
               reject(new Error(`Worker stopped with exit code ${code}`));
             }
@@ -673,7 +691,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
     v8OptimizationsEnabled: boolean;
   } {
     const activeMetrics = Array.from(this.streamMetrics.values());
-    
+
     if (activeMetrics.length === 0) {
       return {
         activeStreams: 0,
@@ -684,15 +702,18 @@ export class StreamingResponseOptimizer extends EventEmitter {
         optimizationEfficiency: 0,
         memoryPressure: this.getMemoryPressure(),
         webStreamsEnabled: this.WEB_STREAMS_ENABLED,
-        v8OptimizationsEnabled: this.V8_MEMORY_OPTIMIZATION
+        v8OptimizationsEnabled: this.V8_MEMORY_OPTIMIZATION,
       };
     }
-    
-    const avgThroughput = activeMetrics.reduce((sum, m) => sum + m.throughput, 0) / activeMetrics.length;
+
+    const avgThroughput =
+      activeMetrics.reduce((sum, m) => sum + m.throughput, 0) / activeMetrics.length;
     const avgLatency = activeMetrics.reduce((sum, m) => sum + m.latency, 0) / activeMetrics.length;
-    const avgBufferUtil = activeMetrics.reduce((sum, m) => sum + m.bufferUtilization, 0) / activeMetrics.length;
-    const avgCompression = activeMetrics.reduce((sum, m) => sum + m.compressionRatio, 0) / activeMetrics.length;
-    
+    const avgBufferUtil =
+      activeMetrics.reduce((sum, m) => sum + m.bufferUtilization, 0) / activeMetrics.length;
+    const avgCompression =
+      activeMetrics.reduce((sum, m) => sum + m.compressionRatio, 0) / activeMetrics.length;
+
     return {
       activeStreams: this.activeStreams.size,
       totalStreamsProcessed: this.streamMetrics.size,
@@ -702,7 +723,7 @@ export class StreamingResponseOptimizer extends EventEmitter {
       optimizationEfficiency: (1 - avgCompression) * 100, // Efficiency from compression
       memoryPressure: this.getMemoryPressure(),
       webStreamsEnabled: this.WEB_STREAMS_ENABLED,
-      v8OptimizationsEnabled: this.V8_MEMORY_OPTIMIZATION
+      v8OptimizationsEnabled: this.V8_MEMORY_OPTIMIZATION,
     };
   }
 
@@ -733,19 +754,19 @@ export class StreamingResponseOptimizer extends EventEmitter {
     for (const streamId of activeStreamIds) {
       this.closeStream(streamId);
     }
-    
+
     // Cleanup intervals
     if (this.cleanupIntervalId) {
       resourceManager.cleanup(this.cleanupIntervalId);
     }
-    
+
     const stats = this.getStreamingStats();
     logger.info('🔄 StreamingResponseOptimizer shutting down', {
       totalStreamsProcessed: stats.totalStreamsProcessed,
       avgThroughput: stats.averageThroughput.toFixed(1),
-      avgLatency: stats.averageLatency.toFixed(1)
+      avgLatency: stats.averageLatency.toFixed(1),
     });
-    
+
     this.removeAllListeners();
   }
 }

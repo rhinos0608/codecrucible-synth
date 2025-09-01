@@ -4,7 +4,10 @@
 export interface REPLInterface {
   showStatus(): void;
   listModels(): void;
-  executePromptProcessing(prompt: string, options?: any): Promise<any>;
+  executePromptProcessing(
+    prompt: string,
+    options?: Record<string, unknown>
+  ): Promise<Record<string, unknown>>;
 }
 
 // Model client interface

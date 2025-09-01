@@ -1,12 +1,16 @@
 /**
  * Multi-Voice Synthesis Use Case
  * Application Layer - Orchestrates multi-voice collaboration
- * 
+ *
  * Handles: Coordinating multiple AI voices for complex problems
  * Imports: Domain services only (follows ARCHITECTURE.md)
  */
 
-import { IVoiceOrchestrationService, VoiceSelectionPreferences, SynthesisMode } from '../../domain/services/voice-orchestration-service.js';
+import {
+  IVoiceOrchestrationService,
+  VoiceSelectionPreferences,
+  SynthesisMode,
+} from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
 import { Voice } from '../../domain/entities/voice.js';
@@ -61,41 +65,37 @@ export class MultiVoiceSynthesisUseCase {
 
   async execute(input: MultiVoiceSynthesisInput): Promise<MultiVoiceSynthesisOutput> {
     const startTime = Date.now();
-    
+
     // Input validation and transformation
     const request = this.transformToProcessingRequest(input);
     const preferences = this.transformToVoicePreferences(input);
-    
+
     // Domain orchestration - Voice Selection
     const voiceSelection = await this.voiceOrchestrationService.selectVoicesForRequest(
-      request, 
+      request,
       preferences
     );
-    
+
     // Domain orchestration - Model Selection
     const selectedModel = await this.modelSelectionService.selectOptimalModel(request);
-    
+
     // Generate responses from all selected voices
     const allVoices = [voiceSelection.primaryVoice, ...voiceSelection.supportingVoices];
-    const voiceResponses = await this.generateVoiceResponses(
-      allVoices, 
-      request, 
-      selectedModel
-    );
-    
+    const voiceResponses = await this.generateVoiceResponses(allVoices, request, selectedModel);
+
     // Domain orchestration - Synthesis
     const synthesisResult = await this.voiceOrchestrationService.synthesizeVoiceResponses(
       voiceResponses,
       voiceSelection.synthesisMode
     );
-    
+
     // Domain orchestration - Conflict Resolution
     const conflicts = await this.voiceOrchestrationService.detectVoiceConflicts(voiceResponses);
     const conflictResolutions = await this.voiceOrchestrationService.resolveVoiceConflicts(
       conflicts,
       allVoices
     );
-    
+
     // Output transformation
     return this.transformToOutput(
       synthesisResult,
@@ -125,9 +125,14 @@ export class MultiVoiceSynthesisUseCase {
     return {
       maxVoices: input.voiceCount || 3,
       minVoices: Math.max(2, Math.min(input.voiceCount || 2, 2)), // At least 2 for multi-voice
-      synthesisMode: input.synthesisMode === 'competitive' ? SynthesisMode.COMPETITIVE :
-                     input.synthesisMode === 'consensus' ? SynthesisMode.CONSENSUS :
-                     input.synthesisMode === 'weighted' ? SynthesisMode.WEIGHTED : SynthesisMode.COLLABORATIVE,
+      synthesisMode:
+        input.synthesisMode === 'competitive'
+          ? SynthesisMode.COMPETITIVE
+          : input.synthesisMode === 'consensus'
+            ? SynthesisMode.CONSENSUS
+            : input.synthesisMode === 'weighted'
+              ? SynthesisMode.WEIGHTED
+              : SynthesisMode.COLLABORATIVE,
       preferredVoices: input.requiredVoices,
       diversityWeight: 0.7,
     };
@@ -139,7 +144,7 @@ export class MultiVoiceSynthesisUseCase {
     model: any
   ): Promise<any[]> {
     const responses = [];
-    
+
     for (const voice of voices) {
       try {
         const response = await model.generateResponse(request, voice);
@@ -155,20 +160,18 @@ export class MultiVoiceSynthesisUseCase {
         console.warn(`Voice ${voice.id} failed to generate response:`, error);
       }
     }
-    
+
     return responses;
   }
 
   private calculateExpertiseMatch(voice: Voice, request: ProcessingRequest): number {
     const requiredCapabilities = request.requiresCapabilities();
     const voiceExpertise = voice.expertise;
-    
+
     const matches = requiredCapabilities.filter(capability =>
-      voiceExpertise.some(expertise => 
-        expertise.toLowerCase().includes(capability.toLowerCase())
-      )
+      voiceExpertise.some(expertise => expertise.toLowerCase().includes(capability.toLowerCase()))
     ).length;
-    
+
     return requiredCapabilities.length > 0 ? matches / requiredCapabilities.length : 1.0;
   }
 

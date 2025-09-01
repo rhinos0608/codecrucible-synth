@@ -10,8 +10,10 @@
     "codecrucible": "./dist/bin/crucible.js"
   },
   "scripts": {
-    "build": "set NODE_OPTIONS=--max-old-space-size=4096 && tsc && npm run copy-assets",
-    "build:all": "set NODE_OPTIONS=--max-old-space-size=4096 && tsc && npm run copy-assets",
+    "build": "npm run build:rust && tsc && npm run copy-assets",
+    "build:all": "npm run build:rust && tsc && npm run copy-assets",
+    "build:rust": "napi build --platform --release rust-executor",
+    "build:rust:dev": "napi build --platform rust-executor",
     "copy-assets": "node scripts/copy-assets.js",
     "dev": "tsx src/index.ts",
     "test": "npm run test:unit && npm run test:integration",
@@ -185,6 +187,7 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@napi-rs/cli": "^3.1.5",
     "@types/archiver": "^6.0.3",
     "@types/better-sqlite3": "^7.6.8",
     "@types/cross-spawn": "^6.0.6",
@@ -232,6 +235,17 @@
     },
     "linux": {
       "target": "AppImage"
+    }
+  },
+  "napi": {
+    "name": "codecrucible-rust-executor",
+    "triples": {
+      "additional": [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "aarch64-pc-windows-msvc",
+        "x86_64-unknown-linux-musl"
+      ]
     }
   }
 }

@@ -1,6 +1,6 @@
 /**
  * Analyze Directory Use Case - Application Layer
- * 
+ *
  * Handles directory analysis operations following clean architecture principles.
  * Contains application logic for analyzing entire directories and project structures.
  */
@@ -8,8 +8,15 @@
 import { performance } from 'perf_hooks';
 import { readdirSync, statSync, readFileSync, existsSync } from 'fs';
 import { join, extname, relative, basename } from 'path';
-import { IAnalyzeDirectoryUseCase, AnalysisRequest, AnalysisResponse } from '../../domain/interfaces/use-cases.js';
-import { IWorkflowOrchestrator, WorkflowRequest } from '../../domain/interfaces/workflow-orchestrator.js';
+import {
+  IAnalyzeDirectoryUseCase,
+  AnalysisRequest,
+  AnalysisResponse,
+} from '../../domain/interfaces/use-cases.js';
+import {
+  IWorkflowOrchestrator,
+  WorkflowRequest,
+} from '../../domain/interfaces/workflow-orchestrator.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 
 interface FileInfo {
@@ -35,7 +42,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
 
   async execute(request: AnalysisRequest): Promise<AnalysisResponse> {
     const startTime = performance.now();
-    
+
     try {
       // Validate request
       if (!request.directoryPath) {
@@ -72,18 +79,18 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
           prompt: analysisPrompt,
           directoryPath: request.directoryPath,
           structure: directoryStructure,
-          options: request.options
+          options: request.options,
         },
         context: {
           sessionId: `directory-analysis-${Date.now()}`,
           workingDirectory: request.directoryPath,
           permissions: ['read', 'analyze', 'traverse'],
-          securityLevel: 'medium' as const
-        }
+          securityLevel: 'medium' as const,
+        },
       };
 
       const workflowResponse = await this.orchestrator.processRequest(workflowRequest);
-      
+
       if (!workflowResponse.success) {
         throw new Error(workflowResponse.error?.message || 'Directory analysis failed');
       }
@@ -93,54 +100,56 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
         workflowResponse.result,
         directoryStructure
       );
-      
+
       const metadata = {
         duration: performance.now() - startTime,
         linesAnalyzed: directoryStructure.totalLines,
-        filesAnalyzed: directoryStructure.totalFiles
+        filesAnalyzed: directoryStructure.totalFiles,
       };
 
       return {
         success: true,
         analysis: analysisResult,
-        metadata
+        metadata,
       };
-
     } catch (error) {
       const duration = performance.now() - startTime;
       logger.error('Directory analysis failed:', error);
-      
+
       return {
         success: false,
         analysis: {
           summary: 'Directory analysis failed',
           insights: [],
-          recommendations: ['Check directory path and permissions']
+          recommendations: ['Check directory path and permissions'],
         },
         metadata: {
           duration,
           linesAnalyzed: 0,
-          filesAnalyzed: 0
+          filesAnalyzed: 0,
         },
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
-  private async scanDirectory(directoryPath: string, maxDepth: number): Promise<DirectoryStructure> {
+  private async scanDirectory(
+    directoryPath: string,
+    maxDepth: number
+  ): Promise<DirectoryStructure> {
     const files: FileInfo[] = [];
     const dependencies = new Set<string>();
-    
+
     const scanRecursive = (currentPath: string, currentDepth: number) => {
       if (currentDepth > maxDepth) return;
 
       try {
         const entries = readdirSync(currentPath);
-        
+
         for (const entry of entries) {
           const fullPath = join(currentPath, entry);
           const stats = statSync(fullPath);
-          
+
           // Skip hidden files and common ignore patterns
           if (this.shouldSkipFile(entry, fullPath)) {
             continue;
@@ -151,7 +160,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
           } else if (stats.isFile()) {
             const fileInfo = this.analyzeFile(fullPath, directoryPath);
             files.push(fileInfo);
-            
+
             // Extract dependencies if it's a config file
             if (fileInfo.type === 'config') {
               this.extractDependencies(fullPath).forEach(dep => dependencies.add(dep));
@@ -168,19 +177,17 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     // Calculate statistics
     const totalFiles = files.length;
     const totalLines = files.reduce((sum, file) => sum + file.lines, 0);
-    
+
     const filesByType: Record<string, number> = {};
     const filesByExtension: Record<string, number> = {};
-    
+
     files.forEach(file => {
       filesByType[file.type] = (filesByType[file.type] || 0) + 1;
       filesByExtension[file.extension] = (filesByExtension[file.extension] || 0) + 1;
     });
 
     // Get largest files (top 10)
-    const largestFiles = files
-      .sort((a, b) => b.lines - a.lines)
-      .slice(0, 10);
+    const largestFiles = files.sort((a, b) => b.lines - a.lines).slice(0, 10);
 
     return {
       totalFiles,
@@ -188,7 +195,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
       filesByType,
       filesByExtension,
       largestFiles,
-      dependencies: Array.from(dependencies)
+      dependencies: Array.from(dependencies),
     };
   }
 
@@ -207,7 +214,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
       /cache/,
       /logs?/,
       /\.log$/,
-      /\.lock$/
+      /\.lock$/,
     ];
 
     return skipPatterns.some(pattern => pattern.test(entry) || pattern.test(fullPath));
@@ -217,7 +224,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     const stats = statSync(filePath);
     const extension = extname(filePath);
     const relativePath = relative(rootPath, filePath);
-    
+
     let lines = 0;
     try {
       const content = readFileSync(filePath, 'utf-8');
@@ -232,7 +239,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
       size: stats.size,
       extension,
       type: this.determineFileType(filePath),
-      lines
+      lines,
     };
   }
 
@@ -241,39 +248,82 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     const extension = extname(filePath).toLowerCase();
 
     // Test files
-    if (fileName.includes('test') || fileName.includes('spec') || 
-        filePath.includes('/tests/') || filePath.includes('/__tests__/')) {
+    if (
+      fileName.includes('test') ||
+      fileName.includes('spec') ||
+      filePath.includes('/tests/') ||
+      filePath.includes('/__tests__/')
+    ) {
       return 'test';
     }
 
     // Configuration files
     const configFiles = [
-      'package.json', 'tsconfig.json', 'webpack.config.js', 'rollup.config.js',
-      'babel.config.js', 'jest.config.js', 'eslint.config.js', '.eslintrc',
-      'prettier.config.js', '.prettierrc', 'docker-compose.yml', 'dockerfile',
-      'makefile', 'cmake', '.env', '.gitignore', '.gitattributes'
+      'package.json',
+      'tsconfig.json',
+      'webpack.config.js',
+      'rollup.config.js',
+      'babel.config.js',
+      'jest.config.js',
+      'eslint.config.js',
+      '.eslintrc',
+      'prettier.config.js',
+      '.prettierrc',
+      'docker-compose.yml',
+      'dockerfile',
+      'makefile',
+      'cmake',
+      '.env',
+      '.gitignore',
+      '.gitattributes',
     ];
     const configExtensions = ['.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.config'];
-    
-    if (configFiles.some(config => fileName.includes(config.toLowerCase())) ||
-        configExtensions.includes(extension)) {
+
+    if (
+      configFiles.some(config => fileName.includes(config.toLowerCase())) ||
+      configExtensions.includes(extension)
+    ) {
       return 'config';
     }
 
     // Documentation files
     const docExtensions = ['.md', '.txt', '.rst', '.adoc'];
-    if (docExtensions.includes(extension) || fileName.includes('readme') || 
-        fileName.includes('changelog') || fileName.includes('license')) {
+    if (
+      docExtensions.includes(extension) ||
+      fileName.includes('readme') ||
+      fileName.includes('changelog') ||
+      fileName.includes('license')
+    ) {
       return 'documentation';
     }
 
     // Source code files
     const sourceExtensions = [
-      '.ts', '.js', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.cs',
-      '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.html',
-      '.css', '.scss', '.sass', '.less', '.vue', '.svelte'
+      '.ts',
+      '.js',
+      '.jsx',
+      '.tsx',
+      '.py',
+      '.java',
+      '.cpp',
+      '.c',
+      '.cs',
+      '.go',
+      '.rs',
+      '.rb',
+      '.php',
+      '.swift',
+      '.kt',
+      '.scala',
+      '.html',
+      '.css',
+      '.scss',
+      '.sass',
+      '.less',
+      '.vue',
+      '.svelte',
     ];
-    
+
     if (sourceExtensions.includes(extension)) {
       return 'source';
     }
@@ -283,7 +333,7 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
 
   private extractDependencies(filePath: string): string[] {
     const dependencies: string[] = [];
-    
+
     try {
       const content = readFileSync(filePath, 'utf-8');
       const fileName = basename(filePath).toLowerCase();
@@ -329,18 +379,18 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     options?: AnalysisRequest['options']
   ): string {
     const dirName = basename(directoryPath);
-    
+
     let prompt = `Please analyze the following project directory "${dirName}":\n\n`;
-    
+
     prompt += `**Project Structure Overview**:\n`;
     prompt += `- Total Files: ${structure.totalFiles}\n`;
     prompt += `- Total Lines of Code: ${structure.totalLines.toLocaleString()}\n`;
     prompt += `- File Types:\n`;
-    
+
     Object.entries(structure.filesByType).forEach(([type, count]) => {
       prompt += `  - ${type}: ${count} files\n`;
     });
-    
+
     prompt += `- Main Languages/Extensions:\n`;
     Object.entries(structure.filesByExtension)
       .sort(([, a], [, b]) => b - a)
@@ -394,34 +444,39 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     if (result && typeof result === 'object' && result.analysis) {
       return {
         ...result.analysis,
-        structure: this.buildStructureSummary(structure)
+        structure: this.buildStructureSummary(structure),
       };
     }
 
     // If result is a string, parse it into structured format
     const resultText = typeof result === 'string' ? result : String(result);
-    
+
     return {
-      summary: this.extractSection(resultText, 'Project Overview') || 
-               this.extractSection(resultText, 'Summary') ||
-               'Directory analysis completed successfully',
-      insights: this.extractListItems(resultText, 'Key Insights') || 
-                this.extractListItems(resultText, 'Insights') || 
-                this.extractListItems(resultText, 'Architecture Assessment') ||
-                ['Project structure and dependencies analyzed'],
-      recommendations: this.extractListItems(resultText, 'Recommendations') || 
-                      ['Review the analysis for potential improvements'],
+      summary:
+        this.extractSection(resultText, 'Project Overview') ||
+        this.extractSection(resultText, 'Summary') ||
+        'Directory analysis completed successfully',
+      insights: this.extractListItems(resultText, 'Key Insights') ||
+        this.extractListItems(resultText, 'Insights') ||
+        this.extractListItems(resultText, 'Architecture Assessment') || [
+          'Project structure and dependencies analyzed',
+        ],
+      recommendations: this.extractListItems(resultText, 'Recommendations') || [
+        'Review the analysis for potential improvements',
+      ],
       codeQuality: this.extractCodeQuality(resultText, structure),
-      structure: this.buildStructureSummary(structure)
+      structure: this.buildStructureSummary(structure),
     };
   }
 
-  private buildStructureSummary(structure: DirectoryStructure): AnalysisResponse['analysis']['structure'] {
+  private buildStructureSummary(
+    structure: DirectoryStructure
+  ): AnalysisResponse['analysis']['structure'] {
     return {
       files: structure.totalFiles,
       classes: this.estimateClasses(structure),
       functions: this.estimateFunctions(structure),
-      dependencies: structure.dependencies
+      dependencies: structure.dependencies,
     };
   }
 
@@ -431,15 +486,15 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
     const javaFiles = structure.filesByExtension['.java'] || 0;
     const tsFiles = structure.filesByExtension['.ts'] || 0;
     const jsFiles = structure.filesByExtension['.js'] || 0;
-    
-    return Math.round((javaFiles * 0.8) + (tsFiles * 0.6) + (jsFiles * 0.4));
+
+    return Math.round(javaFiles * 0.8 + tsFiles * 0.6 + jsFiles * 0.4);
   }
 
   private estimateFunctions(structure: DirectoryStructure): number {
     // Rough estimation based on lines of code and file types
     const sourceLines = structure.totalLines;
     const sourceFiles = structure.filesByType.source || 0;
-    
+
     // Estimate ~1 function per 20 lines of source code
     return Math.round((sourceLines * 0.8) / 20);
   }
@@ -456,33 +511,35 @@ export class AnalyzeDirectoryUseCase implements IAnalyzeDirectoryUseCase {
 
     return sectionText
       .split('\n')
-      .map(line => line.replace(/^[\s\-\*\d\.]+/, '').trim())
+      .map(line => line.replace(/^[-\s*\d.]+/, '').trim())
       .filter(line => line.length > 0);
   }
 
   private extractCodeQuality(
-    text: string, 
+    text: string,
     structure: DirectoryStructure
   ): AnalysisResponse['analysis']['codeQuality'] | undefined {
     const qualitySection = this.extractSection(text, 'Code Quality');
-    
+
     // Calculate a basic quality score based on project metrics
     let score = 70; // Base score
-    
+
     // Adjust based on structure
     if (structure.filesByType.test > 0) score += 10; // Has tests
     if (structure.filesByType.documentation > 0) score += 5; // Has documentation
     if (structure.totalLines > 10000) score -= 5; // Large codebase penalty
     if (structure.dependencies.length > 50) score -= 5; // Many dependencies penalty
-    
+
     score = Math.max(0, Math.min(100, score));
-    
+
     return {
       score,
-      issues: this.extractListItems(text, 'Issues') || 
-              this.extractListItems(text, 'Problems') || [],
-      suggestions: this.extractListItems(text, 'Suggestions') || 
-                   this.extractListItems(text, 'Recommendations') || []
+      issues:
+        this.extractListItems(text, 'Issues') || this.extractListItems(text, 'Problems') || [],
+      suggestions:
+        this.extractListItems(text, 'Suggestions') ||
+        this.extractListItems(text, 'Recommendations') ||
+        [],
     };
   }
 }

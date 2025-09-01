@@ -1,12 +1,12 @@
 /**
  * Unified Data Models for System Integration
- * 
+ *
  * Addresses Issues #4, #5, #6, #12:
  * - Data Transformation Mismatches
- * - Context Passing Inconsistencies  
+ * - Context Passing Inconsistencies
  * - State Management Conflicts
  * - Request/Response Standardization
- * 
+ *
  * This module provides standardized data contracts for inter-system communication
  * between the 4 major systems: Routing, Voice, MCP, and Orchestration.
  */
@@ -14,6 +14,65 @@
 // ========================================
 // CORE UNIFIED DATA TYPES
 // ========================================
+
+/**
+ * System State - Discriminated union for type-safe system state management
+ * Replaces generic Record<string, any> with specific typed states
+ */
+export type SystemState =
+  | RoutingSystemState
+  | VoiceSystemState
+  | MCPSystemState
+  | OrchestrationSystemState
+  | IdleSystemState;
+
+interface RoutingSystemState {
+  type: 'routing';
+  activeProvider: string;
+  routingDecision: {
+    provider: string;
+    model: string;
+    confidence: number;
+    reasoning: string;
+  };
+  fallbackProviders: string[];
+  circuitBreakerStates: Record<string, 'open' | 'closed' | 'half-open'>;
+}
+
+interface VoiceSystemState {
+  type: 'voice';
+  activeVoices: string[];
+  councilMode: boolean;
+  consensusThreshold: number;
+  voiceResponses: Record<string, unknown>;
+  synthesisInProgress: boolean;
+}
+
+interface MCPSystemState {
+  type: 'mcp';
+  activeServers: string[];
+  toolsAvailable: string[];
+  connectionHealth: Record<string, 'healthy' | 'degraded' | 'disconnected'>;
+  lastHeartbeat: number;
+}
+
+interface OrchestrationSystemState {
+  type: 'orchestration';
+  workflowStep: string;
+  pendingTasks: string[];
+  resourceAllocation: {
+    cpu: number;
+    memory: number;
+    networkBandwidth: number;
+  };
+  retryCount: number;
+}
+
+interface IdleSystemState {
+  type: 'idle';
+  lastActivity: number;
+  systemReadiness: Record<string, boolean>;
+}
 
 /**
  * Universal Request Context - Standardized context for all systems
@@ -25,17 +84,17 @@ export interface UnifiedRequestContext {
   sessionId: string;
   userId?: string;
   timestamp: number;
-  
+
   // Living Spiral context
   phase?: 'collapse' | 'council' | 'synthesis' | 'rebirth' | 'reflection';
   iteration?: number;
   spiralHistory?: SpiralPhaseResult[];
-  
+
   // System context
   systemPath: string[]; // Track which systems have processed this context
   previousResults?: SystemResult[];
-  currentSystemState: Record<string, any>;
-  
+  currentSystemState: SystemState;
+
   // Performance context
   performanceTargets: {
     maxLatency: number;
@@ -43,7 +102,7 @@ export interface UnifiedRequestContext {
     maxCost: number;
     qualityThreshold: number;
   };
-  
+
   // Routing preferences
   routingPreferences: {
     prioritizeSpeed: boolean;
@@ -52,7 +111,7 @@ export interface UnifiedRequestContext {
     preferredProviders: string[];
     enableHybridRouting: boolean;
   };
-  
+
   // MCP requirements
   mcpRequirements: {
     capabilities: string[];
@@ -60,7 +119,7 @@ export interface UnifiedRequestContext {
     maxLatency: number;
     securityLevel: 'basic' | 'standard' | 'high' | 'enterprise';
   };
-  
+
   // Error recovery options
   errorRecovery: {
     fallbackEnabled: boolean;
@@ -68,7 +127,7 @@ export interface UnifiedRequestContext {
     escalateToHuman: boolean;
     allowPartialResults: boolean;
   };
-  
+
   // State synchronization
   stateVersion: string;
   stateLocks: string[]; // Systems that have state locks
@@ -77,28 +136,29 @@ export interface UnifiedRequestContext {
 
 /**
  * Universal System Result - Standardized output from any system
+ * Generic T allows proper typing of result data
  */
-export interface SystemResult {
+export interface SystemResult<T = unknown> {
   // Result identification
   resultId: string;
   requestId: string;
   systemId: string;
   timestamp: number;
-  
+
   // Result data
   success: boolean;
-  data?: any;
+  data?: T;
   error?: SystemError;
-  
+
   // Performance metrics
   executionTime: number;
   resourceUsage: ResourceUsage;
   qualityMetrics: QualityMetrics;
-  
+
   // State changes
   stateChanges: StateChange[];
   nextRecommendations: SystemRecommendation[];
-  
+
   // Integration metadata
   transformations: DataTransformation[];
   contextPreservation: ContextPreservation;
@@ -144,11 +204,12 @@ export interface QualityMetrics {
 
 /**
  * State Change Tracking
+ * Generic T allows proper typing of state values
  */
-export interface StateChange {
+export interface StateChange<T = unknown> {
   key: string;
-  oldValue: any;
-  newValue: any;
+  oldValue: T;
+  newValue: T;
   changeType: 'create' | 'update' | 'delete';
   system: string;
   timestamp: number;
@@ -172,7 +233,7 @@ export interface SystemRecommendation {
  */
 export interface ConvergenceMetrics {
   consensusLevel: number; // 0-1
-  conflictResolution: number; // 0-1  
+  conflictResolution: number; // 0-1
   informationGain: number; // 0-1
   decisionStability: number; // 0-1
   readyForNextPhase: boolean;
@@ -194,17 +255,17 @@ export interface UnifiedRoutingDecision extends SystemResult {
     selectedVoices: VoiceSelection[];
     selectedProvider: ProviderSelection;
     routingStrategy: RoutingStrategy;
-    
+
     // Decision metadata
     confidence: number;
     reasoning: string;
     alternativeOptions: AlternativeOption[];
-    
+
     // Performance predictions
     estimatedLatency: number;
     estimatedCost: number;
     estimatedQuality: number;
-    
+
     // Fallback chain
     fallbackChain: FallbackOption[];
   };
@@ -221,12 +282,12 @@ export interface UnifiedVoiceResult extends SystemResult {
     primaryVoice: VoiceResult;
     supportingVoices: VoiceResult[];
     synthesisResult: SynthesisResult;
-    
+
     // Voice coordination
     coordinationStrategy: CoordinationStrategy;
     conflictResolutions: ConflictResolution[];
     consensusMetrics: ConsensusMetrics;
-    
+
     // Quality assessment
     voiceQualityScores: Record<string, number>;
     overallQuality: number;
@@ -244,12 +305,12 @@ export interface UnifiedMCPResult extends SystemResult {
     // Tool execution results
     executedTools: ToolExecutionResult[];
     coordinationPlan: ToolCoordinationPlan;
-    
+
     // Performance metrics
     connectionMetrics: ConnectionMetrics;
     reliabilityScore: number;
     securityCompliance: SecurityComplianceResult;
-    
+
     // Integration results
     voiceIntegrationResults: VoiceMCPResult[];
     loadBalancingDecisions: LoadBalancingDecision[];
@@ -266,15 +327,15 @@ export interface UnifiedOrchestrationResult extends SystemResult {
     // Final synthesis
     finalOutput: any;
     synthesisStrategy: SynthesisStrategy;
-    
+
     // System coordination
     systemContributions: SystemContribution[];
     integrationQuality: IntegrationQuality;
-    
+
     // Workflow results
     workflowExecution: WorkflowExecutionResult;
     taskResults: TaskResult[];
-    
+
     // Final recommendations
     optimizationRecommendations: OptimizationRecommendation[];
     nextIterationSuggestions: string[];
@@ -304,7 +365,7 @@ export interface DataTransformation {
   dataLossDetails?: string[];
 }
 
-export type TransformationType = 
+export type TransformationType =
   | 'format_conversion'
   | 'schema_mapping'
   | 'data_enrichment'
@@ -315,24 +376,25 @@ export type TransformationType =
 /**
  * Transformation Rule
  */
-export interface TransformationRule {
+export interface TransformationRule<T = unknown> {
   ruleId: string;
   sourceField: string;
   targetField: string;
   transformFunction: string;
-  defaultValue?: any;
+  defaultValue?: T;
   validationRules: string[];
   preserveMetadata: boolean;
 }
 
 /**
  * Validation Result
+ * Generic T allows proper typing of normalized data
  */
-export interface ValidationResult {
+export interface ValidationResult<T = unknown> {
   valid: boolean;
   errors: ValidationError[];
   warnings: string[];
-  normalizedData?: any;
+  normalizedData?: T;
   confidence: number;
 }
 
@@ -406,12 +468,12 @@ export interface UnifiedStateSnapshot {
 }
 
 /**
- * System State
+ * System State Snapshot - State persistence interface
  */
-export interface SystemState {
+export interface SystemStateSnapshot<T = Record<string, unknown>> {
   systemId: string;
   version: string;
-  state: Record<string, any>;
+  state: T;
   lastModified: number;
   stateHash: string;
   dependencies: string[];
@@ -419,15 +481,55 @@ export interface SystemState {
 }
 
 /**
- * Global State - Cross-system shared state
+ * Global State - Cross-system shared state with specific typed sections
  */
 export interface GlobalState {
-  sessionData: Record<string, any>;
-  userPreferences: Record<string, any>;
+  sessionData: SessionData;
+  userPreferences: UserPreferences;
   activeProcesses: ActiveProcess[];
-  sharedMemory: Record<string, any>;
+  sharedMemory: SharedMemoryState;
   eventHistory: StateEvent[];
   metricsAccumulator: MetricsAccumulator;
+}
+
+/**
+ * Session-specific data with common fields
+ */
+export interface SessionData {
+  sessionId: string;
+  userId?: string;
+  workingDirectory: string;
+  startTime: number;
+  lastActivity: number;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * User preferences with typed sections
+ */
+export interface UserPreferences {
+  voices?: {
+    preferred: string[];
+    weights: Record<string, number>;
+  };
+  providers?: {
+    preferred: string[];
+    fallback: string[];
+  };
+  ui?: {
+    theme: 'light' | 'dark' | 'auto';
+    verbosity: 'minimal' | 'normal' | 'detailed';
+  };
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Shared memory state between systems
+ */
+export interface SharedMemoryState {
+  cache?: Record<string, unknown>;
+  context?: Record<string, unknown>;
+  temporary?: Record<string, unknown>;
 }
 
 /**
@@ -731,12 +833,9 @@ export interface TransformationRegistry {
     targetSystem: string,
     transformer: DataTransformer
   ): void;
-  
-  getTransformer(
-    sourceSystem: string,
-    targetSystem: string
-  ): DataTransformer | null;
-  
+
+  getTransformer(sourceSystem: string, targetSystem: string): DataTransformer | null;
+
   transform<T, U>(
     data: T,
     sourceSystem: string,
@@ -748,22 +847,19 @@ export interface TransformationRegistry {
 /**
  * Data Transformer Interface
  */
-export interface DataTransformer {
+export interface DataTransformer<TSource = unknown, TTarget = unknown> {
   transformerId: string;
   sourceFormat: string;
   targetFormat: string;
-  
-  transform(
-    data: any,
-    context: UnifiedRequestContext
-  ): Promise<TransformationResult<any>>;
-  
-  validate(data: any): ValidationResult;
-  
+
+  transform(data: TSource, context: UnifiedRequestContext): Promise<TransformationResult<TTarget>>;
+
+  validate(data: TSource): ValidationResult<TSource>;
+
   reverseTransform?(
-    data: any,
+    data: TTarget,
     context: UnifiedRequestContext
-  ): Promise<TransformationResult<any>>;
+  ): Promise<TransformationResult<TSource>>;
 }
 
 /**

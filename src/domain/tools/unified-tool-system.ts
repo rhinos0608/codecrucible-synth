@@ -1,24 +1,25 @@
 /**
  * Unified Tool System
- * 
+ *
  * Consolidates 44+ tool implementations using Decorator and Strategy patterns.
- * Replaces multiple versions (basic, enhanced, secure, real, etc.) with 
+ * Replaces multiple versions (basic, enhanced, secure, real, etc.) with
  * configurable, composable tool behaviors.
  */
 
 import { EventEmitter } from 'events';
-import { 
-  ITool, 
-  IToolRegistry, 
+import {
+  ITool,
+  IToolRegistry,
   IToolExecutor,
-  ToolDefinition, 
-  ToolExecutionContext, 
-  ToolExecutionResult, 
-  ToolExecutionRequest 
+  ToolDefinition,
+  ToolExecutionContext,
+  ToolExecutionResult,
+  ToolExecutionRequest,
 } from '../interfaces/tool-system.js';
 import { IUnifiedSecurityValidator } from '../services/unified-security-validator.js';
 import { IEventBus } from '../interfaces/event-bus.js';
 import { ILogger } from '../interfaces/logger.js';
+import { RustExecutionBackend } from '../../core/execution/rust-executor/rust-execution-backend.js';
 
 // ============================================================================
 // CORE TOOL FRAMEWORK - Base classes and interfaces
@@ -39,14 +40,21 @@ export abstract class BaseTool implements ITool {
     };
   }
 
-  abstract execute(args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult>;
+  abstract execute(
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult>;
 
   validateArguments(args: Record<string, any>): { valid: boolean; errors?: string[] } {
     const errors: string[] = [];
-    
+
     // Check required parameters
     for (const requiredParam of this.definition.parameters.required) {
-      if (!(requiredParam in args) || args[requiredParam] === undefined || args[requiredParam] === null) {
+      if (
+        !(requiredParam in args) ||
+        args[requiredParam] === undefined ||
+        args[requiredParam] === null
+      ) {
         errors.push(`Missing required parameter: ${requiredParam}`);
       }
     }
@@ -71,20 +79,20 @@ export abstract class BaseTool implements ITool {
     // Check security level compatibility
     const toolSecurity = this.definition.securityLevel;
     const contextSecurity = context.securityLevel;
-    
+
     const securityLevels = ['safe', 'restricted', 'dangerous'];
     const toolLevel = securityLevels.indexOf(toolSecurity);
     const contextLevel = securityLevels.indexOf(contextSecurity);
-    
+
     if (toolLevel > contextLevel) {
       return false;
     }
 
     // Check permissions
-    return this.definition.permissions.every(permission => 
-      context.permissions.some(contextPerm => 
-        contextPerm.type === permission.type && 
-        contextPerm.resource === permission.resource
+    return this.definition.permissions.every(permission =>
+      context.permissions.some(
+        contextPerm =>
+          contextPerm.type === permission.type && contextPerm.resource === permission.resource
       )
     );
   }
@@ -101,16 +109,16 @@ export abstract class BaseTool implements ITool {
    * Execute with decorators applied
    */
   protected async executeWithDecorators(
-    args: Record<string, any>, 
+    args: Record<string, any>,
     context: ToolExecutionContext
   ): Promise<ToolExecutionResult> {
     let result = await this.execute(args, context);
-    
+
     // Apply decorators in reverse order (last added, first applied to result)
     for (let i = this.decorators.length - 1; i >= 0; i--) {
       result = await this.decorators[i].postProcess(result, args, context);
     }
-    
+
     return result;
   }
 
@@ -122,28 +130,28 @@ export abstract class BaseTool implements ITool {
     // Type validation
     const expectedType = definition.type;
     const actualType = typeof value;
-    
+
     if (expectedType === 'string' && actualType !== 'string') {
       return `Parameter ${name} must be a string, got ${actualType}`;
     }
-    
+
     if (expectedType === 'number' && actualType !== 'number') {
       return `Parameter ${name} must be a number, got ${actualType}`;
     }
-    
+
     if (expectedType === 'boolean' && actualType !== 'boolean') {
       return `Parameter ${name} must be a boolean, got ${actualType}`;
     }
-    
+
     if (expectedType === 'array' && !Array.isArray(value)) {
       return `Parameter ${name} must be an array`;
     }
-    
+
     // Enum validation
     if (definition.enum && !definition.enum.includes(value)) {
       return `Parameter ${name} must be one of: ${definition.enum.join(', ')}`;
     }
-    
+
     // String length validation
     if (expectedType === 'string' && typeof value === 'string') {
       if (definition.minLength && value.length < definition.minLength) {
@@ -153,7 +161,7 @@ export abstract class BaseTool implements ITool {
         return `Parameter ${name} must be at most ${definition.maxLength} characters`;
       }
     }
-    
+
     // Regex validation
     if (definition.validation && typeof value === 'string') {
       const regex = new RegExp(definition.validation);
@@ -161,7 +169,7 @@ export abstract class BaseTool implements ITool {
         return `Parameter ${name} does not match required pattern`;
       }
     }
-    
+
     return null;
   }
 }
@@ -171,8 +179,15 @@ export abstract class BaseTool implements ITool {
  */
 export interface ToolDecorator {
   name: string;
-  preProcess?(args: Record<string, any>, context: ToolExecutionContext): Promise<Record<string, any>>;
-  postProcess(result: ToolExecutionResult, args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult>;
+  preProcess?(
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<Record<string, any>>;
+  postProcess(
+    result: ToolExecutionResult,
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult>;
 }
 
 /**
@@ -183,7 +198,10 @@ export class SecurityDecorator implements ToolDecorator {
 
   constructor(private securityValidator: IUnifiedSecurityValidator) {}
 
-  async preProcess(args: Record<string, any>, context: ToolExecutionContext): Promise<Record<string, any>> {
+  async preProcess(
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<Record<string, any>> {
     // Validate arguments for security threats
     for (const [key, value] of Object.entries(args)) {
       if (typeof value === 'string') {
@@ -193,17 +211,23 @@ export class SecurityDecorator implements ToolDecorator {
           environment: 'sandbox',
           permissions: context.permissions.map(p => p.type),
         });
-        
+
         if (!validation.isValid) {
-          throw new Error(`Security violation in parameter ${key}: ${validation.violations.map(v => v.message).join(', ')}`);
+          throw new Error(
+            `Security violation in parameter ${key}: ${validation.violations.map(v => v.message).join(', ')}`
+          );
         }
       }
     }
-    
+
     return args;
   }
 
-  async postProcess(result: ToolExecutionResult, args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  async postProcess(
+    result: ToolExecutionResult,
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult> {
     // Sanitize output if needed
     if (typeof result.result === 'string') {
       const sanitized = this.securityValidator.sanitizeInput(result.result);
@@ -216,7 +240,7 @@ export class SecurityDecorator implements ToolDecorator {
         },
       };
     }
-    
+
     return result;
   }
 }
@@ -226,42 +250,56 @@ export class SecurityDecorator implements ToolDecorator {
  */
 export class CachingDecorator implements ToolDecorator {
   name = 'caching';
-  private cache = new Map<string, { result: ToolExecutionResult; timestamp: number; ttl: number }>();
+  private cache = new Map<
+    string,
+    { result: ToolExecutionResult; timestamp: number; ttl: number }
+  >();
 
   constructor(private defaultTTL: number = 300000) {} // 5 minutes
 
-  async postProcess(result: ToolExecutionResult, args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  async postProcess(
+    result: ToolExecutionResult,
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult> {
     if (result.success) {
       const cacheKey = this.generateCacheKey(args, context);
       const ttl = this.defaultTTL;
-      
+
       this.cache.set(cacheKey, {
         result,
         timestamp: Date.now(),
         ttl,
       });
-      
+
       // Clean up expired entries
       this.cleanupCache();
     }
-    
+
     return result;
   }
 
-  async preProcess(args: Record<string, any>, context: ToolExecutionContext): Promise<Record<string, any>> {
+  async preProcess(
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<Record<string, any>> {
     const cacheKey = this.generateCacheKey(args, context);
     const cached = this.cache.get(cacheKey);
-    
-    if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
       // Return cached result by throwing a special exception that the executor can catch
       throw new CacheHitException(cached.result);
     }
-    
+
     return args;
   }
 
   private generateCacheKey(args: Record<string, any>, context: ToolExecutionContext): string {
-    const normalized = JSON.stringify({ args, sessionId: context.sessionId, workingDirectory: context.workingDirectory });
+    const normalized = JSON.stringify({
+      args,
+      sessionId: context.sessionId,
+      workingDirectory: context.workingDirectory,
+    });
     return Buffer.from(normalized).toString('base64');
   }
 
@@ -289,9 +327,15 @@ export class LoggingDecorator implements ToolDecorator {
 
   constructor(private eventBus?: IEventBus) {}
 
-  constructor(private logger: ILogger, private eventBus?: IEventBus) {}
+  constructor(
+    private logger: ILogger,
+    private eventBus?: IEventBus
+  ) {}
 
-  async preProcess(args: Record<string, any>, context: ToolExecutionContext): Promise<Record<string, any>> {
+  async preProcess(
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<Record<string, any>> {
     this.logger.debug('Tool execution started', {
       sessionId: context.sessionId,
       userId: context.userId,
@@ -310,11 +354,15 @@ export class LoggingDecorator implements ToolDecorator {
     return args;
   }
 
-  async postProcess(result: ToolExecutionResult, args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  async postProcess(
+    result: ToolExecutionResult,
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult> {
     const logLevel = result.success ? 'info' : 'error';
     if (logLevel === 'info') {
       this.logger.info('Tool execution completed', {
-      sessionId: context.sessionId,
+        sessionId: context.sessionId,
         success: result.success,
         executionTime: result.executionTimeMs,
         error: result.error?.message,
@@ -364,7 +412,11 @@ export class RetryDecorator implements ToolDecorator {
     private backoffMultiplier: number = 2
   ) {}
 
-  async postProcess(result: ToolExecutionResult, args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  async postProcess(
+    result: ToolExecutionResult,
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult> {
     if (result.success) {
       return result;
     }
@@ -380,7 +432,7 @@ export class RetryDecorator implements ToolDecorator {
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       // Note: logger not available in decorator context, would need to be injected
       // this.logger.info(`Retrying tool execution, attempt ${attempt}/${this.maxRetries}`);
-      
+
       // Wait before retry
       await this.delay(delay);
       delay *= this.backoffMultiplier;
@@ -407,7 +459,7 @@ export class RetryDecorator implements ToolDecorator {
 
   private isRetryableError(error?: { code: string; message: string }): boolean {
     if (!error) return false;
-    
+
     // Define retryable error codes
     const retryableErrors = [
       'network_timeout',
@@ -415,11 +467,11 @@ export class RetryDecorator implements ToolDecorator {
       'rate_limited',
       'service_unavailable',
     ];
-    
+
     return retryableErrors.includes(error.code);
   }
 
-  private delay(ms: number): Promise<void> {
+  private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
@@ -431,17 +483,24 @@ export class PerformanceDecorator implements ToolDecorator {
   name = 'performance';
   private metrics = new Map<string, { count: number; totalTime: number; errors: number }>();
 
-  async preProcess(args: Record<string, any>, context: ToolExecutionContext): Promise<Record<string, any>> {
+  async preProcess(
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<Record<string, any>> {
     // Record start time
     context.metadata = context.metadata || {};
     context.metadata.startTime = Date.now();
     return args;
   }
 
-  async postProcess(result: ToolExecutionResult, args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  async postProcess(
+    result: ToolExecutionResult,
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult> {
     const executionTime = Date.now() - (context.metadata?.startTime || 0);
     const toolId = 'unknown'; // Would need access to tool ID
-    
+
     // Update metrics
     const current = this.metrics.get(toolId) || { count: 0, totalTime: 0, errors: 0 };
     current.count++;
@@ -490,7 +549,7 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
     }
 
     this.tools.set(tool.definition.id, tool);
-    
+
     // Update category index
     const category = tool.definition.category;
     if (!this.categories.has(category)) {
@@ -523,9 +582,10 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
 
   searchTools(query: string): ITool[] {
     const lowerQuery = query.toLowerCase();
-    return this.getAllTools().filter(tool => 
-      tool.definition.name.toLowerCase().includes(lowerQuery) ||
-      tool.definition.description.toLowerCase().includes(lowerQuery)
+    return this.getAllTools().filter(
+      tool =>
+        tool.definition.name.toLowerCase().includes(lowerQuery) ||
+        tool.definition.description.toLowerCase().includes(lowerQuery)
     );
   }
 
@@ -536,7 +596,7 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
     }
 
     this.tools.delete(id);
-    
+
     // Remove from category index
     const category = tool.definition.category;
     const categoryTools = this.categories.get(category);
@@ -549,7 +609,7 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
 
     this.emit('toolUnregistered', { toolId: id });
     this.logger.info(`Tool unregistered: ${id}`);
-    
+
     return true;
   }
 
@@ -567,19 +627,44 @@ export class UnifiedToolRegistry extends EventEmitter implements IToolRegistry {
 // ============================================================================
 
 export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
+  private rustBackend?: RustExecutionBackend;
+
   constructor(
     private logger: ILogger,
     private registry: IToolRegistry,
     private securityValidator?: IUnifiedSecurityValidator,
-    private eventBus?: IEventBus
+    private eventBus?: IEventBus,
+    rustBackend?: RustExecutionBackend
   ) {
     super();
-    this.logger.info('UnifiedToolExecutor initialized');
+    this.rustBackend = rustBackend;
+    this.logger.info('UnifiedToolExecutor initialized', {
+      rustBackendEnabled: !!this.rustBackend,
+      rustAvailable: this.rustBackend?.isAvailable() || false,
+    });
   }
 
   async execute(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
     const startTime = Date.now();
-    
+
+    // Try Rust backend first if available and enabled
+    if (this.rustBackend?.isAvailable()) {
+      try {
+        this.logger.debug('Attempting Rust backend execution for tool:', request.toolId);
+        const rustResult = await this.rustBackend.execute(request);
+        
+        if (rustResult.success) {
+          this.logger.debug('Rust backend execution successful for tool:', request.toolId);
+          return rustResult;
+        } else {
+          this.logger.warn('Rust backend execution failed, falling back to TypeScript:', rustResult.error);
+        }
+      } catch (error) {
+        this.logger.warn('Rust backend error, falling back to TypeScript:', error);
+      }
+    }
+
+    // Fallback to TypeScript implementation
     try {
       // Get the tool
       const tool = this.registry.getTool(request.toolId);
@@ -621,7 +706,7 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
 
       // Apply decorators and execute
       const decoratedTool = this.applyDecorators(tool, request);
-      
+
       try {
         const result = await decoratedTool.execute(request.arguments, request.context);
         return {
@@ -640,7 +725,6 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
         }
         throw error;
       }
-
     } catch (error) {
       return {
         success: false,
@@ -656,78 +740,79 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
 
   async executeSequence(requests: ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
     const results: ToolExecutionResult[] = [];
-    
+
     for (const request of requests) {
       const result = await this.execute(request);
       results.push(result);
-      
+
       // Stop on first failure unless configured otherwise
       if (!result.success) {
         break;
       }
     }
-    
+
     return results;
   }
 
   async executeParallel(requests: ToolExecutionRequest[]): Promise<ToolExecutionResult[]> {
-    const promises = requests.map(request => this.execute(request));
+    const promises = requests.map(async request => this.execute(request));
     return await Promise.all(promises);
   }
 
   private applyDecorators(tool: ITool, request: ToolExecutionRequest): ITool {
     // Create a copy of the tool with decorators applied
     const decoratedTool = Object.create(tool);
-    
+
     // Apply standard decorators based on context
     const decorators: ToolDecorator[] = [];
-    
+
     // Always apply logging
     decorators.push(new LoggingDecorator(this.eventBus));
-    
+
     // Apply security if validator is available
     if (this.securityValidator) {
       decorators.push(new SecurityDecorator(this.securityValidator));
     }
-    
+
     // Apply performance monitoring
     decorators.push(new PerformanceDecorator());
-    
+
     // Apply caching for read-only operations
     if (this.isReadOnlyOperation(request)) {
       decorators.push(new CachingDecorator());
     }
-    
+
     // Apply retry for network operations
     if (this.isNetworkOperation(request)) {
       decorators.push(new RetryDecorator(3, 1000));
     }
-    
+
     // Add decorators to tool
     decorators.forEach(decorator => decoratedTool.addDecorator(decorator));
-    
+
     return decoratedTool;
   }
 
   private isReadOnlyOperation(request: ToolExecutionRequest): boolean {
     // Heuristic: operations that don't modify state
     const readOnlyPatterns = [
-      'read', 'get', 'list', 'search', 'find', 'analyze', 'check', 'validate'
+      'read',
+      'get',
+      'list',
+      'search',
+      'find',
+      'analyze',
+      'check',
+      'validate',
     ];
-    
-    return readOnlyPatterns.some(pattern => 
-      request.toolId.toLowerCase().includes(pattern)
-    );
+
+    return readOnlyPatterns.some(pattern => request.toolId.toLowerCase().includes(pattern));
   }
 
   private isNetworkOperation(request: ToolExecutionRequest): boolean {
     // Heuristic: operations that involve network calls
-    const networkPatterns = [
-      'fetch', 'download', 'upload', 'sync', 'api', 'http', 'request'
-    ];
-    
-    return networkPatterns.some(pattern => 
-      request.toolId.toLowerCase().includes(pattern)
-    );
+    const networkPatterns = ['fetch', 'download', 'upload', 'sync', 'api', 'http', 'request'];
+
+    return networkPatterns.some(pattern => request.toolId.toLowerCase().includes(pattern));
   }
 }

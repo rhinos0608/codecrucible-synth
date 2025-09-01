@@ -167,7 +167,7 @@ export class UnifiedCacheSystem extends EventEmitter {
     prompt: string,
     context: string[]
   ): Promise<CacheResult<T> | null> {
-    const queryEmbedding = await this.getEmbedding(`${prompt  } ${  context.join(' ')}`);
+    const queryEmbedding = await this.getEmbedding(`${prompt} ${context.join(' ')}`);
     const similarResults: Array<{ key: string; similarity: number }> = [];
 
     // Search through vector index
@@ -222,7 +222,7 @@ export class UnifiedCacheSystem extends EventEmitter {
       let embedding = options?.embedding;
       if (!embedding && options?.metadata?.prompt) {
         embedding = await this.getEmbedding(
-          `${options.metadata.prompt  } ${  (options.metadata.context || []).join(' ')}`
+          `${options.metadata.prompt} ${(options.metadata.context || []).join(' ')}`
         );
       }
 
@@ -577,5 +577,5 @@ export function getUnifiedCache(): UnifiedCacheSystem {
 export const unifiedCache = new Proxy({} as UnifiedCacheSystem, {
   get(target, prop) {
     return getUnifiedCache()[prop as keyof UnifiedCacheSystem];
-  }
+  },
 });

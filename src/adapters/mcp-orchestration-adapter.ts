@@ -1,7 +1,7 @@
 /**
  * MCP Orchestration Adapter
  * Translates between application layer and MCP infrastructure
- * 
+ *
  * Architecture Compliance:
  * - Adapter layer: translates between application and infrastructure
  * - Imports from Application & Domain layers
@@ -10,9 +10,13 @@
  */
 
 import { EventEmitter } from 'events';
-import { MCPConnectionClient, MCPServerInfo, MCPServerStatus } from '../infrastructure/mcp/mcp-connection-client.js';
-import { 
-  MCPDiscoveryService, 
+import {
+  MCPConnectionClient,
+  MCPServerInfo,
+  MCPServerStatus,
+} from '../infrastructure/mcp/mcp-connection-client.js';
+import {
+  MCPDiscoveryService,
   MCPServerProfile,
   ServerDiscoveryQuery,
   ServerSelectionResult,
@@ -196,11 +200,11 @@ export class MCPOrchestrationAdapter extends EventEmitter {
    */
   async discoverAndConnect(query: ServerDiscoveryQuery): Promise<ServerSelectionResult> {
     const operationId = this.generateOperationId();
-    
+
     try {
       // Discover available servers
       const discoveredServers = await this.discoveryService.discoverServers(query);
-      
+
       if (discoveredServers.length === 0) {
         throw new Error('No servers discovered matching the criteria');
       }
@@ -210,15 +214,15 @@ export class MCPOrchestrationAdapter extends EventEmitter {
 
       // Connect to selected servers
       await Promise.allSettled(
-        selectionResult.primaryServers.map(server => this.connectToServer(server))
+        selectionResult.primaryServers.map(async server => this.connectToServer(server))
       );
 
-      // Connect to fallback servers (but don't wait for them)
-      selectionResult.fallbackServers.forEach(server => 
-        this.connectToServer(server).catch(error => 
+      // Connect to fallback servers (fire-and-forget; do not return a Promise in forEach callback)
+      selectionResult.fallbackServers.forEach(server => {
+        void this.connectToServer(server).catch(error =>
           this.emit('fallbackConnectionError', { server: server.id, error })
-        )
-      );
+        );
+      });
 
       this.emit('serversDiscoveredAndConnected', {
         operationId,
@@ -288,11 +292,11 @@ export class MCPOrchestrationAdapter extends EventEmitter {
 
     try {
       await client.connect();
-      
+
       connection.status.connected = true;
       connection.status.connectionTime = new Date();
       connection.status.isHealthy = true;
-      
+
       this.connections.set(serverProfile.id, connection);
 
       this.emit('serverConnected', {
@@ -346,14 +350,14 @@ export class MCPOrchestrationAdapter extends EventEmitter {
     try {
       // Select server for tool execution
       const connection = await this.selectServerForTool(request.toolName, request.serverId);
-      
+
       if (!connection) {
         throw new Error(`No server available for tool: ${request.toolName}`);
       }
 
       // Execute with retry policy
       const result = await this.executeWithRetry(
-        () => connection.client.callTool(request.toolName, request.arguments),
+        async () => connection.client.callTool(request.toolName, request.arguments),
         request.retryPolicy || this.getDefaultRetryPolicy()
       );
 
@@ -412,7 +416,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
 
     try {
       const results = await Promise.allSettled(
-        requests.map(request => this.executeTool(request))
+        requests.map(async request => this.executeTool(request))
       );
 
       const batchResults = results.map((result, index) => {
@@ -456,7 +460,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
     try {
       // Select server for resource access
       const connection = await this.selectServerForResource(request.resourceUri, request.serverId);
-      
+
       if (!connection) {
         throw new Error(`No server available for resource: ${request.resourceUri}`);
       }
@@ -529,7 +533,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
    */
   getConnectionMetrics(): Map<string, ConnectionMetrics> {
     const metrics = new Map<string, ConnectionMetrics>();
-    
+
     for (const [serverId, connection] of this.connections) {
       metrics.set(serverId, { ...connection.metrics });
     }
@@ -557,7 +561,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       // Disconnect first
       await connection.client.disconnect();
       connection.status.connected = false;
-      
+
       // Reconnect
       await connection.client.connect();
       connection.status.connected = true;
@@ -580,7 +584,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       clearInterval(this.healthCheckInterval);
     }
 
-    const disconnectionPromises = Array.from(this.connections.keys()).map(serverId =>
+    const disconnectionPromises = Array.from(this.connections.keys()).map(async serverId =>
       this.disconnectFromServer(serverId)
     );
 
@@ -596,27 +600,27 @@ export class MCPOrchestrationAdapter extends EventEmitter {
     client.on('connected', () => {
       connection.status.connected = true;
       connection.status.isHealthy = true;
-      this.emit('connectionStatusChanged', { 
-        serverId: connection.id, 
-        connected: true 
+      this.emit('connectionStatusChanged', {
+        serverId: connection.id,
+        connected: true,
       });
     });
 
     client.on('disconnected', () => {
       connection.status.connected = false;
       connection.status.isHealthy = false;
-      this.emit('connectionStatusChanged', { 
-        serverId: connection.id, 
-        connected: false 
+      this.emit('connectionStatusChanged', {
+        serverId: connection.id,
+        connected: false,
       });
     });
 
-    client.on('connectionError', (error) => {
+    client.on('connectionError', error => {
       connection.status.errorCount++;
       connection.status.isHealthy = false;
-      this.emit('connectionError', { 
-        serverId: connection.id, 
-        error 
+      this.emit('connectionError', {
+        serverId: connection.id,
+        error,
       });
     });
 
@@ -631,7 +635,10 @@ export class MCPOrchestrationAdapter extends EventEmitter {
     });
   }
 
-  private async selectServerForTool(toolName: string, preferredServerId?: string): Promise<MCPServerConnection | null> {
+  private async selectServerForTool(
+    toolName: string,
+    preferredServerId?: string
+  ): Promise<MCPServerConnection | null> {
     // If preferred server is specified and available, use it
     if (preferredServerId) {
       const connection = this.connections.get(preferredServerId);
@@ -646,7 +653,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
 
     // Find servers with the required tool
     const eligibleConnections: MCPServerConnection[] = [];
-    
+
     for (const connection of this.connections.values()) {
       if (!connection.status.connected || !connection.status.isHealthy) continue;
 
@@ -669,7 +676,10 @@ export class MCPOrchestrationAdapter extends EventEmitter {
     return this.applyLoadBalancing(eligibleConnections);
   }
 
-  private async selectServerForResource(resourceUri: string, preferredServerId?: string): Promise<MCPServerConnection | null> {
+  private async selectServerForResource(
+    resourceUri: string,
+    preferredServerId?: string
+  ): Promise<MCPServerConnection | null> {
     // Similar logic to selectServerForTool but for resources
     if (preferredServerId) {
       const connection = this.connections.get(preferredServerId);
@@ -679,8 +689,9 @@ export class MCPOrchestrationAdapter extends EventEmitter {
     }
 
     // For now, return any healthy connection
-    const healthyConnections = Array.from(this.connections.values())
-      .filter(conn => conn.status.connected && conn.status.isHealthy);
+    const healthyConnections = Array.from(this.connections.values()).filter(
+      conn => conn.status.connected && conn.status.isHealthy
+    );
 
     if (healthyConnections.length === 0) {
       return null;
@@ -692,21 +703,24 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   private applyLoadBalancing(connections: MCPServerConnection[]): MCPServerConnection {
     switch (this.loadBalancingConfig.strategy) {
       case LoadBalancingStrategy.LEAST_CONNECTIONS:
-        return connections.reduce((min, conn) => 
+        return connections.reduce((min, conn) =>
           conn.metrics.requestCount < min.metrics.requestCount ? conn : min
         );
 
       case LoadBalancingStrategy.PERFORMANCE_WEIGHTED:
         // Select based on performance metrics (lower latency is better)
-        return connections.reduce((best, conn) => 
-          conn.profile.performance.averageLatency < best.profile.performance.averageLatency ? conn : best
+        return connections.reduce((best, conn) =>
+          conn.profile.performance.averageLatency < best.profile.performance.averageLatency
+            ? conn
+            : best
         );
 
       case LoadBalancingStrategy.ROUND_ROBIN:
-      default:
+      default: {
         // Simple round-robin based on operation counter
         const index = this.operationCounter % connections.length;
         return connections[index];
+      }
     }
   }
 
@@ -733,7 +747,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       }
     }
 
-    throw lastError!;
+    throw (lastError ?? new Error('Unknown error during retry operation'));
   }
 
   private getDefaultRetryPolicy(): RetryPolicy {
@@ -766,9 +780,9 @@ export class MCPOrchestrationAdapter extends EventEmitter {
       }
 
       // Check error rate
-      const errorRate = connection.metrics.errorCount / 
-        Math.max(connection.metrics.requestCount, 1);
-      
+      const errorRate =
+        connection.metrics.errorCount / Math.max(connection.metrics.requestCount, 1);
+
       if (errorRate > 0.1) {
         issues.push({
           type: IssueType.HIGH_ERROR_RATE,
@@ -808,32 +822,36 @@ export class MCPOrchestrationAdapter extends EventEmitter {
   }
 
   private startHealthMonitoring(): void {
-    this.healthCheckInterval = setInterval(async () => {
-      const healthStatuses = await this.getServersHealth();
-      
-      const unhealthyServers = healthStatuses.filter(status => !status.isHealthy);
-      if (unhealthyServers.length > 0) {
-        this.emit('unhealthyServersDetected', unhealthyServers);
-      }
+    this.healthCheckInterval = setInterval(() => {
+      void this.getServersHealth()
+        .then(healthStatuses => {
+          const unhealthyServers = healthStatuses.filter(status => !status.isHealthy);
+          if (unhealthyServers.length > 0) {
+            this.emit('unhealthyServersDetected', unhealthyServers);
+          }
 
-      this.emit('healthCheckCompleted', {
-        totalServers: healthStatuses.length,
-        healthyServers: healthStatuses.filter(s => s.isHealthy).length,
-        unhealthyServers: unhealthyServers.length,
-      });
+          this.emit('healthCheckCompleted', {
+            totalServers: healthStatuses.length,
+            healthyServers: healthStatuses.filter(s => s.isHealthy).length,
+            unhealthyServers: unhealthyServers.length,
+          });
+        })
+        .catch(error => {
+          this.emit('healthCheckError', { error });
+        });
     }, this.loadBalancingConfig.healthCheckInterval);
   }
 
   private updateLatencyMetrics(connection: MCPServerConnection, latency: number): void {
     const metrics = connection.metrics;
     const totalRequests = metrics.requestCount;
-    
+
     // Calculate running average
-    metrics.averageLatency = 
-      ((metrics.averageLatency * (totalRequests - 1)) + latency) / totalRequests;
+    metrics.averageLatency =
+      (metrics.averageLatency * (totalRequests - 1) + latency) / totalRequests;
   }
 
-  private delay(ms: number): Promise<void> {
+  private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 

@@ -114,9 +114,12 @@ export class SecurityPolicyLoader {
    */
   async loadPolicies(environment: string = 'production'): Promise<SecurityPolicies> {
     const now = Date.now();
-    
+
     // Return cached policies if still valid
-    if (SecurityPolicyLoader.policies && (now - SecurityPolicyLoader.lastLoadTime) < SecurityPolicyLoader.CACHE_TTL) {
+    if (
+      SecurityPolicyLoader.policies &&
+      now - SecurityPolicyLoader.lastLoadTime < SecurityPolicyLoader.CACHE_TTL
+    ) {
       return SecurityPolicyLoader.policies;
     }
 
@@ -134,7 +137,7 @@ export class SecurityPolicyLoader {
       };
 
       // Apply environment overrides if they exist
-      if (config.environments && config.environments[environment]) {
+      if (config.environments?.[environment]) {
         const envOverrides = config.environments[environment];
         SecurityPolicyLoader.policies = this.mergeDeep(basePolicies, envOverrides);
       } else {
@@ -143,11 +146,11 @@ export class SecurityPolicyLoader {
 
       SecurityPolicyLoader.lastLoadTime = now;
       logger.info(`🔒 Security policies loaded for environment: ${environment}`);
-      
+
       return SecurityPolicyLoader.policies;
     } catch (error) {
       logger.error(`❌ Failed to load security policies: ${error}`);
-      
+
       // Return fallback policies
       return this.getFallbackPolicies();
     }
@@ -158,7 +161,7 @@ export class SecurityPolicyLoader {
    */
   async getDangerousPatterns(): Promise<RegExp[]> {
     const policies = await this.loadPolicies();
-    
+
     return policies.inputValidation.dangerousPatterns.map(pattern => {
       try {
         return new RegExp(pattern.pattern, pattern.flags || 'g');
@@ -198,7 +201,7 @@ export class SecurityPolicyLoader {
    */
   private mergeDeep(target: any, source: any): any {
     const output = Object.assign({}, target);
-    
+
     if (this.isObject(target) && this.isObject(source)) {
       Object.keys(source).forEach(key => {
         if (this.isObject(source[key])) {
@@ -212,7 +215,7 @@ export class SecurityPolicyLoader {
         }
       });
     }
-    
+
     return output;
   }
 
@@ -228,7 +231,7 @@ export class SecurityPolicyLoader {
    */
   private getFallbackPolicies(): SecurityPolicies {
     logger.warn('🔒 Using fallback security policies - configuration file not available');
-    
+
     return {
       inputValidation: {
         dangerousPatterns: [
@@ -236,14 +239,14 @@ export class SecurityPolicyLoader {
             pattern: '[;&|`$(){}[\\]\\\\]',
             description: 'Shell metacharacters',
             riskLevel: 'high',
-            action: 'block'
+            action: 'block',
           },
           {
             pattern: '\\.\\.',
             description: 'Directory traversal',
             riskLevel: 'high',
-            action: 'block'
-          }
+            action: 'block',
+          },
         ],
         allowedCommands: ['/help', '/status', '/models'],
         sanitizationRules: {
@@ -252,8 +255,8 @@ export class SecurityPolicyLoader {
           stripHtml: true,
           normalizeWhitespace: true,
           removeControlChars: true,
-          safeCharacterPattern: '^[a-zA-Z0-9\\s\\-_.,!?\'\"@#%^&*()+=:;/\\\\]+$'
-        }
+          safeCharacterPattern: '^[a-zA-Z0-9\\s\\-_.,!?\'\"@#%^&*()+=:;/\\\\]+$',
+        },
       },
       authentication: {
         e2b: {
@@ -261,7 +264,7 @@ export class SecurityPolicyLoader {
           sessionTimeout: 3600,
           requireMFA: false,
           allowAnonymousRead: false,
-          maxExecutionsPerSession: 100
+          maxExecutionsPerSession: 100,
         },
         api: {
           jwtExpiresIn: '1h',
@@ -270,7 +273,7 @@ export class SecurityPolicyLoader {
           requireHttps: true,
           allowCors: false,
           rateLimitRequests: 1000,
-          rateLimitWindowMs: 900000
+          rateLimitWindowMs: 900000,
         },
         cli: {
           requireAuth: true,
@@ -278,8 +281,8 @@ export class SecurityPolicyLoader {
           autoRefresh: true,
           deviceTrust: false,
           localTokenStorage: true,
-          sessionTimeoutMinutes: 480
-        }
+          sessionTimeoutMinutes: 480,
+        },
       },
       executionSecurity: {
         e2b: {
@@ -290,7 +293,7 @@ export class SecurityPolicyLoader {
           maxMemoryMB: 512,
           maxCpuPercent: 50,
           executionTimeoutSeconds: 300,
-          allowedLanguages: ['python', 'javascript', 'bash']
+          allowedLanguages: ['python', 'javascript', 'bash'],
         },
         mcp: {
           validateConnections: true,
@@ -299,22 +302,22 @@ export class SecurityPolicyLoader {
           maxConnectionsPerClient: 10,
           connectionTimeoutSeconds: 30,
           allowedServers: [],
-          blockedServers: []
-        }
+          blockedServers: [],
+        },
       },
       rateLimiting: {
         authentication: {
           maxAttempts: 5,
           windowMinutes: 15,
-          blockDurationMinutes: 30
+          blockDurationMinutes: 30,
         },
         api: {
           requestsPerMinute: 60,
           burstAllowance: 20,
           globalLimit: 10000,
-          perUserLimit: 1000
-        }
-      }
+          perUserLimit: 1000,
+        },
+      },
     };
   }
 
@@ -330,7 +333,10 @@ export class SecurityPolicyLoader {
   /**
    * Validate a dangerous pattern for security
    */
-  async validatePattern(input: string, patterns?: DangerousPattern[]): Promise<{
+  async validatePattern(
+    input: string,
+    patterns?: DangerousPattern[]
+  ): Promise<{
     isValid: boolean;
     violations: string[];
     riskLevel: string;
@@ -345,7 +351,7 @@ export class SecurityPolicyLoader {
         const regex = new RegExp(patternConfig.pattern, patternConfig.flags || 'gi');
         if (regex.test(input)) {
           violations.push(patternConfig.description);
-          
+
           // Track highest risk level
           const riskLevels = ['low', 'medium', 'high', 'critical'];
           if (riskLevels.indexOf(patternConfig.riskLevel) > riskLevels.indexOf(highestRiskLevel)) {
@@ -360,7 +366,7 @@ export class SecurityPolicyLoader {
     return {
       isValid: violations.length === 0,
       violations,
-      riskLevel: highestRiskLevel
+      riskLevel: highestRiskLevel,
     };
   }
 }

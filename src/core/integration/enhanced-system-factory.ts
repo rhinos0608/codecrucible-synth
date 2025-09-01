@@ -53,7 +53,7 @@ export interface EnhancedSystemInstance {
   qualityAnalyzer?: CodeQualityAnalyzer;
   voiceSystem?: VoiceArchetypeSystem;
   sequentialAgentSystem?: SequentialDualAgentSystem;
-  
+
   // Integrated methods
   processRequest: (request: any) => Promise<any>;
   getSystemHealth: () => Promise<any>;
@@ -83,7 +83,7 @@ export class EnhancedSystemFactory {
       security: {
         enabled: true,
         riskThreshold: 75,
-        auditEnabled: true
+        auditEnabled: true,
       },
       quality: {
         enabled: true,
@@ -92,8 +92,8 @@ export class EnhancedSystemFactory {
         thresholds: {
           complexity: 20,
           maintainability: 70,
-          overall: 80
-        }
+          overall: 80,
+        },
       },
       voice: {
         enabled: true,
@@ -104,13 +104,13 @@ export class EnhancedSystemFactory {
         convergenceTarget: 0.85,
         enableReflection: true,
         parallelVoices: false,
-        councilSize: 3
+        councilSize: 3,
       },
       spiral: {
         enabled: true,
         maxIterations: 5,
-        convergenceThreshold: 0.85
-      }
+        convergenceThreshold: 0.85,
+      },
     };
 
     const finalConfig = { ...defaultConfig, ...config };
@@ -120,82 +120,91 @@ export class EnhancedSystemFactory {
       const coordinator = SystemIntegrationCoordinator.getInstance();
 
       // Step 1: Create VoiceArchetypeSystem first (without spiral coordinator to break circular dependency)
-      const voiceSystem = finalConfig.voice.enabled ? new VoiceArchetypeSystem(
-        logger,
-        undefined, // Will be injected later
-        modelClient,
-        {
-          voices: {
-            default: ['explorer', 'maintainer'],
-            available: [
-              'explorer',
-              'maintainer', 
-              'analyzer',
-              'developer',
-              'implementor',
-              'security',
-              'architect',
-              'designer',
-              'optimizer',
-              'guardian'
-            ],
-            parallel: finalConfig.voice.parallelVoices || false,
-            maxConcurrent: finalConfig.voice.maxVoices || 3
-          }
-        }
-      ) : undefined;
+      const voiceSystem = finalConfig.voice.enabled
+        ? new VoiceArchetypeSystem(
+            logger,
+            undefined, // Will be injected later
+            modelClient,
+            {
+              voices: {
+                default: ['explorer', 'maintainer'],
+                available: [
+                  'explorer',
+                  'maintainer',
+                  'analyzer',
+                  'developer',
+                  'implementor',
+                  'security',
+                  'architect',
+                  'designer',
+                  'optimizer',
+                  'guardian',
+                ],
+                parallel: finalConfig.voice.parallelVoices || false,
+                maxConcurrent: finalConfig.voice.maxVoices || 3,
+              },
+            }
+          )
+        : undefined;
 
       // Step 2: Create LivingSpiralCoordinator with VoiceArchetypeSystem as orchestration service
-      const spiralCoordinator = voiceSystem ? new LivingSpiralCoordinator(
-        voiceSystem as any, // VoiceArchetypeSystem implements the needed methods
-        modelClient,
-        logger,
-        {
-          maxIterations: finalConfig.voice.maxIterations || 5,
-          qualityThreshold: finalConfig.voice.qualityThreshold || 0.8,
-          convergenceTarget: finalConfig.voice.convergenceTarget || 0.85,
-          enableReflection: finalConfig.voice.enableReflection || true,
-          parallelVoices: finalConfig.voice.parallelVoices || false,
-          councilSize: finalConfig.voice.councilSize || 3
-        }
-      ) : undefined;
+      const spiralCoordinator = voiceSystem
+        ? new LivingSpiralCoordinator(
+            voiceSystem as any, // VoiceArchetypeSystem implements the needed methods
+            modelClient,
+            logger,
+            {
+              maxIterations: finalConfig.voice.maxIterations || 5,
+              qualityThreshold: finalConfig.voice.qualityThreshold || 0.8,
+              convergenceTarget: finalConfig.voice.convergenceTarget || 0.85,
+              enableReflection: finalConfig.voice.enableReflection || true,
+              parallelVoices: finalConfig.voice.parallelVoices || false,
+              councilSize: finalConfig.voice.councilSize || 3,
+            }
+          )
+        : undefined;
 
       // Step 3: Inject the spiral coordinator back into the voice system (complete the circular dependency)
       if (voiceSystem && spiralCoordinator) {
         voiceSystem.setLivingSpiralCoordinator(spiralCoordinator);
       }
-      
+
       // Initialize all integrated systems
       await coordinator.initializeIntegratedSystems();
 
       // Create additional systems for direct access
-      const securityFramework = finalConfig.security.enabled ? new EnterpriseSecurityFramework() : undefined;
-      const qualityAnalyzer = finalConfig.quality.enabled ? new CodeQualityAnalyzer({
-        quality: {
-          maintainability: {
-            excellent: 80,
-            acceptable: 60,
-            problematic: 40,
-            critical: 20
-          },
-          weights: {
-            complexity: 0.25,
-            maintainability: 0.20,
-            linting: 0.15,
-            formatting: 0.10,
-            typeScript: 0.15,
-            documentation: 0.10,
-            security: 0.05,
-          }
-        },
-        performance: {},
-        tools: {},
-        analysis: {}
-      }) : undefined;
-
-      const sequentialAgentSystem = finalConfig.voice.collaborationMode === 'sequential' 
-        ? new SequentialDualAgentSystem() 
+      const securityFramework = finalConfig.security.enabled
+        ? new EnterpriseSecurityFramework()
         : undefined;
+      const qualityAnalyzer = finalConfig.quality.enabled
+        ? new CodeQualityAnalyzer({
+            quality: {
+              maintainability: {
+                excellent: 80,
+                acceptable: 60,
+                problematic: 40,
+                critical: 20,
+              },
+              weights: {
+                complexity: 0.25,
+                maintainability: 0.2,
+                linting: 0.15,
+                formatting: 0.1,
+                typeScript: 0.15,
+                documentation: 0.1,
+                security: 0.05,
+              },
+            },
+            performance: {},
+            tools: {},
+            analysis: {},
+          })
+        : undefined;
+
+      const sequentialAgentSystem =
+        finalConfig.voice.collaborationMode === 'sequential'
+          ? new SequentialDualAgentSystem()
+          : undefined;
 
       this.instance = {
         coordinator,
@@ -219,10 +228,10 @@ export class EnhancedSystemFactory {
               voiceSelectionCriteria: request.voiceSelectionCriteria,
               mcpCapabilityRequirements: request.mcpCapabilityRequirements,
               performanceTargets: request.performanceTargets,
-              errorRecoveryOptions: request.errorRecoveryOptions
+              errorRecoveryOptions: request.errorRecoveryOptions,
             },
             priority: request.priority || 'medium',
-            constraints: request.constraints
+            constraints: request.constraints,
           });
         },
 
@@ -236,15 +245,16 @@ export class EnhancedSystemFactory {
           logger.info('🛑 Shutting down enhanced system');
           // The coordinator handles coordinated shutdown
           this.instance = null;
-        }
+        },
       };
 
       logger.info('✅ Enhanced system created successfully with full integration');
       return this.instance;
-
     } catch (error) {
       logger.error('❌ Failed to create enhanced system:', error);
-      throw new Error(`Enhanced system creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Enhanced system creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -303,8 +313,8 @@ export function createEnhancedRequest(
     priority: options?.priority || 'medium',
     context: {
       timestamp: new Date().toISOString(),
-      enhanced: true
-    }
+      enhanced: true,
+    },
   };
 }
 

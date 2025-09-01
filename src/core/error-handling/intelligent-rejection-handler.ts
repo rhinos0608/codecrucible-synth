@@ -9,21 +9,21 @@ import { getConfig } from '../config/env-config.js';
 
 export enum RejectionCategory {
   NETWORK_ERROR = 'network',
-  FILE_SYSTEM_ERROR = 'filesystem', 
+  FILE_SYSTEM_ERROR = 'filesystem',
   EXTERNAL_SERVICE_ERROR = 'external_service',
   TOOL_EXECUTION_ERROR = 'tool_execution',
   VALIDATION_ERROR = 'validation',
   RESOURCE_ERROR = 'resource',
   LOGIC_ERROR = 'logic',
-  UNKNOWN_ERROR = 'unknown'
+  UNKNOWN_ERROR = 'unknown',
 }
 
 export enum RecoveryAction {
-  CONTINUE = 'continue',           // Log and continue operation
-  RETRY = 'retry',                // Attempt automatic retry
+  CONTINUE = 'continue', // Log and continue operation
+  RETRY = 'retry', // Attempt automatic retry
   GRACEFUL_DEGRADATION = 'degrade', // Disable affected component
   CONTROLLED_SHUTDOWN = 'shutdown', // Clean shutdown and restart
-  IMMEDIATE_EXIT = 'exit'          // Critical failure - exit immediately
+  IMMEDIATE_EXIT = 'exit', // Critical failure - exit immediately
 }
 
 export interface RejectionContext {
@@ -66,7 +66,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       action: RecoveryAction.RETRY,
       maxRetries: 3,
       cooldownMs: 5000,
-      description: 'Network connectivity issues'
+      description: 'Network connectivity issues',
     },
     {
       category: RejectionCategory.EXTERNAL_SERVICE_ERROR,
@@ -74,7 +74,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       action: RecoveryAction.GRACEFUL_DEGRADATION,
       maxRetries: 2,
       cooldownMs: 10000,
-      description: 'External AI/MCP service unavailable'
+      description: 'External AI/MCP service unavailable',
     },
 
     // File System Errors
@@ -82,7 +82,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       category: RejectionCategory.FILE_SYSTEM_ERROR,
       pattern: /ENOENT|EACCES|EPERM|EMFILE|ENFILE|file system|permission denied/i,
       action: RecoveryAction.CONTINUE,
-      description: 'File system access issues'
+      description: 'File system access issues',
     },
 
     // Tool Execution Errors
@@ -90,7 +90,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       category: RejectionCategory.TOOL_EXECUTION_ERROR,
       pattern: /spawn.*ENOENT|execSync|Command failed|Process exited/i,
       action: RecoveryAction.CONTINUE,
-      description: 'Tool execution failures'
+      description: 'Tool execution failures',
     },
 
     // Resource Exhaustion
@@ -98,7 +98,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       category: RejectionCategory.RESOURCE_ERROR,
       pattern: /ENOMEM|out of memory|Maximum call stack|heap.*limit/i,
       action: RecoveryAction.CONTROLLED_SHUTDOWN,
-      description: 'Resource exhaustion detected'
+      description: 'Resource exhaustion detected',
     },
 
     // Critical Logic Errors
@@ -106,7 +106,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       category: RejectionCategory.LOGIC_ERROR,
       pattern: /TypeError.*undefined|Cannot read prop.*undefined|ReferenceError/i,
       action: RecoveryAction.IMMEDIATE_EXIT,
-      description: 'Critical logic errors that indicate code bugs'
+      description: 'Critical logic errors that indicate code bugs',
     },
 
     // Validation Errors
@@ -114,8 +114,8 @@ export class IntelligentRejectionHandler extends EventEmitter {
       category: RejectionCategory.VALIDATION_ERROR,
       pattern: /validation failed|invalid.*parameter|schema.*error/i,
       action: RecoveryAction.CONTINUE,
-      description: 'Input validation failures'
-    }
+      description: 'Input validation failures',
+    },
   ];
 
   /**
@@ -155,7 +155,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
   private categorizeRejection(reason: any, promise: Promise<any>): RejectionContext {
     const errorMessage = this.extractErrorMessage(reason);
     const stack = reason instanceof Error ? reason.stack : undefined;
-    
+
     // Find matching pattern
     const matchedPattern = this.REJECTION_PATTERNS.find(pattern => {
       if (pattern.pattern instanceof RegExp) {
@@ -182,8 +182,8 @@ export class IntelligentRejectionHandler extends EventEmitter {
       metadata: {
         errorMessage,
         matchedPattern: matchedPattern?.description,
-        rejectionCount: this.rejectionCount
-      }
+        rejectionCount: this.rejectionCount,
+      },
     };
   }
 
@@ -201,11 +201,13 @@ export class IntelligentRejectionHandler extends EventEmitter {
       case RecoveryAction.RETRY:
         const retryCount = this.retryAttempts.get(actionKey) || 0;
         const pattern = this.REJECTION_PATTERNS.find(p => p.category === context.category);
-        
+
         if (retryCount < (pattern?.maxRetries || 3)) {
           this.retryAttempts.set(actionKey, retryCount + 1);
-          logger.info(`🔄 Scheduling retry ${retryCount + 1} for ${context.category} in ${pattern?.cooldownMs || 5000}ms`);
-          
+          logger.info(
+            `🔄 Scheduling retry ${retryCount + 1} for ${context.category} in ${pattern?.cooldownMs || 5000}ms`
+          );
+
           // Implement exponential backoff
           const delay = (pattern?.cooldownMs || 5000) * Math.pow(2, retryCount);
           setTimeout(() => {
@@ -213,15 +215,23 @@ export class IntelligentRejectionHandler extends EventEmitter {
           }, delay);
         } else {
           logger.error(`❌ Max retries exceeded for ${context.category}, degrading service`);
-          await this.executeRecoveryAction({ ...context, action: RecoveryAction.GRACEFUL_DEGRADATION });
+          await this.executeRecoveryAction({
+            ...context,
+            action: RecoveryAction.GRACEFUL_DEGRADATION,
+          });
         }
         break;
 
       case RecoveryAction.GRACEFUL_DEGRADATION:
         if (context.component) {
           this.componentHealth.set(context.component, false);
-          logger.warn(`⚠️ Component ${context.component} marked as degraded due to ${context.category}`);
-          this.emit('component:degraded', { component: context.component, reason: context.category });
+          logger.warn(
+            `⚠️ Component ${context.component} marked as degraded due to ${context.category}`
+          );
+          this.emit('component:degraded', {
+            component: context.component,
+            reason: context.category,
+          });
         }
         break;
 
@@ -246,14 +256,18 @@ export class IntelligentRejectionHandler extends EventEmitter {
     );
 
     if (recentRejections.length > 10) {
-      logger.error(`🚨 System health critical: ${recentRejections.length} rejections in last minute`);
+      logger.error(
+        `🚨 System health critical: ${recentRejections.length} rejections in last minute`
+      );
       this.emit('system:critical', { recentRejections: recentRejections.length });
-      
+
       // If too many critical errors, force shutdown
       const criticalErrors = recentRejections.filter(
-        r => r.action === RecoveryAction.IMMEDIATE_EXIT || r.action === RecoveryAction.CONTROLLED_SHUTDOWN
+        r =>
+          r.action === RecoveryAction.IMMEDIATE_EXIT ||
+          r.action === RecoveryAction.CONTROLLED_SHUTDOWN
       );
-      
+
       if (criticalErrors.length > 3) {
         await this.initiateControlledShutdown({
           category: RejectionCategory.UNKNOWN_ERROR,
@@ -261,7 +275,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
           reason: 'Multiple critical rejections detected',
           promise: Promise.resolve(),
           timestamp: Date.now(),
-          metadata: { criticalErrorCount: criticalErrors.length }
+          metadata: { criticalErrorCount: criticalErrors.length },
         });
       }
     }
@@ -272,7 +286,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
    */
   private async initiateControlledShutdown(context: RejectionContext): Promise<void> {
     if (this.isShuttingDown) return;
-    
+
     this.isShuttingDown = true;
     logger.error('🛑 Initiating controlled shutdown...');
 
@@ -300,16 +314,16 @@ export class IntelligentRejectionHandler extends EventEmitter {
       category: context.category,
       reason: context.reason,
       component: context.component,
-      timestamp: new Date(context.timestamp).toISOString()
+      timestamp: new Date(context.timestamp).toISOString(),
     });
-    
+
     // Minimal cleanup attempt
     try {
       this.emit('system:emergency', context);
       // Give 1 second for emergency cleanup
       await Promise.race([
         new Promise(resolve => setTimeout(resolve, 1000)),
-        this.performEmergencyCleanup()
+        this.performEmergencyCleanup(),
       ]);
     } finally {
       process.exit(1);
@@ -354,7 +368,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       /\/tools\/([^\/]+)\//,
       /\/core\/([^\/]+)\//,
       /\/infrastructure\/([^\/]+)\//,
-      /\/application\/([^\/]+)\//
+      /\/application\/([^\/]+)\//,
     ];
 
     for (const pattern of patterns) {
@@ -378,7 +392,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       rejectionCount: this.rejectionCount,
       totalRejections: this.rejectionHistory.length,
       timestamp: new Date(context.timestamp).toISOString(),
-      errorMessage: this.extractErrorMessage(context.reason)
+      errorMessage: this.extractErrorMessage(context.reason),
     };
 
     switch (context.action) {
@@ -410,10 +424,13 @@ export class IntelligentRejectionHandler extends EventEmitter {
       r => Date.now() - r.timestamp < 300000 // Last 5 minutes
     );
 
-    const categoryCounts = recentRejections.reduce((acc, r) => {
-      acc[r.category] = (acc[r.category] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const categoryCounts = recentRejections.reduce(
+      (acc, r) => {
+        acc[r.category] = (acc[r.category] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     const degradedComponents = Array.from(this.componentHealth.entries())
       .filter(([, healthy]) => !healthy)
@@ -425,7 +442,7 @@ export class IntelligentRejectionHandler extends EventEmitter {
       categoryBreakdown: categoryCounts,
       degradedComponents,
       systemHealth: degradedComponents.length === 0 ? 'healthy' : 'degraded',
-      isShuttingDown: this.isShuttingDown
+      isShuttingDown: this.isShuttingDown,
     };
   }
 

@@ -8,7 +8,12 @@
  * - Encapsulates routing algorithms and decision logic
  */
 
-import { RoutingDecision, TaskComplexity, RoutingPriority, ModelSelectionCriteria } from '../entities/routing-decision.js';
+import {
+  RoutingDecision,
+  TaskComplexity,
+  RoutingPriority,
+  ModelSelectionCriteria,
+} from '../entities/routing-decision.js';
 import { Model } from '../entities/model.js';
 import { ConfidenceScore } from '../entities/reasoning-step.js';
 
@@ -36,12 +41,24 @@ export class RoutingRequest {
     return new RoutingRequest(requestId, prompt, taskComplexity, priority, criteria, context);
   }
 
-  get requestId(): string { return this._requestId; }
-  get prompt(): string { return this._prompt; }
-  get taskComplexity(): TaskComplexity { return this._taskComplexity; }
-  get priority(): RoutingPriority { return this._priority; }
-  get criteria(): ModelSelectionCriteria { return this._criteria; }
-  get context(): RequestContext { return this._context; }
+  get requestId(): string {
+    return this._requestId;
+  }
+  get prompt(): string {
+    return this._prompt;
+  }
+  get taskComplexity(): TaskComplexity {
+    return this._taskComplexity;
+  }
+  get priority(): RoutingPriority {
+    return this._priority;
+  }
+  get criteria(): ModelSelectionCriteria {
+    return this._criteria;
+  }
+  get context(): RequestContext {
+    return this._context;
+  }
 }
 
 /**
@@ -79,12 +96,24 @@ export class RequestContext {
     return new RequestContext();
   }
 
-  get sessionId(): string | undefined { return this._sessionId; }
-  get userId(): string | undefined { return this._userId; }
-  get previousModelUsed(): string | undefined { return this._previousModelUsed; }
-  get budgetConstraints(): boolean { return this._budgetConstraints; }
-  get timeConstraints(): boolean { return this._timeConstraints; }
-  get qualityRequirements(): boolean { return this._qualityRequirements; }
+  get sessionId(): string | undefined {
+    return this._sessionId;
+  }
+  get userId(): string | undefined {
+    return this._userId;
+  }
+  get previousModelUsed(): string | undefined {
+    return this._previousModelUsed;
+  }
+  get budgetConstraints(): boolean {
+    return this._budgetConstraints;
+  }
+  get timeConstraints(): boolean {
+    return this._timeConstraints;
+  }
+  get qualityRequirements(): boolean {
+    return this._qualityRequirements;
+  }
 }
 
 /**
@@ -115,11 +144,21 @@ export class ModelScoringResult {
     );
   }
 
-  get model(): Model { return this._model; }
-  get score(): number { return this._score; }
-  get reasoning(): string { return this._reasoning; }
-  get strengths(): readonly string[] { return this._strengths; }
-  get weaknesses(): readonly string[] { return this._weaknesses; }
+  get model(): Model {
+    return this._model;
+  }
+  get score(): number {
+    return this._score;
+  }
+  get reasoning(): string {
+    return this._reasoning;
+  }
+  get strengths(): readonly string[] {
+    return this._strengths;
+  }
+  get weaknesses(): readonly string[] {
+    return this._weaknesses;
+  }
 }
 
 /**
@@ -128,16 +167,19 @@ export class ModelScoringResult {
 export interface RoutingStrategy {
   name: string;
   description: string;
-  
+
   /**
    * Calculate model scores for the given request
    */
   scoreModels(request: RoutingRequest, availableModels: Model[]): ModelScoringResult[];
-  
+
   /**
    * Select the best model from scored results
    */
-  selectBestModel(scoringResults: ModelScoringResult[], request: RoutingRequest): ModelScoringResult;
+  selectBestModel(
+    scoringResults: ModelScoringResult[],
+    request: RoutingRequest
+  ): ModelScoringResult;
 }
 
 /**
@@ -158,7 +200,7 @@ export class PerformanceFirstStrategy implements RoutingStrategy {
         // Heavily weight performance characteristics
         const latencyScore = this.calculateLatencyScore(model);
         score += latencyScore * 0.5;
-        
+
         if (latencyScore > 0.8) {
           strengths.push('Fast response time');
         } else {
@@ -168,7 +210,7 @@ export class PerformanceFirstStrategy implements RoutingStrategy {
         // Moderate weight for capability matching
         const capabilityScore = this.calculateCapabilityScore(model, request);
         score += capabilityScore * 0.3;
-        
+
         if (capabilityScore > 0.8) {
           strengths.push('Good capability match');
         }
@@ -183,20 +225,23 @@ export class PerformanceFirstStrategy implements RoutingStrategy {
       });
   }
 
-  selectBestModel(scoringResults: ModelScoringResult[], request: RoutingRequest): ModelScoringResult {
+  selectBestModel(
+    scoringResults: ModelScoringResult[],
+    request: RoutingRequest
+  ): ModelScoringResult {
     return scoringResults.sort((a, b) => b.score - a.score)[0];
   }
 
   private calculateLatencyScore(model: Model): number {
     // Simplified latency calculation - in real implementation would use actual metrics
     const estimatedLatency = model.parameters.estimatedLatency;
-    return Math.max(0, 1 - (estimatedLatency / 5000)); // 5s max
+    return Math.max(0, 1 - estimatedLatency / 5000); // 5s max
   }
 
   private calculateCapabilityScore(model: Model, request: RoutingRequest): number {
     return model.calculateSuitabilityScore({
       requiredCapabilities: [...request.criteria.requiredCapabilities],
-      maxLatency: request.criteria.maxLatency
+      maxLatency: request.criteria.maxLatency,
     });
   }
 
@@ -223,7 +268,7 @@ export class QualityFirstStrategy implements RoutingStrategy {
         // Heavily weight quality characteristics
         const qualityScore = model.parameters.qualityRating;
         score += qualityScore * 0.5;
-        
+
         if (qualityScore > 0.8) {
           strengths.push('High quality output');
         } else {
@@ -233,7 +278,7 @@ export class QualityFirstStrategy implements RoutingStrategy {
         // High weight for capability matching
         const capabilityScore = this.calculateCapabilityScore(model, request);
         score += capabilityScore * 0.4;
-        
+
         if (capabilityScore > 0.9) {
           strengths.push('Excellent capability match');
         } else if (capabilityScore < 0.6) {
@@ -250,20 +295,23 @@ export class QualityFirstStrategy implements RoutingStrategy {
       });
   }
 
-  selectBestModel(scoringResults: ModelScoringResult[], request: RoutingRequest): ModelScoringResult {
+  selectBestModel(
+    scoringResults: ModelScoringResult[],
+    request: RoutingRequest
+  ): ModelScoringResult {
     return scoringResults.sort((a, b) => b.score - a.score)[0];
   }
 
   private calculateCapabilityScore(model: Model, request: RoutingRequest): number {
     return model.calculateSuitabilityScore({
       requiredCapabilities: [...request.criteria.requiredCapabilities],
-      qualityThreshold: request.criteria.minQuality
+      qualityThreshold: request.criteria.minQuality,
     });
   }
 
   private calculatePerformanceScore(model: Model): number {
     const latency = model.parameters.estimatedLatency;
-    return Math.max(0, 1 - (latency / 10000)); // 10s max
+    return Math.max(0, 1 - latency / 10000); // 10s max
   }
 }
 
@@ -288,8 +336,11 @@ export class BalancedRoutingStrategy implements RoutingStrategy {
         const performanceScore = this.calculatePerformanceScore(model);
         const reliabilityScore = this.calculateReliabilityScore(model);
 
-        score = (qualityScore * 0.3) + (capabilityScore * 0.3) + 
-                (performanceScore * 0.2) + (reliabilityScore * 0.2);
+        score =
+          qualityScore * 0.3 +
+          capabilityScore * 0.3 +
+          performanceScore * 0.2 +
+          reliabilityScore * 0.2;
 
         // Determine strengths and weaknesses
         if (qualityScore > 0.8) strengths.push('High quality');
@@ -308,37 +359,41 @@ export class BalancedRoutingStrategy implements RoutingStrategy {
       });
   }
 
-  selectBestModel(scoringResults: ModelScoringResult[], request: RoutingRequest): ModelScoringResult {
+  selectBestModel(
+    scoringResults: ModelScoringResult[],
+    request: RoutingRequest
+  ): ModelScoringResult {
     // Consider priority for tie-breaking
     const sortedResults = scoringResults.sort((a, b) => b.score - a.score);
-    
+
     if (request.priority.isHighPriority() && sortedResults.length > 1) {
       // For high priority, prefer models with better reliability even if slightly lower score
       const topResults = sortedResults.slice(0, 3); // Top 3 candidates
-      const mostReliable = topResults.reduce((best, current) => 
-        this.calculateReliabilityScore(current.model) > this.calculateReliabilityScore(best.model) 
-          ? current : best
+      const mostReliable = topResults.reduce((best, current) =>
+        this.calculateReliabilityScore(current.model) > this.calculateReliabilityScore(best.model)
+          ? current
+          : best
       );
-      
+
       return mostReliable;
     }
-    
+
     return sortedResults[0];
   }
 
   private calculateCapabilityScore(model: Model, request: RoutingRequest): number {
     return model.calculateSuitabilityScore({
-      requiredCapabilities: [...request.criteria.requiredCapabilities]
+      requiredCapabilities: [...request.criteria.requiredCapabilities],
     });
   }
 
   private calculatePerformanceScore(model: Model): number {
     const latency = model.parameters.estimatedLatency;
-    return Math.max(0, 1 - (latency / 8000)); // 8s max
+    return Math.max(0, 1 - latency / 8000); // 8s max
   }
 
   private calculateReliabilityScore(model: Model): number {
-    return Math.max(0, 1 - (model.errorCount * 0.1));
+    return Math.max(0, 1 - model.errorCount * 0.1);
   }
 }
 
@@ -349,7 +404,7 @@ export class ModelRoutingService {
   private readonly strategies = new Map<string, RoutingStrategy>([
     ['performance', new PerformanceFirstStrategy()],
     ['quality', new QualityFirstStrategy()],
-    ['balanced', new BalancedRoutingStrategy()]
+    ['balanced', new BalancedRoutingStrategy()],
   ]);
 
   /**
@@ -369,7 +424,7 @@ export class ModelRoutingService {
 
     // Select routing strategy based on request characteristics
     const strategy = this.selectRoutingStrategy(request);
-    
+
     // Score all suitable models
     const scoringResults = strategy.scoreModels(request, suitableModels);
     if (scoringResults.length === 0) {
@@ -378,10 +433,10 @@ export class ModelRoutingService {
 
     // Select best model
     const bestResult = strategy.selectBestModel(scoringResults, request);
-    
+
     // Calculate confidence in the routing decision
     const confidence = this.calculateRoutingConfidence(bestResult, scoringResults, request);
-    
+
     // Get alternatives
     const alternatives = scoringResults
       .filter(result => result.model.name.value !== bestResult.model.name.value)
@@ -457,7 +512,11 @@ export class ModelRoutingService {
       qualityScore += 0.1;
     }
 
-    const recommendations = this.generateImprovementRecommendations(issues, decision, actualOutcome);
+    const recommendations = this.generateImprovementRecommendations(
+      issues,
+      decision,
+      actualOutcome
+    );
 
     return RoutingEvaluation.create(
       qualityScore,
@@ -479,15 +538,21 @@ export class ModelRoutingService {
     let optimalStrategy = 'balanced';
 
     // Analyze success rates by strategy
-    const strategyPerformance = this.analyzeStrategyPerformance(historicalDecisions, historicalOutcomes);
-    
+    const strategyPerformance = this.analyzeStrategyPerformance(
+      historicalDecisions,
+      historicalOutcomes
+    );
+
     // Find best performing strategy
-    const bestStrategy = Array.from(strategyPerformance.entries())
-      .sort(([,a], [,b]) => b.successRate - a.successRate)[0];
-    
+    const bestStrategy = Array.from(strategyPerformance.entries()).sort(
+      ([, a], [, b]) => b.successRate - a.successRate
+    )[0];
+
     if (bestStrategy && bestStrategy[1].successRate > 0.8) {
       optimalStrategy = bestStrategy[0];
-      recommendations.push(`Consider defaulting to ${optimalStrategy} strategy (${Math.round(bestStrategy[1].successRate * 100)}% success rate)`);
+      recommendations.push(
+        `Consider defaulting to ${optimalStrategy} strategy (${Math.round(bestStrategy[1].successRate * 100)}% success rate)`
+      );
     }
 
     // Analyze failure patterns
@@ -506,14 +571,14 @@ export class ModelRoutingService {
   private filterSuitableModels(models: Model[], request: RoutingRequest): Model[] {
     return models.filter(model => {
       if (!model.isAvailable()) return false;
-      
+
       // Check basic capability requirements
       const suitabilityScore = model.calculateSuitabilityScore({
         requiredCapabilities: [...request.criteria.requiredCapabilities],
         maxLatency: request.criteria.maxLatency,
-        qualityThreshold: request.criteria.minQuality
+        qualityThreshold: request.criteria.minQuality,
       });
-      
+
       return suitabilityScore > 0.3; // Minimum threshold
     });
   }
@@ -523,15 +588,15 @@ export class ModelRoutingService {
     if (request.criteria.preferSpeed || request.context.timeConstraints) {
       return this.strategies.get('performance')!;
     }
-    
+
     if (request.criteria.preferQuality || request.context.qualityRequirements) {
       return this.strategies.get('quality')!;
     }
-    
+
     if (request.priority.isHighPriority()) {
       return this.strategies.get('quality')!; // High priority gets quality focus
     }
-    
+
     return this.strategies.get('balanced')!; // Default to balanced
   }
 
@@ -541,34 +606,30 @@ export class ModelRoutingService {
     request: RoutingRequest
   ): ConfidenceScore {
     let confidence = bestResult.score;
-    
+
     // Reduce confidence if scores are very close (indicating uncertainty)
     if (allResults.length > 1) {
       const secondBest = allResults.sort((a, b) => b.score - a.score)[1];
       const scoreDifference = bestResult.score - secondBest.score;
-      
+
       if (scoreDifference < 0.1) {
         confidence -= 0.2; // Close scores reduce confidence
       }
     }
-    
+
     // Adjust confidence based on task complexity
     if (request.taskComplexity.isAdvanced() && bestResult.model.parameters.qualityRating < 0.8) {
       confidence -= 0.1; // Lower confidence for complex tasks with lower-quality models
     }
-    
+
     // Ensure confidence is within valid range
     confidence = Math.max(0.1, Math.min(1.0, confidence));
-    
+
     return ConfidenceScore.create(confidence);
   }
 
   private createFallbackDecision(request: RoutingRequest, reason: string): RoutingDecision {
-    return RoutingDecision.createFallbackDecision(
-      request.requestId,
-      'fallback_model',
-      reason
-    );
+    return RoutingDecision.createFallbackDecision(request.requestId, 'fallback_model', reason);
   }
 
   private analyzeStrategyPerformance(
@@ -577,32 +638,38 @@ export class ModelRoutingService {
   ): Map<string, { successRate: number; avgLatency: number; count: number }> {
     // Simplified analysis - would be more sophisticated in real implementation
     const performance = new Map();
-    
+
     // This would analyze actual strategy usage from decision metadata
     performance.set('balanced', { successRate: 0.85, avgLatency: 2500, count: 100 });
     performance.set('performance', { successRate: 0.78, avgLatency: 1200, count: 50 });
     performance.set('quality', { successRate: 0.92, avgLatency: 4500, count: 75 });
-    
+
     return performance;
   }
 
-  private analyzeFailurePatterns(decisions: RoutingDecision[], outcomes: RoutingOutcome[]): string[] {
+  private analyzeFailurePatterns(
+    decisions: RoutingDecision[],
+    outcomes: RoutingOutcome[]
+  ): string[] {
     const patterns = [];
-    
+
     // This would analyze actual failure patterns
     patterns.push('Complex tasks routed to simple models had 40% higher failure rate');
     patterns.push('High-priority requests with quality strategy showed 15% better outcomes');
-    
+
     return patterns;
   }
 
-  private analyzeModelPerformance(decisions: RoutingDecision[], outcomes: RoutingOutcome[]): string[] {
+  private analyzeModelPerformance(
+    decisions: RoutingDecision[],
+    outcomes: RoutingOutcome[]
+  ): string[] {
     const insights = [];
-    
+
     // This would analyze actual model performance
     insights.push('Model X consistently outperformed expectations for coding tasks');
     insights.push('Model Y showed degrading performance over time - health check needed');
-    
+
     return insights;
   }
 
@@ -612,19 +679,19 @@ export class ModelRoutingService {
     outcome: RoutingOutcome
   ): string[] {
     const recommendations = [];
-    
+
     if (issues.includes('Latency exceeded requirements')) {
       recommendations.push('Consider routing similar requests to faster models');
     }
-    
+
     if (issues.includes('Quality below requirements')) {
       recommendations.push('Increase minimum quality threshold for this task type');
     }
-    
+
     if (!decision.hasAppropriateTaskModelAlignment()) {
       recommendations.push('Improve task complexity detection algorithms');
     }
-    
+
     return recommendations;
   }
 }
@@ -667,11 +734,21 @@ export class RoutingEvaluation {
     );
   }
 
-  get qualityScore(): number { return this._qualityScore; }
-  get wasSuccessful(): boolean { return this._wasSuccessful; }
-  get issues(): readonly string[] { return this._issues; }
-  get successes(): readonly string[] { return this._successes; }
-  get recommendations(): readonly string[] { return this._recommendations; }
+  get qualityScore(): number {
+    return this._qualityScore;
+  }
+  get wasSuccessful(): boolean {
+    return this._wasSuccessful;
+  }
+  get issues(): readonly string[] {
+    return this._issues;
+  }
+  get successes(): readonly string[] {
+    return this._successes;
+  }
+  get recommendations(): readonly string[] {
+    return this._recommendations;
+  }
 }
 
 export class StrategyOptimization {
@@ -693,7 +770,13 @@ export class StrategyOptimization {
     );
   }
 
-  get optimalStrategy(): string { return this._optimalStrategy; }
-  get recommendations(): readonly string[] { return this._recommendations; }
-  get strategyPerformance(): Map<string, any> { return this._strategyPerformance; }
+  get optimalStrategy(): string {
+    return this._optimalStrategy;
+  }
+  get recommendations(): readonly string[] {
+    return this._recommendations;
+  }
+  get strategyPerformance(): Map<string, any> {
+    return this._strategyPerformance;
+  }
 }

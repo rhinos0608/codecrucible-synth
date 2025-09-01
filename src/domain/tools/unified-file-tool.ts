@@ -1,6 +1,6 @@
 /**
  * Unified File Tool
- * 
+ *
  * Replaces 6 different file tool implementations:
  * - file-tools.ts (basic)
  * - enhanced-file-tools.ts (glob patterns, multiple files)
@@ -18,11 +18,11 @@ import { glob } from 'glob';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import { BaseTool } from './unified-tool-system.js';
-import { 
-  ToolDefinition, 
-  ToolExecutionContext, 
-  ToolExecutionResult, 
-  ToolParameterSchema 
+import {
+  ToolDefinition,
+  ToolExecutionContext,
+  ToolExecutionResult,
+  ToolParameterSchema,
 } from '../interfaces/tool-system.js';
 
 const execAsync = promisify(exec);
@@ -49,7 +49,7 @@ export class BasicFileStrategy implements FileOperationStrategy {
 
   async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
     const path = this.resolvePath(args.path, context);
-    
+
     switch (operation) {
       case 'read':
         return await this.readFile(path, args);
@@ -68,7 +68,7 @@ export class BasicFileStrategy implements FileOperationStrategy {
     try {
       await fs.access(path);
       const stats = await fs.stat(path);
-      
+
       // Size limit check
       const maxSize = args.maxSize || 1000000; // 1MB default
       if (stats.size > maxSize) {
@@ -78,7 +78,9 @@ export class BasicFileStrategy implements FileOperationStrategy {
       const content = await fs.readFile(path, args.encoding || 'utf-8');
       return content;
     } catch (error) {
-      throw new Error(`Failed to read file ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to read file ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -87,16 +89,18 @@ export class BasicFileStrategy implements FileOperationStrategy {
       // Ensure directory exists
       const dir = dirname(path);
       await fs.mkdir(dir, { recursive: true });
-      
+
       const options: any = {};
       if (args.encoding) options.encoding = args.encoding;
       if (args.mode) options.mode = args.mode;
-      
+
       await fs.writeFile(path, args.content, options);
-      
+
       return `File written successfully: ${path}`;
     } catch (error) {
-      throw new Error(`Failed to write file ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to write file ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -112,7 +116,9 @@ export class BasicFileStrategy implements FileOperationStrategy {
         permissions: stats.mode,
       };
     } catch (error) {
-      throw new Error(`Failed to get file info for ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to get file info for ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -141,22 +147,22 @@ export class BatchFileStrategy extends BasicFileStrategy {
   name = 'batch';
 
   supports(operation: string, args: any): boolean {
-    return super.supports(operation) && (
-      Array.isArray(args.paths) || 
-      (typeof args.path === 'string' && args.path.includes('*'))
+    return (
+      super.supports(operation) &&
+      (Array.isArray(args.paths) || (typeof args.path === 'string' && args.path.includes('*')))
     );
   }
 
   async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
     const paths = await this.resolvePaths(args, context);
     const maxFiles = args.maxFiles || 20;
-    
+
     if (paths.length > maxFiles) {
       throw new Error(`Too many files: ${paths.length} exceeds limit of ${maxFiles}`);
     }
 
     const results: any[] = [];
-    
+
     for (const path of paths) {
       try {
         const result = await super.execute(operation, { ...args, path }, context);
@@ -202,7 +208,7 @@ export class BatchFileStrategy extends BasicFileStrategy {
           absolute: true,
           ignore: args.excludePatterns || [],
         };
-        
+
         const matches = await glob(inputPath, globOptions);
         resolvedPaths.push(...matches);
       } else {
@@ -235,11 +241,14 @@ export class SmartFileStrategy extends BatchFileStrategy {
         return baseResult.map(item => this.enhanceFileResult(item, args));
       } else {
         // Single file
-        return this.enhanceFileResult({
-          path: args.path,
-          success: true,
-          result: baseResult,
-        }, args);
+        return this.enhanceFileResult(
+          {
+            path: args.path,
+            success: true,
+            result: baseResult,
+          },
+          args
+        );
       }
     }
 
@@ -288,7 +297,7 @@ export class SmartFileStrategy extends BatchFileStrategy {
 
   private detectLanguage(path: string, content: string): string {
     const ext = extname(path).toLowerCase();
-    
+
     const languageMap: Record<string, string> = {
       '.js': 'javascript',
       '.jsx': 'javascript',
@@ -324,10 +333,25 @@ export class SmartFileStrategy extends BatchFileStrategy {
 
   private isCodeFile(path: string): boolean {
     const codeExtensions = [
-      '.js', '.jsx', '.ts', '.tsx', '.py', '.rb', '.java', '.c', '.cpp', 
-      '.cs', '.php', '.go', '.rs', '.swift', '.kt', '.scala', '.sh'
+      '.js',
+      '.jsx',
+      '.ts',
+      '.tsx',
+      '.py',
+      '.rb',
+      '.java',
+      '.c',
+      '.cpp',
+      '.cs',
+      '.php',
+      '.go',
+      '.rs',
+      '.swift',
+      '.kt',
+      '.scala',
+      '.sh',
     ];
-    
+
     const ext = extname(path).toLowerCase();
     return codeExtensions.includes(ext);
   }
@@ -361,7 +385,6 @@ export class SmartFileStrategy extends BatchFileStrategy {
 
       // Count comments
       analysis.comments = this.countComments(content, language);
-      
     } catch (error) {
       analysis.error = `Failed to analyze code: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
@@ -391,7 +414,7 @@ export class SmartFileStrategy extends BatchFileStrategy {
     const pattern = /class\s+(\w+)/g;
     const classes: string[] = [];
     let match;
-    
+
     while ((match = pattern.exec(content)) !== null) {
       classes.push(match[1]);
     }
@@ -420,7 +443,7 @@ export class SmartFileStrategy extends BatchFileStrategy {
     const pattern = /def\s+(\w+)\s*\(/g;
     const functions: string[] = [];
     let match;
-    
+
     while ((match = pattern.exec(content)) !== null) {
       functions.push(match[1]);
     }
@@ -432,7 +455,7 @@ export class SmartFileStrategy extends BatchFileStrategy {
     const pattern = /class\s+(\w+)/g;
     const classes: string[] = [];
     let match;
-    
+
     while ((match = pattern.exec(content)) !== null) {
       classes.push(match[1]);
     }
@@ -441,10 +464,7 @@ export class SmartFileStrategy extends BatchFileStrategy {
   }
 
   private extractPythonImports(content: string): string[] {
-    const patterns = [
-      /import\s+([\w.]+)/g,
-      /from\s+([\w.]+)\s+import/g,
-    ];
+    const patterns = [/import\s+([\w.]+)/g, /from\s+([\w.]+)\s+import/g];
 
     const imports: string[] = [];
     for (const pattern of patterns) {
@@ -457,7 +477,10 @@ export class SmartFileStrategy extends BatchFileStrategy {
     return [...new Set(imports)];
   }
 
-  private countComments(content: string, language: string): { single: number; multi: number; total: number } {
+  private countComments(
+    content: string,
+    language: string
+  ): { single: number; multi: number; total: number } {
     const result = { single: 0, multi: 0, total: 0 };
 
     try {
@@ -569,7 +592,8 @@ export class UnifiedFileTool extends BaseTool {
 
     super({
       name: 'Unified File Tool',
-      description: 'Comprehensive file operations with configurable behavior - replaces 6 different file tool implementations',
+      description:
+        'Comprehensive file operations with configurable behavior - replaces 6 different file tool implementations',
       category: 'file',
       parameters,
       securityLevel: 'restricted',
@@ -585,14 +609,17 @@ export class UnifiedFileTool extends BaseTool {
     this.strategies.set('smart', new SmartFileStrategy());
   }
 
-  async execute(args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  async execute(
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult> {
     try {
       // Select appropriate strategy
       const strategy = this.selectStrategy(args);
-      
+
       // Execute with selected strategy
       const result = await strategy.execute(args.operation || 'read', args, context);
-      
+
       return {
         success: true,
         result,
@@ -602,7 +629,6 @@ export class UnifiedFileTool extends BaseTool {
           timestamp: new Date().toISOString(),
         },
       };
-      
     } catch (error) {
       return {
         success: false,
@@ -617,7 +643,7 @@ export class UnifiedFileTool extends BaseTool {
 
   private selectStrategy(args: any): FileOperationStrategy {
     // Strategy selection logic based on arguments
-    
+
     // Use smart strategy if metadata is requested
     if (args.includeMetadata !== false) {
       const smartStrategy = this.strategies.get('smart')!;
@@ -625,15 +651,15 @@ export class UnifiedFileTool extends BaseTool {
         return smartStrategy;
       }
     }
-    
+
     // Use batch strategy for multiple files or patterns
-    if (Array.isArray(args.paths) || (args.path && args.path.includes('*'))) {
+    if (Array.isArray(args.paths) || (args.path?.includes('*'))) {
       const batchStrategy = this.strategies.get('batch')!;
       if (batchStrategy.supports(args.operation || 'read', args)) {
         return batchStrategy;
       }
     }
-    
+
     // Default to basic strategy
     return this.strategies.get('basic')!;
   }

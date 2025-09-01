@@ -345,8 +345,8 @@ export class EnterpriseMCPOrchestrator {
               memory: 0,
               cpu: 0,
               network: true,
-              fileSystem: false
-            }
+              fileSystem: false,
+            },
           },
           context.securityContext
         );
@@ -357,7 +357,9 @@ export class EnterpriseMCPOrchestrator {
           logger.warn('Tool failed security validation', {
             toolName: capability.name,
             serverId: capability.serverId,
-            violations: validation.violations.map((v: any) => typeof v === 'string' ? v : v.type || v),
+            violations: validation.violations.map((v: any) =>
+              typeof v === 'string' ? v : v.type || v
+            ),
           });
         }
       } catch (error) {

@@ -876,7 +876,7 @@ export class ProductionRBACSystem extends EventEmitter {
   private startCacheCleanup(): void {
     // Clean up revoked tokens every hour
     setInterval(
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       () => {
         this.revokedTokens.clear();
         this.userPermissionCache.clear();

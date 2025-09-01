@@ -1,9 +1,9 @@
 /**
  * Response Cache Manager - Compatibility Stub
- * 
+ *
  * This is a minimal stub to maintain backward compatibility
  * during the architectural migration.
- * 
+ *
  * @deprecated Use UnifiedPerformanceSystem caching instead
  */
 
@@ -20,19 +20,19 @@ class ResponseCacheManager {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
-      ttl
+      ttl,
     });
   }
 
   get(key: string): any | null {
     const entry = this.cache.get(key);
     if (!entry) return null;
-    
+
     if (Date.now() - entry.timestamp > entry.ttl) {
       this.cache.delete(key);
       return null;
     }
-    
+
     return entry.data;
   }
 
@@ -48,7 +48,7 @@ class ResponseCacheManager {
     return {
       size: this.cache.size,
       hits: 0, // Stub values
-      misses: 0
+      misses: 0,
     };
   }
 }

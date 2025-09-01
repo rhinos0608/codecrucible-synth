@@ -1,7 +1,7 @@
 /**
  * File Operations Adapter
  * Translates between application layer and file system infrastructure
- * 
+ *
  * Architecture Compliance:
  * - Adapter layer: translates between application and infrastructure
  * - Imports from Application & Domain layers
@@ -10,14 +10,18 @@
  */
 
 import { EventEmitter } from 'events';
-import { FileSystemClient, FileMetadata, DirectoryListing } from '../infrastructure/filesystem/file-system-client.js';
-import { 
-  FileSecurityService, 
-  FileSecurityPolicy, 
-  FileAccessRequest, 
+import {
+  FileSystemClient,
+  FileMetadata,
+  DirectoryListing,
+} from '../infrastructure/filesystem/file-system-client.js';
+import {
+  FileSecurityService,
+  FileSecurityPolicy,
+  FileAccessRequest,
   FileOperation as SecurityFileOperation,
   PolicyUseCase,
-  RiskLevel
+  RiskLevel,
 } from '../domain/services/file-security-service.js';
 
 // Application layer interfaces
@@ -101,10 +105,7 @@ export class FileOperationsAdapter extends EventEmitter {
   private securityService: FileSecurityService;
   private operationCounter: number = 0;
 
-  constructor(
-    fileSystemClient: FileSystemClient,
-    securityService?: FileSecurityService
-  ) {
+  constructor(fileSystemClient: FileSystemClient, securityService?: FileSecurityService) {
     super();
     this.fileSystemClient = fileSystemClient;
     this.securityService = securityService || new FileSecurityService();
@@ -130,12 +131,12 @@ export class FileOperationsAdapter extends EventEmitter {
       [RiskLevel.LOW]: 1,
       [RiskLevel.MEDIUM]: 2,
       [RiskLevel.HIGH]: 3,
-      [RiskLevel.CRITICAL]: 4
+      [RiskLevel.CRITICAL]: 4,
     };
-    
+
     const score1 = riskLevels[risk1] || 0;
     const score2 = riskLevels[risk2] || 0;
-    
+
     return score1 >= score2 ? risk1 : risk2;
   }
 
@@ -150,13 +151,16 @@ export class FileOperationsAdapter extends EventEmitter {
 
     try {
       // Validate security
-      const securityValidation = this.securityService.validateFileAccess({
-        path: request.path,
-        operation: SecurityFileOperation.READ,
-        userId: request.userId,
-        userRole: request.userRole,
-        context: request.context,
-      }, request.policy);
+      const securityValidation = this.securityService.validateFileAccess(
+        {
+          path: request.path,
+          operation: SecurityFileOperation.READ,
+          userId: request.userId,
+          userRole: request.userRole,
+          context: request.context,
+        },
+        request.policy
+      );
 
       // Check if operation is allowed
       if (!securityValidation.isValid) {
@@ -187,7 +191,7 @@ export class FileOperationsAdapter extends EventEmitter {
 
       // Scan content for security issues
       const contentValidation = this.securityService.scanFileContent(data, request.path);
-      
+
       if (!contentValidation.isValid) {
         this.emit('contentSecurityWarning', {
           operationId,
@@ -239,13 +243,16 @@ export class FileOperationsAdapter extends EventEmitter {
 
     try {
       // Validate security
-      const securityValidation = this.securityService.validateFileAccess({
-        path: request.path,
-        operation: SecurityFileOperation.WRITE,
-        userId: request.userId,
-        userRole: request.userRole,
-        context: request.context,
-      }, request.policy);
+      const securityValidation = this.securityService.validateFileAccess(
+        {
+          path: request.path,
+          operation: SecurityFileOperation.WRITE,
+          userId: request.userId,
+          userRole: request.userRole,
+          context: request.context,
+        },
+        request.policy
+      );
 
       if (!securityValidation.isValid) {
         return {
@@ -273,7 +280,7 @@ export class FileOperationsAdapter extends EventEmitter {
 
       // Validate content before writing
       const contentValidation = this.securityService.scanFileContent(request.content, request.path);
-      
+
       if (!contentValidation.isValid && contentValidation.riskLevel === 'critical') {
         return {
           success: false,
@@ -291,8 +298,8 @@ export class FileOperationsAdapter extends EventEmitter {
       this.emit('fileWritten', {
         operationId,
         path: request.path,
-        size: Buffer.isBuffer(request.content) 
-          ? request.content.length 
+        size: Buffer.isBuffer(request.content)
+          ? request.content.length
           : Buffer.byteLength(request.content, request.encoding),
         securityStatus: contentValidation,
       });
@@ -332,13 +339,16 @@ export class FileOperationsAdapter extends EventEmitter {
 
     try {
       // Validate security
-      const securityValidation = this.securityService.validateFileAccess({
-        path: request.path,
-        operation: SecurityFileOperation.DELETE,
-        userId: request.userId,
-        userRole: request.userRole,
-        context: request.context,
-      }, request.policy);
+      const securityValidation = this.securityService.validateFileAccess(
+        {
+          path: request.path,
+          operation: SecurityFileOperation.DELETE,
+          userId: request.userId,
+          userRole: request.userRole,
+          context: request.context,
+        },
+        request.policy
+      );
 
       if (!securityValidation.isValid) {
         return {
@@ -394,30 +404,42 @@ export class FileOperationsAdapter extends EventEmitter {
 
     try {
       // Validate source file security
-      const sourceValidation = this.securityService.validateFileAccess({
-        path: request.path,
-        operation: SecurityFileOperation.READ,
-        userId: request.userId,
-        userRole: request.userRole,
-        context: request.context,
-      }, request.policy);
+      const sourceValidation = this.securityService.validateFileAccess(
+        {
+          path: request.path,
+          operation: SecurityFileOperation.READ,
+          userId: request.userId,
+          userRole: request.userRole,
+          context: request.context,
+        },
+        request.policy
+      );
 
       // Validate target path security
-      const targetValidation = this.securityService.validateFileAccess({
-        path: request.targetPath,
-        operation: SecurityFileOperation.WRITE,
-        userId: request.userId,
-        userRole: request.userRole,
-        context: request.context,
-      }, request.policy);
+      const targetValidation = this.securityService.validateFileAccess(
+        {
+          path: request.targetPath,
+          operation: SecurityFileOperation.WRITE,
+          userId: request.userId,
+          userRole: request.userRole,
+          context: request.context,
+        },
+        request.policy
+      );
 
       const combinedViolations = [...sourceValidation.violations, ...targetValidation.violations];
 
-      if (combinedViolations.length > 0 && (!sourceValidation.isValid || !targetValidation.isValid)) {
+      if (
+        combinedViolations.length > 0 &&
+        (!sourceValidation.isValid || !targetValidation.isValid)
+      ) {
         return {
           success: false,
           securityViolations: combinedViolations,
-          riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
+          riskLevel: this.getHigherRiskLevel(
+            sourceValidation.riskLevel,
+            targetValidation.riskLevel
+          ),
           operationId,
           timestamp,
           error: 'Security validation failed',
@@ -482,30 +504,42 @@ export class FileOperationsAdapter extends EventEmitter {
 
     try {
       // Validate source file security
-      const sourceValidation = this.securityService.validateFileAccess({
-        path: request.path,
-        operation: SecurityFileOperation.DELETE, // Moving requires delete permission on source
-        userId: request.userId,
-        userRole: request.userRole,
-        context: request.context,
-      }, request.policy);
+      const sourceValidation = this.securityService.validateFileAccess(
+        {
+          path: request.path,
+          operation: SecurityFileOperation.DELETE, // Moving requires delete permission on source
+          userId: request.userId,
+          userRole: request.userRole,
+          context: request.context,
+        },
+        request.policy
+      );
 
       // Validate target path security
-      const targetValidation = this.securityService.validateFileAccess({
-        path: request.targetPath,
-        operation: SecurityFileOperation.WRITE,
-        userId: request.userId,
-        userRole: request.userRole,
-        context: request.context,
-      }, request.policy);
+      const targetValidation = this.securityService.validateFileAccess(
+        {
+          path: request.targetPath,
+          operation: SecurityFileOperation.WRITE,
+          userId: request.userId,
+          userRole: request.userRole,
+          context: request.context,
+        },
+        request.policy
+      );
 
       const combinedViolations = [...sourceValidation.violations, ...targetValidation.violations];
 
-      if (combinedViolations.length > 0 && (!sourceValidation.isValid || !targetValidation.isValid)) {
+      if (
+        combinedViolations.length > 0 &&
+        (!sourceValidation.isValid || !targetValidation.isValid)
+      ) {
         return {
           success: false,
           securityViolations: combinedViolations,
-          riskLevel: this.getHigherRiskLevel(sourceValidation.riskLevel, targetValidation.riskLevel),
+          riskLevel: this.getHigherRiskLevel(
+            sourceValidation.riskLevel,
+            targetValidation.riskLevel
+          ),
           operationId,
           timestamp,
           error: 'Security validation failed',
@@ -622,19 +656,24 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * List directory with security filtering
    */
-  async listDirectory(request: SecureFileOperation & { recursive?: boolean }): Promise<SecureFileResult<DirectoryListing>> {
+  async listDirectory(
+    request: SecureFileOperation & { recursive?: boolean }
+  ): Promise<SecureFileResult<DirectoryListing>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
     try {
       // Validate path security
-      const securityValidation = this.securityService.validateFileAccess({
-        path: request.path,
-        operation: SecurityFileOperation.READ,
-        userId: request.userId,
-        userRole: request.userRole,
-        context: request.context,
-      }, request.policy);
+      const securityValidation = this.securityService.validateFileAccess(
+        {
+          path: request.path,
+          operation: SecurityFileOperation.READ,
+          userId: request.userId,
+          userRole: request.userRole,
+          context: request.context,
+        },
+        request.policy
+      );
 
       if (!securityValidation.isValid) {
         return {
@@ -652,17 +691,21 @@ export class FileOperationsAdapter extends EventEmitter {
 
       // Apply security filtering to results
       const secureFiles = await Promise.all(
-        listing.files.map(file => this.addSecurityMetadata(file, request.policy))
+        listing.files.map(async file => this.addSecurityMetadata(file, request.policy))
       );
 
       const secureDirectories = await Promise.all(
-        listing.directories.map(dir => this.addSecurityMetadata(dir, request.policy))
+        listing.directories.map(async dir => this.addSecurityMetadata(dir, request.policy))
       );
 
       const secureListing = {
         ...listing,
-        files: secureFiles.filter(file => file.securityStatus.isSecure || file.securityStatus.riskLevel !== 'critical'),
-        directories: secureDirectories.filter(dir => dir.securityStatus.isSecure || dir.securityStatus.riskLevel !== 'critical'),
+        files: secureFiles.filter(
+          file => file.securityStatus.isSecure || file.securityStatus.riskLevel !== 'critical'
+        ),
+        directories: secureDirectories.filter(
+          dir => dir.securityStatus.isSecure || dir.securityStatus.riskLevel !== 'critical'
+        ),
       };
 
       this.emit('directoryListed', {
@@ -716,20 +759,21 @@ export class FileOperationsAdapter extends EventEmitter {
 
       // Filter results based on security policy
       const secureMatches: string[] = [];
-      
+
       for (const match of matches) {
         const pathValidation = this.securityService.validatePath(match, options.policy);
         const fileValidation = this.securityService.validateFile(match, undefined, options.policy);
-        
+
         // Include file if it passes security validation or is low risk
-        if ((pathValidation.isValid && fileValidation.isValid) || 
-            (fileValidation.riskLevel !== 'critical' && pathValidation.isValid)) {
-          
+        if (
+          (pathValidation.isValid && fileValidation.isValid) ||
+          (fileValidation.riskLevel !== 'critical' && pathValidation.isValid)
+        ) {
           // Check for hidden files
           if (!options.includeHidden && this.isHiddenFile(match)) {
             continue;
           }
-          
+
           secureMatches.push(match);
         }
       }
@@ -771,7 +815,10 @@ export class FileOperationsAdapter extends EventEmitter {
   /**
    * Get secure file metadata
    */
-  async getSecureFileMetadata(filePath: string, policy?: Partial<FileSecurityPolicy>): Promise<SecureFileResult<SecureFileMetadata>> {
+  async getSecureFileMetadata(
+    filePath: string,
+    policy?: Partial<FileSecurityPolicy>
+  ): Promise<SecureFileResult<SecureFileMetadata>> {
     const operationId = this.generateOperationId();
     const timestamp = new Date();
 
@@ -826,25 +873,44 @@ export class FileOperationsAdapter extends EventEmitter {
   // Private helper methods
 
   private setupEventForwarding(): void {
-    this.fileSystemClient.on('initialized', (data) => this.emit('fileSystemInitialized', data));
-    this.fileSystemClient.on('fileRead', (data) => this.emit('fileSystemOperation', { ...data, operation: 'read' }));
-    this.fileSystemClient.on('fileWritten', (data) => this.emit('fileSystemOperation', { ...data, operation: 'write' }));
-    this.fileSystemClient.on('fileDeleted', (data) => this.emit('fileSystemOperation', { ...data, operation: 'delete' }));
-    this.fileSystemClient.on('fileCopied', (data) => this.emit('fileSystemOperation', { ...data, operation: 'copy' }));
-    this.fileSystemClient.on('fileMoved', (data) => this.emit('fileSystemOperation', { ...data, operation: 'move' }));
+    this.fileSystemClient.on('initialized', data => this.emit('fileSystemInitialized', data));
+    this.fileSystemClient.on('fileRead', data =>
+      this.emit('fileSystemOperation', { ...data, operation: 'read' })
+    );
+    this.fileSystemClient.on('fileWritten', data =>
+      this.emit('fileSystemOperation', { ...data, operation: 'write' })
+    );
+    this.fileSystemClient.on('fileDeleted', data =>
+      this.emit('fileSystemOperation', { ...data, operation: 'delete' })
+    );
+    this.fileSystemClient.on('fileCopied', data =>
+      this.emit('fileSystemOperation', { ...data, operation: 'copy' })
+    );
+    this.fileSystemClient.on('fileMoved', data =>
+      this.emit('fileSystemOperation', { ...data, operation: 'move' })
+    );
   }
 
   private generateOperationId(): string {
     return `op_${Date.now()}_${++this.operationCounter}`;
   }
 
-  private async addSecurityMetadata(metadata: FileMetadata, policy?: Partial<FileSecurityPolicy>): Promise<SecureFileMetadata> {
+  private async addSecurityMetadata(
+    metadata: FileMetadata,
+    policy?: Partial<FileSecurityPolicy>
+  ): Promise<SecureFileMetadata> {
     const pathValidation = this.securityService.validatePath(metadata.absolutePath, policy);
-    const fileValidation = this.securityService.validateFile(metadata.absolutePath, metadata.size, policy);
+    const fileValidation = this.securityService.validateFile(
+      metadata.absolutePath,
+      metadata.size,
+      policy
+    );
 
     const allViolations = [...pathValidation.violations, ...fileValidation.violations];
     const isSecure = allViolations.length === 0;
-    const recommendations = [...new Set([...pathValidation.recommendations, ...fileValidation.recommendations])];
+    const recommendations = [
+      ...new Set([...pathValidation.recommendations, ...fileValidation.recommendations]),
+    ];
 
     return {
       ...metadata,

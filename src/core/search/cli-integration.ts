@@ -134,7 +134,13 @@ export class CLISearchIntegration {
 
       // Simulate CLI command execution
       const mockOptions = {
-        type: (options.type ?? 'general') as 'function' | 'class' | 'import' | 'general' | 'todo' | 'error',
+        type: (options.type ?? 'general') as
+          | 'function'
+          | 'class'
+          | 'import'
+          | 'general'
+          | 'todo'
+          | 'error',
         lang: options.lang ? [options.lang] : undefined,
         output: 'simple' as const,
         maxResults: '10',
@@ -144,7 +150,7 @@ export class CLISearchIntegration {
       let output = '';
       const originalConsoleLog = console.log;
       console.log = (...args) => {
-        output += `${args.join(' ')  }\n`;
+        output += `${args.join(' ')}\n`;
       };
 
       try {
@@ -173,7 +179,7 @@ export class CLISearchIntegration {
       let output = '';
       const originalConsoleLog = console.log;
       console.log = (...args) => {
-        output += `${args.join(' ')  }\n`;
+        output += `${args.join(' ')}\n`;
       };
 
       try {
@@ -205,7 +211,7 @@ export class CLISearchIntegration {
       let output = '';
       const originalConsoleLog = console.log;
       console.log = (...args) => {
-        output += `${args.join(' ')  }\n`;
+        output += `${args.join(' ')}\n`;
       };
 
       try {
@@ -233,7 +239,7 @@ export class CLISearchIntegration {
       let output = '';
       const originalConsoleLog = console.log;
       console.log = (...args) => {
-        output += `${args.join(' ')  }\n`;
+        output += `${args.join(' ')}\n`;
       };
 
       try {
@@ -260,7 +266,7 @@ export class CLISearchIntegration {
       let output = '';
       const originalConsoleLog = console.log;
       console.log = (...args) => {
-        output += `${args.join(' ')  }\n`;
+        output += `${args.join(' ')}\n`;
       };
 
       try {

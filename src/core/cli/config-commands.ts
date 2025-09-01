@@ -1,6 +1,6 @@
 /**
  * Configuration CLI Commands
- * 
+ *
  * Command-line interface for configuration management and migration.
  */
 
@@ -72,7 +72,6 @@ export class ConfigCommands {
           console.log(`   ${key}: ${info.source} (precedence: ${info.priority})`);
         }
       }
-
     } catch (error) {
       console.error('❌ Failed to load configuration:', error.message);
       process.exit(1);
@@ -113,12 +112,13 @@ export class ConfigCommands {
         });
       }
 
-      console.log(`\n📊 Summary: ${validation.errors.length} errors, ${validation.warnings.length} warnings`);
+      console.log(
+        `\n📊 Summary: ${validation.errors.length} errors, ${validation.warnings.length} warnings`
+      );
 
       if (!validation.isValid) {
         process.exit(1);
       }
-
     } catch (error) {
       console.error('❌ Validation failed:', error.message);
       process.exit(1);
@@ -141,7 +141,7 @@ export class ConfigCommands {
         analysis.legacyFiles.forEach(file => {
           const status = file.canAutoMigrate ? '✅' : '❌';
           console.log(`   ${status} ${file.path} (${file.format}, ${file.issues.length} issues)`);
-          
+
           if (options.verbose && file.issues.length > 0) {
             file.issues.forEach(issue => {
               console.log(`      - ${issue.type}: ${issue.message}`);
@@ -155,14 +155,14 @@ export class ConfigCommands {
         analysis.conflicts.forEach(conflict => {
           const severityIcon = {
             low: '🟡',
-            medium: '🟠', 
+            medium: '🟠',
             high: '🔴',
-            critical: '🚨'
+            critical: '🚨',
           }[conflict.severity];
-          
+
           console.log(`   ${severityIcon} ${conflict.key} (${conflict.severity})`);
           console.log(`      ${conflict.suggestion}`);
-          
+
           if (options.verbose) {
             conflict.values.forEach(value => {
               console.log(`      - ${value.source}: ${JSON.stringify(value.value)}`);
@@ -174,7 +174,9 @@ export class ConfigCommands {
       console.log(`\n📊 Analysis Summary:`);
       console.log(`   Compatibility Score: ${analysis.compatibilityScore}%`);
       console.log(`   Estimated Effort: ${analysis.estimatedEffort}`);
-      console.log(`   Files: ${analysis.legacyFiles.length}, Conflicts: ${analysis.conflicts.length}`);
+      console.log(
+        `   Files: ${analysis.legacyFiles.length}, Conflicts: ${analysis.conflicts.length}`
+      );
 
       if (analysis.recommendations.length > 0) {
         console.log(`\n💡 Recommendations:`);
@@ -182,15 +184,14 @@ export class ConfigCommands {
           const priorityIcon = {
             low: '🟢',
             medium: '🟡',
-            high: '🔴'
+            high: '🔴',
           }[rec.priority];
-          
+
           console.log(`   ${i + 1}. ${priorityIcon} ${rec.type.toUpperCase()}: ${rec.target}`);
           console.log(`      Reason: ${rec.reason}`);
           console.log(`      Action: ${rec.action}`);
         });
       }
-
     } catch (error) {
       console.error('❌ Analysis failed:', error.message);
       process.exit(1);
@@ -210,19 +211,25 @@ export class ConfigCommands {
 
       // Analyze first
       const analysis = await this.migrator.analyzeLegacyConfiguration();
-      
+
       if (analysis.legacyFiles.length === 0) {
         console.log('✅ No legacy configuration files found - nothing to migrate.');
         return;
       }
 
-      console.log(`📋 Found ${analysis.legacyFiles.length} legacy files with ${analysis.conflicts.length} conflicts`);
+      console.log(
+        `📋 Found ${analysis.legacyFiles.length} legacy files with ${analysis.conflicts.length} conflicts`
+      );
 
       if (options.dryRun) {
         console.log('\n🔍 Dry run results:');
         console.log(`   - Would process ${analysis.legacyFiles.length} files`);
-        console.log(`   - Would resolve ${analysis.conflicts.filter(c => c.resolution === 'auto').length} conflicts automatically`);
-        console.log(`   - Would require ${analysis.conflicts.filter(c => c.resolution === 'manual').length} manual interventions`);
+        console.log(
+          `   - Would resolve ${analysis.conflicts.filter(c => c.resolution === 'auto').length} conflicts automatically`
+        );
+        console.log(
+          `   - Would require ${analysis.conflicts.filter(c => c.resolution === 'manual').length} manual interventions`
+        );
         console.log(`   - Estimated effort: ${analysis.estimatedEffort}`);
         return;
       }
@@ -232,11 +239,13 @@ export class ConfigCommands {
 
       if (result.success) {
         console.log('✅ Migration completed successfully!\n');
-        
+
         console.log('📊 Migration Results:');
         console.log(`   Files Processed: ${result.migrationReport.filesProcessed}`);
         console.log(`   Conflicts Resolved: ${result.migrationReport.conflictsResolved}`);
-        console.log(`   Manual Interventions: ${result.migrationReport.manualInterventionsRequired}`);
+        console.log(
+          `   Manual Interventions: ${result.migrationReport.manualInterventionsRequired}`
+        );
         console.log(`   Migration Time: ${result.migrationReport.migrationTime}ms`);
         console.log(`   Backup Location: ${result.migrationReport.backupLocation}`);
 
@@ -253,10 +262,9 @@ export class ConfigCommands {
         console.log('   3. Test your application with the new configuration');
         console.log('   4. Remove legacy files when satisfied');
         console.log('\n📖 See MIGRATION_GUIDE.md for detailed information');
-
       } else {
         console.log('❌ Migration failed!\n');
-        
+
         if (result.errors.length > 0) {
           console.log('🚨 Errors:');
           result.errors.forEach(error => console.log(`   - ${error}`));
@@ -265,7 +273,6 @@ export class ConfigCommands {
         console.log(`\n📋 Files have been backed up to: ${result.migrationReport.backupLocation}`);
         process.exit(1);
       }
-
     } catch (error) {
       console.error('❌ Migration failed:', error.message);
       process.exit(1);
@@ -293,7 +300,6 @@ export class ConfigCommands {
       await fs.writeFile(filePath, content, 'utf-8');
 
       console.log(`✅ Configuration exported to ${filePath} (${format})`);
-
     } catch (error) {
       console.error('❌ Export failed:', error.message);
       process.exit(1);

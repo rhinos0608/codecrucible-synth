@@ -6,7 +6,7 @@
 import { EventEmitter } from 'events';
 import { logger } from '../logger.js';
 import { ModelRequest, ProjectContext } from '../types.js';
-import { ActiveProcess, ActiveProcessManager } from '../performance/active-process-manager.js';
+import { ActiveProcess, ActiveProcessManager } from '../../infrastructure/performance/active-process-manager.js';
 import { ProviderType } from '../providers/provider-repository.js';
 import { toError } from '../../utils/error-utils.js';
 

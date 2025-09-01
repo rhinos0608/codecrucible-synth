@@ -1,6 +1,6 @@
 /**
  * Voice Orchestration Interface - Domain Layer
- * 
+ *
  * Domain interface for voice orchestration and multi-voice AI collaboration.
  * Abstraction for voice archetype systems following clean architecture principles.
  */
@@ -53,7 +53,11 @@ export interface IVoiceOrchestrationService {
   /**
    * Generate multi-voice solutions (legacy compatibility method)
    */
-  generateMultiVoiceSolutions(voices: string[], prompt: string, context?: any): Promise<VoiceResponse[]>;
+  generateMultiVoiceSolutions(
+    voices: string[],
+    prompt: string,
+    context?: any
+  ): Promise<VoiceResponse[]>;
 
   /**
    * Generate single voice response (legacy compatibility method)

@@ -132,11 +132,11 @@ export class ActiveProcessManager extends EventEmitter {
       modelName: 'unknown',
       estimatedMemoryUsage: 50 * 1024 * 1024, // 50MB default
       promise: handler(),
-      priority: 'medium' as const
+      priority: 'medium' as const,
     };
 
     const { id } = this.registerProcess(processConfig);
-    
+
     try {
       await processConfig.promise;
     } catch (error) {
@@ -174,7 +174,9 @@ export class ActiveProcessManager extends EventEmitter {
    */
   async pauseProcess(processId: string): Promise<boolean> {
     // Infrastructure layer doesn't support pause/resume, but return false to indicate unsupported
-    this.logger.warn(`Pause operation not supported for process ${processId} in infrastructure layer`);
+    this.logger.warn(
+      `Pause operation not supported for process ${processId} in infrastructure layer`
+    );
     return false;
   }
 
@@ -183,7 +185,9 @@ export class ActiveProcessManager extends EventEmitter {
    */
   async resumeProcess(processId: string): Promise<boolean> {
     // Infrastructure layer doesn't support pause/resume, but return false to indicate unsupported
-    this.logger.warn(`Resume operation not supported for process ${processId} in infrastructure layer`);
+    this.logger.warn(
+      `Resume operation not supported for process ${processId} in infrastructure layer`
+    );
     return false;
   }
 
@@ -205,8 +209,8 @@ export class ActiveProcessManager extends EventEmitter {
       priority: process.priority,
       metadata: {
         modelName: process.modelName,
-        estimatedMemoryUsage: process.estimatedMemoryUsage
-      }
+        estimatedMemoryUsage: process.estimatedMemoryUsage,
+      },
     };
   }
 
@@ -225,8 +229,8 @@ export class ActiveProcessManager extends EventEmitter {
         priority: process.priority,
         metadata: {
           modelName: process.modelName,
-          estimatedMemoryUsage: process.estimatedMemoryUsage
-        }
+          estimatedMemoryUsage: process.estimatedMemoryUsage,
+        },
       });
     }
     return processes;

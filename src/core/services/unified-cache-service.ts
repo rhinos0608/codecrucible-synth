@@ -34,6 +34,13 @@ export interface CacheEntry<T = any> {
     responseTokens?: number;
     hitCount?: number;
     cachedAt?: number;
+    // Template-specific metadata
+    templateType?: string;
+    templateVersion?: string;
+    variables?: string[];
+    isCompiled?: boolean;
+    complexity?: 'low' | 'medium' | 'high';
+    voiceArchetype?: string;
   };
   priority?: 'low' | 'normal' | 'high';
 }
@@ -85,6 +92,32 @@ export interface CacheStats {
   lastCleanup: Date;
   avgResponseTime: number;
   totalRequests: number;
+  // Template-specific stats
+  templateCacheHits: number;
+  templateCacheMisses: number;
+  compiledTemplates: number;
+  templateWarmingTime: number;
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  template: string;
+  variables: string[];
+  templateType: 'voice' | 'system' | 'user' | 'tool' | 'reasoning';
+  version: string;
+  voiceArchetype?: string;
+  complexity: 'low' | 'medium' | 'high';
+  metadata?: Record<string, any>;
+}
+
+export interface CompiledTemplate {
+  id: string;
+  compiledTemplate: (variables: Record<string, any>) => string;
+  originalTemplate: PromptTemplate;
+  compiledAt: number;
+  usageCount: number;
+  lastUsed: number;
 }
 
 /**
@@ -286,6 +319,29 @@ class RedisCache {
     this.mockStorage.clear();
   }
 
+  async keys(pattern: string = '*'): Promise<string[]> {
+    const prefix = this.config.keyPrefix || '';
+    const fullPattern = `${prefix}${pattern}`;
+
+    if (this.useRealRedis && this.isConnected && this.client) {
+      try {
+        const keys: string[] = await this.client.keys(fullPattern);
+        return keys.map((k: string) => (k.startsWith(prefix) ? k.slice(prefix.length) : k));
+      } catch (error) {
+        this.useRealRedis = false;
+      }
+    }
+
+    const out: string[] = [];
+    const regex = new RegExp('^' + fullPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*') + '$');
+    for (const key of this.mockStorage.keys()) {
+      if (regex.test(key)) {
+        out.push(key.startsWith(prefix) ? key.slice(prefix.length) : key);
+      }
+    }
+    return out;
+  }
+
   async disconnect(): Promise<void> {
     if (this.client && this.isConnected) {
       try {
@@ -312,10 +368,18 @@ export class UnifiedCacheService extends EventEmitter {
   private encryptionKey?: Buffer;
   private healthCheckCache: Map<string, { healthy: boolean; timestamp: number }> = new Map();
   private cleanupIntervalId: string | null = null;
-  
+
   // LLM-specific constants
   private readonly SIMILARITY_THRESHOLD = 0.85;
   private readonly HEALTH_CACHE_TTL = 30000; // 30 seconds
+
+  // Template cache specific properties
+  private compiledTemplatesCache: Map<string, CompiledTemplate> = new Map();
+  private templateRegistrations: Map<string, PromptTemplate> = new Map();
+  private templateWarmupPromises: Map<string, Promise<void>> = new Map();
+  private readonly TEMPLATE_DEFAULT_TTL = 86400000; // 24 hours
+  private readonly COMPILED_TEMPLATE_TTL = 7200000; // 2 hours
+  private templateWarmingStartTime: number = 0;
 
   constructor(config: Partial<CacheConfig> = {}) {
     super();
@@ -362,6 +426,11 @@ export class UnifiedCacheService extends EventEmitter {
       lastCleanup: new Date(),
       avgResponseTime: 0,
       totalRequests: 0,
+      // Template-specific stats
+      templateCacheHits: 0,
+      templateCacheMisses: 0,
+      compiledTemplates: 0,
+      templateWarmingTime: 0,
     };
 
     if (this.config.enableEncryption && this.config.encryptionKey) {
@@ -429,13 +498,13 @@ export class UnifiedCacheService extends EventEmitter {
       if (fuzzyMatch) {
         this.stats.hits++;
         this.updateHitRate();
-        
-        logger.debug('Cache hit (fuzzy match)', { 
+
+        logger.debug('Cache hit (fuzzy match)', {
           key: cacheKey,
-          similarity: fuzzyMatch.metadata?.similarity 
+          similarity: fuzzyMatch.metadata?.similarity,
         });
         this.emit('cache-hit', { key: cacheKey, layer: 'fuzzy' });
-        
+
         return this.deserializeValue(fuzzyMatch.value);
       }
 
@@ -444,7 +513,6 @@ export class UnifiedCacheService extends EventEmitter {
       this.updateHitRate();
       this.emit('cache-miss', { key: cacheKey });
       return null;
-
     } catch (error) {
       logger.error('Cache get error', { error: error as Error, key });
       this.emit('cache-error', { operation: 'get', key, error });
@@ -459,7 +527,9 @@ export class UnifiedCacheService extends EventEmitter {
     try {
       const cacheKey = this.generateCacheKey(key);
       const now = Date.now();
-      const ttl = options.intelligent ? this.getIntelligentTTL(key, value) : (options.ttl || this.config.defaultTTL);
+      const ttl = options.intelligent
+        ? this.getIntelligentTTL(key, value)
+        : options.ttl || this.config.defaultTTL;
       const expiresAt = ttl > 0 ? now + ttl * 1000 : 0;
 
       const entry: CacheEntry<T> = {
@@ -490,7 +560,6 @@ export class UnifiedCacheService extends EventEmitter {
 
       logger.debug('Cache set', { key: cacheKey, ttl, options });
       this.emit('cache-set', { key: cacheKey, ttl, options });
-
     } catch (error) {
       logger.error('Cache set error', { error: error as Error, key });
       this.emit('cache-error', { operation: 'set', key, error });
@@ -501,10 +570,15 @@ export class UnifiedCacheService extends EventEmitter {
   /**
    * LLM-specific cache methods
    */
-  async getLLMResponse(prompt: string, model: string, provider: string, tools?: any[]): Promise<CacheEntry | null> {
+  async getLLMResponse(
+    prompt: string,
+    model: string,
+    provider: string,
+    tools?: any[]
+  ): Promise<CacheEntry | null> {
     const key = this.generateLLMCacheKey(prompt, model, provider, tools);
     const cached = await this.get(key);
-    
+
     if (cached) {
       return cached;
     }
@@ -514,9 +588,9 @@ export class UnifiedCacheService extends EventEmitter {
   }
 
   async setLLMResponse(
-    prompt: string, 
-    model: string, 
-    provider: string, 
+    prompt: string,
+    model: string,
+    provider: string,
     response: { content: string; usage?: any; finishReason?: string },
     tools?: any[]
   ): Promise<void> {
@@ -547,7 +621,10 @@ export class UnifiedCacheService extends EventEmitter {
     this.healthCheckCache.set(key, { healthy, timestamp: Date.now() });
   }
 
-  getHealthCheck(key: string, ttl: number = this.HEALTH_CACHE_TTL): { healthy: boolean; timestamp: number } | null {
+  getHealthCheck(
+    key: string,
+    ttl: number = this.HEALTH_CACHE_TTL
+  ): { healthy: boolean; timestamp: number } | null {
     const cached = this.healthCheckCache.get(key);
     if (!cached || Date.now() - cached.timestamp > ttl) {
       return null;
@@ -642,9 +719,16 @@ export class UnifiedCacheService extends EventEmitter {
   /**
    * Generate specialized cache keys
    */
-  private generateLLMCacheKey(prompt: string, model: string, provider: string, tools?: any[]): string {
+  private generateLLMCacheKey(
+    prompt: string,
+    model: string,
+    provider: string,
+    tools?: any[]
+  ): string {
     const normalizedPrompt = this.normalizePrompt(prompt);
-    const toolsHash = tools ? crypto.createHash('md5').update(JSON.stringify(tools)).digest('hex') : '';
+    const toolsHash = tools
+      ? crypto.createHash('md5').update(JSON.stringify(tools)).digest('hex')
+      : '';
     const keyData = `llm:${provider}:${model}:${normalizedPrompt}:${toolsHash}`;
     return crypto.createHash('sha256').update(keyData).digest('hex');
   }
@@ -671,16 +755,300 @@ export class UnifiedCacheService extends EventEmitter {
   private calculateSimilarity(str1: string, str2: string): number {
     const words1 = new Set(str1.split(' '));
     const words2 = new Set(str2.split(' '));
-    
+
     const intersection = new Set([...words1].filter(x => words2.has(x)));
     const union = new Set([...words1, ...words2]);
-    
+
     return intersection.size / union.size;
   }
 
   private estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
+
+  // ==========================================
+  // PROMPT TEMPLATE CACHE METHODS
+  // ==========================================
+
+  /**
+   * Register a prompt template for caching and compilation
+   */
+  async registerTemplate(template: PromptTemplate): Promise<void> {
+    try {
+      this.templateRegistrations.set(template.id, template);
+      
+      // Cache the template with appropriate TTL based on complexity
+      const ttl = this.calculateTemplateTTL(template);
+      await this.set(
+        `template:${template.id}`,
+        template,
+        {
+          ttl,
+          tags: ['template', template.templateType, template.voiceArchetype || 'general'],
+          priority: template.complexity === 'high' ? 'high' : 'normal',
+          metadata: {
+            templateType: template.templateType,
+            templateVersion: template.version,
+            variables: template.variables,
+            complexity: template.complexity,
+            voiceArchetype: template.voiceArchetype,
+          },
+        }
+      );
+
+      logger.debug('Template registered and cached', {
+        templateId: template.id,
+        templateType: template.templateType,
+        variables: template.variables.length,
+        complexity: template.complexity,
+      });
+
+      this.emit('template-registered', { templateId: template.id, template });
+    } catch (error) {
+      logger.error('Failed to register template', { templateId: template.id, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get a compiled template with variable substitution
+   */
+  async getCompiledTemplate(
+    templateId: string,
+    variables: Record<string, any> = {}
+  ): Promise<string | null> {
+    try {
+      // Check if compiled template exists and is fresh
+      const compiled = this.compiledTemplatesCache.get(templateId);
+      if (compiled && Date.now() - compiled.compiledAt < this.COMPILED_TEMPLATE_TTL) {
+        compiled.usageCount++;
+        compiled.lastUsed = Date.now();
+        this.stats.templateCacheHits++;
+        
+        logger.debug('Compiled template cache hit', { templateId });
+        return compiled.compiledTemplate(variables);
+      }
+
+      // Template not compiled or expired, get base template
+      const template = await this.getTemplate(templateId);
+      if (!template) {
+        this.stats.templateCacheMisses++;
+        return null;
+      }
+
+      // Compile the template
+      const compiledTemplate = this.compileTemplate(template);
+      
+      // Cache the compiled template
+      this.compiledTemplatesCache.set(templateId, {
+        id: templateId,
+        compiledTemplate,
+        originalTemplate: template,
+        compiledAt: Date.now(),
+        usageCount: 1,
+        lastUsed: Date.now(),
+      });
+
+      this.stats.compiledTemplates = this.compiledTemplatesCache.size;
+      this.stats.templateCacheHits++;
+
+      logger.debug('Template compiled and cached', { templateId });
+      return compiledTemplate(variables);
+    } catch (error) {
+      logger.error('Failed to get compiled template', { templateId, error });
+      this.stats.templateCacheMisses++;
+      return null;
+    }
+  }
+
+  /**
+   * Get a template by ID
+   */
+  async getTemplate(templateId: string): Promise<PromptTemplate | null> {
+    try {
+      // Try memory first
+      const cached = await this.get<PromptTemplate>(`template:${templateId}`);
+      if (cached) {
+        return cached;
+      }
+
+      // Try from registrations
+      const registered = this.templateRegistrations.get(templateId);
+      if (registered) {
+        // Re-cache it
+        await this.registerTemplate(registered);
+        return registered;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('Failed to get template', { templateId, error });
+      return null;
+    }
+  }
+
+  /**
+   * Warm up template cache with frequently used templates
+   */
+  async warmupTemplateCache(templateIds: string[] = []): Promise<void> {
+    this.templateWarmingStartTime = Date.now();
+    
+    try {
+      logger.info('Starting template cache warmup', { templateCount: templateIds.length });
+
+      const warmupPromises = templateIds.map(async (templateId) => {
+        if (!this.templateWarmupPromises.has(templateId)) {
+          const warmupPromise = this.warmupSingleTemplate(templateId);
+          this.templateWarmupPromises.set(templateId, warmupPromise);
+        }
+        return this.templateWarmupPromises.get(templateId)!;
+      });
+
+      await Promise.allSettled(warmupPromises);
+
+      const warmingTime = Date.now() - this.templateWarmingStartTime;
+      this.stats.templateWarmingTime = warmingTime;
+
+      logger.info('Template cache warmup completed', {
+        warmingTime,
+        compiledTemplates: this.compiledTemplatesCache.size,
+      });
+
+      this.emit('template-warmup-complete', { warmingTime, templateCount: templateIds.length });
+    } catch (error) {
+      logger.error('Template cache warmup failed', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Clear template cache
+   */
+  async clearTemplateCache(): Promise<void> {
+    try {
+      this.compiledTemplatesCache.clear();
+      this.templateRegistrations.clear();
+      this.templateWarmupPromises.clear();
+      
+      // Clear template-related entries from main cache
+      const templateKeys = (await this.getKeys()).filter((key: string) => key.startsWith('template:'));
+      for (const key of templateKeys as string[]) {
+        await this.delete(key);
+      }
+
+      this.stats.compiledTemplates = 0;
+      this.stats.templateCacheHits = 0;
+      this.stats.templateCacheMisses = 0;
+
+      logger.info('Template cache cleared');
+      this.emit('template-cache-cleared');
+    } catch (error) {
+      logger.error('Failed to clear template cache', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get template cache statistics
+   */
+  getTemplateCacheStats(): {
+    registeredTemplates: number;
+    compiledTemplates: number;
+    templateCacheHits: number;
+    templateCacheMisses: number;
+    templateHitRate: string;
+    warmingTime: number;
+    averageCompileTime: number;
+  } {
+    const totalTemplateRequests = this.stats.templateCacheHits + this.stats.templateCacheMisses;
+    const templateHitRate = totalTemplateRequests > 0 
+      ? ((this.stats.templateCacheHits / totalTemplateRequests) * 100).toFixed(2) + '%'
+      : '0%';
+
+    return {
+      registeredTemplates: this.templateRegistrations.size,
+      compiledTemplates: this.compiledTemplatesCache.size,
+      templateCacheHits: this.stats.templateCacheHits,
+      templateCacheMisses: this.stats.templateCacheMisses,
+      templateHitRate,
+      warmingTime: this.stats.templateWarmingTime,
+      averageCompileTime: this.calculateAverageCompileTime(),
+    };
+  }
+
+  /**
+   * Private helper methods for template caching
+   */
+  private compileTemplate(template: PromptTemplate): (variables: Record<string, any>) => string {
+    // Simple template compilation using string replacement
+    return (variables: Record<string, any>): string => {
+      let compiled = template.template;
+      
+      // Replace variables in the format {{variableName}}
+      for (const [key, value] of Object.entries(variables)) {
+        const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+        compiled = compiled.replace(regex, String(value));
+      }
+      
+      // Replace any remaining unreplaced variables with empty strings
+      compiled = compiled.replace(/\{\{\s*\w+\s*\}\}/g, '');
+      
+      return compiled.trim();
+    };
+  }
+
+  private async warmupSingleTemplate(templateId: string): Promise<void> {
+    try {
+      const template = await this.getTemplate(templateId);
+      if (!template) {
+        logger.warn('Template not found during warmup', { templateId });
+        return;
+      }
+
+      // Pre-compile the template
+      const compiledTemplate = this.compileTemplate(template);
+      this.compiledTemplatesCache.set(templateId, {
+        id: templateId,
+        compiledTemplate,
+        originalTemplate: template,
+        compiledAt: Date.now(),
+        usageCount: 0,
+        lastUsed: Date.now(),
+      });
+
+      logger.debug('Template warmed up', { templateId });
+    } catch (error) {
+      logger.error('Failed to warm up template', { templateId, error });
+    }
+  }
+
+  private calculateTemplateTTL(template: PromptTemplate): number {
+    // TTL based on template characteristics
+    const baseTTL = this.TEMPLATE_DEFAULT_TTL;
+    
+    switch (template.complexity) {
+      case 'high':
+        return baseTTL * 2; // 48 hours for complex templates
+      case 'medium':
+        return baseTTL * 1.5; // 36 hours for medium templates
+      case 'low':
+      default:
+        return baseTTL; // 24 hours for simple templates
+    }
+  }
+
+  private calculateAverageCompileTime(): number {
+    const compiledTemplates = Array.from(this.compiledTemplatesCache.values());
+    if (compiledTemplates.length === 0) return 0;
+    
+    // This is a simplified calculation - in a real implementation,
+    // you would track actual compilation times
+    return compiledTemplates.length * 0.5; // Assume 0.5ms average compile time
+  }
+
+  // ==========================================
+  // END PROMPT TEMPLATE CACHE METHODS
+  // ==========================================
 
   /**
    * Serialization methods
@@ -734,7 +1102,11 @@ export class UnifiedCacheService extends EventEmitter {
     if (!this.encryptionKey) return value;
 
     const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(this.encryptionKey).subarray(0, 32), iv);
+    const cipher = crypto.createCipheriv(
+      'aes-256-cbc',
+      Buffer.from(this.encryptionKey).subarray(0, 32),
+      iv
+    );
 
     let encrypted = cipher.update(value, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -751,7 +1123,11 @@ export class UnifiedCacheService extends EventEmitter {
     const iv = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
 
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(this.encryptionKey).subarray(0, 32), iv);
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(this.encryptionKey).subarray(0, 32),
+      iv
+    );
 
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
@@ -767,7 +1143,7 @@ export class UnifiedCacheService extends EventEmitter {
 
     if (this.config.layers.memory.enabled) {
       const entries = this.memoryCache.entries();
-      for (const [key, entry] of entries) {
+      for (const [key, entry] of entries as Array<[string, CacheEntry<any>]>) {
         if (entry.tags.some(tag => tags.includes(tag))) {
           this.memoryCache.delete(key);
           deletedCount++;
@@ -776,8 +1152,16 @@ export class UnifiedCacheService extends EventEmitter {
     }
 
     if (this.config.layers.redis.enabled && this.redisCache) {
-      const keys = await this.redisCache.get('*');
-      // Implementation would scan Redis keys and check tags
+      const keys = await this.redisCache.keys('*');
+      for (const key of keys) {
+        const value = await this.redisCache.get(key);
+        if (!value) continue;
+        const entry: CacheEntry = JSON.parse(value);
+        if (entry.tags.some(tag => tags.includes(tag))) {
+          await this.redisCache.delete(key);
+          deletedCount++;
+        }
+      }
     }
 
     return deletedCount;
@@ -806,7 +1190,7 @@ export class UnifiedCacheService extends EventEmitter {
 
   private estimateMemoryUsage(): number {
     let total = 0;
-    for (const [key, entry] of this.memoryCache.entries()) {
+    for (const [key, entry] of this.memoryCache.entries() as Array<[string, CacheEntry<any>]>) {
       total += key.length * 2;
       total += JSON.stringify(entry).length * 2;
     }
@@ -832,7 +1216,7 @@ export class UnifiedCacheService extends EventEmitter {
 
       if (this.config.layers.memory.enabled) {
         const entries = this.memoryCache.entries();
-        for (const [key, entry] of entries) {
+        for (const [key, entry] of entries as Array<[string, CacheEntry<any>]>) {
           if (entry.expiresAt > 0 && now > entry.expiresAt) {
             this.memoryCache.delete(key);
             cleaned++;
@@ -906,6 +1290,41 @@ export class UnifiedCacheService extends EventEmitter {
     this.removeAllListeners();
 
     logger.info('Unified cache service destroyed');
+  }
+
+  /**
+   * Return list of cache keys across layers (without redis keyPrefix)
+   */
+  async getKeys(prefixFilter: string = '*'): Promise<string[]> {
+    const memKeys = this.config.layers.memory.enabled ? this.memoryCache.keys() : [];
+    const filter = (k: string) => {
+      if (!prefixFilter || prefixFilter === '*') return true;
+      const base = prefixFilter.endsWith('*') ? prefixFilter.slice(0, -1) : prefixFilter;
+      return k.startsWith(base);
+    };
+    const filteredMem = memKeys.filter(filter);
+
+    let redisKeys: string[] = [];
+    if (this.config.layers.redis.enabled && this.redisCache) {
+      redisKeys = await this.redisCache.keys(prefixFilter);
+    }
+
+    const set = new Set<string>([...filteredMem, ...redisKeys]);
+    return Array.from(set);
+  }
+
+  /**
+   * Delete a key across layers
+   */
+  async delete(key: string): Promise<boolean> {
+    let deleted = false;
+    if (this.config.layers.memory.enabled) {
+      deleted = this.memoryCache.delete(key) || deleted;
+    }
+    if (this.config.layers.redis.enabled && this.redisCache) {
+      deleted = (await this.redisCache.delete(key)) || deleted;
+    }
+    return deleted;
   }
 }
 

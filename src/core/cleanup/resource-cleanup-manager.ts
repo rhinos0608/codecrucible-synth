@@ -1,6 +1,6 @@
 /**
  * Core Resource Cleanup Manager - Replaced with Infrastructure Implementation
- * 
+ *
  * @deprecated Use ResourceCleanupManager from infrastructure/performance instead
  * This provides backward compatibility during architectural migration.
  */

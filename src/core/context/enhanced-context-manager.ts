@@ -3,7 +3,11 @@ import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import { Task } from '../planning/enhanced-agentic-planner.js';
-import { registerShutdownHandler, createManagedInterval, clearManagedInterval } from '../utils/lifecycle-utils.js';
+import {
+  registerShutdownHandler,
+  createManagedInterval,
+  clearManagedInterval,
+} from '../utils/lifecycle-utils.js';
 
 export interface ContextItem {
   key: string;
@@ -695,7 +699,7 @@ export class EnhancedContextManager {
       // Keep first and last parts, summarize middle
       const start = compressed.substring(0, 2000);
       const end = compressed.substring(compressed.length - 2000);
-      compressed = `${start  }\n\n[... content compressed ...]\n\n${  end}`;
+      compressed = `${start}\n\n[... content compressed ...]\n\n${end}`;
     }
 
     return compressed;

@@ -1,7 +1,7 @@
 /**
  * Startup Optimizer
  * Optimizes system initialization performance through parallel loading and timeouts
- * 
+ *
  * Performance Impact: 60-80% faster system startup through intelligent sequencing
  */
 
@@ -92,14 +92,14 @@ export class StartupOptimizer {
       totalTime: `${totalTime}ms`,
       successCount,
       failureCount,
-      successRate: `${((successCount / results.length) * 100).toFixed(1)}%`
+      successRate: `${((successCount / results.length) * 100).toFixed(1)}%`,
     });
 
     return {
       totalTime,
       successCount,
       failureCount,
-      results
+      results,
     };
   }
 
@@ -121,31 +121,30 @@ export class StartupOptimizer {
       // Execute with timeout
       const result = await Promise.race([
         task.task(),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Task timeout')), task.timeout)
-        )
+        ),
       ]);
 
       const duration = Date.now() - startTime;
-      
+
       this.results.set(task.name, {
         name: task.name,
         success: true,
-        duration
+        duration,
       });
 
       this.completed.add(task.name);
-      
-      logger.debug(`✅ Task completed: ${task.name} (${duration}ms)`);
 
+      logger.debug(`✅ Task completed: ${task.name} (${duration}ms)`);
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      
+
       this.results.set(task.name, {
         name: task.name,
         success: false,
         duration,
-        error: error.message
+        error: error.message,
       });
 
       logger.warn(`❌ Task failed: ${task.name} (${duration}ms) - ${error.message}`);
@@ -155,13 +154,16 @@ export class StartupOptimizer {
   /**
    * Execute tasks in parallel with concurrency limit and proper dependency resolution
    */
-  private async executeTasksParallel(tasks: InitializationTask[], maxConcurrency: number): Promise<void> {
+  private async executeTasksParallel(
+    tasks: InitializationTask[],
+    maxConcurrency: number
+  ): Promise<void> {
     // Sort tasks by dependency order first
     const sortedTasks = this.topologicalSort(tasks);
-    
+
     // Execute tasks in dependency order, but allow parallel execution when possible
     let remainingTasks = [...sortedTasks];
-    
+
     while (remainingTasks.length > 0) {
       // Find tasks that can run now (dependencies met)
       const readyTasks = remainingTasks.filter(task => {
@@ -171,21 +173,21 @@ export class StartupOptimizer {
 
       if (readyTasks.length === 0) {
         // No tasks can run - there might be circular dependencies or missing tasks
-        logger.warn('No ready tasks found, remaining tasks may have unmet dependencies:', 
-          remainingTasks.map(t => t.name));
+        logger.warn(
+          'No ready tasks found, remaining tasks may have unmet dependencies:',
+          remainingTasks.map(t => t.name)
+        );
         break;
       }
 
       // Execute ready tasks in parallel (up to concurrency limit)
       const tasksToExecute = readyTasks.slice(0, maxConcurrency);
       const promises = tasksToExecute.map(async task => this.executeTask(task));
-      
+
       await Promise.allSettled(promises);
-      
+
       // Remove completed tasks from remaining list
-      remainingTasks = remainingTasks.filter(task => 
-        !tasksToExecute.includes(task)
-      );
+      remainingTasks = remainingTasks.filter(task => !tasksToExecute.includes(task));
     }
   }
 
@@ -197,7 +199,7 @@ export class StartupOptimizer {
     const visiting = new Set<string>();
     const result: InitializationTask[] = [];
     const taskMap = new Map<string, InitializationTask>();
-    
+
     // Build task map
     for (const task of tasks) {
       taskMap.set(task.name, task);
@@ -249,12 +251,12 @@ export class StartupOptimizer {
     const results = Array.from(this.results.values());
     const tasks = Array.from(this.tasks.values());
 
-    const criticalResults = results.filter(r => 
-      tasks.find(t => t.name === r.name)?.priority === 'critical'
+    const criticalResults = results.filter(
+      r => tasks.find(t => t.name === r.name)?.priority === 'critical'
     );
-    
-    const highResults = results.filter(r => 
-      tasks.find(t => t.name === r.name)?.priority === 'high'
+
+    const highResults = results.filter(
+      r => tasks.find(t => t.name === r.name)?.priority === 'high'
     );
 
     const bottlenecks = results
@@ -264,7 +266,7 @@ export class StartupOptimizer {
       .map(r => ({
         task: r.name,
         duration: r.duration,
-        priority: tasks.find(t => t.name === r.name)?.priority || 'unknown'
+        priority: tasks.find(t => t.name === r.name)?.priority || 'unknown',
       }));
 
     return {
@@ -273,7 +275,7 @@ export class StartupOptimizer {
       averageDuration: results.reduce((sum, r) => sum + r.duration, 0) / results.length,
       criticalTasksTime: criticalResults.reduce((sum, r) => sum + r.duration, 0),
       highTasksTime: highResults.reduce((sum, r) => sum + r.duration, 0),
-      bottlenecks
+      bottlenecks,
     };
   }
 
@@ -290,7 +292,7 @@ export class StartupOptimizer {
         // Core system bootstrap
         logger.debug('Core bootstrap task completed');
         return true;
-      }
+      },
     });
 
     this.registerTask({
@@ -302,7 +304,7 @@ export class StartupOptimizer {
         logger.debug('DI system task completed');
         return true;
       },
-      dependencies: ['core_bootstrap']
+      dependencies: ['core_bootstrap'],
     });
 
     // High priority tasks
@@ -315,7 +317,7 @@ export class StartupOptimizer {
         logger.debug('Provider repository task completed');
         return true;
       },
-      dependencies: ['dependency_injection']
+      dependencies: ['dependency_injection'],
     });
 
     this.registerTask({
@@ -326,10 +328,10 @@ export class StartupOptimizer {
         // Local MCP server startup
         logger.debug('Local MCP servers task completed');
         return true;
-      }
+      },
     });
 
-    // Medium priority tasks  
+    // Medium priority tasks
     this.registerTask({
       name: 'configuration_loading',
       priority: 'medium',
@@ -338,7 +340,7 @@ export class StartupOptimizer {
         // Configuration loading
         logger.debug('Configuration loading task completed');
         return true;
-      }
+      },
     });
 
     this.registerTask({
@@ -349,7 +351,7 @@ export class StartupOptimizer {
         // Security systems
         logger.debug('Security initialization task completed');
         return true;
-      }
+      },
     });
 
     // Low priority tasks (can fail without blocking)
@@ -362,7 +364,7 @@ export class StartupOptimizer {
         await new Promise(resolve => setTimeout(resolve, Math.random() * 3000 + 1000));
         logger.debug('External MCP connections task completed');
         return true;
-      }
+      },
     });
 
     this.registerTask({
@@ -374,7 +376,7 @@ export class StartupOptimizer {
         await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 500));
         logger.debug('Smithery registry task completed');
         return true;
-      }
+      },
     });
   }
 
@@ -395,7 +397,9 @@ export class StartupOptimizer {
     const recommendations: string[] = [];
 
     if (analytics.bottlenecks.length > 0) {
-      recommendations.push(`Optimize slow tasks: ${analytics.bottlenecks.map(b => b.task).join(', ')}`);
+      recommendations.push(
+        `Optimize slow tasks: ${analytics.bottlenecks.map(b => b.task).join(', ')}`
+      );
     }
 
     if (analytics.criticalTasksTime > 1000) {

@@ -137,7 +137,7 @@ export class MemoryLeakDetector extends EventEmitter {
     const timeout = setTimeout(() => {
       this.stopMemoryMonitoring();
     }, getConfig().memoryMonitoringTimeout);
-    
+
     this.timeouts.push(timeout);
   }
 
@@ -150,7 +150,7 @@ export class MemoryLeakDetector extends EventEmitter {
     for (const interval of this.intervals) {
       clearInterval(interval);
     }
-    
+
     for (const timeout of this.timeouts) {
       clearTimeout(timeout);
     }

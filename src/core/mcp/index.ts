@@ -1,9 +1,9 @@
 /**
  * Enhanced MCP External Integration System - Main Export Index
- * 
+ *
  * This module provides comprehensive MCP (Model Context Protocol) integration enhancements
  * for the CodeCrucible Synth AI system, including:
- * 
+ *
  * - Advanced connection reliability and error handling
  * - Intelligent server discovery and registration
  * - Connection pooling and load balancing
@@ -87,28 +87,28 @@ import { PerformanceReport } from '../../domain/services/unified-performance-sys
 
 /**
  * Enhanced MCP Integration Manager
- * 
+ *
  * Provides a unified interface for all enhanced MCP functionality
  */
 export class EnhancedMCPIntegrationManager {
   private static instance: EnhancedMCPIntegrationManager | null = null;
-  
+
   private readonly reliabilitySystem = new EnhancedMCPReliabilitySystem();
-  private readonly discoverySystem = new AdvancedMCPDiscoverySystem();  
+  private readonly discoverySystem = new AdvancedMCPDiscoverySystem();
   private readonly loadBalancer = new IntelligentMCPLoadBalancer();
   private readonly securitySystem = new EnhancedMCPSecuritySystem();
   private readonly voiceIntegration = new IntelligentMCPVoiceIntegration();
   private readonly analyticsSystem = new MCPPerformanceAnalyticsSystem();
-  
+
   private constructor() {}
-  
+
   static getInstance(): EnhancedMCPIntegrationManager {
     if (!EnhancedMCPIntegrationManager.instance) {
       EnhancedMCPIntegrationManager.instance = new EnhancedMCPIntegrationManager();
     }
     return EnhancedMCPIntegrationManager.instance;
   }
-  
+
   /**
    * Initialize all enhanced MCP systems
    */
@@ -117,21 +117,23 @@ export class EnhancedMCPIntegrationManager {
     if (config?.smithery?.apiKey) {
       await this.discoverySystem.registerDiscoverySource(
         'smithery',
-        new (await import('../../mcp-servers/smithery-registry-integration.js')).SmitheryRegistryIntegration({
-          apiKey: config.smithery.apiKey
+        new (
+          await import('../../mcp-servers/smithery-registry-integration.js')
+        ).SmitheryRegistryIntegration({
+          apiKey: config.smithery.apiKey,
         })
       );
     }
-    
+
     // Start server discovery
     await this.discoverySystem.discoverServers();
-    
+
     // Set up event listeners for system coordination
     this.setupSystemCoordination();
-    
+
     console.log('🚀 Enhanced MCP Integration System initialized successfully');
   }
-  
+
   /**
    * Set up coordination between different MCP systems
    */
@@ -140,25 +142,30 @@ export class EnhancedMCPIntegrationManager {
     this.discoverySystem.on('discovery-completed', (serverCount: number) => {
       console.log(`📡 Discovered ${serverCount} MCP servers - initializing reliability monitoring`);
     });
-    
+
     // Coordinate load balancer with performance analytics
-    this.loadBalancer.on('request-completed', (poolId: string, connectionId: string, success: boolean, responseTime: number) => {
-      // Record performance metric
-      this.analyticsSystem.recordMetric('mcp_request_response_time', responseTime, 'ms');
-    });
-    
+    this.loadBalancer.on(
+      'request-completed',
+      (poolId: string, connectionId: string, success: boolean, responseTime: number) => {
+        // Record performance metric
+        this.analyticsSystem.recordMetric('mcp_request_response_time', responseTime, 'ms');
+      }
+    );
+
     // Coordinate security with voice integration
     this.securitySystem.on('security-event', (event: any) => {
       if (event.severity === 'critical') {
         console.log(`🔒 Critical security event detected: ${event.description}`);
       }
     });
-    
+
     // Coordinate voice integration with analytics
     this.voiceIntegration.on('voice-mcp-success', (response: any) => {
-      console.log(`🎭 Voice ${response.voiceId} successfully executed MCP request in ${response.executionTime}ms`);
+      console.log(
+        `🎭 Voice ${response.voiceId} successfully executed MCP request in ${response.executionTime}ms`
+      );
     });
-    
+
     // Coordinate analytics with all systems
     this.analyticsSystem.on('alert-created', (alert: any) => {
       if (alert.severity === 'critical' || alert.severity === 'error') {
@@ -166,7 +173,7 @@ export class EnhancedMCPIntegrationManager {
       }
     });
   }
-  
+
   /**
    * Get comprehensive system status
    */
@@ -180,7 +187,7 @@ export class EnhancedMCPIntegrationManager {
       analytics: this.analyticsSystem.getAnalyticsStats(),
     };
   }
-  
+
   /**
    * Execute optimized MCP request using all enhanced systems
    */
@@ -211,36 +218,31 @@ export class EnhancedMCPIntegrationManager {
         minReliability: 80,
         maxLatency: 5000,
       };
-      
+
       // Execute through voice integration system
       const response = await this.voiceIntegration.executeVoiceMCPRequest(voiceRequest);
-      
+
       return response;
-      
     } catch (error) {
       console.error('Enhanced MCP request execution failed:', error);
       throw error;
     }
   }
-  
+
   /**
    * Create orchestration plan for multi-voice collaboration
    */
-  async createCollaborationPlan(
-    phase: string,
-    voices: string[],
-    requirements: any
-  ) {
+  async createCollaborationPlan(phase: string, voices: string[], requirements: any) {
     return this.voiceIntegration.createOrchestrationPlan(phase, voices, requirements);
   }
-  
+
   /**
    * Execute collaboration plan
    */
   async executeCollaborationPlan(planId: string) {
     return this.voiceIntegration.executeOrchestrationPlan(planId);
   }
-  
+
   /**
    * Get performance insights and recommendations
    */
@@ -248,34 +250,36 @@ export class EnhancedMCPIntegrationManager {
     const [trends, alerts, recommendations] = await Promise.all([
       Promise.resolve(this.analyticsSystem.getPerformanceTrends()),
       Promise.resolve(this.analyticsSystem.getActiveAlerts()),
-      this.analyticsSystem.generatePerformanceReport().then((report: PerformanceReport) => report.recommendations),
+      this.analyticsSystem
+        .generatePerformanceReport()
+        .then((report: PerformanceReport) => report.recommendations),
     ]);
-    
+
     return {
       trends: Array.from(trends.entries()),
       activeAlerts: alerts,
       recommendations,
     };
   }
-  
+
   /**
    * Generate capacity planning report
    */
   async generateCapacityPlan(serverId: string) {
     return this.analyticsSystem.generateCapacityPlan();
   }
-  
+
   /**
    * Integration method for SystemIntegrationCoordinator
    * Execute integrated MCP request based on voice result and capability requirements
    */
   async executeIntegratedRequest(
-    voiceResult: any, 
+    voiceResult: any,
     mcpCapabilityRequirements: string[]
   ): Promise<any> {
     try {
       const startTime = Date.now();
-      
+
       // If no MCP capabilities required, return voice result directly
       if (!mcpCapabilityRequirements || mcpCapabilityRequirements.length === 0) {
         return {
@@ -283,16 +287,19 @@ export class EnhancedMCPIntegrationManager {
           mcpCapabilitiesUsed: [],
           mcpResults: [],
           processingTime: 0,
-          fallback: false
+          fallback: false,
         };
       }
-      
+
       // For now, return enhanced voice result with simulated MCP integration
       // TODO: Implement full MCP capability discovery and execution
-      const simulatedMCPResult = this.simulateMCPIntegration(voiceResult, mcpCapabilityRequirements);
-      
+      const simulatedMCPResult = this.simulateMCPIntegration(
+        voiceResult,
+        mcpCapabilityRequirements
+      );
+
       const processingTime = Date.now() - startTime;
-      
+
       return {
         content: simulatedMCPResult.content,
         mcpCapabilitiesUsed: mcpCapabilityRequirements,
@@ -305,25 +312,24 @@ export class EnhancedMCPIntegrationManager {
           capabilityCount: mcpCapabilityRequirements.length,
           serverCount: 1,
           integrationMethod: 'executeIntegratedRequest',
-          note: 'Using simulated MCP integration until full implementation'
-        }
+          note: 'Using simulated MCP integration until full implementation',
+        },
       };
-      
     } catch (error) {
       console.error('Failed to execute integrated MCP request:', error);
-      
+
       // Return fallback result
       return this.createMCPFallbackResult(voiceResult, mcpCapabilityRequirements, error);
     }
   }
-  
+
   /**
    * Simulate MCP integration for testing and development
    */
   private simulateMCPIntegration(voiceResult: any, capabilities: string[]): any {
     const baseContent = voiceResult.content || voiceResult;
     const results: any[] = [];
-    
+
     // Simulate different MCP capabilities
     for (const capability of capabilities) {
       switch (capability) {
@@ -331,49 +337,49 @@ export class EnhancedMCPIntegrationManager {
           results.push({
             capability: 'file_operations',
             result: `[MCP] File operations simulated for content analysis`,
-            confidence: 0.8
+            confidence: 0.8,
           });
           break;
-          
+
         case 'code_execution':
           results.push({
             capability: 'code_execution',
             result: `[MCP] Code execution simulated - syntax validated`,
-            confidence: 0.9
+            confidence: 0.9,
           });
           break;
-          
+
         case 'web_search':
           results.push({
             capability: 'web_search',
             result: `[MCP] Web search simulated - relevant resources found`,
-            confidence: 0.7
+            confidence: 0.7,
           });
           break;
-          
+
         default:
           results.push({
             capability,
             result: `[MCP] ${capability} simulated`,
-            confidence: 0.6
+            confidence: 0.6,
           });
       }
     }
-    
+
     // Combine voice result with simulated MCP results
     const enhancedContent = [
       baseContent,
       '--- MCP Integration ---',
-      ...results.map(r => r.result)
+      ...results.map(r => r.result),
     ].join('\n');
-    
+
     return {
       content: enhancedContent,
       results,
-      enhanced: true
+      enhanced: true,
     };
   }
-  
+
   /**
    * Create fallback result when MCP integration fails
    */
@@ -386,17 +392,29 @@ export class EnhancedMCPIntegrationManager {
       fallback: true,
       fallbackReason: error ? error.message : 'MCP integration unavailable',
       originalRequirements: requirements,
-      warning: 'MCP integration unavailable - using voice result only'
+      warning: 'MCP integration unavailable - using voice result only',
     };
   }
-  
+
   // Provide access to individual systems
-  get reliability() { return this.reliabilitySystem; }
-  get discovery() { return this.discoverySystem; }
-  get loadBalancing() { return this.loadBalancer; }
-  get security() { return this.securitySystem; }
-  get voiceIntegrationSystem() { return this.voiceIntegration; }
-  get analytics() { return this.analyticsSystem; }
+  get reliability() {
+    return this.reliabilitySystem;
+  }
+  get discovery() {
+    return this.discoverySystem;
+  }
+  get loadBalancing() {
+    return this.loadBalancer;
+  }
+  get security() {
+    return this.securitySystem;
+  }
+  get voiceIntegrationSystem() {
+    return this.voiceIntegration;
+  }
+  get analytics() {
+    return this.analyticsSystem;
+  }
 }
 
 // Export singleton instance

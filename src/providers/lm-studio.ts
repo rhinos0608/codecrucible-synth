@@ -26,12 +26,12 @@ export class LMStudioProvider {
 
     this.model = this.config.model || 'auto-detect';
 
-    // Initialize official LM Studio client 
+    // Initialize official LM Studio client
     // Try custom endpoint first, fallback to default SDK behavior
     try {
       if (config.endpoint && config.endpoint !== 'ws://localhost:8080') {
         this.client = new LMStudioClient({
-          baseUrl: config.endpoint
+          baseUrl: config.endpoint,
         });
       } else {
         // Use default LMStudioClient behavior (auto-detection)
@@ -40,7 +40,7 @@ export class LMStudioProvider {
     } catch (error) {
       logger.warn('Failed to initialize LM Studio client with endpoint, using default', {
         endpoint: config.endpoint,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       // Fallback to default behavior
       this.client = new LMStudioClient();
@@ -48,21 +48,21 @@ export class LMStudioProvider {
 
     logger.debug('LMStudioProvider initialized successfully', {
       endpoint: this.config.endpoint,
-      model: this.model
+      model: this.model,
     });
   }
 
   async isServiceAvailable(): Promise<boolean> {
     try {
       logger.debug('LMStudioProvider checking service availability');
-      
+
       // Use official LM Studio client to check availability
       const models = await this.client.llm.listLoaded();
       this.isAvailable = models.length > 0;
-      
+
       logger.info('LMStudioProvider availability check result', {
         available: this.isAvailable,
-        modelCount: models.length
+        modelCount: models.length,
       });
 
       return this.isAvailable;
@@ -70,7 +70,7 @@ export class LMStudioProvider {
       this.isAvailable = false;
       logger.warn('LMStudioProvider service availability check failed', {
         error: getErrorMessage(error),
-        endpoint: this.config.endpoint
+        endpoint: this.config.endpoint,
       });
       return false;
     }
@@ -81,12 +81,12 @@ export class LMStudioProvider {
       logger.debug('LMStudioProvider generateText called', {
         promptLength: prompt.length,
         model: this.model,
-        hasOptions: Object.keys(options).length > 0
+        hasOptions: Object.keys(options).length > 0,
       });
 
       // Determine model to use
       const modelToUse = this.model === 'auto-detect' ? await this.detectBestModel() : this.model;
-      
+
       if (!modelToUse) {
         throw new Error('No model available for text generation');
       }
@@ -98,12 +98,12 @@ export class LMStudioProvider {
       const response = await model.complete(prompt, {
         temperature: options.temperature || 0.7,
         maxTokens: options.maxTokens || 1000,
-        ...options
+        ...options,
       });
 
       logger.info('LMStudioProvider generateText completed', {
         model: modelToUse,
-        responseLength: response.content.length
+        responseLength: response.content.length,
       });
 
       return response.content;
@@ -111,7 +111,7 @@ export class LMStudioProvider {
       logger.error('LMStudioProvider generateText failed', {
         error: getErrorMessage(error),
         model: this.model,
-        endpoint: this.config.endpoint
+        endpoint: this.config.endpoint,
       });
       throw error;
     }
@@ -121,11 +121,11 @@ export class LMStudioProvider {
     try {
       logger.debug('LMStudioProvider generateTextStreaming called', {
         promptLength: prompt.length,
-        model: this.model
+        model: this.model,
       });
 
       const modelToUse = this.model === 'auto-detect' ? await this.detectBestModel() : this.model;
-      
+
       if (!modelToUse) {
         throw new Error('No model available for streaming generation');
       }
@@ -138,7 +138,7 @@ export class LMStudioProvider {
         temperature: options.temperature || 0.7,
         maxTokens: options.maxTokens || 1000,
         stream: true,
-        ...options
+        ...options,
       });
 
       return (async function* () {
@@ -151,7 +151,7 @@ export class LMStudioProvider {
     } catch (error) {
       logger.error('LMStudioProvider generateTextStreaming failed', {
         error: getErrorMessage(error),
-        model: this.model
+        model: this.model,
       });
       throw error;
     }
@@ -161,11 +161,11 @@ export class LMStudioProvider {
     try {
       logger.debug('LMStudioProvider chat called', {
         messageCount: messages.length,
-        model: this.model
+        model: this.model,
       });
 
       const modelToUse = this.model === 'auto-detect' ? await this.detectBestModel() : this.model;
-      
+
       if (!modelToUse) {
         throw new Error('No model available for chat');
       }
@@ -177,19 +177,19 @@ export class LMStudioProvider {
       const response = await model.respond(messages, {
         temperature: options.temperature || 0.7,
         maxTokens: options.maxTokens || 1000,
-        ...options
+        ...options,
       });
 
       logger.info('LMStudioProvider chat completed', {
         model: modelToUse,
-        responseLength: response.content.length
+        responseLength: response.content.length,
       });
 
       return response.content;
     } catch (error) {
       logger.error('LMStudioProvider chat failed', {
         error: getErrorMessage(error),
-        model: this.model
+        model: this.model,
       });
       throw error;
     }
@@ -201,11 +201,11 @@ export class LMStudioProvider {
       logger.debug('LMStudioProvider act called', {
         taskLength: task.length,
         toolCount: tools.length,
-        model: this.model
+        model: this.model,
       });
 
       const modelToUse = this.model === 'auto-detect' ? await this.detectBestModel() : this.model;
-      
+
       if (!modelToUse) {
         throw new Error('No model available for agentic workflow');
       }
@@ -217,19 +217,19 @@ export class LMStudioProvider {
       const response = await model.act(task, tools, {
         temperature: options.temperature || 0.7,
         maxSteps: options.maxSteps || 10,
-        ...options
+        ...options,
       });
 
       logger.info('LMStudioProvider act completed', {
         model: modelToUse,
-        responseType: typeof response
+        responseType: typeof response,
       });
 
       return response;
     } catch (error) {
       logger.error('LMStudioProvider act failed', {
         error: getErrorMessage(error),
-        model: this.model
+        model: this.model,
       });
       throw error;
     }
@@ -239,12 +239,11 @@ export class LMStudioProvider {
     try {
       // First try to get loaded models
       const loadedModels = await this.client.llm.listLoaded();
-      
+
       if (loadedModels.length > 0) {
         // Prefer coding models for CodeCrucible
-        const codingModels = loadedModels.filter(m => 
-          m.path.toLowerCase().includes('coder') || 
-          m.path.toLowerCase().includes('code')
+        const codingModels = loadedModels.filter(
+          m => m.path.toLowerCase().includes('coder') || m.path.toLowerCase().includes('code')
         );
 
         if (codingModels.length > 0) {
@@ -261,7 +260,7 @@ export class LMStudioProvider {
         'qwen2.5-coder-7b-instruct',
         'qwen/qwen2.5-coder-14b:qwen2.5-coder-14b-instruct',
         'qwen/qwen2.5-coder-14b',
-        'openai/gpt-oss-20b:gpt-oss-20b'
+        'openai/gpt-oss-20b:gpt-oss-20b',
       ];
 
       // Try each default model to see if it's available
@@ -274,7 +273,7 @@ export class LMStudioProvider {
         } catch (modelError) {
           // Continue to next model
           logger.debug(`Model ${modelName} not available, trying next`, {
-            error: getErrorMessage(modelError)
+            error: getErrorMessage(modelError),
           });
         }
       }
@@ -282,7 +281,7 @@ export class LMStudioProvider {
       throw new Error('No available models found. Please load a model in LM Studio first.');
     } catch (error) {
       logger.error('LMStudioProvider model detection failed', {
-        error: getErrorMessage(error)
+        error: getErrorMessage(error),
       });
       throw error;
     }
@@ -299,7 +298,7 @@ export class LMStudioProvider {
       return false;
     } catch (error) {
       logger.debug('LMStudioProvider health check failed', {
-        error: getErrorMessage(error)
+        error: getErrorMessage(error),
       });
       return false;
     }
@@ -321,7 +320,7 @@ export class LMStudioProvider {
   // Legacy compatibility methods
   async processRequest(request: any): Promise<any> {
     logger.debug('LMStudioProvider processRequest called (legacy compatibility)');
-    
+
     if (request.messages) {
       return this.chat(request.messages, request.options || {});
     } else if (request.prompt) {

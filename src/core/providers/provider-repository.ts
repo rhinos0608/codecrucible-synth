@@ -102,7 +102,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
     this.deferredConfigs = configs;
     logger.debug('Provider configurations deferred for lazy initialization', {
       configCount: configs.length,
-      types: configs.map(c => c.type)
+      types: configs.map(c => c.type),
     });
   }
 
@@ -125,7 +125,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
     logger.info('Initializing provider repository', {
       providerCount: actualConfigs.length,
       providers: actualConfigs.map(c => c.type),
-      deferred: !configs && !!this.deferredConfigs
+      deferred: !configs && !!this.deferredConfigs,
     });
 
     const initPromises = actualConfigs.map(async config => this.initializeProvider(config));
@@ -178,18 +178,20 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
       // Create provider instance with timeout
       const provider = await Promise.race([
         this.createProvider(config),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error(`Provider ${config.type} initialization timeout`)), 
-                    config.timeout || this.PROVIDER_TIMEOUT)
-        )
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Provider ${config.type} initialization timeout`)),
+            config.timeout || this.PROVIDER_TIMEOUT
+          )
+        ),
       ]);
 
       // Test provider health with timeout
       const isHealthy = await Promise.race([
         this.testProviderHealth(provider, config),
-        new Promise<boolean>((resolve) => 
-          setTimeout(() => resolve(false), 3000) // 3s health check timeout
-        )
+        new Promise<boolean>(
+          resolve => setTimeout(() => resolve(false), 3000) // 3s health check timeout
+        ),
       ]);
 
       if (isHealthy) {
@@ -516,7 +518,7 @@ export class ProviderRepository extends EventEmitter implements IProviderReposit
    */
   private setupHealthMonitoring(): void {
     this.healthCheckInterval = setInterval(async () => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       if (!this.isInitialized) return;
 
       for (const type of this.providers.keys()) {

@@ -1,15 +1,15 @@
 /**
- * Unified Resource Coordinator  
+ * Unified Resource Coordinator
  * Agent 3: Runtime Coordination & Performance Specialist
- * 
+ *
  * Coordinates resource utilization across all systems to prevent contention
  * - Memory management and limits
- * - CPU usage coordination  
+ * - CPU usage coordination
  * - Network connection pooling
  * - File system access coordination
  * - Concurrent request limiting
  * - Resource cleanup and lifecycle management
- * 
+ *
  * Addresses resource contention between routing, voice, MCP, and orchestration systems
  */
 
@@ -128,27 +128,27 @@ export interface ResourceCoordinationStats {
  */
 export class UnifiedResourceCoordinator extends EventEmitter {
   private static instance: UnifiedResourceCoordinator | null = null;
-  
+
   private resourceLimits: ResourceLimits;
   private currentUsage: ResourceUsage;
   private allocations = new Map<string, ResourceAllocation>();
   private restrictions = new Map<string, ResourceRestriction>();
   private alerts: ResourceAlert[] = [];
-  
+
   private monitoringIntervalId?: NodeJS.Timeout;
   private isMonitoring = false;
   private startTime = Date.now();
-  
+
   // System coordination
   private registeredSystems = new Set<string>();
   private systemPriorities = new Map<string, number>();
   private operationQueue: QueuedOperation[] = [];
   private activeOperations = new Map<string, Operation>();
-  
+
   // Resource pools
   private connectionPools = new Map<string, ConnectionPool>();
   private memoryPools = new Map<string, MemoryPool>();
-  
+
   // Metrics
   private preventedContentionCount = 0;
   private resourceSavings = 0;
@@ -156,16 +156,16 @@ export class UnifiedResourceCoordinator extends EventEmitter {
 
   private constructor() {
     super();
-    
+
     this.resourceLimits = this.getDefaultResourceLimits();
     this.currentUsage = this.initializeResourceUsage();
-    
+
     this.setupSystemPriorities();
     this.setupResourcePools();
-    
+
     logger.info('⚡ Unified Resource Coordinator initialized', {
       memoryLimit: `${(this.resourceLimits.memory.maxHeapSize / 1024 / 1024).toFixed(0)}MB`,
-      concurrencyLimit: this.resourceLimits.concurrency.maxConcurrentOperations
+      concurrencyLimit: this.resourceLimits.concurrency.maxConcurrentOperations,
     });
   }
 
@@ -192,7 +192,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
 
     logger.info('🚀 Resource coordination started', {
       interval: `${intervalMs}ms`,
-      systems: this.registeredSystems.size
+      systems: this.registeredSystems.size,
     });
 
     // Perform initial coordination
@@ -218,7 +218,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
   registerSystem(name: string, priority: number = 50): void {
     this.registeredSystems.add(name);
     this.systemPriorities.set(name, priority);
-    
+
     // Initialize resource allocations
     this.allocations.set(name, {
       systemName: name,
@@ -227,7 +227,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
       used: 0,
       priority,
       lastAccessed: Date.now(),
-      restrictions: []
+      restrictions: [],
     });
 
     logger.info(`📋 Registered system for resource coordination: ${name} (priority: ${priority})`);
@@ -243,15 +243,18 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     amount: number,
     priority: 'low' | 'medium' | 'high' | 'critical' = 'medium'
   ): Promise<boolean> {
-    
     const priorityValue = { low: 1, medium: 2, high: 3, critical: 4 }[priority];
-    
+
     try {
       // Check if resource is available
       const available = await this.checkResourceAvailability(resourceType, amount);
       if (!available) {
         // Try to free resources from lower priority systems
-        const freed = await this.freeResourcesForHigherPriority(resourceType, amount, priorityValue);
+        const freed = await this.freeResourcesForHigherPriority(
+          resourceType,
+          amount,
+          priorityValue
+        );
         if (!freed) {
           this.recordResourceDenial(systemName, resourceType, amount, 'insufficient_resources');
           return false;
@@ -266,20 +269,19 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         used: 0,
         priority: priorityValue,
         lastAccessed: Date.now(),
-        restrictions: []
+        restrictions: [],
       };
 
       allocation.allocated += amount;
       allocation.resourceType = resourceType;
       allocation.lastAccessed = Date.now();
-      
+
       this.allocations.set(systemName, allocation);
 
       logger.debug(`✅ Resource allocated: ${systemName} -> ${amount} ${resourceType}`);
       this.emit('resource-allocated', { systemName, resourceType, amount, priority });
-      
-      return true;
 
+      return true;
     } catch (error) {
       logger.error(`Error allocating resource for ${systemName}:`, error);
       return false;
@@ -294,7 +296,6 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     resourceType: 'memory' | 'cpu' | 'network' | 'filesystem' | 'concurrency',
     amount: number
   ): Promise<void> {
-    
     const allocation = this.allocations.get(systemName);
     if (!allocation) return;
 
@@ -320,11 +321,10 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     timeout: number;
     callback: () => Promise<any>;
   }): Promise<void> {
-    
     const queuedOp: QueuedOperation = {
       ...operation,
       queuedAt: Date.now(),
-      attempts: 0
+      attempts: 0,
     };
 
     // Insert in priority order
@@ -356,12 +356,11 @@ export class UnifiedResourceCoordinator extends EventEmitter {
       retries?: number;
     }
   ): Promise<T> {
-    
     const opts = {
       priority: 'medium' as const,
       timeout: 30000,
       retries: 2,
-      ...options
+      ...options,
     };
 
     const operationInfo: Operation = {
@@ -369,7 +368,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
       systemName,
       startTime: Date.now(),
       resourceRequirements,
-      status: 'starting'
+      status: 'starting',
     };
 
     this.activeOperations.set(operationId, operationInfo);
@@ -377,15 +376,15 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     try {
       // Request resources
       const resourcesAllocated: Array<{ type: string; amount: number }> = [];
-      
+
       for (const req of resourceRequirements) {
         const allocated = await this.requestResource(
-          systemName, 
-          req.type as any, 
-          req.amount, 
+          systemName,
+          req.type as any,
+          req.amount,
           opts.priority
         );
-        
+
         if (!allocated) {
           // Queue the operation if resources not available
           await this.queueOperation({
@@ -394,38 +393,37 @@ export class UnifiedResourceCoordinator extends EventEmitter {
             resourceRequirements,
             priority: { low: 1, medium: 2, high: 3, critical: 4 }[opts.priority],
             timeout: opts.timeout,
-            callback: operation
+            callback: operation,
           });
-          
+
           throw new Error(`Insufficient ${req.type} resources, operation queued`);
         }
-        
+
         resourcesAllocated.push(req);
       }
 
       operationInfo.status = 'running';
-      
+
       // Execute operation with timeout
       const result = await Promise.race([
         operation(),
-        new Promise<never>((_, reject) => 
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Operation timeout')), opts.timeout)
-        )
+        ),
       ]);
 
       operationInfo.status = 'completed';
       operationInfo.endTime = Date.now();
-      
+
       // Release resources
       for (const req of resourcesAllocated) {
         await this.releaseResource(systemName, req.type as any, req.amount);
       }
 
       this.activeOperations.delete(operationId);
-      
+
       logger.debug(`✅ Coordinated operation completed: ${operationId}`);
       return result;
-
     } catch (error) {
       operationInfo.status = 'failed';
       operationInfo.endTime = Date.now();
@@ -437,7 +435,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
       }
 
       this.activeOperations.delete(operationId);
-      
+
       logger.error(`❌ Coordinated operation failed: ${operationId}`, error);
       throw error;
     }
@@ -457,8 +455,8 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         preventedContention: this.preventedContentionCount,
         resourceSavings: this.calculateResourceSavings(),
         coordinationOverhead: this.calculateCoordinationOverhead(),
-        fairnessScore: this.calculateFairnessScore()
-      }
+        fairnessScore: this.calculateFairnessScore(),
+      },
     };
   }
 
@@ -468,39 +466,45 @@ export class UnifiedResourceCoordinator extends EventEmitter {
   getResourceHealthReport(): any {
     const usage = this.currentUsage;
     const limits = this.resourceLimits;
-    
+
     return {
       overall: {
         status: this.calculateOverallResourceHealth(),
         utilizationPercent: this.calculateOverallUtilization(),
         systemsActive: this.activeOperations.size,
-        queueLength: this.operationQueue.length
+        queueLength: this.operationQueue.length,
       },
       memory: {
         status: this.getResourceStatus('memory', usage.memory.utilizationPercent),
         current: usage.memory.heapUsed,
         limit: limits.memory.maxHeapSize,
-        utilizationPercent: usage.memory.utilizationPercent
+        utilizationPercent: usage.memory.utilizationPercent,
       },
       cpu: {
         status: this.getResourceStatus('cpu', usage.cpu.usagePercent),
         current: usage.cpu.usagePercent,
         limit: limits.cpu.maxUsagePercent,
-        utilizationPercent: usage.cpu.usagePercent
+        utilizationPercent: usage.cpu.usagePercent,
       },
       network: {
-        status: this.getResourceStatus('network', usage.network.activeConnections / limits.network.maxConnections * 100),
+        status: this.getResourceStatus(
+          'network',
+          (usage.network.activeConnections / limits.network.maxConnections) * 100
+        ),
         connections: usage.network.activeConnections,
         limit: limits.network.maxConnections,
-        pendingRequests: usage.network.pendingRequests
+        pendingRequests: usage.network.pendingRequests,
       },
       concurrency: {
-        status: this.getResourceStatus('concurrency', usage.concurrency.activeOperations / limits.concurrency.maxConcurrentOperations * 100),
+        status: this.getResourceStatus(
+          'concurrency',
+          (usage.concurrency.activeOperations / limits.concurrency.maxConcurrentOperations) * 100
+        ),
         activeOperations: usage.concurrency.activeOperations,
         queuedOperations: usage.concurrency.queuedOperations,
-        limit: limits.concurrency.maxConcurrentOperations
+        limit: limits.concurrency.maxConcurrentOperations,
       },
-      recommendations: this.generateResourceOptimizationRecommendations()
+      recommendations: this.generateResourceOptimizationRecommendations(),
     };
   }
 
@@ -510,25 +514,24 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     try {
       // Update resource usage
       await this.updateResourceUsage();
-      
+
       // Check for resource violations
       await this.checkResourceViolations();
-      
+
       // Process queued operations
       await this.processQueuedOperations();
-      
+
       // Clean up expired resources and operations
       await this.cleanupExpiredResources();
-      
+
       // Update coordination metrics
       this.coordinationOperations++;
-      
+
       this.emit('coordination-cycle-complete', {
         usage: this.currentUsage,
         activeOperations: this.activeOperations.size,
-        queueSize: this.operationQueue.length
+        queueSize: this.operationQueue.length,
       });
-
     } catch (error) {
       logger.error('Resource coordination cycle error:', error);
       this.emit('coordination-error', error);
@@ -538,7 +541,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
   private async updateResourceUsage(): Promise<void> {
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
-    
+
     this.currentUsage = {
       timestamp: Date.now(),
       memory: {
@@ -546,30 +549,30 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         heapTotal: memUsage.heapTotal,
         external: memUsage.external,
         rss: memUsage.rss,
-        utilizationPercent: (memUsage.heapUsed / this.resourceLimits.memory.maxHeapSize) * 100
+        utilizationPercent: (memUsage.heapUsed / this.resourceLimits.memory.maxHeapSize) * 100,
       },
       cpu: {
         usagePercent: this.estimateCPUUsage(cpuUsage),
         loadAverage: [], // Would be populated with actual load average
-        processTime: (cpuUsage.user + cpuUsage.system) / 1000000 // Convert to ms
+        processTime: (cpuUsage.user + cpuUsage.system) / 1000000, // Convert to ms
       },
       network: {
         activeConnections: this.calculateActiveConnections(),
         pendingRequests: this.operationQueue.length,
         bytesTransferred: 0, // Would track actual bytes
-        errors: 0
+        errors: 0,
       },
       filesystem: {
         openFiles: 0, // Would track actual open files
         diskUsage: 0,
-        ioOperations: 0
+        ioOperations: 0,
       },
       concurrency: {
         activeOperations: this.activeOperations.size,
         queuedOperations: this.operationQueue.length,
         completedOperations: 0, // Would track completed operations
-        failedOperations: 0
-      }
+        failedOperations: 0,
+      },
     };
   }
 
@@ -587,12 +590,11 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         limit: limits.memory.maxHeapSize,
         message: `Memory usage critical: ${usage.memory.utilizationPercent.toFixed(1)}%`,
         timestamp: Date.now(),
-        action: 'force_gc_and_cleanup'
+        action: 'force_gc_and_cleanup',
       });
-      
+
       // Force garbage collection and cleanup
       await this.forceResourceCleanup('memory');
-      
     } else if (usage.memory.utilizationPercent > limits.memory.warningThreshold) {
       alerts.push({
         level: 'warning',
@@ -601,7 +603,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         limit: limits.memory.maxHeapSize,
         message: `Memory usage high: ${usage.memory.utilizationPercent.toFixed(1)}%`,
         timestamp: Date.now(),
-        action: 'cleanup_low_priority_caches'
+        action: 'cleanup_low_priority_caches',
       });
     }
 
@@ -614,9 +616,9 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         limit: limits.cpu.maxUsagePercent,
         message: `CPU usage high: ${usage.cpu.usagePercent.toFixed(1)}%`,
         timestamp: Date.now(),
-        action: 'throttle_low_priority_operations'
+        action: 'throttle_low_priority_operations',
       });
-      
+
       await this.throttleLowPriorityOperations();
     }
 
@@ -629,7 +631,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         limit: limits.concurrency.maxConcurrentOperations,
         message: 'Too many concurrent operations',
         timestamp: Date.now(),
-        action: 'queue_new_operations'
+        action: 'queue_new_operations',
       });
     }
 
@@ -647,37 +649,38 @@ export class UnifiedResourceCoordinator extends EventEmitter {
 
   private async processQueuedOperations(): Promise<void> {
     const processableOps: QueuedOperation[] = [];
-    
+
     // Find operations that can now be processed
     for (let i = this.operationQueue.length - 1; i >= 0; i--) {
       const op = this.operationQueue[i];
-      
+
       // Check if operation has timed out
       if (Date.now() - op.queuedAt > op.timeout) {
         this.operationQueue.splice(i, 1);
         logger.warn(`Operation ${op.id} timed out in queue`);
         continue;
       }
-      
+
       // Check if resources are now available
       let canProcess = true;
       for (const req of op.resourceRequirements) {
-        if (!await this.checkResourceAvailability(req.type as any, req.amount)) {
+        if (!(await this.checkResourceAvailability(req.type as any, req.amount))) {
           canProcess = false;
           break;
         }
       }
-      
+
       if (canProcess) {
         processableOps.push(op);
         this.operationQueue.splice(i, 1);
       }
     }
-    
+
     // Process operations in priority order
     processableOps.sort((a, b) => b.priority - a.priority);
-    
-    for (const op of processableOps.slice(0, 3)) { // Process up to 3 at once
+
+    for (const op of processableOps.slice(0, 3)) {
+      // Process up to 3 at once
       try {
         await op.callback();
         logger.info(`✅ Queued operation processed: ${op.id}`);
@@ -691,26 +694,25 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     resourceType: 'memory' | 'cpu' | 'network' | 'filesystem' | 'concurrency',
     amount: number
   ): Promise<boolean> {
-    
     const usage = this.currentUsage;
     const limits = this.resourceLimits;
-    
+
     switch (resourceType) {
       case 'memory':
-        return (usage.memory.heapUsed + amount) < (limits.memory.maxHeapSize * 0.9);
-      
+        return usage.memory.heapUsed + amount < limits.memory.maxHeapSize * 0.9;
+
       case 'cpu':
-        return usage.cpu.usagePercent < (limits.cpu.maxUsagePercent * 0.8);
-      
+        return usage.cpu.usagePercent < limits.cpu.maxUsagePercent * 0.8;
+
       case 'network':
         return usage.network.activeConnections < limits.network.maxConnections;
-      
+
       case 'concurrency':
         return usage.concurrency.activeOperations < limits.concurrency.maxConcurrentOperations;
-      
+
       case 'filesystem':
         return usage.filesystem.openFiles < limits.filesystem.maxOpenFiles;
-      
+
       default:
         return false;
     }
@@ -721,66 +723,69 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     amount: number,
     requestorPriority: number
   ): Promise<boolean> {
-    
     // Find lower priority allocations to free
     const candidates = Array.from(this.allocations.values())
-      .filter(alloc => 
-        alloc.resourceType === resourceType && 
-        alloc.priority < requestorPriority &&
-        alloc.allocated > 0
+      .filter(
+        alloc =>
+          alloc.resourceType === resourceType &&
+          alloc.priority < requestorPriority &&
+          alloc.allocated > 0
       )
       .sort((a, b) => a.priority - b.priority);
 
     let freedAmount = 0;
     for (const candidate of candidates) {
       if (freedAmount >= amount) break;
-      
+
       const toFree = Math.min(candidate.allocated, amount - freedAmount);
       candidate.allocated -= toFree;
       freedAmount += toFree;
-      
+
       this.preventedContentionCount++;
-      
-      logger.info(`🔄 Freed ${toFree} ${resourceType} from ${candidate.systemName} for higher priority request`);
+
+      logger.info(
+        `🔄 Freed ${toFree} ${resourceType} from ${candidate.systemName} for higher priority request`
+      );
     }
-    
+
     return freedAmount >= amount;
   }
 
   private async forceResourceCleanup(resourceType: string): Promise<void> {
     logger.warn(`🧹 Forcing resource cleanup for ${resourceType}`);
-    
+
     if (resourceType === 'memory') {
       // Force garbage collection if available
       if (global.gc) {
         global.gc();
       }
-      
+
       // Clear caches if possible
       this.emit('force-cleanup', { resourceType: 'memory' });
     }
-    
+
     // Additional cleanup logic for other resource types
   }
 
   private async throttleLowPriorityOperations(): Promise<void> {
     logger.info('🐌 Throttling low priority operations due to high CPU usage');
-    
+
     // Add restrictions to low priority systems
     for (const [systemName, allocation] of this.allocations.entries()) {
-      if (allocation.priority <= 2) { // Low and medium priority
+      if (allocation.priority <= 2) {
+        // Low and medium priority
         const restriction: ResourceRestriction = {
           type: 'cpu_throttle',
           value: 50, // 50% reduction
           reason: 'High system CPU usage',
           startTime: Date.now(),
         };
-        
+
         allocation.restrictions.push(restriction);
         this.restrictions.set(`${systemName}-cpu`, restriction);
       }
     }
-    
+
     // Remove restrictions after 30 seconds
     setTimeout(() => {
       this.clearResourceRestrictions('cpu_throttle');
@@ -794,19 +799,19 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         this.restrictions.delete(key);
       }
     }
-    
+
     // Clear from allocations
     for (const allocation of this.allocations.values()) {
       allocation.restrictions = allocation.restrictions.filter(r => r.type !== restrictionType);
     }
-    
+
     logger.info(`✅ Cleared resource restrictions: ${restrictionType}`);
   }
 
   private async cleanupExpiredResources(): Promise<void> {
     const now = Date.now();
     const STALE_THRESHOLD = 300000; // 5 minutes
-    
+
     // Clean up stale allocations
     for (const [systemName, allocation] of this.allocations.entries()) {
       if (now - allocation.lastAccessed > STALE_THRESHOLD) {
@@ -815,14 +820,16 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         logger.debug(`🧹 Cleaned up stale allocation for ${systemName}`);
       }
     }
-    
+
     // Clean up completed operations
     for (const [id, operation] of this.activeOperations.entries()) {
       if (operation.status === 'completed' || operation.status === 'failed') {
-        if (operation.endTime && now - operation.endTime > 60000) { // 1 minute
+        if (operation.endTime && now - operation.endTime > 60000) {
+          // 1 minute
           this.activeOperations.delete(id);
         }
-      } else if (now - operation.startTime > 300000) { // 5 minutes timeout
+      } else if (now - operation.startTime > 300000) {
+        // 5 minutes timeout
         operation.status = 'failed';
         operation.endTime = now;
         operation.error = new Error('Operation timeout');
@@ -831,15 +838,22 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     }
   }
 
-  private recordResourceDenial(systemName: string, resourceType: string, amount: number, reason: string): void {
-    logger.warn(`🚫 Resource denied: ${systemName} requested ${amount} ${resourceType} - ${reason}`);
-    
+  private recordResourceDenial(
+    systemName: string,
+    resourceType: string,
+    amount: number,
+    reason: string
+  ): void {
+    logger.warn(
+      `🚫 Resource denied: ${systemName} requested ${amount} ${resourceType} - ${reason}`
+    );
+
     this.emit('resource-denied', {
       systemName,
       resourceType,
       amount,
       reason,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -867,9 +881,9 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     // Score indicating how fairly resources are distributed
     const priorities = Array.from(this.systemPriorities.values());
     const allocations = Array.from(this.allocations.values()).map(a => a.allocated);
-    
+
     if (priorities.length === 0) return 1.0;
-    
+
     // Simplified fairness calculation
     const variance = this.calculateVariance(allocations);
     return Math.max(0, 1 - variance / 1000);
@@ -877,7 +891,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
 
   private calculateVariance(values: number[]): number {
     if (values.length === 0) return 0;
-    
+
     const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
     const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
     return squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
@@ -886,10 +900,13 @@ export class UnifiedResourceCoordinator extends EventEmitter {
   private calculateOverallResourceHealth(): 'excellent' | 'good' | 'fair' | 'poor' {
     const memUtil = this.currentUsage.memory.utilizationPercent;
     const cpuUtil = this.currentUsage.cpu.usagePercent;
-    const concurrencyUtil = (this.currentUsage.concurrency.activeOperations / this.resourceLimits.concurrency.maxConcurrentOperations) * 100;
-    
+    const concurrencyUtil =
+      (this.currentUsage.concurrency.activeOperations /
+        this.resourceLimits.concurrency.maxConcurrentOperations) *
+      100;
+
     const avgUtilization = (memUtil + cpuUtil + concurrencyUtil) / 3;
-    
+
     if (avgUtilization < 50) return 'excellent';
     if (avgUtilization < 70) return 'good';
     if (avgUtilization < 85) return 'fair';
@@ -899,8 +916,11 @@ export class UnifiedResourceCoordinator extends EventEmitter {
   private calculateOverallUtilization(): number {
     const memUtil = this.currentUsage.memory.utilizationPercent;
     const cpuUtil = this.currentUsage.cpu.usagePercent;
-    const concurrencyUtil = (this.currentUsage.concurrency.activeOperations / this.resourceLimits.concurrency.maxConcurrentOperations) * 100;
-    
+    const concurrencyUtil =
+      (this.currentUsage.concurrency.activeOperations /
+        this.resourceLimits.concurrency.maxConcurrentOperations) *
+      100;
+
     return (memUtil + cpuUtil + concurrencyUtil) / 3;
   }
 
@@ -913,23 +933,31 @@ export class UnifiedResourceCoordinator extends EventEmitter {
   private generateResourceOptimizationRecommendations(): string[] {
     const recommendations: string[] = [];
     const usage = this.currentUsage;
-    
+
     if (usage.memory.utilizationPercent > 80) {
-      recommendations.push('Consider increasing memory limits or implementing more aggressive cache cleanup');
+      recommendations.push(
+        'Consider increasing memory limits or implementing more aggressive cache cleanup'
+      );
     }
-    
+
     if (usage.cpu.usagePercent > 70) {
-      recommendations.push('Implement CPU throttling for low-priority operations during peak usage');
+      recommendations.push(
+        'Implement CPU throttling for low-priority operations during peak usage'
+      );
     }
-    
+
     if (this.operationQueue.length > 5) {
-      recommendations.push('Consider increasing concurrency limits or optimizing operation processing');
+      recommendations.push(
+        'Consider increasing concurrency limits or optimizing operation processing'
+      );
     }
-    
+
     if (this.preventedContentionCount > 10) {
-      recommendations.push('Resource contention frequently prevented - consider increasing resource limits');
+      recommendations.push(
+        'Resource contention frequently prevented - consider increasing resource limits'
+      );
     }
-    
+
     return recommendations;
   }
 
@@ -948,14 +976,14 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     this.connectionPools.set('default', {
       maxConnections: 50,
       activeConnections: 0,
-      queue: []
+      queue: [],
     });
-    
+
     // Initialize memory pools for different types of data
     this.memoryPools.set('cache', {
       maxSize: 50 * 1024 * 1024, // 50MB
       currentSize: 0,
-      allocations: new Map()
+      allocations: new Map(),
     });
   }
 
@@ -965,35 +993,35 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         maxHeapSize: 200 * 1024 * 1024, // 200MB
         warningThreshold: 70, // 70%
         criticalThreshold: 85, // 85%
-        gcForceThreshold: 90 // 90%
+        gcForceThreshold: 90, // 90%
       },
       cpu: {
         maxUsagePercent: 80,
         warningThreshold: 60,
-        throttleThreshold: 75
+        throttleThreshold: 75,
       },
       network: {
         maxConnections: 100,
         maxConcurrentRequests: 50,
         connectionTimeout: 30000,
-        requestTimeout: 60000
+        requestTimeout: 60000,
       },
       filesystem: {
         maxOpenFiles: 100,
         maxCacheSize: 100 * 1024 * 1024, // 100MB
-        tempDirQuota: 50 * 1024 * 1024 // 50MB
+        tempDirQuota: 50 * 1024 * 1024, // 50MB
       },
       concurrency: {
         maxConcurrentOperations: 20,
         maxQueueSize: 50,
-        operationTimeout: 300000 // 5 minutes
-      }
+        operationTimeout: 300000, // 5 minutes
+      },
     };
   }
 
   private initializeResourceUsage(): ResourceUsage {
     const memUsage = process.memoryUsage();
-    
+
     return {
       timestamp: Date.now(),
       memory: {
@@ -1001,30 +1029,30 @@ export class UnifiedResourceCoordinator extends EventEmitter {
         heapTotal: memUsage.heapTotal,
         external: memUsage.external,
         rss: memUsage.rss,
-        utilizationPercent: 0
+        utilizationPercent: 0,
       },
       cpu: {
         usagePercent: 0,
         loadAverage: [],
-        processTime: 0
+        processTime: 0,
       },
       network: {
         activeConnections: 0,
         pendingRequests: 0,
         bytesTransferred: 0,
-        errors: 0
+        errors: 0,
       },
       filesystem: {
         openFiles: 0,
         diskUsage: 0,
-        ioOperations: 0
+        ioOperations: 0,
       },
       concurrency: {
         activeOperations: 0,
         queuedOperations: 0,
         completedOperations: 0,
-        failedOperations: 0
-      }
+        failedOperations: 0,
+      },
     };
   }
 
@@ -1041,7 +1069,7 @@ export class UnifiedResourceCoordinator extends EventEmitter {
     this.connectionPools.clear();
     this.memoryPools.clear();
     this.removeAllListeners();
-    
+
     logger.info('🧹 Unified Resource Coordinator destroyed');
   }
 }

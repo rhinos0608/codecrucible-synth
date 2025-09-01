@@ -1,7 +1,7 @@
 /**
  * Spiral Convergence Analyzer
  * Application Layer - Single responsibility convergence analysis
- * 
+ *
  * Extracted from LivingSpiralCoordinator for clean separation of concerns
  * Handles: Quality assessment and convergence detection
  * Imports: Domain services only (follows ARCHITECTURE.md)
@@ -43,10 +43,7 @@ export class SpiralConvergenceAnalyzer {
   /**
    * Analyze convergence based on iteration history
    */
-  analyzeConvergence(
-    iterations: IterationResult[],
-    maxIterations: number
-  ): ConvergenceAnalysis {
+  analyzeConvergence(iterations: IterationResult[], maxIterations: number): ConvergenceAnalysis {
     if (iterations.length === 0) {
       return {
         isConverged: false,
@@ -81,7 +78,8 @@ export class SpiralConvergenceAnalyzer {
       reasoning = `Maximum iterations (${maxIterations}) reached. Current quality: ${currentIteration.quality.toFixed(2)}`;
     } else if (qualityPlateau) {
       recommendation = 'quality_plateau';
-      reasoning = 'Quality improvement has plateaued. Consider adjusting approach or accepting current solution.';
+      reasoning =
+        'Quality improvement has plateaued. Consider adjusting approach or accepting current solution.';
     } else {
       recommendation = 'continue';
       reasoning = `Continue iterating. Current quality: ${currentIteration.quality.toFixed(2)}, target: ${this.qualityThreshold}`;
@@ -131,8 +129,11 @@ export class SpiralConvergenceAnalyzer {
     }
 
     // Calculate moving average to smooth out noise
-    const smoothedTrend = this.calculateMovingAverage(qualityTrend, Math.min(3, qualityTrend.length));
-    
+    const smoothedTrend = this.calculateMovingAverage(
+      qualityTrend,
+      Math.min(3, qualityTrend.length)
+    );
+
     // Calculate trend direction
     const recent = smoothedTrend[smoothedTrend.length - 1];
     const previous = smoothedTrend[Math.max(0, smoothedTrend.length - 3)];
@@ -152,7 +153,8 @@ export class SpiralConvergenceAnalyzer {
 
     // Calculate volatility (standard deviation)
     const mean = qualityTrend.reduce((sum, q) => sum + q, 0) / qualityTrend.length;
-    const variance = qualityTrend.reduce((sum, q) => sum + Math.pow(q - mean, 2), 0) / qualityTrend.length;
+    const variance =
+      qualityTrend.reduce((sum, q) => sum + Math.pow(q - mean, 2), 0) / qualityTrend.length;
     const volatility = Math.sqrt(variance);
 
     return { direction, rate, volatility };
@@ -161,7 +163,10 @@ export class SpiralConvergenceAnalyzer {
   /**
    * Provide iteration recommendations
    */
-  getIterationRecommendations(analysis: ConvergenceAnalysis, iterations: IterationResult[]): string[] {
+  getIterationRecommendations(
+    analysis: ConvergenceAnalysis,
+    iterations: IterationResult[]
+  ): string[] {
     const recommendations: string[] = [];
 
     if (analysis.recommendation === 'converged') {
@@ -201,12 +206,12 @@ export class SpiralConvergenceAnalyzer {
 
     const qualityTrend = iterations.map(iter => iter.quality);
     const trend = this.calculateQualityTrend(qualityTrend);
-    
+
     // Base convergence on current quality and trend stability
     const currentQuality = qualityTrend[qualityTrend.length - 1];
     const stabilityBonus = trend.direction === 'stable' ? 0.1 : 0;
     const improvementPenalty = trend.direction === 'improving' ? -0.05 : 0; // Still improving = not fully converged
-    
+
     return Math.min(1.0, currentQuality + stabilityBonus + improvementPenalty);
   }
 
@@ -218,7 +223,7 @@ export class SpiralConvergenceAnalyzer {
     // Check if last 3 iterations show minimal improvement
     const recentTrend = qualityTrend.slice(-3);
     const maxImprovement = Math.max(...recentTrend) - Math.min(...recentTrend);
-    
+
     return maxImprovement < 0.05; // Less than 5% improvement
   }
 
@@ -250,14 +255,14 @@ export class SpiralConvergenceAnalyzer {
 
   private calculateMovingAverage(values: number[], windowSize: number): number[] {
     const result: number[] = [];
-    
+
     for (let i = 0; i < values.length; i++) {
       const start = Math.max(0, i - windowSize + 1);
       const window = values.slice(start, i + 1);
       const average = window.reduce((sum, val) => sum + val, 0) / window.length;
       result.push(average);
     }
-    
+
     return result;
   }
 }

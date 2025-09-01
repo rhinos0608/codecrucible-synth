@@ -519,7 +519,7 @@ export class SecretsManager {
 
       // Enhanced buffer validation
       let salt: Buffer, iv: Buffer, authTag: Buffer;
-      
+
       try {
         salt = Buffer.from(encrypted.salt, 'base64');
         iv = Buffer.from(encrypted.iv, 'base64');
@@ -530,11 +530,15 @@ export class SecretsManager {
 
       // Validate buffer lengths
       if (salt.length !== this.config.encryption.saltLength) {
-        throw new Error(`Invalid salt length: expected ${this.config.encryption.saltLength}, got ${salt.length}`);
+        throw new Error(
+          `Invalid salt length: expected ${this.config.encryption.saltLength}, got ${salt.length}`
+        );
       }
-      
+
       if (iv.length !== this.config.encryption.ivLength) {
-        throw new Error(`Invalid IV length: expected ${this.config.encryption.ivLength}, got ${iv.length}`);
+        throw new Error(
+          `Invalid IV length: expected ${this.config.encryption.ivLength}, got ${iv.length}`
+        );
       }
 
       // Key derivation with error handling
@@ -556,12 +560,14 @@ export class SecretsManager {
       try {
         const decipher = crypto.createDecipheriv(encrypted.algorithm, key, iv);
         (decipher as any).setAuthTag(authTag);
-        
+
         decrypted = decipher.update(encrypted.encryptedValue, 'base64', 'utf8');
         decrypted += decipher.final('utf8');
       } catch (error: any) {
         if (error.message?.includes('Unsupported state or unable to authenticate data')) {
-          throw new Error(`GCM authentication failed - data may be corrupted or master key incorrect: ${error.message}`);
+          throw new Error(
+            `GCM authentication failed - data may be corrupted or master key incorrect: ${error.message}`
+          );
         }
         throw error;
       }
@@ -571,7 +577,9 @@ export class SecretsManager {
         value: decrypted,
         description: encrypted.metadata.description,
         tags: encrypted.metadata.tags || [],
-        expiresAt: encrypted.metadata.expiresAt ? new Date(encrypted.metadata.expiresAt) : undefined,
+        expiresAt: encrypted.metadata.expiresAt
+          ? new Date(encrypted.metadata.expiresAt)
+          : undefined,
         createdAt: new Date(encrypted.metadata.createdAt),
         lastAccessed: encrypted.metadata.lastAccessed
           ? new Date(encrypted.metadata.lastAccessed)
@@ -583,7 +591,7 @@ export class SecretsManager {
         secretName: encrypted.name,
         algorithm: encrypted.algorithm,
         hasAuthTag: !!encrypted.authTag,
-        hasMasterKey: !!this.masterKey
+        hasMasterKey: !!this.masterKey,
       });
       throw error;
     }
@@ -778,7 +786,7 @@ export class SecretsManager {
     const intervalMs = this.config.keyRotation.intervalDays * 24 * 60 * 60 * 1000;
 
     this.keyRotationTimer = setInterval(async () => {
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       try {
         logger.info('Starting automatic key rotation');
         await this.rotateMasterKey();

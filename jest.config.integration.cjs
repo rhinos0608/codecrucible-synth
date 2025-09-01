@@ -33,6 +33,7 @@ module.exports = {
   maxWorkers: 2, // Limited parallelization for integration tests
   testTimeout: 300000, // 5 minutes for integration tests
   verbose: true,
-  forceExit: true,
-  detectOpenHandles: true
+  // Enhanced resource management - Build System Agent completion 2025
+  openHandlesTimeout: 30000, // 30 seconds to identify hanging resources
+  workerIdleMemoryLimit: '1GB' // Prevent memory buildup in workers
 };

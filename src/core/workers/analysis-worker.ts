@@ -39,7 +39,7 @@ if (!isMainThread) {
         error: () => {},
         warn: () => {},
         debug: () => {},
-        trace: () => {}
+        trace: () => {},
       };
       const voiceSystem = new VoiceArchetypeSystem(logger, undefined, client, config);
 

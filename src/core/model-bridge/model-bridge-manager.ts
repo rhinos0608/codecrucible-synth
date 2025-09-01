@@ -333,7 +333,7 @@ export class ModelBridgeManager {
    * Create metadata file for model
    */
   private async createModelMetadataFile(symlinkPath: string, model: ModelInfo): Promise<void> {
-    const metadataPath = `${symlinkPath  }.metadata.json`;
+    const metadataPath = `${symlinkPath}.metadata.json`;
     const metadata = {
       model: {
         id: model.id,
@@ -553,7 +553,7 @@ export class ModelBridgeManager {
   private async startPeriodicSync(): Promise<void> {
     // Sync every 5 minutes
     this.syncInterval = setInterval(
-    // TODO: Store interval ID and call clearInterval in cleanup
+      // TODO: Store interval ID and call clearInterval in cleanup
       async () => {
         try {
           await this.synchronizeModels();

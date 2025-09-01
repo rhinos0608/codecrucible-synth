@@ -4,7 +4,15 @@
 
 export interface RAGQuery {
   query: string;
-  queryType: 'function' | 'class' | 'import' | 'pattern' | 'general' | 'semantic' | 'todo' | 'error';
+  queryType:
+    | 'function'
+    | 'class'
+    | 'import'
+    | 'pattern'
+    | 'general'
+    | 'semantic'
+    | 'todo'
+    | 'error';
   maxResults?: number;
   useRegex?: boolean;
   caseSensitive?: boolean;

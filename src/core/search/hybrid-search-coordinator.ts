@@ -229,7 +229,7 @@ export class HybridSearchCoordinator extends EventEmitter {
       complexity: 'low' | 'medium' | 'high';
       language?: string;
     };
-    const systemAnalysis = await this.analyzeSystemState() as {
+    const systemAnalysis = (await this.analyzeSystemState()) as {
       memoryPressure: number;
       ragAvailable: boolean;
       ripgrepAvailable: boolean;
@@ -919,9 +919,10 @@ export class HybridSearchCoordinator extends EventEmitter {
    */
   private updateErrorMetrics(error: unknown): void {
     // This integrates with existing metrics system
-    const errorType = (error && typeof error === 'object' && 'category' in error 
-      ? (error as { category: string }).category 
-      : null) ?? 'unknown';
+    const errorType =
+      (error && typeof error === 'object' && 'category' in error
+        ? (error as { category: string }).category
+        : null) ?? 'unknown';
     const currentCount = this.metrics.routingDecisions.get(`error_${errorType}`) ?? 0;
     this.metrics.routingDecisions.set(`error_${errorType}`, currentCount + 1);
   }

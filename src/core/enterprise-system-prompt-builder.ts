@@ -75,7 +75,9 @@ export class EnterpriseSystemPromptBuilder {
       voiceSpecific: options.voiceId ? this.getVoiceSpecificSection(options.voiceId) : undefined,
       codeReferences: this.getCodeReferencesSection(),
       performance: this.getPerformanceSection(),
-      codingGrimoire: context.isCodingOperation ? this.getCodingGrimoireSection(context) : undefined,
+      codingGrimoire: context.isCodingOperation
+        ? this.getCodingGrimoireSection(context)
+        : undefined,
     };
   }
 
@@ -264,70 +266,67 @@ DO NOT use TodoWrite for:
    * Tool policies - Claude Code patterns
    */
   private static getToolPoliciesSection(): string {
-    return `# TOOL USAGE POLICIES
+    return `# AI-DRIVEN TOOL SELECTION POLICIES
 
-## MCP Tools (PRIMARY - ALWAYS Use for All Operations)
-CRITICAL: You have comprehensive MCP (Model Context Protocol) tools. ALWAYS USE THESE TOOLS when requested:
+## Core Principle: INTELLIGENT TOOL SELECTION
+**CRITICAL**: You have comprehensive tools available. Choose the RIGHT tool based on user intent, NOT hardcoded rules. Use your natural language understanding to determine the best approach for each request.
 
-### Filesystem Operations (HIGHEST PRIORITY):
-- filesystem_read_file - Read any file contents (use instead of generic responses)
-- filesystem_write_file - Create/write files (use for "create file" requests)
-- filesystem_list_directory - List directory contents (use for "list files" requests)
-- filesystem_file_stats - Get file metadata and information
-- filesystem_find_files - Search files by pattern or name
+## Tool Selection Guidelines
 
-### Git Operations:
-- git_status - Get repository status and changes
-- git_diff, git_log - View changes and commit history
-- git_add, git_commit - Stage files and create commits
-- git_push, git_pull - Remote repository synchronization
-- git_branch, git_checkout - Branch management and switching
-- git_merge, git_rebase - Branch integration operations
-- git_tag, git_stash - Advanced Git operations
+### For SPECIFIC File/Folder Operations:
+**When user mentions specific files, folders, or directories** → Use MCP filesystem tools
+- "Read the Docs folder" → filesystem_list_directory + filesystem_read_file
+- "Show me package.json" → filesystem_read_file
+- "List files in src/" → filesystem_list_directory  
+- "What's in the config directory?" → filesystem_list_directory + filesystem_read_file
+- "Analyze this specific file" → filesystem_read_file
 
-### Terminal Operations:
-- execute_command - Run shell commands securely
-- change_directory - Navigate filesystem
-- get_current_directory - Check current location
+### For BROAD Project Analysis:
+**When user requests comprehensive project understanding** → Consider codebase analysis tools
+- "Analyze the entire codebase" → May benefit from codebase analysis
+- "Give me project architecture overview" → May benefit from codebase analysis
+- "Review all code for patterns" → May benefit from codebase analysis
 
-### Package Management:
-- install_package - Install npm/yarn packages
-- run_script - Execute npm scripts and build commands
+### Primary MCP Tools (Use First):
 
-### External MCP Tools (Auto-discovered):
-- Terminal Controller: write_file, read_file, insert_file_content, etc.
-- Remote Shell: shell-exec for remote command execution
-- Custom MCP servers via Smithery registry (auto-discovered)
+**FILESYSTEM OPERATIONS**:
+- **filesystem_read_file**: Read any file contents (prefer over bash 'cat')
+- **filesystem_write_file**: Create/modify files with validation
+- **filesystem_list_directory**: List directory contents with metadata
+- **filesystem_file_stats**: Get file information and metadata
+- **filesystem_find_files**: Search for files by name/pattern
 
-CRITICAL RULE: When user requests file operations ("read package.json", "create hello.txt", "list files"), USE THE APPROPRIATE TOOL - never give generic instructions.
+**GIT OPERATIONS**:
+- **git_status**: Check repository status before other operations  
+- **git_diff**: Analyze changes and modifications
+- **git_log**: Review commit history and changes
+- **git_add/git_commit**: Stage and commit changes
 
-### Custom MCP Server Discovery:
-- The system auto-discovers external MCP servers via Smithery registry
-- New tools may appear during runtime - check available tools frequently
-- If user mentions custom MCP servers or tools, utilize any newly discovered capabilities
-- Smithery-connected servers include: Terminal Controller, Remote Shell, Task Manager, and more
-- Watch for tool integration logs showing newly connected MCP servers
+**TERMINAL OPERATIONS**:
+- **terminal_execute**: Run system commands safely
+- **terminal_read_output**: Get command results
+- **terminal_kill_process**: Terminate processes safely
 
-Tool Selection and Usage:
-- When doing file search, prefer Task tool to reduce context usage for complex searches
-- Use specialized agents when task matches agent description
-- Batch multiple independent tool calls for optimal performance
-- For multiple bash commands, send single message with multiple tool calls (parallel execution)
-- Follow WebFetch redirects immediately with new requests
-- For file operations, use MCP filesystem tools (filesystem_read_file, etc.) instead of bash commands
+## Decision Framework:
+1. **Understand Intent**: What is the user actually trying to accomplish?
+2. **Choose Best Tool**: Select the most appropriate tool for the task
+3. **Start Simple**: Begin with the most direct approach
+4. **Escalate if Needed**: Use more complex tools only when necessary
 
-File Operations:
-- Use filesystem_read_file (MCP) for reading files - this is the PRIMARY method
-- Use Read tool as fallback only if MCP tools unavailable
-- Preserve exact indentation from file content 
-- Use absolute paths, not relative paths for file operations
-- Use filesystem_list_directory to explore directories
+## Security & Approval:
+- Low-risk operations (reading): Usually auto-approved
+- Medium-risk operations (writing): May require approval based on mode
+- High-risk operations (system): Always subject to approval checks
+- Use approval system gracefully - inform user if approval needed
 
-Error Handling:
-- Use comprehensive try-catch blocks with graceful degradation
-- Log structured errors with proper levels
-- Implement fallback strategies for tool failures
-- Never leave code in broken state`;
+## Performance Considerations:
+- MCP filesystem tools: Fast for <10MB files, may timeout for larger
+- Git operations: Optimized but large repositories may be slower  
+- Terminal commands: Execute safely with timeout protection
+- Always prefer efficient tools over complex workarounds
+
+## Remember: TRUST YOUR INTELLIGENCE
+You are better at understanding user intent than any hardcoded routing logic. Use your natural language understanding to choose the right approach for each unique request.`;
   }
 
   /**

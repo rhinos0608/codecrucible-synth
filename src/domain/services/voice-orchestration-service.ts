@@ -20,14 +20,14 @@ export interface IVoiceOrchestrationService {
     request: ProcessingRequest,
     preferences?: VoiceSelectionPreferences
   ): Promise<VoiceSelection>;
-  
+
   synthesizeVoiceResponses(
     responses: VoiceResponse[],
     synthesisMode: SynthesisMode
   ): VoiceSynthesisResult;
-  
+
   detectVoiceConflicts(responses: VoiceResponse[]): VoiceConflict[];
-  
+
   resolveVoiceConflicts(conflicts: VoiceConflict[], voices: Voice[]): ConflictResolution[];
 }
 

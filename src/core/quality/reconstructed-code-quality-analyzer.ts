@@ -2,13 +2,13 @@
  * Reconstructed Production-Grade Code Quality Analyzer
  * Enterprise-ready quality analysis with AST processing, async tool integration, and comprehensive metrics
  * Created: August 26, 2025 - Quality Analyzer Reconstruction Agent
- * 
+ *
  * REPLACES: src/core/quality/code-quality-analyzer.ts (broken implementation)
- * 
+ *
  * Key Improvements:
  * - AST-based complexity analysis (replaces regex-based approach)
  * - Non-blocking asynchronous tool integration (replaces execSync)
- * - Mathematically correct Halstead metrics 
+ * - Mathematically correct Halstead metrics
  * - Enterprise-grade performance monitoring and resource management
  * - Comprehensive error handling with circuit breaker patterns
  * - Production-ready timeout handling and graceful degradation
@@ -25,34 +25,34 @@ import { logger } from '../logger.js';
 
 // Import our new production-grade components
 import { ASTComplexityAnalyzer, ASTComplexityMetrics } from './ast-complexity-analyzer.js';
-import { 
-  AsyncToolIntegrationManager, 
-  ESLintResult, 
-  PrettierResult, 
+import {
+  AsyncToolIntegrationManager,
+  ESLintResult,
+  PrettierResult,
   TypeScriptResult,
-  ToolExecutionOptions 
+  ToolExecutionOptions,
 } from './async-tool-integration-manager.js';
-import { 
-  ComprehensiveQualityCalculator, 
+import {
+  ComprehensiveQualityCalculator,
   ComprehensiveQualityMetrics,
   QualityMetricsConfig,
   QualityRecommendation,
-  QualityTrend 
+  QualityTrend,
 } from './comprehensive-quality-calculator.js';
-import { 
-  QualityAnalysisMonitor, 
+import {
+  QualityAnalysisMonitor,
   PerformanceMetrics,
   ResourceLimits,
-  AnalysisProgressInfo 
+  AnalysisProgressInfo,
 } from './quality-analysis-monitor.js';
 
 export interface ReconstructedQualityConfig {
   // Analysis configuration
   quality: Partial<QualityMetricsConfig>;
-  
+
   // Performance and resource limits
   performance: Partial<ResourceLimits>;
-  
+
   // Tool execution options
   tools: {
     eslintConfigPath?: string;
@@ -61,7 +61,7 @@ export interface ReconstructedQualityConfig {
     defaultTimeout?: number;
     retries?: number;
   };
-  
+
   // Analysis behavior
   analysis: {
     enableProgressReporting?: boolean;
@@ -74,15 +74,15 @@ export interface ReconstructedQualityConfig {
 export interface AnalysisResult {
   // Main quality metrics
   qualityMetrics: ComprehensiveQualityMetrics;
-  
+
   // Performance information
   performanceMetrics: PerformanceMetrics;
-  
+
   // Analysis metadata
   analysisId: string;
   analysisTimestamp: number;
   configurationUsed: ReconstructedQualityConfig;
-  
+
   // System information
   systemHealth: {
     memoryUsage: number;
@@ -97,12 +97,12 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
   private readonly toolManager: AsyncToolIntegrationManager;
   private readonly qualityCalculator: ComprehensiveQualityCalculator;
   private readonly performanceMonitor: QualityAnalysisMonitor;
-  
+
   private analysisCounter = 0;
-  
+
   constructor(config?: Partial<ReconstructedQualityConfig>) {
     super();
-    
+
     // Set default configuration
     this.config = {
       quality: {},
@@ -111,33 +111,33 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
         maxAnalysisTimeMs: 60000,
         maxConcurrentAnalyses: 3,
         maxFileSizeMB: 10,
-        maxLinesPerFile: 50000
+        maxLinesPerFile: 50000,
       },
       tools: {
         eslintConfigPath: join(process.cwd(), 'eslint.config.js'),
         prettierConfigPath: join(process.cwd(), '.prettierrc'),
         tsconfigPath: join(process.cwd(), 'tsconfig.json'),
         defaultTimeout: 15000,
-        retries: 2
+        retries: 2,
       },
       analysis: {
         enableProgressReporting: true,
         enableTrendAnalysis: true,
         enablePerformanceMonitoring: true,
-        enableDetailedRecommendations: true
+        enableDetailedRecommendations: true,
       },
-      ...config
+      ...config,
     };
-    
+
     // Initialize components with configuration
     this.astAnalyzer = new ASTComplexityAnalyzer();
     this.toolManager = new AsyncToolIntegrationManager();
     this.qualityCalculator = new ComprehensiveQualityCalculator(this.config.quality);
     this.performanceMonitor = new QualityAnalysisMonitor(this.config.performance);
-    
+
     // Set up event forwarding for progress reporting
     this.setupEventForwarding();
-    
+
     logger.info('Reconstructed Code Quality Analyzer initialized with enterprise configuration');
   }
 
@@ -156,35 +156,35 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
   ): Promise<AnalysisResult> {
     const analysisId = `analysis-${++this.analysisCounter}-${Date.now()}`;
     const startTime = performance.now();
-    
+
     logger.info(`Starting comprehensive quality analysis: ${analysisId}`);
-    
+
     try {
       // Pre-flight checks
       const codeLines = code.split('\n').length;
       const codeSizeMB = Buffer.byteLength(code, 'utf8') / 1024 / 1024;
-      
+
       const resourceCheck = this.performanceMonitor.canStartAnalysis(codeSizeMB, codeLines);
       if (!resourceCheck.allowed) {
         throw new Error(`Analysis rejected: ${resourceCheck.reason}`);
       }
-      
+
       // Start performance monitoring
       const monitoringId = this.performanceMonitor.startAnalysis(analysisId);
-      
+
       // Create temporary file for tool analysis
       const tempFile = this.createTempFile(code, language, options.filename);
-      
+
       try {
         // Execute analysis pipeline with progress reporting
         const analysisResult = await this.executeAnalysisPipeline(
-          code, 
-          tempFile, 
-          language, 
-          analysisId, 
+          code,
+          tempFile,
+          language,
+          analysisId,
           options
         );
-        
+
         // Complete performance monitoring
         const performanceMetrics = this.performanceMonitor.completeAnalysis(
           monitoringId,
@@ -192,7 +192,7 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
           analysisResult.qualityMetrics.astMetrics.functionCount,
           analysisResult.qualityMetrics.overallScore
         );
-        
+
         // Prepare final result
         const finalResult: AnalysisResult = {
           qualityMetrics: analysisResult.qualityMetrics,
@@ -203,34 +203,36 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
           systemHealth: {
             memoryUsage: performanceMetrics.peakMemoryUsage,
             activeAnalyses: this.performanceMonitor.getPerformanceStatus().activeAnalyses,
-            systemLoad: this.performanceMonitor.getPerformanceStatus().systemLoad
-          }
+            systemLoad: this.performanceMonitor.getPerformanceStatus().systemLoad,
+          },
         };
-        
+
         const totalDuration = performance.now() - startTime;
-        logger.info(`Quality analysis completed: ${analysisId} (${totalDuration.toFixed(2)}ms, score: ${analysisResult.qualityMetrics.overallScore})`);
-        
+        logger.info(
+          `Quality analysis completed: ${analysisId} (${totalDuration.toFixed(2)}ms, score: ${analysisResult.qualityMetrics.overallScore})`
+        );
+
         // Emit completion event
         this.emit('analysisComplete', finalResult);
-        
+
         return finalResult;
-        
       } finally {
         // Clean up temporary file
         this.cleanupTempFile(tempFile);
       }
-      
     } catch (error) {
       // Handle analysis failures gracefully
       logger.error(`Quality analysis failed: ${analysisId}`, error);
-      
+
       // Try to clean up monitoring if it was started
       this.performanceMonitor.forceCleanupAnalysis(analysisId);
-      
+
       // Emit error event
       this.emit('analysisError', { analysisId, error });
-      
-      throw new Error(`Quality analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      throw new Error(
+        `Quality analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -244,55 +246,72 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
     analysisId: string,
     options: any
   ): Promise<{ qualityMetrics: ComprehensiveQualityMetrics }> {
-    
     const toolOptions: ToolExecutionOptions = {
       timeout: this.config.tools.defaultTimeout,
       retries: this.config.tools.retries,
-      fallbackOnError: true
+      fallbackOnError: true,
     };
-    
+
     // Stage 1: AST Analysis
     this.updateProgress(analysisId, 'ast', 0, 'Parsing AST and analyzing complexity');
     const astMetrics = await this.performanceMonitor.enforceTimeoutLimit(
-      () => this.astAnalyzer.analyzeComplexity(code),
+      async () => this.astAnalyzer.analyzeComplexity(code),
       this.config.performance?.maxAnalysisTimeMs || 60000,
       'AST analysis'
     );
     this.performanceMonitor.trackComponentTime(analysisId, 'astAnalysisTime', performance.now());
     this.updateProgress(analysisId, 'ast', 100, 'AST analysis complete');
-    
+
     // Stage 2: ESLint Analysis (parallel execution starts here)
     this.updateProgress(analysisId, 'linting', 0, 'Running ESLint analysis');
     const eslintPromise = this.toolManager.runESLint(
-      tempFile, 
+      tempFile,
       this.config.tools.eslintConfigPath,
       toolOptions
     );
-    
+
     // Stage 3: Prettier Analysis (parallel)
     this.updateProgress(analysisId, 'formatting', 0, 'Running Prettier analysis');
     const prettierPromise = this.toolManager.runPrettier(code, tempFile, toolOptions);
-    
+
     // Stage 4: TypeScript Analysis (parallel)
     this.updateProgress(analysisId, 'typescript', 0, 'Running TypeScript analysis');
-    const typescriptPromise = language === 'typescript' 
-      ? this.toolManager.runTypeScript(tempFile, this.config.tools.tsconfigPath, toolOptions)
-      : Promise.resolve(this.getDefaultTypeScriptResult());
-    
+    const typescriptPromise =
+      language === 'typescript'
+        ? this.toolManager.runTypeScript(tempFile, this.config.tools.tsconfigPath, toolOptions)
+        : Promise.resolve(this.getDefaultTypeScriptResult());
+
     // Wait for all tool analyses to complete
     const [eslintResults, prettierResults, typescriptResults] = await Promise.all([
       eslintPromise,
       prettierPromise,
-      typescriptPromise
+      typescriptPromise,
     ]);
-    
+
     // Track tool execution times
-    this.performanceMonitor.trackComponentTime(analysisId, 'lintingTime', eslintResults.executionTime);
-    this.performanceMonitor.trackComponentTime(analysisId, 'formattingTime', prettierResults.executionTime);
-    this.performanceMonitor.trackComponentTime(analysisId, 'typescriptTime', typescriptResults.executionTime);
-    
-    this.updateProgress(analysisId, 'calculation', 0, 'Calculating quality metrics and recommendations');
-    
+    this.performanceMonitor.trackComponentTime(
+      analysisId,
+      'lintingTime',
+      eslintResults.executionTime
+    );
+    this.performanceMonitor.trackComponentTime(
+      analysisId,
+      'formattingTime',
+      prettierResults.executionTime
+    );
+    this.performanceMonitor.trackComponentTime(
+      analysisId,
+      'typescriptTime',
+      typescriptResults.executionTime
+    );
+
+    this.updateProgress(
+      analysisId,
+      'calculation',
+      0,
+      'Calculating quality metrics and recommendations'
+    );
+
     // Stage 5: Quality Calculation
     const calculationStart = performance.now();
     const qualityMetrics = await this.qualityCalculator.calculateQualityMetrics(
@@ -302,12 +321,12 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
       typescriptResults,
       options.identifier
     );
-    
+
     const calculationTime = performance.now() - calculationStart;
     this.performanceMonitor.trackComponentTime(analysisId, 'calculationTime', calculationTime);
-    
+
     this.updateProgress(analysisId, 'complete', 100, 'Analysis complete');
-    
+
     return { qualityMetrics };
   }
 
@@ -315,7 +334,7 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
    * Update analysis progress and emit progress events
    */
   private updateProgress(
-    analysisId: string, 
+    analysisId: string,
     stage: AnalysisProgressInfo['stage'],
     progress: number,
     operation: string
@@ -323,7 +342,7 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
     if (this.config.analysis?.enableProgressReporting) {
       this.performanceMonitor.updateAnalysisProgress(analysisId, stage, {
         stageProgress: progress,
-        currentOperation: operation
+        currentOperation: operation,
       });
     }
   }
@@ -341,7 +360,7 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
       performance: this.performanceMonitor.getPerformanceStatus(),
       analytics: this.performanceMonitor.getPerformanceAnalytics(),
       toolAvailability: this.toolManager.getToolAvailabilityStatus(),
-      configuration: this.config
+      configuration: this.config,
     };
   }
 
@@ -350,12 +369,12 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
    */
   updateConfiguration(updates: Partial<ReconstructedQualityConfig>): void {
     Object.assign(this.config, updates);
-    
+
     // Update component configurations
     if (updates.performance) {
       this.performanceMonitor.updateResourceLimits(updates.performance);
     }
-    
+
     logger.info('Quality analyzer configuration updated');
     this.emit('configurationUpdated', this.config);
   }
@@ -388,14 +407,14 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
    */
   async shutdown(): Promise<void> {
     logger.info('Shutting down quality analyzer...');
-    
+
     // Clean up all components
     this.performanceMonitor.cleanup();
     this.clearHistory();
-    
+
     // Remove all listeners
     this.removeAllListeners();
-    
+
     logger.info('Quality analyzer shutdown complete');
   }
 
@@ -405,13 +424,13 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
 
   private setupEventForwarding(): void {
     // Forward performance monitoring events
-    this.performanceMonitor.on('progressUpdate', (data) => {
+    this.performanceMonitor.on('progressUpdate', data => {
       if (this.config.analysis?.enableProgressReporting) {
         this.emit('progress', data);
       }
     });
-    
-    this.performanceMonitor.on('performanceAlert', (alert) => {
+
+    this.performanceMonitor.on('performanceAlert', alert => {
       this.emit('performanceAlert', alert);
       logger.warn(`Performance alert: ${alert.message}`);
     });
@@ -419,18 +438,20 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
 
   private createTempFile(code: string, language: string, filename?: string): string {
     const extension = language === 'typescript' ? '.ts' : '.js';
-    const tempFilename = filename 
-      ? `${filename.replace(/\.[^/.]+$/, "")}${extension}`
+    const tempFilename = filename
+      ? `${filename.replace(/\.[^/.]+$/, '')}${extension}`
       : `quality-analysis-${Date.now()}${extension}`;
-    
+
     const tempFile = join(tmpdir(), tempFilename);
-    
+
     try {
       writeFileSync(tempFile, code, 'utf8');
       return tempFile;
     } catch (error) {
       logger.error('Failed to create temporary file:', error);
-      throw new Error(`Failed to create temporary file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to create temporary file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -451,7 +472,7 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
       totalWarnings: 0,
       score: 100,
       coverage: 100,
-      executionTime: 0
+      executionTime: 0,
     };
   }
 }
@@ -460,11 +481,11 @@ export class ReconstructedCodeQualityAnalyzer extends EventEmitter {
 export const reconstructedCodeQualityAnalyzer = new ReconstructedCodeQualityAnalyzer();
 
 // Re-export important types for consumers
-export type { 
+export type {
   ComprehensiveQualityMetrics,
   QualityRecommendation,
   QualityTrend,
   ASTComplexityMetrics,
   PerformanceMetrics,
-  AnalysisProgressInfo
+  AnalysisProgressInfo,
 };

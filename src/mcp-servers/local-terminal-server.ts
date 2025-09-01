@@ -45,14 +45,48 @@ class LocalTerminalServer {
 
     // Configure allowed/blocked commands based on security requirements
     this.allowedCommands = new Set([
-      'npm', 'node', 'git', 'ls', 'cat', 'pwd', 'echo', 'mkdir', 'touch',
-      'grep', 'find', 'head', 'tail', 'wc', 'sort', 'uniq', 'tree',
-      'tsc', 'tsx', 'eslint', 'prettier', 'jest', 'mocha', 'vitest'
+      'npm',
+      'node',
+      'git',
+      'ls',
+      'cat',
+      'pwd',
+      'echo',
+      'mkdir',
+      'touch',
+      'grep',
+      'find',
+      'head',
+      'tail',
+      'wc',
+      'sort',
+      'uniq',
+      'tree',
+      'tsc',
+      'tsx',
+      'eslint',
+      'prettier',
+      'jest',
+      'mocha',
+      'vitest',
     ]);
 
     this.blockedCommands = new Set([
-      'rm', 'del', 'sudo', 'su', 'chmod', 'chown', 'kill', 'killall',
-      'shutdown', 'reboot', 'halt', 'format', 'fdisk', 'dd', 'mkfs'
+      'rm',
+      'del',
+      'sudo',
+      'su',
+      'chmod',
+      'chown',
+      'kill',
+      'killall',
+      'shutdown',
+      'reboot',
+      'halt',
+      'format',
+      'fdisk',
+      'dd',
+      'mkfs',
     ]);
 
     this.setupRequestHandlers();
@@ -137,7 +171,7 @@ class LocalTerminalServer {
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args } = request.params;
 
       try {
@@ -178,7 +212,9 @@ class LocalTerminalServer {
     // Security validation
     const sanitizationResult = InputSanitizer.sanitizePrompt(command);
     if (!sanitizationResult.isValid) {
-      throw new Error(`Command blocked by security validation: ${sanitizationResult.violations.join(', ')}`);
+      throw new Error(
+        `Command blocked by security validation: ${sanitizationResult.violations.join(', ')}`
+      );
     }
 
     // Additional command-level validation
@@ -190,10 +226,11 @@ class LocalTerminalServer {
     }
 
     // Check if command is in allowed list or starts with allowed command
-    const isAllowed = this.allowedCommands.has(mainCommand) || 
-                     Array.from(this.allowedCommands).some(allowed => 
-                       mainCommand.startsWith(allowed) || command.includes(allowed)
-                     );
+    const isAllowed =
+      this.allowedCommands.has(mainCommand) ||
+      Array.from(this.allowedCommands).some(
+        allowed => mainCommand.startsWith(allowed) || command.includes(allowed)
+      );
 
     if (!isAllowed && !this.isCompilationCommand(command)) {
       logger.warn(`Command '${mainCommand}' not in allowed list, proceeding with caution`);
@@ -268,36 +305,42 @@ class LocalTerminalServer {
     // Validate file path with AI-friendly preprocessing
     const validation = InputSanitizer.validateFilePath(file_path);
     if (!validation.isValid) {
-      logger.warn(`File path validation failed for "${file_path}": ${validation.violations.join(', ')} - attempting fallback with processed path "${validation.sanitized}"`);
-      
+      logger.warn(
+        `File path validation failed for "${file_path}": ${validation.violations.join(', ')} - attempting fallback with processed path "${validation.sanitized}"`
+      );
+
       // Try with the sanitized/processed path instead of blocking
       if (validation.sanitized && validation.sanitized !== file_path) {
         logger.info(`Attempting file read with processed path: ${validation.sanitized}`);
         try {
           const content = await fs.readFile(validation.sanitized, 'utf-8');
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                content,
-                path: validation.sanitized,
-                original_path: file_path,
-                size: content.length,
-                note: 'Path was automatically processed from AI-generated format'
-              }),
-            }],
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  content,
+                  path: validation.sanitized,
+                  original_path: file_path,
+                  size: content.length,
+                  note: 'Path was automatically processed from AI-generated format',
+                }),
+              },
+            ],
           };
         } catch (fallbackError) {
           logger.warn(`Fallback with processed path also failed: ${fallbackError}`);
         }
       }
-      
-      throw new Error(`File path blocked: ${validation.violations.join(', ')} - tried original: "${file_path}" and processed: "${validation.sanitized}"`);
+
+      throw new Error(
+        `File path blocked: ${validation.violations.join(', ')} - tried original: "${file_path}" and processed: "${validation.sanitized}"`
+      );
     }
 
     try {
       const content = await fs.readFile(file_path, 'utf-8');
-      
+
       return {
         content: [
           {
@@ -321,8 +364,10 @@ class LocalTerminalServer {
     // Validate file path with AI-friendly preprocessing
     const validation = InputSanitizer.validateFilePath(file_path);
     if (!validation.isValid) {
-      logger.warn(`Write path validation failed for "${file_path}": ${validation.violations.join(', ')} - attempting fallback with processed path "${validation.sanitized}"`);
-      
+      logger.warn(
+        `Write path validation failed for "${file_path}": ${validation.violations.join(', ')} - attempting fallback with processed path "${validation.sanitized}"`
+      );
+
       // Try with the sanitized/processed path instead of blocking
       if (validation.sanitized && validation.sanitized !== file_path) {
         logger.info(`Attempting file write with processed path: ${validation.sanitized}`);
@@ -331,23 +376,27 @@ class LocalTerminalServer {
           await fs.mkdir(dir, { recursive: true });
           await fs.writeFile(validation.sanitized, content, 'utf-8');
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                path: validation.sanitized,
-                original_path: file_path,
-                size: content.length,
-                note: 'Path was automatically processed from AI-generated format'
-              }),
-            }],
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: true,
+                  path: validation.sanitized,
+                  original_path: file_path,
+                  size: content.length,
+                  note: 'Path was automatically processed from AI-generated format',
+                }),
+              },
+            ],
           };
         } catch (fallbackError) {
           logger.warn(`Fallback write with processed path also failed: ${fallbackError}`);
         }
       }
-      
-      throw new Error(`Write path blocked: ${validation.violations.join(', ')} - tried original: "${file_path}" and processed: "${validation.sanitized}"`);
+
+      throw new Error(
+        `Write path blocked: ${validation.violations.join(', ')} - tried original: "${file_path}" and processed: "${validation.sanitized}"`
+      );
     }
 
     try {
@@ -386,7 +435,7 @@ class LocalTerminalServer {
 
     try {
       const entries = await fs.readdir(directory_path, { withFileTypes: true });
-      
+
       const items = entries.map(entry => ({
         name: entry.name,
         type: entry.isDirectory() ? 'directory' : 'file',
@@ -412,12 +461,27 @@ class LocalTerminalServer {
 
   private isCompilationCommand(command: string): boolean {
     const compilationIndicators = [
-      'node-gyp', 'gyp', 'make', 'gcc', 'clang', 'tsc', 'npm run build',
-      'npm install', 'yarn install', 'pnpm install', 'webpack', 'rollup',
-      'babel', 'esbuild', 'vite build', 'cmake', 'meson', 'ninja'
+      'node-gyp',
+      'gyp',
+      'make',
+      'gcc',
+      'clang',
+      'tsc',
+      'npm run build',
+      'npm install',
+      'yarn install',
+      'pnpm install',
+      'webpack',
+      'rollup',
+      'babel',
+      'esbuild',
+      'vite build',
+      'cmake',
+      'meson',
+      'ninja',
     ];
 
-    return compilationIndicators.some(indicator => 
+    return compilationIndicators.some(indicator =>
       command.toLowerCase().includes(indicator.toLowerCase())
     );
   }

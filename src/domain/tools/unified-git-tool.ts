@@ -1,13 +1,17 @@
 /**
  * Unified Git Tool
- * 
+ *
  * Consolidates git-tools.ts and enhanced-git-tools.ts into single implementation
  * with configurable strategies for different git operations.
  */
 
 import { spawn } from 'child_process';
 import { BaseTool } from './unified-tool-system.js';
-import { ToolExecutionContext, ToolExecutionResult, ToolParameterSchema } from '../interfaces/tool-system.js';
+import {
+  ToolExecutionContext,
+  ToolExecutionResult,
+  ToolParameterSchema,
+} from '../interfaces/tool-system.js';
 
 export class UnifiedGitTool extends BaseTool {
   constructor(context?: { workingDirectory?: string }) {
@@ -19,7 +23,18 @@ export class UnifiedGitTool extends BaseTool {
         operation: {
           type: 'string',
           description: 'Git operation to perform',
-          enum: ['status', 'log', 'diff', 'branch', 'remote', 'add', 'commit', 'push', 'pull', 'stash'],
+          enum: [
+            'status',
+            'log',
+            'diff',
+            'branch',
+            'remote',
+            'add',
+            'commit',
+            'push',
+            'pull',
+            'stash',
+          ],
           default: 'status',
         },
         args: {
@@ -28,7 +43,7 @@ export class UnifiedGitTool extends BaseTool {
           default: [],
         },
         files: {
-          type: 'array', 
+          type: 'array',
           description: 'Specific files to operate on (for add, diff, etc.)',
         },
         message: {
@@ -56,7 +71,10 @@ export class UnifiedGitTool extends BaseTool {
     });
   }
 
-  async execute(args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+  async execute(
+    args: Record<string, any>,
+    context: ToolExecutionContext
+  ): Promise<ToolExecutionResult> {
     try {
       const operation = args.operation || 'status';
       const gitArgs = this.buildGitArgs(operation, args);

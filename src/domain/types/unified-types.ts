@@ -1,6 +1,6 @@
 /**
  * Unified Type System for CodeCrucible Synth
- * 
+ *
  * Consolidates and organizes all type definitions following domain-driven design:
  * - Core domain types (business logic)
  * - Application types (use cases)
@@ -70,7 +70,13 @@ export interface ModelProvider extends CodeCrucibleEntity {
   configuration: ProviderConfiguration;
 }
 
-export type ProviderType = 'ollama' | 'lm-studio' | 'huggingface' | 'openai' | 'anthropic' | 'google';
+export type ProviderType =
+  | 'ollama'
+  | 'lm-studio'
+  | 'huggingface'
+  | 'openai'
+  | 'anthropic'
+  | 'google';
 
 export interface AIModel {
   id: string;
@@ -100,7 +106,13 @@ export interface ModelPerformance {
   costPerToken?: number;
 }
 
-export type ModelSpecialization = 'coding' | 'analysis' | 'writing' | 'reasoning' | 'math' | 'research';
+export type ModelSpecialization =
+  | 'coding'
+  | 'analysis'
+  | 'writing'
+  | 'reasoning'
+  | 'math'
+  | 'research';
 
 export interface ProviderCapabilities {
   maxConcurrentRequests: number;
@@ -142,16 +154,16 @@ export interface VoiceArchetype extends CodeCrucibleEntity {
   configuration: VoiceConfiguration;
 }
 
-export type VoiceSpecialization = 
-  | 'exploration' 
-  | 'maintenance' 
-  | 'security' 
-  | 'architecture' 
-  | 'development' 
-  | 'analysis' 
-  | 'optimization' 
-  | 'design' 
-  | 'testing' 
+export type VoiceSpecialization =
+  | 'exploration'
+  | 'maintenance'
+  | 'security'
+  | 'architecture'
+  | 'development'
+  | 'analysis'
+  | 'optimization'
+  | 'design'
+  | 'testing'
   | 'documentation';
 
 export interface VoiceCharacteristics {
@@ -228,7 +240,13 @@ export interface QualityCriterion {
   weight: number;
 }
 
-export type ProcessState = 'initializing' | 'running' | 'converging' | 'completed' | 'failed' | 'paused';
+export type ProcessState =
+  | 'initializing'
+  | 'running'
+  | 'converging'
+  | 'completed'
+  | 'failed'
+  | 'paused';
 
 // ============================================================================
 // APPLICATION LAYER TYPES - Use Cases and Application Services
@@ -376,14 +394,14 @@ export interface AnalysisRequest {
   options: AnalysisOptions;
 }
 
-export type AnalysisType = 
-  | 'code_quality' 
-  | 'security' 
-  | 'performance' 
-  | 'architecture' 
-  | 'dependencies' 
-  | 'complexity' 
-  | 'maintainability' 
+export type AnalysisType =
+  | 'code_quality'
+  | 'security'
+  | 'performance'
+  | 'architecture'
+  | 'dependencies'
+  | 'complexity'
+  | 'maintainability'
   | 'test_coverage'
   | 'technical_debt';
 

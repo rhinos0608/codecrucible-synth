@@ -1,14 +1,17 @@
 /**
  * Simplified Living Spiral Coordinator
  * Application Layer - Clean orchestration with single responsibility
- * 
+ *
  * Replaces the complex LivingSpiralCoordinator with clean separation of concerns
  * Handles: High-level spiral process orchestration only
  * Imports: Application services and domain services only (follows ARCHITECTURE.md)
  */
 
 import { SpiralPhaseExecutor, PhaseInput } from '../services/spiral-phase-executor.js';
-import { SpiralConvergenceAnalyzer, IterationResult } from '../services/spiral-convergence-analyzer.js';
+import {
+  SpiralConvergenceAnalyzer,
+  IterationResult,
+} from '../services/spiral-convergence-analyzer.js';
 import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
 
@@ -71,7 +74,7 @@ export class SimplifiedLivingSpiralCoordinator {
   async executeSpiralProcess(input: SimplifiedSpiralInput): Promise<SimplifiedSpiralOutput> {
     const startTime = Date.now();
     const config = { ...this.defaultConfig, ...input.config };
-    
+
     // Initialize convergence analyzer with config
     this.convergenceAnalyzer = new SpiralConvergenceAnalyzer(
       config.qualityThreshold,
@@ -85,7 +88,7 @@ export class SimplifiedLivingSpiralCoordinator {
 
     while (iterationCount < config.maxIterations && !convergenceAchieved) {
       iterationCount++;
-      
+
       // Execute single iteration
       const iteration = await this.executeSingleIteration(
         currentInput,
@@ -93,15 +96,21 @@ export class SimplifiedLivingSpiralCoordinator {
         config,
         input.context || {}
       );
-      
+
       iterations.push(iteration);
 
       // Analyze convergence
-      const analysis = this.convergenceAnalyzer.analyzeConvergence(iterations, config.maxIterations);
-      
+      const analysis = this.convergenceAnalyzer.analyzeConvergence(
+        iterations,
+        config.maxIterations
+      );
+
       if (analysis.isConverged || analysis.recommendation === 'converged') {
         convergenceAchieved = true;
-      } else if (analysis.recommendation === 'quality_plateau' || analysis.recommendation === 'max_iterations') {
+      } else if (
+        analysis.recommendation === 'quality_plateau' ||
+        analysis.recommendation === 'max_iterations'
+      ) {
         break; // Stop iterating
       } else {
         // Prepare input for next iteration
@@ -110,8 +119,14 @@ export class SimplifiedLivingSpiralCoordinator {
     }
 
     // Generate final recommendations
-    const finalAnalysis = this.convergenceAnalyzer.analyzeConvergence(iterations, config.maxIterations);
-    const recommendations = this.convergenceAnalyzer.getIterationRecommendations(finalAnalysis, iterations);
+    const finalAnalysis = this.convergenceAnalyzer.analyzeConvergence(
+      iterations,
+      config.maxIterations
+    );
+    const recommendations = this.convergenceAnalyzer.getIterationRecommendations(
+      finalAnalysis,
+      iterations
+    );
 
     return {
       finalSolution: iterations[iterations.length - 1]?.content || '',
@@ -140,7 +155,7 @@ export class SimplifiedLivingSpiralCoordinator {
     context: Record<string, unknown>
   ): Promise<IterationResult> {
     let currentContent = input;
-    let allVoicesUsed: string[] = [];
+    const allVoicesUsed: string[] = [];
     let totalProcessingTime = 0;
     const phasesCompleted: string[] = [];
 
@@ -160,7 +175,7 @@ export class SimplifiedLivingSpiralCoordinator {
       };
 
       const phaseOutput = await this.phaseExecutor.executePhase(phaseInput);
-      
+
       currentContent = phaseOutput.content;
       allVoicesUsed.push(...phaseOutput.voicesUsed);
       totalProcessingTime += phaseOutput.processingTime;
@@ -192,10 +207,7 @@ export class SimplifiedLivingSpiralCoordinator {
     };
   }
 
-  private prepareNextIterationInput(
-    iteration: IterationResult,
-    analysis: any
-  ): string {
+  private prepareNextIterationInput(iteration: IterationResult, analysis: any): string {
     return `Based on the previous iteration results, please improve upon this solution:
 
 PREVIOUS OUTPUT:
@@ -214,9 +226,10 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
   }
 
   private extractUniqueVoices(iterations: IterationResult[]): string[] {
-    const allVoices = iterations.flatMap(iter => 
-      // Extract voices from iteration metadata (simplified)
-      ['explorer', 'architect', 'implementor', 'guardian'] // Default voices used
+    const allVoices = iterations.flatMap(
+      iter =>
+        // Extract voices from iteration metadata (simplified)
+        ['explorer', 'architect', 'implementor', 'guardian'] // Default voices used
     );
     return [...new Set(allVoices)];
   }
@@ -244,8 +257,14 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
       };
     }
 
-    const analysis = this.convergenceAnalyzer.analyzeConvergence(iterations, this.defaultConfig.maxIterations);
-    const recommendations = this.convergenceAnalyzer.getIterationRecommendations(analysis, iterations);
+    const analysis = this.convergenceAnalyzer.analyzeConvergence(
+      iterations,
+      this.defaultConfig.maxIterations
+    );
+    const recommendations = this.convergenceAnalyzer.getIterationRecommendations(
+      analysis,
+      iterations
+    );
 
     return {
       currentQuality: analysis.currentQuality,

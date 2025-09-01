@@ -26,24 +26,24 @@ export interface MCPConnectionConfig {
   name: string;
   type: 'process' | 'http';
   enabled: boolean;
-  
+
   // Process-based configuration
   command?: string;
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
-  
+
   // HTTP-based configuration
   url?: string;
   apiKey?: string;
   headers?: Record<string, string>;
-  
+
   // Security configuration
   restrictedPaths?: string[];
   allowedPaths?: string[];
   allowedCommands?: string[];
   blockedCommands?: string[];
-  
+
   // Reliability configuration
   timeout?: number;
   retryCount?: number;
@@ -92,14 +92,14 @@ export interface MCPConnection {
   name: string;
   type: 'process' | 'http';
   config: MCPConnectionConfig;
-  
+
   // Process-specific
   process?: ChildProcess;
-  
+
   // HTTP-specific
   client?: Client;
   transport?: StreamableHTTPClientTransport;
-  
+
   // Common properties
   status: 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting';
   capabilities?: MCPServerCapabilities;
@@ -130,7 +130,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
   private connections: Map<string, MCPConnection> = new Map();
   private globalStats: MCPConnectionStats;
   private cleanupIntervalId: string | null = null;
-  
+
   // Configuration constants
   private readonly DEFAULT_TIMEOUT = 30000;
   private readonly DEFAULT_RETRY_COUNT = 3;
@@ -140,7 +140,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
 
   constructor() {
     super();
-    
+
     this.globalStats = {
       totalConnections: 0,
       activeConnections: 0,
@@ -200,7 +200,6 @@ export class UnifiedMCPConnectionService extends EventEmitter {
 
       this.emit('connection-added', connection);
       this.updateGlobalStats();
-
     } catch (error) {
       logger.error(`Failed to add MCP connection ${config.name}:`, error);
       throw error;
@@ -254,7 +253,6 @@ export class UnifiedMCPConnectionService extends EventEmitter {
 
       logger.info(`✅ MCP connection started: ${connection.name}`);
       this.emit('connection-started', connection);
-
     } catch (error) {
       connection.status = 'error';
       connection.lastError = error instanceof Error ? error.message : 'Unknown error';
@@ -271,20 +269,20 @@ export class UnifiedMCPConnectionService extends EventEmitter {
       this.emit('connection-error', connection, error);
 
       logger.error(`❌ Failed to start MCP connection ${connection.name}:`, error);
-      
+
       // Schedule retry if configured
       if (connection.retryCount < (connection.config.retryCount || this.DEFAULT_RETRY_COUNT)) {
         connection.retryCount++;
         connection.status = 'reconnecting';
-        
+
         const retryDelay = Math.min(1000 * Math.pow(2, connection.retryCount), 30000);
         connection.reconnectTimeout = setTimeout(() => {
-          this.startConnection(id).catch(err => 
-            logger.error(`Retry failed for ${id}:`, err)
-          );
+          this.startConnection(id).catch(err => logger.error(`Retry failed for ${id}:`, err));
         }, retryDelay);
 
-        logger.info(`Retrying connection ${id} in ${retryDelay}ms (attempt ${connection.retryCount})`);
+        logger.info(
+          `Retrying connection ${id} in ${retryDelay}ms (attempt ${connection.retryCount})`
+        );
       }
 
       throw error;
@@ -296,7 +294,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
    */
   private async startProcessConnection(connection: MCPConnection): Promise<void> {
     const config = connection.config;
-    
+
     if (!config.command) {
       throw new Error('Process command not specified');
     }
@@ -311,7 +309,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
 
     return new Promise((resolve, reject) => {
       let resolved = false;
-      
+
       const timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -341,14 +339,14 @@ export class UnifiedMCPConnectionService extends EventEmitter {
       childProcess.on('exit', (code: any) => {
         connection.status = 'stopped';
         connection.process = undefined;
-        
+
         if (this.globalStats.activeConnections > 0) {
           this.globalStats.activeConnections--;
         }
-        
+
         logger.warn(`Process MCP connection exited: ${connection.name} (code: ${code})`);
         this.emit('connection-stopped', connection);
-        
+
         // Attempt reconnection if enabled
         if (config.enabled && code !== 0) {
           this.scheduleReconnection(connection);
@@ -375,7 +373,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
    */
   private async startHttpConnection(connection: MCPConnection): Promise<void> {
     const config = connection.config;
-    
+
     if (!config.url) {
       throw new Error('HTTP URL not specified');
     }
@@ -410,7 +408,6 @@ export class UnifiedMCPConnectionService extends EventEmitter {
       await Promise.race([connectPromise, timeoutPromise]);
 
       logger.debug(`HTTP MCP connection established: ${connection.name}`);
-
     } catch (error) {
       // Clean up on failure
       if (connection.client) {
@@ -440,34 +437,37 @@ export class UnifiedMCPConnectionService extends EventEmitter {
         // Discover HTTP-based capabilities
         try {
           const toolsResult = await connection.client.listTools();
-          capabilities.tools = toolsResult?.tools?.map((tool: any) => ({
-            name: tool.name,
-            description: tool.description || '',
-            inputSchema: tool.inputSchema || {},
-          })) || [];
+          capabilities.tools =
+            toolsResult?.tools?.map((tool: any) => ({
+              name: tool.name,
+              description: tool.description || '',
+              inputSchema: tool.inputSchema || {},
+            })) || [];
         } catch (error) {
           logger.debug(`Failed to discover tools for ${connection.name}:`, error);
         }
 
         try {
           const resourcesResult = await connection.client.listResources();
-          capabilities.resources = resourcesResult?.resources?.map((resource: any) => ({
-            uri: resource.uri,
-            name: resource.name,
-            description: resource.description,
-            mimeType: resource.mimeType,
-          })) || [];
+          capabilities.resources =
+            resourcesResult?.resources?.map((resource: any) => ({
+              uri: resource.uri,
+              name: resource.name,
+              description: resource.description,
+              mimeType: resource.mimeType,
+            })) || [];
         } catch (error) {
           logger.debug(`Failed to discover resources for ${connection.name}:`, error);
         }
 
         try {
           const promptsResult = await connection.client.listPrompts();
-          capabilities.prompts = promptsResult?.prompts?.map((prompt: any) => ({
-            name: prompt.name,
-            description: prompt.description,
-            arguments: prompt.arguments,
-          })) || [];
+          capabilities.prompts =
+            promptsResult?.prompts?.map((prompt: any) => ({
+              name: prompt.name,
+              description: prompt.description,
+              arguments: prompt.arguments,
+            })) || [];
         } catch (error) {
           logger.debug(`Failed to discover prompts for ${connection.name}:`, error);
         }
@@ -475,7 +475,9 @@ export class UnifiedMCPConnectionService extends EventEmitter {
         // For process-based connections, capabilities would be discovered
         // through MCP protocol communication over stdin/stdout
         // This is a placeholder for process-based capability discovery
-        logger.debug(`Process-based capability discovery not yet implemented for ${connection.name}`);
+        logger.debug(
+          `Process-based capability discovery not yet implemented for ${connection.name}`
+        );
       }
 
       connection.capabilities = capabilities;
@@ -488,7 +490,6 @@ export class UnifiedMCPConnectionService extends EventEmitter {
       });
 
       this.emit('capabilities-discovered', connection, capabilities);
-
     } catch (error) {
       logger.error(`Failed to discover capabilities for ${connection.name}:`, error);
     }
@@ -534,7 +535,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
       // Update performance metrics
       const responseTime = Date.now() - startTime;
       connection.performance.lastResponseTime = responseTime;
-      connection.performance.avgResponseTime = 
+      connection.performance.avgResponseTime =
         (connection.performance.avgResponseTime + responseTime) / 2;
 
       // Update success rate
@@ -550,7 +551,6 @@ export class UnifiedMCPConnectionService extends EventEmitter {
       }
 
       return result;
-
     } catch (error) {
       // Update failure metrics
       connection.performance.failedRequests++;
@@ -601,7 +601,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
     try {
       if (connection.type === 'process' && connection.process) {
         connection.process.kill('SIGTERM');
-        
+
         // Force kill after timeout
         setTimeout(() => {
           if (connection.process && !connection.process.killed) {
@@ -634,12 +634,12 @@ export class UnifiedMCPConnectionService extends EventEmitter {
    */
   async removeConnection(id: string): Promise<void> {
     await this.stopConnection(id);
-    
+
     const connection = this.connections.get(id);
     if (connection) {
       this.connections.delete(id);
       this.globalStats.totalConnections--;
-      
+
       logger.info(`MCP connection removed: ${connection.name}`);
       this.emit('connection-removed', connection);
       this.updateGlobalStats();
@@ -670,7 +670,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
    */
   private startHealthMonitoring(connection: MCPConnection): void {
     const interval = connection.config.healthCheckInterval || this.DEFAULT_HEALTH_CHECK_INTERVAL;
-    
+
     connection.healthCheckInterval = setInterval(async () => {
       await this.performHealthCheck(connection);
     }, interval);
@@ -686,7 +686,7 @@ export class UnifiedMCPConnectionService extends EventEmitter {
   private async performHealthCheck(connection: MCPConnection): Promise<void> {
     try {
       const startTime = Date.now();
-      
+
       if (connection.type === 'http' && connection.client) {
         // Simple ping for HTTP connections
         await connection.client.listTools();
@@ -699,29 +699,27 @@ export class UnifiedMCPConnectionService extends EventEmitter {
 
       const responseTime = Date.now() - startTime;
       connection.performance.lastHealthCheck = new Date();
-      
+
       // Update availability
       connection.performance.availability = Math.min(
-        (connection.performance.availability * 0.9) + (1 * 0.1) * 100,
+        connection.performance.availability * 0.9 + 1 * 0.1 * 100,
         100
       );
 
       this.emit('health-check-success', connection, responseTime);
-
     } catch (error) {
       logger.warn(`Health check failed for ${connection.name}:`, error);
-      
-      connection.performance.availability = Math.max(
-        connection.performance.availability * 0.9,
-        0
-      );
+
+      connection.performance.availability = Math.max(connection.performance.availability * 0.9, 0);
 
       this.emit('health-check-failure', connection, error);
 
       // Consider reconnection if health checks consistently fail
       connection.consecutiveFailures++;
       if (connection.consecutiveFailures >= 3) {
-        logger.warn(`Multiple health check failures for ${connection.name}, attempting reconnection`);
+        logger.warn(
+          `Multiple health check failures for ${connection.name}, attempting reconnection`
+        );
         this.scheduleReconnection(connection);
       }
     }
@@ -761,24 +759,27 @@ export class UnifiedMCPConnectionService extends EventEmitter {
 
   private updateGlobalStats(): void {
     const connections = Array.from(this.connections.values());
-    
+
     this.globalStats.activeConnections = connections.filter(c => c.status === 'running').length;
     this.globalStats.failedConnections = connections.filter(c => c.status === 'error').length;
-    
+
     const responseTimes = connections
       .filter(c => c.performance.avgResponseTime > 0)
       .map(c => c.performance.avgResponseTime);
-    
-    this.globalStats.avgResponseTime = responseTimes.length > 0
-      ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
-      : 0;
+
+    this.globalStats.avgResponseTime =
+      responseTimes.length > 0
+        ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
+        : 0;
 
     this.globalStats.totalTools = connections.reduce(
-      (total, conn) => total + (conn.capabilities?.tools?.length || 0), 0
+      (total, conn) => total + (conn.capabilities?.tools?.length || 0),
+      0
     );
-    
+
     this.globalStats.totalResources = connections.reduce(
-      (total, conn) => total + (conn.capabilities?.resources?.length || 0), 0
+      (total, conn) => total + (conn.capabilities?.resources?.length || 0),
+      0
     );
   }
 
@@ -820,8 +821,8 @@ export class UnifiedMCPConnectionService extends EventEmitter {
   }
 
   async stopAllConnections(): Promise<void> {
-    const stopPromises = Array.from(this.connections.keys()).map(id => 
-      this.stopConnection(id).catch(error => 
+    const stopPromises = Array.from(this.connections.keys()).map(async id =>
+      this.stopConnection(id).catch(error =>
         logger.error(`Error stopping connection ${id}:`, error)
       )
     );
@@ -832,8 +833,8 @@ export class UnifiedMCPConnectionService extends EventEmitter {
   async startAllEnabledConnections(): Promise<void> {
     const startPromises = Array.from(this.connections.values())
       .filter(conn => conn.config.enabled)
-      .map(conn => 
-        this.startConnection(conn.id).catch(error => 
+      .map(async conn =>
+        this.startConnection(conn.id).catch(error =>
           logger.error(`Error starting connection ${conn.id}:`, error)
         )
       );

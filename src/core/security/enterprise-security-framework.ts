@@ -74,27 +74,30 @@ export class EnterpriseSecurityFramework {
       allowedVoiceIds: [], // Empty means all are allowed
       rateLimits: {
         requestsPerMinute: 60,
-        maxRequestSize: 1024 * 1024 // 1MB
+        maxRequestSize: 1024 * 1024, // 1MB
       },
       isolation: {
         enforceResourceIsolation: true,
-        maxMemoryUsage: 512 * 1024 * 1024 // 512MB
-      }
+        maxMemoryUsage: 512 * 1024 * 1024, // 512MB
+      },
     };
   }
 
-  async validateOperation(operation: string, context: Record<string, any> = {}): Promise<SecurityValidationResult> {
+  async validateOperation(
+    operation: string,
+    context: Record<string, any> = {}
+  ): Promise<SecurityValidationResult> {
     try {
       // Sanitize inputs
       const sanitizedOperation = await this.inputSanitizer.sanitize(operation);
-      
+
       // Basic validation
       const violations: string[] = [];
-      
+
       if (!sanitizedOperation || sanitizedOperation.length === 0) {
         violations.push('Empty or invalid operation');
       }
-      
+
       if (operation.length > this.defaultPolicy.rateLimits.maxRequestSize) {
         violations.push('Operation exceeds maximum size limit');
       }
@@ -102,14 +105,14 @@ export class EnterpriseSecurityFramework {
       return {
         isValid: violations.length === 0,
         violations,
-        mitigationActions: violations.length > 0 
-          ? ['Sanitize inputs', 'Apply rate limiting', 'Log security event']
-          : [],
-        mitigations: violations.length > 0 
-          ? ['Input sanitization applied', 'Rate limiting enforced']
-          : [],
+        mitigationActions:
+          violations.length > 0
+            ? ['Sanitize inputs', 'Apply rate limiting', 'Log security event']
+            : [],
+        mitigations:
+          violations.length > 0 ? ['Input sanitization applied', 'Rate limiting enforced'] : [],
         allowed: violations.length === 0,
-        riskScore: violations.length * 0.3
+        riskScore: violations.length * 0.3,
       };
     } catch (error) {
       return {
@@ -118,7 +121,7 @@ export class EnterpriseSecurityFramework {
         mitigationActions: ['Block operation', 'Log security error'],
         mitigations: ['Operation blocked due to validation failure'],
         allowed: false,
-        riskScore: 1.0
+        riskScore: 1.0,
       };
     }
   }
@@ -127,7 +130,10 @@ export class EnterpriseSecurityFramework {
     return { ...this.defaultPolicy };
   }
 
-  async enforceIsolation(resourceId: string, isolationLevel: string = 'standard'): Promise<boolean> {
+  async enforceIsolation(
+    resourceId: string,
+    isolationLevel: string = 'standard'
+  ): Promise<boolean> {
     // Basic isolation enforcement
     try {
       // Log the enforcement attempt
@@ -139,36 +145,42 @@ export class EnterpriseSecurityFramework {
     }
   }
 
-  async validateAgentAction(action: AgentAction, context: SecurityContext): Promise<SecurityValidationResult> {
+  async validateAgentAction(
+    action: AgentAction,
+    context: SecurityContext
+  ): Promise<SecurityValidationResult> {
     try {
       const violations: string[] = [];
-      
+
       // Validate action type
       if (!['analyze', 'generate', 'transform', 'validate', 'communicate'].includes(action.type)) {
         violations.push(`Invalid action type: ${action.type}`);
       }
-      
+
       // Check resource requirements
       if (action.resourceRequirements.memory > this.defaultPolicy.isolation.maxMemoryUsage) {
         violations.push('Action exceeds memory limit');
       }
-      
+
       // Check security level
-      if (action.securityLevel === 'critical' && !context.permissions.includes('critical-operations')) {
+      if (
+        action.securityLevel === 'critical' &&
+        !context.permissions.includes('critical-operations')
+      ) {
         violations.push('Insufficient permissions for critical action');
       }
 
       return {
         isValid: violations.length === 0,
         violations,
-        mitigationActions: violations.length > 0 
-          ? ['Block action', 'Log security event', 'Notify administrator']
-          : [],
-        mitigations: violations.length > 0 
-          ? ['Action blocked due to security policy violations']
-          : [],
+        mitigationActions:
+          violations.length > 0
+            ? ['Block action', 'Log security event', 'Notify administrator']
+            : [],
+        mitigations:
+          violations.length > 0 ? ['Action blocked due to security policy violations'] : [],
         allowed: violations.length === 0,
-        riskScore: violations.length * 0.4 + (action.securityLevel === 'critical' ? 0.2 : 0)
+        riskScore: violations.length * 0.4 + (action.securityLevel === 'critical' ? 0.2 : 0),
       };
     } catch (error) {
       return {
@@ -177,7 +189,7 @@ export class EnterpriseSecurityFramework {
         mitigationActions: ['Block action', 'Log error'],
         mitigations: ['Action blocked due to validation failure'],
         allowed: false,
-        riskScore: 1.0
+        riskScore: 1.0,
       };
     }
   }

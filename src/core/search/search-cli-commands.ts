@@ -307,7 +307,7 @@ export class SearchCLICommands implements CLISearchIntegration {
         // Convert to RAGResult format for monitoring
         searchResults = {
           documents: results.map((r: SearchResult) => ({
-            document: { 
+            document: {
               id: `${r.file}:${r.line}`,
               content: r.match,
               metadata: {
@@ -317,8 +317,8 @@ export class SearchCLICommands implements CLISearchIntegration {
                 fileType: path.extname(r.file).slice(1) || 'unknown',
                 size: r.match.length,
                 hash: `${r.file}:${r.line}:${Date.now()}`,
-                semanticType: 'code' as const
-              }
+                semanticType: 'code' as const,
+              },
             },
             score: r.score,
           })),
@@ -333,7 +333,11 @@ export class SearchCLICommands implements CLISearchIntegration {
 
       // Complete performance monitoring
       this.performanceMonitor?.recordSearchTiming(queryId, 'complete', duration);
-      this.performanceMonitor?.completeMonitoring(queryId, searchResults, options.method || 'hybrid');
+      this.performanceMonitor?.completeMonitoring(
+        queryId,
+        searchResults,
+        options.method || 'hybrid'
+      );
 
       // Output results with performance info
       this.outputSearchResults(results, options.output || 'table', {
@@ -351,7 +355,10 @@ export class SearchCLICommands implements CLISearchIntegration {
   /**
    * Handle function search command
    */
-  public async handleFunctionSearch(pattern: string, options: FunctionSearchOptions): Promise<void> {
+  public async handleFunctionSearch(
+    pattern: string,
+    options: FunctionSearchOptions
+  ): Promise<void> {
     try {
       this.logger.info(`🔧 Function search: "${pattern}"`);
 
@@ -562,7 +569,8 @@ export class SearchCLICommands implements CLISearchIntegration {
 
       // Calculate summary statistics
       if (results.length > 0) {
-        const avgSpeedup = results.reduce((sum: number, r: any) => sum + r.speedupVsRAG, 0) / results.length;
+        const avgSpeedup =
+          results.reduce((sum: number, r: any) => sum + r.speedupVsRAG, 0) / results.length;
         const avgMemoryReduction =
           results.reduce((sum: number, r: any) => sum + r.memoryReduction, 0) / results.length;
         const fastQueries = results.filter((r: any) => r.ripgrepTime < 200);
@@ -599,7 +607,8 @@ export class SearchCLICommands implements CLISearchIntegration {
           results,
           summary: {
             totalQueries: results.length,
-            avgSpeedup: results.reduce((sum: number, r: any) => sum + r.speedupVsRAG, 0) / results.length,
+            avgSpeedup:
+              results.reduce((sum: number, r: any) => sum + r.speedupVsRAG, 0) / results.length,
             avgMemoryReduction:
               results.reduce((sum: number, r: any) => sum + r.memoryReduction, 0) / results.length,
             fastQueries: results.filter((r: any) => r.ripgrepTime < 200).length,
@@ -675,7 +684,11 @@ export class SearchCLICommands implements CLISearchIntegration {
   /**
    * Helper methods for output formatting
    */
-  private outputSearchResults(results: SearchResult[], format: string, metadata: { query: string; duration?: number }): void {
+  private outputSearchResults(
+    results: SearchResult[],
+    format: string,
+    metadata: { query: string; duration?: number }
+  ): void {
     if (results.length === 0) {
       console.log(`\n🔍 No results found for ${metadata.query}`);
       return;
@@ -690,9 +703,7 @@ export class SearchCLICommands implements CLISearchIntegration {
         console.log(`\n🔍 Found ${results.length} results:\n`);
         results.forEach(result => {
           const relPath = path.relative(this.workingDirectory, result.file);
-          console.log(
-            `${relPath}:${result.line}: ${result.match?.trim()}`
-          );
+          console.log(`${relPath}:${result.line}: ${result.match?.trim()}`);
         });
         break;
 
@@ -703,12 +714,12 @@ export class SearchCLICommands implements CLISearchIntegration {
           console.log(`⚡ Search completed in ${metadata.duration}ms\n`);
         }
 
-        console.log(`${'File'.padEnd(50) + 'Line'.padEnd(8)  }Content`);
+        console.log(`${'File'.padEnd(50) + 'Line'.padEnd(8)}Content`);
         console.log('-'.repeat(100));
 
         results.slice(0, 25).forEach(result => {
           const relPath = path.relative(this.workingDirectory, result.file);
-          const file = relPath.length > 47 ? `...${  relPath.slice(-44)}` : relPath;
+          const file = relPath.length > 47 ? `...${relPath.slice(-44)}` : relPath;
           const line = result.line?.toString() ?? 'N/A';
           const content = result.match.trim().substring(0, 40);
 
@@ -722,7 +733,10 @@ export class SearchCLICommands implements CLISearchIntegration {
     }
   }
 
-  private outputFileResults(results: Array<{ path: string; size: number; modified: Date }>, format: string): void {
+  private outputFileResults(
+    results: Array<{ path: string; size: number; modified: Date }>,
+    format: string
+  ): void {
     console.log(`\n📁 Found ${results.length} files:\n`);
 
     results.slice(0, 50).forEach(result => {

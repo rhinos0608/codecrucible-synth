@@ -1,6 +1,6 @@
 /**
  * Tool System Interfaces
- * 
+ *
  * These interfaces define contracts for tool execution and management,
  * breaking circular dependencies in the tool system.
  */
@@ -69,17 +69,17 @@ export interface ToolExecutionResult {
  */
 export interface ITool {
   readonly definition: ToolDefinition;
-  
+
   /**
    * Execute the tool with given arguments and context
    */
   execute(args: Record<string, any>, context: ToolExecutionContext): Promise<ToolExecutionResult>;
-  
+
   /**
    * Validate arguments against the tool's parameter schema
    */
   validateArguments(args: Record<string, any>): { valid: boolean; errors?: string[] };
-  
+
   /**
    * Check if the tool can be executed in the given context
    */
@@ -94,22 +94,22 @@ export interface IToolRegistry {
    * Register a tool
    */
   register(tool: ITool): void;
-  
+
   /**
    * Get a tool by ID
    */
   getTool(id: string): ITool | undefined;
-  
+
   /**
    * Get all registered tools
    */
   getAllTools(): ITool[];
-  
+
   /**
    * Get tools by category
    */
   getToolsByCategory(category: string): ITool[];
-  
+
   /**
    * Search tools by name or description
    */
@@ -124,12 +124,12 @@ export interface IToolExecutor {
    * Execute a tool
    */
   execute(request: ToolExecutionRequest): Promise<ToolExecutionResult>;
-  
+
   /**
    * Execute multiple tools in sequence
    */
   executeSequence(requests: ToolExecutionRequest[]): Promise<ToolExecutionResult[]>;
-  
+
   /**
    * Execute multiple tools in parallel
    */
@@ -144,22 +144,22 @@ export interface IMCPManager {
    * Get available MCP servers
    */
   getAvailableServers(): Promise<MCPServerInfo[]>;
-  
+
   /**
    * Start MCP servers
    */
   startServers(): Promise<void>;
-  
+
   /**
    * Stop MCP servers
    */
   stopServers(): Promise<void>;
-  
+
   /**
    * Get server status
    */
   getServerStatus(serverId?: string): Promise<Record<string, MCPServerStatus>>;
-  
+
   /**
    * Execute a tool through MCP
    */

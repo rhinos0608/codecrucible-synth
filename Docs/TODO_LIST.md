@@ -1,383 +1,187 @@
-# CodeCrucible Synth - Comprehensive Implementation TODO List
-## Enterprise AI Platform Activation - Based on Dual-Agent Analysis
-
-**Purpose**: Complete implementation roadmap based on comprehensive dual-agent analysis  
-**Timeline**: 4-7 day implementation to activate sophisticated enterprise AI platform  
-**Status**: Implementation in progress - cross out (~~strikethrough~~) items as completed  
-**Methodology**: Living Spiral (Collapse → Council → Synthesis → Rebirth → Reflection)
-
+# Master TODO List - CodeCrucible Synth v4.x
+## OverviewThis master TODO list consolidates all implementation tasks from the architecture analysis and guides. Tasks are organized into phases with clear priorities and dependencies.
+## Phase Structure- **Phase 1**: Critical Fixes (Immediate - Week 1)- **Phase 2**: Performance Quick Wins (Week 1-2)- **Phase 3**: Architecture Foundation (Week 2-3)- **Phase 4**: Rust Integration Prep (Week 3-4)- **Phase 5**: Advanced Features (Week 4-6)- **Phase 6**: Production Hardening (Week 6-8)
 ---
-
-## 🔥 **PHASE 1: IMMEDIATE FIXES (Day 1-2) - ~~COMPLETED ✅~~**
-
-### ~~Critical Legacy System Cleanup~~
-- [x] ~~**Remove `generated-code.ts` file causing "[object Object]" output**~~ ✅
-  - ~~Location: Find and delete the file containing only "[object Object]"~~ 
-  - ~~Risk: NONE - File contains only malformed output~~
-  - ~~Verification: `grep -r "generated-code" src/` to ensure no references~~
-
-- [x] ~~**Clean legacy context system references in `unified-cli-coordinator.ts`**~~ ✅
-  - ~~Remove lines 27-35: Legacy ContextAwareCLIIntegration imports~~
-  - ~~Remove lines 127-128: Legacy component references~~  
-  - ~~Remove lines 476-487: Legacy initialization in `createSession()`~~
-  - ~~Replace complex methods with simple implementations (lines 514-572)~~
-
-- [x] ~~**Fix critical ModelClient initialization in `src/index.ts`**~~ ✅
-  - ~~**CRITICAL**: Uncomment line: `// modelClient: unifiedModelClient,`~~
-  - ~~This is the PRIMARY cause of system running on fallback responses~~
-  - ~~Test: `node dist/index.js "Hello"` should produce AI responses~~
-
-- [x] ~~**Verify and activate unified entry point**~~ ✅
-  - ~~Compare `src/index.ts` vs `src/refactored-index.ts`~~
-  - ~~Ensure main entry point uses working configuration~~
-  - ~~Test: `npm run build && crucible --version`~~
-
-### ~~Import Path Resolution~~  
-- [x] ~~**Complete ES module import fixes across remaining files**~~ ✅
-  - ~~Run: `npm run build` to identify any remaining import issues~~
-  - ~~Fix missing .js extensions in relative imports~~
-  - ~~Verify: Clean compilation with `npx tsc --noEmit`~~
-
-**🎉 PHASE 1 RESULTS:**
-- ✅ **"[object Object]" Issue RESOLVED** - Clean system output achieved
-- ✅ **ModelClient Successfully Activated** - System now attempts real AI model requests  
-- ✅ **All TypeScript Compilation Errors FIXED** - Clean build achieved (0 errors)
-- ✅ **Legacy System Cleanup Complete** - 25+ compilation errors eliminated
-- ✅ **Unified Architecture Operational** - Proper dependency injection working
-- ✅ **Error Recovery System Working** - Graceful degradation when AI models unavailable
-
-## ~~🚀 **PHASE 2: CORE AI INTEGRATION (Day 2-4) - ✅ COMPLETED**~~
-
-### ~~AI Model Provider Integration~~
-- [x] ~~**Configure and test Ollama integration**~~ ✅ 
-  - ~~Install: `ollama pull qwen2.5-coder:7b` and `ollama pull deepseek-coder:8b`~~
-  - ~~Update `src/core/client.ts` with proper Ollama configuration~~
-  - ~~Test connection: `curl http://localhost:11434/api/tags`~~
-  - ~~Verify: `crucible models` shows available models~~
-
-- [x] ~~**Implement LM Studio integration**~~ ✅
-  - ~~Configure `src/providers/lm-studio-provider.ts` with proper endpoints~~
-  - ~~Set up hybrid routing: LM Studio for speed, Ollama for quality~~
-  - ~~Update `config/hybrid-config.json` with routing rules~~
-  - ~~Test: Fast responses for simple queries, quality responses for complex~~
-
-- [x] ~~**Activate UnifiedModelClient in dependency injection**~~ ✅
-  - ~~Update `src/core/services/unified-config-service.ts`~~
-  - ~~Ensure ModelClient is properly injected in orchestrator~~
-  - ~~Fix constructor dependencies in `concrete-workflow-orchestrator.ts`~~
-  - ~~Test: AI responses work in CLI interface~~
-
-### ~~Multi-Voice Synthesis System~~
-- [x] ~~**Integrate Voice Archetype System with AI providers**~~ ✅
-  - ~~Connect `src/voices/voice-archetype-system.ts` to ModelClient~~
-  - ~~Implement voice-specific prompt engineering for 10 archetypes:~~
-    - ~~Explorer, Maintainer, Security, Architect, Developer~~
-    - ~~Analyzer, Implementor, Designer, Optimizer, Guardian~~
-  - ~~Update `config/voices.yaml` with model-specific configurations~~
-
-- [x] ~~**Implement Living Spiral Coordinator**~~ ✅
-  - ~~Activate `src/core/living-spiral-coordinator.ts` 5-phase methodology:~~
-    - ~~Collapse (problem decomposition)~~
-    - ~~Council (multi-voice perspective)~~
-    - ~~Synthesis (unified design)~~ 
-    - ~~Rebirth (implementation)~~
-    - ~~Reflection (quality assessment)~~
-  - ~~Test: Complex analysis requests use multi-voice approach~~
-
-- [x] ~~**Configure voice collaboration system**~~ ✅
-  - ~~Implement democratic decision-making in voice responses~~
-  - ~~Set up voice weighting based on context relevance~~
-  - ~~Add convergence detection for multi-voice sessions~~
-  - ~~Test: `crucible analyze --voices security,maintainer,analyzer src/`~~
-
-**🎉 PHASE 2 RESULTS:**
-- ✅ **IntelligentModelRouter Activated** - Sophisticated hybrid routing with circuit breakers, cost optimization, and adaptive learning
-- ✅ **Voice Archetype System Integrated** - 10-voice collaboration system connected to UnifiedModelClient
-- ✅ **Living Spiral Methodology Operational** - 5-phase iterative development process activated
-- ✅ **Ollama Integration Working** - Successfully generating AI responses through CLI
-- ✅ **Multi-Voice Synthesis Ready** - Enterprise-grade voice orchestration system active
-- ✅ **Environment Configuration Complete** - Proper .env setup with provider endpoints
-
-## 🚀 **NEW PHASE: INDUSTRY-LEADING IMPROVEMENTS (2025-08-31) - ✅ COMPLETED**
-
-### Industry Standard Features (Based on Qwen CLI, Gemini CLI, Claude Code Research)
-- [x] ~~**@ Syntax for File References**~~ ✅ IMPLEMENTED
-  - ~~Industry-standard @src/main.js, @. for current directory~~
-  - ~~Comprehensive FileReferenceParser with glob support~~
-  - ~~Matches Qwen CLI and Gemini CLI patterns~~
-  - Test: `crucible "analyze @package.json"` works perfectly
-
-- [x] ~~**Project Configuration Files**~~ ✅ IMPLEMENTED  
-  - ~~CODECRUCIBLE.md for human-readable instructions~~
-  - ~~.codecrucible.yaml for machine configuration~~
-  - ~~Auto-detection of project type, language, framework~~
-  - Test: Configuration loads in <10ms
-
-- [x] ~~**Enhanced Context Window Utilization**~~ ✅ IMPLEMENTED
-  - ~~256K token context window management~~
-  - ~~Intelligent file prioritization and chunking~~
-  - ~~113 files analyzed in 80ms with 100% efficiency~~
-  - Test: `crucible "analyze entire codebase"` triggers advanced analysis
-
-- [x] ~~**Natural Language Command Interface**~~ ✅ IMPLEMENTED
-  - ~~Intent recognition with confidence scoring~~
-  - ~~No need for complex command syntax~~
-  - ~~Works seamlessly with existing REPL~~
-  - Test: `crucible "create a React component"` understood correctly
-
-- [ ] **Transparent Agentic Workflow Display** 🔄 IN PROGRESS
-  - Show plan → execute → test → iterate phases
-  - Real-time progress indicators
-  - User can see AI's thinking process
-  - Implementation started, needs completion
-
-### 🔧 **CRITICAL SYSTEM FIXES - ✅ COMPLETED (2025-08-31)**
-- [x] ~~**Fix Model Context Window (4096→256K tokens)**~~ ✅ FIXED
-  - ~~Issue: Ollama loading only 4096 tokens instead of 256K~~
-  - ~~Root cause: Missing `num_ctx: 256000` in OllamaProvider configuration~~
-  - ~~Solution: Added large context window support to unified-model-client.ts~~
-  - Test: Models now use 256K token context window
-
-- [x] ~~**Fix MCP Server 500 Error**~~ ✅ FIXED
-  - ~~Issue: MCP servers failing to initialize with import errors~~
-  - ~~Root cause: Wrong logger import path in mcp-server-manager.ts~~
-  - ~~Solution: Updated to use unified-logger.js~~
-  - Test: All MCP servers start successfully in <1ms
-
-## 🛠️ **PHASE 3: MCP & EXTERNAL INTEGRATION (Day 4-6) - ✅ COMPLETED**
-
-### MCP Server Activation
-- [x] ~~**Activate built-in MCP servers**~~ ✅ ACTIVATED
-  - ~~Filesystem server: Full file operations with security restrictions~~
-  - ~~Git server: Repository operations with safe mode enabled~~
-  - ~~Terminal server: Allowed commands (ls, cat, echo, pwd, node, npm)~~
-  - ~~Package manager: npm operations with security scanning~~
-  - ~~Security: Blocked dangerous commands (rm, sudo, chmod, kill)~~
-  - Test: `crucible "test MCP initialization"` shows all servers running
-
-- [ ] **Configure Smithery Registry Integration**
-  - Set up API key in `.env`: `SMITHERY_API_KEY=your_key_here`
-  - Activate `src/mcp-servers/smithery-registry-integration.ts`
-  - Connect to 10+ external MCP servers via Smithery registry
-  - Test: `crucible status` shows connected external servers
-
-- [ ] **Implement Enhanced MCP Client Manager**
-  - Activate `src/mcp-servers/enhanced-mcp-client-manager.ts`
-  - Set up health monitoring and automatic reconnection
-  - Configure server discovery and capability detection
-  - Test: Server health checks and failover work properly
-
-### Security Framework Integration
-- [ ] **Activate Enterprise Security Framework**
-  - Enable `src/core/security/enterprise-security-framework.ts`
-  - Configure OWASP compliance validation
-  - Set up input sanitization and output validation
-  - Test: Security policies prevent malicious inputs
-
-- [ ] **Configure Advanced Security Validator**
-  - Activate `src/infrastructure/security/advanced-security-validator.ts`
-  - Set up command whitelisting and path restrictions
-  - Configure rate limiting and resource monitoring
-  - Test: System blocks unauthorized operations
-
-## 📊 **PHASE 4: PERFORMANCE & OPTIMIZATION (Day 6-7) - LOW PRIORITY**
-
-### Performance Monitoring
-- [ ] **Activate Performance Systems**
-  - Enable `src/core/performance/adaptive-performance-tuner.ts`
-  - Configure `src/core/observability/observability-system.ts`
-  - Set up memory monitoring and garbage collection optimization
-  - Test: Performance metrics display in `crucible status`
-
-- [ ] **Configure Caching and Optimization**
-  - Activate `src/core/search/advanced-search-cache.ts`
-  - Set up response caching with TTL policies
-  - Configure hybrid search coordination
-  - Test: Repeated queries use cached responses
-
-- [ ] **Implement Streaming Manager**
-  - Activate `src/core/streaming/streaming-manager.ts`
-  - Configure real-time response streaming
-  - Set up WebSocket integration for server mode
-  - Test: Streaming responses in interactive mode
-
-### Configuration Management
-- [ ] **Complete Configuration System Integration**
-  - Verify `src/domain/services/unified-configuration-manager.ts` works
-  - Test environment variable loading from `.env`
-  - Configure YAML config file loading
-  - Test: `crucible config` shows current configuration
-
+## Phase 1: Critical Fixes (P0 - Immediate) ✅ **COMPLETED**#
+## 1.1 Fix Build-Breaking Issues ✅
+- [x] ~~**Fix PerformanceMonitor mock** (`src/core/di/service-factories.ts`)~~ ✅ DONE  - ~~Add missing properties: `startTime`, `monitoringEnabled`, `metrics`, `thresholds`~~ ✅  - ~~Implement mock methods with proper state tracking~~ ✅  - ~~Write unit tests to verify all properties~~ ✅
+- [x] ~~**Standardize ErrorFactory signatures** (`src/core/execution/execution-backend.ts`)~~ ✅ DONE  - ~~Create dual-signature support for migration period~~ ✅  - ~~Write migration script to update all call sites~~ ✅  - ~~Add deprecation warnings for legacy usage~~ ✅
+- [x] ~~**Unify ActiveProcessManager interfaces**~~ ✅ DONE  - ~~Create `IProcessManager` interface in `src/domain/interfaces/`~~ ✅  - ~~Implement `UnifiedProcessManager` with consolidated API~~ ✅  - ~~Add adapter pattern for legacy code compatibility~~ ✅#
+## 1.2 Fix Integration Issues ✅
+- [x] ~~**Align StreamToken structures**~~ ✅ DONE  - ~~Add `timestamp` field to infrastructure version~~ ✅  - ~~Create `StreamTokenFactory` for consistent creation~~ ✅  - ~~Add type guards for validation~~ ✅
+- [x] ~~**Update LM Studio client**~~ ✅ DONE  - ~~Fix SDK method calls (`listDownloadedModels`, `listLoaded`)~~ ✅  - ~~Implement proper model caching~~ ✅  - ~~Add fallback handling for missing methods~~ ✅
+- [x] ~~**Synchronize Security Utils API**~~ ✅ DONE  - ~~Create `UnifiedSecurityUtils` with consistent signatures~~ ✅  - ~~Support both validation types and options~~ ✅  - ~~Add comprehensive input sanitization~~ ✅#
+## 1.3 Testing & Validation ✅
+- [x] ~~Run full TypeScript compilation without errors~~ ✅ DONE
+- [x] ~~Execute existing test suite and fix failures~~ ✅ DONE
+- [x] ~~Add regression tests for each fixed issue~~ ✅ DONE
 ---
-
-## 🧪 **PHASE 5: TESTING & VALIDATION (Ongoing)**
-
-### Core Functionality Testing
-- [ ] **Basic CLI Operations**
-  - Test: `crucible --version` shows correct version
-  - Test: `crucible --help` shows complete command list
-  - Test: `crucible status` shows system health
-  - Test: `crucible models` shows available AI models
-
-- [ ] **AI Response Generation**
-  - Test: Simple prompts generate appropriate AI responses
-  - Test: Complex analysis requests work correctly
-  - Test: File analysis produces meaningful insights
-  - Test: Code generation creates valid, working code
-
-- [ ] **Multi-Voice Synthesis**
-  - Test: Voice-specific responses show different perspectives
-  - Test: Multi-voice analysis produces comprehensive results
-  - Test: Voice collaboration system reaches consensus
-  - Test: Living Spiral methodology completes all 5 phases
-
-- [ ] **MCP Tool Integration**
-  - Test: Filesystem operations (read, write, search)
-  - Test: Git operations (status, commit, branch)
-  - Test: Terminal execution with security sandboxing
-  - Test: Package manager operations (install, update)
-
-### Integration Testing
-- [ ] **Server Mode Testing**
-  - Test: `npm run start` launches REST API on port 3002
-  - Test: API endpoints respond correctly
-  - Test: WebSocket connections work for streaming
-  - Test: Health check endpoint returns system status
-
-- [ ] **Performance Validation**
-  - Test: CLI responsiveness (<2s for simple commands)
-  - Test: Memory usage stays within reasonable limits
-  - Test: Large file analysis completes without crashes
-  - Test: Concurrent request handling works properly
-
-## 📋 **ENVIRONMENT & SETUP TASKS**
-
-### Development Environment
-- [ ] **Complete Environment Configuration**
-  - Copy `.env.example` to `.env` with proper values
-  - Configure AI provider endpoints (Ollama, LM Studio)
-  - Set up Smithery API key for external MCP servers
-  - Configure security policies and rate limiting
-
-- [ ] **Build System Verification**
-  - Test: `npm install` completes without errors
-  - Test: `npm run build` produces clean dist/ folder
-  - Test: `npm run install-global` creates global CLI link
-  - Test: All TypeScript compilation errors resolved
-
-### Documentation Completion
-- [ ] **Update README with current status**
-  - Reflect actual working features vs planned features
-  - Update installation and usage instructions
-  - Document voice archetype system usage
-  - Add MCP integration examples
-
-- [ ] **Create troubleshooting guide**
-  - Document common setup issues and solutions
-  - Add debugging steps for AI provider connections
-  - Include MCP server connection troubleshooting
-  - Document performance tuning recommendations
-
+## Phase 2: Performance Quick Wins (Week 1-2) ✅ **COMPLETED**#
+## 2.1 Instrumentation & Profiling ✅
+- [x] ~~**Implement PerformanceProfiler**~~ ✅ DONE  - ~~Create `src/core/performance/profiler.ts`~~ ✅  - ~~Add timer tracking with `performance.now()`~~ ✅  - ~~Integrate with existing logger and MetricsCollector~~ ✅
+- [x] ~~**Add profiling points**~~ ✅ DONE  - ~~LLM inference timing (unified-model-client.ts)~~ ✅  - ~~Tool execution timing (sequential-tool-executor.ts)~~ ✅  - ~~Prompt preparation timing~~ ✅  - ~~Event bus latency (optimized-event-bus.ts)~~ ✅#
+## 2.2 Caching Implementation ✅
+- [x] ~~**Implement PromptTemplateCache**~~ ✅ DONE  - ~~Pre-compile and cache frequently used prompts~~ ✅  - ~~Add TTL-based expiration~~ ✅  - ~~Implement cache warming on startup~~ ✅
+- [x] ~~**Add tool metadata caching**~~ ✅ DONE  - ~~Cache tool descriptions and schemas~~ ✅  - ~~Reduce repeated JSON parsing~~ ✅  - ~~Implement lazy loading (tool-metadata-cache.ts)~~ ✅#
+## 2.3 Async Optimization ✅
+- [x] ~~**Implement AsyncToolExecutor**~~ ✅ DONE  - ~~Stream LLM responses while tools execute~~ ✅  - ~~Non-blocking file I/O operations~~ ✅  - ~~Parallel tool execution where possible~~ ✅
+- [x] ~~**Optimize event bus**~~ ✅ DONE  - ~~Batch event processing~~ ✅  - ~~Implement priority queue for critical events~~ ✅  - ~~Add event deduplication~~ ✅
 ---
-
-## 🎯 **SUCCESS CRITERIA**
-
-### Technical Success Indicators
-- [ ] System builds without any TypeScript errors (`npm run build`)
-- [ ] No "[object Object]" appears in any generated content
-- [ ] AI responses generate properly for all voice archetypes
-- [ ] MCP tools execute correctly with security sandboxing
-- [ ] Performance metrics show system health status
-
-### Functional Success Indicators  
-- [ ] CLI commands respond within performance thresholds
-- [ ] Multi-voice analysis produces comprehensive results
-- [ ] File analysis and code generation work reliably
-- [ ] Interactive mode provides smooth user experience
-- [ ] Server mode handles concurrent requests properly
-
-### Enterprise Success Indicators
-- [ ] Security framework prevents unauthorized operations
-- [ ] Error handling provides graceful degradation
-- [ ] System monitoring shows healthy resource usage
-- [ ] Configuration management works across environments
-- [ ] Integration testing passes for all major workflows
-
+## Phase 3: Architecture Foundation (Week 2-3) — COMPLETED#
+## 3.1 Core Refactoring
+- [x] **Extract pure domain layer**  - ~~Move entities to `src/domain/core/entities/`~~ (kept in `src/domain/entities/` per repo guidelines)  - ~~Move value objects to `src/domain/core/value-objects/`~~ (kept in `src/domain/value-objects/` per repo guidelines)  
+- [x] Remove all infrastructure imports from domain
+- [x] **Implement CQRS pattern**  
+- [x] Create `CommandBus` and `QueryBus`  
+- [x] Implement command handlers for core agent use-cases  
+- [x] Add middleware pipeline for cross-cutting concerns#
+## 3.2 Plugin System
+- [x] **Create plugin architecture**  
+- [x] Define `IPlugin` interface  
+- [x] Implement `PluginManager` with lifecycle hooks  
+- [x] Add plugin discovery and loading
+- [x] **Convert features to plugins**  
+- [x] Code generation plugin (stub)  
+- [x] Analysis plugin (stub)  
+- [x] Security plugin (stub)  
+- [x] Voice synthesis plugin (stub)#
+## 3.3 Dependency Injection Improvements
+- [x] **Refactor DI container**  
+- [x] Implement scoped lifetime management  
+- [x] Add circular dependency detection  
+- [x] Create factory pattern for complex objects
+- [x] **Service registration cleanup**  
+- [x] Centralize all registrations (container-driven)  
+- [x] Add validation for missing dependencies  
+- [x] Implement lazy resolution
 ---
+## Phase 4: Rust Integration Preparation (Week 3-4) — **WEEK 1 COMPLETED** ✅
 
-## 🚨 **CRITICAL DEPENDENCIES & BLOCKERS**
+### 4.1 Rust Crate Setup ✅ **WEEK 1 COMPLETED**
+- [x] ~~**Initialize Rust project**~~ ✅ DONE
+  - ~~Create `rust-executor/` directory with complete module structure~~ ✅
+  - ~~Set up `Cargo.toml` with NAPI 2.14, tokio, serde, security dependencies~~ ✅
+  - ~~Configure NAPI bindings with cross-platform build targets~~ ✅
 
-### Must Complete First
-1. **ModelClient activation** - System won't produce AI responses without this
-2. **Legacy cleanup** - "[object Object]" issue blocks proper output  
-3. **ES import fixes** - Build failures prevent testing other components
+- [x] ~~**Implement foundation structure**~~ ✅ DONE
+  - ~~Create RustExecutor with NAPI bindings and basic functionality~~ ✅
+  - ~~Implement module structure (executor, security, protocol, tools, utils)~~ ✅
+  - ~~Add placeholder implementations for all core modules~~ ✅
 
-### External Dependencies
-- **Ollama models**: Required for AI functionality
-- **Smithery API key**: Optional but enables external MCP servers
-- **LM Studio**: Optional for hybrid model architecture
-- **Node.js 18+**: Required for ES modules and modern TypeScript
+### 4.2 Build System Integration ✅ **WEEK 1 COMPLETED**
+- [x] ~~**Configure build system**~~ ✅ DONE
+  - ~~Add @napi-rs/cli to devDependencies with build scripts~~ ✅
+  - ~~Configure npm scripts for Rust compilation (build:rust)~~ ✅
+  - ~~Add NAPI configuration for cross-platform targets~~ ✅
 
-### Risk Mitigation
-- **Backup strategy**: Keep archive of legacy files before deletion
-- **Rollback plan**: Git branches for each major phase
-- **Testing plan**: Smoke tests after each major change
-- **Performance monitoring**: Watch memory/CPU during activation
+### 4.3 TypeScript Integration ✅ **WEEK 1 COMPLETED**
+- [x] ~~**Create TypeScript integration layer**~~ ✅ DONE
+  - ~~Implement RustExecutionBackend with fallback support~~ ✅
+  - ~~Create RustBridgeManager for module lifecycle management~~ ✅
+  - ~~Build RustProviderClient and RustToolIntegration~~ ✅
+  - ~~Add RustFileAnalyzer as example concrete tool implementation~~ ✅
 
+### **WEEK 2 TASKS** (Next Implementation Phase)
+- [ ] **Security Implementation**
+  - Implement SecurityContext with capability-based permissions
+  - Add process isolation using fork() and rlimits
+  - Create resource management and cleanup systems
+
+- [ ] **Communication Protocol**
+  - Implement NDJSON streaming protocol for TypeScript-Rust communication
+  - Add message serialization/deserialization with proper error handling
+  - Create streaming response handling with progress updates
+
+- [ ] **Basic Executors**
+  - File system executor with path validation and sandboxing
+  - Command executor with whitelisting and resource limits
+  - Integration testing and performance benchmarking
 ---
-
-## 🎭 **GRIMOIRE COMPLIANCE TRACKING**
-
-### Living Spiral Methodology Application
-- **Collapse**: ✅ COMPLETE - Problems decomposed by dual-agent analysis
-- **Council**: ✅ COMPLETE - Comprehensive agent perspectives gathered  
-- **Synthesis**: 🔄 IN PROGRESS - Unifying agent deliverables into implementation plan
-- **Rebirth**: ⏳ PENDING - Implementation phase starting
-- **Reflection**: ⏳ PENDING - Learning and iteration after implementation
-
-### Quality With A Name (QWAN) Metrics
-- **Current Status**: Sophisticated architecture with small integration gaps
-- **Target**: >90% test coverage, measurable quality gates, performance SLOs
-- **Progress**: Agent analysis completed, comprehensive implementation plan created
-
-### Council-Driven Development
-- **Implementation**: ✅ Dual specialized agents provided comprehensive perspectives
-- **Documentation**: ✅ Comprehensive implementation guides created in Docs/
-- **Consensus**: ✅ Clear 4-7 day implementation roadmap established
-
+## Phase 5: Advanced Features (Week 4-6)#
+## 5.1 Model Optimization
+- [ ] **Implement tiered model selection**  - Fast tier (3B models) for simple tasks  - Balanced tier (7B models) for medium complexity  - Quality tier (15B+ models) for complex reasoning
+- [ ] **Model prewarming**  - Load frequently used models on startup  - Keep models in memory between requests  - Implement model rotation based on usage#
+## 5.2 Advanced Caching
+- [ ] **Implement multi-layer cache**  - L1: In-memory cache (fast, limited)  - L2: Redis cache (optional, shared)  - L3: Disk cache (large, persistent)
+- [ ] **Response caching**  - Cache similar prompts and responses  - Implement semantic similarity matching  - Add cache invalidation strategies#
+## 5.3 Worker Thread Pool
+- [ ] **Implement worker pool**  - Create pool of worker threads  - Distribute CPU-intensive tasks  - Add work stealing algorithm
+- [ ] **Task scheduling**  - Priority-based scheduling  - Resource-aware scheduling  - Deadline-based scheduling
 ---
-
-## 🔄 **REFLECTION & ITERATION**
-
-### After Each Phase
-- [ ] Assess implementation quality against Grimoire standards
-- [ ] Update TODO list with discovered issues (cross out completed items)
-- [ ] Apply Living Spiral reflection to improve next phase
-- [ ] Document lessons learned and methodology improvements
-
+## Phase 6: Production Hardening (Week 6-8)#
+## 6.1 Observability
+- [ ] **Implement distributed tracing**  - Integrate OpenTelemetry  - Add Jaeger exporter  - Instrument all service calls
+- [ ] **Metrics collection**  - Add Prometheus metrics  - Create custom metrics for business logic  - Build performance dashboard
+- [ ] **Centralized logging**  - Structured logging with context  - Log aggregation setup  - Error tracking integration#
+## 6.2 Resilience
+- [ ] **Circuit breakers**  - Add circuit breaker for each external service  - Implement fallback strategies  - Add health checks
+- [ ] **Rate limiting**  - Per-user rate limits  - Global rate limits  - Adaptive rate limiting based on load
+- [ ] **Graceful degradation**  - Fallback to simpler models  - Cache-only mode  - Read-only mode#
+## 6.3 Security Hardening
+- [ ] **Input validation everywhere**  - Validate all user inputs  - Sanitize file paths  - Command injection prevention
+- [ ] **Sandboxing improvements**  - Implement proper chroot/jail  - Resource limits (CPU, memory, disk)  - Network isolation
+- [ ] **Audit logging**  - Log all security-relevant events  - Implement tamper-proof logging  - Add compliance reporting
 ---
-
-## 📊 **IMMEDIATE PRIORITIES (Today)**
-
-### ✅ **COMPLETED ANALYSIS PHASE**
-- [x] **COMPLETE**: Read and analyze all agent deliverables
-- [x] **CRITICAL**: Comprehensive dual-agent analysis of sophisticated system
-- [x] **PLAN**: Create comprehensive TODO_LIST documentation (this file)
-- [x] **UNDERSTANDING**: System is enterprise-grade AI platform with small integration gaps
-
-### **NEXT ACTIONS (Ready to Begin)**
-- [ ] **Phase 1 Implementation**: Begin legacy system cleanup (highest priority)
-- [ ] **ModelClient Activation**: Fix primary cause of fallback responses
-- [ ] **Import Path Resolution**: Complete remaining ES module fixes
-- [ ] **"[object Object]" Resolution**: Remove problematic generated file
-
+## Optional Enhancements (Future)#
+## Rust Executor Expansion
+- [ ] Implement WASI support for portable execution
+- [ ] Add gRPC interface for remote execution
+- [ ] Create hot-reload for Rust plugins#
+## Microservices Migration
+- [ ] Extract code service
+- [ ] Extract execution service
+- [ ] Implement service mesh#
+## Advanced AI Features
+- [ ] Multi-model ensemble voting
+- [ ] Automatic prompt optimization
+- [ ] Self-improving code generation
 ---
-
-**FINAL OUTCOME**: Fully operational sophisticated enterprise AI platform with multi-voice synthesis, comprehensive MCP integration, enterprise security, and production-grade performance monitoring - ready for complex long-running AI workflows.
-
-**ESTIMATED COMPLETION**: 4-7 days with systematic implementation following this roadmap.
-
-**METHODOLOGY**: Continuous Living Spiral iteration with Grimoire compliance.
-
+## Implementation Guidelines#
+## Priority Levels- **P0**: Build-breaking, must fix immediately- **P1**: Major functionality broken- **P2**: Performance or UX issues- **P3**: Nice-to-have improvements#
+## Testing Requirements- Each task must include unit tests- Integration tests for cross-component changes- Performance benchmarks for optimization tasks#
+## Documentation- Update relevant documentation for each change- Add inline comments for complex logic- Update API documentation#
+## Code Review Checklist
+- [ ] TypeScript compiles without errors
+- [ ] All tests pass
+- [ ] No performance regression
+- [ ] Security review completed
+- [ ] Documentation updated
 ---
-*This comprehensive TODO list is based on dual-agent analysis findings and follows the AI Coding Grimoire principles. Cross out (~~strikethrough~~) items as completed.*
+## Progress Tracking#
+## Week 1 Goals
+- [x] ~~Complete Phase 1 critical fixes~~ ✅ COMPLETED
+- [x] ~~Start Phase 2 performance work~~ ✅ COMPLETED
+- [x] ~~Set up monitoring infrastructure~~ ✅ COMPLETED#
+## Week 2 Goals
+- [x] ~~Complete Phase 2 performance optimization~~ ✅ COMPLETED 
+- [x] Start Phase 3 architecture refactoring
+- [ ] Initial Rust setup#
+## Week 3-4 Goals 
+- [x] Complete Phase 3 architecture work
+- [ ] Complete Phase 4 Rust integration
+- [ ] Begin advanced features#
+## Week 5-6 Goals
+- [ ] Complete Phase 5 advanced features
+- [ ] Start production hardening
+- [ ] Performance testing#
+## Week 7-8 Goals
+- [ ] Complete Phase 6 production hardening
+- [ ] Full system testing
+- [ ] Deployment preparation
+---
+## Success Criteria#
+## Performance- ✅ Simple generation under 9 seconds- ✅ P95 latency under 15 seconds- ✅ Support 10 concurrent requests#
+## Reliability- ✅ 99.9% uptime- ✅ Graceful degradation- ✅ Zero data loss#
+## Security- ✅ All inputs validated- ✅ Sandboxed execution- ✅ Audit trail complete#
+## Developer Experience- ✅ Clean architecture- ✅ Comprehensive tests- ✅ Clear documentation
+---
+## Notes- This TODO list is a living document - update as priorities change- Each completed task should be marked with a checkmark and date- Add new tasks as they're discovered- Regular review meetings to assess progress
+## Current Status
+
+**Last Updated**: 2025-09-01
+**Phase**: ✅ **Phase 3 COMPLETED** - Ready for Phase 4
+**Blockers**: None
+**Next Review**: Phase 4 Rust integration planning#
+## ✅ Phase 1 Achievements (Completed)- **Build System**: Clean TypeScript compilation achieved- **Critical Fixes**: All P0 issues resolved- **Import Paths**: ActiveProcessManager import conflicts fixed  - **Error Handling**: ErrorFactory signatures standardized- **Test Suite**: Core functionality verified- **Documentation**: Complete implementation guides created#
+## ✅ Phase 2 Achievements (Completed)- **Performance Profiler**: Session-based profiling with performance.now() timing- **LLM/Tool/EventBus Profiling**: Comprehensive instrumentation across core components- **Prompt Template Cache**: TTL-based caching with template compilation and warming- **Tool Metadata Cache**: Lazy loading with background discovery and schema optimization- **Async Tool Executor**: Streaming responses and parallel execution with resource management- **Optimized Event Bus**: Batching, priority queue, and deduplication with advanced processing pipeline#
+## 🎯 Next Steps (Phase 3)- Extract pure domain layer architecture- Implement CQRS pattern with command/query buses- Create plugin architecture with lifecycle management- Refactor dependency injection container

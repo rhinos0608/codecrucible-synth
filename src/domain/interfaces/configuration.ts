@@ -1,9 +1,9 @@
 /**
  * Unified Configuration Interface - Backward Compatibility Layer
- * 
+ *
  * @deprecated Use UnifiedConfiguration from '../types/unified-types.js' instead
  * This file provides backward compatibility for old imports while redirecting to the canonical definition.
- * 
+ *
  * ULTRATHINK ARCHITECTURE FIX: Consolidates duplicate UnifiedConfiguration interfaces
  * - Eliminates type conflicts between domain/interfaces and domain/types
  * - Provides seamless backward compatibility
@@ -11,13 +11,10 @@
  */
 
 // Import types for local use
-import type { 
-  ApplicationConfiguration,
-  VoiceSystemConfiguration
-} from '../types/unified-types.js';
+import type { ApplicationConfiguration, VoiceSystemConfiguration } from '../types/unified-types.js';
 
 // Re-export the canonical UnifiedConfiguration and all related types from unified-types
-export type { 
+export type {
   UnifiedConfiguration,
   SystemConfiguration,
   ApplicationConfiguration,
@@ -49,7 +46,7 @@ export type {
   ConfigurationError,
   ConfigurationSource,
   ConfigurationSourceInfo,
-  ConfigurationWarning
+  ConfigurationWarning,
 } from '../types/unified-types.js';
 
 // Legacy aliases for backward compatibility

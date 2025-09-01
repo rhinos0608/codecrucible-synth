@@ -142,9 +142,9 @@ export function validateRequiredConfig(): { valid: boolean; missing: string[] } 
 
   // Add validation for required fields based on your needs
   // For now, we'll just check that critical endpoints are accessible
-  
+
   return {
     valid: missing.length === 0,
-    missing
+    missing,
   };
 }

@@ -1,6 +1,6 @@
 /**
  * Enhanced MCP Integration Utilities
- * 
+ *
  * Utility functions and helpers for the enhanced MCP integration system
  */
 
@@ -11,23 +11,23 @@ import { logger } from '../logger.js';
  */
 export function validateMCPServerConfig(config: any): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
+
   if (!config.id || typeof config.id !== 'string') {
     errors.push('Server ID is required and must be a string');
   }
-  
+
   if (!config.name || typeof config.name !== 'string') {
     errors.push('Server name is required and must be a string');
   }
-  
+
   if (!config.endpoint && !config.qualifiedName) {
     errors.push('Server endpoint or qualifiedName is required');
   }
-  
+
   if (config.capabilities && !Array.isArray(config.capabilities)) {
     errors.push('Capabilities must be an array');
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -42,9 +42,9 @@ export function formatPerformanceMetrics(metrics: any): string {
     if (ms < 1000) return `${ms.toFixed(0)}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   };
-  
+
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
-  
+
   return [
     `Response Time: ${formatTime(metrics.avgResponseTime)}`,
     `Success Rate: ${formatPercent(metrics.successRate)}`,
@@ -69,19 +69,19 @@ export function calculateServerHealthScore(metrics: {
     availability: 0.3,
     successRate: 0.2,
   };
-  
+
   // Normalize metrics to 0-100 scale (higher is better)
-  const normalizedResponseTime = Math.max(0, 100 - (metrics.responseTime / 100));
-  const normalizedErrorRate = Math.max(0, 100 - (metrics.errorRate * 5));
+  const normalizedResponseTime = Math.max(0, 100 - metrics.responseTime / 100);
+  const normalizedErrorRate = Math.max(0, 100 - metrics.errorRate * 5);
   const normalizedAvailability = metrics.availability;
   const normalizedSuccessRate = metrics.successRate;
-  
-  const healthScore = 
+
+  const healthScore =
     normalizedResponseTime * weights.responseTime +
     normalizedErrorRate * weights.errorRate +
     normalizedAvailability * weights.availability +
     normalizedSuccessRate * weights.successRate;
-  
+
   return Math.round(Math.max(0, Math.min(100, healthScore)));
 }
 
@@ -91,7 +91,7 @@ export function calculateServerHealthScore(metrics: {
 export function parseCapabilityRequirements(description: string): string[] {
   const capabilities: string[] = [];
   const text = description.toLowerCase();
-  
+
   // Capability mapping patterns
   const patterns = [
     { pattern: /search|find|look|query/, capability: 'web-search' },
@@ -105,22 +105,20 @@ export function parseCapabilityRequirements(description: string): string[] {
     { pattern: /monitor|track|observe/, capability: 'monitoring' },
     { pattern: /security|safe|secure/, capability: 'security' },
   ];
-  
+
   patterns.forEach(({ pattern, capability }) => {
     if (pattern.test(text) && !capabilities.includes(capability)) {
       capabilities.push(capability);
     }
   });
-  
+
   return capabilities.length > 0 ? capabilities : ['general'];
 }
 
 /**
  * Create connection retry configuration
  */
-export function createRetryConfig(
-  complexity: 'simple' | 'moderate' | 'complex' = 'moderate'
-): any {
+export function createRetryConfig(complexity: 'simple' | 'moderate' | 'complex' = 'moderate'): any {
   const configs = {
     simple: {
       maxRetries: 2,
@@ -144,7 +142,7 @@ export function createRetryConfig(
       retryOn: 'all',
     },
   };
-  
+
   return configs[complexity];
 }
 
@@ -158,22 +156,22 @@ export function estimateRequestComplexity(
   // Base complexity by capability type
   const capabilityComplexity: { [key: string]: number } = {
     'web-search': 2,
-    'filesystem': 1,
+    filesystem: 1,
     'version-control': 2,
-    'terminal': 3,
-    'analysis': 4,
-    'generation': 5,
+    terminal: 3,
+    analysis: 4,
+    generation: 5,
     'ai-processing': 5,
     'data-processing': 3,
   };
-  
+
   let complexity = capabilityComplexity[capability] || 2;
-  
+
   // Adjust based on parameters
   if (parameters) {
     const paramCount = Object.keys(parameters).length;
     complexity += Math.floor(paramCount / 3);
-    
+
     // Check for complex parameter types
     Object.values(parameters).forEach((value: any) => {
       if (Array.isArray(value) && value.length > 10) complexity += 1;
@@ -181,7 +179,7 @@ export function estimateRequestComplexity(
       if (typeof value === 'string' && value.length > 1000) complexity += 1;
     });
   }
-  
+
   if (complexity <= 2) return 'low';
   if (complexity <= 4) return 'medium';
   return 'high';
@@ -224,10 +222,10 @@ export function createPerformanceSummary(metrics: any[]): any {
       availability: 0,
     };
   }
-  
+
   const total = metrics.length;
   const successful = metrics.filter(m => m.success || m.successRate > 50).length;
-  
+
   return {
     totalRequests: total,
     avgResponseTime: metrics.reduce((sum, m) => sum + (m.responseTime || 0), 0) / total,
@@ -258,17 +256,17 @@ export function filterServersByQuality(
     if (criteria.minReliability && server.reliability < criteria.minReliability) {
       return false;
     }
-    
+
     // Check performance
     if (criteria.minPerformance && server.performance < criteria.minPerformance) {
       return false;
     }
-    
+
     // Check capabilities
     if (criteria.requiredCapabilities && criteria.requiredCapabilities.length > 0) {
       const serverCapabilities = server.capabilities || [];
       const hasAllCapabilities = criteria.requiredCapabilities.every(cap =>
-        serverCapabilities.some((serverCap: any) => 
+        serverCapabilities.some((serverCap: any) =>
           typeof serverCap === 'string' ? serverCap === cap : serverCap.name === cap
         )
       );
@@ -276,12 +274,12 @@ export function filterServersByQuality(
         return false;
       }
     }
-    
+
     // Check response time
     if (criteria.maxResponseTime && server.avgResponseTime > criteria.maxResponseTime) {
       return false;
     }
-    
+
     return true;
   });
 }
@@ -304,13 +302,13 @@ export function sortServersByPriority(
     popularity: 0.2,
     responseTime: 0.1,
   };
-  
+
   const finalWeights = { ...defaultWeights, ...weights };
-  
+
   return servers
     .map(server => ({
       ...server,
-      priorityScore: 
+      priorityScore:
         (server.reliability || 0) * finalWeights.reliability +
         (server.performance || 0) * finalWeights.performance +
         (server.popularity || 0) * finalWeights.popularity +
@@ -322,33 +320,42 @@ export function sortServersByPriority(
 /**
  * Validate voice capability mapping
  */
-export function validateVoiceCapabilityMapping(mapping: any): { isValid: boolean; errors: string[] } {
+export function validateVoiceCapabilityMapping(mapping: any): {
+  isValid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
-  
+
   if (!mapping.voiceId || typeof mapping.voiceId !== 'string') {
     errors.push('Voice ID is required and must be a string');
   }
-  
+
   if (!mapping.voiceName || typeof mapping.voiceName !== 'string') {
     errors.push('Voice name is required and must be a string');
   }
-  
+
   if (!Array.isArray(mapping.preferredCapabilities)) {
     errors.push('Preferred capabilities must be an array');
   }
-  
+
   if (!Array.isArray(mapping.expertCapabilities)) {
     errors.push('Expert capabilities must be an array');
   }
-  
-  if (mapping.reliabilityWeight && (mapping.reliabilityWeight < 0 || mapping.reliabilityWeight > 1)) {
+
+  if (
+    mapping.reliabilityWeight &&
+    (mapping.reliabilityWeight < 0 || mapping.reliabilityWeight > 1)
+  ) {
     errors.push('Reliability weight must be between 0 and 1');
   }
-  
-  if (mapping.performanceWeight && (mapping.performanceWeight < 0 || mapping.performanceWeight > 1)) {
+
+  if (
+    mapping.performanceWeight &&
+    (mapping.performanceWeight < 0 || mapping.performanceWeight > 1)
+  ) {
     errors.push('Performance weight must be between 0 and 1');
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -372,31 +379,27 @@ export function createHealthCheckConfig(serverType: string): any {
       retries: 2,
       checkMethod: 'list-tools',
     },
-    'database': {
+    database: {
       interval: 120000,
       timeout: 15000,
       retries: 1,
       checkMethod: 'ping',
     },
-    'default': {
+    default: {
       interval: 60000,
       timeout: 10000,
       retries: 2,
       checkMethod: 'basic',
     },
   };
-  
+
   return configs[serverType] || configs.default;
 }
 
 /**
  * Log performance metrics in structured format
  */
-export function logPerformanceMetrics(
-  operation: string,
-  metrics: any,
-  context?: any
-): void {
+export function logPerformanceMetrics(operation: string, metrics: any, context?: any): void {
   logger.info(`Performance metrics for ${operation}`, {
     operation,
     responseTime: metrics.responseTime,
@@ -411,11 +414,7 @@ export function logPerformanceMetrics(
 /**
  * Create error context for debugging
  */
-export function createErrorContext(
-  operation: string,
-  error: Error,
-  context?: any
-): any {
+export function createErrorContext(operation: string, error: Error, context?: any): any {
   return {
     operation,
     errorMessage: error.message,
@@ -434,17 +433,17 @@ export function sanitizeLogData(data: any): any {
   if (!data || typeof data !== 'object') {
     return data;
   }
-  
+
   const sensitiveFields = ['password', 'token', 'apiKey', 'secret', 'key', 'auth'];
   const sanitized = { ...data };
-  
+
   const sanitizeObject = (obj: any): any => {
     if (!obj || typeof obj !== 'object') {
       return obj;
     }
-    
+
     const result: any = Array.isArray(obj) ? [] : {};
-    
+
     for (const key in obj) {
       if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
         result[key] = '[REDACTED]';
@@ -454,10 +453,10 @@ export function sanitizeLogData(data: any): any {
         result[key] = obj[key];
       }
     }
-    
+
     return result;
   };
-  
+
   return sanitizeObject(sanitized);
 }
 

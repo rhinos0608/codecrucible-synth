@@ -1,11 +1,15 @@
 /**
  * CLI User Interaction Implementation
- * 
+ *
  * This implementation provides concrete user interaction capabilities
  * that can be injected into tools and other systems, breaking circular dependencies.
  */
 
-import { IUserInteraction, DisplayOptions, PromptOptions } from '../../domain/interfaces/user-interaction.js';
+import {
+  IUserInteraction,
+  DisplayOptions,
+  PromptOptions,
+} from '../../domain/interfaces/user-interaction.js';
 import chalk from 'chalk';
 import ora, { Ora } from 'ora';
 import inquirer from 'inquirer';
@@ -82,14 +86,14 @@ export class CLIUserInteraction implements IUserInteraction {
         if (options.required && !input.trim()) {
           return 'This field is required';
         }
-        
+
         if (options.validation) {
           const result = options.validation(input);
           if (result === true) return true;
           if (typeof result === 'string') return result;
           return 'Invalid input';
         }
-        
+
         return true;
       };
     }

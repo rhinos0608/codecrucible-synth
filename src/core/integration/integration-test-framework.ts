@@ -1,9 +1,9 @@
 /**
  * Integration Testing Framework for System Integration
- * 
+ *
  * Comprehensive testing framework that validates:
  * - System-to-system integration points
- * - End-to-end workflows 
+ * - End-to-end workflows
  * - Performance under load
  * - Failure scenarios and recovery
  * - Circuit breaker behavior
@@ -121,17 +121,17 @@ export interface TestRecommendation {
  */
 export class IntegrationTestFramework extends EventEmitter {
   private static instance: IntegrationTestFramework | null = null;
-  
+
   // Core components
   private coordinator: SystemIntegrationCoordinator;
   private healthMonitor: SystemHealthMonitor;
   private performanceOptimizer: PerformanceOptimizer;
-  
+
   // Test management
   private registeredTests: Map<string, IntegrationTest> = new Map();
   private testSuites: Map<string, TestSuite> = new Map();
   private executionHistory: TestResult[] = [];
-  
+
   // Test execution state
   private isRunning = false;
   private currentExecution: {
@@ -140,23 +140,23 @@ export class IntegrationTestFramework extends EventEmitter {
     results: TestResult[];
     cancelled: boolean;
   } | null = null;
-  
+
   private constructor() {
     super();
     this.coordinator = SystemIntegrationCoordinator.getInstance();
     this.healthMonitor = SystemHealthMonitor.getInstance();
     this.performanceOptimizer = PerformanceOptimizer.getInstance();
-    
+
     this.setupDefaultTests();
   }
-  
+
   static getInstance(): IntegrationTestFramework {
     if (!IntegrationTestFramework.instance) {
       IntegrationTestFramework.instance = new IntegrationTestFramework();
     }
     return IntegrationTestFramework.instance;
   }
-  
+
   /**
    * Register a new integration test
    */
@@ -165,7 +165,7 @@ export class IntegrationTestFramework extends EventEmitter {
     this.registeredTests.set(test.id, test);
     this.emit('test-registered', test);
   }
-  
+
   /**
    * Create a test suite from registered tests
    */
@@ -176,7 +176,7 @@ export class IntegrationTestFramework extends EventEmitter {
     config?: Partial<TestSuiteConfig>
   ): void {
     const tests: IntegrationTest[] = [];
-    
+
     for (const testId of testIds) {
       const test = this.registeredTests.get(testId);
       if (test) {
@@ -185,7 +185,7 @@ export class IntegrationTestFramework extends EventEmitter {
         logger.warn(`Test not found: ${testId}`);
       }
     }
-    
+
     const suite: TestSuite = {
       id: suiteId,
       name,
@@ -198,16 +198,16 @@ export class IntegrationTestFramework extends EventEmitter {
         reporting: {
           detailed: true,
           includeMetrics: true,
-          exportFormat: 'json'
+          exportFormat: 'json',
         },
-        ...config
-      }
+        ...config,
+      },
     };
-    
+
     this.testSuites.set(suiteId, suite);
     logger.info(`📋 Created test suite: ${name} with ${tests.length} tests`);
   }
-  
+
   /**
    * Execute a test suite
    */
@@ -215,93 +215,89 @@ export class IntegrationTestFramework extends EventEmitter {
     if (this.isRunning) {
       throw new Error('Test execution already in progress');
     }
-    
+
     const suite = this.testSuites.get(suiteId);
     if (!suite) {
       throw new Error(`Test suite not found: ${suiteId}`);
     }
-    
+
     logger.info(`🧪 Starting test suite execution: ${suite.name}`);
-    
+
     this.isRunning = true;
     this.currentExecution = {
       suiteId,
       startTime: Date.now(),
       results: [],
-      cancelled: false
+      cancelled: false,
     };
-    
+
     try {
       const report = await this.executeTestSuiteInternal(suite);
-      
+
       // Store execution history
       this.executionHistory.push(...report.results);
       if (this.executionHistory.length > 1000) {
         this.executionHistory = this.executionHistory.slice(-1000);
       }
-      
+
       this.emit('suite-completed', report);
       return report;
-      
     } catch (error) {
       logger.error('Test suite execution failed:', error);
       this.emit('suite-failed', suiteId, error);
       throw error;
-      
     } finally {
       this.isRunning = false;
       this.currentExecution = null;
     }
   }
-  
+
   /**
    * Execute system integration validation tests
    */
   async validateSystemIntegration(): Promise<TestReport> {
     logger.info('🔍 Running comprehensive system integration validation');
-    
+
     // Create validation test suite
     this.createValidationTestSuite();
-    
+
     // Execute validation tests
     return await this.executeTestSuite('system-integration-validation');
   }
-  
+
   /**
    * Execute performance benchmark tests
    */
   async runPerformanceBenchmarks(): Promise<TestReport> {
     logger.info('⚡ Running performance benchmark tests');
-    
+
     this.createPerformanceBenchmarkSuite();
     return await this.executeTestSuite('performance-benchmarks');
   }
-  
+
   /**
    * Execute resilience tests (chaos engineering)
    */
   async runResilienceTests(): Promise<TestReport> {
     logger.info('🔥 Running resilience and chaos engineering tests');
-    
+
     this.createResilienceTestSuite();
     return await this.executeTestSuite('resilience-tests');
   }
-  
+
   /**
    * Get test execution report
    */
   getExecutionReport(suiteId?: string): TestReport | TestReport[] {
     if (suiteId) {
-      const suiteResults = this.executionHistory.filter(r => 
-        r.metadata.suiteId === suiteId
-      );
-      
+      const suiteResults = this.executionHistory.filter(r => r.metadata.suiteId === suiteId);
+
       return this.generateReport(suiteId, suiteResults);
     }
-    
+
     // Return all execution history grouped by suite
     const suiteGroups = new Map<string, TestResult[]>();
-    
+
     for (const result of this.executionHistory) {
       const suiteName = result.metadata.suiteId || 'unknown';
       if (!suiteGroups.has(suiteName)) {
@@ -309,66 +305,76 @@ export class IntegrationTestFramework extends EventEmitter {
       }
       suiteGroups.get(suiteName)!.push(result);
     }
-    
-    return Array.from(suiteGroups.entries()).map(([suiteId, results]) => 
+
+    return Array.from(suiteGroups.entries()).map(([suiteId, results]) =>
       this.generateReport(suiteId, results)
     );
   }
-  
+
   // Private implementation methods
-  
+
   private async executeTestSuiteInternal(suite: TestSuite): Promise<TestReport> {
     const startTime = Date.now();
     const results: TestResult[] = [];
-    
+
     if (suite.configuration.parallel) {
       // Execute tests in parallel with concurrency control
-      results.push(...await this.executeTestsParallel(suite.tests, suite.configuration.maxConcurrency));
+      results.push(
+        ...(await this.executeTestsParallel(suite.tests, suite.configuration.maxConcurrency))
+      );
     } else {
       // Execute tests sequentially
-      results.push(...await this.executeTestsSequential(suite.tests, suite.configuration.failFast));
+      results.push(
+        ...(await this.executeTestsSequential(suite.tests, suite.configuration.failFast))
+      );
     }
-    
+
     // Cleanup if configured
     if (suite.configuration.cleanup) {
       await this.performSuiteCleanup(suite);
     }
-    
+
     const executionTime = Date.now() - startTime;
     return this.generateReport(suite.id, results, executionTime);
   }
-  
-  private async executeTestsSequential(tests: IntegrationTest[], failFast: boolean): Promise<TestResult[]> {
+
+  private async executeTestsSequential(
+    tests: IntegrationTest[],
+    failFast: boolean
+  ): Promise<TestResult[]> {
     const results: TestResult[] = [];
-    
+
     for (const test of tests) {
       if (this.currentExecution?.cancelled) {
         break;
       }
-      
+
       const result = await this.executeTest(test);
       results.push(result);
-      
+
       this.emit('test-completed', result);
-      
+
       if (failFast && !result.passed) {
         logger.warn('Stopping test execution due to failure (failFast enabled)');
         break;
       }
     }
-    
+
     return results;
   }
-  
-  private async executeTestsParallel(tests: IntegrationTest[], maxConcurrency: number): Promise<TestResult[]> {
+
+  private async executeTestsParallel(
+    tests: IntegrationTest[],
+    maxConcurrency: number
+  ): Promise<TestResult[]> {
     const results: TestResult[] = [];
     const executing = new Set<Promise<TestResult>>();
-    
+
     for (const test of tests) {
       if (this.currentExecution?.cancelled) {
         break;
       }
-      
+
       // Wait if at max concurrency
       if (executing.size >= maxConcurrency) {
         const completed = await Promise.race(executing);
@@ -376,12 +382,12 @@ export class IntegrationTestFramework extends EventEmitter {
         results.push(completed);
         this.emit('test-completed', completed);
       }
-      
+
       // Start test execution
       const testPromise = this.executeTest(test);
       executing.add(testPromise);
     }
-    
+
     // Wait for remaining tests to complete
     while (executing.size > 0) {
       const completed = await Promise.race(executing);
@@ -389,29 +395,29 @@ export class IntegrationTestFramework extends EventEmitter {
       results.push(completed);
       this.emit('test-completed', completed);
     }
-    
+
     return results;
   }
-  
+
   private async executeTest(test: IntegrationTest): Promise<TestResult> {
     const startTime = Date.now();
     let attempt = 0;
     let lastError: any = null;
-    
+
     while (attempt <= test.retries) {
       try {
         // Setup test
         await test.setup();
-        
+
         // Execute test with timeout
         const result = await Promise.race([
           test.execute(),
-          this.createTimeoutPromise(test.timeout, test.id)
+          this.createTimeoutPromise(test.timeout, test.id),
         ]);
-        
+
         // Cleanup test
         await test.cleanup();
-        
+
         // Return successful result
         const duration = Date.now() - startTime;
         return {
@@ -420,28 +426,27 @@ export class IntegrationTestFramework extends EventEmitter {
           metadata: {
             ...result.metadata,
             attempts: attempt + 1,
-            suiteId: this.currentExecution?.suiteId
-          }
+            suiteId: this.currentExecution?.suiteId,
+          },
         };
-        
       } catch (error) {
         lastError = error;
         attempt++;
-        
+
         // Cleanup on failure
         try {
           await test.cleanup();
         } catch (cleanupError) {
           logger.error('Test cleanup failed:', cleanupError);
         }
-        
+
         if (attempt <= test.retries) {
           logger.warn(`Test ${test.id} failed, retrying (${attempt}/${test.retries})`);
           await this.delay(1000 * attempt); // Progressive delay
         }
       }
     }
-    
+
     // Return failure result after all retries
     const duration = Date.now() - startTime;
     return {
@@ -449,29 +454,35 @@ export class IntegrationTestFramework extends EventEmitter {
       passed: false,
       duration,
       metrics: this.getDefaultMetrics(),
-      errors: [{
-        type: 'TestExecutionError',
-        message: lastError?.message || 'Unknown error',
-        severity: 'high',
-        stackTrace: lastError?.stack
-      }],
+      errors: [
+        {
+          type: 'TestExecutionError',
+          message: lastError?.message || 'Unknown error',
+          severity: 'high',
+          stackTrace: lastError?.stack,
+        },
+      ],
       warnings: [],
       metadata: {
         attempts: attempt,
         suiteId: this.currentExecution?.suiteId,
-        allRetriesExhausted: true
-      }
+        allRetriesExhausted: true,
+      },
     };
   }
-  
-  private generateReport(suiteId: string, results: TestResult[], executionTime?: number): TestReport {
+
+  private generateReport(
+    suiteId: string,
+    results: TestResult[],
+    executionTime?: number
+  ): TestReport {
     const totalTests = results.length;
     const passedTests = results.filter(r => r.passed).length;
     const failedTests = totalTests - passedTests;
-    
+
     const summary = this.calculateTestSummary(results);
     const recommendations = this.generateRecommendations(results, summary);
-    
+
     return {
       suiteId,
       executionTime: executionTime || 0,
@@ -482,10 +493,10 @@ export class IntegrationTestFramework extends EventEmitter {
       overallSuccess: failedTests === 0,
       results,
       summary,
-      recommendations
+      recommendations,
     };
   }
-  
+
   private calculateTestSummary(results: TestResult[]): TestSummary {
     if (results.length === 0) {
       return {
@@ -494,58 +505,63 @@ export class IntegrationTestFramework extends EventEmitter {
         integrationScore: 0,
         criticalIssues: 0,
         warnings: 0,
-        coveragePercentage: 0
+        coveragePercentage: 0,
       };
     }
-    
+
     const totalResults = results.length;
     const passedResults = results.filter(r => r.passed);
-    
+
     // Calculate performance score (based on latency and throughput)
-    const avgPerformance = passedResults.reduce((sum, r) => 
-      sum + (r.metrics.performance.latency < 5000 ? 100 : 50), 0
-    ) / totalResults;
-    
+    const avgPerformance =
+      passedResults.reduce((sum, r) => sum + (r.metrics.performance.latency < 5000 ? 100 : 50), 0) /
+      totalResults;
+
     // Calculate reliability score (based on success rate)
     const reliabilityScore = (passedResults.length / totalResults) * 100;
-    
+
     // Calculate integration score (based on system communication)
-    const avgIntegration = passedResults.reduce((sum, r) => 
-      sum + r.metrics.integration.dataIntegrity, 0
-    ) / Math.max(passedResults.length, 1);
-    
+    const avgIntegration =
+      passedResults.reduce((sum, r) => sum + r.metrics.integration.dataIntegrity, 0) /
+      Math.max(passedResults.length, 1);
+
     // Count critical issues
-    const criticalIssues = results.reduce((count, r) => 
-      count + r.errors.filter(e => e.severity === 'critical').length, 0
+    const criticalIssues = results.reduce(
+      (count, r) => count + r.errors.filter(e => e.severity === 'critical').length,
+      0
     );
-    
+
     // Count warnings
     const warnings = results.reduce((count, r) => count + r.warnings.length, 0);
-    
+
     return {
       performanceScore: Math.round(avgPerformance),
       reliabilityScore: Math.round(reliabilityScore),
       integrationScore: Math.round(avgIntegration),
       criticalIssues,
       warnings,
-      coveragePercentage: Math.round((passedResults.length / totalResults) * 100)
+      coveragePercentage: Math.round((passedResults.length / totalResults) * 100),
     };
   }
-  
-  private generateRecommendations(results: TestResult[], summary: TestSummary): TestRecommendation[] {
+
+  private generateRecommendations(
+    results: TestResult[],
+    summary: TestSummary
+  ): TestRecommendation[] {
     const recommendations: TestRecommendation[] = [];
-    
+
     // Performance recommendations
     if (summary.performanceScore < 80) {
       recommendations.push({
         category: 'performance',
         priority: 'high',
         description: 'System performance is below optimal levels',
-        suggestedAction: 'Review and optimize high-latency operations, implement caching strategies',
-        estimatedImpact: 25
+        suggestedAction:
+          'Review and optimize high-latency operations, implement caching strategies',
+        estimatedImpact: 25,
       });
     }
-    
+
     // Reliability recommendations
     if (summary.reliabilityScore < 95) {
       recommendations.push({
@@ -553,10 +569,10 @@ export class IntegrationTestFramework extends EventEmitter {
         priority: 'critical',
         description: 'System reliability needs improvement',
         suggestedAction: 'Implement better error handling and circuit breaker patterns',
-        estimatedImpact: 40
+        estimatedImpact: 40,
       });
     }
-    
+
     // Integration recommendations
     if (summary.integrationScore < 90) {
       recommendations.push({
@@ -564,10 +580,10 @@ export class IntegrationTestFramework extends EventEmitter {
         priority: 'medium',
         description: 'System integration quality can be improved',
         suggestedAction: 'Review data transformation and communication protocols',
-        estimatedImpact: 20
+        estimatedImpact: 20,
       });
     }
-    
+
     // Critical issues
     if (summary.criticalIssues > 0) {
       recommendations.push({
@@ -575,18 +591,18 @@ export class IntegrationTestFramework extends EventEmitter {
         priority: 'critical',
         description: `${summary.criticalIssues} critical issues detected`,
         suggestedAction: 'Address all critical issues before production deployment',
-        estimatedImpact: 60
+        estimatedImpact: 60,
       });
     }
-    
+
     return recommendations.sort((a, b) => {
       const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
       return priorityOrder[b.priority] - priorityOrder[a.priority];
     });
   }
-  
+
   // Setup default tests
-  
+
   private setupDefaultTests(): void {
     // System initialization test
     this.registerTest({
@@ -599,11 +615,11 @@ export class IntegrationTestFramework extends EventEmitter {
       },
       execute: async () => {
         const startTime = Date.now();
-        
+
         try {
           // Test system initialization
           await this.coordinator.initializeIntegratedSystems();
-          
+
           return {
             testId: 'system-initialization',
             passed: true,
@@ -611,26 +627,27 @@ export class IntegrationTestFramework extends EventEmitter {
             metrics: {
               performance: { latency: Date.now() - startTime, throughput: 1, resourceUsage: 50 },
               reliability: { successRate: 100, errorRate: 0, availability: 100 },
-              integration: { systemsUsed: ['all'], communicationLatency: 100, dataIntegrity: 100 }
+              integration: { systemsUsed: ['all'], communicationLatency: 100, dataIntegrity: 100 },
             },
             errors: [],
             warnings: [],
-            metadata: { testType: 'initialization' }
+            metadata: { testType: 'initialization' },
           };
-          
         } catch (error) {
           return {
             testId: 'system-initialization',
             passed: false,
             duration: Date.now() - startTime,
             metrics: this.getDefaultMetrics(),
-            errors: [{
-              type: 'InitializationError',
-              message: error instanceof Error ? error.message : 'Unknown initialization error',
-              severity: 'critical'
-            }],
+            errors: [
+              {
+                type: 'InitializationError',
+                message: error instanceof Error ? error.message : 'Unknown initialization error',
+                severity: 'critical',
+              },
+            ],
             warnings: [],
-            metadata: { testType: 'initialization' }
+            metadata: { testType: 'initialization' },
           };
         }
       },
@@ -638,9 +655,9 @@ export class IntegrationTestFramework extends EventEmitter {
         // Cleanup after initialization test
       },
       timeout: 60000,
-      retries: 2
+      retries: 2,
     });
-    
+
     // Add more default tests...
     this.registerTest({
       id: 'health-monitoring',
@@ -651,22 +668,22 @@ export class IntegrationTestFramework extends EventEmitter {
       execute: async () => this.testHealthMonitoring(),
       cleanup: async () => {},
       timeout: 30000,
-      retries: 1
+      retries: 1,
     });
-    
+
     this.registerTest({
       id: 'performance-optimization',
-      name: 'Performance Optimization Test', 
+      name: 'Performance Optimization Test',
       description: 'Validates performance optimization features',
       category: 'performance',
       setup: async () => {},
       execute: async () => this.testPerformanceOptimization(),
       cleanup: async () => {},
       timeout: 45000,
-      retries: 1
+      retries: 1,
     });
   }
-  
+
   private createValidationTestSuite(): void {
     this.createTestSuite(
       'system-integration-validation',
@@ -676,68 +693,77 @@ export class IntegrationTestFramework extends EventEmitter {
         parallel: false,
         failFast: true,
         cleanup: true,
-        reporting: { detailed: true, includeMetrics: true, exportFormat: 'json' }
+        reporting: { detailed: true, includeMetrics: true, exportFormat: 'json' },
       }
     );
   }
-  
+
   private createPerformanceBenchmarkSuite(): void {
     // Implementation for performance benchmark suite
   }
-  
+
   private createResilienceTestSuite(): void {
     // Implementation for resilience test suite
   }
-  
+
   // Helper methods
-  
+
   private async testHealthMonitoring(): Promise<TestResult> {
     const startTime = Date.now();
-    
+
     try {
       const health = await this.coordinator.getSystemHealth();
       const passed = health.overallHealthScore > 70;
-      
+
       return {
         testId: 'health-monitoring',
         passed,
         duration: Date.now() - startTime,
         metrics: {
           performance: { latency: 200, throughput: 1, resourceUsage: 30 },
-          reliability: { successRate: passed ? 100 : 70, errorRate: passed ? 0 : 30, availability: 100 },
-          integration: { systemsUsed: ['health-monitor'], communicationLatency: 50, dataIntegrity: 95 }
+          reliability: {
+            successRate: passed ? 100 : 70,
+            errorRate: passed ? 0 : 30,
+            availability: 100,
+          },
+          integration: {
+            systemsUsed: ['health-monitor'],
+            communicationLatency: 50,
+            dataIntegrity: 95,
+          },
         },
         errors: [],
         warnings: passed ? [] : ['Health score below optimal threshold'],
-        metadata: { healthScore: health.overallHealthScore }
+        metadata: { healthScore: health.overallHealthScore },
       };
-      
     } catch (error) {
       return {
         testId: 'health-monitoring',
         passed: false,
         duration: Date.now() - startTime,
         metrics: this.getDefaultMetrics(),
-        errors: [{
-          type: 'HealthMonitoringError',
-          message: error instanceof Error ? error.message : 'Health monitoring test failed',
-          severity: 'high'
-        }],
+        errors: [
+          {
+            type: 'HealthMonitoringError',
+            message: error instanceof Error ? error.message : 'Health monitoring test failed',
+            severity: 'high',
+          },
+        ],
         warnings: [],
-        metadata: {}
+        metadata: {},
       };
     }
   }
-  
+
   private async testPerformanceOptimization(): Promise<TestResult> {
     const startTime = Date.now();
-    
+
     try {
       const metrics = this.performanceOptimizer.getCurrentMetrics();
       const improvement = this.performanceOptimizer.getPerformanceImprovement();
-      
+
       const passed = improvement >= 0; // At least no degradation
-      
+
       return {
         testId: 'performance-optimization',
         passed,
@@ -747,41 +773,47 @@ export class IntegrationTestFramework extends EventEmitter {
             latency: metrics.responseTime,
             throughput: metrics.throughput,
             resourceUsage: metrics.memoryUsage,
-            cacheHitRate: 85 // Default cache hit rate
+            cacheHitRate: 85, // Default cache hit rate
           },
           reliability: { successRate: 100, errorRate: 0, availability: 100 },
-          integration: { systemsUsed: ['performance-optimizer'], communicationLatency: 30, dataIntegrity: 100 }
+          integration: {
+            systemsUsed: ['performance-optimizer'],
+            communicationLatency: 30,
+            dataIntegrity: 100,
+          },
         },
         errors: [],
         warnings: improvement < 10 ? ['Performance improvement is minimal'] : [],
-        metadata: { improvement }
+        metadata: { improvement },
       };
-      
     } catch (error) {
       return {
         testId: 'performance-optimization',
         passed: false,
         duration: Date.now() - startTime,
         metrics: this.getDefaultMetrics(),
-        errors: [{
-          type: 'PerformanceOptimizationError',
-          message: error instanceof Error ? error.message : 'Performance optimization test failed',
-          severity: 'medium'
-        }],
+        errors: [
+          {
+            type: 'PerformanceOptimizationError',
+            message:
+              error instanceof Error ? error.message : 'Performance optimization test failed',
+            severity: 'medium',
+          },
+        ],
         warnings: [],
-        metadata: {}
+        metadata: {},
       };
     }
   }
-  
+
   private getDefaultMetrics(): TestMetrics {
     return {
       performance: { latency: 0, throughput: 0, resourceUsage: 0 },
       reliability: { successRate: 0, errorRate: 100, availability: 0 },
-      integration: { systemsUsed: [], communicationLatency: 0, dataIntegrity: 0 }
+      integration: { systemsUsed: [], communicationLatency: 0, dataIntegrity: 0 },
     };
   }
-  
+
   private async createTimeoutPromise(timeout: number, testId: string): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
@@ -789,11 +821,11 @@ export class IntegrationTestFramework extends EventEmitter {
       }, timeout);
     });
   }
-  
-  private delay(ms: number): Promise<void> {
+
+  private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
-  
+
   private async performSuiteCleanup(suite: TestSuite): Promise<void> {
     // Implementation for suite cleanup
   }

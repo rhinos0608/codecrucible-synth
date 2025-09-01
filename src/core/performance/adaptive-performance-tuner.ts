@@ -57,37 +57,37 @@ export class AdaptivePerformanceTuner extends EventEmitter {
 
   constructor() {
     super();
-    
+
     this.metrics = {
       cpuUsage: 0,
       memoryUsage: 0,
       responseTime: 0,
       requestRate: 0,
       errorRate: 0,
-      activeConnections: 0
+      activeConnections: 0,
     };
 
     this.thresholds = {
       cpu: { low: 30, medium: 60, high: 85 },
       memory: { low: 40, medium: 70, high: 90 },
       responseTime: { low: 100, medium: 500, high: 2000 },
-      errorRate: { low: 1, medium: 5, high: 15 }
+      errorRate: { low: 1, medium: 5, high: 15 },
     };
 
     this.config = {
       batchSize: 10,
       timeouts: {
         request: 30000,
-        connection: 5000
+        connection: 5000,
       },
       concurrency: {
         max: 50,
-        optimal: 25
+        optimal: 25,
       },
       caching: {
         enabled: true,
-        ttl: 300000 // 5 minutes
-      }
+        ttl: 300000, // 5 minutes
+      },
     };
   }
 
@@ -97,10 +97,10 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     }
 
     logger.info('Starting adaptive performance monitoring');
-    
+
     this.monitoringInterval = setInterval(() => {
       this.collectMetrics()
-        .then(() => this.analyzeAndTune())
+        .then(async () => this.analyzeAndTune())
         .catch(error => {
           logger.error('Performance monitoring error:', error);
         });
@@ -124,7 +124,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
         responseTime: await this.getAverageResponseTime(),
         requestRate: await this.getRequestRate(),
         errorRate: await this.getErrorRate(),
-        activeConnections: await this.getActiveConnections()
+        activeConnections: await this.getActiveConnections(),
       };
 
       this.emit('metricsCollected', this.metrics);
@@ -189,7 +189,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     const oldValue = this.config.concurrency.max;
     this.config.concurrency.max = Math.max(10, Math.floor(this.config.concurrency.max * 0.8));
     this.config.concurrency.optimal = Math.floor(this.config.concurrency.max * 0.7);
-    
+
     this.recordAdjustment('concurrency', oldValue, this.config.concurrency.max, 'high CPU usage');
   }
 
@@ -197,14 +197,14 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     const oldValue = this.config.concurrency.max;
     this.config.concurrency.max = Math.min(100, Math.floor(this.config.concurrency.max * 1.2));
     this.config.concurrency.optimal = Math.floor(this.config.concurrency.max * 0.7);
-    
+
     this.recordAdjustment('concurrency', oldValue, this.config.concurrency.max, 'low CPU usage');
   }
 
   private async reduceBatchSize(): Promise<void> {
     const oldValue = this.config.batchSize;
     this.config.batchSize = Math.max(1, Math.floor(this.config.batchSize * 0.8));
-    
+
     this.recordAdjustment('batchSize', oldValue, this.config.batchSize, 'high memory usage');
   }
 
@@ -218,14 +218,19 @@ export class AdaptivePerformanceTuner extends EventEmitter {
   private async reduceTimeouts(): Promise<void> {
     const oldValue = this.config.timeouts.request;
     this.config.timeouts.request = Math.max(5000, Math.floor(this.config.timeouts.request * 0.8));
-    
-    this.recordAdjustment('requestTimeout', oldValue, this.config.timeouts.request, 'high response time');
+
+    this.recordAdjustment(
+      'requestTimeout',
+      oldValue,
+      this.config.timeouts.request,
+      'high response time'
+    );
   }
 
   private async increaseCacheHitRate(): Promise<void> {
     const oldValue = this.config.caching.ttl;
     this.config.caching.ttl = Math.min(600000, Math.floor(this.config.caching.ttl * 1.2)); // Max 10 minutes
-    
+
     this.recordAdjustment('cacheTTL', oldValue, this.config.caching.ttl, 'improve response time');
   }
 
@@ -245,7 +250,7 @@ export class AdaptivePerformanceTuner extends EventEmitter {
       metric,
       oldValue,
       newValue,
-      reason
+      reason,
     });
 
     // Keep only last 100 adjustments
@@ -294,18 +299,18 @@ export class AdaptivePerformanceTuner extends EventEmitter {
     if (this.responseTimeHistory.length > 100) {
       this.responseTimeHistory = this.responseTimeHistory.slice(-50);
     }
-    
+
     // Update counters
     this.requestCount += requestCount;
     if (errorRate > 0) {
       this.errorCount += Math.ceil(requestCount * errorRate);
     }
-    
+
     // Log significant performance events
     if (responseTime > 10000) {
       logger.warn(`High response time detected: ${responseTime}ms`);
     }
-    
+
     if (errorRate > 0.1) {
       logger.warn(`High error rate detected: ${(errorRate * 100).toFixed(1)}%`);
     }

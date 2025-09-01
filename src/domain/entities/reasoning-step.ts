@@ -12,13 +12,21 @@
  * Reasoning Step Type Value Object
  */
 export class ReasoningStepType {
-  private static readonly VALID_TYPES = ['thought', 'action', 'observation', 'conclusion', 'error'] as const;
-  
-  private constructor(private readonly _value: typeof ReasoningStepType.VALID_TYPES[number]) {}
+  private static readonly VALID_TYPES = [
+    'thought',
+    'action',
+    'observation',
+    'conclusion',
+    'error',
+  ] as const;
+
+  private constructor(private readonly _value: (typeof ReasoningStepType.VALID_TYPES)[number]) {}
 
   static create(value: string): ReasoningStepType {
     if (!this.VALID_TYPES.includes(value as any)) {
-      throw new Error(`Invalid reasoning step type: ${value}. Must be one of: ${this.VALID_TYPES.join(', ')}`);
+      throw new Error(
+        `Invalid reasoning step type: ${value}. Must be one of: ${this.VALID_TYPES.join(', ')}`
+      );
     }
     return new ReasoningStepType(value as any);
   }
@@ -56,7 +64,9 @@ export class ReasoningStepType {
   }
 
   isThinkingStep(): boolean {
-    return this._value === 'thought' || this._value === 'observation' || this._value === 'conclusion';
+    return (
+      this._value === 'thought' || this._value === 'observation' || this._value === 'conclusion'
+    );
   }
 
   isErrorStep(): boolean {
@@ -173,7 +183,7 @@ export class ReasoningStep {
     metadata: Record<string, any> = {}
   ) {
     this.validateInputs(stepNumber, content);
-    
+
     this._stepNumber = stepNumber;
     this._type = type;
     this._content = content;
@@ -269,22 +279,22 @@ export class ReasoningStep {
    */
   calculateImportance(): number {
     let importance = this._confidence.value;
-    
+
     // Tool steps are generally more important for execution
     if (this.isToolStep()) {
       importance += 0.2;
     }
-    
+
     // Error steps are critical
     if (this.hasError()) {
       importance += 0.5;
     }
-    
+
     // Conclusion steps are important for final outcomes
     if (this._type.value === 'conclusion') {
       importance += 0.3;
     }
-    
+
     return Math.min(1.0, importance);
   }
 
@@ -338,7 +348,7 @@ export class ReasoningStep {
       confidence: this._confidence.value,
       timestamp: this._timestamp.toISOString(),
       executionTime: this._executionTime,
-      metadata: { ...this._metadata }
+      metadata: { ...this._metadata },
     };
   }
 
@@ -361,26 +371,46 @@ export class ReasoningStep {
   }
 
   // Factory methods
-  
-  static createThoughtStep(stepNumber: number, content: string, confidence: ConfidenceScore): ReasoningStep {
+
+  static createThoughtStep(
+    stepNumber: number,
+    content: string,
+    confidence: ConfidenceScore
+  ): ReasoningStep {
     return new ReasoningStep(stepNumber, ReasoningStepType.thought(), content, confidence);
   }
 
   static createActionStep(
-    stepNumber: number, 
-    content: string, 
-    toolName: string, 
-    toolArgs: ToolArguments, 
+    stepNumber: number,
+    content: string,
+    toolName: string,
+    toolArgs: ToolArguments,
     confidence: ConfidenceScore
   ): ReasoningStep {
-    return new ReasoningStep(stepNumber, ReasoningStepType.action(), content, confidence, new Date(), toolName, toolArgs);
+    return new ReasoningStep(
+      stepNumber,
+      ReasoningStepType.action(),
+      content,
+      confidence,
+      new Date(),
+      toolName,
+      toolArgs
+    );
   }
 
-  static createObservationStep(stepNumber: number, content: string, confidence: ConfidenceScore): ReasoningStep {
+  static createObservationStep(
+    stepNumber: number,
+    content: string,
+    confidence: ConfidenceScore
+  ): ReasoningStep {
     return new ReasoningStep(stepNumber, ReasoningStepType.observation(), content, confidence);
   }
 
-  static createConclusionStep(stepNumber: number, content: string, confidence: ConfidenceScore): ReasoningStep {
+  static createConclusionStep(
+    stepNumber: number,
+    content: string,
+    confidence: ConfidenceScore
+  ): ReasoningStep {
     return new ReasoningStep(stepNumber, ReasoningStepType.conclusion(), content, confidence);
   }
 
@@ -392,7 +422,7 @@ export class ReasoningStep {
     if (stepNumber < 1) {
       throw new Error('Step number must be positive');
     }
-    
+
     if (!content || content.trim().length === 0) {
       throw new Error('Reasoning step content cannot be empty');
     }

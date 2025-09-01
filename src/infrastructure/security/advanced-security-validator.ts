@@ -56,7 +56,7 @@ export class AdvancedSecurityValidator {
       ],
       enableLogging: true,
       requireEncryption: false,
-      ...options
+      ...options,
     };
 
     // Create a logger for the validator
@@ -65,7 +65,7 @@ export class AdvancedSecurityValidator {
       error: (msg: string, error?: any) => console.error(`[SecurityValidator] ${msg}`, error),
       warn: (msg: string) => console.warn(`[SecurityValidator] ${msg}`),
       debug: (msg: string) => console.debug(`[SecurityValidator] ${msg}`),
-      trace: (msg: string) => console.trace(`[SecurityValidator] ${msg}`)
+      trace: (msg: string) => console.trace(`[SecurityValidator] ${msg}`),
     } as ILogger;
 
     this.unifiedValidator = new UnifiedSecurityValidator(validatorLogger, {
@@ -99,7 +99,7 @@ export class AdvancedSecurityValidator {
       allowDynamicImports: false,
       enableAuditLogging: this.options.enableLogging,
       logSecurityViolations: true,
-      alertOnCriticalViolations: true
+      alertOnCriticalViolations: true,
     });
     this.inputSanitizer = new ModernInputSanitizer();
   }
@@ -125,10 +125,10 @@ export class AdvancedSecurityValidator {
         permissions: context.permissions || [],
         metadata: {
           securityLevel: this.options.enableStrictMode ? 'high' : 'medium',
-          timeoutMs: 30000
-        }
+          timeoutMs: 30000,
+        },
       });
-      
+
       if (!basicValidation.isValid) {
         errors.push(...basicValidation.violations.map(v => v.message));
         securityLevel = basicValidation.riskLevel === 'critical' ? 'critical' : 'high';
@@ -174,12 +174,24 @@ export class AdvancedSecurityValidator {
         sanitizedInput,
         securityLevel,
         validationTime: Date.now() - startTime,
-        riskLevel: securityLevel === 'critical' ? 'critical' : securityLevel === 'high' ? 'high' : securityLevel === 'medium' ? 'medium' : 'low',
+        riskLevel:
+          securityLevel === 'critical'
+            ? 'critical'
+            : securityLevel === 'high'
+              ? 'high'
+              : securityLevel === 'medium'
+                ? 'medium'
+                : 'low',
         violations: errors.map(error => ({
           type: 'validation_error',
-          severity: securityLevel === 'critical' ? 'critical' : securityLevel === 'high' ? 'high' : 'medium',
-          message: error
-        }))
+          severity:
+            securityLevel === 'critical'
+              ? 'critical'
+              : securityLevel === 'high'
+                ? 'high'
+                : 'medium',
+          message: error,
+        })),
       };
 
       if (this.options.enableLogging) {
@@ -187,10 +199,9 @@ export class AdvancedSecurityValidator {
       }
 
       return result;
-
     } catch (error) {
       logger.error('Advanced security validation failed:', error);
-      
+
       return {
         isValid: false,
         errors: [`Validation error: ${error}`],
@@ -198,11 +209,13 @@ export class AdvancedSecurityValidator {
         securityLevel: 'critical',
         validationTime: Date.now() - startTime,
         riskLevel: 'critical',
-        violations: [{
-          type: 'system_error',
-          severity: 'critical',
-          message: `Validation error: ${error}`
-        }]
+        violations: [
+          {
+            type: 'system_error',
+            severity: 'critical',
+            message: `Validation error: ${error}`,
+          },
+        ],
       };
     }
   }
@@ -215,9 +228,7 @@ export class AdvancedSecurityValidator {
   }
 
   async validateBatch(inputs: any[], context: any = {}): Promise<ValidationResult[]> {
-    const results = await Promise.all(
-      inputs.map(input => this.validate(input, context))
-    );
+    const results = await Promise.all(inputs.map(async input => this.validate(input, context)));
 
     // Log batch summary if logging is enabled
     if (this.options.enableLogging) {
@@ -240,7 +251,7 @@ export class AdvancedSecurityValidator {
       validationCount: 0, // Would track in real implementation
       blockCount: 0, // Would track blocked attempts
       lastValidation: Date.now(),
-      securityLevel: this.options.enableStrictMode ? 'high' : 'medium'
+      securityLevel: this.options.enableStrictMode ? 'high' : 'medium',
     };
   }
 
@@ -260,10 +271,10 @@ export class AdvancedSecurityValidator {
 
     // Check allowed patterns if specified
     if (this.options.allowedPatterns.length > 0) {
-      const hasAllowedPattern = this.options.allowedPatterns.some(pattern => 
+      const hasAllowedPattern = this.options.allowedPatterns.some(pattern =>
         pattern.test(inputStr)
       );
-      
+
       if (!hasAllowedPattern) {
         warnings.push('Input does not match any allowed patterns');
       }
@@ -272,7 +283,7 @@ export class AdvancedSecurityValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
@@ -281,25 +292,34 @@ export class AdvancedSecurityValidator {
     const inputStr = typeof input === 'string' ? input : JSON.stringify(input);
 
     if (inputStr.length > this.options.maxInputLength) {
-      errors.push(`Input exceeds maximum length: ${inputStr.length} > ${this.options.maxInputLength}`);
+      errors.push(
+        `Input exceeds maximum length: ${inputStr.length} > ${this.options.maxInputLength}`
+      );
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
-  private validateStructure(input: any, context: any): { isValid: boolean; errors: string[]; warnings: string[] } {
+  private validateStructure(
+    input: any,
+    context: any
+  ): { isValid: boolean; errors: string[]; warnings: string[] } {
     const errors: string[] = [];
     const warnings: string[] = [];
 
     // Check for suspicious object structures
     if (typeof input === 'object' && input !== null) {
       const keys = Object.keys(input);
-      
+
       // Check for prototype pollution attempts
-      if (keys.includes('__proto__') || keys.includes('constructor') || keys.includes('prototype')) {
+      if (
+        keys.includes('__proto__') ||
+        keys.includes('constructor') ||
+        keys.includes('prototype')
+      ) {
         errors.push('Input contains potentially dangerous object properties');
       }
 
@@ -312,37 +332,36 @@ export class AdvancedSecurityValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
   private isEncrypted(input: any): boolean {
     // Simple heuristic to check if input might be encrypted
     if (typeof input !== 'string') return false;
-    
+
     // Check for base64 encoding patterns or common encryption prefixes
     return /^[A-Za-z0-9+/]+=*$/.test(input) && input.length > 20;
   }
 
   private getObjectDepth(obj: any, depth: number = 0): number {
     if (depth > 20) return depth; // Prevent stack overflow
-    
+
     if (typeof obj !== 'object' || obj === null) {
       return depth;
     }
 
-    const depths = Object.values(obj).map(value => 
-      this.getObjectDepth(value, depth + 1)
-    );
+    const depths = Object.values(obj).map(value => this.getObjectDepth(value, depth + 1));
 
     return Math.max(depth, ...depths);
   }
 
   private logValidationResult(result: ValidationResult, input: any, context: any): void {
     const level = result.isValid ? 'info' : 'warn';
-    const message = `Security validation ${result.isValid ? 'passed' : 'failed'}: ` +
+    const message =
+      `Security validation ${result.isValid ? 'passed' : 'failed'}: ` +
       `level=${result.securityLevel}, errors=${result.errors.length}, warnings=${result.warnings.length}`;
-    
+
     logger[level](message);
 
     if (result.errors.length > 0) {

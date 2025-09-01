@@ -117,17 +117,17 @@ export class AutoConfigurator {
    */
   private createDualAgentSystem(config: OptimalConfiguration): DualAgentRealtimeSystem {
     const system = new DualAgentRealtimeSystem();
-    
+
     try {
       // Read unified model config
       const configPath = path.join(process.cwd(), 'config', 'unified-model-config.yaml');
       const configContent = fs.readFileSync(configPath, 'utf8');
       const modelConfig = yaml.load(configContent) as any;
-      
+
       // Extract provider configurations from YAML
       const ollamaConfig = modelConfig.llm?.providers?.ollama || {};
       const lmStudioConfig = modelConfig.llm?.providers?.['lm-studio'] || {};
-      
+
       // Writer agent configuration (Ollama for complex analysis)
       const writerConfig = {
         platform: 'ollama',
@@ -137,31 +137,30 @@ export class AutoConfigurator {
         maxTokens: ollamaConfig.models?.settings?.[config.writer.model]?.max_tokens || 128000,
         timeout: ollamaConfig.timeout?.response || 30000,
       };
-      
+
       // Auditor agent configuration (LM Studio for fast reviews)
       const auditorConfig = {
-        platform: 'lm-studio', 
+        platform: 'lm-studio',
         model: config.auditor.model,
         endpoint: lmStudioConfig.endpoint || 'http://localhost:1234',
         temperature: lmStudioConfig.models?.settings?.[config.auditor.model]?.temperature || 0.7,
         maxTokens: lmStudioConfig.models?.settings?.[config.auditor.model]?.max_tokens || 128000,
         timeout: lmStudioConfig.timeout?.response || 15000,
       };
-      
+
       // Check if dual-agent review is enabled
       const dualAgentEnabled = modelConfig.llm?.experimental?.dual_agent_review || false;
-      
+
       this.logger.info('Dual-agent system configured from unified-model-config.yaml', {
         writerEndpoint: writerConfig.endpoint,
         auditorEndpoint: auditorConfig.endpoint,
         dualAgentEnabled,
-        configPath
+        configPath,
       });
-      
     } catch (error) {
       this.logger.warn('Failed to load unified model config, using defaults', { error });
     }
-    
+
     return system;
   }
 

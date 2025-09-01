@@ -1,6 +1,6 @@
 /**
  * Models Command - Interactive Model Management
- * 
+ *
  * Provides CLI commands for listing, selecting, and managing AI models
  */
 
@@ -56,31 +56,35 @@ export class ModelsCommand {
       }
 
       // Group by provider
-      const groupedModels = models.reduce((groups, model) => {
-        const provider = model.provider;
-        if (!groups[provider]) {
-          groups[provider] = [];
-        }
-        groups[provider].push(model);
-        return groups;
-      }, {} as Record<string, typeof models>);
+      const groupedModels = models.reduce(
+        (groups, model) => {
+          const provider = model.provider;
+          if (!groups[provider]) {
+            groups[provider] = [];
+          }
+          groups[provider].push(model);
+          return groups;
+        },
+        {} as Record<string, typeof models>
+      );
 
       Object.entries(groupedModels).forEach(([provider, providerModels]) => {
         console.log(`\n📦 ${provider.toUpperCase()}`);
         console.log('─'.repeat(20));
-        
+
         providerModels.forEach(model => {
           const status = model.available ? '🟢' : '🔴';
           const size = model.size ? ` (${model.size})` : '';
           const description = model.description ? ` • ${model.description}` : '';
-          
+
           console.log(`  ${status} ${model.id}${size}${description}`);
         });
       });
 
-      console.log(`\n✅ Found ${models.length} models across ${Object.keys(groupedModels).length} providers`);
+      console.log(
+        `\n✅ Found ${models.length} models across ${Object.keys(groupedModels).length} providers`
+      );
       console.log('\n💡 Use "cc models --select" to interactively choose a model');
-
     } catch (error) {
       logger.error('Failed to discover models:', error);
       console.log('❌ Failed to discover models. Check your AI provider connections.');
@@ -96,7 +100,6 @@ export class ModelsCommand {
       console.log(`\n🎯 Model selected: ${selection.selectedModel.name}`);
       console.log('💾 This selection will be used for the current session.');
       console.log('\n💡 Restart CodeCrucible to select a different model.');
-      
     } catch (error) {
       logger.error('Model selection failed:', error);
       console.log('❌ Model selection failed. Please try again.');
@@ -148,13 +151,13 @@ export function parseModelsArgs(args: string[]): ModelsCommandOptions {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     switch (arg) {
       case '--list':
       case '-l':
         options.list = true;
         break;
-        
+
       case '--select':
       case '-s':
       case '--interactive':
@@ -162,7 +165,7 @@ export function parseModelsArgs(args: string[]): ModelsCommandOptions {
         options.select = true;
         options.interactive = true;
         break;
-        
+
       case '--help':
       case '-h':
         // Will show help by default when no other options

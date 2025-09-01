@@ -1,0 +1,28 @@
+{
+  "name": "codecrucible-rust-executor",
+  "version": "0.1.0",
+  "description": "Rust executor for CodeCrucible with NAPI bindings",
+  "main": "codecrucible-rust-executor.win32-x64-msvc.node",
+  "napi": {
+    "binaryName": "codecrucible-rust-executor",
+    "targets": [
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "artifacts": "napi artifacts",
+    "version": "napi version"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4"
+  },
+  "files": [
+    "*.node"
+  ],
+  "engines": {
+    "node": ">= 10"
+  }
+}

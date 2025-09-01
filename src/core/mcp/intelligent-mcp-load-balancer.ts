@@ -1,6 +1,6 @@
 /**
  * Intelligent MCP Connection Pool and Load Balancer
- * 
+ *
  * Provides advanced load balancing and connection pooling for MCP servers including:
  * - Intelligent routing based on capability matching and performance
  * - Dynamic pool scaling and connection lifecycle management
@@ -28,9 +28,9 @@ export interface ConnectionPoolConfig {
   affinityTTL: number; // Affinity session TTL
 }
 
-export type LoadBalancingStrategy = 
+export type LoadBalancingStrategy =
   | 'round-robin'
-  | 'least-connections' 
+  | 'least-connections'
   | 'weighted-response-time'
   | 'capability-aware'
   | 'resource-based'
@@ -43,7 +43,7 @@ export interface PoolConnection {
   serverName: string;
   capabilities: string[];
   status: 'idle' | 'active' | 'unhealthy' | 'scaling';
-  
+
   // Performance metrics
   activeRequests: number;
   totalRequests: number;
@@ -51,15 +51,15 @@ export interface PoolConnection {
   successRate: number;
   lastUsed: Date;
   createdAt: Date;
-  
+
   // Resource usage
   cpuUsage?: number;
   memoryUsage?: number;
   networkLatency?: number;
-  
+
   // Capability scores
   capabilityScores: Map<string, number>; // How well this connection handles specific capabilities
-  
+
   // Health metrics
   healthScore: number;
   consecutiveErrors: number;
@@ -80,22 +80,22 @@ export interface PoolMetrics {
   activeConnections: number;
   idleConnections: number;
   unhealthyConnections: number;
-  
+
   // Performance
   avgResponseTime: number;
   totalRequests: number;
   requestsPerSecond: number;
-  
+
   // Resource utilization
   avgCpuUsage: number;
   avgMemoryUsage: number;
   avgNetworkLatency: number;
-  
+
   // Quality metrics
   overallHealthScore: number;
   loadDistribution: Map<string, number>;
   capabilityCoverage: string[];
-  
+
   // Scaling metrics
   scaleEvents: number;
   lastScaleAction: Date;
@@ -107,14 +107,14 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   private connections: Map<string, Map<string, PoolConnection>> = new Map();
   private sessionAffinity: Map<string, string> = new Map(); // sessionId -> connectionId
   private performanceModel: PerformanceMLModel = new PerformanceMLModel();
-  
+
   // Request routing cache
   private routingCache: Map<string, { connectionId: string; expiresAt: number }> = new Map();
   private readonly ROUTING_CACHE_TTL = 30000; // 30 seconds
-  
+
   // Pool monitoring
   private monitoringIntervals: Map<string, NodeJS.Timeout> = new Map();
-  
+
   constructor() {
     super();
     this.startGlobalMonitoring();
@@ -125,16 +125,16 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
    */
   async createPool(config: ConnectionPoolConfig, serverIds: string[]): Promise<void> {
     logger.info(`Creating intelligent connection pool: ${config.poolId}`);
-    
+
     this.pools.set(config.poolId, config);
     this.connections.set(config.poolId, new Map());
-    
+
     // Initialize connections
     await this.initializePoolConnections(config.poolId, serverIds);
-    
+
     // Start pool monitoring
     this.startPoolMonitoring(config.poolId);
-    
+
     this.emit('pool-created', config.poolId, config);
   }
 
@@ -144,15 +144,15 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   private async initializePoolConnections(poolId: string, serverIds: string[]): Promise<void> {
     const config = this.pools.get(poolId)!;
     const poolConnections = this.connections.get(poolId)!;
-    
+
     // Create initial connections up to minConnections
     const connectionsToCreate = Math.min(config.minConnections, serverIds.length);
-    
+
     for (let i = 0; i < connectionsToCreate; i++) {
       const serverId = serverIds[i % serverIds.length];
       await this.createConnection(poolId, serverId);
     }
-    
+
     logger.info(`Initialized pool ${poolId} with ${poolConnections.size} connections`);
   }
 
@@ -161,36 +161,36 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
    */
   private async createConnection(poolId: string, serverId: string): Promise<PoolConnection> {
     const connectionId = `${poolId}-${serverId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-    
+
     // Initialize connection monitoring in reliability system
     await enhancedMCPReliabilitySystem.initializeConnection(connectionId, serverId);
-    
+
     const connection: PoolConnection = {
       connectionId,
       serverId,
       serverName: serverId, // This would be resolved from server registry
       capabilities: await this.getServerCapabilities(serverId),
       status: 'idle',
-      
+
       activeRequests: 0,
       totalRequests: 0,
       avgResponseTime: 0,
       successRate: 100,
       lastUsed: new Date(),
       createdAt: new Date(),
-      
+
       capabilityScores: new Map(),
       healthScore: 100,
       consecutiveErrors: 0,
       lastHealthCheck: new Date(),
     };
-    
+
     const poolConnections = this.connections.get(poolId)!;
     poolConnections.set(connectionId, connection);
-    
+
     logger.debug(`Created connection ${connectionId} for pool ${poolId}`);
     this.emit('connection-created', poolId, connection);
-    
+
     return connection;
   }
 
@@ -198,14 +198,14 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
    * Get best connection for request based on intelligent routing
    */
   async getConnection(
-    poolId: string, 
+    poolId: string,
     requiredCapabilities: string[] = [],
     sessionId?: string,
     requestContext?: any
   ): Promise<LoadBalancingDecision | null> {
     const config = this.pools.get(poolId);
     const poolConnections = this.connections.get(poolId);
-    
+
     if (!config || !poolConnections) {
       throw new Error(`Pool ${poolId} not found`);
     }
@@ -241,10 +241,8 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     }
 
     // Get healthy connections
-    const healthyConnections = Array.from(poolConnections.values()).filter(conn => 
-      conn.status === 'idle' && 
-      conn.healthScore > 70 &&
-      conn.consecutiveErrors < 3
+    const healthyConnections = Array.from(poolConnections.values()).filter(
+      conn => conn.status === 'idle' && conn.healthScore > 70 && conn.consecutiveErrors < 3
     );
 
     if (healthyConnections.length === 0) {
@@ -292,25 +290,25 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     switch (strategy) {
       case 'round-robin':
         return this.selectRoundRobin(connections);
-      
+
       case 'least-connections':
         return this.selectLeastConnections(connections);
-      
+
       case 'weighted-response-time':
         return this.selectByResponseTime(connections);
-      
+
       case 'capability-aware':
         return this.selectByCapability(connections, requiredCapabilities);
-      
+
       case 'resource-based':
         return this.selectByResourceUsage(connections);
-      
+
       case 'ml-optimized':
         return await this.selectByMLModel(connections, requiredCapabilities, requestContext);
-      
+
       case 'hybrid':
         return await this.selectByHybridStrategy(connections, requiredCapabilities, requestContext);
-      
+
       default:
         return this.selectRoundRobin(connections);
     }
@@ -319,7 +317,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   private selectRoundRobin(connections: PoolConnection[]): LoadBalancingDecision {
     // Simple round-robin selection
     const selected = connections[Math.floor(Math.random() * connections.length)];
-    
+
     return {
       selectedConnection: selected,
       reason: 'Round-robin selection',
@@ -332,7 +330,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   private selectLeastConnections(connections: PoolConnection[]): LoadBalancingDecision {
     const sorted = connections.sort((a, b) => a.activeRequests - b.activeRequests);
     const selected = sorted[0];
-    
+
     return {
       selectedConnection: selected,
       reason: `Least connections (${selected.activeRequests} active)`,
@@ -346,7 +344,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     // Weight inversely by response time
     const weights = connections.map(conn => 1 / (conn.avgResponseTime + 1));
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-    
+
     let random = Math.random() * totalWeight;
     for (let i = 0; i < connections.length; i++) {
       random -= weights[i];
@@ -360,31 +358,34 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
         };
       }
     }
-    
+
     return this.selectRoundRobin(connections);
   }
 
-  private selectByCapability(connections: PoolConnection[], requiredCapabilities: string[]): LoadBalancingDecision {
+  private selectByCapability(
+    connections: PoolConnection[],
+    requiredCapabilities: string[]
+  ): LoadBalancingDecision {
     if (requiredCapabilities.length === 0) {
       return this.selectLeastConnections(connections);
     }
 
     // Score connections based on capability match and performance
     const scoredConnections = connections.map(conn => {
-      const capabilityMatch = requiredCapabilities.filter(cap => 
-        conn.capabilities.includes(cap)
-      ).length / requiredCapabilities.length;
-      
+      const capabilityMatch =
+        requiredCapabilities.filter(cap => conn.capabilities.includes(cap)).length /
+        requiredCapabilities.length;
+
       const performanceScore = Math.max(0, 100 - conn.avgResponseTime) / 100;
       const healthScore = conn.healthScore / 100;
-      
-      const overallScore = (capabilityMatch * 0.5) + (performanceScore * 0.3) + (healthScore * 0.2);
-      
+
+      const overallScore = capabilityMatch * 0.5 + performanceScore * 0.3 + healthScore * 0.2;
+
       return { connection: conn, score: overallScore };
     });
 
     const best = scoredConnections.sort((a, b) => b.score - a.score)[0];
-    
+
     return {
       selectedConnection: best.connection,
       reason: `Capability-aware selection (${(best.score * 100).toFixed(1)}% match)`,
@@ -396,8 +397,8 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
 
   private selectByResourceUsage(connections: PoolConnection[]): LoadBalancingDecision {
     // Select connection with lowest resource usage
-    const withResourceData = connections.filter(conn => 
-      conn.cpuUsage !== undefined && conn.memoryUsage !== undefined
+    const withResourceData = connections.filter(
+      conn => conn.cpuUsage !== undefined && conn.memoryUsage !== undefined
     );
 
     if (withResourceData.length === 0) {
@@ -411,7 +412,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     });
 
     const selected = sorted[0];
-    
+
     return {
       selectedConnection: selected,
       reason: `Resource-based selection (${((selected.cpuUsage! + selected.memoryUsage!) / 2).toFixed(1)}% usage)`,
@@ -428,13 +429,17 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   ): Promise<LoadBalancingDecision> {
     const predictions = await Promise.all(
       connections.map(async conn => {
-        const prediction = await this.performanceModel.predictPerformance(conn, requiredCapabilities, requestContext);
+        const prediction = await this.performanceModel.predictPerformance(
+          conn,
+          requiredCapabilities,
+          requestContext
+        );
         return { connection: conn, prediction };
       })
     );
 
     const best = predictions.sort((a, b) => a.prediction.score - b.prediction.score)[0];
-    
+
     return {
       selectedConnection: best.connection,
       reason: `ML-optimized selection (${best.prediction.score.toFixed(1)} predicted score)`,
@@ -470,7 +475,10 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
 
       if (decision) {
         const current = scores.get(decision.selectedConnection.connectionId) || 0;
-        scores.set(decision.selectedConnection.connectionId, current + (weight * decision.confidence));
+        scores.set(
+          decision.selectedConnection.connectionId,
+          current + weight * decision.confidence
+        );
         reasons.push(`${strategy}: ${decision.confidence}%`);
       }
     }
@@ -487,7 +495,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     }
 
     const selectedConnection = connections.find(c => c.connectionId === bestConnectionId)!;
-    
+
     return {
       selectedConnection,
       reason: `Hybrid strategy (${reasons.join(', ')})`,
@@ -509,7 +517,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   ): void {
     const poolConnections = this.connections.get(poolId);
     const connection = poolConnections?.get(connectionId);
-    
+
     if (!connection) return;
 
     // Update basic metrics
@@ -519,7 +527,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     connection.activeRequests = Math.max(0, connection.activeRequests - 1);
 
     if (success) {
-      connection.successRate = (connection.successRate * 0.9) + (1 * 0.1);
+      connection.successRate = connection.successRate * 0.9 + 1 * 0.1;
       connection.consecutiveErrors = 0;
       connection.healthScore = Math.min(100, connection.healthScore + 1);
     } else {
@@ -538,7 +546,12 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     }
 
     // Record in reliability system
-    enhancedMCPReliabilitySystem.recordRequestCompletion(connectionId, success, responseTime, poolId);
+    enhancedMCPReliabilitySystem.recordRequestCompletion(
+      connectionId,
+      success,
+      responseTime,
+      poolId
+    );
 
     // Update performance model
     this.performanceModel.recordRequest(connection, success, responseTime, capabilities);
@@ -555,7 +568,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
 
     const poolConnections = this.connections.get(poolId);
     const connection = poolConnections?.get(connectionId);
-    
+
     return connection && connection.status === 'idle' ? connection : null;
   }
 
@@ -565,7 +578,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   private async scaleUp(poolId: string): Promise<void> {
     const config = this.pools.get(poolId);
     const poolConnections = this.connections.get(poolId);
-    
+
     if (!config || !poolConnections) return;
 
     const currentCount = poolConnections.size;
@@ -579,7 +592,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     // Add new connection - this would need server selection logic
     // For now, we'll use a placeholder server ID
     await this.createConnection(poolId, `auto-scaled-server-${Date.now()}`);
-    
+
     this.emit('pool-scaled-up', poolId, poolConnections.size);
   }
 
@@ -589,21 +602,21 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   private async scaleDown(poolId: string): Promise<void> {
     const config = this.pools.get(poolId);
     const poolConnections = this.connections.get(poolId);
-    
+
     if (!config || !poolConnections) return;
 
     const currentCount = poolConnections.size;
     if (currentCount <= config.minConnections) return;
 
     // Find least used idle connection
-    const idleConnections = Array.from(poolConnections.values()).filter(conn => 
-      conn.status === 'idle' && conn.activeRequests === 0
+    const idleConnections = Array.from(poolConnections.values()).filter(
+      conn => conn.status === 'idle' && conn.activeRequests === 0
     );
 
     if (idleConnections.length === 0) return;
 
     const leastUsed = idleConnections.sort((a, b) => a.totalRequests - b.totalRequests)[0];
-    
+
     // Remove connection
     poolConnections.delete(leastUsed.connectionId);
     this.sessionAffinity.forEach((connectionId, sessionId) => {
@@ -629,7 +642,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
    */
   private startPoolMonitoring(poolId: string): void {
     const config = this.pools.get(poolId)!;
-    
+
     const interval = setInterval(async () => {
       await this.monitorPool(poolId);
     }, config.healthCheckInterval);
@@ -643,7 +656,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   private async monitorPool(poolId: string): Promise<void> {
     const config = this.pools.get(poolId);
     const poolConnections = this.connections.get(poolId);
-    
+
     if (!config || !poolConnections) return;
 
     const connections = Array.from(poolConnections.values());
@@ -651,7 +664,8 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
 
     // Check scaling conditions
     const avgCpuUsage = metrics.avgCpuUsage || 0;
-    const avgActiveRequests = connections.reduce((sum, conn) => sum + conn.activeRequests, 0) / connections.length;
+    const avgActiveRequests =
+      connections.reduce((sum, conn) => sum + conn.activeRequests, 0) / connections.length;
 
     if (avgCpuUsage > config.scaleUpThreshold || avgActiveRequests > 5) {
       await this.scaleUp(poolId);
@@ -674,23 +688,29 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
     const idleConnections = connections.filter(c => c.status === 'idle').length;
     const unhealthyConnections = connections.filter(c => c.healthScore < 70).length;
 
-    const avgResponseTime = connections.reduce((sum, c) => sum + c.avgResponseTime, 0) / totalConnections;
+    const avgResponseTime =
+      connections.reduce((sum, c) => sum + c.avgResponseTime, 0) / totalConnections;
     const totalRequests = connections.reduce((sum, c) => sum + c.totalRequests, 0);
-    
-    const avgCpuUsage = connections
-      .filter(c => c.cpuUsage !== undefined)
-      .reduce((sum, c) => sum + c.cpuUsage!, 0) / totalConnections;
-    
-    const avgMemoryUsage = connections
-      .filter(c => c.memoryUsage !== undefined)
-      .reduce((sum, c) => sum + c.memoryUsage!, 0) / totalConnections;
 
-    const overallHealthScore = connections.reduce((sum, c) => sum + c.healthScore, 0) / totalConnections;
+    const avgCpuUsage =
+      connections.filter(c => c.cpuUsage !== undefined).reduce((sum, c) => sum + c.cpuUsage!, 0) /
+      totalConnections;
+
+    const avgMemoryUsage =
+      connections
+        .filter(c => c.memoryUsage !== undefined)
+        .reduce((sum, c) => sum + c.memoryUsage!, 0) / totalConnections;
+
+    const overallHealthScore =
+      connections.reduce((sum, c) => sum + c.healthScore, 0) / totalConnections;
 
     // Calculate load distribution
     const loadDistribution = new Map<string, number>();
     connections.forEach(conn => {
-      loadDistribution.set(conn.serverId, (loadDistribution.get(conn.serverId) || 0) + conn.totalRequests);
+      loadDistribution.set(
+        conn.serverId,
+        (loadDistribution.get(conn.serverId) || 0) + conn.totalRequests
+      );
     });
 
     // Get all unique capabilities
@@ -705,19 +725,20 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
       activeConnections,
       idleConnections,
       unhealthyConnections,
-      
+
       avgResponseTime,
       totalRequests,
-      requestsPerSecond: totalRequests / ((Date.now() - connections[0]?.createdAt.getTime()) / 1000),
-      
+      requestsPerSecond:
+        totalRequests / ((Date.now() - connections[0]?.createdAt.getTime()) / 1000),
+
       avgCpuUsage,
       avgMemoryUsage,
       avgNetworkLatency: 0, // Would be calculated from actual measurements
-      
+
       overallHealthScore,
       loadDistribution,
       capabilityCoverage: Array.from(allCapabilities),
-      
+
       scaleEvents: 0, // Would be tracked separately
       lastScaleAction: new Date(),
       scaleDirection: 'stable',
@@ -730,7 +751,7 @@ export class IntelligentMCPLoadBalancer extends EventEmitter {
   private async cleanupIdleConnections(poolId: string): Promise<void> {
     const config = this.pools.get(poolId)!;
     const poolConnections = this.connections.get(poolId)!;
-    
+
     const now = Date.now();
     const connectionsToRemove: string[] = [];
 
@@ -839,10 +860,11 @@ class PerformanceMLModel {
     requestContext?: any
   ): Promise<{ score: number; confidence: number; expectedResponseTime: number }> {
     // Simple ML model - would be more sophisticated in real implementation
-    
-    const relevantHistory = this.requestHistory.filter(req => 
-      req.connectionId === connection.connectionId ||
-      req.capabilities.some(cap => requiredCapabilities.includes(cap))
+
+    const relevantHistory = this.requestHistory.filter(
+      req =>
+        req.connectionId === connection.connectionId ||
+        req.capabilities.some(cap => requiredCapabilities.includes(cap))
     );
 
     if (relevantHistory.length < 5) {
@@ -857,25 +879,22 @@ class PerformanceMLModel {
     // Calculate weighted score based on recent performance
     const recentHistory = relevantHistory.slice(-20);
     const successRate = recentHistory.filter(req => req.success).length / recentHistory.length;
-    const avgResponseTime = recentHistory.reduce((sum, req) => sum + req.responseTime, 0) / recentHistory.length;
+    const avgResponseTime =
+      recentHistory.reduce((sum, req) => sum + req.responseTime, 0) / recentHistory.length;
 
     // Factor in capability match
-    const capabilityMatch = requiredCapabilities.filter(cap => 
-      connection.capabilities.includes(cap)
-    ).length / Math.max(1, requiredCapabilities.length);
+    const capabilityMatch =
+      requiredCapabilities.filter(cap => connection.capabilities.includes(cap)).length /
+      Math.max(1, requiredCapabilities.length);
 
     // Calculate prediction score (lower is better for response time)
-    const responseTimeScore = Math.max(0, 100 - (avgResponseTime / 100));
+    const responseTimeScore = Math.max(0, 100 - avgResponseTime / 100);
     const successScore = successRate * 100;
     const capabilityScore = capabilityMatch * 100;
     const healthScore = connection.healthScore;
 
-    const overallScore = (
-      responseTimeScore * 0.3 +
-      successScore * 0.3 +
-      capabilityScore * 0.2 +
-      healthScore * 0.2
-    );
+    const overallScore =
+      responseTimeScore * 0.3 + successScore * 0.3 + capabilityScore * 0.2 + healthScore * 0.2;
 
     const confidence = Math.min(100, relevantHistory.length * 2);
 

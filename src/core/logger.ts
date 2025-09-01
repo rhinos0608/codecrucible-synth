@@ -1,9 +1,9 @@
 /**
  * Legacy Core Logger - Compatibility Stub
- * 
+ *
  * This is a minimal stub to maintain backward compatibility
  * during the architectural migration.
- * 
+ *
  * @deprecated Use createLogger from infrastructure/logging/logger-adapter.js instead
  */
 

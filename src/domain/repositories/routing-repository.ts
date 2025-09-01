@@ -1,10 +1,10 @@
 /**
- * Routing Repository Domain Interface  
+ * Routing Repository Domain Interface
  * Pure domain interface - NO infrastructure dependencies
  *
  * Living Spiral Council Applied:
  * - Domain-driven repository pattern
- * - Interface segregation principle 
+ * - Interface segregation principle
  * - No concrete implementations (those go in infrastructure layer)
  */
 
@@ -88,7 +88,9 @@ export interface ModelAvailabilityRepository {
   /**
    * Find models suitable for task complexity
    */
-  findSuitableForComplexity(complexity: 'simple' | 'moderate' | 'complex' | 'advanced'): Promise<Model[]>;
+  findSuitableForComplexity(
+    complexity: 'simple' | 'moderate' | 'complex' | 'advanced'
+  ): Promise<Model[]>;
 
   /**
    * Update model health status
@@ -317,17 +319,23 @@ export interface RoutingAnalyticsResult {
   totalDecisions: number;
   successRate: number;
   averageLatency: number;
-  modelPerformance: Map<string, {
-    decisions: number;
-    successRate: number;
-    avgLatency: number;
-    avgQuality: number;
-  }>;
-  complexityAnalysis: Map<string, {
-    count: number;
-    preferredModels: string[];
-    successRate: number;
-  }>;
+  modelPerformance: Map<
+    string,
+    {
+      decisions: number;
+      successRate: number;
+      avgLatency: number;
+      avgQuality: number;
+    }
+  >;
+  complexityAnalysis: Map<
+    string,
+    {
+      count: number;
+      preferredModels: string[];
+      successRate: number;
+    }
+  >;
 }
 
 export interface RoutingInsights {

@@ -1,13 +1,16 @@
 /**
  * Simple Council Coordinator
  * Application Layer - Simplified voice coordination service
- * 
+ *
  * Replaces the overly complex CouncilDecisionEngine with clean orchestration
  * Handles: Multi-voice coordination without unnecessary abstraction layers
  * Imports: Domain services only (follows ARCHITECTURE.md)
  */
 
-import { IVoiceOrchestrationService, VoiceResponse } from '../../domain/services/voice-orchestration-service.js';
+import {
+  IVoiceOrchestrationService,
+  VoiceResponse,
+} from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
 import { ProcessingRequest } from '../../domain/entities/request.js';
 
@@ -50,32 +53,32 @@ export class SimpleCouncilCoordinator {
    */
   async coordinateCouncil(request: CouncilRequest): Promise<CouncilResponse> {
     const startTime = Date.now();
-    
+
     // Input transformation
     const processingRequest = this.transformToProcessingRequest(request);
-    
+
     // Domain orchestration
-    const selectedModel = await this.modelSelectionService.selectOptimalModel(processingRequest);
-    
+    const selectedModel = await Promise.resolve(
+      this.modelSelectionService.selectOptimalModel(processingRequest)
+    );
+
     // Generate responses from all voices
     const voiceResponses = await this.generateVoiceResponses(
       request.voiceIds,
       processingRequest,
       selectedModel
     );
-    
+
     // Synthesize responses using domain service
-    const synthesisResult = await this.voiceOrchestrationService.synthesizeVoiceResponses(
+    const synthesisResult = await Promise.resolve(
+      this.voiceOrchestrationService.synthesizeVoiceResponses(
       voiceResponses,
       this.mapSynthesisMode(request.synthesisMode)
+    )
     );
-    
+
     // Output transformation
-    return this.transformToCouncilResponse(
-      synthesisResult,
-      voiceResponses,
-      startTime
-    );
+    return this.transformToCouncilResponse(synthesisResult, voiceResponses, startTime);
   }
 
   /**
@@ -84,14 +87,16 @@ export class SimpleCouncilCoordinator {
    */
   async getVoiceRecommendations(request: CouncilRequest): Promise<VoiceContribution[]> {
     const processingRequest = this.transformToProcessingRequest(request);
-    const selectedModel = await this.modelSelectionService.selectOptimalModel(processingRequest);
-    
+    const selectedModel = await Promise.resolve(
+      this.modelSelectionService.selectOptimalModel(processingRequest)
+    );
+
     const voiceResponses = await this.generateVoiceResponses(
       request.voiceIds,
       processingRequest,
       selectedModel
     );
-    
+
     return voiceResponses.map(response => ({
       voiceId: response.voiceId,
       content: response.content,
@@ -118,7 +123,7 @@ export class SimpleCouncilCoordinator {
     model: any
   ): Promise<VoiceResponse[]> {
     const responses: VoiceResponse[] = [];
-    
+
     for (const voiceId of voiceIds) {
       try {
         const voiceRequest = ProcessingRequest.create(
@@ -126,14 +131,16 @@ export class SimpleCouncilCoordinator {
           request.type as any,
           'medium',
           request.context,
-          { 
-            ...request.constraints, 
-            mustIncludeVoices: [voiceId] 
+          {
+            ...request.constraints,
+            mustIncludeVoices: [voiceId],
           }
         );
 
-        const response = await model.generateResponse(voiceRequest, { id: voiceId });
-        
+        const response = await Promise.resolve(
+          model.generateResponse(voiceRequest, { id: voiceId })
+        );
+
         responses.push({
           voiceId,
           content: response.content,
@@ -143,7 +150,7 @@ export class SimpleCouncilCoordinator {
         });
       } catch (error) {
         console.warn(`Voice ${voiceId} failed to generate response:`, error);
-        
+
         // Add fallback response to avoid breaking the council
         responses.push({
           voiceId,
@@ -154,7 +161,7 @@ export class SimpleCouncilCoordinator {
         });
       }
     }
-    
+
     return responses;
   }
 
@@ -165,7 +172,7 @@ export class SimpleCouncilCoordinator {
       consensus: 'CONSENSUS',
       weighted: 'WEIGHTED',
     };
-    
+
     return modeMap[mode] || 'COLLABORATIVE';
   }
 
@@ -199,7 +206,9 @@ export class SimpleCouncilCoordinator {
       return false;
     }
 
-    const conflicts = await this.voiceOrchestrationService.detectVoiceConflicts(voiceResponses);
+    const conflicts = await Promise.resolve(
+      this.voiceOrchestrationService.detectVoiceConflicts(voiceResponses)
+    );
     return conflicts.length > 0;
   }
 
@@ -213,12 +222,13 @@ export class SimpleCouncilCoordinator {
     }
 
     // Calculate average confidence as a simple consensus metric
-    const avgConfidence = voiceResponses.reduce((sum, response) => 
-      sum + response.confidence, 0) / voiceResponses.length;
-    
+    const avgConfidence =
+      voiceResponses.reduce((sum, response) => sum + response.confidence, 0) /
+      voiceResponses.length;
+
     // Adjust for number of voices (more voices = potentially less consensus)
     const voiceCountFactor = Math.min(1.0, 2.0 / voiceResponses.length);
-    
+
     return avgConfidence * voiceCountFactor;
   }
 }

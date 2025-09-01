@@ -143,9 +143,9 @@ export class LintCodeTool extends BaseTool {
             {
               ruleId: null,
               severity: 2,
-              message:
-                `Path parameter is required for lintCode tool. Received args: ${ 
-                JSON.stringify(args)}`,
+              message: `Path parameter is required for lintCode tool. Received args: ${JSON.stringify(
+                args
+              )}`,
               line: 1,
               column: 1,
             },
@@ -302,7 +302,7 @@ export class GetAstTool extends BaseTool {
 
     if (!args?.path || args.path.trim() === '') {
       return {
-        error: `Path parameter is required for getAst tool. Received args: ${  JSON.stringify(args)}`,
+        error: `Path parameter is required for getAst tool. Received args: ${JSON.stringify(args)}`,
         fileName: args?.path || 'undefined',
         kind: 'InvalidInput',
         text: 'Invalid or missing path parameter',

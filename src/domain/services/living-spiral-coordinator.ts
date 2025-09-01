@@ -5,11 +5,15 @@
 
 import { ILogger } from '../interfaces/logger.js';
 import { IModelClient } from '../interfaces/model-client.js';
-import { IVoiceOrchestrationService, VoiceResponse, CouncilSession } from '../interfaces/voice-orchestration.js';
-import { 
-  LivingSpiralCoordinatorInterface, 
-  WorkflowContext, 
-  OrchestratorDependencies 
+import {
+  IVoiceOrchestrationService,
+  VoiceResponse,
+  CouncilSession,
+} from '../interfaces/voice-orchestration.js';
+import {
+  LivingSpiralCoordinatorInterface,
+  WorkflowContext,
+  OrchestratorDependencies,
 } from '../interfaces/workflow-orchestrator.js';
 
 export enum SpiralPhase {
@@ -395,10 +399,10 @@ ${reflectionContent}
     try {
       // QWAN-compliant quality assessment with measurable gates
       const qualityMetrics = await this.assessOutputQuality(output);
-      
+
       // Apply QWAN quality gates (>90% threshold for excellence)
       const qualityScore = Math.max(0.0, Math.min(1.0, qualityMetrics.overallScore));
-      
+
       // Log quality assessment for transparency
       this.logger?.info(`Living Spiral quality assessment`, {
         score: qualityScore,
@@ -406,12 +410,14 @@ ${reflectionContent}
         hasCode: qualityMetrics.hasCodeImplementation,
         hasDocumentation: qualityMetrics.hasDocumentation,
         hasTests: qualityMetrics.hasTestCoverage,
-        actionableSteps: qualityMetrics.actionableSteps
+        actionableSteps: qualityMetrics.actionableSteps,
       });
-      
+
       return qualityScore;
     } catch (error) {
-      this.logger?.warn('Quality calculation failed, using basic assessment', { error: error.message });
+      this.logger?.warn('Quality calculation failed, using basic assessment', {
+        error: error.message,
+      });
       return this.calculateBasicQuality(output);
     }
   }
@@ -434,40 +440,46 @@ ${reflectionContent}
     const hasTestCoverage = /test|spec|describe|it\(|expect\(/i.test(output);
     const hasErrorHandling = /try|catch|throw|error|exception/i.test(output);
     const hasTypeDefinitions = /interface|type|class.*\{|extends|implements/i.test(output);
-    const hasSecurityConsiderations = /security|auth|validation|sanitiz|encrypt|token/i.test(output);
-    
+    const hasSecurityConsiderations = /security|auth|validation|sanitiz|encrypt|token/i.test(
+      output
+    );
+
     // Actionable steps assessment
-    const actionableSteps = (output.match(/(step|implement|create|build|deploy|install|configure|setup|add|update|remove|fix)/gi) || []).length;
-    
+    const actionableSteps = (
+      output.match(
+        /(step|implement|create|build|deploy|install|configure|setup|add|update|remove|fix)/gi
+      ) || []
+    ).length;
+
     // Content quality metrics
     const wordCount = output.split(/\s+/).length;
     const hasDetail = wordCount >= 100; // Minimum detail threshold
     const hasStructure = /^\s*[\d\-\*]\.|#+\s|^###?/m.test(output);
     const hasExamples = /example|instance|sample|demo/i.test(output);
-    
+
     // Calculate weighted quality score using QWAN principles
     let score = 0.3; // Base score for basic response
-    
+
     // Code implementation quality (30% weight)
-    if (hasCodeImplementation) score += 0.30;
-    if (hasTypeDefinitions) score += 0.10;
-    if (hasErrorHandling) score += 0.10;
-    
-    // Documentation quality (25% weight) 
-    if (hasDocumentation) score += 0.20;
+    if (hasCodeImplementation) score += 0.3;
+    if (hasTypeDefinitions) score += 0.1;
+    if (hasErrorHandling) score += 0.1;
+
+    // Documentation quality (25% weight)
+    if (hasDocumentation) score += 0.2;
     if (hasExamples) score += 0.05;
-    
+
     // Test coverage quality (20% weight) - Critical for QWAN
-    if (hasTestCoverage) score += 0.20;
-    
+    if (hasTestCoverage) score += 0.2;
+
     // Security and best practices (15% weight)
-    if (hasSecurityConsiderations) score += 0.10;
+    if (hasSecurityConsiderations) score += 0.1;
     if (hasDetail) score += 0.05;
-    
+
     // Structure and actionability (10% weight)
     if (hasStructure) score += 0.05;
     if (actionableSteps >= 3) score += 0.05;
-    
+
     // Determine quality grade based on score
     let qualityGrade = 'F';
     if (score >= 0.9) qualityGrade = 'A+';
@@ -477,14 +489,14 @@ ${reflectionContent}
     else if (score >= 0.7) qualityGrade = 'C+';
     else if (score >= 0.65) qualityGrade = 'C';
     else if (score >= 0.6) qualityGrade = 'D';
-    
+
     return {
       overallScore: Math.min(1.0, score),
       qualityGrade,
       hasCodeImplementation,
       hasDocumentation,
       hasTestCoverage,
-      actionableSteps
+      actionableSteps,
     };
   }
 
@@ -576,10 +588,10 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
    */
   async checkConvergence(results: any[]): Promise<boolean> {
     if (results.length === 0) return false;
-    
+
     const qualities = results.map((r: any) => r.quality || 0);
     const avgQuality = qualities.reduce((sum, q) => sum + q, 0) / qualities.length;
-    
+
     return avgQuality >= this.config.qualityThreshold;
   }
 
@@ -588,7 +600,7 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
    */
   async analyzeCode(filePath: string, context: WorkflowContext): Promise<any> {
     this.logger.info(`Analyzing code: ${filePath}`);
-    
+
     const analysisPrompt = `
 Please analyze the code file: ${filePath}
 
@@ -612,7 +624,7 @@ Provide a comprehensive analysis including:
       analysis: response,
       quality: this.calculateQualityScore(response),
       recommendations: this.extractRecommendations(response),
-      context
+      context,
     };
   }
 
@@ -621,11 +633,11 @@ Provide a comprehensive analysis including:
    */
   async initialize(dependencies: OrchestratorDependencies): Promise<void> {
     this.logger.info('Initializing LivingSpiralCoordinator with dependencies');
-    
+
     // Store references to dependencies if needed
     // For now, we assume the coordinator is already initialized in constructor
     // But this provides a hook for future dependency injection
-    
+
     this.logger.info('LivingSpiralCoordinator initialization completed');
   }
 
@@ -634,10 +646,10 @@ Provide a comprehensive analysis including:
    */
   async shutdown(): Promise<void> {
     this.logger.info('Shutting down LivingSpiralCoordinator');
-    
+
     // Cleanup any resources, stop timers, etc.
     // Currently no cleanup needed, but this provides the interface hook
-    
+
     this.logger.info('LivingSpiralCoordinator shutdown completed');
   }
 
@@ -648,12 +660,12 @@ Provide a comprehensive analysis including:
     const length = content.length;
     const hasStructure = content.includes('\n') && content.includes('1.');
     const hasRecommendations = content.toLowerCase().includes('recommend');
-    
+
     let score = 0.5; // Base score
     if (length > 500) score += 0.2;
     if (hasStructure) score += 0.2;
     if (hasRecommendations) score += 0.1;
-    
+
     return Math.min(1.0, score);
   }
 
@@ -661,15 +673,17 @@ Provide a comprehensive analysis including:
     // Extract recommendations from analysis content
     const lines = content.split('\n');
     const recommendations: string[] = [];
-    
+
     for (const line of lines) {
-      if (line.toLowerCase().includes('recommend') || 
-          line.toLowerCase().includes('suggest') ||
-          line.toLowerCase().includes('should')) {
+      if (
+        line.toLowerCase().includes('recommend') ||
+        line.toLowerCase().includes('suggest') ||
+        line.toLowerCase().includes('should')
+      ) {
         recommendations.push(line.trim());
       }
     }
-    
+
     return recommendations;
   }
 }

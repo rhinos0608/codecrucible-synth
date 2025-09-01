@@ -1,6 +1,6 @@
 /**
  * Interactive Model Selection Interface
- * 
+ *
  * Provides a user-friendly interface for selecting AI models at startup
  * with arrow key navigation and dynamic model discovery.
  */
@@ -63,7 +63,7 @@ export class ModelSelector {
         name: 'GPT-4o (OpenAI)',
         provider: 'openai',
         description: 'Latest OpenAI model',
-        available: true
+        available: true,
       });
     }
 
@@ -73,7 +73,7 @@ export class ModelSelector {
         name: 'Claude 3.5 Sonnet (Anthropic)',
         provider: 'anthropic',
         description: 'Latest Claude model',
-        available: true
+        available: true,
       });
     }
 
@@ -90,14 +90,14 @@ export class ModelSelector {
       throw new Error('Ollama not available');
     }
 
-    const data = await response.json() as { models: any[] };
+    const data = (await response.json()) as { models: any[] };
     return data.models.map(model => ({
       id: model.name,
       name: `${model.name} (${this.formatSize(model.size)})`,
       provider: 'ollama' as const,
       size: this.formatSize(model.size),
       description: `Ollama • ${model.details?.parameter_size || 'Unknown size'}`,
-      available: true
+      available: true,
     }));
   }
 
@@ -116,7 +116,7 @@ export class ModelSelector {
   async selectModel(): Promise<ModelSelectionResult> {
     console.log('\n🤖 Select AI Model for CodeCrucible Synth');
     console.log('═'.repeat(50));
-    
+
     // Discover available models
     console.log('🔍 Discovering available models...\n');
     await this.discoverModels();
@@ -132,7 +132,7 @@ export class ModelSelector {
     return new Promise((resolve, reject) => {
       const rl = createInterface({
         input: process.stdin,
-        output: process.stdout
+        output: process.stdout,
       });
 
       // Enable raw mode for arrow key detection
@@ -161,13 +161,13 @@ export class ModelSelector {
             const selectedModel = this.models[this.selectedIndex];
             this.cleanup();
             rl.close();
-            
+
             console.log(`\n✅ Selected: ${selectedModel.name}`);
             console.log('━'.repeat(50));
-            
+
             resolve({
               selectedModel,
-              provider: selectedModel.provider
+              provider: selectedModel.provider,
             });
             return;
 
@@ -176,7 +176,7 @@ export class ModelSelector {
             rl.close();
             console.log('\n\n👋 Goodbye!');
             process.exit(0);
-            
+
           case 'q':
           case 'Q':
             this.cleanup();
@@ -204,7 +204,7 @@ export class ModelSelector {
   private renderModelList(): void {
     // Clear screen and move cursor to top
     process.stdout.write('\x1B[2J\x1B[H');
-    
+
     console.log('🤖 Select AI Model for CodeCrucible Synth');
     console.log('═'.repeat(50));
     console.log('Use ↑/↓ arrow keys to navigate, Enter to select, Q to quit\n');
@@ -214,11 +214,11 @@ export class ModelSelector {
       const prefix = isSelected ? '▶ ' : '  ';
       const style = isSelected ? '\x1b[36m\x1b[1m' : '\x1b[0m'; // Cyan and bold for selected
       const reset = '\x1b[0m';
-      
+
       const availability = model.available ? '🟢' : '🔴';
       const modelInfo = `${model.name}`;
       const description = model.description ? ` • ${model.description}` : '';
-      
+
       console.log(`${style}${prefix}${availability} ${modelInfo}${description}${reset}`);
     });
 
@@ -231,10 +231,10 @@ export class ModelSelector {
   private formatSize(bytes: number): string {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 B';
-    
+
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     const size = (bytes / Math.pow(1024, i)).toFixed(1);
-    
+
     return `${size} ${sizes[i]}`;
   }
 
@@ -244,7 +244,7 @@ export class ModelSelector {
   private cleanup(): void {
     // Show cursor again
     process.stdout.write('\x1B[?25h');
-    
+
     // Reset terminal mode
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(false);
@@ -265,7 +265,7 @@ export class ModelSelector {
 export async function quickSelectModel(): Promise<ModelSelectionResult> {
   const selector = new ModelSelector();
   const models = await selector.discoverModels();
-  
+
   if (models.length === 0) {
     throw new Error('No AI models available');
   }
@@ -274,6 +274,6 @@ export async function quickSelectModel(): Promise<ModelSelectionResult> {
   const firstModel = models.find(m => m.available) || models[0];
   return {
     selectedModel: firstModel,
-    provider: firstModel.provider
+    provider: firstModel.provider,
   };
 }

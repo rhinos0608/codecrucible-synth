@@ -13,6 +13,7 @@ use crate::protocol::messages::{
     HealthStatus, CheckResult
 };
 use crate::executors::filesystem::{FileSystemExecutor, FileSystemError};
+use crate::executors::command::CommandExecutor as CommandExecutorImpl;
 use crate::security::{SecurityContext, SecurityError};
 
 #[derive(Debug)]
@@ -70,6 +71,10 @@ impl ExecutorRegistry {
         self.filesystem_executor = Some(executor);
     }
 
+    pub fn register_command_executor(&mut self, executor: Arc<dyn CommandExecutor>) {
+        self.command_executor = Some(executor);
+    }
+
     pub fn register_security_context(&mut self, session_id: String, context: SecurityContext) {
         self.security_contexts.insert(session_id, context);
     }
@@ -96,19 +101,22 @@ impl ExecutorRegistry {
                 }
             }
             "command" => {
-                // TODO: Implement command executor
-                ExecutionResponse {
-                    request_id: uuid::Uuid::new_v4().to_string(),
-                    success: false,
-                    result: None,
-                    error: Some(ErrorInfo {
-                        code: "NOT_IMPLEMENTED".to_string(),
-                        message: "Command executor not yet implemented".to_string(),
-                        category: ErrorCategory::SystemError,
-                        details: HashMap::new(),
-                    }),
-                    execution_time_ms: 0,
-                    performance_metrics: None,
+                if let Some(executor) = &self.command_executor {
+                    executor.execute(request).await
+                } else {
+                    ExecutionResponse {
+                        request_id: uuid::Uuid::new_v4().to_string(),
+                        success: false,
+                        result: None,
+                        error: Some(ErrorInfo {
+                            code: "EXECUTOR_NOT_AVAILABLE".to_string(),
+                            message: "Command executor not registered".to_string(),
+                            category: ErrorCategory::SystemError,
+                            details: HashMap::new(),
+                        }),
+                        execution_time_ms: 0,
+                        performance_metrics: None,
+                    }
                 }
             }
             _ => {
@@ -167,10 +175,14 @@ impl CommunicationHandler {
         );
         let fs_executor = Arc::new(FileSystemExecutor::new(security_context.clone()));
         registry.register_filesystem_executor(fs_executor);
-        
+
+        // Register command executor with its security context
+        let command_executor: Arc<dyn CommandExecutor> = Arc::new(CommandExecutorImpl::new(command_context));
+        registry.register_command_executor(command_executor);
+
         // Register default security context
         registry.register_security_context("default".to_string(), security_context);
-        
+
         info!("Communication handler initialized successfully");
         Ok(())
     }

@@ -22,8 +22,8 @@ export class RustExecutor {
   executeFilesystem(operation: string, path: string, content?: string, options?: RustExecutorOptions): Promise<RustExecutionResult>;
   executeCommand(command: string, args: string[], options?: RustExecutorOptions): Promise<RustExecutionResult>;
   execute(toolId: string, args: string, options?: RustExecutorOptions): Promise<RustExecutionResult>;
-  getPerformanceMetrics(): Promise<string>;
-  resetPerformanceMetrics(): Promise<void>;
+  getPerformanceMetrics(): string;
+  resetPerformanceMetrics(): void;
   healthCheck(): Promise<string>;
   getSupportedTools(): string[];
   getFilesystemOperations(): string[];

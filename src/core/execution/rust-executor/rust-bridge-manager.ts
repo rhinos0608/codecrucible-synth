@@ -1,6 +1,6 @@
 /**
  * Rust Bridge Manager - Phase 4 Implementation
- * 
+ *
  * Manages the NAPI bridge between TypeScript and Rust, handling
  * module loading, lifecycle management, and communication protocols.
  */
@@ -60,25 +60,27 @@ export class RustBridgeManager {
       // Load the native module with timeout
       const loadPromise = this.loadRustModule();
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Module load timeout')), this.config.initializationTimeout)
+        setTimeout(
+          () => reject(new Error('Module load timeout')),
+          this.config.initializationTimeout
+        )
       );
 
       this.rustModule = await Promise.race([loadPromise, timeoutPromise]);
 
-      if (this.rustModule) {
-        this.health.status = 'healthy';
-        this.startHealthMonitoring();
-        
-        logger.info('Rust bridge initialized successfully');
-        return true;
+        throw new Error('Rust bridge module not found');
       }
 
-      return false;
+      this.health.status = 'healthy';
+      this.startHealthMonitoring();
+
+      logger.info('Rust bridge initialized successfully');
+      return true;
     } catch (error) {
       logger.error('Failed to initialize Rust bridge:', error);
       this.health.status = 'failed';
       this.health.errorCount++;
-      return false;
+      throw error;
     }
   }
 
@@ -117,10 +119,10 @@ export class RustBridgeManager {
 
     try {
       const startTime = Date.now();
-      
+
       // Test basic functionality
       const testResult = this.rustModule.add(2, 2);
-      
+
       this.health.responseTime = Date.now() - startTime;
       this.health.lastCheck = new Date();
 
@@ -137,13 +139,13 @@ export class RustBridgeManager {
       this.health.status = 'failed';
       this.health.errorCount++;
       this.health.lastCheck = new Date();
-      
+
       // Auto-recovery attempt
       if (this.config.autoRecover && this.health.errorCount < 5) {
         logger.info('Attempting Rust bridge recovery...');
         return this.initialize();
       }
-      
+
       return false;
     }
   }
@@ -160,7 +162,7 @@ export class RustBridgeManager {
 
       this.rustModule = null;
       this.health.status = 'failed';
-      
+
       logger.info('Rust bridge shut down successfully');
     } catch (error) {
       logger.error('Error during Rust bridge shutdown:', error);

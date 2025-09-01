@@ -15,7 +15,10 @@ import { logger } from '../logger.js';
 import { getErrorMessage, toError } from '../../utils/error-utils.js';
 import { ModelRequest, ModelResponse } from '../../domain/interfaces/model-client.js';
 import { ProjectContext, ComplexityAnalysis, TaskType } from '../../domain/types/unified-types.js';
-import { ActiveProcess, ActiveProcessManager } from '../../infrastructure/performance/active-process-manager.js';
+import {
+  ActiveProcess,
+  ActiveProcessManager,
+} from '../../infrastructure/performance/active-process-manager.js';
 import {
   EnhancedToolIntegration,
   getGlobalEnhancedToolIntegration,
@@ -181,13 +184,19 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
 
   private async initializeRustBackend(): Promise<void> {
     try {
-      await this.rustBackend.initialize();
-      logger.info('🚀 RequestExecutionManager: Rust backend initialized', {
-        available: this.rustBackend.isAvailable(),
-        strategy: this.rustBackend.getStrategy(),
-      });
+      const initialized = await this.rustBackend.initialize();
+      if (initialized) {
+        logger.info('🚀 RequestExecutionManager: Rust backend initialized', {
+          available: this.rustBackend.isAvailable(),
+          strategy: this.rustBackend.getStrategy(),
+        });
+      } else {
+        logger.warn(
+          '⚠️ RequestExecutionManager: Rust backend module not found, using TypeScript fallback'
+        );
+      }
     } catch (error) {
-      logger.warn('⚠️ RequestExecutionManager: Rust backend initialization failed, using TypeScript fallback:', error);
+      logger.error('❌ RequestExecutionManager: Rust backend initialization failed', error);
     }
   }
 

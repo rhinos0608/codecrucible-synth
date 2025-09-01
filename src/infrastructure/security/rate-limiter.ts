@@ -53,12 +53,11 @@ export interface SlidingWindowConfig {
  */
 class MemoryStore implements RateLimitStore {
   private store = new Map<string, { info: RateLimitInfo; expiry: number }>();
-  private cleanupInterval: NodeJS.Timeout;
+  private cleanupInterval?: NodeJS.Timeout;
 
   constructor() {
     // Clean up expired entries every minute
     this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
-    // TODO: Store interval ID and call clearInterval in cleanup
   }
 
   async get(key: string): Promise<RateLimitInfo | null> {
@@ -111,7 +110,11 @@ class MemoryStore implements RateLimitStore {
   }
 
   stop(): void {
-    clearInterval(this.cleanupInterval);
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
+
     this.store.clear();
   }
 }
@@ -260,7 +263,6 @@ export class RateLimiter extends EventEmitter {
     // Start cleanup for sliding windows
     if (this.config.algorithm === 'sliding-window') {
       this.cleanupInterval = setInterval(() => this.cleanupSlidingWindows(), 60000);
-      // TODO: Store interval ID and call clearInterval in cleanup
     }
   }
 
@@ -606,6 +608,7 @@ export class RateLimiter extends EventEmitter {
   stop(): void {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
     }
 
     this.tokenBuckets.clear();

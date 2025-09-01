@@ -137,4 +137,17 @@ test-logs/
 *.cer
 private-keys/
 certificates/.env
+
+# Rust build artifacts
+target/debug/
+target/release/
+**/*.pdb
+**/*.rlib
+**/*.rmeta
+*.dll.exp
+
+# Large temporary files
+full_output.txt
+temp_query.txt
+
 .env

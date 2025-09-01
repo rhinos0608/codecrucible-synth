@@ -4,7 +4,8 @@ import * as path from 'path';
 import { logger } from '../infrastructure/logging/unified-logger.js';
 import chalk from 'chalk';
 import { readFile, writeFile, access, stat, readdir } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, createReadStream } from 'fs';
+import { createInterface } from 'readline';
 import axios from 'axios';
 import { SmitheryMCPServer, SmitheryMCPConfig } from './smithery-mcp-server.js';
 import {
@@ -522,9 +523,35 @@ export class MCPServerManager {
   // MCP Server Operations
 
   /**
-   * Safe file system operations - SECURITY FIX for path traversal
+   * Safe file system operations - Enhanced with streaming support for large files
    */
-  async readFileSecure(filePath: string): Promise<string> {
+  async readFileSecure(filePath: string, options: { streaming?: boolean; maxChunkSize?: number } = {}): Promise<string> {
+    const processedPath = await this.validateAndPreprocessPath(filePath);
+    
+    try {
+      const fileStats = await stat(processedPath);
+      
+      // Check if streaming should be used based on file size and configuration
+      const shouldStream = await this.shouldUseStreamingForFile(fileStats.size, options.streaming);
+      
+      if (shouldStream) {
+        logger.info(`Using streaming read for large file (${this.formatBytes(fileStats.size)}): ${processedPath}`);
+        return await this.readFileWithStreaming(processedPath, options.maxChunkSize);
+      } else {
+        return await readFile(processedPath, 'utf8');
+      }
+    } catch (error) {
+      logger.error('File read operation failed', { filePath, error });
+      throw new Error(
+        `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Validate and preprocess file path with security checks
+   */
+  private async validateAndPreprocessPath(filePath: string): Promise<string> {
     // CRITICAL FIX: Normalize paths that start with '/' as relative to project root
     let normalizedFilePath = filePath;
     if (filePath.startsWith('/')) {
@@ -556,14 +583,171 @@ export class MCPServerManager {
       throw new Error(`Access denied: ${processedPath} (original: ${filePath})`);
     }
 
+    return processedPath;
+  }
+
+  /**
+   * Determine if streaming should be used based on file size and configuration
+   */
+  private async shouldUseStreamingForFile(fileSize: number, forceStreaming?: boolean): Promise<boolean> {
+    if (forceStreaming === true) return true;
+    if (forceStreaming === false) return false;
+
     try {
-      return await readFile(processedPath, 'utf8');
+      // Import output configuration
+      const { outputConfig } = await import('../utils/output-config.js');
+      const isStreamingEnabled = outputConfig.isStreamingEnabled();
+      
+      if (!isStreamingEnabled) return false;
+
+      // Use configured streaming threshold
+      const streamingThreshold = outputConfig.getStreamingThresholdBytes();
+      return fileSize > streamingThreshold;
     } catch (error) {
-      logger.error('File read operation failed', { filePath, error });
+      logger.warn('Failed to load output configuration for streaming decision, using default threshold', error);
+      // Fallback: stream files larger than 5MB
+      return fileSize > (5 * 1024 * 1024);
+    }
+  }
+
+  /**
+   * Read file using streaming/chunked approach for large files
+   */
+  private async readFileWithStreaming(filePath: string, maxChunkSize?: number): Promise<string> {
+    // Get configuration values
+    let configuredChunkSize = 8192;
+    let configuredMaxFileSize = 100 * 1024 * 1024; // 100MB default
+    
+    try {
+      const { outputConfig } = await import('../utils/output-config.js');
+      configuredChunkSize = outputConfig.getStreamingChunkSize();
+      configuredMaxFileSize = outputConfig.getMaxStreamingFileSizeBytes();
+    } catch (error) {
+      logger.warn('Failed to load streaming configuration, using defaults', error);
+    }
+
+    const chunkSize = maxChunkSize || configuredChunkSize;
+    const maxFileSize = configuredMaxFileSize;
+
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      let totalSize = 0;
+
+      const readStream = createReadStream(filePath, {
+        encoding: 'utf8',
+        highWaterMark: chunkSize,
+      });
+
+      readStream.on('data', (chunk: string) => {
+        const chunkBuffer = Buffer.from(chunk, 'utf8');
+        totalSize += chunkBuffer.length;
+
+        // Safety check to prevent memory exhaustion
+        if (totalSize > maxFileSize) {
+          readStream.destroy();
+          reject(new Error(`File too large to read into memory (>${this.formatBytes(maxFileSize)}). Consider processing in smaller chunks.`));
+          return;
+        }
+
+        chunks.push(chunkBuffer);
+      });
+
+      readStream.on('end', () => {
+        const content = Buffer.concat(chunks).toString('utf8');
+        logger.info(`Successfully streamed file content (${this.formatBytes(totalSize)})`);
+        resolve(content);
+      });
+
+      readStream.on('error', (error) => {
+        logger.error('Streaming file read failed', { filePath, error });
+        reject(new Error(`Streaming read failed: ${error.message}`));
+      });
+    });
+  }
+
+  /**
+   * Read file line by line using readline for text processing (alternative streaming approach)
+   */
+  private async readFileLineByLine(filePath: string, maxLines?: number): Promise<string> {
+    // Get configured max lines
+    let configuredMaxLines = 10000;
+    try {
+      const { outputConfig } = await import('../utils/output-config.js');
+      configuredMaxLines = outputConfig.getMaxStreamingLines();
+    } catch (error) {
+      logger.warn('Failed to load streaming line configuration, using default', error);
+    }
+
+    const lineLimit = maxLines || configuredMaxLines;
+
+    return new Promise((resolve, reject) => {
+      const lines: string[] = [];
+      let lineCount = 0;
+      let wasTruncated = false;
+
+      const fileStream = createReadStream(filePath);
+      const rl = createInterface({
+        input: fileStream,
+        crlfDelay: Infinity, // Handle Windows line endings
+      });
+
+      rl.on('line', (line) => {
+        if (lineCount < lineLimit) {
+          lines.push(line);
+          lineCount++;
+        } else if (!wasTruncated) {
+          wasTruncated = true;
+          lines.push('... (file truncated due to line limit)');
+        }
+      });
+
+      rl.on('close', () => {
+        const content = lines.join('\n');
+        if (wasTruncated) {
+          logger.warn(`File was truncated at ${lineLimit} lines for memory safety`, { filePath });
+        }
+        logger.info(`Read ${lineCount} lines using readline streaming`);
+        resolve(content);
+      });
+
+      rl.on('error', (error) => {
+        logger.error('Line-by-line file read failed', { filePath, error });
+        reject(new Error(`Line-by-line read failed: ${error.message}`));
+      });
+    });
+  }
+
+  /**
+   * Public method for line-by-line file reading - useful for text processing workflows
+   * 
+   * @param filePath - Path to the file to read
+   * @param maxLines - Maximum number of lines to read (optional, uses config default)
+   * @returns Promise<string> - File content with lines joined by newlines
+   */
+  async readFileLineByLineSecure(filePath: string, maxLines?: number): Promise<string> {
+    const processedPath = await this.validateAndPreprocessPath(filePath);
+    
+    try {
+      const fileStats = await stat(processedPath);
+      logger.info(`Reading file line-by-line (${this.formatBytes(fileStats.size)}): ${processedPath}`);
+      return await this.readFileLineByLine(processedPath, maxLines);
+    } catch (error) {
+      logger.error('Line-by-line file read operation failed', { filePath, error });
       throw new Error(
-        `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to read file line-by-line: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
+  }
+
+  /**
+   * Format bytes for human-readable display
+   */
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   async writeFileSecure(filePath: string, content: string): Promise<void> {

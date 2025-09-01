@@ -111,7 +111,7 @@ export class ExaSearchTool {
 
       return {
         query,
-        results: this.processSearchResults(response.data.results || []),
+        results: await this.processSearchResults(response.data.results || []),
         totalResults: response.data.results?.length || 0,
         searchTime,
       };
@@ -225,7 +225,7 @@ export class ExaSearchTool {
 
       return {
         query: `Similar to: ${input}`,
-        results: this.processSearchResults(response.data.results || []),
+        results: await this.processSearchResults(response.data.results || []),
         totalResults: response.data.results?.length || 0,
         searchTime,
       };
@@ -318,29 +318,38 @@ export class ExaSearchTool {
   /**
    * Process and normalize search results
    */
-  private processSearchResults(results: any[]): ExaSearchResult[] {
-    return results.map(result => ({
-      title: result.title || 'Untitled',
-      url: result.url || '',
-      content: this.cleanContent(result.text || result.content || ''),
-      score: result.score || 0,
-      publishedDate: result.publishedDate,
-      author: result.author,
-    }));
+  private async processSearchResults(results: any[]): Promise<ExaSearchResult[]> {
+    const processedResults = await Promise.all(
+      results.map(async result => ({
+        title: result.title || 'Untitled',
+        url: result.url || '',
+        content: await this.cleanContent(result.text || result.content || ''),
+        score: result.score || 0,
+        publishedDate: result.publishedDate,
+        author: result.author,
+      }))
+    );
+    return processedResults;
   }
 
   /**
-   * Clean and truncate content for better readability
+   * Clean and truncate content for better readability using configurable limits
    */
-  private cleanContent(content: string): string {
+  private async cleanContent(content: string): Promise<string> {
     if (!content) return '';
 
     // Remove excessive whitespace
     let cleaned = content.replace(/\s+/g, ' ').trim();
 
-    // Truncate if too long
-    if (cleaned.length > 1000) {
-      cleaned = `${cleaned.substring(0, 1000)}...`;
+    // Use configurable truncation instead of hard-coded 1000 chars
+    try {
+      const { outputConfig } = await import('../utils/output-config.js');
+      cleaned = outputConfig.truncateForContext(cleaned, 'searchContent');
+    } catch (error) {
+      // Fallback to original behavior if config loading fails
+      if (cleaned.length > 1000) {
+        cleaned = `${cleaned.substring(0, 1000)}...`;
+      }
     }
 
     return cleaned;

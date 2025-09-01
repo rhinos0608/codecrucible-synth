@@ -411,9 +411,15 @@ export class CLICommands {
       if (this.context.voiceSystem && this.context.modelClient) {
         const voices = options.voices || ['analyzer'];
 
+        // Import configuration utility
+        const { outputConfig } = await import('../../utils/output-config.js');
+        
+        // Use configurable truncation instead of hard-coded 2000 chars
+        const truncatedContent = outputConfig.truncateForContext(content, 'fileAnalysis');
+        
         const analysis = await this.context.voiceSystem.generateMultiVoiceSolutions(
           Array.isArray(voices) ? voices : [voices],
-          `Analyze this file: ${filePath}\n\nContent:\n${content.substring(0, 2000)}${content.length > 2000 ? '...' : ''}`,
+          `Analyze this file: ${filePath}\n\nContent:\n${truncatedContent}`,
           { files: [filePath] }
         );
 

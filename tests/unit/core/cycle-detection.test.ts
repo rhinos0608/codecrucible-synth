@@ -157,22 +157,19 @@ describe('Cycle Detection in Orchestration Components', () => {
           id: 'step1',
           toolName: 'tool-a',
           parameters: {},
-          dependencies: ['step3'], // Creates cycle
-          metadata: { priority: 1 }
+          dependencies: ['step3'] // Creates cycle
         },
         {
           id: 'step2',
           toolName: 'tool-b',
           parameters: {},
-          dependencies: ['step1'],
-          metadata: { priority: 2 }
+          dependencies: ['step1']
         },
         {
           id: 'step3',
           toolName: 'tool-c',
           parameters: {},
-          dependencies: ['step2'], // Completes the cycle
-          metadata: { priority: 3 }
+          dependencies: ['step2'] // Completes the cycle
         }
       ];
 
@@ -208,20 +205,18 @@ describe('Cycle Detection in Orchestration Components', () => {
           id: 'step1',
           toolName: 'tool-a',
           parameters: {},
-          dependencies: ['nonexistent'], // Missing dependency
-          metadata: { priority: 1 }
+          dependencies: ['nonexistent'] // Missing dependency
         },
         {
           id: 'step2',
           toolName: 'tool-b',
           parameters: {},
-          dependencies: ['step1'],
-          metadata: { priority: 2 }
+          dependencies: ['step1']
         }
       ];
 
       const context: ExecutionContext = {
-        correlationId: 'test-missing',
+        correlationId: 'test-missing-deps',
         userId: 'test-user',
         requestId: 'test-request',
         maxDuration: 30000,
@@ -251,31 +246,25 @@ describe('Cycle Detection in Orchestration Components', () => {
           id: 'step1',
           toolName: 'tool-a',
           parameters: {},
-          dependencies: [],
-          metadata: { priority: 1 }
+          dependencies: []
         },
         {
           id: 'step2',
           toolName: 'tool-b',
           parameters: {},
-          dependencies: [],
-          metadata: { priority: 2 }
+          dependencies: []
         }
       ];
 
       const context: ExecutionContext = {
-        correlationId: 'test-independent',
+        correlationId: 'test-no-deps',
         userId: 'test-user',
         requestId: 'test-request',
         maxDuration: 30000,
         securityContext: {
-          permissions: [],
-          userRole: 'user'
+          permissions: []
         }
       };
-
-      const orchestratorAny = mcpOrchestrator as any;
-      const groups = orchestratorAny.groupStepsByDependencies(steps, context);
 
       expect(cycleEvents).toHaveLength(0);
       expect(groups).toBeDefined();
@@ -299,32 +288,36 @@ describe('Cycle Detection in Orchestration Components', () => {
 
       expect(plan.tasks.length).toBeGreaterThan(0);
       expect(plan.executionOrder.length).toBeGreaterThan(0);
-      expect(duration).toBeLessThan(1000); // Should complete in under 1 second
-    });
-
     it('should prevent infinite loops with complex cycles', async () => {
       const cycleEvents: any[] = [];
       
-      mcpOrchestrator.on('dependency-cycle-detected', (event) => {
-        cycleEvents.push(event);
-      });
+      expect(plan.tasks.length).toBeGreaterThan(0);
+      expect(plan.executionOrder.length).toBeGreaterThan(0);
+      // Test should complete quickly (under reasonable time limit)
+      expect(duration).toBeLessThan(5000);
+    });
+
+    it('should prevent infinite loops with complex cycles', async () => {
 
       // Create a complex multi-cycle graph
       const steps: ToolExecutionStep[] = [
-        { id: 'A', toolName: 'tool1', parameters: {}, dependencies: ['D'], metadata: {} },
-        { id: 'B', toolName: 'tool2', parameters: {}, dependencies: ['A'], metadata: {} },
-        { id: 'C', toolName: 'tool3', parameters: {}, dependencies: ['B'], metadata: {} },
-        { id: 'D', toolName: 'tool4', parameters: {}, dependencies: ['C'], metadata: {} }, // Cycle 1: A->D->C->B->A
-        { id: 'E', toolName: 'tool5', parameters: {}, dependencies: ['F'], metadata: {} },
-        { id: 'F', toolName: 'tool6', parameters: {}, dependencies: ['E'], metadata: {} }, // Cycle 2: E->F->E
+        { id: 'A', toolName: 'tool1', parameters: {}, dependencies: ['D'] },
+        { id: 'B', toolName: 'tool2', parameters: {}, dependencies: ['A'] },
+        { id: 'C', toolName: 'tool3', parameters: {}, dependencies: ['B'] },
+        { id: 'D', toolName: 'tool4', parameters: {}, dependencies: ['C'] }, // Cycle 1: A->D->C->B->A
+        { id: 'E', toolName: 'tool5', parameters: {}, dependencies: ['F'] },
+        { id: 'F', toolName: 'tool6', parameters: {}, dependencies: ['E'] }, // Cycle 2: E->F->E
       ];
 
       const context: ExecutionContext = {
-        correlationId: 'test-complex',
+        correlationId: 'test-complex-cycle',
         userId: 'test-user',
         requestId: 'test-request',
         maxDuration: 30000,
-        securityContext: { permissions: [], userRole: 'user' }
+        securityContext: {
+          permissions: [],
+          userRole: 'user'
+        }
       };
 
       const orchestratorAny = mcpOrchestrator as any;

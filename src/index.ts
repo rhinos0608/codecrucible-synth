@@ -95,8 +95,28 @@ export async function initialize(): Promise<UnifiedCLI> {
       },
       terminal: {
         enabled: true,
-        allowedCommands: ['ls', 'cat', 'echo', 'pwd', 'which', 'node', 'npm'],
-        blockedCommands: ['rm', 'sudo', 'chmod', 'chown', 'kill', 'pkill'],
+        allowedCommands: [
+          // Basic commands
+          'ls', 'cat', 'echo', 'pwd', 'which', 'node', 'npm',
+          // Safe search commands for development workflows
+          'grep', 'rg', 'ripgrep', 'find', 'locate', 'ack', 'ag', 'fzf',
+          // File inspection commands
+          'head', 'tail', 'less', 'more', 'wc', 'sort', 'uniq',
+          // Development tools
+          'git', 'diff', 'curl', 'wget', 'jq', 'yq',
+        ],
+        blockedCommands: [
+          // Destructive file operations
+          'rm', 'rmdir', 'unlink', 'mv', 'cp',
+          // System administration
+          'sudo', 'su', 'chmod', 'chown', 'chgrp',
+          // Process management
+          'kill', 'pkill', 'killall', 'nohup', 'bg', 'fg',
+          // Network security risks
+          'nc', 'netcat', 'telnet', 'ssh', 'scp', 'rsync',
+          // System modification
+          'mount', 'umount', 'fdisk', 'mkfs', 'dd',
+        ],
       },
       packageManager: {
         enabled: true,
@@ -112,11 +132,14 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     const mcpServerManager = new MCPServerManager(mcpConfig);
 
-    // Start MCP servers asynchronously (don't block initialization)
-    mcpServerManager.startServers().catch(error => {
-      logger.warn('MCP servers initialization had issues:', error);
+    // Start MCP servers and await their readiness
+    try {
+      await mcpServerManager.startServers();
+      logger.info('✅ MCP servers are ready for tool execution');
+    } catch (error) {
+      logger.warn('⚠️ MCP servers initialization had issues, continuing with degraded capabilities:', error);
       // Continue without MCP servers - graceful degradation
-    });
+    }
 
     // Create concrete workflow orchestrator (breaks circular dependencies)
   const orchestrator = new ConcreteWorkflowOrchestrator();

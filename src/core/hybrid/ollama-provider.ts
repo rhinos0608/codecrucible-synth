@@ -99,20 +99,67 @@ export class OllamaProvider implements LLMProvider {
   }
 
   /**
-   * Make HTTP request to Ollama API
+   * Make HTTP request to Ollama API with full tool and context support
    */
   private async makeRequest(prompt: string, options: any): Promise<any> {
+    // If tools are provided, delegate to the request method for function calling
+    if (options.tools && options.tools.length > 0) {
+      logger.debug('makeRequest delegating to request method for tool support', {
+        toolCount: options.tools.length
+      });
+      
+      const requestObj = {
+        prompt,
+        tools: options.tools,
+        model: options.model || this.config.defaultModel,
+        temperature: options.temperature || this.getTemperature(options.taskType),
+        num_ctx: options.num_ctx || options.contextLength || this.getContextLength(options.taskType),
+        options: {
+          top_p: parseFloat(process.env.MODEL_TOP_P || '0.9'),
+          top_k: parseInt(process.env.MODEL_TOP_K || '40'),
+          ...options
+        }
+      };
+      
+      const result = await this.request(requestObj);
+      return {
+        content: result.content,
+        model: result.model || this.config.defaultModel,
+        total_duration: result.total_duration,
+        load_duration: result.load_duration,
+        prompt_eval_count: result.prompt_eval_count,
+        eval_count: result.eval_count,
+        eval_duration: result.eval_duration,
+        tool_calls: result.tool_calls
+      };
+    }
+
+    // Build payload with proper context and option propagation
     const payload = {
       model: options.model || this.config.defaultModel,
       prompt: this.buildPrompt(prompt, options.taskType),
-      stream: false,
+      stream: options.stream ?? false,
       options: {
-        temperature: this.getTemperature(options.taskType),
-        top_p: parseFloat(process.env.MODEL_TOP_P || '0.9'),
-        top_k: parseInt(process.env.MODEL_TOP_K || '40'),
-        num_ctx: this.getContextLength(options.taskType),
+        temperature: options.temperature || this.getTemperature(options.taskType),
+        top_p: options.top_p || parseFloat(process.env.MODEL_TOP_P || '0.9'),
+        top_k: options.top_k || parseInt(process.env.MODEL_TOP_K || '40'),
+        num_ctx: options.num_ctx || options.contextLength || this.getContextLength(options.taskType),
+        // Propagate any additional context options
+        ...(options.ollamaOptions || {}),
+        // Allow direct option overrides
+        ...Object.fromEntries(
+          Object.entries(options)
+            .filter(([key]) => ['mirostat', 'mirostat_eta', 'mirostat_tau', 'repeat_penalty', 'tfs_z'].includes(key))
+        )
       },
     };
+
+    logger.debug('Ollama makeRequest payload', {
+      model: payload.model,
+      contextLength: payload.options.num_ctx,
+      temperature: payload.options.temperature,
+      hasAdditionalOptions: Object.keys(options).length > 5
+    });
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options.timeout || this.config.timeout);

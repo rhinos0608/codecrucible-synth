@@ -242,9 +242,207 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     }
   }
 
+  // Tool registry cache to avoid rebuilding definitions
+  private toolRegistryCache: Map<string, ModelTool> | null = null;
+  private toolSelectionCache: Map<string, ModelTool[]> = new Map();
+  private readonly maxCacheSize = 50;
+
   /**
-   * Get MCP tools and convert them to ModelTool format for AI model
-   * CRITICAL FIX: Expose ALL available MCP tools, not just 4 hardcoded ones
+   * Initialize tool registry cache once to avoid rebuilding static definitions
+   */
+  private initializeToolRegistry(): Map<string, ModelTool> {
+    if (this.toolRegistryCache) {
+      return this.toolRegistryCache;
+    }
+
+    const registry = new Map<string, ModelTool>();
+
+    // Filesystem tools
+    registry.set('filesystem_list', {
+      type: 'function',
+      function: {
+        name: 'filesystem_list_directory',
+        description: 'List files and directories in a specified path',
+        parameters: {
+          type: 'object',
+          properties: {
+            path: { type: 'string', description: 'The directory path to list contents for' },
+          },
+          required: ['path'],
+        },
+      },
+    });
+
+    registry.set('filesystem_read', {
+      type: 'function',
+      function: {
+        name: 'filesystem_read_file',
+        description: 'Read the contents of a file from the filesystem',
+        parameters: {
+          type: 'object',
+          properties: {
+            file_path: { type: 'string', description: 'The path to the file to read' },
+          },
+          required: ['file_path'],
+        },
+      },
+    });
+
+    registry.set('filesystem_write', {
+      type: 'function',
+      function: {
+        name: 'filesystem_write_file',
+        description: 'Write content to a file on the filesystem',
+        parameters: {
+          type: 'object',
+          properties: {
+            file_path: { type: 'string', description: 'The path where to write the file' },
+            content: { type: 'string', description: 'The content to write to the file' },
+          },
+          required: ['file_path', 'content'],
+        },
+      },
+    });
+
+    registry.set('filesystem_stats', {
+      type: 'function',
+      function: {
+        name: 'filesystem_get_stats',
+        description: 'Get file or directory statistics (size, modified time, etc.)',
+        parameters: {
+          type: 'object',
+          properties: {
+            file_path: { type: 'string', description: 'The path to get statistics for' },
+          },
+          required: ['file_path'],
+        },
+      },
+    });
+
+    // Git tools
+    registry.set('git_status', {
+      type: 'function',
+      function: {
+        name: 'git_status',
+        description: 'Check the git repository status',
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    });
+
+    registry.set('git_add', {
+      type: 'function',
+      function: {
+        name: 'git_add',
+        description: 'Stage files for commit',
+        parameters: {
+          type: 'object',
+          properties: {
+            files: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'List of file paths to stage',
+            },
+          },
+          required: ['files'],
+        },
+      },
+    });
+
+    registry.set('git_commit', {
+      type: 'function',
+      function: {
+        name: 'git_commit',
+        description: 'Commit staged changes with a message',
+        parameters: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', description: 'The commit message' },
+          },
+          required: ['message'],
+        },
+      },
+    });
+
+    // Terminal tools
+    registry.set('execute_command', {
+      type: 'function',
+      function: {
+        name: 'execute_command',
+        description: 'Execute a terminal command safely',
+        parameters: {
+          type: 'object',
+          properties: {
+            command: { type: 'string', description: 'The command to execute' },
+            args: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Command arguments',
+              default: [],
+            },
+          },
+          required: ['command'],
+        },
+      },
+    });
+
+    // Package manager tools
+    registry.set('npm_install', {
+      type: 'function',
+      function: {
+        name: 'npm_install',
+        description: 'Install an npm package',
+        parameters: {
+          type: 'object',
+          properties: {
+            packageName: { type: 'string', description: 'The package name to install' },
+            dev: { type: 'boolean', description: 'Install as dev dependency', default: false },
+          },
+          required: ['packageName'],
+        },
+      },
+    });
+
+    registry.set('npm_run', {
+      type: 'function',
+      function: {
+        name: 'npm_run',
+        description: 'Run an npm script',
+        parameters: {
+          type: 'object',
+          properties: {
+            scriptName: { type: 'string', description: 'The npm script name to run' },
+          },
+          required: ['scriptName'],
+        },
+      },
+    });
+
+    // Smithery tools
+    registry.set('smithery_status', {
+      type: 'function',
+      function: {
+        name: 'smithery_status',
+        description: 'Get Smithery registry status and available tools',
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    });
+
+    registry.set('smithery_refresh', {
+      type: 'function',
+      function: {
+        name: 'smithery_refresh',
+        description: 'Refresh Smithery servers and tools',
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    });
+
+    this.toolRegistryCache = registry;
+    logger.info(`🔧 Tool registry initialized with ${registry.size} tools`);
+    return registry;
+  }
+
+  /**
+   * Dynamic MCP tool selection with intelligent context analysis and caching
    */
   private async getMCPToolsForModel(userQuery?: string): Promise<ModelTool[]> {
     if (!this.mcpManager) {
@@ -252,261 +450,114 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     }
 
     try {
-      // EXPANDED MCP TOOLS: All tools available in MCPServerManager
-      const mcpTools: ModelTool[] = [
-        // Filesystem operations (enhanced)
-        {
-          type: 'function',
-          function: {
-            name: 'filesystem_list_directory',
-            description: 'List files and directories in a specified path',
-            parameters: {
-              type: 'object',
-              properties: {
-                path: {
-                  type: 'string',
-                  description: 'The directory path to list contents for',
-                },
-              },
-              required: ['path'],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'filesystem_read_file',
-            description: 'Read the contents of a file from the filesystem',
-            parameters: {
-              type: 'object',
-              properties: {
-                file_path: {
-                  type: 'string',
-                  description: 'The path to the file to read',
-                },
-              },
-              required: ['file_path'],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'filesystem_write_file',
-            description: 'Write content to a file on the filesystem',
-            parameters: {
-              type: 'object',
-              properties: {
-                file_path: {
-                  type: 'string',
-                  description: 'The path where to write the file',
-                },
-                content: {
-                  type: 'string',
-                  description: 'The content to write to the file',
-                },
-              },
-              required: ['file_path', 'content'],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'filesystem_get_stats',
-            description: 'Get file or directory statistics (size, modified time, etc.)',
-            parameters: {
-              type: 'object',
-              properties: {
-                file_path: {
-                  type: 'string',
-                  description: 'The path to get statistics for',
-                },
-              },
-              required: ['file_path'],
-            },
-          },
-        },
-        // Git operations (complete set)
-        {
-          type: 'function',
-          function: {
-            name: 'git_status',
-            description: 'Check the git repository status',
-            parameters: {
-              type: 'object',
-              properties: {},
-              required: [],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'git_add',
-            description: 'Stage files for commit',
-            parameters: {
-              type: 'object',
-              properties: {
-                files: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  description: 'List of file paths to stage',
-                },
-              },
-              required: ['files'],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'git_commit',
-            description: 'Commit staged changes with a message',
-            parameters: {
-              type: 'object',
-              properties: {
-                message: {
-                  type: 'string',
-                  description: 'The commit message',
-                },
-              },
-              required: ['message'],
-            },
-          },
-        },
-        // Terminal operations
-        {
-          type: 'function',
-          function: {
-            name: 'execute_command',
-            description: 'Execute a terminal command safely',
-            parameters: {
-              type: 'object',
-              properties: {
-                command: {
-                  type: 'string',
-                  description: 'The command to execute',
-                },
-                args: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  description: 'Command arguments',
-                  default: [],
-                },
-              },
-              required: ['command'],
-            },
-          },
-        },
-        // Package manager operations
-        {
-          type: 'function',
-          function: {
-            name: 'npm_install',
-            description: 'Install an npm package',
-            parameters: {
-              type: 'object',
-              properties: {
-                packageName: {
-                  type: 'string',
-                  description: 'The package name to install',
-                },
-                dev: {
-                  type: 'boolean',
-                  description: 'Install as dev dependency',
-                  default: false,
-                },
-              },
-              required: ['packageName'],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'npm_run',
-            description: 'Run an npm script',
-            parameters: {
-              type: 'object',
-              properties: {
-                scriptName: {
-                  type: 'string',
-                  description: 'The npm script name to run',
-                },
-              },
-              required: ['scriptName'],
-            },
-          },
-        },
-        // Smithery operations
-        {
-          type: 'function',
-          function: {
-            name: 'smithery_status',
-            description: 'Get Smithery registry status and available tools',
-            parameters: {
-              type: 'object',
-              properties: {},
-              required: [],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'smithery_refresh',
-            description: 'Refresh Smithery servers and tools',
-            parameters: {
-              type: 'object',
-              properties: {},
-              required: [],
-            },
-          },
-        },
-      ];
+      // Initialize tool registry cache
+      const registry = this.initializeToolRegistry();
 
-      // Smart tool selection based on user query to reduce memory pressure
-      if (userQuery) {
-        const query = userQuery.toLowerCase();
-        const selectedTools: ModelTool[] = [];
-        
-        // Start with minimal filesystem tools for basic queries
-        if (query.includes('list') || query.includes('show') || query.includes('directory') || query.includes('files')) {
-          // Only include list_directory and read_file for basic queries
-          selectedTools.push(mcpTools[0]); // filesystem_list_directory
-          selectedTools.push(mcpTools[1]); // filesystem_read_file
-        } else {
-          // Include all filesystem tools for more complex operations
-          selectedTools.push(...mcpTools.slice(0, 4));
-        }
-        
-        // Add domain-specific tools based on query intent (be more specific)
-        if (query.includes('git ') || query.includes('git status') || query.includes('commit') || query.includes('branch') || query.includes('git diff') || query.startsWith('git')) {
-          // Add git tools (indices 4-5)
-          selectedTools.push(...mcpTools.slice(4, 6));
-        }
-        
-        if (query.includes('run') || query.includes('execute') || query.includes('command') || query.includes('terminal') || query.includes('npm') || query.includes('build') || query.includes('install')) {
-          // Add terminal and package tools (indices 6-9)
-          selectedTools.push(...mcpTools.slice(6, 10));
-        }
-        
-        if (query.includes('smithery') || query.includes('registry') || query.includes('mcp')) {
-          // Add smithery tools (indices 10-11)
-          selectedTools.push(...mcpTools.slice(10, 12));
-        }
-        
-        logger.info(`🎯 Smart tool selection: ${selectedTools.length} tools for query intent (reduced from ${mcpTools.length})`);
-        return selectedTools;
+      // If no query, return minimal essential tools
+      if (!userQuery) {
+        const essentialTools = ['filesystem_list', 'filesystem_read', 'git_status'];
+        return essentialTools.map(key => registry.get(key)!).filter(Boolean);
       }
 
-      logger.info(`🔧 Providing ${mcpTools.length} MCP tools to AI model (EXPANDED from 4 to complete set)`);
-      return mcpTools;
+      // Check cache first
+      const cacheKey = this.generateCacheKey(userQuery);
+      if (this.toolSelectionCache.has(cacheKey)) {
+        const cached = this.toolSelectionCache.get(cacheKey)!;
+        logger.debug(`🎯 Using cached tool selection: ${cached.length} tools`);
+        return cached;
+      }
+
+      // Intelligent tool selection based on query analysis
+      const selectedToolKeys = this.analyzeQueryForTools(userQuery);
+      const selectedTools = selectedToolKeys
+        .map(key => registry.get(key))
+        .filter(Boolean) as ModelTool[];
+
+      // Cache the result (with LRU eviction)
+      if (this.toolSelectionCache.size >= this.maxCacheSize) {
+        const firstKey = this.toolSelectionCache.keys().next().value;
+        this.toolSelectionCache.delete(firstKey);
+      }
+      this.toolSelectionCache.set(cacheKey, selectedTools);
+
+      logger.info(`🎯 Dynamic tool selection: ${selectedTools.length} tools for "${userQuery.substring(0, 50)}..." (from ${registry.size} available)`);
+      return selectedTools;
+
     } catch (error) {
       logger.warn('Failed to get MCP tools for model:', error);
-      return [];
+      // Return essential tools as fallback
+      const registry = this.initializeToolRegistry();
+      return ['filesystem_list', 'filesystem_read'].map(key => registry.get(key)!).filter(Boolean);
     }
+  }
+
+  /**
+   * Analyze user query to determine which tools are needed
+   */
+  private analyzeQueryForTools(query: string): string[] {
+    const normalizedQuery = query.toLowerCase();
+    const selectedTools = new Set<string>();
+
+    // Always include basic filesystem operations for most queries
+    selectedTools.add('filesystem_list');
+    selectedTools.add('filesystem_read');
+
+    // Query intent patterns
+    const patterns = [
+      // Filesystem operations
+      { pattern: /\b(write|create|save|edit|modify|update)\b.*\bfile/i, tools: ['filesystem_write'] },
+      { pattern: /\b(stat|size|info|details|properties)\b/i, tools: ['filesystem_stats'] },
+      { pattern: /\b(show|display|cat|view|open)\b.*\bfile/i, tools: ['filesystem_read'] },
+      
+      // Git operations
+      { pattern: /\bgit\s+(status|st)\b/i, tools: ['git_status'] },
+      { pattern: /\bgit\s+(add|stage)\b/i, tools: ['git_add'] },
+      { pattern: /\bgit\s+(commit|ci)\b/i, tools: ['git_commit'] },
+      { pattern: /\b(commit|stage|git)\b/i, tools: ['git_status', 'git_add', 'git_commit'] },
+      
+      // Terminal operations
+      { pattern: /\b(run|execute|command|terminal|shell|bash)\b/i, tools: ['execute_command'] },
+      { pattern: /\b(npm|yarn|node|build|test|start)\b/i, tools: ['execute_command', 'npm_run'] },
+      { pattern: /\binstall\b.*\bpackage/i, tools: ['npm_install'] },
+      
+      // Smithery/MCP operations
+      { pattern: /\b(smithery|mcp|registry|server)\b/i, tools: ['smithery_status', 'smithery_refresh'] },
+    ];
+
+    // Apply patterns
+    for (const { pattern, tools } of patterns) {
+      if (pattern.test(normalizedQuery)) {
+        tools.forEach(tool => selectedTools.add(tool));
+      }
+    }
+
+    // Context-based tool additions
+    if (normalizedQuery.includes('analyze') || normalizedQuery.includes('check')) {
+      selectedTools.add('filesystem_stats');
+      selectedTools.add('git_status');
+    }
+
+    if (normalizedQuery.includes('fix') || normalizedQuery.includes('debug')) {
+      selectedTools.add('filesystem_write');
+      selectedTools.add('execute_command');
+    }
+
+    return Array.from(selectedTools);
+  }
+
+  /**
+   * Generate cache key for tool selection
+   */
+  private generateCacheKey(query: string): string {
+    // Create a normalized cache key based on query intent
+    const normalized = query
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Use first 100 chars for cache key to balance specificity and reuse
+    return normalized.substring(0, 100);
   }
 
   private async handlePromptRequest(request: WorkflowRequest): Promise<any> {

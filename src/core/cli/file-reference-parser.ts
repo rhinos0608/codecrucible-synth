@@ -199,12 +199,17 @@ export class FileReferenceParser {
     const stats = await stat(filePath);
 
     if (stats.size > this.maxFileSize) {
+      // Use configurable truncation instead of hard-coded 1000 chars
+      const { outputConfig } = await import('../../utils/output-config.js');
+      const fileContent = await readFile(filePath, 'utf-8');
+      const truncatedContent = outputConfig.truncateForContext(fileContent, 'largeFilePreview');
+      
       return {
         path: filePath,
         type: 'file',
         exists: true,
         size: stats.size,
-        content: `File too large (${this.formatBytes(stats.size)}), showing first 1000 characters:\n\n${(await readFile(filePath, 'utf-8')).substring(0, 1000)}...`,
+        content: `File too large (${this.formatBytes(stats.size)}), showing preview:\n\n${truncatedContent}`,
       };
     }
 

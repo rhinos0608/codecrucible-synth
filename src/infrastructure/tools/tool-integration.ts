@@ -57,14 +57,29 @@ export class ToolIntegration {
 
   private async initializeTools(): Promise<void> {
     try {
-      // Check if MCP manager is ready
-      if (!this.mcpManager) {
-        logger.warn('MCP Manager not available, tools will be unavailable');
-        return;
+      // Initialize filesystem tools with proper backend delegation
+      this.filesystemTools = new FilesystemTools();
+      
+      // Set MCP manager as fallback
+      if (this.mcpManager) {
+        this.filesystemTools.setMCPManager(this.mcpManager);
       }
 
-      // Initialize filesystem tools lazily
-      this.filesystemTools = new FilesystemTools();
+      // Try to initialize Rust backend
+      try {
+        const { RustExecutionBackend } = await import('../../core/execution/rust-executor/rust-execution-backend.js');
+        const rustBackend = new RustExecutionBackend();
+        const initialized = await rustBackend.initialize();
+        
+        if (initialized) {
+          this.filesystemTools.setRustBackend(rustBackend);
+          logger.info('Rust execution backend initialized for filesystem tools');
+        } else {
+          logger.warn('Rust execution backend failed to initialize, using MCP fallback');
+        }
+      } catch (error) {
+        logger.warn('Failed to load Rust execution backend, using MCP fallback', error);
+      }
 
       // Register filesystem tools
       const fsTools = this.filesystemTools.getTools();
@@ -73,7 +88,7 @@ export class ToolIntegration {
       }
 
       this.isInitialized = true;
-      logger.info(`Lazily initialized ${this.availableTools.size} tools for LLM integration`);
+      logger.info(`Initialized ${this.availableTools.size} tools for LLM integration with Rust-first architecture`);
     } catch (error) {
       logger.error('Failed to initialize tools:', error);
       // Don't throw - allow system to continue without tools

@@ -168,8 +168,14 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private hardwareAwareModelSelector?: HardwareAwareModelSelector;
   private initialized = false;
   private requestCount = 0;
-  private cache = new Map<string, { response: ModelResponse; timestamp: number }>();
+  private cache = new Map<string, { response: ModelResponse; timestamp: number; accessCount: number; lastAccess: number }>();
   private dependencies?: UnifiedModelClientDependencies;
+  
+  // Cache management settings
+  private readonly maxCacheSize = 100; // Maximum number of cached responses
+  private readonly cacheExpiryMs = 300000; // 5 minutes in milliseconds
+  private readonly evictionBatchSize = 20; // Clean up this many entries when cache is full
+  private cacheEvictionTimer?: NodeJS.Timeout;
 
   constructor(
     config: UnifiedModelClientConfig | UnifiedConfiguration,
@@ -195,6 +201,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.setupLivingSpiralCoordinator();
     this.setupPerformanceProfiler();
     this.setupHardwareAwareSelector();
+    this.setupCacheEvictionTimer();
   }
 
   private convertUnifiedConfig(unifiedConfig: UnifiedConfiguration): UnifiedModelClientConfig {
@@ -578,13 +585,17 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       );
     }
 
-    // Check cache first
+    // Check cache first with eviction
     if (this.config.enableCaching) {
       const cacheKey = this.getCacheKey(request);
       const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < 300000) {
-        // 5 minute cache
-        logger.debug(`Cache hit for request: ${requestId}`);
+      if (cached && Date.now() - cached.timestamp < this.cacheExpiryMs) {
+        // Update access tracking for LRU eviction
+        cached.accessCount++;
+        cached.lastAccess = Date.now();
+        this.cache.set(cacheKey, cached);
+        
+        logger.debug(`Cache hit for request: ${requestId} (access count: ${cached.accessCount})`);
         
         // End preparation profiling on cache hit
         if (this.performanceProfiler && profilingSessionId && preparationOperationId) {
@@ -593,6 +604,10 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         }
         
         return { ...cached.response, id: requestId };
+      } else if (cached) {
+        // Remove expired entry immediately
+        this.cache.delete(cacheKey);
+        logger.debug(`Removed expired cache entry: ${requestId}`);
       }
     }
 
@@ -734,10 +749,24 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         this.performanceProfiler.endOperation(profilingSessionId, inferenceOperationId);
       }
 
-      // Cache successful responses
+      // Cache successful responses with eviction management
       if (this.config.enableCaching && response) {
         const cacheKey = this.getCacheKey(request);
-        this.cache.set(cacheKey, { response, timestamp: Date.now() });
+        const now = Date.now();
+        
+        // Check if cache is full and trigger eviction
+        if (this.cache.size >= this.maxCacheSize) {
+          this.evictCacheEntries();
+        }
+        
+        this.cache.set(cacheKey, { 
+          response, 
+          timestamp: now, 
+          accessCount: 1, 
+          lastAccess: now 
+        });
+        
+        logger.debug(`Cached response for: ${requestId} (cache size: ${this.cache.size}/${this.maxCacheSize})`);
       }
 
       const duration = Date.now() - startTime;
@@ -881,6 +910,90 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     return availableProviders.length > 0;
   }
 
+  // Cache management methods
+  
+  /**
+   * Set up periodic cache cleanup timer
+   */
+  private setupCacheEvictionTimer(): void {
+    // Clean up expired entries every 2 minutes
+    this.cacheEvictionTimer = setInterval(() => {
+      this.cleanupExpiredEntries();
+    }, 120000); // 2 minutes
+    
+    logger.debug('Cache eviction timer initialized');
+  }
+
+  /**
+   * Evict cache entries when cache is full
+   * Uses a combination of LRU (Least Recently Used) and age-based eviction
+   */
+  private evictCacheEntries(): void {
+    const now = Date.now();
+    const entries = Array.from(this.cache.entries());
+    
+    // First, remove all expired entries
+    const expiredKeys = entries
+      .filter(([, entry]) => now - entry.timestamp > this.cacheExpiryMs)
+      .map(([key]) => key);
+    
+    expiredKeys.forEach(key => this.cache.delete(key));
+    
+    if (expiredKeys.length > 0) {
+      logger.debug(`Evicted ${expiredKeys.length} expired cache entries`);
+    }
+    
+    // If still over limit, remove LRU entries
+    if (this.cache.size >= this.maxCacheSize) {
+      const remainingEntries = Array.from(this.cache.entries())
+        .sort(([, a], [, b]) => {
+          // Sort by lastAccess (oldest first), then by accessCount (least used first)
+          if (a.lastAccess !== b.lastAccess) {
+            return a.lastAccess - b.lastAccess;
+          }
+          return a.accessCount - b.accessCount;
+        });
+      
+      const toEvict = Math.min(this.evictionBatchSize, remainingEntries.length - this.maxCacheSize + this.evictionBatchSize);
+      const keysToEvict = remainingEntries.slice(0, toEvict).map(([key]) => key);
+      
+      keysToEvict.forEach(key => this.cache.delete(key));
+      
+      if (keysToEvict.length > 0) {
+        logger.debug(`Evicted ${keysToEvict.length} LRU cache entries (cache size: ${this.cache.size}/${this.maxCacheSize})`);
+      }
+    }
+  }
+  
+  /**
+   * Clean up expired cache entries (called by timer)
+   */
+  private cleanupExpiredEntries(): void {
+    const now = Date.now();
+    const initialSize = this.cache.size;
+    
+    const expiredKeys = Array.from(this.cache.entries())
+      .filter(([, entry]) => now - entry.timestamp > this.cacheExpiryMs)
+      .map(([key]) => key);
+    
+    expiredKeys.forEach(key => this.cache.delete(key));
+    
+    if (expiredKeys.length > 0) {
+      logger.debug(`Periodic cleanup: removed ${expiredKeys.length} expired cache entries (${initialSize} -> ${this.cache.size})`);
+    }
+  }
+  
+  /**
+   * Get cache statistics for monitoring
+   */
+  getCacheStats(): { size: number; maxSize: number; hitRate?: number } {
+    return {
+      size: this.cache.size,
+      maxSize: this.maxCacheSize,
+      // Could add hit rate tracking if needed
+    };
+  }
+
   async shutdown(): Promise<void> {
     logger.info('Shutting down Unified Model Client...');
 
@@ -905,6 +1018,13 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     // Shutdown Living Spiral Coordinator
     if (this.livingSpiralCoordinator) {
       await this.livingSpiralCoordinator.shutdown();
+    }
+
+    // Clean up cache eviction timer
+    if (this.cacheEvictionTimer) {
+      clearInterval(this.cacheEvictionTimer);
+      this.cacheEvictionTimer = undefined;
+      logger.debug('Cache eviction timer cleared');
     }
 
     this.providers.clear();

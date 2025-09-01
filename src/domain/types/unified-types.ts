@@ -686,6 +686,22 @@ export interface PerformanceConfiguration {
   defaultTimeout?: number;
   preferGPU?: boolean;
   memoryThresholdMB?: number;
+  output?: OutputConfiguration;
+}
+
+export interface OutputConfiguration {
+  // File analysis output limits
+  maxFileAnalysisChars: number;
+  // Search content limits
+  maxSearchContentChars: number;
+  // Large file preview limits
+  maxLargeFilePreviewChars: number;
+  // Command output limits
+  maxCommandOutputChars: number;
+  // Enable streaming for large outputs
+  enableStreaming: boolean;
+  // Configurable truncation suffix
+  truncationSuffix: string;
 }
 
 export interface CacheConfiguration {

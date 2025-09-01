@@ -1,7 +1,7 @@
 use napi_derive::napi;
 use serde_json;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
 use tracing::{error, info};
@@ -25,6 +25,8 @@ pub struct RustExecutor {
     communication_handler: Arc<CommunicationHandler>,
     initialized: bool,
     performance_metrics: Arc<RwLock<PerformanceMetrics>>,
+    // Shared Tokio runtime for all async operations
+    runtime: Arc<Mutex<Runtime>>,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]
@@ -94,6 +96,11 @@ impl RustExecutor {
         let id = Uuid::new_v4().to_string();
         let communication_handler = Arc::new(CommunicationHandler::new());
 
+        // Create a single Tokio runtime for all async operations
+        let runtime = Arc::new(Mutex::new(
+            Runtime::new().expect("Failed to create Tokio runtime")
+        ));
+
         info!("RustExecutor created with ID: {}", id);
 
         Self {
@@ -101,6 +108,7 @@ impl RustExecutor {
             communication_handler,
             initialized: false,
             performance_metrics: Arc::new(RwLock::new(PerformanceMetrics::default())),
+            runtime,
         }
     }
 
@@ -117,9 +125,9 @@ impl RustExecutor {
             return true;
         }
 
-        // Initialize communication handler with executors
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        match rt.block_on(self.communication_handler.initialize()) {
+        // Initialize communication handler with executors using shared runtime
+        let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
+        match runtime.block_on(self.communication_handler.initialize()) {
             Ok(_) => {
                 self.initialized = true;
                 info!("RustExecutor initialized successfully: {}", self.id);
@@ -182,9 +190,9 @@ impl RustExecutor {
             stream_response: false,
         };
 
-        // Execute request through communication handler and update performance metrics
-        let rt = Runtime::new().expect("Failed to create Tokio runtime");
-        let response = rt.block_on(async {
+        // Execute request through communication handler and update performance metrics using shared runtime
+        let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
+        let response = runtime.block_on(async {
             let response = self.communication_handler.execute_request(request).await;
             self._update_performance_metrics(response.success, response.execution_time_ms)
                 .await;
@@ -275,16 +283,16 @@ impl RustExecutor {
     /// Get performance metrics as JSON string
     #[napi]
     pub fn get_performance_metrics(&self) -> String {
-        let rt = Runtime::new().expect("Failed to create Tokio runtime");
-        let metrics = rt.block_on(async { self.performance_metrics.read().await.clone() });
+        let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
+        let metrics = runtime.block_on(async { self.performance_metrics.read().await.clone() });
         serde_json::to_string(&metrics).unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Reset performance metrics
     #[napi]
     pub fn reset_performance_metrics(&self) {
-        let rt = Runtime::new().expect("Failed to create Tokio runtime");
-        rt.block_on(async {
+        let runtime = self.runtime.lock().expect("Failed to acquire runtime lock");
+        runtime.block_on(async {
             let mut metrics = self.performance_metrics.write().await;
             *metrics = PerformanceMetrics::default();
         });
@@ -367,6 +375,14 @@ impl RustExecutor {
     #[napi]
     pub fn cleanup(&self) {
         info!("Cleaning up RustExecutor {}", self.id);
+        
+        // Gracefully shutdown the runtime if possible
+        if let Ok(_runtime) = self.runtime.lock() {
+            // Note: We don't call shutdown() here because it would consume the runtime
+            // and we can't move it out of the Arc<Mutex<>>. The runtime will be
+            // automatically dropped when the RustExecutor is dropped.
+            info!("Runtime cleanup scheduled for RustExecutor {}", self.id);
+        }
     }
 
     // Private helper methods

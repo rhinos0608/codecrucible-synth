@@ -347,6 +347,20 @@ performance:
     max_heap: "4096MB"
     warning_threshold: 0.8
     
+  # Output configuration and limits
+  output:
+    max_file_analysis_chars: 8000     # Increased from 2000
+    max_search_content_chars: 2000    # Increased from 1000
+    max_large_file_preview_chars: 3000 # Increased from 1000
+    max_command_output_chars: 50000   # Increased from 30000
+    enable_streaming: true            # Enable streaming for large outputs
+    truncation_suffix: "... (truncated - use streaming for full content)"
+    # Streaming configuration
+    streaming_threshold_mb: 10        # Start streaming for files > 10MB
+    max_streaming_file_size_mb: 100   # Maximum file size to attempt streaming (100MB)
+    streaming_chunk_size: 8192        # Chunk size for streaming reads (8KB)
+    max_streaming_lines: 10000        # Maximum lines for readline-based streaming
+    
   # Model optimization settings
   enable_model_caching: true
   enable_fast_mode: true

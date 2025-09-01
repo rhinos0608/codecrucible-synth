@@ -51,8 +51,8 @@ interface NativeRustExecutor {
   ): Promise<RustExecutionResult>;
   executeCommand(command: string, args: string[], options?: any): Promise<RustExecutionResult>;
   execute(toolId: string, args: string, options?: any): Promise<RustExecutionResult>;
-  getPerformanceMetrics(): Promise<string>;
-  resetPerformanceMetrics(): Promise<void>;
+  getPerformanceMetrics(): string;
+  resetPerformanceMetrics(): void;
   healthCheck(): Promise<string>;
   getSupportedTools(): string[];
   getFilesystemOperations(): string[];
@@ -143,7 +143,6 @@ export class RustExecutionBackend {
       if (RustExecutor || createRustExecutor) {
         this.rustExecutor = RustExecutor ? RustExecutor.create() : createRustExecutor();
 
-
         // Initialize the Rust executor
         const initResult = await this.rustExecutor.initialize();
         if (initResult) {
@@ -206,9 +205,24 @@ export class RustExecutionBackend {
         result = await this.executeGenericOperation(request);
       }
 
-      // Update performance stats
-      this.performanceStats.successfulRequests++;
-      this.updateAverageExecutionTime(Date.now() - startTime);
+      // Sync performance metrics from Rust executor
+      let parsedMetrics: any = undefined;
+      try {
+        const metricsStr = this.rustExecutor.getPerformanceMetrics();
+        const metrics = JSON.parse(metricsStr);
+        this.performanceStats = {
+          totalRequests: metrics.total_requests ?? 0,
+          successfulRequests: metrics.successful_requests ?? 0,
+          failedRequests: metrics.failed_requests ?? 0,
+          averageExecutionTime: metrics.average_execution_time_ms ?? 0,
+        };
+        parsedMetrics = result.performance_metrics
+          ? JSON.parse(result.performance_metrics)
+          : undefined;
+      } catch (err) {
+        logger.warn('Failed to parse Rust performance metrics', err);
+        parsedMetrics = result.performance_metrics;
+      }
 
       logger.debug('✅ Rust execution completed', {
         toolId: request.toolId,
@@ -228,7 +242,7 @@ export class RustExecutionBackend {
         metadata: {
           executionTimeMs: result.execution_time_ms,
           executor: 'rust',
-          performanceMetrics: result.performance_metrics,
+          performanceMetrics: parsedMetrics,
           ...request.metadata,
         },
         executionTimeMs: result.execution_time_ms,
@@ -292,7 +306,6 @@ export class RustExecutionBackend {
   ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
     this.performanceStats.totalRequests++;
-
 
     if (!this.tsOrchestrator) {
       this.performanceStats.failedRequests++;
@@ -440,6 +453,20 @@ export class RustExecutionBackend {
    * Get performance statistics
    */
   getPerformanceStats() {
+    if (this.rustExecutor) {
+      try {
+        const metricsStr = this.rustExecutor.getPerformanceMetrics();
+        const metrics = JSON.parse(metricsStr);
+        this.performanceStats = {
+          totalRequests: metrics.total_requests ?? 0,
+          successfulRequests: metrics.successful_requests ?? 0,
+          failedRequests: metrics.failed_requests ?? 0,
+          averageExecutionTime: metrics.average_execution_time_ms ?? 0,
+        };
+      } catch (err) {
+        logger.warn('Failed to fetch Rust performance metrics', err);
+      }
+    }
     return {
       ...this.performanceStats,
       rustExecutorAvailable: this.isAvailable(),
@@ -450,7 +477,7 @@ export class RustExecutionBackend {
   /**
    * Reset performance metrics
    */
-  async resetPerformanceMetrics(): Promise<void> {
+  resetPerformanceMetrics(): void {
     this.performanceStats = {
       totalRequests: 0,
       successfulRequests: 0,
@@ -459,7 +486,7 @@ export class RustExecutionBackend {
     };
 
     if (this.rustExecutor) {
-      await this.rustExecutor.resetPerformanceMetrics();
+      this.rustExecutor.resetPerformanceMetrics();
     }
   }
 }

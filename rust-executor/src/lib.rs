@@ -1,24 +1,30 @@
+use napi::{
+    threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode},
+    Error, JsFunction, Result as NapiResult,
+};
 use napi_derive::napi;
-use napi::{Result as NapiResult, Error, JsFunction, threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode}};
+use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
-use serde_json;
-use tracing::{info, error, warn, debug};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 // Module declarations - keeping full complexity
-pub mod security;
-pub mod protocol;
 pub mod executors;
+pub mod protocol;
+pub mod security;
 pub mod utils;
 
-use crate::security::{SecurityContext, Capability};
-use crate::protocol::messages::{ExecutionMessage, MessageType, MessagePayload, ExecutionRequest, ExecutionContext, SecurityLevel as ProtocolSecurityLevel, ResourceLimitConfig};
-use crate::protocol::communication::{CommunicationHandler, ExecutorRegistry};
-use crate::executors::filesystem::FileSystemExecutor;
 use crate::executors::command::CommandExecutor;
+use crate::executors::filesystem::FileSystemExecutor;
+use crate::protocol::communication::{CommunicationHandler, ExecutorRegistry};
+use crate::protocol::messages::{
+    ExecutionContext, ExecutionMessage, ExecutionRequest, MessagePayload, MessageType,
+    ResourceLimitConfig, SecurityLevel as ProtocolSecurityLevel,
+};
+use crate::security::{Capability, SecurityContext};
 
 /// Main Rust Executor class exposed to Node.js via NAPI
 #[napi]
@@ -86,16 +92,18 @@ impl RustExecutor {
         if tracing::subscriber::set_global_default(
             tracing_subscriber::FmtSubscriber::builder()
                 .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-                .finish()
-        ).is_err() {
+                .finish(),
+        )
+        .is_err()
+        {
             // Subscriber already set, ignore error
         }
 
         let id = Uuid::new_v4().to_string();
         let communication_handler = Arc::new(CommunicationHandler::new());
-        
+
         info!("RustExecutor created with ID: {}", id);
-        
+
         Self {
             id,
             communication_handler,
@@ -134,9 +142,14 @@ impl RustExecutor {
 
     /// Execute a command with the given arguments and options  
     #[napi]
-    pub fn execute(&self, tool_id: String, arguments: String, options: Option<ExecutionOptions>) -> ExecutionResult {
+    pub fn execute(
+        &self,
+        tool_id: String,
+        arguments: String,
+        options: Option<ExecutionOptions>,
+    ) -> ExecutionResult {
         let start_time = std::time::Instant::now();
-        
+
         if !self.initialized {
             return ExecutionResult {
                 success: false,
@@ -148,48 +161,41 @@ impl RustExecutor {
         }
 
         // Parse arguments from JSON
-        let parsed_arguments: HashMap<String, serde_json::Value> = match serde_json::from_str(&arguments) {
-            Ok(args) => args,
-            Err(e) => {
-                return ExecutionResult {
-                    success: false,
-                    result: None,
-                    error: Some(format!("Invalid arguments JSON: {}", e)),
-                    execution_time_ms: start_time.elapsed().as_millis() as u32,
-                    performance_metrics: None,
-                };
-            }
-        };
+        let parsed_arguments: HashMap<String, serde_json::Value> =
+            match serde_json::from_str(&arguments) {
+                Ok(args) => args,
+                Err(e) => {
+                    return ExecutionResult {
+                        success: false,
+                        result: None,
+                        error: Some(format!("Invalid arguments JSON: {}", e)),
+                        execution_time_ms: start_time.elapsed().as_millis() as u32,
+                        performance_metrics: None,
+                    };
+                }
+            };
 
         // Build execution context from options
         let execution_context = self.build_execution_context(options.as_ref());
-        
+
         // Create execution request
         let request = ExecutionRequest {
             tool_id,
             operation: "execute".to_string(),
             arguments: parsed_arguments,
             context: execution_context,
-            timeout_ms: options.as_ref().and_then(|o| o.timeout_ms.map(|t| t as u64)),
+            timeout_ms: options
+                .as_ref()
+                .and_then(|o| o.timeout_ms.map(|t| t as u64)),
             stream_response: false,
         };
 
-        // Execute request through communication handler and update performance metrics in a single async block
+        // Execute request through communication handler and update performance metrics
         let rt = Runtime::new().expect("Failed to create Tokio runtime");
         let response = rt.block_on(async {
             let response = self.communication_handler.execute_request(request).await;
-            {
-                let mut metrics = self.performance_metrics.write().await;
-                metrics.total_requests += 1;
-                metrics.total_execution_time_ms += response.execution_time_ms;
-                if response.success {
-                    metrics.successful_requests += 1;
-                } else {
-                    metrics.failed_requests += 1;
-                }
-                metrics.average_execution_time_ms =
-                    metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
-            }
+            self._update_performance_metrics(response.success, response.execution_time_ms)
+                .await;
             response
         });
 
@@ -216,9 +222,9 @@ impl RustExecutor {
             None => None,
         };
 
-        let error_str = response.error.map(|e| {
-            serde_json::to_string(&e).unwrap_or_else(|_| e.message)
-        });
+        let error_str = response
+            .error
+            .map(|e| serde_json::to_string(&e).unwrap_or_else(|_| e.message));
 
         ExecutionResult {
             success: response.success,
@@ -231,11 +237,20 @@ impl RustExecutor {
 
     /// Execute a file system operation
     #[napi]
-    pub fn execute_filesystem(&self, operation: String, path: String, content: Option<String>, options: Option<ExecutionOptions>) -> ExecutionResult {
+    pub fn execute_filesystem(
+        &self,
+        operation: String,
+        path: String,
+        content: Option<String>,
+        options: Option<ExecutionOptions>,
+    ) -> ExecutionResult {
         let mut arguments = HashMap::new();
-        arguments.insert("operation".to_string(), serde_json::Value::String(operation));
+        arguments.insert(
+            "operation".to_string(),
+            serde_json::Value::String(operation),
+        );
         arguments.insert("path".to_string(), serde_json::Value::String(path));
-        
+
         if let Some(content) = content {
             arguments.insert("content".to_string(), serde_json::Value::String(content));
         }
@@ -247,12 +262,18 @@ impl RustExecutor {
 
     /// Execute a command
     #[napi]
-    pub fn execute_command(&self, command: String, args: Vec<String>, options: Option<ExecutionOptions>) -> ExecutionResult {
+    pub fn execute_command(
+        &self,
+        command: String,
+        args: Vec<String>,
+        options: Option<ExecutionOptions>,
+    ) -> ExecutionResult {
         let mut arguments = HashMap::new();
         arguments.insert("command".to_string(), serde_json::Value::String(command));
-        arguments.insert("args".to_string(), serde_json::Value::Array(
-            args.into_iter().map(serde_json::Value::String).collect()
-        ));
+        arguments.insert(
+            "args".to_string(),
+            serde_json::Value::Array(args.into_iter().map(serde_json::Value::String).collect()),
+        );
 
         let arguments_json = serde_json::to_string(&arguments).unwrap_or_default();
 
@@ -262,19 +283,19 @@ impl RustExecutor {
     /// Get performance metrics as JSON string
     #[napi]
     pub fn get_performance_metrics(&self) -> String {
-        // For now return a placeholder until we fix async integration
-        serde_json::json!({
-            "total_requests": 0,
-            "successful_requests": 0,
-            "failed_requests": 0,
-            "average_execution_time": 0.0
-        }).to_string()
+        let rt = Runtime::new().expect("Failed to create Tokio runtime");
+        let metrics = rt.block_on(async { self.performance_metrics.read().await.clone() });
+        serde_json::to_string(&metrics).unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Reset performance metrics
     #[napi]
     pub fn reset_performance_metrics(&self) {
-        // For now just return - placeholder until we fix async integration
+        let rt = Runtime::new().expect("Failed to create Tokio runtime");
+        rt.block_on(async {
+            let mut metrics = self.performance_metrics.write().await;
+            *metrics = PerformanceMetrics::default();
+        });
     }
 
     /// Check if the executor is healthy
@@ -284,23 +305,22 @@ impl RustExecutor {
             return serde_json::json!({
                 "status": "unhealthy",
                 "reason": "not initialized"
-            }).to_string();
+            })
+            .to_string();
         }
 
         serde_json::json!({
             "status": "healthy",
             "executor_id": self.id,
             "initialized": self.initialized
-        }).to_string()
+        })
+        .to_string()
     }
 
     /// Get supported tools and operations
     #[napi]
     pub fn get_supported_tools(&self) -> Vec<String> {
-        vec![
-            "filesystem".to_string(),
-            "command".to_string(),
-        ]
+        vec!["filesystem".to_string(), "command".to_string()]
     }
 
     /// Get supported file system operations
@@ -323,12 +343,31 @@ impl RustExecutor {
     pub fn get_supported_commands(&self) -> Vec<String> {
         // Return the same whitelist as the command executor
         vec![
-            "ls".to_string(), "dir".to_string(), "cat".to_string(), "head".to_string(), "tail".to_string(),
-            "find".to_string(), "grep".to_string(), "wc".to_string(), "sort".to_string(), "uniq".to_string(),
-            "git".to_string(), "npm".to_string(), "node".to_string(), "python".to_string(), "python3".to_string(),
-            "pip".to_string(), "pip3".to_string(), "rustc".to_string(), "cargo".to_string(),
-            "echo".to_string(), "pwd".to_string(), "which".to_string(), "whereis".to_string(),
-            "uname".to_string(), "whoami".to_string(),
+            "ls".to_string(),
+            "dir".to_string(),
+            "cat".to_string(),
+            "head".to_string(),
+            "tail".to_string(),
+            "find".to_string(),
+            "grep".to_string(),
+            "wc".to_string(),
+            "sort".to_string(),
+            "uniq".to_string(),
+            "git".to_string(),
+            "npm".to_string(),
+            "node".to_string(),
+            "python".to_string(),
+            "python3".to_string(),
+            "pip".to_string(),
+            "pip3".to_string(),
+            "rustc".to_string(),
+            "cargo".to_string(),
+            "echo".to_string(),
+            "pwd".to_string(),
+            "which".to_string(),
+            "whereis".to_string(),
+            "uname".to_string(),
+            "whoami".to_string(),
         ]
     }
 
@@ -377,9 +416,18 @@ impl RustExecutor {
         }
     }
 
-    /// Update performance metrics (placeholder)
-    fn _update_performance_metrics(&self, _success: bool, _execution_time_ms: u64) {
-        // Placeholder - will be implemented when we restore async functionality
+    /// Update performance metrics after each execution
+    async fn _update_performance_metrics(&self, success: bool, execution_time_ms: u64) {
+        let mut metrics = self.performance_metrics.write().await;
+        metrics.total_requests += 1;
+        metrics.total_execution_time_ms += execution_time_ms;
+        if success {
+            metrics.successful_requests += 1;
+        } else {
+            metrics.failed_requests += 1;
+        }
+        metrics.average_execution_time_ms =
+            metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
     }
 }
 
@@ -399,15 +447,20 @@ pub fn get_version() -> String {
 #[napi]
 pub fn init_logging(level: Option<String>) {
     let log_level = level.unwrap_or_else(|| "info".to_string());
-    
+
     if tracing::subscriber::set_global_default(
         tracing_subscriber::FmtSubscriber::builder()
-            .with_env_filter(tracing_subscriber::EnvFilter::new(format!("rust_executor={}", log_level)))
-            .finish()
-    ).is_err() {
+            .with_env_filter(tracing_subscriber::EnvFilter::new(format!(
+                "rust_executor={}",
+                log_level
+            )))
+            .finish(),
+    )
+    .is_err()
+    {
         // Subscriber already set, ignore error
     }
-    
+
     info!("Rust executor logging initialized at level: {}", log_level);
 }
 
@@ -416,21 +469,21 @@ pub fn init_logging(level: Option<String>) {
 pub fn benchmark_execution(iterations: u32) -> String {
     let mut executor = RustExecutor::new();
     executor.initialize();
-    
+
     let start_time = std::time::Instant::now();
     let mut successful = 0u32;
     let mut failed = 0u32;
-    
+
     for _i in 0..iterations {
         // Simplified benchmark without async operations for now
         // In a real implementation, we'd call the actual executor methods
         std::thread::sleep(std::time::Duration::from_millis(1));
         successful += 1;
     }
-    
+
     let total_time = start_time.elapsed();
     let avg_time_ms = total_time.as_millis() as f64 / iterations as f64;
-    
+
     let benchmark_result = serde_json::json!({
         "iterations": iterations,
         "successful": successful,
@@ -439,6 +492,6 @@ pub fn benchmark_execution(iterations: u32) -> String {
         "average_time_ms": avg_time_ms,
         "operations_per_second": (iterations as f64 / total_time.as_secs_f64()).round()
     });
-    
+
     benchmark_result.to_string()
 }

@@ -135,8 +135,9 @@ impl FileSystemExecutor {
 
         // Execute in isolated process for additional security
         let operation_clone = operation.clone();
-        // Simplified execution without isolation for now to avoid lifetime issues
-        let result = self.execute_operation_internal(operation_clone);
+        // Execute async operation with proper error handling
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(self.execute_operation_internal(operation_clone));
 
         let execution_time = start_time.elapsed().as_millis() as u64;
 
@@ -174,23 +175,30 @@ impl FileSystemExecutor {
     }
 
     /// Execute the actual file system operation (runs in isolated process)
-    fn execute_operation_internal(&self, operation: FileOperation) -> Result<FileSystemResult, FileSystemError> {
+    async fn execute_operation_internal(&self, operation: FileOperation) -> Result<FileSystemResult, FileSystemError> {
         match operation.operation_type {
-            FileOperationType::Read => self.read_file(&operation.path),
-            FileOperationType::Write => self.write_file(&operation.path, operation.content.as_deref().unwrap_or("")),
-            FileOperationType::Append => self.append_file(&operation.path, operation.content.as_deref().unwrap_or("")),
-            FileOperationType::Delete => self.delete_path(&operation.path),
-            FileOperationType::CreateDir => self.create_directory(&operation.path, operation.recursive.unwrap_or(false)),
-            FileOperationType::List => self.list_directory(&operation.path),
-            FileOperationType::Exists => self.check_exists(&operation.path),
-            FileOperationType::GetInfo => self.get_file_info(&operation.path),
+            FileOperationType::Read => self.read_file(&operation.path).await,
+            FileOperationType::Write => self.write_file(&operation.path, operation.content.as_deref().unwrap_or("")).await,
+            FileOperationType::Append => self.append_file(&operation.path, operation.content.as_deref().unwrap_or("")).await,
+            FileOperationType::Delete => self.delete_path(&operation.path).await,
+            FileOperationType::CreateDir => self.create_directory(&operation.path, operation.recursive.unwrap_or(false)).await,
+            FileOperationType::List => self.list_directory(&operation.path).await,
+            FileOperationType::Exists => self.check_exists(&operation.path).await,
+            FileOperationType::GetInfo => self.get_file_info(&operation.path).await,
         }
     }
 
     /// Read file contents with size validation
-    fn read_file(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
+    async fn read_file(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
+        // Canonicalize path to prevent directory traversal attacks
+        let canonical_path = path.canonicalize().map_err(|e| {
+            FileSystemError::InvalidPath {
+                path: format!("Failed to canonicalize path '{}': {}", path.display(), e),
+            }
+        })?;
+
         // Validate file size before reading
-        let metadata = fs::metadata(path)?;
+        let metadata = async_fs::metadata(&canonical_path).await?;
         if metadata.len() > self.max_file_size {
             return Err(FileSystemError::FileTooLarge {
                 size: metadata.len(),
@@ -198,20 +206,22 @@ impl FileSystemExecutor {
             });
         }
 
-        let content = fs::read_to_string(path)?;
+        let content = async_fs::read_to_string(&canonical_path).await?;
+        let file_info = self.create_file_info(&canonical_path, &metadata)?;
+        
         Ok(FileSystemResult {
             success: true,
             operation: FileOperationType::Read,
-            path: path.to_path_buf(),
+            path: canonical_path,
             content: Some(content),
-            file_info: Some(self.path_to_file_info(path)?),
+            file_info: Some(file_info),
             files: None,
             error: None,
         })
     }
 
     /// Write file contents with atomic operations
-    fn write_file(&self, path: &Path, content: &str) -> Result<FileSystemResult, FileSystemError> {
+    async fn write_file(&self, path: &Path, content: &str) -> Result<FileSystemResult, FileSystemError> {
         // Check content size
         if content.len() as u64 > self.max_file_size {
             return Err(FileSystemError::FileTooLarge {
@@ -244,7 +254,7 @@ impl FileSystemExecutor {
     }
 
     /// Append to file with atomic operations
-    fn append_file(&self, path: &Path, content: &str) -> Result<FileSystemResult, FileSystemError> {
+    async fn append_file(&self, path: &Path, content: &str) -> Result<FileSystemResult, FileSystemError> {
         // Check combined size after append
         let current_size = if path.exists() {
             fs::metadata(path)?.len()
@@ -279,7 +289,7 @@ impl FileSystemExecutor {
     }
 
     /// Delete file or directory
-    fn delete_path(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
+    async fn delete_path(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
         if path.is_dir() {
             fs::remove_dir_all(path)?;
         } else {
@@ -298,7 +308,7 @@ impl FileSystemExecutor {
     }
 
     /// Create directory with optional recursion
-    fn create_directory(&self, path: &Path, recursive: bool) -> Result<FileSystemResult, FileSystemError> {
+    async fn create_directory(&self, path: &Path, recursive: bool) -> Result<FileSystemResult, FileSystemError> {
         if recursive {
             fs::create_dir_all(path)?;
         } else {
@@ -317,7 +327,7 @@ impl FileSystemExecutor {
     }
 
     /// List directory contents with limits
-    fn list_directory(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
+    async fn list_directory(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
         let entries = fs::read_dir(path)?;
         let mut files = Vec::new();
 
@@ -343,7 +353,7 @@ impl FileSystemExecutor {
     }
 
     /// Check if path exists
-    fn check_exists(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
+    async fn check_exists(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
         let exists = path.exists();
 
         Ok(FileSystemResult {
@@ -358,7 +368,7 @@ impl FileSystemExecutor {
     }
 
     /// Get detailed file information
-    fn get_file_info(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
+    async fn get_file_info(&self, path: &Path) -> Result<FileSystemResult, FileSystemError> {
         let file_info = self.path_to_file_info(path)?;
 
         Ok(FileSystemResult {
@@ -375,7 +385,11 @@ impl FileSystemExecutor {
     /// Convert path to FileInfo structure
     fn path_to_file_info(&self, path: &Path) -> Result<FileInfo, FileSystemError> {
         let metadata = fs::metadata(path)?;
+        self.create_file_info(path, &metadata)
+    }
 
+    /// Create FileInfo from path and metadata
+    fn create_file_info(&self, path: &Path, metadata: &std::fs::Metadata) -> Result<FileInfo, FileSystemError> {
         Ok(FileInfo {
             path: path.to_path_buf(),
             size: metadata.len(),

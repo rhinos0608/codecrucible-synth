@@ -119,18 +119,41 @@ impl SecurityContext {
     /// Validate a capability against this security context
     pub fn validate_capability(&self, capability: &Capability) -> Result<(), SecurityError> {
         match capability {
-            Capability::FileRead(path) | Capability::FileWrite(path) => {
-                self.validate_path_access(path)?;
+            Capability::FileRead(requested_path) | Capability::FileWrite(requested_path) => {
+                // First validate path access
+                self.validate_path_access(requested_path)?;
+                
+                // Check if we have a matching capability for the directory containing this file
+                let has_capability = self.capabilities.iter().any(|cap| {
+                    match (cap, capability) {
+                        (Capability::FileRead(allowed_path), Capability::FileRead(req_path)) |
+                        (Capability::FileWrite(allowed_path), Capability::FileWrite(req_path)) => {
+                            let canonical_allowed = allowed_path.canonicalize().unwrap_or_else(|_| allowed_path.clone());
+                            let canonical_requested = req_path.canonicalize().unwrap_or_else(|_| req_path.clone());
+                            canonical_requested.starts_with(&canonical_allowed)
+                        }
+                        _ => false
+                    }
+                });
+                
+                if has_capability {
+                    Ok(())
+                } else {
+                    Err(SecurityError::CapabilityDenied {
+                        capability: format!("{:?}", capability),
+                    })
+                }
             }
-            _ => {}
-        }
-        
-        if self.capabilities.contains(capability) {
-            Ok(())
-        } else {
-            Err(SecurityError::CapabilityDenied {
-                capability: format!("{:?}", capability),
-            })
+            _ => {
+                // For non-path capabilities, use exact match
+                if self.capabilities.contains(capability) {
+                    Ok(())
+                } else {
+                    Err(SecurityError::CapabilityDenied {
+                        capability: format!("{:?}", capability),
+                    })
+                }
+            }
         }
     }
     
@@ -140,16 +163,18 @@ impl SecurityContext {
         
         // Check if path is explicitly restricted
         for restricted in &self.restricted_paths {
-            if canonical_path.starts_with(restricted) {
+            let canonical_restricted = restricted.canonicalize().unwrap_or_else(|_| restricted.clone());
+            if canonical_path.starts_with(&canonical_restricted) {
                 return Err(SecurityError::PathAccessDenied {
                     path: path.display().to_string(),
                 });
             }
         }
         
-        // Check if path is in allowed list
+        // Check if path is in allowed list - canonicalize both for consistent comparison
         for allowed in &self.allowed_paths {
-            if canonical_path.starts_with(allowed) {
+            let canonical_allowed = allowed.canonicalize().unwrap_or_else(|_| allowed.clone());
+            if canonical_path.starts_with(&canonical_allowed) {
                 return Ok(());
             }
         }

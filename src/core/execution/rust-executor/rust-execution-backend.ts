@@ -6,15 +6,12 @@
  */
 
 import { logger } from '../../logger.js';
-import path from 'path';
+import * as path from 'path';
 import { pathToFileURL } from 'url';
 import type {
   ToolExecutionRequest,
   ToolExecutionResult,
-
   IToolExecutor,
-=======
-
 } from '../../../domain/interfaces/tool-system.js';
 import { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
 import { ProjectContext } from '../../../domain/types/unified-types.js';
@@ -100,7 +97,7 @@ export class RustExecutionBackend {
   /**
    * Initialize the Rust executor NAPI module
    */
-  async initialize(): Promise<void> {
+  async initialize(): Promise<boolean> {
     try {
       // Initialize logging for Rust module
       if (typeof global !== 'undefined') {
@@ -157,20 +154,9 @@ export class RustExecutionBackend {
             performanceMetrics: this.options.enableProfiling,
           });
         } else {
-          throw new Error('Rust executor initialization failed');
-=======
-        try {
-          const initResult = await this.rustExecutor.initialize();
-          if (!initResult) {
-            logger.error('❌ Rust executor initialization failed');
-            this.initialized = false;
-            throw new Error('Rust executor initialization failed');
-          }
-        } catch (error) {
-          logger.error('❌ Rust executor initialization threw error:', error);
+          logger.error('❌ Rust executor initialization failed');
           this.initialized = false;
-          throw error;
-
+          throw new Error('Rust executor initialization failed');
         }
 
         this.initialized = true;
@@ -182,11 +168,13 @@ export class RustExecutionBackend {
         return true;
       }
 
-      throw new Error('Rust module not found or invalid');
+      logger.warn('Rust module not found or invalid - falling back to TypeScript');
+      this.initialized = false;
+      return false;
     } catch (error) {
       logger.error('RustExecutionBackend initialization error:', error);
       this.initialized = false;
-      throw error;
+      return false;
     }
   }
 
@@ -321,14 +309,6 @@ export class RustExecutionBackend {
           ...request.metadata,
         },
         executionTimeMs: Date.now() - startTime,
-=======
-    try {
-      // Basic TypeScript fallback - could integrate with existing TypeScript executors
-      const result = {
-        message: `TypeScript fallback execution of ${request.toolId}`,
-        toolId: request.toolId,
-        arguments: request.arguments,
-
       };
     }
 

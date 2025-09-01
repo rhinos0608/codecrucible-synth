@@ -117,10 +117,19 @@ impl RustExecutor {
             return true;
         }
 
-        // Simplified initialization without async for now
-        self.initialized = true;
-        info!("RustExecutor initialized successfully: {}", self.id);
-        true
+        // Initialize communication handler with executors
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        match rt.block_on(self.communication_handler.initialize()) {
+            Ok(_) => {
+                self.initialized = true;
+                info!("RustExecutor initialized successfully: {}", self.id);
+                true
+            }
+            Err(e) => {
+                error!("RustExecutor initialization failed: {:?}", e);
+                false
+            }
+        }
     }
 
     /// Execute a command with the given arguments and options  
@@ -208,7 +217,7 @@ impl RustExecutor {
         };
 
         let error_str = response.error.map(|e| {
-            serde_json::to_string(&e).unwrap_or_else(|_| e.to_string())
+            serde_json::to_string(&e).unwrap_or_else(|_| e.message)
         });
 
         ExecutionResult {

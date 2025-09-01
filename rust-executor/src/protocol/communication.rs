@@ -15,9 +15,7 @@ use crate::protocol::messages::{
 use crate::executors::filesystem::{FileSystemExecutor, FileSystemError};
 
 use crate::security::{SecurityContext, SecurityError, Capability};
-=======
 use crate::executors::command::CommandExecutor as CommandExecutorImpl;
-use crate::security::{SecurityContext, SecurityError};
 
 
 #[derive(Debug)]
@@ -177,14 +175,24 @@ impl CommunicationHandler {
         let mut registry = self.registry.write().await;
         
         // Register filesystem executor with default security context
-        let security_context = SecurityContext::for_file_operations(
-            &std::env::temp_dir()
-        );
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir());
+        let temp_dir = std::env::temp_dir();
+        
+        // Canonicalize paths to ensure consistent comparison
+        let canonical_current = current_dir.canonicalize().unwrap_or(current_dir);
+        let canonical_temp = temp_dir.canonicalize().unwrap_or(temp_dir);
+        
+        let mut security_context = SecurityContext::for_file_operations(&canonical_current);
+        
+        // Add temp directory if it's not already included
+        if !security_context.allowed_paths.iter().any(|p| p == &canonical_temp) {
+            security_context.allowed_paths.push(canonical_temp);
+        }
         let fs_executor = Arc::new(FileSystemExecutor::new(security_context.clone()));
         registry.register_filesystem_executor(fs_executor);
 
         // Register command executor with its security context
-        let command_executor: Arc<dyn CommandExecutor> = Arc::new(CommandExecutorImpl::new(command_context));
+        let command_executor: Arc<dyn CommandExecutor> = Arc::new(CommandExecutorImpl::new(security_context.clone()));
         registry.register_command_executor(command_executor);
 
         // Register default security context
@@ -473,7 +481,9 @@ impl CommunicationHandler {
         // Basic session expiration check
         let age = context.last_activity.elapsed();
         if age >= Duration::from_secs(3600) {
-            return Err(SecurityError::SessionExpired);
+            return Err(SecurityError::CapabilityDenied { 
+                capability: "Session expired".to_string() 
+            });
         }
 
         // Validate environment variables

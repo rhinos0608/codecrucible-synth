@@ -2,7 +2,7 @@ import { logger } from '../logging/logger.js';
 import { ResponseNormalizer } from '../../core/response-normalizer.js';
 import { DomainAwareToolOrchestrator, DomainAnalysis } from './domain-aware-tool-orchestrator.js';
 import { PerformanceProfiler } from '../../core/performance/profiler.js';
-import { RustExecutionBackend } from '../../core/execution/rust-executor/rust-execution-backend.js';
+import { RustExecutionBackend } from '../../core/execution/rust-executor/index.js';
 
 /**
  * Sequential Tool Executor with Chain-of-Thought Reasoning

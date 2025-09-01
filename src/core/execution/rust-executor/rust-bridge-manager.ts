@@ -68,6 +68,7 @@ export class RustBridgeManager {
 
       this.rustModule = await Promise.race([loadPromise, timeoutPromise]);
 
+      if (!this.rustModule) {
         throw new Error('Rust bridge module not found');
       }
 

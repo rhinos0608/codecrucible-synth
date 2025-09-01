@@ -28,7 +28,7 @@ import { DomainAwareToolOrchestrator } from '../tools/domain-aware-tool-orchestr
 import { requestBatcher } from '../performance/intelligent-request-batcher.js';
 import { adaptiveTuner } from '../performance/adaptive-performance-tuner.js';
 import { requestTimeoutOptimizer } from '../performance/request-timeout-optimizer.js';
-import { RustExecutionBackend } from './rust-executor/rust-execution-backend.js';
+import { RustExecutionBackend } from './rust-executor/index.js';
 
 // EVIDENCE COLLECTION BRIDGE - Global system to capture tool results for evidence collection
 class GlobalEvidenceCollector {
@@ -185,7 +185,7 @@ export class RequestExecutionManager extends EventEmitter implements IRequestExe
   private async initializeRustBackend(): Promise<void> {
     try {
       const initialized = await this.rustBackend.initialize();
-      if (initialized) {
+      if (initialized === true) {
         logger.info('🚀 RequestExecutionManager: Rust backend initialized', {
           available: this.rustBackend.isAvailable(),
           strategy: this.rustBackend.getStrategy(),

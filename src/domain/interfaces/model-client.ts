@@ -15,6 +15,13 @@ export interface ModelRequest {
   stream?: boolean;
   tools?: ModelTool[];
   context?: RequestContext;
+  // Structured message format for tool results
+  messages?: Array<{
+    role: 'user' | 'assistant' | 'tool';
+    content: string;
+    tool_calls?: any[];
+    tool_call_id?: string;
+  }>;
   // Ollama-specific parameters  
   num_ctx?: number;
   options?: Record<string, any>;

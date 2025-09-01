@@ -334,8 +334,12 @@ export class OllamaProvider implements LLMProvider {
    * This method is called by UnifiedModelClient and must handle function calling
    */
   async request(request: any): Promise<any> {
-    console.log('🔧 DEBUG: OllamaProvider.request() METHOD ENTRY - CORRECT FILE');
-    logger.info('🔧 OllamaProvider.request() called', {
+    logger.debug('OllamaProvider.request() method entry', { 
+      requestId: request.id,
+      hasPrompt: !!request.prompt,
+      promptLength: request.prompt?.length || 0
+    });
+    logger.info('OllamaProvider.request() called', {
       hasTools: !!request.tools,
       toolCount: request.tools?.length || 0,
       requestKeys: Object.keys(request),
@@ -343,25 +347,26 @@ export class OllamaProvider implements LLMProvider {
 
     // For requests with tools, use function calling support
     if (request.tools && request.tools.length > 0) {
-      logger.info(`🔧 OLLAMA FUNCTION CALLING: Processing ${request.tools.length} tools`);
+      logger.info(`Ollama function calling: Processing ${request.tools.length} tools`);
       
       try {
+        // Validate and transform tools safely
+        const validatedTools = this.validateAndTransformTools(request.tools);
+        
+        if (validatedTools.length === 0) {
+          logger.warn('No valid tools found after validation, falling back to prompt-only mode');
+          return await this.generateCode(request.prompt, request.options || {});
+        }
+        
         const ollamaRequest = {
-          model: this.config.defaultModel,
+          model: request.model || this.config.defaultModel,
           messages: [
             {
               role: 'user',
               content: request.prompt,
             }
           ],
-          tools: request.tools.map((tool: any) => ({
-            type: 'function',
-            function: {
-              name: tool.function.name,
-              description: tool.function.description,
-              parameters: tool.function.parameters,
-            }
-          })),
+          tools: validatedTools,
           stream: false,
           options: {
             temperature: request.temperature || parseFloat(process.env.MODEL_TEMPERATURE || '0.7'),
@@ -370,7 +375,7 @@ export class OllamaProvider implements LLMProvider {
           },
         };
 
-        logger.info('🔧 SENDING TO OLLAMA WITH TOOLS:', {
+        logger.debug('Sending request to Ollama with tools', {
           model: ollamaRequest.model,
           toolCount: ollamaRequest.tools.length,
         });
@@ -385,14 +390,14 @@ export class OllamaProvider implements LLMProvider {
 
         if (!response.ok) {
           const errorText = await response.text();
-          logger.warn('🔧 OLLAMA FUNCTION CALLING FAILED - attempting fallback', {
+          logger.warn('Ollama function calling failed, attempting fallback', {
             status: response.status,
             error: errorText,
           });
           
           // If function calling failed, try without tools (fallback mode)
           if (response.status === 500 || errorText.includes('does not support tools')) {
-            logger.info('🔧 OLLAMA FALLBACK: Model does not support tools, using prompt-based approach');
+            logger.info('Ollama fallback: Model does not support tools, using prompt-based approach');
             return await this.generateCode(request.prompt, request.options || {});
           }
           
@@ -401,7 +406,7 @@ export class OllamaProvider implements LLMProvider {
 
         const result = await response.json();
         
-        logger.info('🔧 OLLAMA FUNCTION CALLING: Response received', {
+        logger.debug('Ollama function calling response received', {
           hasToolCalls: !!result.message?.tool_calls,
           toolCallCount: result.message?.tool_calls?.length || 0,
         });
@@ -414,7 +419,10 @@ export class OllamaProvider implements LLMProvider {
             id: toolCall.function?.name || `tool_${Date.now()}`,
             function: {
               name: toolCall.function?.name,
-              arguments: JSON.stringify(toolCall.function?.arguments),
+              // CRITICAL FIX: Check if arguments are already a string to prevent double-encoding
+              arguments: typeof toolCall.function?.arguments === 'string' 
+                ? toolCall.function.arguments 
+                : JSON.stringify(toolCall.function?.arguments || {}),
             },
           })) || [],
           usage: {
@@ -426,13 +434,88 @@ export class OllamaProvider implements LLMProvider {
           provider: this.name,
         };
       } catch (error) {
-        logger.error('🔧 OLLAMA FUNCTION CALLING FAILED:', error);
+        logger.error('Ollama function calling failed:', error);
         throw error;
       }
     }
 
     // Fallback to regular generateCode for non-tool requests
     return await this.generateCode(request.prompt, request.options || {});
+  }
+
+  /**
+   * Validate and transform tools to prevent runtime errors
+   * Fixes the issue where invalid tool shapes can produce runtime errors
+   */
+  private validateAndTransformTools(tools: any[]): any[] {
+    if (!Array.isArray(tools)) {
+      logger.warn('Tools parameter is not an array, returning empty array');
+      return [];
+    }
+
+    const validTools: any[] = [];
+    
+    for (let i = 0; i < tools.length; i++) {
+      const tool = tools[i];
+      
+      try {
+        // Validate tool structure - handle both ModelTool and ToolInfo formats
+        let transformedTool: any;
+        
+        if (tool && typeof tool === 'object') {
+          // Handle ModelTool format (with nested function object)
+          if (tool.type === 'function' && tool.function) {
+            if (this.isValidFunctionSpec(tool.function)) {
+              transformedTool = {
+                type: 'function',
+                function: {
+                  name: tool.function.name,
+                  description: tool.function.description || '',
+                  parameters: tool.function.parameters || { type: 'object', properties: {} },
+                }
+              };
+            }
+          }
+          // Handle ToolInfo format (flat structure)
+          else if (tool.name && typeof tool.name === 'string') {
+            transformedTool = {
+              type: 'function',
+              function: {
+                name: tool.name,
+                description: tool.description || '',
+                parameters: tool.inputSchema || tool.parameters || { type: 'object', properties: {} },
+              }
+            };
+          }
+        }
+        
+        if (transformedTool) {
+          validTools.push(transformedTool);
+          logger.debug(`Validated tool: ${transformedTool.function.name}`);
+        } else {
+          logger.warn(`Invalid tool at index ${i}, skipping`, { 
+            toolKeys: tool ? Object.keys(tool) : 'null/undefined',
+            toolType: typeof tool
+          });
+        }
+      } catch (error) {
+        logger.warn(`Failed to validate tool at index ${i}:`, error);
+      }
+    }
+    
+    logger.info(`Tool validation complete: ${validTools.length}/${tools.length} tools valid`);
+    return validTools;
+  }
+
+  /**
+   * Check if a function specification is valid
+   */
+  private isValidFunctionSpec(func: any): boolean {
+    return func && 
+           typeof func === 'object' && 
+           typeof func.name === 'string' && 
+           func.name.length > 0 &&
+           typeof func.description === 'string';
   }
 
   /**

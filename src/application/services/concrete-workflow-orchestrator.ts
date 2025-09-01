@@ -234,6 +234,7 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
 
   /**
    * Get MCP tools and convert them to ModelTool format for AI model
+   * CRITICAL FIX: Expose ALL available MCP tools, not just 4 hardcoded ones
    */
   private async getMCPToolsForModel(): Promise<ModelTool[]> {
     if (!this.mcpManager) {
@@ -241,8 +242,9 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
     }
 
     try {
-      // Basic MCP filesystem tools - these are the most common ones
+      // EXPANDED MCP TOOLS: All tools available in MCPServerManager
       const mcpTools: ModelTool[] = [
+        // Filesystem operations (enhanced)
         {
           type: 'function',
           function: {
@@ -301,6 +303,24 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
         {
           type: 'function',
           function: {
+            name: 'filesystem_get_stats',
+            description: 'Get file or directory statistics (size, modified time, etc.)',
+            parameters: {
+              type: 'object',
+              properties: {
+                file_path: {
+                  type: 'string',
+                  description: 'The path to get statistics for',
+                },
+              },
+              required: ['file_path'],
+            },
+          },
+        },
+        // Git operations (complete set)
+        {
+          type: 'function',
+          function: {
             name: 'git_status',
             description: 'Check the git repository status',
             parameters: {
@@ -310,9 +330,133 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
             },
           },
         },
+        {
+          type: 'function',
+          function: {
+            name: 'git_add',
+            description: 'Stage files for commit',
+            parameters: {
+              type: 'object',
+              properties: {
+                files: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'List of file paths to stage',
+                },
+              },
+              required: ['files'],
+            },
+          },
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'git_commit',
+            description: 'Commit staged changes with a message',
+            parameters: {
+              type: 'object',
+              properties: {
+                message: {
+                  type: 'string',
+                  description: 'The commit message',
+                },
+              },
+              required: ['message'],
+            },
+          },
+        },
+        // Terminal operations
+        {
+          type: 'function',
+          function: {
+            name: 'execute_command',
+            description: 'Execute a terminal command safely',
+            parameters: {
+              type: 'object',
+              properties: {
+                command: {
+                  type: 'string',
+                  description: 'The command to execute',
+                },
+                args: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Command arguments',
+                  default: [],
+                },
+              },
+              required: ['command'],
+            },
+          },
+        },
+        // Package manager operations
+        {
+          type: 'function',
+          function: {
+            name: 'npm_install',
+            description: 'Install an npm package',
+            parameters: {
+              type: 'object',
+              properties: {
+                packageName: {
+                  type: 'string',
+                  description: 'The package name to install',
+                },
+                dev: {
+                  type: 'boolean',
+                  description: 'Install as dev dependency',
+                  default: false,
+                },
+              },
+              required: ['packageName'],
+            },
+          },
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'npm_run',
+            description: 'Run an npm script',
+            parameters: {
+              type: 'object',
+              properties: {
+                scriptName: {
+                  type: 'string',
+                  description: 'The npm script name to run',
+                },
+              },
+              required: ['scriptName'],
+            },
+          },
+        },
+        // Smithery operations
+        {
+          type: 'function',
+          function: {
+            name: 'smithery_status',
+            description: 'Get Smithery registry status and available tools',
+            parameters: {
+              type: 'object',
+              properties: {},
+              required: [],
+            },
+          },
+        },
+        {
+          type: 'function',
+          function: {
+            name: 'smithery_refresh',
+            description: 'Refresh Smithery servers and tools',
+            parameters: {
+              type: 'object',
+              properties: {},
+              required: [],
+            },
+          },
+        },
       ];
 
-      logger.info(`🔧 Providing ${mcpTools.length} MCP tools to AI model`);
+      logger.info(`🔧 Providing ${mcpTools.length} MCP tools to AI model (EXPANDED from 4 to complete set)`);
       return mcpTools;
     } catch (error) {
       logger.warn('Failed to get MCP tools for model:', error);
@@ -377,41 +521,44 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
           }
         }
 
-        // CRITICAL: Send tool results back to AI model in follow-up request
+        // CRITICAL FIX: Send tool results back to AI model using structured messages
         if (toolResults.length > 0) {
           logger.info(
-            `🔄 Sending ${toolResults.length} tool results back to AI model for synthesis`
+            `🔄 Sending ${toolResults.length} tool results back to AI model for synthesis (STRUCTURED)`
           );
 
-          // Create follow-up prompt with tool results
-          const toolResultsText = toolResults
-            .map(tr => {
-              if (tr.error) {
-                return `Tool ${tr.id} failed: ${tr.error}`;
-              } else {
-                return `Tool ${tr.id} result: ${JSON.stringify(tr.result, null, 2)}`;
-              }
-            })
-            .join('\n\n');
+          // IMPROVED: Use structured message format instead of plain text embedding
+          const structuredMessages = [
+            {
+              role: 'user' as const,
+              content: payload.input || payload.prompt
+            },
+            {
+              role: 'assistant' as const,
+              content: response.content || 'I need to use tools to help with this request.',
+              tool_calls: response.toolCalls
+            },
+            {
+              role: 'tool' as const,
+              content: JSON.stringify(toolResults, null, 2),
+              tool_call_id: 'batch_results'
+            }
+          ];
 
-          const followUpPrompt = `Previous tool calls have been executed. Here are the results:
-
-${toolResultsText}
-
-Based on these tool results, please provide a comprehensive response to the user's original request: "${payload.input || payload.prompt}"`;
-
-          // Make follow-up request to AI with tool results
+          // Create structured follow-up request
           const followUpRequest: ModelRequest = {
-            id: `${request.id}-followup`,
-            prompt: followUpPrompt,
+            id: `${request.id}-structured-followup`,
+            prompt: `User request: ${payload.input || payload.prompt}\n\nTool execution results are provided in the conversation history. Please provide a comprehensive response based on these results.`,
             model: modelRequest.model,
             temperature: modelRequest.temperature,
             maxTokens: modelRequest.maxTokens,
+            tools: mcpTools,
+            messages: structuredMessages,
             context: request.context,
           };
 
           const finalResponse = await this.modelClient.request(followUpRequest);
-          logger.info(`✅ AI model synthesized tool results into final response`);
+          logger.info(`✅ AI model synthesized structured tool results into final response`);
 
           return finalResponse;
         }
@@ -528,41 +675,44 @@ Based on these tool results, please provide a comprehensive response to the user
         }
       }
 
-      // CRITICAL: Send tool results back to AI model for comprehensive analysis
+      // CRITICAL FIX: Send tool results back to AI model using structured messages
       if (toolResults.length > 0) {
         logger.info(
-          `🔄 Sending ${toolResults.length} tool results back to AI for analysis synthesis`
+          `🔄 Sending ${toolResults.length} tool results back to AI for analysis synthesis (STRUCTURED)`
         );
 
-        // Create follow-up prompt with tool results
-        const toolResultsText = toolResults
-          .map(tr => {
-            if (tr.error) {
-              return `Tool ${tr.id} failed: ${tr.error}`;
-            } else {
-              return `Tool ${tr.id} result: ${JSON.stringify(tr.result, null, 2)}`;
-            }
-          })
-          .join('\n\n');
+        // IMPROVED: Use structured message format for analysis too
+        const structuredMessages = [
+          {
+            role: 'user' as const,
+            content: analysisPrompt
+          },
+          {
+            role: 'assistant' as const,
+            content: result.content || 'I need to use tools to analyze this.',
+            tool_calls: result.toolCalls
+          },
+          {
+            role: 'tool' as const,
+            content: JSON.stringify(toolResults, null, 2),
+            tool_call_id: 'analysis_batch_results'
+          }
+        ];
 
-        const followUpAnalysisPrompt = `Previous analysis tool calls have been executed. Here are the results:
-
-${toolResultsText}
-
-Based on these tool results, please provide a comprehensive analysis for: "${analysisPrompt}"`;
-
-        // Make follow-up request to AI with tool results
+        // Create structured follow-up analysis request
         const followUpRequest: ModelRequest = {
-          id: `${request.id}-analysis-followup`,
-          prompt: followUpAnalysisPrompt,
+          id: `${request.id}-structured-analysis-followup`,
+          prompt: `Analysis request: ${analysisPrompt}\n\nTool execution results are provided in the conversation history. Please provide a comprehensive analysis based on these results.`,
           model: modelRequest.model,
           temperature: modelRequest.temperature,
           maxTokens: modelRequest.maxTokens,
+          tools: mcpTools,
+          messages: structuredMessages,
           context: request.context,
         };
 
         const finalAnalysis = await this.modelClient.request(followUpRequest);
-        logger.info(`✅ AI completed comprehensive analysis with tool results`);
+        logger.info(`✅ AI completed structured analysis synthesis with tool results`);
 
         return finalAnalysis;
       }

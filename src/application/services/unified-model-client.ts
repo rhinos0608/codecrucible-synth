@@ -15,6 +15,7 @@ import {
   ModelInfo,
   ModelCapability,
   RequestContext,
+  ModelTool,
 } from '../../domain/interfaces/model-client.js';
 import { UnifiedConfiguration } from '../../domain/interfaces/configuration.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
@@ -1056,7 +1057,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   /**
    * Get available tools for voice system integration
    */
-  async getAvailableTools(): Promise<ToolInfo[]> {
+  async getAvailableTools(): Promise<ModelTool[]> {
     try {
       // Aggregate tools from all providers
       const allTools: ToolInfo[] = [];
@@ -1077,20 +1078,56 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         {
           name: 'voice_context',
           description: 'Access voice-specific context and persona information',
-          inputSchema: {},
+          inputSchema: { type: 'object', properties: {} },
         },
         {
           name: 'council_deliberation',
           description: 'Facilitate multi-voice council deliberation and consensus building',
-          inputSchema: {},
+          inputSchema: { type: 'object', properties: {} },
         }
       );
 
-      return allTools;
+      // Convert ToolInfo objects to ModelTool format expected by callers
+      return this.convertToolInfoToModelTool(allTools);
     } catch (error) {
       logger.error('Failed to get available tools:', error);
       return [];
     }
+  }
+
+  /**
+   * Convert ToolInfo objects to ModelTool format expected by model clients
+   * Fixes the issue where UnifiedModelClient.getAvailableTools returns incomplete schema
+   */
+  private convertToolInfoToModelTool(toolInfos: ToolInfo[]): ModelTool[] {
+    return toolInfos
+      .map(toolInfo => {
+        try {
+          // Validate that we have the required fields
+          if (!toolInfo.name || typeof toolInfo.name !== 'string') {
+            logger.warn('Invalid tool: missing or invalid name', toolInfo);
+            return null;
+          }
+
+          // Create ModelTool format with proper structure
+          return {
+            type: 'function' as const,
+            function: {
+              name: toolInfo.name,
+              description: toolInfo.description || '',
+              parameters: {
+                type: 'object' as const,
+                properties: (toolInfo.inputSchema as any)?.properties || {},
+                required: (toolInfo.inputSchema as any)?.required || [],
+              } as const,
+            },
+          };
+        } catch (error) {
+          logger.warn(`Failed to convert tool ${toolInfo.name}:`, error);
+          return null;
+        }
+      })
+      .filter((tool): tool is NonNullable<typeof tool> => tool !== null) as ModelTool[];
   }
 
   /**

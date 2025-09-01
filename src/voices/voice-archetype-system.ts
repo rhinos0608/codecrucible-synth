@@ -954,7 +954,7 @@ Provide helpful, concise responses with practical value.`;
     });
 
     // CRITICAL FIX 3: Voice system tool integration
-    // Get available tools for enhanced AI capabilities
+    // Get available tools for enhanced AI capabilities (now in proper ModelTool format)
     let availableTools: any[] = [];
     try {
       // Access tools from the model client if available
@@ -1041,6 +1041,7 @@ Provide helpful, concise responses with practical value.`;
       },
     };
   }
+
 
   /**
    * Apply ultra-concise communication patterns based on Claude Code research

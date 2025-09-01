@@ -1,8 +1,23 @@
-import { MCPServer } from '../core/mcp-server-manager.js';
+// Generic tool handler types
+export interface ToolRequest {
+  [key: string]: unknown;
+}
+
+export interface ToolResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  warning?: string;
+  suggestion?: string;
+}
+
+export type ToolHandler<TReq extends ToolRequest = ToolRequest, TRes = unknown> = (
+  args: TReq
+) => Promise<ToolResponse<TRes>>;
 
 // Simple base class for MCP servers to maintain compatibility
 class BaseMCPServer {
-  protected tools: Record<string, (...args: any[]) => any> = {};
+  protected tools: Record<string, ToolHandler> = {};
 
   constructor(
     public id: string,
@@ -13,8 +28,6 @@ import { ApprovalManager, Operation, OperationContext } from '../core/approval/a
 import { logger } from '../core/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as path from 'path';
-import * as fs from 'fs/promises';
 
 const execAsync = promisify(exec);
 
@@ -70,12 +83,89 @@ export interface TagArgs {
   push?: boolean;
 }
 
-export interface ToolResult {
-  success: boolean;
-  data?: any;
-  error?: string;
-  warning?: string;
-  suggestion?: string;
+// Request/response interfaces for Git tool handlers
+export interface GitDiffRequest {
+  files?: string[];
+  staged?: boolean;
+  commit?: string;
+}
+
+export interface GitLogRequest {
+  limit?: number;
+  since?: string;
+  author?: string;
+  grep?: string;
+}
+
+export interface GitAddRequest {
+  files: string[];
+  all?: boolean;
+}
+
+export interface GitPushRequest {
+  remote?: string;
+  branch?: string;
+  force?: boolean;
+  setUpstream?: boolean;
+}
+
+export interface GitPullRequest {
+  remote?: string;
+  branch?: string;
+  rebase?: boolean;
+}
+
+export interface GitCheckoutRequest {
+  target: string;
+  createBranch?: boolean;
+  force?: boolean;
+}
+
+export interface GitResetRequest {
+  mode?: 'soft' | 'mixed' | 'hard';
+  target?: string;
+}
+
+export interface GitRebaseRequest {
+  target: string;
+  interactive?: boolean;
+  abort?: boolean;
+  continue?: boolean;
+}
+
+export interface GitRemoteRequest {
+  action: 'add' | 'remove' | 'list' | 'show';
+  name?: string;
+  url?: string;
+}
+
+export interface GitStashRequest {
+  action: 'save' | 'pop' | 'list' | 'show' | 'drop';
+  message?: string;
+  index?: number;
+}
+
+export interface GitCleanRequest {
+  dryRun?: boolean;
+  force?: boolean;
+  directories?: boolean;
+  ignored?: boolean;
+}
+
+export interface GitAddResponse {
+  staged: string[] | 'all files';
+}
+
+export interface GitPushResponse {
+  remote: string;
+  branch: string;
+  output: string;
+}
+
+export interface GitPullResponse {
+  remote: string;
+  branch: string;
+  output: string;
 }
 
 /**
@@ -109,7 +199,7 @@ export class GitMCPServer extends BaseMCPServer {
       git_remote: this.handleGitRemote.bind(this),
       git_stash: this.handleGitStash.bind(this),
       git_clean: this.handleGitClean.bind(this),
-    };
+    } as Record<string, ToolHandler>;
 
     logger.info('Git MCP server initialized', { workspaceRoot });
   }
@@ -117,7 +207,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git repository status
    */
-  async handleGitStatus(): Promise<ToolResult> {
+  async handleGitStatus(): Promise<ToolResponse<GitStatus>> {
     try {
       const isRepo = await this.isGitRepository();
       if (!isRepo) {
@@ -145,11 +235,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git diff
    */
-  async handleGitDiff(args: {
-    files?: string[];
-    staged?: boolean;
-    commit?: string;
-  }): Promise<ToolResult> {
+  async handleGitDiff(args: GitDiffRequest): Promise<ToolResponse<GitDiffResult[]>> {
     try {
       const { files = [], staged = false, commit } = args;
 
@@ -179,12 +265,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git log
    */
-  async handleGitLog(args: {
-    limit?: number;
-    since?: string;
-    author?: string;
-    grep?: string;
-  }): Promise<ToolResult> {
+  async handleGitLog(args: GitLogRequest): Promise<ToolResponse<GitCommitInfo[]>> {
     try {
       const { limit = 10, since, author, grep } = args;
 
@@ -214,7 +295,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Add files to Git staging area
    */
-  async handleGitAdd(args: { files: string[]; all?: boolean }): Promise<ToolResult> {
+  async handleGitAdd(args: GitAddRequest): Promise<ToolResponse<GitAddResponse>> {
     try {
       const { files, all = false } = args;
 
@@ -265,7 +346,9 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Commit changes
    */
-  async handleGitCommit(args: CommitArgs): Promise<ToolResult> {
+  async handleGitCommit(
+    args: CommitArgs
+  ): Promise<ToolResponse<{ hash: string; message: string; amend: boolean; files: string[] }>> {
     try {
       const { message, files, amend = false, signoff = false } = args;
 
@@ -332,12 +415,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Push changes to remote
    */
-  async handleGitPush(args: {
-    remote?: string;
-    branch?: string;
-    force?: boolean;
-    setUpstream?: boolean;
-  }): Promise<ToolResult> {
+  async handleGitPush(args: GitPushRequest): Promise<ToolResponse<GitPushResponse>> {
     try {
       const { remote = 'origin', branch, force = false, setUpstream = false } = args;
 
@@ -391,11 +469,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Pull changes from remote
    */
-  async handleGitPull(args: {
-    remote?: string;
-    branch?: string;
-    rebase?: boolean;
-  }): Promise<ToolResult> {
+  async handleGitPull(args: GitPullRequest): Promise<ToolResponse<GitPullResponse>> {
     try {
       const { remote = 'origin', branch, rebase = false } = args;
 
@@ -449,7 +523,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Branch operations
    */
-  async handleGitBranch(args: BranchArgs): Promise<ToolResult> {
+  async handleGitBranch(args: BranchArgs): Promise<ToolResponse<{ currentBranch: string }>> {
     try {
       const { name, checkout = false, delete: deleteBranch = false, remote } = args;
 
@@ -516,11 +590,11 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Checkout branch or commit
    */
-  async handleGitCheckout(args: {
-    target: string;
-    createBranch?: boolean;
-    force?: boolean;
-  }): Promise<ToolResult> {
+  async handleGitCheckout(
+    args: GitCheckoutRequest
+  ): Promise<
+    ToolResponse<{ target: string; createBranch: boolean; force: boolean; output: string }>
+  > {
     try {
       const { target, createBranch = false, force = false } = args;
 
@@ -562,10 +636,9 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Reset repository state
    */
-  async handleGitReset(args: {
-    mode?: 'soft' | 'mixed' | 'hard';
-    target?: string;
-  }): Promise<ToolResult> {
+  async handleGitReset(
+    args: GitResetRequest
+  ): Promise<ToolResponse<{ mode: string; target: string; output: string }>> {
     try {
       const { mode = 'mixed', target = 'HEAD' } = args;
 
@@ -615,7 +688,9 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git merges
    */
-  async handleGitMerge(args: MergeArgs): Promise<ToolResult> {
+  async handleGitMerge(
+    args: MergeArgs
+  ): Promise<ToolResponse<{ branch: string; strategy: string }>> {
     try {
       const { branch, strategy = 'merge', noFastForward = false } = args;
 
@@ -670,12 +745,11 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git rebase
    */
-  async handleGitRebase(args: {
-    target: string;
-    interactive?: boolean;
-    abort?: boolean;
-    continue?: boolean;
-  }): Promise<ToolResult> {
+  async handleGitRebase(
+    args: GitRebaseRequest
+  ): Promise<
+    ToolResponse<{ action?: string; target?: string; interactive?: boolean; output?: string }>
+  > {
     try {
       const { target, interactive = false, abort = false, continue: continueRebase = false } = args;
 
@@ -744,7 +818,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git tags
    */
-  async handleGitTag(args: TagArgs): Promise<ToolResult> {
+  async handleGitTag(args: TagArgs): Promise<ToolResponse<{ name: string; message?: string }>> {
     try {
       const { name, message, delete: deleteTag = false, push = false } = args;
 
@@ -812,11 +886,15 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git remote operations
    */
-  async handleGitRemote(args: {
-    action: 'add' | 'remove' | 'list' | 'show';
-    name?: string;
-    url?: string;
-  }): Promise<ToolResult> {
+  async handleGitRemote(args: GitRemoteRequest): Promise<
+    ToolResponse<{
+      remotes?: string[];
+      remote?: string;
+      info?: string;
+      action?: string;
+      url?: string;
+    }>
+  > {
     try {
       const { action, name, url } = args;
 
@@ -879,11 +957,16 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git stash operations
    */
-  async handleGitStash(args: {
-    action: 'save' | 'pop' | 'list' | 'show' | 'drop';
-    message?: string;
-    index?: number;
-  }): Promise<ToolResult> {
+  async handleGitStash(args: GitStashRequest): Promise<
+    ToolResponse<{
+      action?: string;
+      message?: string;
+      output?: string;
+      index?: number;
+      stashes?: string[];
+      diff?: string;
+    }>
+  > {
     try {
       const { action, message, index } = args;
 
@@ -958,12 +1041,15 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Handle Git clean operations
    */
-  async handleGitClean(args: {
-    dryRun?: boolean;
-    directories?: boolean;
-    ignored?: boolean;
-    force?: boolean;
-  }): Promise<ToolResult> {
+  async handleGitClean(args: GitCleanRequest): Promise<
+    ToolResponse<{
+      dryRun: boolean;
+      directories: boolean;
+      ignored: boolean;
+      force: boolean;
+      output: string;
+    }>
+  > {
     try {
       const { dryRun = true, directories = false, ignored = false, force = false } = args;
 

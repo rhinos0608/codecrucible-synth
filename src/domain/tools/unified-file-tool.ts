@@ -126,17 +126,26 @@ export class BasicFileStrategy implements FileOperationStrategy {
     if (!inputPath) {
       throw new Error('Path is required');
     }
+    const root = context.rootDirectory || context.workingDirectory;
 
     // Handle relative paths
     let resolvedPath = inputPath;
     if (!isAbsolute(inputPath)) {
       resolvedPath = resolve(context.workingDirectory, inputPath);
     }
+    resolvedPath = resolve(resolvedPath); // Normalize and resolve
 
     // Normalize path separators
-    resolvedPath = resolvedPath.split(sep).join('/');
+    const normalizedPath = resolvedPath.split(sep).join('/');
+    const normalizedRoot = resolve(root).split(sep).join('/');
 
-    return resolvedPath;
+    // Ensure path stays within root directory
+    const relativeToRoot = relative(normalizedRoot, normalizedPath);
+    if (relativeToRoot.startsWith('..') || isAbsolute(relativeToRoot)) {
+      throw new Error(`Path outside of root directory is not allowed: ${normalizedPath}`);
+    }
+
+    return normalizedPath;
   }
 }
 
@@ -210,7 +219,10 @@ export class BatchFileStrategy extends BasicFileStrategy {
         };
 
         const matches = await glob(inputPath, globOptions);
-        resolvedPaths.push(...matches);
+        for (const match of matches) {
+          // Re-validate each match against root directory restrictions
+          resolvedPaths.push(this.resolvePath(match, context));
+        }
       } else {
         // Regular path
         const resolved = this.resolvePath(inputPath, context);
@@ -653,7 +665,7 @@ export class UnifiedFileTool extends BaseTool {
     }
 
     // Use batch strategy for multiple files or patterns
-    if (Array.isArray(args.paths) || (args.path?.includes('*'))) {
+    if (Array.isArray(args.paths) || args.path?.includes('*')) {
       const batchStrategy = this.strategies.get('batch')!;
       if (batchStrategy.supports(args.operation || 'read', args)) {
         return batchStrategy;

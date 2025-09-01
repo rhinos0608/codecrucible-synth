@@ -11,6 +11,10 @@ import { pathToFileURL } from 'url';
 import type {
   ToolExecutionRequest,
   ToolExecutionResult,
+
+  IToolExecutor,
+=======
+
 } from '../../../domain/interfaces/tool-system.js';
 import { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
 import { ProjectContext } from '../../../domain/types/unified-types.js';
@@ -67,6 +71,7 @@ export class RustExecutionBackend {
   private rustExecutor: NativeRustExecutor | null = null;
   private initialized = false;
   private options: RustExecutorOptions;
+  private tsOrchestrator?: IToolExecutor;
   private performanceStats = {
     totalRequests: 0,
     successfulRequests: 0,
@@ -74,7 +79,7 @@ export class RustExecutionBackend {
     averageExecutionTime: 0,
   };
 
-  constructor(options: RustExecutorOptions = {}) {
+  constructor(options: RustExecutorOptions = {}, tsOrchestrator?: IToolExecutor) {
     this.options = {
       enableProfiling: true,
       maxConcurrency: 4,
@@ -82,6 +87,14 @@ export class RustExecutionBackend {
       logLevel: 'info',
       ...options,
     };
+    this.tsOrchestrator = tsOrchestrator;
+  }
+
+  /**
+   * Inject TypeScript tool orchestrator for fallback execution
+   */
+  setTypescriptOrchestrator(orchestrator: IToolExecutor): void {
+    this.tsOrchestrator = orchestrator;
   }
 
   /**
@@ -133,6 +146,19 @@ export class RustExecutionBackend {
       if (RustExecutor || createRustExecutor) {
         this.rustExecutor = RustExecutor ? RustExecutor.create() : createRustExecutor();
 
+
+        // Initialize the Rust executor
+        const initResult = await this.rustExecutor.initialize();
+        if (initResult) {
+          this.initialized = true;
+          logger.info('🚀 RustExecutionBackend initialized successfully', {
+            executorId: this.rustExecutor.getId(),
+            supportedTools: this.rustExecutor.getSupportedTools(),
+            performanceMetrics: this.options.enableProfiling,
+          });
+        } else {
+          throw new Error('Rust executor initialization failed');
+=======
         try {
           const initResult = await this.rustExecutor.initialize();
           if (!initResult) {
@@ -144,6 +170,7 @@ export class RustExecutionBackend {
           logger.error('❌ Rust executor initialization threw error:', error);
           this.initialized = false;
           throw error;
+
         }
 
         this.initialized = true;
@@ -278,27 +305,47 @@ export class RustExecutionBackend {
     const startTime = Date.now();
     this.performanceStats.totalRequests++;
 
-    try {
-      // Basic TypeScript fallback - could integrate with existing TypeScript executors
-      const result = {
-        message: `TypeScript fallback execution of ${request.toolId}`,
-        toolId: request.toolId,
-        arguments: request.arguments,
-      };
 
-      this.performanceStats.successfulRequests++;
-      this.updateAverageExecutionTime(Date.now() - startTime);
-
+    if (!this.tsOrchestrator) {
+      this.performanceStats.failedRequests++;
       return {
-        success: true,
-        result: result,
-        error: undefined,
+        success: false,
+        result: undefined,
+        error: {
+          code: 'TYPESCRIPT_ORCHESTRATOR_UNAVAILABLE',
+          message: 'No TypeScript tool orchestrator provided',
+        },
         metadata: {
           executionTimeMs: Date.now() - startTime,
           executor: 'typescript-fallback',
           ...request.metadata,
         },
         executionTimeMs: Date.now() - startTime,
+=======
+    try {
+      // Basic TypeScript fallback - could integrate with existing TypeScript executors
+      const result = {
+        message: `TypeScript fallback execution of ${request.toolId}`,
+        toolId: request.toolId,
+        arguments: request.arguments,
+
+      };
+    }
+
+    try {
+      const result = await this.tsOrchestrator.execute(request);
+
+      this.performanceStats.successfulRequests++;
+      this.updateAverageExecutionTime(Date.now() - startTime);
+
+      return {
+        ...result,
+        metadata: {
+          ...result.metadata,
+          executor: 'typescript-fallback',
+          ...request.metadata,
+        },
+        executionTimeMs: result.executionTimeMs ?? Date.now() - startTime,
       };
     } catch (error) {
       this.performanceStats.failedRequests++;

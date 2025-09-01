@@ -1,15 +1,17 @@
-use std::collections::HashMap;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
-use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
-use tokio::time::timeout;
-use regex::Regex;
-use crate::security::{SecurityContext, SecurityError, ProcessIsolation, IsolationError};
-use crate::protocol::messages::{ExecutionRequest, ExecutionResponse, ErrorInfo, ErrorCategory, PerformanceMetrics};
 use crate::protocol::communication::CommandExecutor as CommandExecutorTrait;
-use thiserror::Error;
+use crate::protocol::messages::{
+    ErrorCategory, ErrorInfo, ExecutionRequest, ExecutionResponse, PerformanceMetrics,
+};
+use crate::security::{IsolationError, ProcessIsolation, SecurityContext, SecurityError};
 use async_trait::async_trait;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::time::{Duration, Instant};
+use thiserror::Error;
+use tokio::{process::Command, time::timeout};
 
 #[derive(Error, Debug)]
 pub enum CommandExecutionError {
@@ -62,25 +64,44 @@ const ALLOWED_COMMANDS: &[&str] = &[
     // Development tools
     "git", "npm", "node", "python", "python3", "pip", "pip3", "rustc", "cargo",
     // System information
-    "echo", "pwd", "which", "whereis", "uname", "whoami",
-    // Text processing
-    "sed", "awk", "cut", "tr", "jq",
-    // Archive operations
+    "echo", "pwd", "which", "whereis", "uname", "whoami", // Text processing
+    "sed", "awk", "cut", "tr", "jq", // Archive operations
     "tar", "zip", "unzip", "gzip", "gunzip",
 ];
 
 /// Environment variable whitelist - only these can be set or accessed
 const ALLOWED_ENV_VARS: &[&str] = &[
-    "PATH", "HOME", "USER", "SHELL", "TERM", "LANG", "LC_ALL",
-    "NODE_ENV", "PYTHON_PATH", "CARGO_HOME", "RUSTUP_HOME",
-    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "TERM",
+    "LANG",
+    "LC_ALL",
+    "NODE_ENV",
+    "PYTHON_PATH",
+    "CARGO_HOME",
+    "RUSTUP_HOME",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
 ];
 
 /// Dangerous command patterns that are always blocked
 const BLOCKED_PATTERNS: &[&str] = &[
-    r"rm\s+-rf", r"rm\s+.*\*", r">\s*/dev/", r"curl.*\|\s*sh",
-    r"wget.*\|\s*sh", r"chmod\s+777", r"chown.*root", r"sudo",
-    r"su\s+", r"passwd", r"useradd", r"userdel", r"usermod",
+    r"rm\s+-rf",
+    r"rm\s+.*\*",
+    r">\s*/dev/",
+    r"curl.*\|\s*sh",
+    r"wget.*\|\s*sh",
+    r"chmod\s+777",
+    r"chown.*root",
+    r"sudo",
+    r"su\s+",
+    r"passwd",
+    r"useradd",
+    r"userdel",
+    r"usermod",
 ];
 
 /// Secure command executor with comprehensive sandboxing and validation
@@ -96,7 +117,7 @@ pub struct CommandExecutor {
 impl CommandExecutor {
     pub fn new(security_context: SecurityContext) -> Self {
         let isolation = ProcessIsolation::new(security_context.clone());
-        
+
         // Compile blocked patterns for efficient matching
         let blocked_patterns = BLOCKED_PATTERNS
             .iter()
@@ -109,7 +130,7 @@ impl CommandExecutor {
             command_whitelist: ALLOWED_COMMANDS.iter().map(|s| s.to_string()).collect(),
             blocked_patterns,
             max_execution_time: Duration::from_secs(120), // 2 minutes default
-            max_output_size: 1024 * 1024, // 1MB default
+            max_output_size: 1024 * 1024,                 // 1MB default
         }
     }
 
@@ -130,8 +151,12 @@ impl CommandExecutor {
                         code: "INVALID_COMMAND_REQUEST".to_string(),
                         message: e.to_string(),
                         category: ErrorCategory::InvalidInput,
-                        details: serde_json::json!({"arguments": request.arguments}).as_object().unwrap().iter()
-                            .map(|(k, v)| (k.clone(), v.clone())).collect(),
+                        details: serde_json::json!({"arguments": request.arguments})
+                            .as_object()
+                            .unwrap()
+                            .iter()
+                            .map(|(k, v)| (k.clone(), v.clone()))
+                            .collect(),
                     }),
                     execution_time_ms: start_time.elapsed().as_millis() as u64,
                     performance_metrics: None,
@@ -152,8 +177,12 @@ impl CommandExecutor {
                     details: serde_json::json!({
                         "command": command_request.command,
                         "working_directory": command_request.working_directory,
-                    }).as_object().unwrap().iter()
-                        .map(|(k, v)| (k.clone(), v.clone())).collect(),
+                    })
+                    .as_object()
+                    .unwrap()
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect(),
                 }),
                 execution_time_ms: start_time.elapsed().as_millis() as u64,
                 performance_metrics: None,
@@ -163,7 +192,7 @@ impl CommandExecutor {
         // Execute in isolated process for additional security
         let request_clone = command_request.clone();
         // Simplified execution without isolation for now to avoid lifetime issues
-        let isolation_result = self.execute_command_internal(request_clone);
+        let isolation_result = self.execute_command_internal(request_clone).await;
 
         let execution_time = start_time.elapsed().as_millis() as u64;
 
@@ -183,27 +212,49 @@ impl CommandExecutor {
                     context_switches: 0,
                 }),
             },
-            Err(e) => ExecutionResponse {
-                request_id,
-                success: false,
-                result: None,
-                error: Some(ErrorInfo {
-                    code: "EXECUTION_FAILED".to_string(),
-                    message: e.to_string(),
-                    category: ErrorCategory::SystemError,
-                    details: serde_json::json!({"isolation_error": e.to_string()}).as_object().unwrap().iter()
-                        .map(|(k, v)| (k.clone(), v.clone())).collect(),
-                }),
-                execution_time_ms: execution_time,
-                performance_metrics: None,
-            },
+            Err(e) => {
+                let (code, category, details) = match &e {
+                    CommandExecutionError::CommandTimeout { timeout_ms } => (
+                        "COMMAND_TIMEOUT",
+                        ErrorCategory::Timeout,
+                        serde_json::json!({ "timeout_ms": timeout_ms }),
+                    ),
+                    _ => (
+                        "EXECUTION_FAILED",
+                        ErrorCategory::SystemError,
+                        serde_json::json!({ "isolation_error": e.to_string() }),
+                    ),
+                };
+
+                ExecutionResponse {
+                    request_id,
+                    success: false,
+                    result: None,
+                    error: Some(ErrorInfo {
+                        code: code.to_string(),
+                        message: e.to_string(),
+                        category,
+                        details: details
+                            .as_object()
+                            .unwrap()
+                            .iter()
+                            .map(|(k, v)| (k.clone(), v.clone()))
+                            .collect(),
+                    }),
+                    execution_time_ms: execution_time,
+                    performance_metrics: None,
+                }
+            }
         }
     }
 
     /// Execute the actual command (runs in isolated process)
-    fn execute_command_internal(&self, request: CommandRequest) -> Result<CommandResult, CommandExecutionError> {
+    async fn execute_command_internal(
+        &self,
+        request: CommandRequest,
+    ) -> Result<CommandResult, CommandExecutionError> {
         let start_time = Instant::now();
-        
+
         // Build the command
         let mut cmd = Command::new(&request.command);
         cmd.args(&request.args);
@@ -239,20 +290,30 @@ impl CommandExecutor {
             cmd.env("HOME", home);
         }
 
+        // Ensure spawned process is terminated if dropped
+        cmd.kill_on_drop(true);
+
         // Execute with timeout
         let timeout_duration = Duration::from_millis(
-            request.timeout_ms.unwrap_or(self.max_execution_time.as_millis() as u64)
+            request
+                .timeout_ms
+                .unwrap_or(self.max_execution_time.as_millis() as u64),
         );
 
-        let execution_result = std::thread::spawn(move || {
-            let child = cmd.spawn()?;
-            child.wait_with_output()
-        }).join();
+        let output = timeout(timeout_duration, async {
+            let mut child = cmd.spawn()?;
+            child.wait_with_output().await
+        })
+        .await;
 
-        let output = match execution_result {
+        let output = match output {
             Ok(Ok(output)) => output,
             Ok(Err(e)) => return Err(CommandExecutionError::IoError(e)),
-            Err(_) => return Err(CommandExecutionError::CommandFailed { code: -1 }),
+            Err(_) => {
+                return Err(CommandExecutionError::CommandTimeout {
+                    timeout_ms: timeout_duration.as_millis() as u64,
+                })
+            }
         };
 
         let execution_time = start_time.elapsed().as_millis() as u64;
@@ -262,13 +323,21 @@ impl CommandExecutor {
         let stderr = String::from_utf8_lossy(&output.stderr);
 
         let stdout_truncated = if stdout.len() > self.max_output_size {
-            format!("{}... (truncated at {} bytes)", &stdout[..self.max_output_size], self.max_output_size)
+            format!(
+                "{}... (truncated at {} bytes)",
+                &stdout[..self.max_output_size],
+                self.max_output_size
+            )
         } else {
             stdout.to_string()
         };
 
         let stderr_truncated = if stderr.len() > self.max_output_size {
-            format!("{}... (truncated at {} bytes)", &stderr[..self.max_output_size], self.max_output_size)
+            format!(
+                "{}... (truncated at {} bytes)",
+                &stderr[..self.max_output_size],
+                self.max_output_size
+            )
         } else {
             stderr.to_string()
         };
@@ -288,15 +357,20 @@ impl CommandExecutor {
     }
 
     /// Parse command request from execution arguments
-    fn parse_command_request(&self, arguments: &HashMap<String, serde_json::Value>) -> Result<CommandRequest, CommandExecutionError> {
-        let command = arguments.get("command")
+    fn parse_command_request(
+        &self,
+        arguments: &HashMap<String, serde_json::Value>,
+    ) -> Result<CommandRequest, CommandExecutionError> {
+        let command = arguments
+            .get("command")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| CommandExecutionError::InvalidArguments { 
-                message: "command field is required".to_string() 
+            .ok_or_else(|| CommandExecutionError::InvalidArguments {
+                message: "command field is required".to_string(),
             })?
             .to_string();
 
-        let args = arguments.get("args")
+        let args = arguments
+            .get("args")
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
@@ -306,29 +380,30 @@ impl CommandExecutor {
             })
             .unwrap_or_default();
 
-        let working_directory = arguments.get("working_directory")
+        let working_directory = arguments
+            .get("working_directory")
             .and_then(|v| v.as_str())
             .map(PathBuf::from);
 
-        let environment = arguments.get("environment")
+        let environment = arguments
+            .get("environment")
             .and_then(|v| v.as_object())
             .map(|obj| {
                 obj.iter()
-                    .filter_map(|(k, v)| {
-                        v.as_str().map(|s| (k.clone(), s.to_string()))
-                    })
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
                     .collect()
             })
             .unwrap_or_default();
 
-        let timeout_ms = arguments.get("timeout_ms")
-            .and_then(|v| v.as_u64());
+        let timeout_ms = arguments.get("timeout_ms").and_then(|v| v.as_u64());
 
-        let capture_output = arguments.get("capture_output")
+        let capture_output = arguments
+            .get("capture_output")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let stream_output = arguments.get("stream_output")
+        let stream_output = arguments
+            .get("stream_output")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -344,11 +419,14 @@ impl CommandExecutor {
     }
 
     /// Comprehensive security validation for command execution
-    fn validate_command_security(&self, request: &CommandRequest) -> Result<(), CommandExecutionError> {
+    fn validate_command_security(
+        &self,
+        request: &CommandRequest,
+    ) -> Result<(), CommandExecutionError> {
         // Check if command is in whitelist
         if !self.command_whitelist.contains(&request.command) {
-            return Err(CommandExecutionError::CommandNotAllowed { 
-                command: request.command.clone() 
+            return Err(CommandExecutionError::CommandNotAllowed {
+                command: request.command.clone(),
             });
         }
 
@@ -356,32 +434,34 @@ impl CommandExecutor {
         let full_command = format!("{} {}", request.command, request.args.join(" "));
         for pattern in &self.blocked_patterns {
             if pattern.is_match(&full_command) {
-                return Err(CommandExecutionError::CommandNotAllowed { 
-                    command: full_command 
+                return Err(CommandExecutionError::CommandNotAllowed {
+                    command: full_command,
                 });
             }
         }
 
         // Validate working directory
         if let Some(ref wd) = request.working_directory {
-            self.security_context.validate_path_access(wd)
-                .map_err(|_| CommandExecutionError::WorkingDirectoryNotAllowed { 
-                    path: wd.display().to_string() 
+            self.security_context
+                .validate_path_access(wd)
+                .map_err(|_| CommandExecutionError::WorkingDirectoryNotAllowed {
+                    path: wd.display().to_string(),
                 })?;
         }
 
         // Validate environment variables
         for key in request.environment.keys() {
             if !ALLOWED_ENV_VARS.contains(&key.as_str()) {
-                return Err(CommandExecutionError::EnvironmentVariableNotAllowed { 
-                    variable: key.clone() 
+                return Err(CommandExecutionError::EnvironmentVariableNotAllowed {
+                    variable: key.clone(),
                 });
             }
         }
 
         // Validate process spawn capability
         use crate::security::Capability;
-        self.security_context.validate_capability(&Capability::ProcessSpawn)?;
+        self.security_context
+            .validate_capability(&Capability::ProcessSpawn)?;
 
         // Additional argument validation for specific commands
         self.validate_command_arguments(&request.command, &request.args)?;
@@ -390,37 +470,50 @@ impl CommandExecutor {
     }
 
     /// Validate command-specific arguments for additional security
-    fn validate_command_arguments(&self, command: &str, args: &[String]) -> Result<(), CommandExecutionError> {
+    fn validate_command_arguments(
+        &self,
+        command: &str,
+        args: &[String],
+    ) -> Result<(), CommandExecutionError> {
         match command {
             "git" => {
                 // Block dangerous git operations
-                if args.iter().any(|arg| arg.contains("--exec") || arg.contains("--upload-pack")) {
-                    return Err(CommandExecutionError::CommandNotAllowed { 
-                        command: format!("git {}", args.join(" ")) 
+                if args
+                    .iter()
+                    .any(|arg| arg.contains("--exec") || arg.contains("--upload-pack"))
+                {
+                    return Err(CommandExecutionError::CommandNotAllowed {
+                        command: format!("git {}", args.join(" ")),
                     });
                 }
             }
             "npm" | "node" => {
                 // Block npm operations that can execute arbitrary code
-                if args.iter().any(|arg| arg == "run-script" || arg.contains("--allow-run")) {
-                    return Err(CommandExecutionError::CommandNotAllowed { 
-                        command: format!("{} {}", command, args.join(" ")) 
+                if args
+                    .iter()
+                    .any(|arg| arg == "run-script" || arg.contains("--allow-run"))
+                {
+                    return Err(CommandExecutionError::CommandNotAllowed {
+                        command: format!("{} {}", command, args.join(" ")),
                     });
                 }
             }
             "python" | "python3" => {
                 // Block dangerous Python operations
-                if args.iter().any(|arg| arg == "-c" || arg.contains("exec") || arg.contains("eval")) {
-                    return Err(CommandExecutionError::CommandNotAllowed { 
-                        command: format!("{} {}", command, args.join(" ")) 
+                if args
+                    .iter()
+                    .any(|arg| arg == "-c" || arg.contains("exec") || arg.contains("eval"))
+                {
+                    return Err(CommandExecutionError::CommandNotAllowed {
+                        command: format!("{} {}", command, args.join(" ")),
                     });
                 }
             }
             "find" => {
                 // Block find with exec
                 if args.iter().any(|arg| arg == "-exec" || arg == "-execdir") {
-                    return Err(CommandExecutionError::CommandNotAllowed { 
-                        command: format!("find {}", args.join(" ")) 
+                    return Err(CommandExecutionError::CommandNotAllowed {
+                        command: format!("find {}", args.join(" ")),
                     });
                 }
             }
@@ -480,7 +573,7 @@ mod tests {
     #[tokio::test]
     async fn test_simple_command_execution() {
         let (executor, _temp_dir) = create_test_executor();
-        
+
         let request = CommandRequest {
             command: "echo".to_string(),
             args: vec!["hello".to_string(), "world".to_string()],
@@ -491,7 +584,7 @@ mod tests {
             stream_output: false,
         };
 
-        let result = executor.execute_command_internal(request).unwrap();
+        let result = executor.execute_command_internal(request).await.unwrap();
         assert!(result.success);
         assert!(result.stdout.contains("hello world"));
     }
@@ -499,7 +592,7 @@ mod tests {
     #[tokio::test]
     async fn test_command_whitelist_validation() {
         let (executor, _temp_dir) = create_test_executor();
-        
+
         let request = CommandRequest {
             command: "rm".to_string(), // Not in whitelist
             args: vec!["-rf".to_string(), "/".to_string()],
@@ -521,9 +614,9 @@ mod tests {
     #[tokio::test]
     async fn test_blocked_pattern_detection() {
         let (executor, _temp_dir) = create_test_executor();
-        
+
         let request = CommandRequest {
-            command: "ls".to_string(), // In whitelist
+            command: "ls".to_string(),                            // In whitelist
             args: vec![">".to_string(), "/dev/null".to_string()], // Blocked pattern
             working_directory: None,
             environment: HashMap::new(),
@@ -539,7 +632,7 @@ mod tests {
     #[tokio::test]
     async fn test_working_directory_validation() {
         let (executor, temp_dir) = create_test_executor();
-        
+
         // Valid working directory
         let request = CommandRequest {
             command: "pwd".to_string(),
@@ -559,11 +652,11 @@ mod tests {
     #[tokio::test]
     async fn test_environment_variable_filtering() {
         let (executor, _temp_dir) = create_test_executor();
-        
+
         let mut env = HashMap::new();
         env.insert("PATH".to_string(), "/usr/bin".to_string()); // Allowed
         env.insert("DANGEROUS_VAR".to_string(), "value".to_string()); // Not allowed
-        
+
         let request = CommandRequest {
             command: "echo".to_string(),
             args: vec!["test".to_string()],
@@ -585,11 +678,15 @@ mod tests {
     #[tokio::test]
     async fn test_argument_validation() {
         let (executor, _temp_dir) = create_test_executor();
-        
+
         // Test dangerous git command
         let request = CommandRequest {
             command: "git".to_string(),
-            args: vec!["clone".to_string(), "--exec".to_string(), "malicious".to_string()],
+            args: vec![
+                "clone".to_string(),
+                "--exec".to_string(),
+                "malicious".to_string(),
+            ],
             working_directory: None,
             environment: HashMap::new(),
             timeout_ms: Some(5000),
@@ -604,15 +701,19 @@ mod tests {
     #[test]
     fn test_output_truncation() {
         let (executor, _temp_dir) = create_test_executor();
-        
+
         // Test with mock large output
         let large_output = "a".repeat(executor.max_output_size + 100);
         let truncated = if large_output.len() > executor.max_output_size {
-            format!("{}... (truncated at {} bytes)", &large_output[..executor.max_output_size], executor.max_output_size)
+            format!(
+                "{}... (truncated at {} bytes)",
+                &large_output[..executor.max_output_size],
+                executor.max_output_size
+            )
         } else {
             large_output
         };
-        
+
         assert!(truncated.contains("truncated"));
         assert!(truncated.len() <= executor.max_output_size + 50); // Allow some extra for truncation message
     }
@@ -620,13 +721,13 @@ mod tests {
     #[test]
     fn test_whitelist_management() {
         let (mut executor, _temp_dir) = create_test_executor();
-        
+
         let initial_count = executor.get_supported_commands().len();
-        
+
         // Add a new command
         executor.add_allowed_command("test_command".to_string());
         assert_eq!(executor.get_supported_commands().len(), initial_count + 1);
-        
+
         // Remove a command
         executor.remove_allowed_command("test_command");
         assert_eq!(executor.get_supported_commands().len(), initial_count);

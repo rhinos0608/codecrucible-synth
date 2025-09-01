@@ -394,7 +394,17 @@ export class UnifiedCacheSystem extends EventEmitter {
         }
 
         const data = await response.json();
-        embedding = data.data[0].embedding;
+        if (
+          data &&
+          Array.isArray(data.data) &&
+          data.data.length > 0 &&
+          data.data[0] &&
+          Array.isArray(data.data[0].embedding) // OpenAI embeddings are arrays
+        ) {
+          embedding = data.data[0].embedding;
+        } else {
+          throw new Error('OpenAI API response missing expected embedding data');
+        }
       } else {
         throw new Error('No embedding provider configured');
       }

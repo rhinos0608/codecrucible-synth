@@ -1,6 +1,6 @@
 /**
  * Rust Execution Backend - Production Implementation
- * 
+ *
  * Integrates the complete Rust executor with comprehensive security, performance,
  * and tool execution capabilities. Replaces TypeScript executors with blazing-fast Rust.
  */
@@ -8,7 +8,11 @@
 import { logger } from '../../logger.js';
 import path from 'path';
 import { pathToFileURL } from 'url';
-import type { ToolExecutionRequest, ToolExecutionResult } from '../../../domain/interfaces/tool-system.js';
+import type {
+  ToolExecutionRequest,
+  ToolExecutionResult,
+  IToolExecutor,
+} from '../../../domain/interfaces/tool-system.js';
 import { ModelRequest, ModelResponse } from '../../../domain/interfaces/model-client.js';
 import { ProjectContext } from '../../../domain/types/unified-types.js';
 
@@ -39,7 +43,12 @@ export interface RustExecutionResult {
 // Import the actual NAPI module types
 interface NativeRustExecutor {
   initialize(): Promise<boolean>;
-  executeFilesystem(operation: string, path: string, content?: string, options?: any): Promise<RustExecutionResult>;
+  executeFilesystem(
+    operation: string,
+    path: string,
+    content?: string,
+    options?: any
+  ): Promise<RustExecutionResult>;
   executeCommand(command: string, args: string[], options?: any): Promise<RustExecutionResult>;
   execute(toolId: string, args: string, options?: any): Promise<RustExecutionResult>;
   getPerformanceMetrics(): Promise<string>;
@@ -59,6 +68,7 @@ export class RustExecutionBackend {
   private rustExecutor: NativeRustExecutor | null = null;
   private initialized = false;
   private options: RustExecutorOptions;
+  private tsOrchestrator?: IToolExecutor;
   private performanceStats = {
     totalRequests: 0,
     successfulRequests: 0,
@@ -66,7 +76,7 @@ export class RustExecutionBackend {
     averageExecutionTime: 0,
   };
 
-  constructor(options: RustExecutorOptions = {}) {
+  constructor(options: RustExecutorOptions = {}, tsOrchestrator?: IToolExecutor) {
     this.options = {
       enableProfiling: true,
       maxConcurrency: 4,
@@ -74,6 +84,14 @@ export class RustExecutionBackend {
       logLevel: 'info',
       ...options,
     };
+    this.tsOrchestrator = tsOrchestrator;
+  }
+
+  /**
+   * Inject TypeScript tool orchestrator for fallback execution
+   */
+  setTypescriptOrchestrator(orchestrator: IToolExecutor): void {
+    this.tsOrchestrator = orchestrator;
   }
 
   /**
@@ -97,7 +115,7 @@ export class RustExecutionBackend {
             return {};
           }
         });
-        
+
         if (initLogging) {
           await initLogging(this.options.logLevel);
           logger.info('🚀 Rust executor logging initialized');
@@ -105,24 +123,26 @@ export class RustExecutionBackend {
       }
 
       // Load the Rust executor NAPI module
-      const { RustExecutor, createRustExecutor } = await import('./rust-native-module.js').catch(async () => {
-        try {
-          // Try the NAPI module name from package.json
-          const napiModule = await import('codecrucible-rust-executor' as any).catch(() => {
-            // Try direct build output path
-            const directPath = path.join(process.cwd(), 'rust-executor.node');
-            return import(directPath);
-          });
-          return napiModule;
-        } catch {
-          // Return empty module as fallback
-          return {};
+      const { RustExecutor, createRustExecutor } = await import('./rust-native-module.js').catch(
+        async () => {
+          try {
+            // Try the NAPI module name from package.json
+            const napiModule = await import('codecrucible-rust-executor' as any).catch(() => {
+              // Try direct build output path
+              const directPath = path.join(process.cwd(), 'rust-executor.node');
+              return import(directPath);
+            });
+            return napiModule;
+          } catch {
+            // Return empty module as fallback
+            return {};
+          }
         }
-      });
-      
+      );
+
       if (RustExecutor || createRustExecutor) {
         this.rustExecutor = RustExecutor ? RustExecutor.create() : createRustExecutor();
-        
+
         // Initialize the Rust executor
         const initResult = await this.rustExecutor.initialize();
         if (initResult) {
@@ -161,12 +181,12 @@ export class RustExecutionBackend {
     try {
       // Determine execution strategy based on request
       let result: RustExecutionResult;
-      
+
       if (request.toolId === 'filesystem' || request.toolId?.startsWith('file')) {
         // File system operations
         result = await this.executeFilesystemOperation(request);
       } else if (request.toolId === 'command' || request.toolId?.startsWith('cmd')) {
-        // Command operations  
+        // Command operations
         result = await this.executeCommandOperation(request);
       } else {
         // Generic tool execution
@@ -186,10 +206,12 @@ export class RustExecutionBackend {
       return {
         success: result.success,
         result: result.result,
-        error: result.error ? {
-          code: 'RUST_EXECUTION_ERROR',
-          message: result.error,
-        } : undefined,
+        error: result.error
+          ? {
+              code: 'RUST_EXECUTION_ERROR',
+              message: result.error,
+            }
+          : undefined,
         metadata: {
           executionTimeMs: result.execution_time_ms,
           executor: 'rust',
@@ -201,7 +223,7 @@ export class RustExecutionBackend {
     } catch (error) {
       this.performanceStats.failedRequests++;
       logger.error('Rust execution failed:', error);
-      
+
       return {
         success: false,
         result: undefined,
@@ -252,25 +274,21 @@ export class RustExecutionBackend {
 
   // Private helper methods
 
-  private async executeTypescriptFallback(request: ToolExecutionRequest): Promise<ToolExecutionResult> {
+  private async executeTypescriptFallback(
+    request: ToolExecutionRequest
+  ): Promise<ToolExecutionResult> {
     const startTime = Date.now();
     this.performanceStats.totalRequests++;
-    
-    try {
-      // Basic TypeScript fallback - could integrate with existing TypeScript executors
-      const result = {
-        message: `TypeScript fallback execution of ${request.toolId}`,
-        toolId: request.toolId,
-        arguments: request.arguments,
-      };
 
-      this.performanceStats.successfulRequests++;
-      this.updateAverageExecutionTime(Date.now() - startTime);
-      
+    if (!this.tsOrchestrator) {
+      this.performanceStats.failedRequests++;
       return {
-        success: true,
-        result: result,
-        error: undefined,
+        success: false,
+        result: undefined,
+        error: {
+          code: 'TYPESCRIPT_ORCHESTRATOR_UNAVAILABLE',
+          message: 'No TypeScript tool orchestrator provided',
+        },
         metadata: {
           executionTimeMs: Date.now() - startTime,
           executor: 'typescript-fallback',
@@ -278,9 +296,26 @@ export class RustExecutionBackend {
         },
         executionTimeMs: Date.now() - startTime,
       };
+    }
+
+    try {
+      const result = await this.tsOrchestrator.execute(request);
+
+      this.performanceStats.successfulRequests++;
+      this.updateAverageExecutionTime(Date.now() - startTime);
+
+      return {
+        ...result,
+        metadata: {
+          ...result.metadata,
+          executor: 'typescript-fallback',
+          ...request.metadata,
+        },
+        executionTimeMs: result.executionTimeMs ?? Date.now() - startTime,
+      };
     } catch (error) {
       this.performanceStats.failedRequests++;
-      
+
       return {
         success: false,
         result: undefined,
@@ -313,15 +348,17 @@ export class RustExecutionBackend {
   private extractCapabilities(request: ToolExecutionRequest): string[] {
     // Extract capabilities from request context or permissions
     const capabilities: string[] = [];
-    
+
     if (request.context?.permissions) {
       capabilities.push(...request.context.permissions.map(p => `${p.type}:${p.resource}`));
     }
-    
+
     return capabilities;
   }
 
-  private async executeFilesystemOperation(request: ToolExecutionRequest): Promise<RustExecutionResult> {
+  private async executeFilesystemOperation(
+    request: ToolExecutionRequest
+  ): Promise<RustExecutionResult> {
     if (!this.rustExecutor) {
       throw new Error('Rust executor not initialized');
     }
@@ -338,7 +375,9 @@ export class RustExecutionBackend {
     return await this.rustExecutor.executeFilesystem(operation, path, content, options);
   }
 
-  private async executeCommandOperation(request: ToolExecutionRequest): Promise<RustExecutionResult> {
+  private async executeCommandOperation(
+    request: ToolExecutionRequest
+  ): Promise<RustExecutionResult> {
     if (!this.rustExecutor) {
       throw new Error('Rust executor not initialized');
     }
@@ -356,7 +395,9 @@ export class RustExecutionBackend {
     return await this.rustExecutor.executeCommand(command, args, options);
   }
 
-  private async executeGenericOperation(request: ToolExecutionRequest): Promise<RustExecutionResult> {
+  private async executeGenericOperation(
+    request: ToolExecutionRequest
+  ): Promise<RustExecutionResult> {
     if (!this.rustExecutor) {
       throw new Error('Rust executor not initialized');
     }
@@ -375,8 +416,10 @@ export class RustExecutionBackend {
   }
 
   private updateAverageExecutionTime(executionTime: number): void {
-    const totalTime = this.performanceStats.averageExecutionTime * this.performanceStats.successfulRequests;
-    this.performanceStats.averageExecutionTime = (totalTime + executionTime) / (this.performanceStats.successfulRequests + 1);
+    const totalTime =
+      this.performanceStats.averageExecutionTime * this.performanceStats.successfulRequests;
+    this.performanceStats.averageExecutionTime =
+      (totalTime + executionTime) / (this.performanceStats.successfulRequests + 1);
   }
 
   /**

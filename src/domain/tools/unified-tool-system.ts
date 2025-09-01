@@ -638,6 +638,8 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
   ) {
     super();
     this.rustBackend = rustBackend;
+    // Inject this orchestrator into the Rust backend for fallback execution
+    this.rustBackend?.setTypescriptOrchestrator(this);
     this.logger.info('UnifiedToolExecutor initialized', {
       rustBackendEnabled: !!this.rustBackend,
       rustAvailable: this.rustBackend?.isAvailable() || false,
@@ -652,12 +654,15 @@ export class UnifiedToolExecutor extends EventEmitter implements IToolExecutor {
       try {
         this.logger.debug('Attempting Rust backend execution for tool:', request.toolId);
         const rustResult = await this.rustBackend.execute(request);
-        
+
         if (rustResult.success) {
           this.logger.debug('Rust backend execution successful for tool:', request.toolId);
           return rustResult;
         } else {
-          this.logger.warn('Rust backend execution failed, falling back to TypeScript:', rustResult.error);
+          this.logger.warn(
+            'Rust backend execution failed, falling back to TypeScript:',
+            rustResult.error
+          );
         }
       } catch (error) {
         this.logger.warn('Rust backend error, falling back to TypeScript:', error);

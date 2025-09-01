@@ -39,7 +39,7 @@ export class InputSanitizer {
           logger.error(`❌ Failed to initialize security policies: ${error}`);
           // Fallback to basic security patterns
           InputSanitizer.allowedCommands = new Set(['/help', '/status', '/config']);
-          InputSanitizer.dangerousPatterns = [/[;&|`$(){}[\\]\\]/g, /\\.\\./g];
+          InputSanitizer.dangerousPatterns = [/[;&|`$(){}[\]\\]/g, /\\.\\./g];
         }
       })();
     }

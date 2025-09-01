@@ -44,6 +44,7 @@ export class EnhancedToolIntegration extends EventEmitter {
   private executionCache: Map<string, { result: any; timestamp: number; ttl: number }> = new Map();
   private metrics: ToolExecutionMetrics[] = [];
   private activeExecutions: Set<string> = new Set();
+  private cacheCleanupInterval?: NodeJS.Timeout;
 
   constructor(config?: Partial<EnhancedToolConfig>) {
     super();
@@ -337,7 +338,7 @@ export class EnhancedToolIntegration extends EventEmitter {
 
   private setupCacheCleanup(): void {
     // Clean up expired cache entries every 10 minutes
-    setInterval(() => {
+    this.cacheCleanupInterval = setInterval(() => {
       const now = Date.now();
       for (const [key, cached] of this.executionCache.entries()) {
         if (now - cached.timestamp > cached.ttl) {
@@ -345,6 +346,14 @@ export class EnhancedToolIntegration extends EventEmitter {
         }
       }
     }, 600000);
+  }
+
+  dispose(): void {
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+      this.cacheCleanupInterval = undefined;
+    }
+    this.removeAllListeners();
   }
 
   /**

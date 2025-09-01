@@ -7,6 +7,9 @@
 import { EventEmitter } from 'events';
 import { createLogger } from './logger.js';
 import { ILogger } from '../domain/interfaces/logger.js';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import YAML from 'yaml';
 
 export interface ModelSelectionConfig {
   provider: 'ollama' | 'lm-studio' | 'auto';
@@ -35,25 +38,34 @@ export class ModelSelectionCoordinator extends EventEmitter {
   private providerCapabilities: Map<string, ProviderCapabilities> = new Map();
   private routingHistory: ModelSelectionConfig[] = [];
 
-  // Unified configuration (INTELLIGENT FUNCTION CALLING ROUTING)
-  private readonly modelPriority = {
-    ollama: {
-      preferred: [
-        'gpt-oss:20b',
-        'llama3.1:8b',
-        'qwen2.5-coder:7b',
-        'qwen2.5-coder:14b',
-        'qwen2.5:32b',
-      ], // Function calling capable models prioritized
-      fallback: ['qwen2.5-coder:3b', 'deepseek-coder:8b', 'llama3.2:latest', 'gemma:latest'],
-      taskTypes: ['analysis', 'planning', 'complex', 'multi-file'],
-    },
-    'lm-studio': {
-      preferred: ['codellama-7b-instruct', 'gemma-2b-it'],
-      fallback: ['qwen/qwen2.5-coder-14b'],
-      taskTypes: ['template', 'edit', 'format', 'boilerplate'],
-    },
-  };
+  // Configuration loaded from .env and unified config - NO HARDCODED VALUES
+  private getModelPriority() {
+    let llmConfig: any = {};
+    
+    try {
+      // Try to read unified config YAML file
+      const configPath = join(process.cwd(), 'config', 'unified-model-config.yaml');
+      const configContent = readFileSync(configPath, 'utf8');
+      const yamlConfig = YAML.parse(configContent);
+      llmConfig = yamlConfig?.llm || {};
+    } catch (error) {
+      this.logger.warn('Could not read unified-model-config.yaml, using environment defaults');
+    }
+    
+    return {
+      ollama: {
+        preferred: llmConfig?.providers?.ollama?.models?.preferred || 
+          (process.env.MODEL_DEFAULT_NAME ? [process.env.MODEL_DEFAULT_NAME] : []),
+        fallback: llmConfig?.providers?.ollama?.models?.fallback || [],
+        taskTypes: llmConfig?.providers?.ollama?.optimal_for || [],
+      },
+      'lm-studio': {
+        preferred: llmConfig?.providers?.['lm-studio']?.models?.preferred || [],
+        fallback: llmConfig?.providers?.['lm-studio']?.models?.fallback || [],
+        taskTypes: llmConfig?.providers?.['lm-studio']?.optimal_for || [],
+      },
+    };
+  }
 
   constructor() {
     super();
@@ -79,8 +91,9 @@ export class ModelSelectionCoordinator extends EventEmitter {
     }
 
     // Determine best model based on unified configuration
-    const config = this.modelPriority[provider as keyof typeof this.modelPriority];
-    if (!config) {
+    const modelPriority = this.getModelPriority();
+    const providerConfig = modelPriority[provider as keyof typeof modelPriority];
+    if (!providerConfig) {
       throw new Error(`Unknown provider: ${provider}`);
     }
 
@@ -90,7 +103,7 @@ export class ModelSelectionCoordinator extends EventEmitter {
     let reason = 'Model selected based on availability and task type';
 
     // Try preferred models first
-    for (const preferred of config.preferred) {
+    for (const preferred of providerConfig.preferred) {
       if (availableModels.length === 0 || availableModels.includes(preferred)) {
         selectedModel = preferred;
         reason = `Preferred model for ${taskType} tasks`;
@@ -106,10 +119,15 @@ export class ModelSelectionCoordinator extends EventEmitter {
     }
 
     // Use fallback if nothing available
-    if (!selectedModel) {
-      selectedModel = config.fallback[0];
+    if (!selectedModel && providerConfig.fallback.length > 0) {
+      selectedModel = providerConfig.fallback[0];
       confidence = 0.5;
       reason = 'Using fallback model (provider may be unavailable)';
+    }
+
+    // If still no model, throw error - no hardcoded fallbacks
+    if (!selectedModel) {
+      throw new Error(`No models configured for provider ${provider}. Check .env and unified-model-config.yaml`);
     }
 
     const selection: ModelSelectionConfig = {
@@ -138,10 +156,16 @@ export class ModelSelectionCoordinator extends EventEmitter {
   getSelectedModel(provider: string): string {
     const selection = this.selectedModels.get(provider);
     if (!selection) {
-      this.logger.warn(`No model selected for ${provider}, using default`);
-      return (
-        this.modelPriority[provider as keyof typeof this.modelPriority]?.preferred[0] || 'unknown'
-      );
+      this.logger.warn(`No model selected for ${provider}, checking configuration`);
+      const modelPriority = this.getModelPriority();
+      const providerConfig = modelPriority[provider as keyof typeof modelPriority];
+      
+      if (providerConfig?.preferred.length > 0) {
+        return providerConfig.preferred[0];
+      }
+      
+      // No hardcoded fallback - return undefined or throw error
+      throw new Error(`No model configured for provider ${provider}. Check .env and unified-model-config.yaml`);
     }
     return selection.model;
   }

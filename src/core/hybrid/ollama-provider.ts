@@ -128,7 +128,8 @@ export class OllamaProvider implements LLMProvider {
       });
 
       if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Ollama API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -394,6 +395,17 @@ export class OllamaProvider implements LLMProvider {
             status: response.status,
             error: errorText,
           });
+          
+          // Check for memory constraint errors first
+          const isMemoryError = errorText.includes('requires more system memory') || 
+                               errorText.includes('insufficient memory') ||
+                               errorText.includes('not enough memory') ||
+                               errorText.includes('memory limit');
+          
+          if (isMemoryError) {
+            // Preserve the original memory error message for UnifiedModelClient to handle
+            throw new Error(`Ollama API error: ${response.status} ${response.statusText} - ${errorText}`);
+          }
           
           // If function calling failed, try without tools (fallback mode)
           if (response.status === 500 || errorText.includes('does not support tools')) {

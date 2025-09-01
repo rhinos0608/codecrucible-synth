@@ -48,6 +48,7 @@ import { ICacheCoordinator } from '../../core/caching/cache-coordinator.js';
 import { IPerformanceMonitor } from '../../domain/services/unified-performance-system.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { HybridLLMRouter } from '../../core/hybrid/hybrid-llm-router.js';
+import { HardwareAwareModelSelector } from '../../infrastructure/performance/hardware-aware-model-selector.js';
 import { SecurityConfig } from '../../core/types/global.types.js';
 import { ToolInfo } from '../../mcp-servers/mcp-server-manager.js';
 import { PerformanceProfiler } from '../../core/performance/profiler.js';
@@ -164,6 +165,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
   private voiceSystem?: VoiceArchetypeSystemInterface;
   private livingSpiralCoordinator?: LivingSpiralCoordinatorInterface;
   private performanceProfiler?: PerformanceProfiler;
+  private hardwareAwareModelSelector?: HardwareAwareModelSelector;
   private initialized = false;
   private requestCount = 0;
   private cache = new Map<string, { response: ModelResponse; timestamp: number }>();
@@ -192,6 +194,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     this.setupVoiceSystem();
     this.setupLivingSpiralCoordinator();
     this.setupPerformanceProfiler();
+    this.setupHardwareAwareSelector();
   }
 
   private convertUnifiedConfig(unifiedConfig: UnifiedConfiguration): UnifiedModelClientConfig {
@@ -497,6 +500,17 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
     }
   }
 
+  private setupHardwareAwareSelector(): void {
+    try {
+      // Initialize hardware-aware model selector for memory fallbacks
+      this.hardwareAwareModelSelector = new HardwareAwareModelSelector();
+      logger.info('Hardware-aware model selector initialized');
+    } catch (error) {
+      logger.warn('Failed to initialize hardware-aware model selector:', error);
+      this.hardwareAwareModelSelector = undefined;
+    }
+  }
+
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
@@ -648,7 +662,7 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
         );
       }
 
-      // Execute request with the selected provider
+      // Execute request with the selected provider (with memory fallback)
       const requestWithId = { ...request, id: requestId, model };
       logger.info('🔧 About to call provider.request()', {
         providerType: provider.type || provider.constructor.name,
@@ -659,12 +673,61 @@ export class UnifiedModelClient extends EventEmitter implements IModelClient {
       });
       
       logger.info('🔧 DEBUG: Calling provider.request() NOW');
-      const response = await provider.request(requestWithId);
-      logger.info('🔧 DEBUG: provider.request() returned', {
-        hasContent: !!response.content,
-        hasToolCalls: !!response.toolCalls,
-        toolCallCount: response.toolCalls?.length || 0,
-      });
+      
+      let response;
+      try {
+        response = await provider.request(requestWithId);
+        logger.info('🔧 DEBUG: provider.request() returned', {
+          hasContent: !!response.content,
+          hasToolCalls: !!response.toolCalls,
+          toolCallCount: response.toolCalls?.length || 0,
+        });
+      } catch (providerError) {
+        logger.warn(`Provider request failed: ${providerError.message}`);
+        
+        // Check if this is a memory constraint error
+        const errorMessage = providerError.message || '';
+        const isMemoryError = errorMessage.includes('requires more system memory') || 
+                             errorMessage.includes('insufficient memory') ||
+                             errorMessage.includes('not enough memory') ||
+                             errorMessage.includes('memory limit');
+        
+        if (isMemoryError && this.hardwareAwareModelSelector) {
+          logger.info('🔄 Memory constraint detected, attempting hardware-aware fallback');
+          
+          try {
+            // Get a smaller model from hardware-aware selector
+            const fallbackModel = await this.hardwareAwareModelSelector.getFallbackModel(
+              model,
+              'hardware_constraint'
+            );
+            
+            if (fallbackModel) {
+              logger.info(`🔄 Retrying with smaller model: ${fallbackModel.name}`);
+              
+              // Retry with the smaller model
+              const fallbackRequest = { ...requestWithId, model: fallbackModel.name };
+              response = await provider.request(fallbackRequest);
+              
+              logger.info('✅ Hardware fallback succeeded', {
+                originalModel: model,
+                fallbackModel: fallbackModel.name,
+                hasContent: !!response.content,
+                hasToolCalls: !!response.toolCalls,
+              });
+            } else {
+              logger.warn('❌ No suitable fallback model available');
+              throw providerError;
+            }
+          } catch (fallbackError) {
+            logger.error('❌ Hardware fallback also failed:', fallbackError);
+            throw providerError; // Throw original error
+          }
+        } else {
+          // Non-memory error or no hardware selector available
+          throw providerError;
+        }
+      }
 
       // End LLM inference profiling on success
       if (this.performanceProfiler && profilingSessionId && inferenceOperationId) {

@@ -17,12 +17,12 @@ llm:
       models:
         # Preferred models in priority order (INTELLIGENT ROUTING)
         preferred: 
-          - "gpt-oss:20b"          # Latest GPT model with function calling
-          - "llama3.1:8b"          # Best overall for function calling  
-          - "qwen2.5-coder:7b"     # Excellent function calling + coding
-          - "qwen2.5-coder:14b"    # Best function calling if available
-          - "qwen2.5:32b"          # Most reliable function calling
-          - "deepseek-coder:8b"    # Decent function calling
+          - "gemma:latest"         # Available model with function calling (PRIORITIZED)
+          - "gemma3n:e4b"          # 6.9B parameters, good performance
+          - "qwen2.5-coder:7b"     # Excellent function calling + coding (if available)
+          - "llama3.1:8b"          # Best overall for function calling (if available)
+          - "deepseek-coder:8b"    # Decent function calling (if available)
+          - "codellama:34b"        # Large model (HIGH MEMORY - 34B parameters)
         # Fallback models if preferred not available
         fallback:
           - "qwen2.5-coder:3b"     # Limited function calling

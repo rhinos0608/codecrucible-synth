@@ -465,21 +465,21 @@ export class IntelligentModelRouter extends EventEmitter {
       // Check model name for known function calling capable models
       const modelName = model.name.toLowerCase();
 
-      // TIER 1: Excellent function calling (based on research + new models)
-      if (modelName.includes('gpt-oss') && modelName.includes('20b')) {
-        return 1.0; // Latest GPT model with excellent function calling
+      // TIER 1: Excellent function calling (memory-optimized order)
+      if (modelName.includes('qwen2.5-coder') && modelName.includes('7b')) {
+        return 1.0; // Best balance of function calling + memory efficiency
       }
       if (modelName.includes('llama3.1') && modelName.includes('8b')) {
-        return 1.0; // Best overall for function calling
+        return 0.95; // Best overall for function calling
       }
       if (modelName.includes('qwen2.5-coder') && modelName.includes('14b')) {
-        return 0.95; // Excellent performance
+        return 0.85; // Excellent but higher memory requirements
       }
-      if (modelName.includes('qwen2.5-coder') && modelName.includes('7b')) {
-        return 0.9; // Very good function calling
+      if (modelName.includes('gpt-oss') && modelName.includes('20b')) {
+        return 0.7; // Powerful but very high memory requirements
       }
       if (modelName.includes('qwen2.5') && modelName.includes('32b')) {
-        return 0.95; // Most reliable according to research
+        return 0.65; // Reliable but highest memory requirements
       }
 
       // TIER 2: Moderate function calling

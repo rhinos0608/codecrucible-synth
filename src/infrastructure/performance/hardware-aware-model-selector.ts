@@ -577,6 +577,28 @@ export class HardwareAwareModelSelector extends EventEmitter {
   }
 
   /**
+   * Get optimal fallback model for a specific failure reason
+   */
+  async getFallbackModel(currentModel: string, reason: ModelSwitchEvent['reason']): Promise<ModelInfo | null> {
+    // Set current model for context
+    this.currentModel = currentModel;
+    
+    // Create minimal performance metrics
+    const metrics: PerformanceMetrics = {
+      responseTime: 0,
+      memoryUsage: 0.8, // Assume high memory usage since we're in fallback
+      cpuUsage: 0.5,
+      errorRate: 0,
+      tokensPerSecond: 1,
+      consecutiveErrors: 1,
+      lastSuccessTime: Date.now(),
+    };
+    
+    // Use the private method to select fallback
+    return this.selectFallbackModel(reason, metrics);
+  }
+
+  /**
    * Force model switch for testing
    */
   async forceModelSwitch(targetModel?: string): Promise<boolean> {

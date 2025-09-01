@@ -24,7 +24,7 @@
     "test:unit:watch": "node node_modules/jest/bin/jest.js --config jest.config.unit.cjs --watch",
     "test:perf": "node node_modules/jest/bin/jest.js --verbose --logHeapUsage --detectOpenHandles",
     "test:all": "node node_modules/jest/bin/jest.js --config jest.config.cjs",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint src/**/*.ts --max-warnings=0",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,js,json}\"",
@@ -42,7 +42,8 @@
     "version": "npm run build",
     "postversion": "echo 'Version updated. Run: git push && git push --tags' to deploy manually",
     "release": "npm run build && npm run package:all && npm version patch && npm publish",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "coverage:check": "node scripts/coverage-check.js"
   },
   "publishConfig": {
     "access": "public"

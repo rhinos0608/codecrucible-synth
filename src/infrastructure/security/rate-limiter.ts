@@ -110,11 +110,6 @@ class MemoryStore implements RateLimitStore {
   }
 
   stop(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = undefined;
-    }
-
     this.store.clear();
   }
 }

@@ -181,7 +181,7 @@ export class GitMCPServer extends BaseMCPServer {
     this.approvalManager = approvalManager;
     this.workspaceRoot = workspaceRoot;
 
-    // Register tool handlers
+    // Register tool handlers with explicit typing
     this.tools = {
       git_status: this.handleGitStatus.bind(this),
       git_diff: this.handleGitDiff.bind(this),
@@ -199,7 +199,7 @@ export class GitMCPServer extends BaseMCPServer {
       git_remote: this.handleGitRemote.bind(this),
       git_stash: this.handleGitStash.bind(this),
       git_clean: this.handleGitClean.bind(this),
-    } as Record<string, ToolHandler>;
+    };
 
     logger.info('Git MCP server initialized', { workspaceRoot });
   }
@@ -207,7 +207,7 @@ export class GitMCPServer extends BaseMCPServer {
   /**
    * Get Git repository status
    */
-  async handleGitStatus(): Promise<ToolResponse<GitStatus>> {
+  async handleGitStatus(args: ToolRequest = {}): Promise<ToolResponse<GitStatus>> {
     try {
       const isRepo = await this.isGitRepository();
       if (!isRepo) {

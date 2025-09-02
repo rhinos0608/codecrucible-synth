@@ -579,7 +579,6 @@ export class OAuthResourceServer extends EventEmitter {
     if (this.cleanupInterval) return;
 
     this.cleanupInterval = setInterval(() => {
-      // TODO: Store interval ID and call clearInterval in cleanup
       this.cleanupExpiredEntries();
     }, 60000); // Clean every minute
   }

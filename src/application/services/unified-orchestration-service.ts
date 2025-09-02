@@ -85,6 +85,11 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
   private initialized = false;
   private activeRequests = new Map<string, OrchestrationRequest>();
+  private cleanupHandlers: Array<() => Promise<void> | void> = [];
+
+  registerCleanup(handler: () => Promise<void> | void): void {
+    this.cleanupHandlers.push(handler);
+  }
 
   constructor(
     configManager: UnifiedConfigurationManager,
@@ -147,6 +152,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
       this.securityValidator = new UnifiedSecurityValidator(securityLogger);
       this.performanceSystem = new UnifiedPerformanceSystem(performanceLogger, this.eventBus);
+      this.registerCleanup(() => this.performanceSystem.shutdown());
 
       // Initialize agent system
       this.agentSystem = new UnifiedAgentSystem(
@@ -157,6 +163,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
         this.performanceSystem
       );
       await this.agentSystem.initialize();
+      this.registerCleanup(() => this.agentSystem.shutdown());
 
       // Initialize server system
       const serverLogger = createLogger('UnifiedServerSystem');
@@ -168,6 +175,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
         this.securityValidator,
         this.performanceSystem
       );
+      this.registerCleanup(() => this.serverSystem.stopAllServers());
 
       // Initialize CQRS: command bus and register agent operation handlers
       this.commandBus = new CommandBus();
@@ -548,17 +556,9 @@ export class UnifiedOrchestrationService extends EventEmitter {
       }
       this.activeRequests.clear();
 
-      // Shutdown components
-      if (this.agentSystem) {
-        await this.agentSystem.shutdown();
-      }
-
-      if (this.serverSystem) {
-        await this.serverSystem.stopAllServers();
-      }
-
-      if (this.performanceSystem) {
-        await this.performanceSystem.shutdown();
+      // Shutdown registered components
+      for (const handler of this.cleanupHandlers) {
+        await handler();
       }
 
       this.initialized = false;

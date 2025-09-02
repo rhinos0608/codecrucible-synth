@@ -105,6 +105,7 @@ export class ProductionRBACSystem extends EventEmitter {
   private roleCache: Map<string, Role> = new Map();
   private userPermissionCache: Map<string, string[]> = new Map();
   private cacheExpiryMs: number = 5 * 60 * 1000; // 5 minutes
+  private cacheCleanupInterval?: NodeJS.Timeout;
 
   constructor(db: ProductionDatabaseManager, secretsManager: SecretsManager) {
     super();
@@ -121,7 +122,7 @@ export class ProductionRBACSystem extends EventEmitter {
     try {
       await this.loadJWTSecrets();
       await this.ensureSystemRoles();
-      await this.startCacheCleanup();
+      this.startCacheCleanup();
 
       logger.info('Production RBAC system initialized');
     } catch (error) {
@@ -875,8 +876,7 @@ export class ProductionRBACSystem extends EventEmitter {
 
   private startCacheCleanup(): void {
     // Clean up revoked tokens every hour
-    setInterval(
-      // TODO: Store interval ID and call clearInterval in cleanup
+    this.cacheCleanupInterval = setInterval(
       () => {
         this.revokedTokens.clear();
         this.userPermissionCache.clear();
@@ -946,6 +946,16 @@ export class ProductionRBACSystem extends EventEmitter {
 
     await this.db.query(query, [userId, role]);
     logger.info('Role assigned to user', { userId, role });
+  }
+
+  shutdown(): void {
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+      this.cacheCleanupInterval = undefined;
+    }
+
+    this.removeAllListeners();
+    logger.info('Production RBAC system shutdown');
   }
 }
 

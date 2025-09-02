@@ -8,6 +8,7 @@ import {
   RuntimeContext,
   createRuntimeContext,
   disposeRuntimeContext,
+  setConfigManager,
 } from '../runtime/runtime-context.js';
 import {
   UnifiedOrchestrationService,
@@ -91,7 +92,7 @@ export class ServiceFactory {
         configFilePath: this.config.configFilePath,
         eventBus,
       });
-      this.runtimeContext.configManager = this.configManager;
+      setConfigManager(this.runtimeContext, this.configManager);
     }
     return this.configManager;
   }

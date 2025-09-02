@@ -15,6 +15,22 @@ import {
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 
+interface Disposable {
+  dispose: () => Promise<void> | void;
+}
+
+interface ListenerRemover {
+  removeAllListeners: () => void;
+}
+
+function isDisposable(value: unknown): value is Disposable {
+  return typeof (value as Disposable)?.dispose === 'function';
+}
+
+function hasRemoveAllListeners(value: unknown): value is ListenerRemover {
+  return typeof (value as ListenerRemover)?.removeAllListeners === 'function';
+}
+
 export interface RuntimeContext {
   eventBus: IEventBus;
   resourceCoordinator: UnifiedResourceCoordinator; // existing singleton wrapped for now
@@ -46,6 +62,13 @@ export function createTestRuntimeContext(eventBus: IEventBus): RuntimeContext {
   return createRuntimeContext({ eventBus });
 }
 
+export function setConfigManager(
+  context: RuntimeContext,
+  configManager: UnifiedConfigurationManager
+): void {
+  context.configManager = configManager;
+}
+
 /**
  * Dispose a runtime context and release underlying resources
  */
@@ -53,17 +76,17 @@ export async function disposeRuntimeContext(context: RuntimeContext): Promise<vo
   // Remove all event listeners to avoid leaks between tests or runs
   context.eventBus.removeAllListeners();
 
-  // Attempt to dispose the resource coordinator if it provides a dispose method
-  const coordinator: any = context.resourceCoordinator as any;
-  if (typeof coordinator?.dispose === 'function') {
-    await coordinator.dispose();
-  } else if (typeof coordinator?.removeAllListeners === 'function') {
-    coordinator.removeAllListeners();
+  const coordinator = context.resourceCoordinator;
+  if (coordinator !== unifiedResourceCoordinator) {
+    if (isDisposable(coordinator)) {
+      await coordinator.dispose();
+    } else if (hasRemoveAllListeners(coordinator)) {
+      coordinator.removeAllListeners();
+    }
   }
 
-  // Clean up configuration manager listeners if present
-  const configManager: any = context.configManager;
-  if (typeof configManager?.removeAllListeners === 'function') {
+  const { configManager } = context;
+  if (configManager && hasRemoveAllListeners(configManager)) {
     configManager.removeAllListeners();
   }
 }

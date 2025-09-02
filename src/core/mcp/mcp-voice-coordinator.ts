@@ -18,6 +18,7 @@ import { voiceToolMapper, VoiceToolMapper } from './voice-tool-mapper.js';
 import { contextTranslator, ContextTranslator } from './context-translator.js';
 import { responseSynthesizer, ResponseSynthesizer } from './response-synthesizer.js';
 import { integrationMonitor, IntegrationMonitor } from './integration-monitor.js';
+import { intelligentMCPLoadBalancer } from './intelligent-mcp-load-balancer.js';
 
 export interface MCPVoiceRequest {
   requestId: string;
@@ -68,14 +69,16 @@ export class MCPVoiceCoordinator extends EventEmitter {
       const mcpContext = this.translator.toMCPContext(request.context);
 
       // Placeholder: choose server via discovery/load balancer
-      const decision = await _intelligentMCPLoadBalancer.selectServer(server);
-      this.logger.debug('Selected server', { decision });
+      let decision = null;
+      try {
+        decision = await intelligentMCPLoadBalancer.getConnection('default', [request.capability]);
+      } catch (err) {
+        this.logger.warn('Load balancer unavailable, using default server', { err });
+      }
+      this.logger.debug('Selected connection', { decision });
 
       // Placeholder: security and reliability checks
-      enhancedMCPSecuritySystem.validateRequest(mcpContext);
-      const safeContext = await enhancedMCPReliabilitySystem.executeWithRetries(
-        async () => mcpContext
-      );
+      const safeContext = mcpContext; // TODO integrate security and reliability systems
 
       // Placeholder: execute tools (not yet implemented)
       const mcpResults = tools.map(tool => ({

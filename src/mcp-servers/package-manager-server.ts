@@ -9,6 +9,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import validatePackageName from 'validate-npm-package-name';
 import { logger } from '../infrastructure/logging/logger.js';
 
 const execFileAsync = promisify(execFile);
@@ -41,7 +42,7 @@ interface PackageJson {
 
 export class PackageManagerMCPServer {
   private server: Server;
-  private config: PackageManagerConfig;
+  private config: Required<PackageManagerConfig>;
   private initialized = false;
 
   constructor(config: PackageManagerConfig = {}) {
@@ -102,10 +103,11 @@ export class PackageManagerMCPServer {
 
       switch (name) {
         case 'install_package': {
-          const result = await this.installPackage(
-            (args as InstallPackageArgs).name,
-            (args as InstallPackageArgs).manager
-          );
+          const installArgs = args as InstallPackageArgs | undefined;
+          if (!installArgs?.name) {
+            throw new Error("Missing required 'name' argument for 'install_package'");
+          }
+          const result = await this.installPackage(installArgs.name, installArgs.manager);
           return {
             content: [{ type: 'text', text: result.stdout || result.stderr || '' }],
           };
@@ -167,24 +169,28 @@ export class PackageManagerMCPServer {
   }
 
   private async installPackage(name: string, manager?: string): Promise<InstallPackageResult> {
-    const pkgManager = manager || this.config.defaultManager!;
-    if (!this.config.allowedManagers!.includes(pkgManager)) {
+    const pkgManager = manager || this.config.defaultManager;
+    if (!pkgManager || !this.config.allowedManagers.includes(pkgManager)) {
       throw new Error(`Package manager ${pkgManager} not allowed`);
     }
 
-    if (!/^[\w@./-]+$/.test(name)) {
+    const atIndex = name.indexOf('@', 1);
+    const pkgName = atIndex > -1 ? name.slice(0, atIndex) : name;
+    const validation = validatePackageName(pkgName);
+    if (!validation.validForNewPackages && !validation.validForOldPackages) {
       throw new Error(`Invalid package name: ${name}`);
     }
 
     const { stdout, stderr } = await execFileAsync(pkgManager, ['install', name], {
       cwd: this.config.workingDirectory,
+      encoding: 'utf8',
     });
 
     return { stdout, stderr };
   }
 
   private async listInstalled(): Promise<ListInstalledResult> {
-    const pkgPath = path.join(this.config.workingDirectory!, 'package.json');
+    const pkgPath = path.join(this.config.workingDirectory, 'package.json');
     let file: string;
     let pkg: PackageJson;
     try {

@@ -229,18 +229,18 @@ export async function initialize(): Promise<UnifiedCLI> {
       adapters: [], // Empty for now, adapters would be created from providers
       defaultProvider: selectedModelInfo.provider,
       providers: [
-      {
-        type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
-        name: `${selectedModelInfo.provider}-selected`,
-        endpoint:
-        selectedModelInfo.provider === 'ollama'
-          ? process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434'
-          : process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080',
-        enabled: true,
-        priority: 1,
-        models: [selectedModelInfo.selectedModel.id],
-        timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
-      },
+        {
+          type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
+          name: `${selectedModelInfo.provider}-selected`,
+          endpoint:
+            selectedModelInfo.provider === 'ollama'
+              ? (process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434')
+              : (process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080'),
+          enabled: true,
+          priority: 1,
+          models: [selectedModelInfo.selectedModel.id],
+          timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
+        },
       ],
       fallbackStrategy: 'priority',
       timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
@@ -281,7 +281,7 @@ export async function initialize(): Promise<UnifiedCLI> {
     };
 
     const cli = new UnifiedCLI(cliOptions);
-    // Removed cli.initialize(orchestrator) as UnifiedCLI does not have an initialize method
+    await cli.initialize(orchestrator);
 
     const initTime = Date.now() - startTime;
     logger.info(`✅ Unified system initialized in ${initTime}ms`);
@@ -331,7 +331,9 @@ export async function main(): Promise<void> {
 
     // Handle models command
     if (args[0] === 'models') {
-      const { ModelsCommand, parseModelsArgs } = await import('./application/cli/models-command.js');
+      const { ModelsCommand, parseModelsArgs } = await import(
+        './application/cli/models-command.js'
+      );
       const modelsCommand = new ModelsCommand();
       const modelsOptions = parseModelsArgs(args.slice(1));
       await modelsCommand.execute(modelsOptions);
@@ -453,33 +455,38 @@ program
   .option('--no-autonomous', 'Disable autonomous mode')
   .option('--no-performance', 'Disable performance optimization')
   .option('--no-resilience', 'Disable error resilience')
-  .action(async (prompt: string[], options: {
-    interactive?: boolean;
-    verbose?: boolean;
-    noStream?: boolean;
-    noIntelligence?: boolean;
-    noAutonomous?: boolean;
-    noPerformance?: boolean;
-    noResilience?: boolean;
-  }) => {
-    const args: string[] = [];
+  .action(
+    async (
+      prompt: string[],
+      options: {
+        interactive?: boolean;
+        verbose?: boolean;
+        noStream?: boolean;
+        noIntelligence?: boolean;
+        noAutonomous?: boolean;
+        noPerformance?: boolean;
+        noResilience?: boolean;
+      }
+    ) => {
+      const args: string[] = [];
 
-    if (options.interactive) {
-      args.push('interactive');
-    } else if (prompt && prompt.length > 0) {
-      args.push(...prompt);
+      if (options.interactive) {
+        args.push('interactive');
+      } else if (prompt && prompt.length > 0) {
+        args.push(...prompt);
+      }
+
+      // Add option flags to args for processing
+      if (options.verbose) args.push('--verbose');
+      if (options.noStream) args.push('--no-stream');
+      if (options.noIntelligence) args.push('--no-intelligence');
+      if (options.noAutonomous) args.push('--no-autonomous');
+      if (options.noPerformance) args.push('--no-performance');
+      if (options.noResilience) args.push('--no-resilience');
+
+      await main();
     }
-
-    // Add option flags to args for processing
-    if (options.verbose) args.push('--verbose');
-    if (options.noStream) args.push('--no-stream');
-    if (options.noIntelligence) args.push('--no-intelligence');
-    if (options.noAutonomous) args.push('--no-autonomous');
-    if (options.noPerformance) args.push('--no-performance');
-    if (options.noResilience) args.push('--no-resilience');
-
-    await main();
-  });
+  );
 
 // Auto-run when directly executed
 if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts')) {

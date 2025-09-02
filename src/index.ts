@@ -17,7 +17,7 @@ import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-i
 // getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
-import { program } from 'commander';
+import { Command } from 'commander';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -46,6 +46,8 @@ export type * from './domain/interfaces/workflow-orchestrator.js';
 export type * from './domain/interfaces/user-interaction.js';
 export type * from './domain/interfaces/event-bus.js';
 export type { CLIOptions, CLIContext } from './application/interfaces/unified-cli.js';
+
+const program = new Command();
 
 // Get package version
 async function getPackageVersion(): Promise<string> {
@@ -444,21 +446,21 @@ program
       options: {
         interactive?: boolean;
         verbose?: boolean;
-        stream?: boolean;
-        intelligence?: boolean;
-        autonomous?: boolean;
-        performance?: boolean;
-        resilience?: boolean;
+        noStream?: boolean;
+        noIntelligence?: boolean;
+        noAutonomous?: boolean;
+        noPerformance?: boolean;
+        noResilience?: boolean;
       }
     ) => {
       const args = options.interactive ? ['interactive'] : prompt;
       const cliOptions: CLIOptions = {
         verbose: options.verbose ?? false,
-        stream: options.stream !== false,
-        contextAware: options.intelligence !== false,
-        autonomousMode: options.autonomous !== false,
-        performance: options.performance !== false,
-        resilience: options.resilience !== false,
+        stream: !options.noStream,
+        contextAware: !options.noIntelligence,
+        autonomousMode: !options.noAutonomous,
+        performance: !options.noPerformance,
+        resilience: !options.noResilience,
       };
 
       await runCLI(args, cliOptions, !!options.interactive);

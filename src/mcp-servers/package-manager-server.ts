@@ -155,7 +155,10 @@ export class PackageManagerMCPServer {
   ): Promise<InstallPackageResult | ListInstalledResult> {
     switch (toolName) {
       case 'install_package':
-        return this.installPackage(args!.name, args!.manager);
+        if (!args) {
+          throw new Error("Missing arguments for 'install_package'");
+        }
+        return this.installPackage(args.name, args.manager);
       case 'list_installed':
         return this.listInstalled();
       default:

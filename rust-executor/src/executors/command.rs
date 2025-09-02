@@ -104,6 +104,11 @@ const BLOCKED_PATTERNS: &[&str] = &[
     "usermod",
 ];
 
+// List of forbidden shell metacharacters to prevent command injection
+const SHELL_METACHARS: &[char] = &[
+    ';', '&', '|', '$', '>', '<', '`', '!', '*', '?', '~', '(', ')', '{', '}', '[', ']', '\'', '"',
+];
+
 /// Secure command executor with comprehensive sandboxing and validation
 pub struct CommandExecutor {
     security_context: SecurityContext,
@@ -138,19 +143,33 @@ impl CommandExecutor {
     }
 
     fn load_command_whitelist(security_context: &SecurityContext) -> Vec<String> {
-        if !security_context.command_allowlist.is_empty() {
-            return security_context.command_allowlist.iter().cloned().collect();
-        }
-
-        if let Ok(path) = std::env::var("COMMAND_ALLOWLIST_FILE") {
-            if let Ok(list) = Self::load_whitelist_from_file(Path::new(&path)) {
-                return list;
+        let mut commands: Vec<String> = if !security_context.command_allowlist.is_empty() {
+            security_context.command_allowlist.iter().cloned().collect()
+        } else if let Ok(path) = std::env::var("COMMAND_ALLOWLIST_FILE") {
+            match Self::load_whitelist_from_file(Path::new(&path)) {
+                Ok(list) => list,
+                Err(e) => {
+                    eprintln!("Failed to load command allowlist from {}: {}", path, e);
+                    Vec::new()
+                }
             }
-        }
+        } else {
+            DEFAULT_ALLOWED_COMMANDS
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        };
 
-        DEFAULT_ALLOWED_COMMANDS
-            .iter()
-            .map(|s| s.to_string())
+        commands
+            .into_iter()
+            .filter(|cmd| {
+                if let Err(e) = Self::validate_command_name_static(cmd) {
+                    eprintln!("Ignoring invalid command in allowlist: {}", e);
+                    false
+                } else {
+                    true
+                }
+            })
             .collect()
     }
 
@@ -159,6 +178,29 @@ impl CommandExecutor {
         let list: Vec<String> = serde_json::from_str(&content)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         Ok(list)
+    }
+
+    fn validate_command_name_static(command: &str) -> Result<(), CommandExecutionError> {
+        if command.trim().is_empty()
+            || command.contains(' ')
+            || command.contains('/')
+            || command.contains('\\')
+            || command.chars().any(|c| SHELL_METACHARS.contains(&c))
+        {
+            return Err(CommandExecutionError::InvalidArguments {
+                message: format!("Invalid command name: {}", command),
+            });
+        }
+
+        for pattern in BLOCKED_PATTERNS {
+            if command.contains(pattern) {
+                return Err(CommandExecutionError::CommandNotAllowed {
+                    command: command.to_string(),
+                });
+            }
+        }
+
+        Ok(())
     }
 
     /// Execute a command with full security validation and sandboxing
@@ -627,6 +669,9 @@ impl CommandExecutor {
     }
 
     fn validate_command_name(&self, command: &str) -> Result<(), CommandExecutionError> {
+
+        Self::validate_command_name_static(command)
+
         // List of forbidden shell metacharacters
         const SHELL_METACHARS: &[char] = &[
             ';', '&', '|', '$', '>', '<', '`', '!', '*', '?', '~', '(', ')', '{', '}', '[', ']', '\'', '"'
@@ -651,6 +696,7 @@ impl CommandExecutor {
         }
 
         Ok(())
+
     }
 }
 

@@ -156,7 +156,8 @@ impl CommandExecutor {
 
     fn load_whitelist_from_file(path: &Path) -> Result<Vec<String>, std::io::Error> {
         let content = fs::read_to_string(path)?;
-        let list: Vec<String> = serde_json::from_str(&content).unwrap_or_default();
+        let list: Vec<String> = serde_json::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         Ok(list)
     }
 

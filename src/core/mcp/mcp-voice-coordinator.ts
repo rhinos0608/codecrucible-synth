@@ -68,8 +68,7 @@ export class MCPVoiceCoordinator extends EventEmitter {
       const mcpContext = this.translator.toMCPContext(request.context);
 
       // Placeholder: choose server via discovery/load balancer
-      const server = await advancedMCPDiscoverySystem.discoverServers(true);
-      const decision = await intelligentMCPLoadBalancer.selectServer(server);
+      const decision = await _intelligentMCPLoadBalancer.selectServer(server);
       this.logger.debug('Selected server', { decision });
 
       // Placeholder: security and reliability checks

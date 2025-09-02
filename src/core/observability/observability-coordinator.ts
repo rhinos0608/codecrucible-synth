@@ -126,6 +126,7 @@ export class ObservabilityCoordinator extends EventEmitter {
    * @deprecated Use {@link getSystemHealth} instead.
    */
   async checkHealth(): Promise<SystemHealth> {
+    this.logger?.warn?.('DEPRECATED: checkHealth() is deprecated. Use getSystemHealth() instead.');
     return this.getSystemHealth();
   }
 

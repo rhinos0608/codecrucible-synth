@@ -19,6 +19,7 @@ import { contextTranslator, ContextTranslator } from './context-translator.js';
 import { responseSynthesizer, ResponseSynthesizer } from './response-synthesizer.js';
 import { integrationMonitor, IntegrationMonitor } from './integration-monitor.js';
 import { intelligentMCPLoadBalancer } from './intelligent-mcp-load-balancer.js';
+import { enhancedMCPSecuritySystem } from './enhanced-mcp-security-system.js';
 
 export interface MCPVoiceRequest {
   requestId: string;
@@ -77,8 +78,8 @@ export class MCPVoiceCoordinator extends EventEmitter {
       }
       this.logger.debug('Selected connection', { decision });
 
-      // Placeholder: security and reliability checks
-      const safeContext = mcpContext; // TODO integrate security and reliability systems
+      // Security validation
+      const safeContext = await enhancedMCPSecuritySystem.validateRequest(mcpContext);
 
       // Placeholder: execute tools (not yet implemented)
       const mcpResults = tools.map(tool => ({

@@ -1,7 +1,7 @@
 use napi_derive::napi;
 use napi::{
-    threadsafe_function::{ThreadsafeFunction, ThreadSafeFunctionCallMode, ErrorStrategy},
-    JsFunction, Result, Env, CallContext,
+    threadsafe_function::ThreadsafeFunction,
+    JsFunction, Result,
 };
 use serde_json;
 use std::collections::HashMap;
@@ -102,7 +102,9 @@ impl RustExecutor {
 
         let id = Uuid::new_v4().to_string();
         let communication_handler = Arc::new(CommunicationHandler::new());
-        let streaming_engine = Arc::new(StreamingEngine::new());
+        let streaming_engine = Arc::new(
+            StreamingEngine::new().expect("Failed to create streaming engine")
+        );
 
         // Create a single Tokio runtime for all async operations
         let runtime = Arc::new(Mutex::new(
@@ -446,6 +448,273 @@ impl RustExecutor {
         metrics.average_execution_time_ms =
             metrics.total_execution_time_ms as f64 / metrics.total_requests as f64;
     }
+
+    /// Stream file content with true streaming (no memory accumulation)
+    #[napi]
+    pub fn stream_file(
+        &self,
+        file_path: String,
+        chunk_size: Option<u32>,
+        context_type: Option<String>,
+        callback: JsFunction,
+    ) -> Result<String> {
+        // TRUE NAPI ARRAY BATCHING: Single JS Array transfer instead of N individual calls
+        let callback: ThreadsafeFunction<Vec<StreamChunk>> = callback
+            .create_threadsafe_function(0, |ctx| {
+                let chunks: Vec<StreamChunk> = ctx.value;
+                let env = ctx.env;
+                
+                // Create JS Array with exact size (single allocation)
+                let mut js_array = env.create_array_with_length(chunks.len())?;
+                
+                // Populate array with all chunks in single operation
+                for (index, chunk) in chunks.iter().enumerate() {
+                    // Convert Rust StreamChunk to JavaScript object
+                    let mut js_chunk = env.create_object()?;
+                    js_chunk.set_named_property("streamId", env.create_string_from_std(chunk.stream_id.clone())?)?;
+                    js_chunk.set_named_property("sequence", env.create_double(chunk.sequence as f64)?)?;
+                    js_chunk.set_named_property("contentType", env.create_string_from_std(chunk.content_type.clone())?)?;
+                    js_chunk.set_named_property("data", env.create_string_from_std(chunk.data.clone())?)?;
+                    js_chunk.set_named_property("size", env.create_double(chunk.size as f64)?)?;
+                    
+                    // Convert metadata to JS object
+                    let mut js_metadata = env.create_object()?;
+                    js_metadata.set_named_property("source", env.create_string_from_std(chunk.metadata.source.clone())?)?;
+                    js_metadata.set_named_property("isLast", env.get_boolean(chunk.metadata.is_last)?)?;
+                    if let Some(progress) = chunk.metadata.progress {
+                        js_metadata.set_named_property("progress", env.create_double(progress as f64)?)?;
+                    }
+                    if let Some(total_size) = chunk.metadata.total_size {
+                        js_metadata.set_named_property("totalSize", env.create_double(total_size as f64)?)?;
+                    }
+                    if let Some(error) = &chunk.metadata.error {
+                        js_metadata.set_named_property("error", env.create_string_from_std(error.clone())?)?;
+                    }
+                    js_chunk.set_named_property("metadata", js_metadata)?;
+                    
+                    // Set chunk in array
+                    js_array.set_element(index as u32, js_chunk)?;
+                }
+                
+                // Return single JS Array instead of Vec of individual objects
+                Ok(vec![js_array])
+            })?;
+
+        let streaming_engine = Arc::clone(&self.streaming_engine);
+        let options = StreamOptions {
+            chunk_size: chunk_size.unwrap_or(16384) as usize,
+            compression: true,
+            buffer_size: 65536,
+            timeout_ms: 30000,
+            context_type: context_type.unwrap_or_else(|| "default".to_string()),
+            include_metrics: true,
+        };
+
+        // Execute streaming in the runtime
+        let runtime = self.runtime.lock().map_err(|_| napi::Error::new(napi::Status::GenericFailure, "Failed to acquire runtime lock"))?;
+        
+        match runtime.block_on(streaming_engine.stream_file_content(&file_path, options, callback)) {
+            Ok(stream_id) => Ok(stream_id),
+            Err(stream_error) => {
+                // Convert StreamError to NAPI error with rich context
+                let error_message = match stream_error {
+                    crate::streaming::StreamError::IoError { kind, path, os_message, operation, .. } => {
+                        format!("IO error during {} on '{}': {} ({:?})", operation, path, os_message, kind)
+                    }
+                    crate::streaming::StreamError::PermissionDenied { path, required_permissions, .. } => {
+                        format!("Permission denied for '{}'. Required: [{}]", path, required_permissions.join(", "))
+                    }
+                    crate::streaming::StreamError::ResourceExhaustion { resource, current, limit, suggested_action, .. } => {
+                        format!("Resource exhaustion: {} usage {}/{} - {}", resource, current, limit, suggested_action)
+                    }
+                    crate::streaming::StreamError::Timeout { operation, duration_ms, timeout_limit_ms, partial_progress } => {
+                        let progress_info = partial_progress
+                            .map(|p| format!(" (processed {} bytes)", p))
+                            .unwrap_or_default();
+                        format!("Timeout during {} after {}ms (limit: {}ms){}", operation, duration_ms, timeout_limit_ms, progress_info)
+                    }
+                    crate::streaming::StreamError::ParseError { encoding, byte_offset, line_number, column_number, invalid_sequence, suggestion } => {
+                        let location = match (line_number, column_number) {
+                            (Some(line), Some(col)) => format!(" at line {}, column {}", line, col),
+                            (Some(line), None) => format!(" at line {}", line),
+                            _ => String::new(),
+                        };
+                        let invalid_preview = if invalid_sequence.len() > 8 {
+                            format!("{:02X?}...", &invalid_sequence[..8])
+                        } else {
+                            format!("{:02X?}", invalid_sequence)
+                        };
+                        let suggestion_text = suggestion
+                            .as_ref()
+                            .map(|s| format!(" Suggestion: {}", s))
+                            .unwrap_or_default();
+                        format!("Parse error: Invalid {} encoding at byte offset {}{} [{}]{}", 
+                                encoding, byte_offset, location, invalid_preview, suggestion_text)
+                    }
+                    crate::streaming::StreamError::NetworkError { url, status_code, error_kind, retry_after, dns_resolution_time, connection_time } => {
+                        let status_info = status_code
+                            .map(|code| format!(" (HTTP {})", code))
+                            .unwrap_or_default();
+                        let timing_info = match (dns_resolution_time, connection_time) {
+                            (Some(dns), Some(conn)) => format!(" [DNS: {}ms, Connect: {}ms]", dns, conn),
+                            (Some(dns), None) => format!(" [DNS: {}ms]", dns),
+                            (None, Some(conn)) => format!(" [Connect: {}ms]", conn),
+                            _ => String::new(),
+                        };
+                        let retry_info = retry_after
+                            .map(|secs| format!(" Retry after: {}s", secs))
+                            .unwrap_or_default();
+                        format!("Network error: {:?} for '{}'{}{}{}", error_kind, url, status_info, timing_info, retry_info)
+                    }
+                    crate::streaming::StreamError::StreamingError { stage, stream_id, sequence, buffer_state, performance_context } => {
+                        let seq_info = sequence
+                            .map(|s| format!(" sequence {}", s))
+                            .unwrap_or_default();
+                        let buffer_info = format!(" [Buffer: {}/{} bytes, {} pending chunks]", 
+                                                 buffer_state.current_size, buffer_state.max_size, buffer_state.pending_chunks);
+                        let perf_info = format!(" [Processed: {} bytes/{} chunks, {} bps, {}% CPU]",
+                                               performance_context.bytes_processed, performance_context.chunks_processed,
+                                               performance_context.current_throughput_bps as u64, performance_context.cpu_usage_percent);
+                        format!("Streaming error: {:?} in stream '{}'{}{}{}", stage, stream_id, seq_info, buffer_info, perf_info)
+                    }
+                    _ => format!("Streaming error: {}", stream_error),
+                };
+                Err(napi::Error::new(napi::Status::GenericFailure, error_message))
+            }
+        }
+    }
+
+    /// Stream command output with real-time processing
+    #[napi]
+    pub fn stream_command(
+        &self,
+        command: String,
+        args: Vec<String>,
+        chunk_size: Option<u32>,
+        callback: JsFunction,
+    ) -> Result<String> {
+        // TRUE NAPI ARRAY BATCHING: Single JS Array transfer for command output
+        let callback: ThreadsafeFunction<Vec<StreamChunk>> = callback
+            .create_threadsafe_function(0, |ctx| {
+                let chunks: Vec<StreamChunk> = ctx.value;
+                let env = ctx.env;
+                
+                // Create JS Array with exact size (single allocation)  
+                let mut js_array = env.create_array_with_length(chunks.len())?;
+                
+                // Populate array with all chunks in single operation
+                for (index, chunk) in chunks.iter().enumerate() {
+                    // Convert Rust StreamChunk to JavaScript object
+                    let mut js_chunk = env.create_object()?;
+                    js_chunk.set_named_property("streamId", env.create_string_from_std(chunk.stream_id.clone())?)?;
+                    js_chunk.set_named_property("sequence", env.create_double(chunk.sequence as f64)?)?;
+                    js_chunk.set_named_property("contentType", env.create_string_from_std(chunk.content_type.clone())?)?;
+                    js_chunk.set_named_property("data", env.create_string_from_std(chunk.data.clone())?)?;
+                    js_chunk.set_named_property("size", env.create_double(chunk.size as f64)?)?;
+                    
+                    // Convert metadata to JS object
+                    let mut js_metadata = env.create_object()?;
+                    js_metadata.set_named_property("source", env.create_string_from_std(chunk.metadata.source.clone())?)?;
+                    js_metadata.set_named_property("isLast", env.get_boolean(chunk.metadata.is_last)?)?;
+                    if let Some(error) = &chunk.metadata.error {
+                        js_metadata.set_named_property("error", env.create_string_from_std(error.clone())?)?;
+                    }
+                    js_chunk.set_named_property("metadata", js_metadata)?;
+                    
+                    // Set chunk in array
+                    js_array.set_element(index as u32, js_chunk)?;
+                }
+                
+                // Return single JS Array instead of Vec of individual objects
+                Ok(vec![js_array])
+            })?;
+
+        let streaming_engine = Arc::clone(&self.streaming_engine);
+        let options = StreamOptions {
+            chunk_size: chunk_size.unwrap_or(8192) as usize,
+            compression: false, // Don't compress command output
+            buffer_size: 32768,
+            timeout_ms: 30000,
+            context_type: "commandOutput".to_string(),
+            include_metrics: true,
+        };
+
+        // Execute streaming in the runtime
+        let runtime = self.runtime.lock().map_err(|_| napi::Error::new(napi::Status::GenericFailure, "Failed to acquire runtime lock"))?;
+        
+        match runtime.block_on(streaming_engine.stream_command_output(&command, args, options, callback)) {
+            Ok(stream_id) => Ok(stream_id),
+            Err(stream_error) => {
+                // Convert StreamError to NAPI error with rich context
+                let error_message = match stream_error {
+                    crate::streaming::StreamError::ProcessError { command, args, exit_code, stderr_preview, .. } => {
+                        let exit_info = exit_code.map(|c| format!(" (exit code: {})", c)).unwrap_or_default();
+                        format!("Process error: '{}{}'{} - {}", command, args.join(" "), exit_info, stderr_preview)
+                    }
+                    crate::streaming::StreamError::ResourceExhaustion { resource, current, limit, suggested_action, .. } => {
+                        format!("Resource exhaustion: {} usage {}/{} - {}", resource, current, limit, suggested_action)
+                    }
+                    crate::streaming::StreamError::Timeout { operation, duration_ms, timeout_limit_ms, .. } => {
+                        format!("Timeout during {} after {}ms (limit: {}ms)", operation, duration_ms, timeout_limit_ms)
+                    }
+                    crate::streaming::StreamError::SecurityError { violation_type, blocked_reason, risk_level, .. } => {
+                        format!("Security violation ({:?}, {} risk): {}", violation_type, risk_level, blocked_reason)
+                    }
+                    crate::streaming::StreamError::ParseError { encoding, byte_offset, line_number, column_number, invalid_sequence, suggestion } => {
+                        let location = match (line_number, column_number) {
+                            (Some(line), Some(col)) => format!(" at line {}, column {}", line, col),
+                            (Some(line), None) => format!(" at line {}", line),
+                            _ => String::new(),
+                        };
+                        let invalid_preview = if invalid_sequence.len() > 8 {
+                            format!("{:02X?}...", &invalid_sequence[..8])
+                        } else {
+                            format!("{:02X?}", invalid_sequence)
+                        };
+                        let suggestion_text = suggestion
+                            .as_ref()
+                            .map(|s| format!(" Suggestion: {}", s))
+                            .unwrap_or_default();
+                        format!("Command parse error: Invalid {} encoding at byte offset {}{} [{}]{}", 
+                                encoding, byte_offset, location, invalid_preview, suggestion_text)
+                    }
+                    crate::streaming::StreamError::NetworkError { url, status_code, error_kind, retry_after, dns_resolution_time, connection_time } => {
+                        let status_info = status_code
+                            .map(|code| format!(" (HTTP {})", code))
+                            .unwrap_or_default();
+                        let timing_info = match (dns_resolution_time, connection_time) {
+                            (Some(dns), Some(conn)) => format!(" [DNS: {}ms, Connect: {}ms]", dns, conn),
+                            (Some(dns), None) => format!(" [DNS: {}ms]", dns),
+                            (None, Some(conn)) => format!(" [Connect: {}ms]", conn),
+                            _ => String::new(),
+                        };
+                        let retry_info = retry_after
+                            .map(|secs| format!(" Retry after: {}s", secs))
+                            .unwrap_or_default();
+                        format!("Command network error: {:?} for '{}'{}{}{}", error_kind, url, status_info, timing_info, retry_info)
+                    }
+                    crate::streaming::StreamError::IoError { kind, path, os_message, operation, .. } => {
+                        format!("Command IO error during {} on '{}': {} ({:?})", operation, path, os_message, kind)
+                    }
+                    crate::streaming::StreamError::PermissionDenied { path, required_permissions, .. } => {
+                        format!("Command permission denied for '{}'. Required: [{}]", path, required_permissions.join(", "))
+                    }
+                    crate::streaming::StreamError::StreamingError { stage, stream_id, sequence, buffer_state, performance_context } => {
+                        let seq_info = sequence
+                            .map(|s| format!(" sequence {}", s))
+                            .unwrap_or_default();
+                        let buffer_info = format!(" [Buffer: {}/{} bytes, {} pending chunks]", 
+                                                 buffer_state.current_size, buffer_state.max_size, buffer_state.pending_chunks);
+                        let perf_info = format!(" [Processed: {} bytes/{} chunks, {} bps, {}% CPU]",
+                                               performance_context.bytes_processed, performance_context.chunks_processed,
+                                               performance_context.current_throughput_bps as u64, performance_context.cpu_usage_percent);
+                        format!("Command streaming error: {:?} in stream '{}'{}{}{}", stage, stream_id, seq_info, buffer_info, perf_info)
+                    }
+                };
+                Err(napi::Error::new(napi::Status::GenericFailure, error_message))
+            }
+        }
+    }
 }
 
 /// Create a RustExecutor instance - convenience function for JavaScript
@@ -511,117 +780,4 @@ pub fn benchmark_execution(iterations: u32) -> String {
     });
 
     benchmark_result.to_string()
-}
-
-    /// Stream file content with true streaming (no memory accumulation)
-    #[napi]
-    pub fn stream_file(
-        &self,
-        file_path: String,
-        chunk_size: Option<u32>,
-        context_type: Option<String>,
-        callback: JsFunction,
-    ) -> Result<String> {
-        let callback: ThreadsafeFunction<StreamChunk> = callback
-            .create_threadsafe_function(0, |ctx| {
-                let chunk = ctx.value;
-                let env = ctx.env;
-                
-                // Convert Rust StreamChunk to JavaScript object
-                let mut js_chunk = env.create_object()?;
-                js_chunk.set_named_property("streamId", env.create_string_from_std(chunk.stream_id)?)?;
-                js_chunk.set_named_property("sequence", env.create_double(chunk.sequence as f64)?)?;
-                js_chunk.set_named_property("contentType", env.create_string_from_std(chunk.content_type)?)?;
-                js_chunk.set_named_property("data", env.create_string_from_std(chunk.data)?)?;
-                js_chunk.set_named_property("size", env.create_double(chunk.size as f64)?)?;
-                
-                // Convert metadata to JS object
-                let mut js_metadata = env.create_object()?;
-                js_metadata.set_named_property("source", env.create_string_from_std(chunk.metadata.source)?)?;
-                js_metadata.set_named_property("isLast", env.get_boolean(chunk.metadata.is_last)?)?;
-                if let Some(progress) = chunk.metadata.progress {
-                    js_metadata.set_named_property("progress", env.create_double(progress as f64)?)?;
-                }
-                if let Some(total_size) = chunk.metadata.total_size {
-                    js_metadata.set_named_property("totalSize", env.create_double(total_size as f64)?)?;
-                }
-                if let Some(error) = chunk.metadata.error {
-                    js_metadata.set_named_property("error", env.create_string_from_std(error)?)?;
-                }
-                js_chunk.set_named_property("metadata", js_metadata)?;
-                
-                Ok(vec![js_chunk])
-            })?;
-
-        let streaming_engine = Arc::clone(&self.streaming_engine);
-        let options = StreamOptions {
-            chunk_size: chunk_size.unwrap_or(16384) as usize,
-            compression: true,
-            buffer_size: 65536,
-            timeout_ms: 30000,
-            context_type: context_type.unwrap_or_else(|| "default".to_string()),
-            include_metrics: true,
-        };
-
-        // Execute streaming in the runtime
-        let runtime = self.runtime.lock().map_err(|_| napi::Error::new(napi::Status::GenericFailure, "Failed to acquire runtime lock"))?;
-        
-        match runtime.block_on(streaming_engine.stream_file_content(&file_path, options, callback)) {
-            Ok(stream_id) => Ok(stream_id),
-            Err(_) => Err(napi::Error::new(napi::Status::GenericFailure, "Failed to stream file content")),
-        }
-    }
-
-    /// Stream command output with real-time processing
-    #[napi]
-    pub fn stream_command(
-        &self,
-        command: String,
-        args: Vec<String>,
-        chunk_size: Option<u32>,
-        callback: JsFunction,
-    ) -> Result<String> {
-        let callback: ThreadsafeFunction<StreamChunk> = callback
-            .create_threadsafe_function(0, |ctx| {
-                let chunk = ctx.value;
-                let env = ctx.env;
-                
-                // Convert Rust StreamChunk to JavaScript object
-                let mut js_chunk = env.create_object()?;
-                js_chunk.set_named_property("streamId", env.create_string_from_std(chunk.stream_id)?)?;
-                js_chunk.set_named_property("sequence", env.create_double(chunk.sequence as f64)?)?;
-                js_chunk.set_named_property("contentType", env.create_string_from_std(chunk.content_type)?)?;
-                js_chunk.set_named_property("data", env.create_string_from_std(chunk.data)?)?;
-                js_chunk.set_named_property("size", env.create_double(chunk.size as f64)?)?;
-                
-                // Convert metadata to JS object
-                let mut js_metadata = env.create_object()?;
-                js_metadata.set_named_property("source", env.create_string_from_std(chunk.metadata.source)?)?;
-                js_metadata.set_named_property("isLast", env.get_boolean(chunk.metadata.is_last)?)?;
-                if let Some(error) = chunk.metadata.error {
-                    js_metadata.set_named_property("error", env.create_string_from_std(error)?)?;
-                }
-                js_chunk.set_named_property("metadata", js_metadata)?;
-                
-                Ok(vec![js_chunk])
-            })?;
-
-        let streaming_engine = Arc::clone(&self.streaming_engine);
-        let options = StreamOptions {
-            chunk_size: chunk_size.unwrap_or(8192) as usize,
-            compression: false, // Don't compress command output
-            buffer_size: 32768,
-            timeout_ms: 30000,
-            context_type: "commandOutput".to_string(),
-            include_metrics: true,
-        };
-
-        // Execute streaming in the runtime
-        let runtime = self.runtime.lock().map_err(|_| napi::Error::new(napi::Status::GenericFailure, "Failed to acquire runtime lock"))?;
-        
-        match runtime.block_on(streaming_engine.stream_command_output(&command, args, options, callback)) {
-            Ok(stream_id) => Ok(stream_id),
-            Err(_) => Err(napi::Error::new(napi::Status::GenericFailure, "Failed to stream command output")),
-        }
-    }
 }

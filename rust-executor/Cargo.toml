@@ -15,8 +15,8 @@ filesystem_permissions = []
 napi = { version = "2", features = ["napi8"] }
 napi-derive = "2"
 
-# Async runtime
-tokio = { version = "1.0", features = ["full"] }
+# Async runtime (reduced features to minimize compilation complexity)
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "sync", "time", "io-util", "fs", "process", "macros"] }
 futures = "0.3"
 
 # JSON/serialization
@@ -27,14 +27,13 @@ sysinfo = "0.30"
 
 # Cross-platform process management
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.27", features = ["process", "signal", "user", "fs", "resource"] }
+nix = { version = "0.27", features = ["process", "signal"] }
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["processthreadsapi", "jobapi", "jobapi2", "handleapi", "winbase", "errhandlingapi"] }
+winapi = { version = "0.3", features = ["processthreadsapi", "handleapi", "errhandlingapi"] }
 
 # Common dependencies
 libc = "0.2"
-regex = "1.11"
 
 # Monitoring and observability
 tracing = "0.1"
@@ -46,9 +45,10 @@ thiserror = "1.0"
 anyhow = "1.0"
 
 # Utilities
-uuid = { version = "1.0", features = ["v4", "serde"] }
+uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
+base64 = "0.21"
 
 [build-dependencies]
 napi-build = "2.0"

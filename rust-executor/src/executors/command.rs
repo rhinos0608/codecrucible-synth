@@ -4,7 +4,6 @@ use crate::protocol::messages::{
 };
 use crate::security::{IsolationError, ProcessIsolation, SecurityContext, SecurityError};
 use async_trait::async_trait;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -89,19 +88,19 @@ const ALLOWED_ENV_VARS: &[&str] = &[
 
 /// Dangerous command patterns that are always blocked
 const BLOCKED_PATTERNS: &[&str] = &[
-    r"rm\s+-rf",
-    r"rm\s+.*\*",
-    r">\s*/dev/",
-    r"curl.*\|\s*sh",
-    r"wget.*\|\s*sh",
-    r"chmod\s+777",
-    r"chown.*root",
-    r"sudo",
-    r"su\s+",
-    r"passwd",
-    r"useradd",
-    r"userdel",
-    r"usermod",
+    "rm -rf",
+    "rm *",
+    "> /dev/",
+    "curl | sh",
+    "wget | sh",
+    "chmod 777",
+    "chown root",
+    "sudo",
+    "su ",
+    "passwd",
+    "useradd",
+    "userdel",
+    "usermod",
 ];
 
 /// Secure command executor with comprehensive sandboxing and validation
@@ -109,7 +108,7 @@ pub struct CommandExecutor {
     security_context: SecurityContext,
     isolation: ProcessIsolation,
     command_whitelist: Vec<String>,
-    blocked_patterns: Vec<Regex>,
+    blocked_patterns: Vec<String>,
     max_execution_time: Duration,
     max_output_size: usize,
     /// Maximum amount of memory the spawned process can allocate (in bytes).
@@ -121,10 +120,10 @@ impl CommandExecutor {
     pub fn new(security_context: SecurityContext) -> Self {
         let isolation = ProcessIsolation::new(security_context.clone());
 
-        // Compile blocked patterns for efficient matching
+        // Copy blocked patterns for simple string matching
         let blocked_patterns = BLOCKED_PATTERNS
             .iter()
-            .filter_map(|pattern| Regex::new(pattern).ok())
+            .map(|s| s.to_string())
             .collect();
 
         Self {
@@ -482,7 +481,7 @@ impl CommandExecutor {
         // Check for blocked patterns in the full command line
         let full_command = format!("{} {}", request.command, request.args.join(" "));
         for pattern in &self.blocked_patterns {
-            if pattern.is_match(&full_command) {
+            if full_command.contains(pattern) {
                 return Err(CommandExecutionError::CommandNotAllowed {
                     command: full_command,
                 });

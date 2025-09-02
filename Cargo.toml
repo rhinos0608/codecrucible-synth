@@ -7,3 +7,12 @@ resolver = "2"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# Memory-efficient release profile to avoid OOM during compilation
+[profile.release-small]
+inherits = "release"
+opt-level = "s"        # Optimize for size, not speed
+lto = false           # Disable link-time optimization (memory intensive)
+debug = false         # No debug info
+panic = "abort"       # Smaller binary size
+codegen-units = 256   # More parallel codegen (less memory per unit)

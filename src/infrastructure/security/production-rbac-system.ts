@@ -122,8 +122,8 @@ export class ProductionRBACSystem extends EventEmitter {
     try {
       await this.loadJWTSecrets();
       await this.ensureSystemRoles();
-      this.startCacheCleanup();
 
+      this.startCacheCleanup();
       logger.info('Production RBAC system initialized');
     } catch (error) {
       logger.error('Failed to initialize RBAC system:', error);

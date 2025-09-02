@@ -395,9 +395,7 @@ export class SystemBootstrap {
       CLIENT_TOKEN,
       async container => {
         // Import client class dynamically to avoid circular imports
-        const { UnifiedModelClient } = await import(
-          '../../application/services/unified-model-client.js'
-        );
+        const { UnifiedModelClient } = await import('../../application/services/model-client.js');
 
         // Resolve all dependencies (await async ones properly)
         const config = container.resolve(CLIENT_CONFIG_TOKEN);

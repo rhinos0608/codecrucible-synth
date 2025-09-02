@@ -15,7 +15,7 @@ class FormatTransformer {
         if (typeof data === 'string') {
           return data;
         }
-        return `\u0060\u0060\u0060json\n${JSON.stringify(data, null, 2)}\n\u0060\u0060\u0060`;
+        return `\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
       case 'json':
       default:
         return JSON.stringify(data, null, 2);

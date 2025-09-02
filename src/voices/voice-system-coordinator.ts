@@ -33,9 +33,10 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     this.council = new CouncilOrchestrator(
       new CouncilDecisionEngine(this as VoiceArchetypeSystemInterface, modelClient)
     );
+    this.initialize();
   }
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     const context = this.buildContext();
     this.voices = createArchetypeDefinitions(context);
   }

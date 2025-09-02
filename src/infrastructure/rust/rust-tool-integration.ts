@@ -5,9 +5,17 @@
  * providing seamless registration, execution, and lifecycle management.
  */
 
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import { RustProviderClient } from './rust-provider-client.js';
+
 import type { ToolDefinition, ToolExecutionContext } from '../../domain/interfaces/tool-system.js';
+
+import type {
+  ITool,
+  ToolDefinition,
+  ToolExecutionContext,
+} from '../../domain/interfaces/tool-system.js';
+
 
 export interface RustToolDefinition extends ToolDefinition {
   rustImplementation: string;
@@ -200,12 +208,21 @@ export abstract class RustTool<Args extends Record<string, unknown>> {
   // Abstract methods to be implemented by concrete tools
 
   protected abstract executeRust(
+
     args: Args,
     context: ToolExecutionContext
   ): Promise<RustToolExecutionResult>;
   protected abstract executeTypescript(
     args: Args,
     context: ToolExecutionContext
+
+    args: any,
+    context?: ToolExecutionContext
+  ): Promise<RustToolExecutionResult>;
+  protected abstract executeTypescript(
+    args: any,
+    context?: ToolExecutionContext
+
   ): Promise<RustToolExecutionResult>;
 }
 
@@ -256,8 +273,13 @@ export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
   }
 
   protected async executeRust(
+
     args: FileAnalyzerArgs,
     context: ToolExecutionContext
+
+    args: any,
+    context?: ToolExecutionContext
+
   ): Promise<RustToolExecutionResult> {
     const request = {
       type: 'code-analysis',
@@ -283,8 +305,13 @@ export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
   }
 
   protected async executeTypescript(
+
     args: FileAnalyzerArgs,
     context: ToolExecutionContext
+
+    args: any,
+    context?: ToolExecutionContext
+
   ): Promise<RustToolExecutionResult> {
     // TypeScript fallback implementation
     const fs = await import('fs/promises');

@@ -14,8 +14,8 @@
  * - Adds audit logging for security monitoring
  */
 
-import { E2BService } from '../../core/e2b/e2b-service.js';
-import { SecurityValidator } from '../../core/e2b/security-validator.js';
+import { E2BService } from '../tools/e2b/e2b-service.js';
+import { SecurityValidator } from '../tools/e2b/security-validator.js';
 import { logger } from '../logging/logger.js';
 import { z } from 'zod';
 
@@ -297,7 +297,7 @@ export class SecureExecutionManager {
       const validationResult = await this.securityValidator.validateCode({
         code: request.command,
         language: request.language || 'javascript',
-        environment: typeof request.environment === 'string' ? request.environment : 'node18-safe'
+        environment: typeof request.environment === 'string' ? request.environment : 'node18-safe',
       });
 
       if (!validationResult.isValid) {

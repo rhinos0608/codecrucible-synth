@@ -5,8 +5,8 @@
  * integrating with the existing provider system architecture.
  */
 
-import { logger } from '../../core/logger.js';
-import { RustBridgeManager } from '../../core/execution/rust-executor/rust-bridge-manager.js';
+import { logger } from '../../infrastructure/logging/logger.js';
+import { RustBridgeManager } from '../execution/rust-executor/rust-bridge-manager.js';
 import type { ProviderClient } from '../../domain/interfaces/provider-interfaces.js';
 
 export interface RustProviderConfig {

@@ -1,5 +1,5 @@
-import { logger } from '../logging/logger.js';
-import { ResponseNormalizer } from '../../core/response-normalizer.js';
+import { createLogger } from '../logging/logger-adapter.js';
+import { ResponseNormalizer } from '../../utils/response-normalizer.js';
 
 /**
  * Domain-Aware Tool Orchestrator
@@ -31,6 +31,7 @@ export interface DomainAnalysis {
 export class DomainAwareToolOrchestrator {
   private readonly toolDomains: Map<string, ToolDomain>;
   private readonly keywordIndex: Map<string, string[]>; // keyword -> domain names
+  private readonly logger = createLogger('ToolOrchestrator');
 
   constructor() {
     this.toolDomains = new Map();
@@ -267,7 +268,7 @@ export class DomainAwareToolOrchestrator {
       this.toolDomains.set(domain.name, domain);
     });
 
-    logger.info('Domain-aware tool orchestrator initialized', {
+    this.logger.info('Domain-aware tool orchestrator initialized', {
       domainCount: domains.length,
       totalKeywords: domains.reduce((sum, d) => sum + d.keywords.length, 0),
     });
@@ -287,7 +288,7 @@ export class DomainAwareToolOrchestrator {
       });
     }
 
-    logger.debug('Keyword index built', {
+    this.logger.debug('Keyword index built', {
       uniqueKeywords: this.keywordIndex.size,
       avgDomainsPerKeyword:
         Array.from(this.keywordIndex.values()).reduce((sum, domains) => sum + domains.length, 0) /
@@ -358,7 +359,7 @@ export class DomainAwareToolOrchestrator {
       reasoning: `Detected ${detectedKeywords.length} keywords, primary domain scored ${primaryScore.toFixed(2)}`,
     };
 
-    logger.debug('Domain analysis completed', {
+    this.logger.debug('Domain analysis completed', {
       prompt: `${prompt.substring(0, 100)}...`,
       analysis: {
         primaryDomain: analysis.primaryDomain,
@@ -387,7 +388,7 @@ export class DomainAwareToolOrchestrator {
     // Get tools for primary domain
     const primaryDomain = this.toolDomains.get(analysis.primaryDomain);
     if (!primaryDomain) {
-      logger.warn('Unknown primary domain, using mixed tools', {
+      this.logger.warn('Unknown primary domain, using mixed tools', {
         primaryDomain: analysis.primaryDomain,
       });
       return this.getToolsForDomain('mixed', allAvailableTools, analysis);
@@ -430,7 +431,7 @@ export class DomainAwareToolOrchestrator {
       `selected ${selectedTools.length}/${allAvailableTools.length} tools, ` +
       `keywords: ${analysis.detectedKeywords.slice(0, 3).join(', ')}`;
 
-    logger.info('Domain-aware tool selection completed', {
+    this.logger.info('Domain-aware tool selection completed', {
       originalToolCount: allAvailableTools.length,
       selectedToolCount: selectedTools.length,
       primaryDomain: analysis.primaryDomain,

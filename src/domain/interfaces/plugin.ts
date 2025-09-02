@@ -23,4 +23,3 @@ export interface IPlugin {
   start?(): Promise<void> | void;
   stop?(): Promise<void> | void;
 }
-

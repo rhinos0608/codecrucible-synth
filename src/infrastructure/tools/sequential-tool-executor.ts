@@ -1,8 +1,8 @@
-import { logger } from '../logging/logger.js';
-import { ResponseNormalizer } from '../../core/response-normalizer.js';
+import { createLogger } from '../logging/logger-adapter.js';
+import { ResponseNormalizer } from '../../utils/response-normalizer.js';
 import { DomainAwareToolOrchestrator, DomainAnalysis } from './domain-aware-tool-orchestrator.js';
-import { PerformanceProfiler } from '../../core/performance/profiler.js';
-import { RustExecutionBackend } from '../../core/execution/rust-executor/index.js';
+import { PerformanceProfiler } from '../performance/profiler.js';
+import { RustExecutionBackend } from '../execution/rust-executor/index.js';
 
 /**
  * Sequential Tool Executor with Chain-of-Thought Reasoning
@@ -44,6 +44,8 @@ export interface ExecutionResult {
   tokensUsed?: number;
 }
 
+const logger = createLogger('ToolExecutor');
+
 export interface StreamingCallbacks {
   onStepStart?: (step: number, type: string, content: string) => void;
   onStepComplete?: (step: number, result: any) => void;
@@ -64,7 +66,7 @@ export class SequentialToolExecutor {
     this.domainOrchestrator = new DomainAwareToolOrchestrator();
     this.performanceProfiler = performanceProfiler;
     this.rustBackend = rustBackend;
-    
+
     logger.info('SequentialToolExecutor initialized', {
       rustBackendEnabled: !!this.rustBackend,
       rustAvailable: this.rustBackend?.isAvailable() || false,
@@ -106,10 +108,12 @@ export class SequentialToolExecutor {
 
     // Start profiling session for tool execution
     let profilingSessionId: string | undefined;
-    
+
     if (this.performanceProfiler) {
-      profilingSessionId = this.performanceProfiler.startSession(`tool_execution_${this.currentExecutionId}`);
-      
+      profilingSessionId = this.performanceProfiler.startSession(
+        `tool_execution_${this.currentExecutionId}`
+      );
+
       // Profile the overall tool execution workflow
       this.performanceProfiler.startOperation(
         profilingSessionId,
@@ -338,7 +342,11 @@ export class SequentialToolExecutor {
 
       // End profiling session on error
       if (this.performanceProfiler && profilingSessionId) {
-        this.performanceProfiler.endOperation(profilingSessionId, 'tool_execution_workflow', error as Error);
+        this.performanceProfiler.endOperation(
+          profilingSessionId,
+          'tool_execution_workflow',
+          error as Error
+        );
         this.performanceProfiler.endSession(profilingSessionId);
       }
 

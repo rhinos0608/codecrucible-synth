@@ -32,7 +32,7 @@ export { MCPServerManager } from './mcp-servers/mcp-server-manager.js';
 
 // Export domain services
 export { UnifiedAgentSystem } from './domain/services/unified-agent-system.js';
-export { UnifiedConfigurationManager } from './domain/services/unified-configuration-manager.js';
+export { UnifiedConfigurationManager } from './domain/config/config-manager.js';
 export { UnifiedSecurityValidator } from './domain/services/unified-security-validator.js';
 export { UnifiedPerformanceSystem } from './domain/services/unified-performance-system.js';
 export { UnifiedServerSystem } from './domain/services/unified-server-system.js';
@@ -97,25 +97,71 @@ export async function initialize(): Promise<UnifiedCLI> {
         enabled: true,
         allowedCommands: [
           // Basic commands
-          'ls', 'cat', 'echo', 'pwd', 'which', 'node', 'npm',
+          'ls',
+          'cat',
+          'echo',
+          'pwd',
+          'which',
+          'node',
+          'npm',
           // Safe search commands for development workflows
-          'grep', 'rg', 'ripgrep', 'find', 'locate', 'ack', 'ag', 'fzf',
+          'grep',
+          'rg',
+          'ripgrep',
+          'find',
+          'locate',
+          'ack',
+          'ag',
+          'fzf',
           // File inspection commands
-          'head', 'tail', 'less', 'more', 'wc', 'sort', 'uniq',
+          'head',
+          'tail',
+          'less',
+          'more',
+          'wc',
+          'sort',
+          'uniq',
           // Development tools
-          'git', 'diff', 'curl', 'wget', 'jq', 'yq',
+          'git',
+          'diff',
+          'curl',
+          'wget',
+          'jq',
+          'yq',
         ],
         blockedCommands: [
           // Destructive file operations
-          'rm', 'rmdir', 'unlink', 'mv', 'cp',
+          'rm',
+          'rmdir',
+          'unlink',
+          'mv',
+          'cp',
           // System administration
-          'sudo', 'su', 'chmod', 'chown', 'chgrp',
+          'sudo',
+          'su',
+          'chmod',
+          'chown',
+          'chgrp',
           // Process management
-          'kill', 'pkill', 'killall', 'nohup', 'bg', 'fg',
+          'kill',
+          'pkill',
+          'killall',
+          'nohup',
+          'bg',
+          'fg',
           // Network security risks
-          'nc', 'netcat', 'telnet', 'ssh', 'scp', 'rsync',
+          'nc',
+          'netcat',
+          'telnet',
+          'ssh',
+          'scp',
+          'rsync',
           // System modification
-          'mount', 'umount', 'fdisk', 'mkfs', 'dd',
+          'mount',
+          'umount',
+          'fdisk',
+          'mkfs',
+          'dd',
         ],
       },
       packageManager: {
@@ -137,12 +183,15 @@ export async function initialize(): Promise<UnifiedCLI> {
       await mcpServerManager.startServers();
       logger.info('✅ MCP servers are ready for tool execution');
     } catch (error) {
-      logger.warn('⚠️ MCP servers initialization had issues, continuing with degraded capabilities:', error);
+      logger.warn(
+        '⚠️ MCP servers initialization had issues, continuing with degraded capabilities:',
+        error
+      );
       // Continue without MCP servers - graceful degradation
     }
 
     // Create concrete workflow orchestrator (breaks circular dependencies)
-  const orchestrator = new ConcreteWorkflowOrchestrator();
+    const orchestrator = new ConcreteWorkflowOrchestrator();
 
     // Initialize proper UnifiedModelClient with dynamic model selection
     const { UnifiedModelClient } = await import('./application/services/unified-model-client.js');
@@ -298,8 +347,12 @@ export async function main(): Promise<void> {
       // Avoid forced exit to let stdout flush naturally
     };
 
-    process.on('SIGINT', () => { cleanup().finally(() => {}); });
-    process.on('SIGTERM', () => { cleanup().finally(() => {}); });
+    process.on('SIGINT', () => {
+      cleanup().finally(() => {});
+    });
+    process.on('SIGTERM', () => {
+      cleanup().finally(() => {});
+    });
     // Note: do not attach to 'exit' to avoid recursive exits
 
     // Run CLI with arguments

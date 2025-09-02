@@ -5,9 +5,18 @@
  */
 
 import { RuntimeContext, RuntimeContextFactory } from '../../core/runtime/runtime-context.js';
-import { UnifiedOrchestrationService, createUnifiedOrchestrationServiceWithContext } from '../../application/services/unified-orchestration-service.js';
-import { UnifiedConfigurationManager, createUnifiedConfigurationManager } from '../../domain/services/unified-configuration-manager.js';
-import { ConfigurableResourceCoordinator, ResourceCoordinatorFactory } from '../../infrastructure/performance/configurable-resource-coordinator.js';
+import {
+  UnifiedOrchestrationService,
+  createUnifiedOrchestrationServiceWithContext,
+} from '../../application/services/unified-orchestration-service.js';
+import {
+  UnifiedConfigurationManager,
+  createUnifiedConfigurationManager,
+} from '../../domain/config/config-manager.js';
+import {
+  ConfigurableResourceCoordinator,
+  ResourceCoordinatorFactory,
+} from '../../infrastructure/performance/configurable-resource-coordinator.js';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-user-interaction.js';
 import { EventBus } from '../../infrastructure/messaging/event-bus.js';
@@ -87,14 +96,14 @@ export class ServiceFactory {
     if (!this.resourceCoordinator) {
       this.resourceCoordinator = ResourceCoordinatorFactory.createHighPerformance();
 
-      // Note: RuntimeContext doesn't have setResourceCoordinator, 
+      // Note: RuntimeContext doesn't have setResourceCoordinator,
       // this is just storing for later disposal
     }
-    
+
     if (!this.resourceCoordinator) {
       throw new Error('Failed to create resource coordinator');
     }
-    
+
     return this.resourceCoordinator;
   }
 
@@ -114,7 +123,7 @@ export class ServiceFactory {
       // Just clean up reference
       this.resourceCoordinator = undefined;
     }
-    
+
     await this.runtimeContext.dispose();
   }
 
@@ -160,9 +169,7 @@ export async function createProductionOrchestrationService(
 /**
  * Create a test-friendly orchestration service with mocked dependencies
  */
-export async function createTestOrchestrationService(
-  config: ServiceFactoryConfig = {}
-): Promise<{
+export async function createTestOrchestrationService(config: ServiceFactoryConfig = {}): Promise<{
   service: UnifiedOrchestrationService;
   factory: ServiceFactory;
   context: RuntimeContext;

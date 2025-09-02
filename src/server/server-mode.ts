@@ -12,7 +12,7 @@ import {
   ServerConfiguration,
   ServerStatus,
 } from '../domain/services/unified-server-system.js';
-import { UnifiedConfigurationManager } from '../domain/services/unified-configuration-manager.js';
+import { UnifiedConfigurationManager } from '../domain/config/config-manager.js';
 import { EventBus } from '../infrastructure/messaging/event-bus.js';
 import { UnifiedSecurityValidator } from '../domain/services/unified-security-validator.js';
 import { UnifiedPerformanceSystem } from '../domain/services/unified-performance-system.js';

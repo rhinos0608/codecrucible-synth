@@ -1,9 +1,8 @@
 use syn::parse_file;
-use tokio::test;
 
 use codecrucible_rust_executor::tools::GenerationTool;
 
-#[test]
+#[tokio::test]
 async fn function_template_generates_compilable_code() {
     let tool = GenerationTool::new();
     let code = tool
@@ -13,7 +12,7 @@ async fn function_template_generates_compilable_code() {
     parse_file(&code).expect("Generated function should be valid Rust");
 }
 
-#[test]
+#[tokio::test]
 async fn struct_template_generates_compilable_code() {
     let tool = GenerationTool::new();
     let code = tool
@@ -23,7 +22,7 @@ async fn struct_template_generates_compilable_code() {
     parse_file(&code).expect("Generated struct should be valid Rust");
 }
 
-#[test]
+#[tokio::test]
 async fn module_template_generates_compilable_code() {
     let tool = GenerationTool::new();
     let code = tool

@@ -12,7 +12,7 @@
 
 import { readFile, stat } from 'fs/promises';
 import { Stats } from 'fs';
-import { extname, relative } from 'path';
+import { extname, relative, dirname, join } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
@@ -248,7 +248,9 @@ export class ContextWindowManager {
 
       try {
         const batchResults = await Promise.all(batchPromises);
-        const validResults = batchResults.filter((result): result is FileAnalysisResult => result !== null);
+        const validResults = batchResults.filter(
+          (result): result is FileAnalysisResult => result !== null
+        );
         const filteredCount = batchResults.length - validResults.length;
 
         results.push(...validResults);
@@ -553,10 +555,72 @@ export class ContextWindowManager {
     files: FileAnalysisResult[],
     availableTokens: number
   ): ContextChunk[] {
-    // For now, fallback to priority-based chunking
-    // TODO: Implement dependency graph analysis for true semantic chunking
-    logger.info(`ℹ️ Semantic chunking not fully implemented, falling back to priority-based`);
-    return this.createPriorityChunks(files, availableTokens);
+    const fileMap = new Map<string, FileAnalysisResult>();
+    files.forEach(f => fileMap.set(f.path, f));
+
+    const graph = new Map<string, Set<string>>();
+    for (const file of files) {
+      const dir = dirname(file.path);
+      for (const dep of file.dependencies || []) {
+        if (!dep.startsWith('.')) continue;
+        const base = join(dir, dep);
+        const candidates = [base, `${base}.ts`, `${base}.js`];
+        const target = candidates.find(c => fileMap.has(c));
+        if (target) {
+          if (!graph.has(file.path)) graph.set(file.path, new Set());
+          if (!graph.has(target)) graph.set(target, new Set());
+          graph.get(file.path)!.add(target);
+          graph.get(target)!.add(file.path);
+        }
+      }
+    }
+
+    const visited = new Set<string>();
+    const components: FileAnalysisResult[][] = [];
+    for (const file of files) {
+      if (visited.has(file.path)) continue;
+      const queue = [file.path];
+      const group: FileAnalysisResult[] = [];
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        const result = fileMap.get(current);
+        if (result) {
+          group.push(result);
+          const neighbors = graph.get(current);
+          if (neighbors) {
+            neighbors.forEach(n => {
+              if (!visited.has(n)) queue.push(n);
+            });
+          }
+        }
+      }
+      if (group.length > 0) components.push(group);
+    }
+
+    const chunkTargetSize = availableTokens * 0.8;
+    const chunks: ContextChunk[] = [];
+    let chunkId = 1;
+    for (const group of components) {
+      let current: FileAnalysisResult[] = [];
+      let tokens = 0;
+      for (const file of group) {
+        if (tokens + file.tokens > chunkTargetSize && current.length > 0) {
+          chunks.push(this.finalizeChunk(current, chunkId++));
+          current = [];
+          tokens = 0;
+        }
+        current.push(file);
+        tokens += file.tokens;
+      }
+      if (current.length > 0) {
+        chunks.push(this.finalizeChunk(current, chunkId++));
+      }
+    }
+
+    logger.info(`✅ Created ${chunks.length} semantic chunks using dependency graph`);
+    return chunks;
   }
 
   /**
@@ -710,15 +774,16 @@ export class ContextWindowManager {
 
   private extractDependencies(content: string): string[] {
     const deps: string[] = [];
-
-    // Extract import/require statements
-    const imports = content.match(
-      /(?:import.*from\s+['"`]([^'"`]+)['"`]|require\(['"`]([^'"`]+)['"`]\))/g
-    );
-    if (imports) {
-      deps.push(...imports.slice(0, 15)); // Limit to 15 dependencies
+    const importRegex =
+      /(?:import(?:[^'"`]*from)?\s*['"`]([^'"`]+)['"`]|require\(['"`]([^'"`]+)['"`]\))/g;
+    let match: RegExpExecArray | null;
+    while ((match = importRegex.exec(content)) !== null) {
+      const dep = match[1] || match[2];
+      if (dep && dep.startsWith('.')) {
+        deps.push(dep);
+      }
+      if (deps.length >= 15) break;
     }
-
     return deps;
   }
 

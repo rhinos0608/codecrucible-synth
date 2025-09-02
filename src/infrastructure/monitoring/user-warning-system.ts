@@ -26,6 +26,7 @@ export class UserWarningSystem {
   private toolUsageMap: Map<string, ToolUsage> = new Map();
   private lastWarningTimes: Map<string, number> = new Map();
   private sessionStartTime: Date;
+  private longRunningInterval: NodeJS.Timeout | null = null;
 
   constructor(config?: Partial<WarningConfig>) {
     this.config = {
@@ -131,10 +132,16 @@ Used: ${usage.count} times in ${duration} minutes
    * Start periodic long-running session warnings
    */
   private startLongRunningWarnings(): void {
-    setInterval(() => {
-      // TODO: Store interval ID and call clearInterval in cleanup
+    this.longRunningInterval = setInterval(() => {
       this.checkLongRunningSession();
     }, this.config.longRunningWarningInterval);
+  }
+
+  shutdown(): void {
+    if (this.longRunningInterval) {
+      clearInterval(this.longRunningInterval);
+      this.longRunningInterval = null;
+    }
   }
 
   /**

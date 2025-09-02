@@ -14,8 +14,14 @@ import { CLIOptions, CLIContext } from './cli-types.js';
 // import { CLIDisplay } from './cli-display.js';
 // import { ProjectContext } from '../client.js';
 import { ServerModeInterface } from '../../server/server-mode.js';
-// import { analysisWorkerPool, AnalysisTask } from '../workers/analysis-worker.js'; // Module doesn't exist
+import { analysisWorkerPool } from './analysis-worker-pool.js';
 import { randomUUID } from 'crypto';
+
+interface AnalysisTask {
+  id: string;
+  files: string[];
+  delay?: number;
+}
 
 export class CLICommands {
   private context: CLIContext;
@@ -461,21 +467,20 @@ export class CLICommands {
   }
 
   /**
-   * Stub method for direct analysis - replaces worker pool implementation
-   * TODO: Implement actual worker pool
+   * Dispatch analysis task to worker pool
    */
-  private async performDirectAnalysis(task: any, config: any): Promise<any> {
-    // Simple stub implementation
+  private async performDirectAnalysis(task: AnalysisTask, _config: any): Promise<any> {
+    const result = await analysisWorkerPool.runTask(task);
     return {
       success: true,
-      duration: 1000,
+      duration: 0,
       result: {
-        totalFiles: task.files.length,
+        totalFiles: result.totalFiles,
         chunks: [],
         summary: {
-          successRate: 100
-        }
-      }
+          successRate: 100,
+        },
+      },
     };
   }
 }

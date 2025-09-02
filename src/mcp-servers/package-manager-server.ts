@@ -152,8 +152,25 @@ export class PackageManagerMCPServer {
 
   private async listInstalled(): Promise<any> {
     const pkgPath = path.join(this.config.workingDirectory!, 'package.json');
-    const file = await fs.readFile(pkgPath, 'utf8');
-    const pkg = JSON.parse(file);
+    let file: string;
+    let pkg: any;
+    try {
+      file = await fs.readFile(pkgPath, 'utf8');
+    } catch (err: any) {
+      if (err.code === 'ENOENT') {
+        logger.error(`package.json not found at ${pkgPath}`);
+        throw new Error(`package.json not found at ${pkgPath}`);
+      } else {
+        logger.error(`Error reading package.json at ${pkgPath}: ${err.message}`);
+        throw new Error(`Error reading package.json at ${pkgPath}: ${err.message}`);
+      }
+    }
+    try {
+      pkg = JSON.parse(file);
+    } catch (err: any) {
+      logger.error(`Invalid JSON in package.json at ${pkgPath}: ${err.message}`);
+      throw new Error(`Invalid JSON in package.json at ${pkgPath}: ${err.message}`);
+    }
     return {
       dependencies: pkg.dependencies || {},
       devDependencies: pkg.devDependencies || {},

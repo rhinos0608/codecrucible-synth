@@ -20,7 +20,14 @@ export class ResponseSynthesizer {
   /** Combine a voice response with MCP outputs. */
   synthesize(voiceResponse: any, mcpResults: any[]): SynthesizedResponse {
     this.logger.debug('Synthesizing voice and MCP responses');
-    const content = [voiceResponse?.content ?? voiceResponse]
+    const extractContent = (resp: any): string => {
+      if (typeof resp === 'string') return resp;
+      if (resp && typeof resp.content === 'string') return resp.content;
+      if (resp && typeof resp.content !== 'undefined') return String(resp.content);
+      if (resp && typeof resp === 'object') return JSON.stringify(resp);
+      return String(resp);
+    };
+    const content = [extractContent(voiceResponse)]
       .concat(mcpResults.map(r => r.result ?? r))
       .join('\n');
     return {

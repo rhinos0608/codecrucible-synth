@@ -14,6 +14,8 @@ import { EventEmitter } from 'events';
 import { createHash, createHmac, randomBytes } from 'crypto';
 import { logger } from '../logger.js';
 
+export const DEFAULT_POLICY_ID = 'default';
+
 export interface SecurityPolicy {
   policyId: string;
   name: string;
@@ -88,6 +90,13 @@ export interface FilteringRule {
   action: 'mask' | 'remove' | 'encrypt' | 'hash';
   condition?: string; // Condition for when to apply the rule
 }
+
+export interface ValidationResult {
+  valid: boolean;
+  violations: string[];
+}
+
+export type MCPRequestData = Record<string, unknown>;
 
 export interface SecurityContext {
   connectionId: string;
@@ -180,7 +189,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
    */
   private initializeDefaultPolicies(): void {
     const defaultPolicy: SecurityPolicy = {
-      policyId: 'default',
+      policyId: DEFAULT_POLICY_ID,
       name: 'Default Security Policy',
       description: 'Standard security policy for MCP connections',
 
@@ -225,7 +234,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
       piiHandling: 'mask',
     };
 
-    this.securityPolicies.set('default', defaultPolicy);
+    this.securityPolicies.set(DEFAULT_POLICY_ID, defaultPolicy);
 
     // Enterprise policy
     const enterprisePolicy: SecurityPolicy = {
@@ -453,7 +462,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   async authorizeRequest(
     connectionId: string,
     capability: string,
-    requestData: any
+    requestData: MCPRequestData
   ): Promise<boolean> {
     const context = this.securityContexts.get(connectionId);
     if (!context) {
@@ -553,23 +562,26 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   /**
    * Filter response data
    */
-  async filterResponse(connectionId: string, responseData: any): Promise<any> {
+  async filterResponse<T extends Record<string, unknown>>(
+    connectionId: string,
+    responseData: T
+  ): Promise<T> {
     const context = this.securityContexts.get(connectionId);
     if (!context) {
       return responseData;
     }
 
     const policy = context.effectivePolicy;
-    let filteredData = JSON.parse(JSON.stringify(responseData));
+    let filteredData: T = JSON.parse(JSON.stringify(responseData));
 
     // Apply filtering rules
     for (const rule of policy.outputFiltering) {
-      filteredData = this.applyFilteringRule(filteredData, rule);
+      filteredData = this.applyFilteringRule(filteredData, rule) as T;
     }
 
     // Handle PII based on policy
     if (policy.piiHandling !== 'allow') {
-      filteredData = this.handlePII(filteredData, policy.piiHandling);
+      filteredData = this.handlePII(filteredData, policy.piiHandling) as T;
     }
 
     return filteredData;
@@ -578,41 +590,45 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   /**
    * Apply filtering rule to data
    */
-  private applyFilteringRule(data: any, rule: FilteringRule): any {
+  private applyFilteringRule(data: unknown, rule: FilteringRule): unknown {
     if (typeof data !== 'object' || data === null) {
       return data;
     }
 
-    const result = Array.isArray(data) ? [...data] : { ...data };
+    const result: Record<string, unknown> | unknown[] = Array.isArray(data)
+      ? [...data]
+      : { ...(data as Record<string, unknown>) };
 
-    if (rule.field in result) {
+    if (rule.field in (result as Record<string, unknown>)) {
+      const obj = result as Record<string, unknown>;
       switch (rule.action) {
         case 'mask':
-          result[rule.field] = this.maskValue(result[rule.field]);
+          obj[rule.field] = this.maskValue(obj[rule.field]);
           break;
         case 'remove':
-          delete result[rule.field];
+          delete obj[rule.field];
           break;
         case 'encrypt':
-          result[rule.field] = this.encryptValue(result[rule.field]);
+          obj[rule.field] = this.encryptValue(obj[rule.field]);
           break;
         case 'hash':
-          result[rule.field] = this.hashValue(result[rule.field]);
+          obj[rule.field] = this.hashValue(obj[rule.field]);
           break;
       }
     }
 
     // Recursively apply to nested objects
-    for (const key in result) {
-      if (typeof result[key] === 'object' && result[key] !== null) {
-        result[key] = this.applyFilteringRule(result[key], rule);
+    const entries = Array.isArray(result) ? result.entries() : Object.entries(result);
+    for (const [key, value] of entries as Iterable<[string, unknown]>) {
+      if (typeof value === 'object' && value !== null) {
+        (result as Record<string, unknown>)[key] = this.applyFilteringRule(value, rule) as unknown;
       }
     }
 
     return result;
   }
 
-  private maskValue(value: any): string {
+  private maskValue(value: unknown): string {
     if (typeof value === 'string') {
       if (value.length <= 4) return '***';
       return (
@@ -622,19 +638,19 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
     return '***';
   }
 
-  private encryptValue(value: any): string {
+  private encryptValue(value: unknown): string {
     // Simple encryption - would use proper encryption in production
     return Buffer.from(JSON.stringify(value)).toString('base64');
   }
 
-  private hashValue(value: any): string {
+  private hashValue(value: unknown): string {
     return createHash('sha256').update(JSON.stringify(value)).digest('hex').substring(0, 16);
   }
 
   /**
    * Handle PII in data
    */
-  private handlePII(data: any, handling: 'mask' | 'deny'): any {
+  private handlePII(data: unknown, handling: 'mask' | 'deny'): unknown {
     // Simple PII detection - would be more sophisticated in production
     const piiFields = ['email', 'phone', 'ssn', 'credit_card', 'password', 'token'];
 
@@ -642,22 +658,27 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
       return data;
     }
 
-    const result = Array.isArray(data) ? [...data] : { ...data };
+    const result: Record<string, unknown> | unknown[] = Array.isArray(data)
+      ? [...data]
+      : { ...(data as Record<string, unknown>) };
 
     for (const field of piiFields) {
-      if (field in result) {
+      if (field in (result as Record<string, unknown>)) {
         if (handling === 'mask') {
-          result[field] = this.maskValue(result[field]);
+          (result as Record<string, unknown>)[field] = this.maskValue(
+            (result as Record<string, unknown>)[field]
+          );
         } else {
-          delete result[field];
+          delete (result as Record<string, unknown>)[field];
         }
       }
     }
 
     // Recursively handle nested objects
-    for (const key in result) {
-      if (typeof result[key] === 'object' && result[key] !== null) {
-        result[key] = this.handlePII(result[key], handling);
+    for (const key in result as Record<string, unknown>) {
+      const value = (result as Record<string, unknown>)[key];
+      if (typeof value === 'object' && value !== null) {
+        (result as Record<string, unknown>)[key] = this.handlePII(value, handling) as unknown;
       }
     }
 
@@ -669,8 +690,8 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
    */
   private async validateInput(
     policy: SecurityPolicy,
-    data: any
-  ): Promise<{ valid: boolean; violations: string[] }> {
+    data: Record<string, unknown>
+  ): Promise<ValidationResult> {
     const violations: string[] = [];
 
     for (const rule of policy.inputValidation) {
@@ -892,7 +913,7 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
    */
   private getEffectivePolicy(serverId: string): SecurityPolicy {
     // Would determine policy based on server configuration
-    return this.securityPolicies.get('default')!;
+    return this.securityPolicies.get(DEFAULT_POLICY_ID)!;
   }
 
   private calculateGrantedCapabilities(policy: SecurityPolicy, permissions: string[]): string[] {

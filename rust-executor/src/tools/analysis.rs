@@ -435,8 +435,7 @@ impl AnalysisTool {
             suggestions.push("Reduce nesting depth for better readability".to_string());
         }
 
-        if metrics.code_lines > 0
-            && metrics.comment_lines as f64 / (metrics.code_lines as f64) < 0.1
+            && metrics.comment_lines as f64 / metrics.code_lines as f64 < 0.1
         {
             suggestions.push("Add more comments to improve code documentation".to_string());
         }

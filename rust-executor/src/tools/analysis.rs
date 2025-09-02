@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Instant};
+use std::{collections::HashMap, sync::Mutex, time::Instant};
 use tracing::{info, warn};
 use tree_sitter::{Node, Parser, Query, QueryCursor};
 use tree_sitter_rust::language as rust_language;
@@ -36,6 +36,10 @@ pub struct CodeIssue {
 
 pub struct AnalysisTool {
     patterns: HashMap<String, Vec<&'static str>>,
+    parser: Mutex<Parser>,
+    query_fn: Query,
+    query_struct: Query,
+    query_complex: Query,
 }
 
 impl AnalysisTool {
@@ -99,7 +103,27 @@ impl AnalysisTool {
             ],
         );
 
-        Self { patterns }
+        let mut parser = Parser::new();
+        parser
+            .set_language(rust_language())
+            .expect("Error loading Rust grammar");
+        let lang = rust_language();
+        let query_fn = Query::new(lang, "(function_item) @fn").expect("Failed to compile fn query");
+        let query_struct = Query::new(lang, "(struct_item) @s\n(enum_item) @e")
+            .expect("Failed to compile struct query");
+        let query_complex = Query::new(
+            lang,
+            "(if_expression) @c\n(match_expression) @c\n(for_expression) @c\n(while_expression) @c\n(loop_expression) @c",
+        )
+        .expect("Failed to compile complexity query");
+
+        Self {
+            patterns,
+            parser: Mutex::new(parser),
+            query_fn,
+            query_struct,
+            query_complex,
+        }
     }
 
     pub async fn analyze_code(&self, code: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -136,9 +160,7 @@ impl AnalysisTool {
     fn calculate_metrics(&self, code: &str) -> CodeMetrics {
         // Benchmark tree-sitter approach
         let start_ts = Instant::now();
-        let ts_metrics = self
-            .calculate_metrics_tree_sitter(code)
-            .unwrap_or_else(|| self.calculate_metrics_regex(code));
+        let ts_metrics = self.calculate_metrics_tree_sitter(code);
         let ts_time = start_ts.elapsed();
 
         // Benchmark legacy regex approach
@@ -151,20 +173,32 @@ impl AnalysisTool {
             ts_time, regex_time
         );
 
-        if ts_metrics != regex_metrics {
-            warn!(
-                "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
-                ts_metrics, regex_metrics
-            );
+        match ts_metrics {
+            Some(ts_metrics) => {
+                if ts_metrics != regex_metrics {
+                    warn!(
+                        "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
+                        ts_metrics, regex_metrics
+                    );
+                    regex_metrics
+                } else {
+                    ts_metrics
+                }
+            }
+            None => {
+                warn!("tree-sitter parsing failed, falling back to regex metrics");
+                regex_metrics
+            }
         }
-
-        ts_metrics
     }
 
     fn calculate_metrics_tree_sitter(&self, code: &str) -> Option<CodeMetrics> {
-        let mut parser = Parser::new();
-        parser.set_language(rust_language()).ok()?;
+        let mut parser = self.parser.lock().ok()?;
         let tree = parser.parse(code, None)?;
+
+        if tree.root_node().has_error() {
+            return None;
+        }
 
         let lines: Vec<&str> = code.lines().collect();
         let total_lines = lines.len();
@@ -186,31 +220,22 @@ impl AnalysisTool {
             }
         }
 
-        let lang = rust_language();
-
         // Count functions
-        let query_fn = Query::new(lang, "(function_item) @fn").ok()?;
         let mut cursor = QueryCursor::new();
         let functions = cursor
-            .matches(&query_fn, tree.root_node(), code.as_bytes())
+            .matches(&self.query_fn, tree.root_node(), code.as_bytes())
             .count();
 
         // Count structs/enums
-        let query_struct = Query::new(lang, "(struct_item) @s\n(enum_item) @e").ok()?;
         let mut cursor = QueryCursor::new();
         let classes_or_structs = cursor
-            .matches(&query_struct, tree.root_node(), code.as_bytes())
+            .matches(&self.query_struct, tree.root_node(), code.as_bytes())
             .count();
 
         // Cyclomatic complexity via control flow nodes
-        let query_complex = Query::new(
-            lang,
-            "(if_expression) @c\n(match_expression) @c\n(for_expression) @c\n(while_expression) @c\n(loop_expression) @c",
-        )
-        .ok()?;
         let mut cursor = QueryCursor::new();
         let cyclomatic_complexity = 1 + cursor
-            .matches(&query_complex, tree.root_node(), code.as_bytes())
+            .matches(&self.query_complex, tree.root_node(), code.as_bytes())
             .count();
 
         // Nesting depth by traversing block nodes
@@ -435,7 +460,8 @@ impl AnalysisTool {
             suggestions.push("Reduce nesting depth for better readability".to_string());
         }
 
-            && metrics.comment_lines as f64 / metrics.code_lines as f64 < 0.1
+        if metrics.code_lines > 0
+            && metrics.comment_lines as f64 / (metrics.code_lines as f64) < 0.1
         {
             suggestions.push("Add more comments to improve code documentation".to_string());
         }

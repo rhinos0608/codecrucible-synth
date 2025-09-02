@@ -1,6 +1,10 @@
 import { parentPort } from 'worker_threads';
 
 parentPort?.on('message', async (task: any) => {
+  if (task.crash) {
+    // Simulate an unexpected failure for testing purposes
+    process.exit(1);
+  }
   try {
     const delay = typeof task.delay === 'number' ? task.delay : 0;
     await new Promise(resolve => setTimeout(resolve, delay));

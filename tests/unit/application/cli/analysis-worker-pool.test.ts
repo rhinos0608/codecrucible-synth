@@ -12,4 +12,12 @@ describe('AnalysisWorkerPool', () => {
     await pool.destroy();
     expect(duration).toBeLessThan(180);
   });
+
+  it('recovers from worker failure', async () => {
+    const pool = new AnalysisWorkerPool(1);
+    await expect(pool.runTask({ crash: true })).rejects.toThrow();
+    const result = await pool.runTask({ files: ['c'], delay: 10 });
+    await pool.destroy();
+    expect(result.totalFiles).toBe(1);
+  });
 });

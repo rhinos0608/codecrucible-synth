@@ -45,12 +45,11 @@ export class TelemetryExporter {
   }
 
   async exportMetrics(metrics: MetricPoint[]): Promise<void> {
+    // TODO: Implement actual export logic for each exporter type.
+    // Placeholder: currently only logs metrics count.
     for (const exporter of this.config.exporters) {
-      try {
-        this.logger.debug(`Telemetry export (${exporter.type}) - metrics count: ${metrics.length}`);
-      } catch (error) {
-        this.logger.error(`Failed telemetry export to ${exporter.type}:`, error);
-      }
+      this.logger.debug(`Telemetry export (${exporter.type}) - metrics count: ${metrics.length}`);
+      this.logger.warn(`Export logic for '${exporter.type}' not implemented. Metrics not exported.`);
     }
   }
 

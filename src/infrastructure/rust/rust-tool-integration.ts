@@ -7,7 +7,11 @@
 
 import { logger } from '../../core/logger.js';
 import { RustProviderClient } from './rust-provider-client.js';
-import type { ToolDefinition, ToolExecutionContext } from '../../domain/interfaces/tool-system.js';
+import type {
+  ITool,
+  ToolDefinition,
+  ToolExecutionContext,
+} from '../../domain/interfaces/tool-system.js';
 
 export interface RustToolDefinition extends ToolDefinition {
   rustImplementation: string;
@@ -35,7 +39,7 @@ export interface RustToolExecutionResult {
 /**
  * Base class for Rust-backed tools
  */
-export abstract class RustTool<Args extends Record<string, unknown>> {
+export abstract class RustTool<Args extends Record<string, unknown>> implements ITool {
   public readonly definition: RustToolDefinition;
   protected providerClient: RustProviderClient;
 
@@ -66,13 +70,17 @@ export abstract class RustTool<Args extends Record<string, unknown>> {
   /**
    * Execute the tool with automatic fallback
    */
-  async execute(args: Args, context: ToolExecutionContext): Promise<RustToolExecutionResult> {
+  async execute(
+    args: Record<string, unknown>,
+    context: ToolExecutionContext
+  ): Promise<RustToolExecutionResult> {
+    const typedArgs = args as Args;
     const startTime = Date.now();
 
     try {
       // Try Rust execution first
       if (await this.providerClient.isAvailable()) {
-        const result = await this.executeRust(args, context);
+        const result = await this.executeRust(typedArgs, context);
         return {
           ...result,
           executionTimeMs: Date.now() - startTime,
@@ -86,7 +94,7 @@ export abstract class RustTool<Args extends Record<string, unknown>> {
     // Fallback to TypeScript implementation
     if (this.definition.fallbackAvailable) {
       try {
-        const result = await this.executeTypescript(args, context);
+        const result = await this.executeTypescript(typedArgs, context);
         return {
           ...result,
           executionTimeMs: Date.now() - startTime,
@@ -120,19 +128,23 @@ export abstract class RustTool<Args extends Record<string, unknown>> {
   /**
    * Validate arguments against the tool's parameter schema
    */
-  validateArguments(args: Args): { valid: boolean; errors?: string[] } {
+  validateArguments(args: Record<string, unknown>): {
+    valid: boolean;
+    errors?: string[];
+  } {
+    const typedArgs = args as Args;
     const errors: string[] = [];
     const { properties, required } = this.definition.parameters;
 
     // Check required parameters
     for (const requiredParam of required) {
-      if (!(requiredParam in args)) {
+      if (!(requiredParam in typedArgs)) {
         errors.push(`Missing required parameter: ${requiredParam}`);
       }
     }
 
     // Validate parameter types and constraints
-    for (const [key, value] of Object.entries(args)) {
+    for (const [key, value] of Object.entries(typedArgs)) {
       const paramDef = properties[key];
       if (!paramDef) {
         errors.push(`Unknown parameter: ${key}`);

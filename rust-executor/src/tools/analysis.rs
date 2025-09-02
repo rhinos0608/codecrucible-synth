@@ -2,10 +2,16 @@ use serde::{Deserialize, Serialize};
 
 use std::{collections::HashMap, sync::Mutex, time::Instant};
 
+
+
+use std::{collections::HashMap, time::Instant};
+
+
 use std::{collections::HashMap, sync::Mutex, time::Instant};
 
 
 use std::{collections::HashMap, time::Instant};
+
 
 
 use tracing::{info, warn};
@@ -121,6 +127,11 @@ impl AnalysisTool {
             .expect("Error loading Rust grammar");
         let lang = rust_language();
 
+        let query_fn = Query::new(lang, "(function_item) @fn").expect("Invalid function query");
+        let query_struct =
+            Query::new(lang, "(struct_item) @s\n(enum_item) @e").expect("Invalid struct query");
+
+
         let query_fn = Query::new(lang, "(function_item) @fn").expect("Failed to compile fn query");
         let query_struct = Query::new(lang, "(struct_item) @s\n(enum_item) @e")
             .expect("Failed to compile struct query");
@@ -129,14 +140,20 @@ impl AnalysisTool {
         let query_struct =
             Query::new(lang, "(struct_item) @s\n(enum_item) @e").expect("Invalid struct query");
 
+
         let query_complex = Query::new(
             lang,
             "(if_expression) @c\n(match_expression) @c\n(for_expression) @c\n(while_expression) @c\n(loop_expression) @c",
         )
 
+        .expect("Invalid complexity query");
+
+
+
         .expect("Failed to compile complexity query");
 
         .expect("Invalid complexity query");
+
 
 
         Self {
@@ -197,6 +214,21 @@ impl AnalysisTool {
 
         match ts_metrics {
 
+            Some(ts) => {
+                if Self::metrics_diverge(&ts, &regex_metrics) {
+                    warn!(
+                        "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
+                        ts, regex_metrics
+                    );
+                    regex_metrics
+                } else {
+                    ts
+                }
+            }
+            None => {
+                warn!("tree-sitter parsing failed; falling back to regex metrics");
+
+
             Some(ts_metrics) => {
                 if ts_metrics != regex_metrics {
                     warn!(
@@ -208,9 +240,17 @@ impl AnalysisTool {
             }
             None => {
                 warn!("tree-sitter parsing failed, falling back to regex metrics");
+
                 regex_metrics
             }
         }
+    }
+
+
+    fn metrics_diverge(ts: &CodeMetrics, regex: &CodeMetrics) -> bool {
+        (regex.code_lines > 0 && ts.code_lines == 0)
+            || (regex.functions > 0 && ts.functions == 0)
+            || (regex.cyclomatic_complexity > 1 && ts.cyclomatic_complexity <= 1)
 
             Some(ts) => {
                 if Self::metrics_diverge(&ts, &regex_metrics) {
@@ -251,6 +291,7 @@ impl AnalysisTool {
             return true;
         }
         false
+
 
     }
 
@@ -549,10 +590,13 @@ impl AnalysisTool {
 
 
         if metrics.code_lines > 0
+
+
             && metrics.comment_lines as f64 / (metrics.code_lines as f64) < 0.1
 
 
         if metrics.code_lines > 0
+
             && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
 
 
@@ -560,6 +604,8 @@ impl AnalysisTool {
 
         if metrics.code_lines > 0
             && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
+
 
 
 

@@ -39,6 +39,7 @@ export interface MCPVoiceResult {
 
 export class MCPVoiceCoordinator extends EventEmitter {
   private readonly logger = createLogger('MCPVoiceCoordinator');
+  private readonly DEFAULT_POOL_ID = process.env.MCP_DEFAULT_POOL_ID || 'default';
 
   constructor(
     private readonly tools: VoiceToolMapper = voiceToolMapper,
@@ -72,7 +73,7 @@ export class MCPVoiceCoordinator extends EventEmitter {
 
       // Placeholder: choose connection via discovery/load balancer
       const decision = await intelligentMCPLoadBalancer.getConnection(
-        'default',
+        this.DEFAULT_POOL_ID,
         [request.capability],
         request.requestId,
         mcpContext
@@ -86,7 +87,8 @@ export class MCPVoiceCoordinator extends EventEmitter {
       try {
         const validationResult = enhancedMCPSecuritySystem.validateRequest(mcpContext);
         if (validationResult === false) {
-          throw new Error('Security validation failed: validateRequest returned false for the provided context.');
+            `Security validation failed for requestId=${request.requestId}, voiceId=${request.voiceId}, capability=${request.capability}: validateRequest returned false for the provided context.`
+          );
         }
       } catch (err) {
         throw new Error(

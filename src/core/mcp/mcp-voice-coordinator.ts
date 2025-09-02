@@ -18,10 +18,6 @@ import { voiceToolMapper, VoiceToolMapper } from './voice-tool-mapper.js';
 import { contextTranslator, ContextTranslator } from './context-translator.js';
 import { responseSynthesizer, ResponseSynthesizer } from './response-synthesizer.js';
 import { integrationMonitor, IntegrationMonitor } from './integration-monitor.js';
-import { advancedMCPDiscoverySystem } from './advanced-mcp-discovery-system.js';
-import { intelligentMCPLoadBalancer } from './intelligent-mcp-load-balancer.js';
-import { enhancedMCPReliabilitySystem } from './enhanced-mcp-reliability-system.js';
-import { enhancedMCPSecuritySystem } from './enhanced-mcp-security-system.js';
 
 export interface MCPVoiceRequest {
   requestId: string;

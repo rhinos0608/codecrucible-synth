@@ -627,10 +627,15 @@ impl CommandExecutor {
     }
 
     fn validate_command_name(&self, command: &str) -> Result<(), CommandExecutionError> {
+        // List of forbidden shell metacharacters
+        const SHELL_METACHARS: &[char] = &[
+            ';', '&', '|', '$', '>', '<', '`', '!', '*', '?', '~', '(', ')', '{', '}', '[', ']', '\'', '"'
+        ];
         if command.trim().is_empty()
             || command.contains(' ')
             || command.contains('/')
             || command.contains('\\')
+            || command.chars().any(|c| SHELL_METACHARS.contains(&c))
         {
             return Err(CommandExecutionError::InvalidArguments {
                 message: format!("Invalid command name: {}", command),

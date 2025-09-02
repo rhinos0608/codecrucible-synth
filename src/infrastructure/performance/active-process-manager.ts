@@ -6,7 +6,7 @@
 import { Logger } from '../logging/logger.js';
 import { EventEmitter } from 'events';
 import { HardwareAwareModelSelector } from './hardware-aware-model-selector.js';
-import { UserWarningSystem } from '../../core/monitoring/user-warning-system.js';
+import { UserWarningSystem } from '../monitoring/user-warning-system.js';
 import { resourceManager } from './resource-cleanup-manager.js';
 import * as os from 'os';
 

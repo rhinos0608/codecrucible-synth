@@ -10,7 +10,7 @@ import {
   createEnhancedRequest,
 } from '../../src/core/integration/enhanced-system-factory.js';
 import { CLI } from '../../src/application/interfaces/cli.js';
-import { logger } from '../../src/core/logger.js';
+import { logger } from '../../src/infrastructure/logging/logger.js';
 import { configManager } from '../../src/config/config-manager.js';
 
 describe('Enhanced System Integration', () => {

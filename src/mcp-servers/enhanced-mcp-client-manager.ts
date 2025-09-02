@@ -4,7 +4,7 @@
  */
 
 import { MCPServerManager } from './mcp-server-manager.js';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 import { EventEmitter } from 'events';
 
 export interface ClientConfig {

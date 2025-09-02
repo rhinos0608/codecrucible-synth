@@ -4,7 +4,7 @@
  * Part of architectural debt remediation
  */
 
-import { RuntimeContext, RuntimeContextFactory } from '../../core/runtime/runtime-context.js';
+import { RuntimeContext, RuntimeContextFactory } from '../runtime/runtime-context.js';
 import {
   UnifiedOrchestrationService,
   createUnifiedOrchestrationServiceWithContext,
@@ -83,7 +83,7 @@ export class ServiceFactory {
       this.configManager = await createUnifiedConfigurationManager({
         logger,
         configFilePath: this.config.configFilePath,
-        eventBus
+        eventBus,
       });
     }
     return this.configManager;

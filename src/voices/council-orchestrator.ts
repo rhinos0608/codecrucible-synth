@@ -3,7 +3,7 @@ import {
   CouncilMode,
   CouncilConfig,
   CouncilDecision,
-} from '../core/collaboration/council-decision-engine.js';
+} from './collaboration/council-decision-engine.js';
 import { VoiceDefinition } from './archetype-definitions.js';
 
 /**

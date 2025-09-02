@@ -6,7 +6,7 @@
 import { ToolIntegration, LLMFunction, ToolCall } from './tool-integration.js';
 import { DomainAwareToolOrchestrator } from './domain-aware-tool-orchestrator.js';
 import { MCPServerManager } from '../../mcp-servers/mcp-server-manager.js';
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import { EventEmitter } from 'events';
 
 export interface EnhancedToolConfig {

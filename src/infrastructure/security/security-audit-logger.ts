@@ -13,14 +13,14 @@ export enum AuditEventType {
   RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
   INPUT_VALIDATION_FAILED = 'input_validation_failed',
   SYSTEM_EVENT = 'system_event',
-  ERROR_EVENT = 'error_event'
+  ERROR_EVENT = 'error_event',
 }
 
 export enum AuditSeverity {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 export enum AuditOutcome {
@@ -28,7 +28,7 @@ export enum AuditOutcome {
   FAILURE = 'failure',
   WARNING = 'warning',
   BLOCKED = 'blocked',
-  ERROR = 'error'
+  ERROR = 'error',
 }
 
 export interface AuditEvent {
@@ -67,62 +67,81 @@ export class SecurityAuditLogger {
   public logAuditEvent(event: Omit<AuditEvent, 'timestamp'>): void {
     const auditEvent: AuditEvent = {
       ...event,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     this.auditQueue.push(auditEvent);
-    
+
     // Log immediately for critical events
     if (event.severity === AuditSeverity.CRITICAL) {
       this.logEvent(auditEvent);
     }
-    
+
     // Flush queue if it gets too large
     if (this.auditQueue.length > 100) {
       this.flushAuditEvents();
     }
   }
 
-  public logAuthenticationEvent(outcome: AuditOutcome, userId?: string, details?: Record<string, unknown>): void {
+  public logAuthenticationEvent(
+    outcome: AuditOutcome,
+    userId?: string,
+    details?: Record<string, unknown>
+  ): void {
     this.logAuditEvent({
       eventType: AuditEventType.AUTHENTICATION,
       severity: outcome === AuditOutcome.FAILURE ? AuditSeverity.HIGH : AuditSeverity.LOW,
       outcome,
       userId,
-      details
+      details,
     });
   }
 
-  public logAuthorizationEvent(outcome: AuditOutcome, userId?: string, resource?: string, action?: string): void {
+  public logAuthorizationEvent(
+    outcome: AuditOutcome,
+    userId?: string,
+    resource?: string,
+    action?: string
+  ): void {
     this.logAuditEvent({
       eventType: AuditEventType.AUTHORIZATION,
       severity: outcome === AuditOutcome.BLOCKED ? AuditSeverity.HIGH : AuditSeverity.MEDIUM,
       outcome,
       userId,
       resource,
-      action
+      action,
     });
   }
 
-  public logToolExecutionEvent(outcome: AuditOutcome, toolName: string, userId?: string, details?: Record<string, unknown>): void {
+  public logToolExecutionEvent(
+    outcome: AuditOutcome,
+    toolName: string,
+    userId?: string,
+    details?: Record<string, unknown>
+  ): void {
     this.logAuditEvent({
       eventType: AuditEventType.TOOL_EXECUTION,
       severity: outcome === AuditOutcome.FAILURE ? AuditSeverity.MEDIUM : AuditSeverity.LOW,
       outcome,
       resource: toolName,
       userId,
-      details
+      details,
     });
   }
 
-  public logSecurityIncident(severity: AuditSeverity, description: string, userId?: string, details?: Record<string, unknown>): void {
+  public logSecurityIncident(
+    severity: AuditSeverity,
+    description: string,
+    userId?: string,
+    details?: Record<string, unknown>
+  ): void {
     this.logAuditEvent({
       eventType: AuditEventType.SECURITY_INCIDENT,
       severity,
       outcome: AuditOutcome.WARNING,
       userId,
       errorMessage: description,
-      details
+      details,
     });
   }
 
@@ -133,7 +152,7 @@ export class SecurityAuditLogger {
       outcome: AuditOutcome.BLOCKED,
       userId,
       errorMessage: reason,
-      details: { input: input.substring(0, 100) } // Log only first 100 chars for security
+      details: { input: input.substring(0, 100) }, // Log only first 100 chars for security
     });
   }
 
@@ -144,18 +163,22 @@ export class SecurityAuditLogger {
       outcome: AuditOutcome.BLOCKED,
       userId,
       resource,
-      details: { limit }
+      details: { limit },
     });
   }
 
-  public logSecurityViolation(userId: string, violation: string, details?: Record<string, unknown>): void {
+  public logSecurityViolation(
+    userId: string,
+    violation: string,
+    details?: Record<string, unknown>
+  ): void {
     this.logAuditEvent({
       eventType: AuditEventType.SECURITY_INCIDENT,
       severity: AuditSeverity.HIGH,
       outcome: AuditOutcome.ERROR,
       userId,
       errorMessage: violation,
-      details
+      details,
     });
   }
 
@@ -173,9 +196,9 @@ export class SecurityAuditLogger {
   public logEvent(event: AuditEvent): void {
     const logLevel = this.getLogLevel(event.severity);
     const message = `[AUDIT] ${event.eventType} - ${event.outcome} (${event.severity})`;
-    
+
     logger[logLevel](message, {
-      auditEvent: event
+      auditEvent: event,
     });
 
     // Also send to centralized audit system if configured

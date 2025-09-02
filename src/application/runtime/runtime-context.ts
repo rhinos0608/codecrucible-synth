@@ -26,8 +26,7 @@ interface ListenerRemover {
   return value != null && typeof (value as Disposable)?.dispose === 'function';
 }
 
-function hasRemoveAllListeners(value: unknown): value is ListenerRemover {
-  return typeof (value as ListenerRemover)?.removeAllListeners === 'function';
+  return value != null && typeof (value as ListenerRemover).removeAllListeners === 'function';
 }
 
 export interface RuntimeContext {

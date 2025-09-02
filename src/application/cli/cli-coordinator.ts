@@ -48,8 +48,8 @@ export class CLICoordinator {
    * Start interactive REPL-style session.
    */
   private async repl(session: CLISession): Promise<void> {
-    const interaction = this.interaction ?? new InteractionManager();
-    this.interaction = interaction;
+    const interaction = this.interaction!;
+    // this.interaction is guaranteed to be set before repl() is called
     let shouldContinue = true;
     while (shouldContinue) {
       const line = await interaction.ask('> ');

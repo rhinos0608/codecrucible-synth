@@ -44,7 +44,7 @@ export class ObservabilityCoordinator extends EventEmitter {
     this.metrics = new MetricsCollector(config.metrics);
     this.health = new HealthMonitor(config.health);
     this.alerts = new AlertManager(config.alerting);
-    this.telemetry = new TelemetryExporter(config.telemetry ?? { exporters: [] });
+    this.telemetry = new TelemetryExporter(config.telemetry);
   }
 
   async initialize(): Promise<void> {

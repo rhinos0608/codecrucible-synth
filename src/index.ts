@@ -17,6 +17,12 @@ import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-i
 // getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
+
+import { Command } from 'commander';
+import { readFile } from 'fs/promises';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
 import { program } from 'commander';
 import { getVersion } from './utils/version.js';
 
@@ -44,6 +50,27 @@ export type * from './domain/interfaces/workflow-orchestrator.js';
 export type * from './domain/interfaces/user-interaction.js';
 export type * from './domain/interfaces/event-bus.js';
 export type { CLIOptions, CLIContext } from './application/interfaces/unified-cli.js';
+
+
+const program = new Command();
+
+// Get package version
+async function getPackageVersion(): Promise<string> {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const packagePath = join(__dirname, '..', 'package.json');
+    const packageData = await readFile(packagePath, 'utf-8');
+    const packageJson = JSON.parse(packageData) as { version?: unknown };
+    if (typeof packageJson.version === 'string') {
+      return packageJson.version;
+    }
+    return '4.0.7-unified';
+  } catch {
+    return '4.0.7-unified';
+  }
+}
+
 
 /**
  * Initialize the unified system with comprehensive capabilities
@@ -446,21 +473,21 @@ program
       options: {
         interactive?: boolean;
         verbose?: boolean;
-        stream?: boolean;
-        intelligence?: boolean;
-        autonomous?: boolean;
-        performance?: boolean;
-        resilience?: boolean;
+        noStream?: boolean;
+        noIntelligence?: boolean;
+        noAutonomous?: boolean;
+        noPerformance?: boolean;
+        noResilience?: boolean;
       }
     ) => {
       const args = options.interactive ? ['interactive'] : prompt;
       const cliOptions: CLIOptions = {
         verbose: options.verbose ?? false,
-        stream: options.stream !== false,
-        contextAware: options.intelligence !== false,
-        autonomousMode: options.autonomous !== false,
-        performance: options.performance !== false,
-        resilience: options.resilience !== false,
+        stream: !options.noStream,
+        contextAware: !options.noIntelligence,
+        autonomousMode: !options.noAutonomous,
+        performance: !options.noPerformance,
+        resilience: !options.noResilience,
       };
 
       await runCLI(args, cliOptions, !!options.interactive);

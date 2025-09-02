@@ -165,7 +165,8 @@ export async function initialize(
 
     const mcpServerManager = new MCPServerManager(mcpConfig);
 
-    // Start MCP servers and await their readiness
+    // Prepare (initialize) MCP servers
+    await mcpServerManager.initialize();
     try {
       await mcpServerManager.startServers();
       logger.info('✅ MCP servers are ready for tool execution');
@@ -440,6 +441,7 @@ program
     async (
 
 
+
       prompt: string[] = [],
       options: {
         interactive?: boolean;
@@ -464,6 +466,7 @@ program
       await runCLI(args, cliOptions, !!options.interactive);
 
 
+
       prompt: string[],
       options: {
         interactive?: boolean;
@@ -476,6 +479,7 @@ program
       }
     ) => {
       const args: string[] = [];
+
 
       if (options.interactive) {
         args.push('interactive');
@@ -492,6 +496,24 @@ program
       if (options.noResilience) args.push('--no-resilience');
 
       await main();
+
+
+      if (options.interactive) {
+        args.push('interactive');
+      } else if (prompt && prompt.length > 0) {
+        args.push(...prompt);
+      }
+
+      // Add option flags to args for processing
+      if (options.verbose) args.push('--verbose');
+      if (options.noStream) args.push('--no-stream');
+      if (options.noIntelligence) args.push('--no-intelligence');
+      if (options.noAutonomous) args.push('--no-autonomous');
+      if (options.noPerformance) args.push('--no-performance');
+      if (options.noResilience) args.push('--no-resilience');
+
+      await main();
+
 
 
 

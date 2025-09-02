@@ -180,10 +180,8 @@ impl AnalysisTool {
                         "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
                         ts_metrics, regex_metrics
                     );
-                    regex_metrics
-                } else {
-                    ts_metrics
                 }
+                ts_metrics
             }
             None => {
                 warn!("tree-sitter parsing failed, falling back to regex metrics");

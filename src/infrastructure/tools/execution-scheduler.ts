@@ -6,14 +6,17 @@ export class ExecutionScheduler {
     let nextIndex = 0;
 
     const runTask = async (): Promise<void> => {
-      const current = nextIndex++;
-      if (current >= tasks.length) {
-        return;
-      }
-      try {
-        results[current] = await tasks[current]();
-      } finally {
-        await runTask();
+      while (true) {
+        const current = nextIndex++;
+        if (current >= tasks.length) {
+          return;
+        }
+        try {
+          results[current] = await tasks[current]();
+        } catch (e) {
+          // Optionally handle errors here, or rethrow if desired
+          throw e;
+        }
       }
     };
 

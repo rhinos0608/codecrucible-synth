@@ -16,7 +16,7 @@ export interface TelemetryExporterConfig {
 export class TelemetryExporter {
   private logger: ILogger = createLogger('TelemetryExporter');
 
-  constructor(private config: TelemetryExporterConfig = {}) {}
+  constructor(private config: TelemetryExporterConfig = { exporters: [] }) {}
 
   async initialize(): Promise<void> {
     // Validate configuration

@@ -80,6 +80,7 @@ export class MCPVoiceCoordinator extends EventEmitter {
       this.logger.debug('Selected connection', { decision });
 
       // Security validation
+
       try {
             throw new Error(`Request not authorized: requestId=${request.requestId}, capability=${request.capability}`);
           }
@@ -89,6 +90,9 @@ export class MCPVoiceCoordinator extends EventEmitter {
         throw err;
       }
       const safeContext = mcpContext;
+
+      const safeContext = await enhancedMCPSecuritySystem.validateRequest(mcpContext);
+
 
       // Placeholder: execute tools (not yet implemented)
       const mcpResults = tools.map(tool => ({

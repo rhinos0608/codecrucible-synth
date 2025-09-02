@@ -551,6 +551,20 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
   }
 
   /**
+   * Validate request data against security policies
+   */
+  async validateRequest(requestData: any): Promise<any> {
+    const policy = this.securityPolicies.get('default');
+    if (policy) {
+      const result = await this.validateInput(policy, requestData);
+      if (!result.valid) {
+        throw new Error(`Request failed security validation: ${result.violations.join(', ')}`);
+      }
+    }
+    return requestData;
+  }
+
+  /**
    * Filter response data
    */
   async filterResponse(connectionId: string, responseData: any): Promise<any> {

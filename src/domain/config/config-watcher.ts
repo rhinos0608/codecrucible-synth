@@ -10,9 +10,11 @@ export class ConfigWatcher {
 
   start(): void {
     if (this.watcher) return;
-    this.watcher = watch(this.filePath, async event => {
-      if (event === 'change') {
-        await this.onChange();
+        try {
+          await this.onChange();
+        } catch (error) {
+          console.error('Error in ConfigWatcher onChange callback:', error);
+        }
       }
     });
   }

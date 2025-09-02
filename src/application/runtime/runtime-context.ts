@@ -15,6 +15,20 @@ import {
 import { UnifiedSecurityValidator } from '../../domain/services/unified-security-validator.js';
 import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 
+interface Disposable {
+  dispose: () => Promise<void> | void;
+}
+
+interface ListenerRemover {
+  removeAllListeners: () => void;
+}
+
+  return value != null && typeof (value as Disposable)?.dispose === 'function';
+}
+
+  return value != null && typeof (value as ListenerRemover).removeAllListeners === 'function';
+}
+
 export interface RuntimeContext {
   eventBus: IEventBus;
   resourceCoordinator: UnifiedResourceCoordinator; // existing singleton wrapped for now
@@ -44,4 +58,33 @@ export function createRuntimeContext(opts: CreateRuntimeContextOptions): Runtime
  */
 export function createTestRuntimeContext(eventBus: IEventBus): RuntimeContext {
   return createRuntimeContext({ eventBus });
+}
+
+export function setConfigManager(
+  context: RuntimeContext,
+  configManager: UnifiedConfigurationManager
+): void {
+  context.configManager = configManager;
+}
+
+/**
+ * Dispose a runtime context and release underlying resources
+ */
+export async function disposeRuntimeContext(context: RuntimeContext): Promise<void> {
+  // Remove all event listeners to avoid leaks between tests or runs
+  context.eventBus.removeAllListeners();
+
+  const coordinator = context.resourceCoordinator;
+  if (coordinator !== unifiedResourceCoordinator) {
+    if (isDisposable(coordinator)) {
+      await coordinator.dispose();
+    } else if (hasRemoveAllListeners(coordinator)) {
+      coordinator.removeAllListeners();
+    }
+  }
+
+  const { configManager } = context;
+  if (configManager && hasRemoveAllListeners(configManager)) {
+    configManager.removeAllListeners();
+  }
 }

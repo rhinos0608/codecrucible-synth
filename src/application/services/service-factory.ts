@@ -4,7 +4,12 @@
  * Part of architectural debt remediation
  */
 
-import { RuntimeContext, createRuntimeContext } from '../runtime/runtime-context.js';
+import {
+  RuntimeContext,
+  createRuntimeContext,
+  disposeRuntimeContext,
+  setConfigManager,
+} from '../runtime/runtime-context.js';
 import {
   UnifiedOrchestrationService,
   createUnifiedOrchestrationServiceWithContext,
@@ -18,6 +23,7 @@ import {
   ResourceCoordinatorFactory,
 } from '../../infrastructure/performance/configurable-resource-coordinator.js';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
+import type { ILogger } from '../../domain/interfaces/logger.js';
 import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-user-interaction.js';
 import { EventBus } from '../../infrastructure/messaging/event-bus.js';
 
@@ -41,7 +47,10 @@ export class ServiceFactory {
   private configManager?: UnifiedConfigurationManager;
   private resourceCoordinator?: ConfigurableResourceCoordinator;
 
-  constructor(private config: ServiceFactoryConfig = {}) {
+  constructor(
+    private config: ServiceFactoryConfig = {},
+    private logger: ILogger = createLogger('ServiceFactory')
+  ) {
     this.runtimeContext = createRuntimeContext({
       eventBus: new EventBus(),
     });
@@ -76,14 +85,14 @@ export class ServiceFactory {
    */
   async createConfigurationManager(): Promise<UnifiedConfigurationManager> {
     if (!this.configManager) {
-      const logger = createLogger('ConfigurationManager'); // TODO: Get logger from context
       const eventBus = this.runtimeContext.eventBus;
 
       this.configManager = await createUnifiedConfigurationManager({
-        logger,
+        logger: this.logger,
         configFilePath: this.config.configFilePath,
         eventBus,
       });
+      setConfigManager(this.runtimeContext, this.configManager);
     }
     return this.configManager;
   }
@@ -118,13 +127,14 @@ export class ServiceFactory {
    */
   async dispose(): Promise<void> {
     if (this.resourceCoordinator) {
-      // ConfigurableResourceCoordinator doesn't have shutdown method in current implementation
-      // Just clean up reference
+      if (typeof this.resourceCoordinator.dispose === 'function') {
+        await this.resourceCoordinator.dispose();
+      }
       this.resourceCoordinator = undefined;
     }
 
-    // TODO: Implement proper cleanup for RuntimeContext
-    // await this.runtimeContext.dispose();
+    await disposeRuntimeContext(this.runtimeContext);
+    this.configManager = undefined;
   }
 
   // Private helper methods

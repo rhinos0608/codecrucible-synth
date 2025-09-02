@@ -15,6 +15,8 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
 
 // Colors for output
 const colors = {
@@ -24,7 +26,7 @@ const colors = {
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
-  cyan: '\x1b[36m'
+  cyan: '\x1b[36m',
 };
 
 function log(message, color = 'reset') {
@@ -47,34 +49,48 @@ function logWarning(message) {
   log(`⚠️  ${message}`, 'yellow');
 }
 
+function showBanner() {
+  log('', 'blue');
+  log('╔══════════════════════════════════════════════════════════════╗', 'blue');
+  const bannerWidth = 62;
+  const bannerText = `CodeCrucible Synth v${version}`;
+  const padTotal = bannerWidth - bannerText.length;
+  const padLeft = Math.floor(padTotal / 2);
+  const padRight = bannerWidth - bannerText.length - padLeft;
+  log(`║${' '.repeat(padLeft)}${bannerText}${' '.repeat(padRight)}║`, 'blue');
+  log('║          Autonomous AI Coding Assistant for Local Models    ║', 'blue');
+  log('╚══════════════════════════════════════════════════════════════╝', 'blue');
+  log('');
+}
+
 async function checkAutoSetup() {
   try {
     // Check if auto-setup is needed
-    const setupPath = join(__dirname, '../core/auto-setup.js');
+    const setupPath = join(__dirname, '../auto-setup.js');
     const setupUrl = new URL(`file:///${setupPath.replace(/\\/g, '/')}`);
     const setupModule = await import(setupUrl);
     const autoSetup = setupModule.autoSetup;
-    
+
     const setupStatus = await autoSetup.checkSetupStatus();
-    
+
     if (setupStatus.required) {
       logStep('First-time setup required...');
-      
+
       const setupResult = await autoSetup.performSetup();
-      
+
       if (setupResult.success) {
         logSuccess('Auto-setup completed successfully!');
         log(`Models: ${setupResult.details.models.join(', ')}`, 'green');
       } else {
         logWarning(`Setup partially completed: ${setupResult.message}`);
-        
+
         if (!setupResult.details.ollama) {
           logError('Ollama installation failed. Please install manually:');
           log('  Windows: https://ollama.com/download/windows', 'yellow');
           log('  macOS/Linux: curl -fsSL https://ollama.com/install.sh | sh', 'yellow');
           process.exit(1);
         }
-        
+
         if (setupResult.details.models.length === 0) {
           logWarning('No models installed. Continuing with basic functionality...');
         }
@@ -92,26 +108,26 @@ async function findMainEntry() {
     join(__dirname, '../index.js'),
     join(__dirname, '../src/index.ts'),
     join(__dirname, '../cli.js'),
-    join(__dirname, '../build/index.js')
+    join(__dirname, '../build/index.js'),
   ];
-  
+
   for (const path of possiblePaths) {
     if (existsSync(path)) {
       return path;
     }
   }
-  
+
   // If not found, try to build the project
   logStep('Built distribution not found, attempting to build...');
-  
+
   try {
     const packageRoot = join(__dirname, '..');
     process.chdir(packageRoot);
-    
+
     if (existsSync(join(packageRoot, 'package.json'))) {
       await execAsync('npm run build');
       logSuccess('Build completed successfully');
-      
+
       // Check again for dist files
       const distPath = join(__dirname, '../index.js');
       if (existsSync(distPath)) {
@@ -121,42 +137,44 @@ async function findMainEntry() {
   } catch (error) {
     logError(`Build failed: ${error.message}`);
   }
-  
+
   throw new Error('Could not find or build CodeCrucible Synth entry point');
 }
 
 async function main() {
   try {
-    // Show banner for first-time users
-    if (process.argv.includes('--help') || process.argv.includes('-h') || process.argv.length === 2) {
-      log('', 'blue');
-      log('╔══════════════════════════════════════════════════════════════╗', 'blue');
-      log('║               CodeCrucible Synth v3.8.4                     ║', 'blue');
-      log('║          Autonomous AI Coding Assistant for Local Models    ║', 'blue');
-      log('╚══════════════════════════════════════════════════════════════╝', 'blue');
-      log('');
+    const args = process.argv.slice(2);
+
+    if (args.includes('--version') || args.includes('-v')) {
+      console.log(version);
+      process.exit(0);
     }
-    
+
+    if (args.includes('--help') || args.includes('-h') || args.length === 0) {
+      showBanner();
+      console.log('Usage: crucible [options]');
+      process.exit(0);
+    }
+
     // Perform auto-setup if needed
     await checkAutoSetup();
-    
+
     // Find and execute main entry point
     const mainEntry = await findMainEntry();
-    
+
     // Import and run the main CLI
     const mainEntryUrl = new URL(`file:///${mainEntry.replace(/\\/g, '/')}`);
     const { main: cliMain } = await import(mainEntryUrl);
-    
+
     if (typeof cliMain === 'function') {
       await cliMain();
     } else {
       logError('Invalid main entry point found');
       process.exit(1);
     }
-    
   } catch (error) {
     logError(`Failed to start CodeCrucible Synth: ${error.message}`);
-    
+
     if (error.message.includes('ENOENT') || error.message.includes('Cannot resolve')) {
       log('');
       log('🔧 Troubleshooting:', 'yellow');
@@ -165,7 +183,7 @@ async function main() {
       log('  3. Or run from source: git clone && npm install && npm run dev', 'yellow');
       log('');
     }
-    
+
     process.exit(1);
   }
 }
@@ -181,13 +199,13 @@ process.on('SIGTERM', () => {
 });
 
 // Catch unhandled errors
-process.on('unhandledRejection', (error) => {
+process.on('unhandledRejection', error => {
   logError(`Unhandled error: ${error.message}`);
   process.exit(1);
 });
 
 // Run main function
-main().catch((error) => {
+main().catch(error => {
   logError(`Fatal error: ${error.message}`);
   process.exit(1);
 });

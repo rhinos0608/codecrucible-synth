@@ -193,9 +193,26 @@ impl AnalysisTool {
     }
 
     fn metrics_diverge(ts: &CodeMetrics, regex: &CodeMetrics) -> bool {
-        (regex.code_lines > 0 && ts.code_lines == 0)
+        // Absolute divergence for code_lines and functions (likely parser failure)
+        if (regex.code_lines > 0 && ts.code_lines == 0)
             || (regex.functions > 0 && ts.functions == 0)
-            || (regex.cyclomatic_complexity > 1 && ts.cyclomatic_complexity <= 1)
+        {
+            return true;
+        }
+        // Relative threshold for cyclomatic complexity
+        let ts_cc = ts.cyclomatic_complexity as f64;
+        let regex_cc = regex.cyclomatic_complexity as f64;
+        let max_cc = ts_cc.max(regex_cc);
+        let min_cc = ts_cc.min(regex_cc);
+        // If both are zero, no divergence
+        if max_cc == 0.0 {
+            return false;
+        }
+        // If the difference is more than 20% of the larger value, consider it a divergence
+        if (max_cc - min_cc) / max_cc > 0.2 {
+            return true;
+        }
+        false
     }
 
     fn calculate_metrics_tree_sitter(&self, code: &str) -> Option<CodeMetrics> {

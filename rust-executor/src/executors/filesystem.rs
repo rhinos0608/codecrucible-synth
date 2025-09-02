@@ -515,7 +515,7 @@ mod tests {
             recursive: None,
         };
 
-        let result = executor.execute_operation_internal(operation).unwrap();
+        let result = executor.execute_operation_internal(operation).await.unwrap();
         assert!(result.success);
 
         // Test read operation
@@ -527,7 +527,7 @@ mod tests {
             recursive: None,
         };
 
-        let result = executor.execute_operation_internal(operation).unwrap();
+        let result = executor.execute_operation_internal(operation).await.unwrap();
         assert!(result.success);
         assert_eq!(result.content.unwrap(), content);
     }
@@ -546,7 +546,7 @@ mod tests {
             recursive: Some(true),
         };
 
-        let result = executor.execute_operation_internal(operation).unwrap();
+        let result = executor.execute_operation_internal(operation).await.unwrap();
         assert!(result.success);
         assert!(test_dir.exists());
 
@@ -559,13 +559,13 @@ mod tests {
             recursive: None,
         };
 
-        let result = executor.execute_operation_internal(operation).unwrap();
+        let result = executor.execute_operation_internal(operation).await.unwrap();
         assert!(result.success);
         assert!(result.files.unwrap().len() > 0);
     }
 
-    #[test]
-    fn test_security_validation() {
+    #[tokio::test]
+    async fn test_security_validation() {
         let temp_dir = TempDir::new().unwrap();
         let security_context = SecurityContext::for_file_operations(temp_dir.path());
         let executor = FileSystemExecutor::new(security_context);
@@ -583,8 +583,8 @@ mod tests {
         assert!(executor.validate_operation(&operation).is_err());
     }
 
-    #[test]
-    fn test_file_size_limits() {
+    #[tokio::test]
+    async fn test_file_size_limits() {
         let temp_dir = TempDir::new().unwrap();
         let security_context = SecurityContext::for_file_operations(temp_dir.path());
         let mut executor = FileSystemExecutor::new(security_context);
@@ -599,7 +599,7 @@ mod tests {
             recursive: None,
         };
 
-        let result = executor.execute_operation_internal(operation);
+        let result = executor.execute_operation_internal(operation).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             FileSystemError::FileTooLarge { .. } => (),

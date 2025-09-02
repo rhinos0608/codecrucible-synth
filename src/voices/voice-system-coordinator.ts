@@ -30,7 +30,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
     logger?: ILogger
   ) {
     this.logger = logger ?? createLogger('VoiceSystem');
-    this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this, modelClient));
+    this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this));
     // NOTE: Call initialize() explicitly after construction.
   }
 
@@ -158,7 +158,7 @@ export class VoiceSystemCoordinator implements VoiceArchetypeSystemInterface {
 
   public setLivingSpiralCoordinator(_coordinator: unknown): void {
     // Update the council with the spiral coordinator if needed
-    this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this, this.modelClient));
+    this.council = new CouncilOrchestrator(new CouncilDecisionEngine(this));
   }
 
   public async synthesizeMultipleVoices(

@@ -138,6 +138,7 @@ export class ErrorRecoverySystem extends EventEmitter {
         // Clean up lock
         this.locks.delete(id);
       }
+      return action;
     } else {
       // If a recovery is already in progress, wait for it and reuse its result.
       try {
@@ -314,5 +315,9 @@ export class ErrorRecoverySystem extends EventEmitter {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((res) => setTimeout(res, ms));
+  }
+
+  clearHistory(): void {
+    this.history.length = 0;
   }
 }

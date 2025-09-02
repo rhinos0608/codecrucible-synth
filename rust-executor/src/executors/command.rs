@@ -64,8 +64,10 @@ const DEFAULT_ALLOWED_COMMANDS: &[&str] = &[
     // Development tools
     "git", "npm", "node", "python", "python3", "pip", "pip3", "rustc", "cargo",
     // System information
-    "echo", "pwd", "which", "whereis", "uname", "whoami", // Text processing
-    "sed", "awk", "cut", "tr", "jq", // Archive operations
+    "echo", "pwd", "which", "whereis", "uname", "whoami",
+    // Text processing
+    "sed", "awk", "cut", "tr", "jq",
+    // Archive operations
     "tar", "zip", "unzip", "gzip", "gunzip",
 ];
 
@@ -143,7 +145,7 @@ impl CommandExecutor {
     }
 
     fn load_command_whitelist(security_context: &SecurityContext) -> Vec<String> {
-        let mut commands: Vec<String> = if !security_context.command_allowlist.is_empty() {
+        let commands: Vec<String> = if !security_context.command_allowlist.is_empty() {
             security_context.command_allowlist.iter().cloned().collect()
         } else if let Ok(path) = std::env::var("COMMAND_ALLOWLIST_FILE") {
             match Self::load_whitelist_from_file(Path::new(&path)) {
@@ -669,34 +671,7 @@ impl CommandExecutor {
     }
 
     fn validate_command_name(&self, command: &str) -> Result<(), CommandExecutionError> {
-
         Self::validate_command_name_static(command)
-
-        // List of forbidden shell metacharacters
-        const SHELL_METACHARS: &[char] = &[
-            ';', '&', '|', '$', '>', '<', '`', '!', '*', '?', '~', '(', ')', '{', '}', '[', ']', '\'', '"'
-        ];
-        if command.trim().is_empty()
-            || command.contains(' ')
-            || command.contains('/')
-            || command.contains('\\')
-            || command.chars().any(|c| SHELL_METACHARS.contains(&c))
-        {
-            return Err(CommandExecutionError::InvalidArguments {
-                message: format!("Invalid command name: {}", command),
-            });
-        }
-
-        for pattern in &self.blocked_patterns {
-            if command.contains(pattern) {
-                return Err(CommandExecutionError::CommandNotAllowed {
-                    command: command.to_string(),
-                });
-            }
-        }
-
-        Ok(())
-
     }
 }
 

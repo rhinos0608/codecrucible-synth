@@ -31,8 +31,7 @@ async fn module_template_generates_compilable_code() {
         .await
         .unwrap();
     parse_file(&code).expect("Generated module should be valid Rust");
-
-use codecrucible_rust_executor::tools::GenerationTool;
+}
 
 #[tokio::test]
 async fn test_generate_function_with_params() {
@@ -67,5 +66,4 @@ async fn test_generate_function_defaults() {
         .expect("generation failed");
     assert!(result.contains("fn GeneratedItem() -> bool"));
     assert!(result.contains("false"));
-
 }

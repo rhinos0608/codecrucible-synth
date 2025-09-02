@@ -73,20 +73,25 @@ export class ServerMode implements ServerModeInterface {
 
       // Create mock user interaction for server mode
       const mockUserInteraction = {
-        display(message: string): void {
+        display(message: string): Promise<void> {
           logger.info(`[Server] ${message}`);
+          return Promise.resolve();
         },
-        warn(message: string): void {
+        warn(message: string): Promise<void> {
           logger.warn(`[Server] ${message}`);
+          return Promise.resolve();
         },
-        error(message: string): void {
+        error(message: string): Promise<void> {
           logger.error(`[Server] ${message}`);
+          return Promise.resolve();
         },
-        success(message: string): void {
+        success(message: string): Promise<void> {
           logger.info(`[Server] Success: ${message}`);
+          return Promise.resolve();
         },
-        progress(message: string, progress?: number): void {
+        progress(message: string, progress?: number): Promise<void> {
           logger.info(`[Server] Progress: ${message}${progress ? ` (${progress}%)` : ''}`);
+          return Promise.resolve();
         },
         prompt(question: string): Promise<string> {
           logger.info(`[Server] Prompt: ${question} (auto-responding: yes)`);

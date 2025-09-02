@@ -39,6 +39,14 @@ export class CommandRegistry {
     return this.commands.has(name);
   }
 
+  getCommand(name: string): { handler: (...args: readonly unknown[]) => unknown } | undefined {
+    const entry = this.commands.get(name);
+    if (!entry) {
+      return undefined;
+    }
+    return { handler: entry.handler };
+  }
+
   async execute(name: string, ...args: any[]): Promise<any> {
     const entry = this.commands.get(name);
     if (!entry) {

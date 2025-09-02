@@ -1,6 +1,6 @@
 use regex::Regex;
 use std::collections::HashMap;
-use tracing::{error, info, warn};
+use tracing::info;
 
 pub struct GenerationTool {
     templates: HashMap<String, &'static str>,
@@ -78,13 +78,33 @@ mod tests {{
         let context = self.extract_context(prompt);
 
         match generation_type.as_str() {
-            "function" => self.generate_function(&context),
-            "struct" => self.generate_struct(&context),
-            "module" => self.generate_module(&context),
-            "test" => self.generate_test(&context),
+            "function" => self.generate_from_template("function", &context),
+            "struct" => self.generate_from_template("struct", &context),
+            "module" => self.generate_from_template("module", &context),
+            "test" => self.generate_from_template("test", &context),
             "api" => self.generate_api_handler(&context),
             "error" => self.generate_error_type(&context),
             _ => self.generate_generic_code(&context),
+        }
+    }
+
+    fn generate_from_template(
+        &self,
+        template_name: &str,
+        context: &HashMap<String, String>,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        if let Some(template) = self.templates.get(template_name) {
+            let mut result = template.to_string();
+            
+            // Replace placeholders with context values
+            for (key, value) in context {
+                let placeholder = format!("{{{}}}", key);
+                result = result.replace(&placeholder, value);
+            }
+            
+            Ok(result)
+        } else {
+            Err(format!("Template '{}' not found", template_name).into())
         }
     }
 
@@ -142,16 +162,11 @@ mod tests {{
         }
 
         // Extract parameters
-
-        if let Some(params) = self.extract_parameters(prompt) {
-
         if let Some(params) = self.extract_params(prompt) {
-
             context.insert("params".to_string(), params);
         } else {
             context.insert("params".to_string(), String::new());
         }
-
 
         // Extract fields
         if let Some(fields) = self.extract_fields(prompt) {
@@ -188,38 +203,6 @@ mod tests {{
             context.insert("module_content".to_string(), content);
         } else {
             context.insert("module_content".to_string(), String::new());
-
-        // Extract struct fields and constructor info
-        if let Some(fields) = self.extract_fields(prompt) {
-            let field_defs = fields
-                .iter()
-                .map(|(name, ty)| format!("pub {}: {}", name, ty))
-                .collect::<Vec<_>>()
-                .join(",\n    ");
-
-            let constructor_params = fields
-                .iter()
-                .map(|(name, ty)| format!("{}: {}", name, ty))
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            let field_assignments = fields
-                .iter()
-                .map(|(name, _)| format!("{},", name))
-                .collect::<Vec<_>>()
-                .join("\n            ");
-
-            context.insert("fields".to_string(), field_defs);
-            context.insert("constructor_params".to_string(), constructor_params);
-            context.insert("field_assignments".to_string(), field_assignments);
-        } else {
-            context.insert("fields".to_string(), "// TODO: Add fields".to_string());
-            context.insert("constructor_params".to_string(), String::new());
-            context.insert(
-                "field_assignments".to_string(),
-                "// TODO: Assign fields".to_string(),
-            );
-
         }
 
         context
@@ -263,30 +246,14 @@ mod tests {{
         None
     }
 
-    fn extract_fields(&self, prompt: &str) -> Option<Vec<String>> {
-        if let Ok(re) = Regex::new(r"fields?:\s*([\w\s:,<>]+)") {
-            if let Some(cap) = re.captures(prompt) {
-                let raw = cap[1].trim();
-                let fields = raw
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>();
-                if !fields.is_empty() {
-                    return Some(fields);
-                }
-            }
-        }
-        None
-    }
-
     fn extract_module_content(&self, prompt: &str) -> Option<String> {
         if let Ok(re) = Regex::new(r"(?s)content:\s*(.*)") {
             if let Some(cap) = re.captures(prompt) {
                 return Some(cap[1].trim().to_string());
             }
         }
-        None
+    None
+}
 
     fn extract_params(&self, prompt: &str) -> Option<String> {
         // Look for explicit parameter list e.g., fn name(a: i32, b: String)
@@ -309,130 +276,17 @@ mod tests {{
         }
     }
 
-    fn extract_fields(&self, prompt: &str) -> Option<Vec<(String, String)>> {
+    fn extract_fields(&self, prompt: &str) -> Option<Vec<String>> {
         let field_regex = regex::Regex::new(r"(\w+)\s*:\s*([A-Za-z0-9_<>]+)").ok()?;
-        let fields: Vec<(String, String)> = field_regex
+        let fields: Vec<String> = field_regex
             .captures_iter(prompt)
-            .map(|c| (c[1].to_string(), c[2].to_string()))
+            .map(|c| format!("{}: {}", c[1].to_string(), c[2].to_string()))
             .collect();
         if fields.is_empty() {
             None
         } else {
             Some(fields)
         }
-
-    }
-
-    fn generate_function(
-        &self,
-        context: &HashMap<String, String>,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        let template = self.templates.get("function").unwrap();
-        let name = context
-            .get("name")
-            .cloned()
-            .unwrap_or_else(|| "generated_function".to_string());
-        let return_type = context
-            .get("return_type")
-            .cloned()
-            .unwrap_or_else(|| "()".to_string());
-        let default_return = context
-            .get("default_return")
-            .cloned()
-            .unwrap_or_else(|| "()".to_string());
-        let params = context.get("params").cloned().unwrap_or_default();
-
-        let code = template
-            .replace("{name}", &name)
-            .replace("{params}", &params)
-            .replace("{return_type}", &return_type)
-            .replace("{default_return}", &default_return);
-
-        Ok(code)
-    }
-
-    fn generate_struct(
-        &self,
-        context: &HashMap<String, String>,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        let template = self.templates.get("struct").unwrap();
-        let name = context
-            .get("name")
-            .cloned()
-            .unwrap_or_else(|| "GeneratedStruct".to_string());
-
-        let fields = context.get("fields").cloned().unwrap_or_default();
-=
-        let fields = context
-            .get("fields")
-            .cloned()
-            .unwrap_or_else(|| "// TODO: Add fields".to_string());
-
-        let constructor_params = context
-            .get("constructor_params")
-            .cloned()
-            .unwrap_or_default();
-        let field_assignments = context
-            .get("field_assignments")
-            .cloned()
-
-            .unwrap_or_default();
-
-            .unwrap_or_else(|| "// TODO: Assign fields".to_string());
-
-
-        let code = template
-            .replace("{name}", &name)
-            .replace("{fields}", &fields)
-            .replace("{constructor_params}", &constructor_params)
-            .replace("{field_assignments}", &field_assignments);
-
-        Ok(code)
-    }
-
-    fn generate_module(
-        &self,
-        context: &HashMap<String, String>,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        let template = self.templates.get("module").unwrap();
-        let name = context
-            .get("name")
-            .cloned()
-            .unwrap_or_else(|| "generated_module".to_string());
-        let description = context
-            .get("description")
-            .cloned()
-            .unwrap_or_else(|| "Generated module".to_string());
-
-        let content = context.get("module_content").cloned().unwrap_or_default();
-
-
-
-        let code = template
-            .replace("{name}", &name)
-            .replace("{description}", &description)
-
-            .replace("{content}", &content);
-
-            .replace("{content}", "// TODO: Add module content");
-
-
-        Ok(code)
-    }
-
-    fn generate_test(
-        &self,
-        context: &HashMap<String, String>,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        let template = self.templates.get("test").unwrap();
-        let name = context
-            .get("name")
-            .cloned()
-            .unwrap_or_else(|| "generated".to_string());
-
-        let code = template.replace("{test_name}", &name);
-
-        Ok(code)
     }
 
     fn generate_api_handler(

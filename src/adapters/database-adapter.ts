@@ -240,16 +240,27 @@ export class DatabaseAdapter extends EventEmitter {
       const result = await this.client.query(sql, params, { readReplica: true });
 
       // Use domain service to analyze the data
-      const analytics = this.analyticsService.analyzeVoiceInteractions(
-        result.rows.map(row => ({
-          sessionId: row['session_id'],
-          voiceName: row['voice_name'],
-          confidence: row['confidence'],
-          tokensUsed: row['tokens_used'],
-          createdAt: row['created_at'],
-          responseTime: row['response_time'],
-        }))
-      );
+      interface VoiceInteractionAnalyticsData {
+        sessionId: string;
+        voiceName: string;
+        confidence: number;
+        tokensUsed: number;
+        createdAt: Date;
+        responseTime?: number;
+      }
+
+      const analyticsData: VoiceInteractionAnalyticsData[] = result.rows.map((row: any) => ({
+        sessionId: row['session_id'],
+        voiceName: row['voice_name'],
+        confidence: row['confidence'],
+        tokensUsed: row['tokens_used'],
+        createdAt: row['created_at'],
+        responseTime: typeof row['response_time'] === 'number'
+          ? row['response_time']
+          : undefined,
+      }));
+
+      const analytics = this.analyticsService.analyzeVoiceInteractions(analyticsData);
 
       // Cache for 5 minutes
       await this.client.setCachedResult(cacheKey, analytics, 300);

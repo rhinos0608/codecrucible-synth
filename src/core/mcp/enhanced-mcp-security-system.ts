@@ -618,8 +618,10 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
     }
 
     // Recursively apply to nested objects
-    const entries = Array.isArray(result) ? result.entries() : Object.entries(result);
-    for (const [key, value] of entries as Iterable<[string, unknown]>) {
+    const entries: [string, unknown][] = Array.isArray(result)
+      ? (result as unknown[]).map((value, index) => [index.toString(), value])
+      : Object.entries(result);
+    for (const [key, value] of entries) {
       if (typeof value === 'object' && value !== null) {
         if (Array.isArray(result)) {
           result[parseInt(key, 10)] = this.applyFilteringRule(value, rule) as unknown;

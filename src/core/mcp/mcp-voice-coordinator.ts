@@ -81,15 +81,7 @@ export class MCPVoiceCoordinator extends EventEmitter {
 
       // Security validation
       try {
-        const securityContext = enhancedMCPSecuritySystem.getSecurityContext(request.requestId);
-        if (securityContext) {
-          const authorized = await enhancedMCPSecuritySystem.authorizeRequest(
-            request.requestId,
-            request.capability,
-            mcpContext
-          );
-          if (!authorized) {
-            throw new Error('Request not authorized');
+            throw new Error(`Request not authorized: requestId=${request.requestId}, capability=${request.capability}`);
           }
         }
       } catch (err) {

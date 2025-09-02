@@ -251,7 +251,7 @@ export async function initialize(
 
     // Create unified CLI with all capabilities
     const cli = new UnifiedCLI(cliOptions);
-    // Removed cli.initialize(orchestrator) as UnifiedCLI does not have an initialize method
+    await cli.initialize(orchestrator);
 
     const initTime = Date.now() - startTime;
     logger.info(`✅ Unified system initialized in ${initTime}ms`);
@@ -439,6 +439,7 @@ program
   .action(
     async (
 
+
       prompt: string[] = [],
       options: {
         interactive?: boolean;
@@ -461,6 +462,7 @@ program
       };
 
       await runCLI(args, cliOptions, !!options.interactive);
+
 
       prompt: string[],
       options: {
@@ -490,6 +492,9 @@ program
       if (options.noResilience) args.push('--no-resilience');
 
       await main();
+
+
+
 
     }
   );

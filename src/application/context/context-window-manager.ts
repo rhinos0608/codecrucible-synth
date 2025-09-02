@@ -10,8 +10,9 @@
  * while maximizing relevant information density.
  */
 
-import { readFile, stat, readdir } from 'fs/promises';
-import { join, relative, extname } from 'path';
+import { readFile, stat } from 'fs/promises';
+import { Stats } from 'fs';
+import { extname, relative } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
@@ -247,7 +248,7 @@ export class ContextWindowManager {
 
       try {
         const batchResults = await Promise.all(batchPromises);
-        const validResults = batchResults.filter(Boolean);
+        const validResults = batchResults.filter((result): result is FileAnalysisResult => result !== null);
         const filteredCount = batchResults.length - validResults.length;
 
         results.push(...validResults);
@@ -287,7 +288,11 @@ export class ContextWindowManager {
       // Check cache first
       const cacheKey = `${filePath}:${query.slice(0, 50)}`;
       if (this.analysisCache.has(cacheKey)) {
-        return this.analysisCache.get(cacheKey)!;
+        const cachedResult = this.analysisCache.get(cacheKey);
+        if (cachedResult) {
+          return cachedResult;
+        }
+        return null;
       }
 
       const stats = await stat(filePath);
@@ -352,12 +357,12 @@ export class ContextWindowManager {
     content: string,
     relativePath: string,
     query: string,
-    stats: any
+    stats: Stats
   ): number {
     let priority = 0.1; // Base priority for all files (was 0)
     const queryLower = query.toLowerCase();
     const pathLower = relativePath.toLowerCase();
-    const contentLower = content.toLowerCase();
+    // Removed unused variable 'contentLower'
 
     // Project analysis queries should include more files by default
     const isProjectAnalysis =
@@ -432,25 +437,26 @@ export class ContextWindowManager {
     availableTokens: number,
     strategy: 'priority' | 'hierarchical' | 'semantic'
   ): Promise<ContextChunk[]> {
-    const chunks: ContextChunk[] = [];
-    const currentChunk: FileAnalysisResult[] = [];
-    const currentTokens = 0;
-    const chunkId = 1;
+    // Removed unused variable 'chunks'
+    logger.debug(`Chunks initialized with strategy: ${strategy}`);
+    // Removed unused variable 'currentChunk'
+    const _currentTokens = 0;
+    const _chunkId = 1;
 
     logger.info(`🧩 Creating context chunks with ${strategy} strategy`);
 
     switch (strategy) {
       case 'priority':
-        return this.createPriorityChunks(files, availableTokens);
+        return Promise.resolve(this.createPriorityChunks(files, availableTokens));
 
       case 'hierarchical':
-        return this.createHierarchicalChunks(files, availableTokens);
+        return Promise.resolve(this.createHierarchicalChunks(files, availableTokens));
 
       case 'semantic':
-        return this.createSemanticChunks(files, availableTokens);
+        return Promise.resolve(this.createSemanticChunks(files, availableTokens));
 
       default:
-        return this.createPriorityChunks(files, availableTokens);
+        return Promise.resolve(this.createPriorityChunks(files, availableTokens));
     }
   }
 
@@ -501,7 +507,10 @@ export class ContextWindowManager {
     for (const file of files) {
       const dir = file.path.split('/').slice(0, -1).join('/') || 'root';
       if (!dirGroups.has(dir)) dirGroups.set(dir, []);
-      dirGroups.get(dir)!.push(file);
+      const group = dirGroups.get(dir);
+      if (group) {
+        group.push(file);
+      }
     }
 
     // Create chunks from directory groups
@@ -555,7 +564,7 @@ export class ContextWindowManager {
    */
   private finalizeChunk(files: FileAnalysisResult[], id: number, focusArea?: string): ContextChunk {
     const totalTokens = files.reduce((sum, f) => sum + f.tokens, 0);
-    const avgPriority = files.reduce((sum, f) => sum + f.priority, 0) / files.length;
+    const _avgPriority = files.reduce((sum, f) => sum + f.priority, 0) / files.length;
 
     return {
       id: `chunk-${id}`,
@@ -643,7 +652,11 @@ export class ContextWindowManager {
     // Rough estimation: 1 token ≈ 4 characters for code, 1 token ≈ 3.5 characters for text
     const cacheKey = text.slice(0, 100) + text.length;
     if (this.tokenCache.has(cacheKey)) {
-      return this.tokenCache.get(cacheKey)!;
+      const cachedValue = this.tokenCache.get(cacheKey);
+      if (cachedValue !== undefined) {
+        return cachedValue;
+      }
+      throw new Error(`Cache miss for key: ${cacheKey}`);
     }
 
     const estimated = Math.ceil(text.length / 3.8); // Conservative estimate

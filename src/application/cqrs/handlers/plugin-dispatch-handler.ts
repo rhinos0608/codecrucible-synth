@@ -1,15 +1,27 @@
 import type { Command, CommandHandler } from '../command-bus.js';
-import type { CommandRegistry } from '../../services/command-registry.js';
 
-export class PluginDispatchHandler implements CommandHandler<{ name: string; args: any[] }, any> {
+interface PluginExecutePayload { readonly name: string; readonly args: readonly unknown[]; }
+type PluginExecuteResult = unknown;
+
+interface PluginCommandEntry {
+  handler: (...args: readonly unknown[]) => unknown;
+}
+
+interface SafeCommandRegistry {
+  readonly getCommand: (name: string) => PluginCommandEntry | undefined;
+}
+
+export class PluginDispatchHandler implements CommandHandler<Readonly<PluginExecutePayload>, PluginExecuteResult> {
   public readonly type = 'plugin:execute';
 
-  constructor(private readonly registry: CommandRegistry) {}
+  public constructor(private readonly registry: SafeCommandRegistry) {}
 
-  async handle(command: Command<{ name: string; args: any[] }>): Promise<any> {
-    const { name, args } = command.payload || ({} as any);
+  public handle(command: Readonly<Command<Readonly<PluginExecutePayload>>>): PluginExecuteResult {
+    const { name, args } = command.payload;
     if (!name) throw new Error('plugin:execute missing command name');
-    return this.registry['commands'].get(name)!.handler(...(args || []));
+    const commandEntry = this.registry.getCommand(name);
+    if (!commandEntry) throw new Error(`Command not found: ${name}`);
+    return commandEntry.handler(...args);
   }
 }
 

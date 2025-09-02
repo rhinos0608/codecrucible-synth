@@ -172,10 +172,10 @@ export class ProductionIntegrationManager extends EventEmitter {
   private emergencyMode: boolean = false;
 
   // Component Instances
-  private hardeningSystem: ProductionHardeningSystem;
-  private securityAuditLogger: ProductionSecurityAuditLogger;
-  private resourceEnforcer: ProductionResourceEnforcer;
-  private observabilitySystem: ObservabilitySystem;
+  private hardeningSystem!: ProductionHardeningSystem;
+  private securityAuditLogger!: ProductionSecurityAuditLogger;
+  private resourceEnforcer!: ProductionResourceEnforcer;
+  private observabilitySystem!: ObservabilitySystem;
 
   // System State
   private systemStartTime: number;

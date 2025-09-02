@@ -8,7 +8,7 @@
 
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
-import { MetricsCollector } from '../monitoring/metrics-collector.js';
+import { MetricsCollector } from '../observability/metrics-collector.js';
 import { AdaptivePerformanceTuner, PerformanceMetrics } from './adaptive-performance-tuner.js';
 import { logger } from '../logging/logger.js';
 
@@ -96,48 +96,8 @@ export class PerformanceProfiler extends EventEmitter {
    * Initialize profiler-specific metrics in MetricsCollector
    */
   private initializeProfilerMetrics(): void {
-    // LLM inference profiling metrics
-    this.metricsCollector.registerHistogram(
-      'llm_inference_detailed_duration_seconds',
-      'Detailed LLM inference timing by provider and model',
-      ['provider', 'model', 'voice', 'operation_type'],
-      [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300]
-    );
-
-    // Tool execution profiling metrics
-    this.metricsCollector.registerHistogram(
-      'tool_execution_detailed_duration_seconds',
-      'Detailed tool execution timing by tool type',
-      ['tool_type', 'tool_name', 'execution_mode'],
-      [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10, 30]
-    );
-
-    // Prompt preparation metrics
-    this.metricsCollector.registerHistogram(
-      'prompt_preparation_duration_seconds',
-      'Time spent preparing and formatting prompts',
-      ['template_type', 'voice_count', 'complexity'],
-      [0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1]
-    );
-
-    // Event bus latency metrics
-    this.metricsCollector.registerHistogram(
-      'event_bus_latency_seconds',
-      'Event bus message processing latency',
-      ['event_type', 'handler_count'],
-      [0.0001, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25]
-    );
-
-    // Session and operation tracking
-    this.metricsCollector.registerGauge(
-      'active_profiling_sessions',
-      'Currently active profiling sessions'
-    );
-    this.metricsCollector.registerCounter(
-      'slow_operations_total',
-      'Total slow operations detected',
-      ['category', 'threshold']
-    );
+    // Metrics are registered dynamically when recorded
+    // No need for explicit registration with the current MetricsCollector API
   }
 
   /**
@@ -153,7 +113,14 @@ export class PerformanceProfiler extends EventEmitter {
     };
 
     this.activeSessions.set(id, session);
-    this.metricsCollector.setGauge('active_profiling_sessions', this.activeSessions.size);
+    this.metricsCollector.record({
+      name: 'active_profiling_sessions',
+      value: this.activeSessions.size,
+      timestamp: new Date(),
+      tags: {},
+      unit: 'count',
+      type: 'gauge'
+    });
 
     if (this.config.enableDetailedLogging) {
       logger.info(`Started profiling session: ${id}`);
@@ -225,36 +192,59 @@ export class PerformanceProfiler extends EventEmitter {
 
     switch (operation.category) {
       case 'llm_inference':
-        this.metricsCollector.observeHistogram(
-          'llm_inference_detailed_duration_seconds',
-          duration,
-          labels
-        );
+        this.metricsCollector.record({
+          name: 'llm_inference_detailed_duration_seconds',
+          value: duration,
+          timestamp: new Date(),
+          tags: labels || {},
+          unit: 'seconds',
+          type: 'histogram'
+        });
         break;
       case 'tool_execution':
-        this.metricsCollector.observeHistogram(
-          'tool_execution_detailed_duration_seconds',
-          duration,
-          labels
-        );
+        this.metricsCollector.record({
+          name: 'tool_execution_detailed_duration_seconds',
+          value: duration,
+          timestamp: new Date(),
+          tags: labels || {},
+          unit: 'seconds',
+          type: 'histogram'
+        });
         break;
       case 'prompt_preparation':
-        this.metricsCollector.observeHistogram(
-          'prompt_preparation_duration_seconds',
-          duration,
-          labels
-        );
+        this.metricsCollector.record({
+          name: 'prompt_preparation_duration_seconds',
+          value: duration,
+          timestamp: new Date(),
+          tags: labels || {},
+          unit: 'seconds',
+          type: 'histogram'
+        });
         break;
       case 'event_bus':
-        this.metricsCollector.observeHistogram('event_bus_latency_seconds', duration, labels);
+        this.metricsCollector.record({
+          name: 'event_bus_latency_seconds',
+          value: duration,
+          timestamp: new Date(),
+          tags: labels || {},
+          unit: 'seconds',
+          type: 'histogram'
+        });
         break;
     }
 
     // Check for slow operations
     if (duration * 1000 > this.config.slowOperationThresholdMs) {
-      this.metricsCollector.incrementCounter('slow_operations_total', {
-        category: operation.category,
-        threshold: this.config.slowOperationThresholdMs.toString(),
+      this.metricsCollector.record({
+        name: 'slow_operations_total',
+        value: 1,
+        timestamp: new Date(),
+        tags: {
+          category: operation.category,
+          threshold: this.config.slowOperationThresholdMs.toString(),
+        },
+        unit: 'count',
+        type: 'counter'
       });
 
       logger.warn(`Slow operation detected: ${operation.name} took ${duration.toFixed(3)}s`);
@@ -306,7 +296,14 @@ export class PerformanceProfiler extends EventEmitter {
     session.totalDuration = performance.now() - session.startTime;
 
     this.activeSessions.delete(sessionId);
-    this.metricsCollector.setGauge('active_profiling_sessions', this.activeSessions.size);
+    this.metricsCollector.record({
+      name: 'active_profiling_sessions',
+      value: this.activeSessions.size,
+      timestamp: new Date(),
+      tags: {},
+      unit: 'count',
+      type: 'gauge'
+    });
 
     if (this.config.enableDetailedLogging) {
       logger.info(`Ended profiling session: ${sessionId}`, {
@@ -474,7 +471,14 @@ export class PerformanceProfiler extends EventEmitter {
       this.operationHistory = this.operationHistory.slice(-5000);
     }
 
-    this.metricsCollector.setGauge('active_profiling_sessions', this.activeSessions.size);
+    this.metricsCollector.record({
+      name: 'active_profiling_sessions',
+      value: this.activeSessions.size,
+      timestamp: new Date(),
+      tags: {},
+      unit: 'count',
+      type: 'gauge'
+    });
   }
 
   /**

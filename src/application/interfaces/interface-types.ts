@@ -2,23 +2,23 @@
 // Migrated from src/core/types.ts - Application layer interfaces
 
 export interface REPLInterface {
-  showStatus(): void;
-  listModels(): void;
-  executePromptProcessing(
+  showStatus: () => void;
+  listModels: () => void;
+  executePromptProcessing: (
     prompt: string,
-    options?: Record<string, unknown>
-  ): Promise<Record<string, unknown>>;
+    options?: Readonly<Record<string, unknown>>
+  ) => Promise<Record<string, unknown>>;
 }
 
 // Model client interface
 export interface ModelClient {
-  generate(request: Record<string, unknown>): Promise<Record<string, unknown>>;
-  checkStatus(): Promise<boolean>;
+  generate: (request: Readonly<Record<string, unknown>>) => Promise<Record<string, unknown>>;
+  checkStatus: () => Promise<boolean>;
 }
 
 // Response Validator (placeholder)
 export const ResponseValidator = {
-  validate: (response: Record<string, unknown>): { isValid: boolean; errors: string[] } => ({ 
+  validate: (_response: Readonly<Record<string, unknown>>): { isValid: boolean; errors: string[] } => ({ 
     isValid: true, 
     errors: [] 
   }),

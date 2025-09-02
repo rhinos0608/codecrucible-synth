@@ -35,13 +35,13 @@ export interface CacheConfig {
   };
 }
 
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   key: string;
   value: T;
   timestamp: number;
   ttl: number;
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export class CacheManager extends EventEmitter {
@@ -69,11 +69,11 @@ export class CacheManager extends EventEmitter {
     }
   }
 
-  async set(
+  public set<T>(
     key: string,
-    value: any,
-    options?: { ttl?: number; tags?: string[]; metadata?: Record<string, any> }
-  ): Promise<void> {
+    value: T,
+    options?: { ttl?: number; tags?: string[]; metadata?: Record<string, unknown> }
+  ): void {
     try {
       if (this.cache.size >= this.config.maxSize) {
         this.evictOldest();
@@ -96,7 +96,7 @@ export class CacheManager extends EventEmitter {
     }
   }
 
-  async get<T = any>(key: string): Promise<T | null> {
+  public get<T = unknown>(key: string): T | null {
     try {
       const entry = this.cache.get(key);
       if (!entry) {
@@ -121,7 +121,7 @@ export class CacheManager extends EventEmitter {
     }
   }
 
-  async has(key: string): Promise<boolean> {
+  public has(key: string): boolean {
     const entry = this.cache.get(key);
     if (!entry) return false;
 
@@ -134,7 +134,7 @@ export class CacheManager extends EventEmitter {
     return true;
   }
 
-  async delete(key: string): Promise<boolean> {
+  public delete(key: string): boolean {
     const result = this.cache.delete(key);
     if (result) {
       this.emit('delete', { key });
@@ -142,7 +142,7 @@ export class CacheManager extends EventEmitter {
     return result;
   }
 
-  async clear(): Promise<void> {
+  public clear(): void {
     this.cache.clear();
     this.hitCount = 0;
     this.missCount = 0;
@@ -171,7 +171,7 @@ export class CacheManager extends EventEmitter {
     }, this.config.cleanupInterval);
   }
 
-  async stop(): Promise<void> {
+  public stop(): void {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
@@ -180,21 +180,21 @@ export class CacheManager extends EventEmitter {
     logger.info('CacheManager stopped');
   }
 
-  async destroy(): Promise<void> {
-    await this.stop();
+  public destroy(): void {
+    this.stop();
     this.cache.clear();
     this.removeAllListeners();
     logger.info('CacheManager destroyed');
   }
 
-  async getStats(): Promise<{
+  public getStats(): {
     size: number;
     hitCount: number;
     missCount: number;
     hitRate: number;
     maxSize: number;
     memoryUsage: string;
-  }> {
+  } {
     const totalRequests = this.hitCount + this.missCount;
     const hitRate = totalRequests > 0 ? (this.hitCount / totalRequests) * 100 : 0;
 

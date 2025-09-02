@@ -1,4 +1,4 @@
-import { createLogger } from '../logging/logger.js';
+import { createLogger } from '../logging/logger-adapter.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { MetricPoint } from './metrics-collector.js';
 import { SystemHealth } from './health-monitor.js';

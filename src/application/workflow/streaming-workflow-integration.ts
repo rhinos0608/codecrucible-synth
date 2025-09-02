@@ -15,15 +15,12 @@
 
 import { EventEmitter } from 'events';
 import {
-  StreamingManager,
   StreamChunk,
   StreamConfig,
+  StreamingManager,
 } from '../../infrastructure/streaming/streaming-manager.js';
-import { StreamToken } from '../../domain/types/core-types.js';
 import {
   AgenticWorkflowDisplay,
-  WorkflowPhase,
-  ProgressUpdate,
 } from './agentic-workflow-display.js';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
@@ -48,13 +45,13 @@ export interface StreamingProgress {
  * Integrates streaming responses with agentic workflow display
  */
 export class StreamingWorkflowIntegration extends EventEmitter {
-  private streamingManager: StreamingManager;
-  private workflowDisplay: AgenticWorkflowDisplay;
-  private activeStreams: Map<string, StreamingProgress> = new Map();
+  private readonly streamingManager: StreamingManager;
+  private readonly workflowDisplay: AgenticWorkflowDisplay;
+  private readonly activeStreams: Map<string, StreamingProgress> = new Map();
   private config: StreamingWorkflowConfig;
-  private progressIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private readonly progressIntervals: Map<string, NodeJS.Timeout> = new Map();
 
-  constructor(
+  public constructor(
     streamingManager: StreamingManager,
     workflowDisplay: AgenticWorkflowDisplay,
     config: StreamingWorkflowConfig = {}
@@ -74,7 +71,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
   /**
    * Start streaming a response with real-time workflow visualization
    */
-  async startStreamingWithWorkflow(
+  public async startStreamingWithWorkflow(
     sessionId: string,
     stepId: string,
     content: string,
@@ -83,9 +80,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
     logger.info(`🌊 Starting streaming workflow for ${operationType}`);
 
     const startTime = Date.now();
-    const tokensGenerated = 0;
-    const currentContent = '';
-    const lastUpdate = Date.now();
+    // Removed unused variables: tokensGenerated, currentContent, lastUpdate
 
     // Initialize streaming progress tracking
     const streamProgress: StreamingProgress = {
@@ -106,7 +101,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
     // Set up progress interval for smooth updates
     const progressInterval = setInterval(() => {
       this.updateStreamingProgress(streamProgress, startTime);
-    }, this.config.updateInterval!);
+    }, this.config.updateInterval);
 
     this.progressIntervals.set(stepId, progressInterval);
 
@@ -114,7 +109,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
       // Start the actual stream with chunk processing
       const result = await this.streamingManager.startModernStream(
         content,
-        (chunk: StreamChunk) => this.handleStreamChunk(chunk, streamProgress, startTime),
+        (chunk: Readonly<StreamChunk>) => { this.handleStreamChunk(chunk, streamProgress, startTime); },
         this.config
       );
 
@@ -123,6 +118,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
       this.progressIntervals.delete(stepId);
 
       const finalElapsed = Date.now() - startTime;
+      const { tokensGenerated } = streamProgress;
       const finalThroughput = tokensGenerated > 0 ? (tokensGenerated / finalElapsed) * 1000 : 0;
 
       this.workflowDisplay.updateStepProgress(
@@ -195,7 +191,7 @@ export class StreamingWorkflowIntegration extends EventEmitter {
           // Show live content if enabled
           if (
             this.config.showTokens &&
-            progress.currentContent.length <= this.config.maxDisplayTokens!
+            progress.currentContent.length <= (this.config.maxDisplayTokens ?? 100)
           ) {
             console.log(chunk.delta, { end: '' }); // Real-time token display
           }

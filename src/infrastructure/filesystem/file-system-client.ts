@@ -74,13 +74,12 @@ export interface FileWatchEvent {
  * Handles file system operations without business logic
  */
 export class FileSystemClient extends EventEmitter {
-  private readonly config: FileSystemConfig;
+  private readonly config!: FileSystemConfig;
   private readonly watchers: Map<string, fsSync.FSWatcher> = new Map();
   private operationHistory: FileOperation[] = [];
 
-  constructor(config: FileSystemConfig) {
+  public constructor(private readonly _config: Readonly<FileSystemConfig>) {
     super();
-    this.config = config;
   }
 
   /**

@@ -54,7 +54,7 @@ export class AutonomousCodebaseAnalyzer {
     this.codebaseAnalyzer = new CodebaseAnalyzer(workingDirectory);
   }
 
-  async performComprehensiveAnalysis(): Promise<CodebaseAnalysis> {
+  public async performComprehensiveAnalysis(): Promise<CodebaseAnalysis> {
     // Leverage existing analyzer
     const analysisText = await this.codebaseAnalyzer.performAnalysis();
 
@@ -64,11 +64,11 @@ export class AutonomousCodebaseAnalyzer {
 
   private parseAnalysisToStructuredFormat(analysisText: string): CodebaseAnalysis {
     // Simple parsing of the analysis text to create structured output
-    const lines = analysisText.split('\n');
+    const _lines = analysisText.split('\n');
 
     // Extract basic metrics (this is a simplified implementation)
-    const fileCount = (analysisText.match(/\d+\s+files?/i) || ['0 files'])[0];
-    const totalFiles = parseInt(fileCount) || 0;
+    const [fileCount = '0 files'] = analysisText.match(/\d+\s+files?/i) ?? [];
+    const totalFiles = parseInt(fileCount, 10) || 0;
 
     // Determine complexity based on file count and content
     let complexity: 'low' | 'medium' | 'high' = 'low';

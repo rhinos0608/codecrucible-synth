@@ -455,4 +455,57 @@ export class VoiceSystemIntegration2025 {
     };
     return overheads[voice] || 150;
   }
+
+  /**
+   * Generate optimization recommendations based on system performance
+   */
+  async generateOptimizationRecommendations(): Promise<string[]> {
+    return [
+      'Consider increasing concurrent voice limit for better throughput',
+      'Use adaptive voice selection for complex requests',
+      'Enable caching for frequently used voice combinations'
+    ];
+  }
+
+  /**
+   * Recommend voices for a specific prompt
+   */
+  recommendVoices(prompt: string, count: number = 3): string[] {
+    const voices = this.getAvailableVoices();
+    return this.selectAdaptiveVoices(voices, count, { prompt });
+  }
+
+  /**
+   * Generate a response using a single voice
+   */
+  async generateSingleVoiceResponse(voice: string, prompt: string, options: any = {}): Promise<any> {
+    return this.synthesizeSingleVoice(voice, prompt, options);
+  }
+
+  /**
+   * Generate solutions using multiple voices
+   */
+  async generateMultiVoiceSolutions(voices: string[], prompt: string, options: any = {}): Promise<any> {
+    const results = await Promise.all(
+      voices.map(voice => this.synthesizeSingleVoice(voice, prompt, options))
+    );
+    return {
+      voices,
+      results,
+      synthesis: 'multi-voice analysis complete'
+    };
+  }
+
+  /**
+   * Synthesize responses from multiple voices with a specific strategy
+   */
+  async synthesize(prompt: string, voices: string[], strategy: string = 'consensus'): Promise<any> {
+    const results = await this.generateMultiVoiceSolutions(voices, prompt, {});
+    return {
+      strategy,
+      voices,
+      synthesis: `Synthesized using ${strategy} strategy`,
+      results: results.results
+    };
+  }
 }

@@ -137,7 +137,7 @@ export function resetConfig(): void {
  * Validate that required environment variables are set
  */
 export function validateRequiredConfig(): { valid: boolean; missing: string[] } {
-  const config = getConfig();
+  const _config = getConfig();
   const missing: string[] = [];
 
   // Add validation for required fields based on your needs

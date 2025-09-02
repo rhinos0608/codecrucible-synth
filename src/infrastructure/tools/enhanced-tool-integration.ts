@@ -287,7 +287,9 @@ export class EnhancedToolIntegration extends EventEmitter {
     if (this.executionCache.size >= this.config.cacheSize) {
       // Remove oldest entry
       const oldestKey = this.executionCache.keys().next().value;
-      this.executionCache.delete(oldestKey);
+      if (oldestKey !== undefined) {
+        this.executionCache.delete(oldestKey);
+      }
     }
 
     const cacheKey = this.generateCacheKey(toolCall);

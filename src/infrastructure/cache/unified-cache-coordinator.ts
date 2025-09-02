@@ -17,7 +17,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../../infrastructure/logging/logger.js';
-import { getUnifiedCache, UnifiedCacheSystem } from './unified-cache-system.js';
+import { UnifiedCacheSystem, getUnifiedCache } from './unified-cache-system.js';
 
 export interface CacheCoordinationConfig {
   enableGlobalCoordination: boolean;
@@ -41,10 +41,19 @@ export interface CacheLevel {
 export interface CacheSystemInfo {
   name: string;
   type: 'unified' | 'specialized' | 'legacy';
-  instance: any;
+  instance: CacheInstance;
   metrics: CacheMetrics;
   lastAccessed: number;
   conflicts: number;
+}
+
+export interface CacheInstance {
+  get: (key: string) => Promise<unknown>;
+  set: (key: string, value: unknown, options?: Record<string, unknown>) => Promise<void>;
+  delete: (key: string) => Promise<boolean>;
+  clear?: () => Promise<void>;
+  getStats?: () => Promise<CacheMetrics>;
+  cleanup?: () => Promise<void>;
 }
 
 export interface CacheMetrics {
@@ -126,7 +135,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
   /**
    * Start cache coordination
    */
-  startCoordination(): void {
+  public startCoordination(): void {
     if (this.isCoordinating) {
       logger.warn('Cache coordination already started');
       return;
@@ -134,7 +143,9 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
     this.isCoordinating = true;
     this.coordinationIntervalId = setInterval(() => {
-      this.performCoordinationCycle();
+      this.performCoordinationCycle().catch(error => {
+        logger.error('Error during scheduled coordination cycle:', error);
+      });
     }, this.config.coordinationInterval);
 
     logger.info('🚀 Cache coordination started', {
@@ -143,7 +154,9 @@ export class UnifiedCacheCoordinator extends EventEmitter {
     });
 
     // Perform initial coordination
-    this.performCoordinationCycle();
+    this.performCoordinationCycle().catch(error => {
+      logger.error('Error during initial coordination cycle:', error);
+    });
   }
 
   /**
@@ -162,10 +175,10 @@ export class UnifiedCacheCoordinator extends EventEmitter {
   /**
    * Register a cache system for coordination
    */
-  registerCacheSystem(
+  public registerCacheSystem(
     name: string,
     type: 'unified' | 'specialized' | 'legacy',
-    instance: any
+    instance: CacheInstance
   ): void {
     const systemInfo: CacheSystemInfo = {
       name,
@@ -212,13 +225,11 @@ export class UnifiedCacheCoordinator extends EventEmitter {
   /**
    * Coordinated cache get operation
    */
-  async get(key: string, preferredSystem?: string): Promise<any> {
-    const startTime = Date.now();
-
+  public async get(key: string, preferredSystem?: string): Promise<unknown> {
     try {
       // Try preferred system first
       if (preferredSystem && this.registeredSystems.has(preferredSystem)) {
-        const result = await this.getFromSystem(key, preferredSystem);
+        const result: unknown = await this.getFromSystem(key, preferredSystem);
         if (result !== null) {
           this.updateAccessMetrics(preferredSystem, 'hit');
           return result;
@@ -227,13 +238,13 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
       // Try systems in priority order
       const systemsByPriority = Array.from(this.registeredSystems.entries()).sort(
-        ([, a], [, b]) => this.systemPriorities.get(b.name)! - this.systemPriorities.get(a.name)!
+        ([, a], [, b]) => (this.systemPriorities.get(b.name) ?? 0) - (this.systemPriorities.get(a.name) ?? 0)
       );
 
-      for (const [systemName, systemInfo] of systemsByPriority) {
+      for (const [systemName, _] of systemsByPriority) {
         if (systemName === preferredSystem) continue; // Already tried
 
-        const result = await this.getFromSystem(key, systemName);
+        const result: unknown = await this.getFromSystem(key, systemName);
         if (result !== null) {
           this.updateAccessMetrics(systemName, 'hit');
 
@@ -256,15 +267,15 @@ export class UnifiedCacheCoordinator extends EventEmitter {
   /**
    * Coordinated cache set operation
    */
-  async set(
+  public async set(
     key: string,
-    value: any,
-    options?: {
-      ttl?: number;
-      systems?: string[];
-      priority?: number;
-      metadata?: any;
-    }
+    value: unknown,
+    options?: Readonly<{
+      readonly ttl?: number;
+      readonly systems?: readonly string[];
+      readonly priority?: number;
+      readonly metadata?: unknown;
+    }>
   ): Promise<boolean> {
     try {
       const targetSystems = options?.systems || ['unified-cache'];
@@ -287,7 +298,10 @@ export class UnifiedCacheCoordinator extends EventEmitter {
         results.push(success);
 
         if (success) {
-          this.keyMapping.get(key)!.add(systemName);
+          const keySet = this.keyMapping.get(key);
+          if (keySet) {
+            keySet.add(systemName);
+          }
           this.updateAccessMetrics(systemName, 'set');
         }
       }
@@ -295,7 +309,8 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       const success = results.some(Boolean);
 
       // Check for conflicts
-      if (this.keyMapping.get(key)!.size > 1) {
+      const keySet = this.keyMapping.get(key);
+      if (keySet && keySet.size > 1) {
         await this.resolveKeyConflict(key);
       }
 
@@ -373,7 +388,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
   /**
    * Get coordination statistics
    */
-  getCoordinationStats(): CacheCoordinationStats {
+  public getCoordinationStats(): CacheCoordinationStats {
     const systemMetrics: Record<string, CacheMetrics> = {};
     let totalSize = 0;
     let totalHits = 0;
@@ -389,7 +404,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
     return {
       totalSystems: this.registeredSystems.size,
       activeSystems: Array.from(this.registeredSystems.values()).filter(
-        s => Date.now() - s.lastAccessed < 300000
+        (s: Readonly<CacheSystemInfo>) => Date.now() - s.lastAccessed < 300000
       ).length,
       totalCacheSize: totalSize,
       globalHitRate: totalRequests > 0 ? totalHits / totalRequests : 0,
@@ -403,7 +418,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
   /**
    * Get cache health report
    */
-  getCacheHealthReport(): any {
+  public getCacheHealthReport(): Record<string, unknown> {
     const stats = this.getCoordinationStats();
     const recentConflicts = this.conflicts.filter(c => Date.now() - c.timestamp < 3600000); // Last hour
 
@@ -437,7 +452,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       await this.detectAndResolveConflicts();
 
       // Optimize cache distribution
-      await this.optimizeCacheDistribution();
+      this.optimizeCacheDistribution();
 
       // Clean up expired entries
       await this.cleanupExpiredEntries();
@@ -456,7 +471,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
     }
   }
 
-  private async getFromSystem(key: string, systemName: string): Promise<any> {
+  private async getFromSystem(key: string, systemName: string): Promise<unknown> {
     const system = this.registeredSystems.get(systemName);
     if (!system) return null;
 
@@ -464,8 +479,23 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       system.lastAccessed = Date.now();
 
       if (typeof system.instance.get === 'function') {
-        const result = await system.instance.get(key);
-        return result?.value !== undefined ? result.value : result !== null ? result : null;
+        const result: unknown = await system.instance.get(key);
+
+        // If result is an object with a 'value' property, return that
+        if (
+          result !== null &&
+          typeof result === 'object' &&
+          'value' in result
+        ) {
+          return (result as { value: unknown }).value;
+        }
+
+        // Otherwise, return result if not null/undefined
+        if (result !== null && result !== undefined) {
+          return result;
+        }
+
+        return null;
       }
 
       return null;
@@ -477,9 +507,14 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
   private async setInSystem(
     key: string,
-    value: any,
+    value: unknown,
     systemName: string,
-    options?: any
+    options?: Readonly<{
+      readonly ttl?: number;
+      readonly systems?: readonly string[];
+      readonly priority?: number;
+      readonly metadata?: unknown;
+    }>
   ): Promise<boolean> {
     const system = this.registeredSystems.get(systemName);
     if (!system) return false;
@@ -519,7 +554,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
 
   private async propagateToHigherPrioritySystems(
     key: string,
-    value: any,
+    value: unknown,
     sourceSystem: string
   ): Promise<void> {
     const sourcePriority = this.systemPriorities.get(sourceSystem) || 0;
@@ -563,6 +598,10 @@ export class UnifiedCacheCoordinator extends EventEmitter {
         break;
       case 'size':
         await this.resolveBySize(key, systems);
+        break;
+      default:
+        // Fallback to priority resolution if strategy is unknown
+        await this.resolveByPriority(key, systems);
         break;
     }
 
@@ -642,10 +681,9 @@ export class UnifiedCacheCoordinator extends EventEmitter {
     }
   }
 
-  private async optimizeCacheDistribution(): Promise<void> {
+  private optimizeCacheDistribution(): void {
     // Move frequently accessed items to higher priority systems
     // This is a simplified implementation
-    const hotKeys = new Map<string, number>(); // key -> access count
 
     // Implementation would track access patterns and optimize distribution
     logger.debug('Cache distribution optimization completed');
@@ -686,6 +724,9 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       case 'delete':
         system.metrics.deletes++;
         break;
+      default:
+        // No action for unknown operation
+        break;
     }
 
     // Update hit rate
@@ -707,6 +748,9 @@ export class UnifiedCacheCoordinator extends EventEmitter {
       case 'delete':
         this.globalMetrics.deletes++;
         break;
+      default:
+        // No action for unknown operation
+        break;
     }
 
     // Update global hit rate
@@ -714,16 +758,49 @@ export class UnifiedCacheCoordinator extends EventEmitter {
     this.globalMetrics.hitRate = total > 0 ? this.globalMetrics.hits / total : 0;
   }
 
-  private normalizeMetrics(stats: any): CacheMetrics {
+  private normalizeMetrics(stats: unknown): CacheMetrics {
+    if (
+      typeof stats === 'object' &&
+      stats !== null &&
+      'hits' in stats &&
+      'misses' in stats &&
+      'sets' in stats &&
+      'deletes' in stats &&
+      'evictions' in stats &&
+      'size' in stats &&
+      'hitRate' in stats &&
+      'memoryUsage' in stats
+    ) {
+      const s = stats as {
+        hits?: number;
+        misses?: number;
+        sets?: number;
+        deletes?: number;
+        evictions?: number;
+        size?: number;
+        hitRate?: number;
+        memoryUsage?: number;
+      };
+      return {
+        hits: s.hits ?? 0,
+        misses: s.misses ?? 0,
+        sets: s.sets ?? 0,
+        deletes: s.deletes ?? 0,
+        evictions: s.evictions ?? 0,
+        size: s.size ?? 0,
+        hitRate: s.hitRate ?? 0,
+        memoryUsage: s.memoryUsage ?? 0,
+      };
+    }
     return {
-      hits: stats.hits || 0,
-      misses: stats.misses || 0,
-      sets: stats.sets || 0,
-      deletes: stats.deletes || 0,
-      evictions: stats.evictions || 0,
-      size: stats.size || 0,
-      hitRate: stats.hitRate || 0,
-      memoryUsage: stats.memoryUsage || 0,
+      hits: 0,
+      misses: 0,
+      sets: 0,
+      deletes: 0,
+      evictions: 0,
+      size: 0,
+      hitRate: 0,
+      memoryUsage: 0,
     };
   }
 
@@ -740,7 +817,7 @@ export class UnifiedCacheCoordinator extends EventEmitter {
   }
 
   private calculateOverallHealth(): 'excellent' | 'good' | 'fair' | 'poor' {
-    const hitRate = this.globalMetrics.hitRate;
+    const { hitRate } = this.globalMetrics;
     const recentConflicts = this.conflicts.filter(c => Date.now() - c.timestamp < 3600000).length;
 
     if (hitRate > 0.8 && recentConflicts < 5) return 'excellent';
@@ -799,7 +876,25 @@ export class UnifiedCacheCoordinator extends EventEmitter {
   }
 
   private registerUnifiedCache(): void {
-    this.registerCacheSystem('unified-cache', 'unified', this.unifiedCache);
+    // Create adapter to match CacheInstance interface
+    const unifiedCacheAdapter: CacheInstance = {
+      get: async (key: string) => this.unifiedCache.get(key),
+      set: async (key: string, value: unknown, options?: Record<string, unknown>) => {
+        await this.unifiedCache.set(key, value, options);
+        return; // Convert boolean to void
+      },
+      delete: async (key: string) => this.unifiedCache.delete(key),
+      clear: async () => this.unifiedCache.clear(),
+      getStats: async () => this.unifiedCache.getStats(),
+      cleanup: async () => {
+        const unifiedCacheWithCleanup = this.unifiedCache as UnifiedCacheSystem & { cleanup?: () => Promise<void> };
+        if (typeof unifiedCacheWithCleanup.cleanup === 'function') {
+          await unifiedCacheWithCleanup.cleanup();
+        }
+      },
+    };
+    
+    this.registerCacheSystem('unified-cache', 'unified', unifiedCacheAdapter);
   }
 
   private setupSystemPriorities(): void {

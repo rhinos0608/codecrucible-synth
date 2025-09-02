@@ -9,13 +9,12 @@ export class CLIParser {
   /**
    * Parse slash commands for role switching
    */
-  static parseSlashCommand(input: string): { command: string; role?: string; content: string } {
+  public static parseSlashCommand(input: string): { command: string; role?: string; content: string } {
     const slashCommandRegex = /^\/(\w+)(?:\s+(.*))?$/;
     const match = input.match(slashCommandRegex);
 
     if (match) {
-      const command = match[1];
-      const content = match[2] || '';
+      const [_, command, content = ''] = match;
 
       switch (command) {
         case 'auditor':
@@ -37,8 +36,13 @@ export class CLIParser {
   /**
    * Parse command line arguments into structured options
    */
-  static parseOptions(args: string[]): CLIOptions {
+  public static parseOptions(args: readonly string[]): CLIOptions {
     const options: CLIOptions = {};
+
+    // Ensure a return value in all code paths
+    if (args.length === 0) {
+      return options;
+    }
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
@@ -54,10 +58,9 @@ export class CLIParser {
               i++;
             }
             break;
-
           case 'mode':
             if (nextArg && !nextArg.startsWith('--')) {
-              options.mode = nextArg as any;
+              options.mode = nextArg as 'agentic' | 'iterative' | 'competitive' | 'collaborative' | 'consensus' | 'comprehensive' | 'analysis';
               i++;
             }
             break;
@@ -106,7 +109,7 @@ export class CLIParser {
 
           case 'backend':
             if (nextArg && !nextArg.startsWith('--')) {
-              options.backend = nextArg as any;
+              options.backend = nextArg as 'auto' | 'docker' | 'e2b' | 'local_e2b' | 'local_process' | 'firecracker' | 'podman';
               i++;
             }
             break;
@@ -281,28 +284,32 @@ export class CLIParser {
           case 'project':
             options.project = true;
             break;
+          default:
+            console.warn(`Unknown option: ${key}`);
+            break;
         }
-      } else if (arg.startsWith('-') && arg.length === 2) {
-        // Short flags
-        const flag = arg[1];
-        switch (flag) {
-          case 'v':
+      } else if (arg.startsWith('-') && !arg.startsWith('--')) {
+        switch (arg) {
+          case '-v':
             options.verbose = true;
             break;
-          case 'q':
+          case '-q':
             options.quiet = true;
             break;
-          case 'i':
+          case '-i':
             options.interactive = true;
             break;
-          case 'f':
+          case '-f':
             options.fast = true;
             break;
-          case 's':
+          case '-s':
             options.spiral = true;
             break;
-          case 'a':
+          case '-a':
             options.autonomous = true;
+            break;
+          default:
+            console.warn(`Unknown short option: ${arg}`);
             break;
         }
       }
@@ -314,7 +321,7 @@ export class CLIParser {
   /**
    * Extract the main command from arguments
    */
-  static extractCommand(args: string[]): { command: string; remainingArgs: string[] } {
+  public static extractCommand(args: readonly string[]): { command: string; remainingArgs: string[] } {
     const commands = ['analyze', 'generate', 'status', 'models', 'configure', 'help'];
 
     for (let i = 0; i < args.length; i++) {
@@ -329,21 +336,21 @@ export class CLIParser {
 
     return {
       command: '',
-      remainingArgs: args,
+      remainingArgs: [...args],
     };
   }
 
   /**
    * Check if arguments contain help flags
    */
-  static isHelpRequest(args: string[]): boolean {
+  public static isHelpRequest(args: readonly string[]): boolean {
     return args.includes('--help') || args.includes('-h') || args.includes('help');
   }
 
   /**
    * Get non-option arguments (potential prompts or files)
    */
-  static getNonOptionArgs(args: string[]): string[] {
+  public static getNonOptionArgs(args: readonly string[]): string[] {
     const nonOptions: string[] = [];
 
     for (let i = 0; i < args.length; i++) {
@@ -385,3 +392,9 @@ export class CLIParser {
     return optionsWithValues.includes(option);
   }
 }
+
+
+
+// Removed duplicate extractCommand function to resolve conflicts.
+
+

@@ -59,8 +59,7 @@ export class E2BTerminalTool {
 
   async initialize(): Promise<void> {
     try {
-      // Initialize the underlying systems if not already initialized
-      await this.securityValidator.initialize();
+      // SecurityValidator doesn't need initialization
       this.logger.info('E2BTerminalTool initialization complete');
     } catch (error) {
       this.logger.error('Failed to initialize E2BTerminalTool:', error);
@@ -74,11 +73,7 @@ export class E2BTerminalTool {
 
     try {
       // Validate the working directory
-      const validationResult = await this.securityValidator.validateInput({
-        type: 'filesystem_path',
-        content: effectiveWorkingDir,
-        context: { operation: 'create_session' },
-      });
+      const validationResult = await this.securityValidator.validateEnvironment(effectiveWorkingDir);
 
       if (!validationResult.isValid) {
         throw new Error(`Invalid working directory: ${validationResult.reason}`);
@@ -126,13 +121,10 @@ export class E2BTerminalTool {
         ? `${command.command} ${command.args.join(' ')}`
         : command.command;
 
-      const validationResult = await this.securityValidator.validateInput({
-        type: 'shell_command',
-        content: fullCommand,
-        context: {
-          sessionId,
-          workingDirectory: command.workingDirectory || session.workingDirectory,
-        },
+      const validationResult = await this.securityValidator.validateCode({
+        code: fullCommand,
+        language: 'bash',
+        environment: 'e2b_sandbox'
       });
 
       if (!validationResult.isValid) {
@@ -186,7 +178,7 @@ export class E2BTerminalTool {
         sessionId,
       };
     } catch (error) {
-      logger.error(`Command execution failed in session ${sessionId}:`, error);
+      this.logger.error(`Command execution failed in session ${sessionId}:`, error);
       return {
         success: false,
         stdout: '',
@@ -241,11 +233,7 @@ export class E2BTerminalTool {
 
     try {
       // Validate the directory path
-      const validationResult = await this.securityValidator.validateInput({
-        type: 'filesystem_path',
-        content: directory,
-        context: { operation: 'change_directory', sessionId },
-      });
+      const validationResult = await this.securityValidator.validateEnvironment(directory);
 
       if (!validationResult.isValid) {
         this.logger.warn(
@@ -285,17 +273,9 @@ export class E2BTerminalTool {
 
     try {
       // Validate environment variable key and value
-      const keyValidation = await this.securityValidator.validateInput({
-        type: 'environment_variable',
-        content: key,
-        context: { operation: 'set_env', sessionId },
-      });
+      const keyValidation = await this.securityValidator.validateEnvironment(key);
 
-      const valueValidation = await this.securityValidator.validateInput({
-        type: 'environment_variable',
-        content: value,
-        context: { operation: 'set_env', sessionId },
-      });
+      const valueValidation = await this.securityValidator.validateEnvironment(value);
 
       if (!keyValidation.isValid || !valueValidation.isValid) {
         this.logger.warn(
@@ -330,10 +310,10 @@ export class E2BTerminalTool {
 
     try {
       // Validate input
-      const validationResult = await this.securityValidator.validateInput({
-        type: 'process_input',
-        content: input,
-        context: { sessionId, processSessionId: session.processSessionId },
+      const validationResult = await this.securityValidator.validateCode({
+        code: input,
+        language: 'text',
+        environment: 'e2b_sandbox'
       });
 
       if (!validationResult.isValid) {

@@ -9,7 +9,7 @@
  * based on analysis of Qwen CLI, Gemini CLI, and other industry leaders.
  */
 
-import { readFile, access } from 'fs/promises';
+import { access, readFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { parse as parseYAML } from 'yaml';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
@@ -24,7 +24,7 @@ export interface ProjectInstructions {
   codeStyle?: {
     formatter?: string;
     linter?: string;
-    rules?: Record<string, any>;
+    rules?: Record<string, unknown>;
   };
   preferences?: {
     responseStyle?: 'concise' | 'detailed' | 'educational';
@@ -101,19 +101,27 @@ export interface CombinedProjectConfig {
   loadTime: number;
 }
 
+export interface PackageJson {
+  bin?: unknown;
+  dependencies?: Record<string, unknown>;
+  devDependencies?: Record<string, unknown>;
+  scripts?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 /**
  * Project Configuration Loader with industry-standard file support
  */
 export class ProjectConfigurationLoader {
-  private configFileNames = ['.codecrucible.yaml', '.codecrucible.yml', 'codecrucible.yaml'];
-  private instructionFileNames = ['CODECRUCIBLE.md', 'codecrucible.md'];
-  private cache: Map<string, CombinedProjectConfig> = new Map();
-  private cacheTimeout = 30000; // 30 seconds
+  private readonly configFileNames = ['.codecrucible.yaml', '.codecrucible.yml', 'codecrucible.yaml'];
+  private readonly instructionFileNames = ['CODECRUCIBLE.md', 'codecrucible.md'];
+  private readonly cache: Map<string, CombinedProjectConfig> = new Map();
+  private readonly cacheTimeout = 30000; // 30 seconds
 
   /**
    * Load complete project configuration for a directory
    */
-  async loadProjectConfig(projectPath: string = process.cwd()): Promise<CombinedProjectConfig> {
+  public async loadProjectConfig(projectPath: string = process.cwd()): Promise<CombinedProjectConfig> {
     const startTime = Date.now();
     const normalizedPath = resolve(projectPath);
 
@@ -152,19 +160,23 @@ export class ProjectConfigurationLoader {
 
       // Load package.json for additional context
       const packageInfo = await this.loadPackageInfo(normalizedPath);
-      if (packageInfo) {
+      if (packageInfo && typeof packageInfo === 'object' && packageInfo !== null) {
         // Merge package.json info into configuration
-        config.configuration.name = config.configuration.name || packageInfo.name;
-        config.configuration.version = config.configuration.version || packageInfo.version;
+        config.configuration.name = config.configuration.name ?? (packageInfo as { name?: string }).name;
+        config.configuration.version = config.configuration.version ?? (packageInfo as { version?: string }).version;
         config.configuration.language =
-          config.configuration.language || this.detectLanguageFromPackage(packageInfo);
+          config.configuration.language ?? this.detectLanguageFromPackage(packageInfo as {
+            [key: string]: unknown;
+            dependencies?: Record<string, unknown>;
+            devDependencies?: Record<string, unknown>;
+          });
         config.configuration.framework =
-          config.configuration.framework || this.detectFrameworkFromPackage(packageInfo);
+          config.configuration.framework ?? this.detectFrameworkFromPackage(packageInfo);
         config.configuration.type =
-          config.configuration.type || this.detectProjectTypeFromPackage(packageInfo);
+          config.configuration.type ?? this.detectProjectTypeFromPackage(packageInfo);
       }
 
-      config.isLoaded = !!(instructions || configuration || packageInfo);
+      config.isLoaded = Boolean(instructions ?? configuration ?? packageInfo);
       config.loadTime = Date.now();
 
       // Cache the result
@@ -233,12 +245,18 @@ export class ProjectConfigurationLoader {
   /**
    * Load package.json for additional project context
    */
-  private async loadPackageInfo(projectPath: string): Promise<any | null> {
+  private async loadPackageInfo(projectPath: string): Promise<PackageJson | null> {
     try {
       const filePath = join(projectPath, 'package.json');
       await access(filePath);
       const content = await readFile(filePath, 'utf-8');
-      return JSON.parse(content);
+
+      // Parse into unknown and validate the shape before casting to avoid unsafe `any`
+      const parsed: unknown = JSON.parse(content);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as PackageJson;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -247,7 +265,7 @@ export class ProjectConfigurationLoader {
   /**
    * Parse instruction file content (CODECRUCIBLE.md)
    */
-  private parseInstructionFile(content: string, fileName: string): ProjectInstructions {
+  private parseInstructionFile(content: string, _fileName: string): ProjectInstructions {
     const instructions: ProjectInstructions = {};
 
     // Extract title/project name from first heading
@@ -312,35 +330,54 @@ export class ProjectConfigurationLoader {
   /**
    * Detect language from package.json
    */
-  private detectLanguageFromPackage(packageJson: any): string {
-    if (packageJson.dependencies || packageJson.devDependencies) {
-      const deps = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
+private detectLanguageFromPackage(packageJson: {
+  dependencies?: Record<string, unknown>;
+  devDependencies?: Record<string, unknown>;
+  [key: string]: unknown;
+}): string {
+  if (
+    packageJson &&
+    (packageJson.dependencies || packageJson.devDependencies)
+  ) {
+    const deps: Record<string, unknown> = {};
 
-      if (deps.typescript || deps['@types/node']) return 'typescript';
-      if (deps.react || deps['@types/react']) return 'javascript';
-      if (deps.vue) return 'javascript';
-      if (deps.angular || deps['@angular/core']) return 'typescript';
+    if (packageJson.dependencies && typeof packageJson.dependencies === 'object') {
+      Object.assign(deps, packageJson.dependencies);
+    }
+    if (packageJson.devDependencies && typeof packageJson.devDependencies === 'object') {
+      Object.assign(deps, packageJson.devDependencies);
     }
 
-    return 'javascript'; // Default
+    if ('typescript' in deps || '@types/node' in deps) return 'typescript';
+    if ('react' in deps || '@types/react' in deps) return 'javascript';
+    if ('vue' in deps) return 'javascript';
+    if ('angular' in deps || '@angular/core' in deps) return 'typescript';
   }
+
+  // Fallback default when no clear language can be detected
+  return 'javascript';
+}
 
   /**
    * Detect framework from package.json
    */
-  private detectFrameworkFromPackage(packageJson: any): string | undefined {
-    if (packageJson.dependencies || packageJson.devDependencies) {
-      const deps = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
+  private detectFrameworkFromPackage(packageJson: PackageJson): string | undefined {
+    const dependencies = typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
+      ? packageJson.dependencies
+      : {};
+    const devDependencies = typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
+      ? packageJson.devDependencies
+      : {};
+    const deps = { ...dependencies, ...devDependencies };
 
-      if (deps.react || deps['@types/react']) return 'react';
-      if (deps.vue) return 'vue';
-      if (deps.angular || deps['@angular/core']) return 'angular';
-      if (deps.svelte) return 'svelte';
-      if (deps.express) return 'express';
-      if (deps.fastify) return 'fastify';
-      if (deps.next) return 'nextjs';
-      if (deps.nuxt) return 'nuxtjs';
-    }
+    if ('react' in deps || '@types/react' in deps) return 'react';
+    if ('vue' in deps) return 'vue';
+    if ('angular' in deps || '@angular/core' in deps) return 'angular';
+    if ('svelte' in deps) return 'svelte';
+    if ('express' in deps) return 'express';
+    if ('fastify' in deps) return 'fastify';
+    if ('next' in deps) return 'nextjs';
+    if ('nuxt' in deps) return 'nuxtjs';
 
     return undefined;
   }
@@ -348,22 +385,26 @@ export class ProjectConfigurationLoader {
   /**
    * Detect project type from package.json
    */
-  private detectProjectTypeFromPackage(packageJson: any): ProjectConfiguration['type'] {
+  private detectProjectTypeFromPackage(packageJson: PackageJson): ProjectConfiguration['type'] {
     // Check for CLI tools
-    if (packageJson.bin) return 'cli';
+    if ('bin' in packageJson && packageJson.bin !== undefined) return 'cli';
 
     // Check for common web frameworks
-    if (packageJson.dependencies || packageJson.devDependencies) {
-      const deps = { ...(packageJson.dependencies || {}), ...(packageJson.devDependencies || {}) };
+    const dependencies = typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
+      ? packageJson.dependencies
+      : {};
+    const devDependencies = typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
+      ? packageJson.devDependencies
+      : {};
+    const deps = { ...dependencies, ...devDependencies };
 
-      if (deps.react || deps.vue || deps.angular || deps.svelte) return 'web';
-      if (deps.express || deps.fastify || deps.koa) return 'api';
-      if (deps.electron) return 'desktop';
-      if (deps['react-native'] || deps.expo) return 'mobile';
-    }
+    if ('react' in deps || 'vue' in deps || 'angular' in deps || 'svelte' in deps) return 'web';
+    if ('express' in deps || 'fastify' in deps || 'koa' in deps) return 'api';
+    if ('electron' in deps) return 'desktop';
+    if ('react-native' in deps || 'expo' in deps) return 'mobile';
 
     // Check scripts for project type hints
-    if (packageJson.scripts) {
+    if ('scripts' in packageJson && typeof packageJson.scripts === 'object' && packageJson.scripts !== null) {
       const scripts = Object.keys(packageJson.scripts).join(' ').toLowerCase();
       if (scripts.includes('start') && scripts.includes('build')) return 'web';
       if (scripts.includes('dev') || scripts.includes('serve')) return 'web';

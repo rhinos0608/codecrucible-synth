@@ -109,7 +109,7 @@ const ENVIRONMENT_CONFIGS: Record<string, ProductionEnvironmentConfig> = {
  * based on the target environment and requirements.
  */
 export class ProductionHardeningSetup {
-  private integrationManager: ProductionIntegrationManager;
+  private integrationManager!: ProductionIntegrationManager;
   private environmentConfig: ProductionEnvironmentConfig;
   private isSetupComplete: boolean = false;
 

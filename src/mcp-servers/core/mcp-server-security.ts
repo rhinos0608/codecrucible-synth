@@ -147,7 +147,9 @@ export class MCPServerSecurity {
         // Limit cache size
         if (this.pathCache.size > 1000) {
           const firstKey = this.pathCache.keys().next().value;
-          this.pathCache.delete(firstKey);
+          if (firstKey !== undefined) {
+            this.pathCache.delete(firstKey);
+          }
         }
       }
       

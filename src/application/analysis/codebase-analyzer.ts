@@ -54,24 +54,24 @@ interface TestAnalysis {
  */
 
 export class CodebaseAnalyzer {
-  private workingDirectory: string;
+  private readonly workingDirectory: string;
 
-  constructor(workingDirectory: string) {
+  public constructor(workingDirectory: string) {
     this.workingDirectory = path.resolve(workingDirectory);
   }
 
   /**
    * Perform comprehensive codebase analysis
    */
-  async performAnalysis(): Promise<string> {
+  public async performAnalysis(): Promise<string> {
     console.log('📊 Analyzing project structure...');
 
     // Real project analysis
     const projectAnalysis = await this.analyzeProjectStructure();
-    const codeMetrics = await this.analyzeCodeMetrics();
+    const codeMetrics = this.analyzeCodeMetrics();
     const dependencyAnalysis = await this.analyzeDependencies();
     const configAnalysis = await this.analyzeConfiguration();
-    const testAnalysis = await this.analyzeTestCoverage();
+    const testAnalysis = this.analyzeTestCoverage();
 
     // Generate dynamic analysis report
     const analysis = `
@@ -86,7 +86,7 @@ export class CodebaseAnalyzer {
 **Total Lines of Code:** ${codeMetrics.totalLines}
 
 ## Architecture Discovery
-${await this.discoverArchitectureComponents()}
+${this.discoverArchitectureComponents()}
 
 ## Code Metrics Analysis
 - **TypeScript Files:** ${codeMetrics.typescriptFiles} (${codeMetrics.typescriptLines} lines)
@@ -97,8 +97,8 @@ ${await this.discoverArchitectureComponents()}
 
 ## File Distribution
 ${Object.entries(projectAnalysis.fileCounts)
-  .sort(([, a], [, b]) => (b as number) - (a as number))
-  .map(([ext, count]) => `- ${ext}: ${count} files`)
+  .sort(([, a]: readonly [string, number], [, b]: readonly [string, number]) => b - a)
+  .map(([ext, count]: readonly [string, number]) => `- ${ext}: ${count} files`)
   .join('\n')}
 
 ## Discovered Components
@@ -121,10 +121,10 @@ ${configAnalysis.configs.map(config => `- **${config.name}**: ${config.status}`)
 ${await this.detectRealIssues()}
 
 ## Security Assessment
-${await this.assessSecurity()}
+${this.assessSecurity()}
 
 ## Performance Analysis
-${await this.analyzePerformance()}
+${this.analyzePerformance()}
 
 ## Recommendations Based on Analysis
 ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalysis)}
@@ -146,8 +146,9 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     if (await this.fileExists(packageJsonPath)) {
       try {
-        const packageJson = JSON.parse(await this.readFile(packageJsonPath));
-        projectInfo = { name: packageJson.name, version: packageJson.version };
+        const packageJsonText = await this.readFile(packageJsonPath);
+        const packageJson = JSON.parse(packageJsonText) as unknown as { name?: string; version?: string };
+        projectInfo = { name: packageJson.name ?? 'Unknown', version: packageJson.version ?? 'Unknown' };
       } catch (error) {
         // Continue with defaults
       }
@@ -155,7 +156,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     const fileCounts = await this.countFilesByType();
     const totalFiles = Object.values(fileCounts).reduce((sum, count) => sum + count, 0);
-    const discoveredComponents = await this.discoverProjectComponents();
+    const discoveredComponents = this.discoverProjectComponents();
 
     return {
       name: projectInfo.name,
@@ -169,7 +170,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze code metrics and lines of code
    */
-  private async analyzeCodeMetrics(): Promise<CodeMetrics> {
+  private analyzeCodeMetrics(): CodeMetrics {
     let totalLines = 0;
     let typescriptFiles = 0;
     let typescriptLines = 0;
@@ -245,12 +246,24 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     if (await this.fileExists(packageJsonPath)) {
       try {
-        const packageJson = JSON.parse(await this.readFile(packageJsonPath));
-        prodDeps = Object.keys(packageJson.dependencies || {}).length;
-        devDeps = Object.keys(packageJson.devDependencies || {}).length;
+        const packageJsonText = await this.readFile(packageJsonPath);
+        const packageJson = JSON.parse(packageJsonText) as {
+          dependencies?: Record<string, unknown>;
+          devDependencies?: Record<string, unknown>;
+        };
+
+        const dependencies = typeof packageJson.dependencies === 'object' && packageJson.dependencies !== null
+          ? packageJson.dependencies
+          : {};
+        const devDependencies = typeof packageJson.devDependencies === 'object' && packageJson.devDependencies !== null
+          ? packageJson.devDependencies
+          : {};
+
+        prodDeps = Object.keys(dependencies).length;
+        devDeps = Object.keys(devDependencies).length;
 
         // Identify key frameworks
-        const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+        const allDeps: Record<string, unknown> = { ...dependencies, ...devDependencies };
         const frameworks = [
           'express',
           'react',
@@ -264,7 +277,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
           'commander',
         ];
         keyFrameworks = frameworks.filter(
-          fw => allDeps[fw] || Object.keys(allDeps).some(dep => dep.includes(fw))
+          fw => allDeps[fw] !== undefined || Object.keys(allDeps).some(dep => dep.includes(fw))
         );
       } catch (error) {
         // Continue with defaults
@@ -297,7 +310,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze test coverage and test files
    */
-  private async analyzeTestCoverage(): Promise<TestAnalysis> {
+  private analyzeTestCoverage(): TestAnalysis {
     let testFiles = 0;
     let testLines = 0;
     const frameworks: string[] = [];
@@ -356,7 +369,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Discover project components by analyzing file structure
    */
-  private async discoverProjectComponents(): Promise<Component[]> {
+  private discoverProjectComponents(): Component[] {
     const components: Component[] = [];
 
     const checkComponent = (name: string, dirPath: string, description: string) => {
@@ -392,7 +405,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Discover architecture components by analyzing imports and exports
    */
-  private async discoverArchitectureComponents(): Promise<string> {
+  private discoverArchitectureComponents(): string {
     const architectureComponents: string[] = [];
 
     // Check for key architecture files
@@ -452,7 +465,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
     if (await this.fileExists(tsconfigPath)) {
       try {
-        const tsconfig = JSON.parse(await this.readFile(tsconfigPath));
+        const tsconfig = JSON.parse(await this.readFile(tsconfigPath)) as { compilerOptions?: { strict?: boolean } };
         if (tsconfig.compilerOptions?.strict !== true) {
           issues.push('🟡 **Warning**: TypeScript strict mode disabled - may hide type errors');
         }
@@ -479,7 +492,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
           }
         ).trim();
 
-        if (parseInt(testFileCount) < 10) {
+        if (parseInt(testFileCount, 10) < 10) {
           issues.push(
             `🟡 **Warning**: Only ${testFileCount} test files found - consider expanding test coverage`
           );
@@ -500,14 +513,18 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
     const packagePath = path.join(this.workingDirectory, 'package.json');
     if (fsSync.existsSync(packagePath)) {
       try {
-        const packageJson = JSON.parse(await this.readFile(packagePath));
+        const packageJsonText = await this.readFile(packagePath);
+        const packageJson = JSON.parse(packageJsonText) as {
+          scripts?: Record<string, unknown>;
+          engines?: { node?: string };
+        };
 
         // Check for missing scripts
-        const scripts = packageJson.scripts || {};
-        if (!scripts.test) {
+        const scripts = packageJson.scripts ?? {};
+        if (!('test' in scripts) || !scripts.test) {
           issues.push('🟡 **Warning**: No test script defined in package.json');
         }
-        if (!scripts.lint) {
+        if (!('lint' in scripts) || !scripts.lint) {
           issues.push('🟡 **Warning**: No lint script defined in package.json');
         }
 
@@ -549,7 +566,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Assess security configuration
    */
-  private async assessSecurity(): Promise<string> {
+  private assessSecurity(): string {
     const securityFeatures: string[] = [];
 
     // Check for security components
@@ -577,7 +594,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
   /**
    * Analyze performance characteristics
    */
-  private async analyzePerformance(): Promise<string> {
+  private analyzePerformance(): string {
     const performanceFeatures: string[] = [];
 
     // Check for performance components
@@ -626,7 +643,7 @@ ${await this.generateRecommendations(codeMetrics, testAnalysis, dependencyAnalys
 
       if (fsSync.existsSync(tsconfigPath)) {
         try {
-          const tsconfig = JSON.parse(await this.readFile(tsconfigPath));
+          const tsconfig = JSON.parse(await this.readFile(tsconfigPath)) as { compilerOptions?: { strict?: boolean } };
           if (tsconfig.compilerOptions?.strict !== true) {
             recommendations.push(
               `${priority++}. **Medium Priority**: Enable TypeScript strict mode for better type safety`

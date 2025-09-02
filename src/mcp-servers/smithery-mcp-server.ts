@@ -67,7 +67,7 @@ export class SmitheryMCPServer {
       // Register tool handlers
       this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
         const { name, arguments: args } = request.params;
-        const result = await this.handleToolCall(name, args);
+        const result = await this.handleToolCall(name, args || {});
         return {
           content: result.content,
           isError: result.isError,

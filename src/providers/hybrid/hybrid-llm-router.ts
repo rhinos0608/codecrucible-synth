@@ -766,7 +766,7 @@ export class HybridLLMRouter extends EventEmitter {
     size: number;
     maxSize: number;
     hitRate: number;
-    stats: typeof this.cacheStats;
+    stats: any;
   } {
     const hitRate =
       this.cacheStats.totalRequests > 0 ? this.cacheStats.hits / this.cacheStats.totalRequests : 0;

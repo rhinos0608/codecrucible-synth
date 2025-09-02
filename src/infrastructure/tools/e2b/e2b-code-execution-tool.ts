@@ -88,8 +88,8 @@ export class E2BCodeExecutionTool {
 
   async initialize(): Promise<void> {
     try {
-      await this.securityValidator.initialize();
-
+      // SecurityValidator doesn't need initialization
+      
       // Initialize Rust backend if available
       try {
         await this.rustBackend.initialize();
@@ -182,14 +182,10 @@ export class E2BCodeExecutionTool {
     issues: string[];
   }> {
     // Use the existing SecurityValidator for comprehensive validation
-    const validationResult = await this.securityValidator.validateInput({
-      type: 'code',
-      content: code,
-      context: {
-        language,
-        operation: 'code_execution',
-        environment: 'e2b_sandbox',
-      },
+    const validationResult = await this.securityValidator.validateCode({
+      code: code,
+      language: language,
+      environment: 'e2b_sandbox',
     });
 
     return {
@@ -203,7 +199,7 @@ export class E2BCodeExecutionTool {
   private canUseRustBackend(language: string): boolean {
     // Check if language can be executed via Rust backend
     const rustSupportedLanguages = ['rust', 'python', 'javascript', 'typescript', 'bash'];
-    return rustSupportedLanguages.includes(language) && this.rustBackend;
+    return rustSupportedLanguages.includes(language) && !!this.rustBackend;
   }
 
   private async prepareEnvironment(request: CodeExecutionRequest): Promise<ExecutionEnvironment> {
@@ -290,10 +286,23 @@ export class E2BCodeExecutionTool {
       const tempFile = await this.createTemporaryFile(request.code, request.language, environment);
 
       // Execute via Rust backend
-      const result = await this.rustBackend.executeCode(tempFile, request.language, {
-        workingDirectory: environment.workingDirectory,
-        timeout: request.timeout || 30000,
-        enableProfiling: true,
+      const result = await this.rustBackend.execute({
+        toolId: 'code_execution',
+        arguments: {
+          code: tempFile,
+          language: request.language,
+          workingDirectory: environment.workingDirectory,
+          timeout: request.timeout || 30000,
+          enableProfiling: true,
+        },
+        context: {
+          securityLevel: 'high',
+          userId: 'system',
+          sessionId: request.sessionId || 'system',
+          workingDirectory: environment.workingDirectory,
+          permissions: [],
+          environment: {}
+        }
       });
 
       // Clean up temporary file
@@ -301,11 +310,11 @@ export class E2BCodeExecutionTool {
 
       return {
         success: result.success,
-        output: result.output,
-        error: result.error,
-        executionTime: Date.now() - startTime,
-        memoryUsed: result.memoryUsage,
-        exitCode: result.exitCode,
+        output: result.result || '',
+        error: result.error?.message,
+        executionTime: result.executionTimeMs,
+        memoryUsed: result.metadata?.memoryUsage,
+        exitCode: result.metadata?.exitCode,
       };
     } catch (error) {
       logger.error('Rust backend execution failed:', error);
@@ -503,7 +512,7 @@ export class E2BCodeExecutionTool {
     // Cleanup the Rust backend
     if (this.rustBackend) {
       try {
-        await this.rustBackend.cleanup();
+        await this.rustBackend.destroy();
       } catch (error) {
         logger.warn('Failed to cleanup Rust backend:', error);
       }
@@ -538,8 +547,7 @@ export class E2BCodeExecutionTool {
     let rustBackendAvailable = false;
     try {
       if (this.rustBackend) {
-        const healthResult = await this.rustBackend.healthCheck();
-        rustBackendAvailable = healthResult.includes('healthy');
+        rustBackendAvailable = this.rustBackend.isAvailable();
       }
     } catch (error) {
       logger.warn('Rust backend health check failed:', error);

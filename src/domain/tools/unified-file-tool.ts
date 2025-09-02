@@ -153,16 +153,16 @@ export class BasicFileStrategy implements FileOperationStrategy {
  * Batch file operations strategy - handles multiple files and patterns
  */
 export class BatchFileStrategy extends BasicFileStrategy {
-  name = 'batch';
+  override name = 'batch';
 
-  supports(operation: string, args: any): boolean {
+  override supports(operation: string, args: any): boolean {
     return (
       super.supports(operation, args) &&
       (Array.isArray(args.paths) || (typeof args.path === 'string' && args.path.includes('*')))
     );
   }
 
-  async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
+  override async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
     const paths = await this.resolvePaths(args, context);
     const maxFiles = args.maxFiles || 20;
 
@@ -238,13 +238,13 @@ export class BatchFileStrategy extends BasicFileStrategy {
  * Smart file strategy - adds intelligent analysis and metadata
  */
 export class SmartFileStrategy extends BatchFileStrategy {
-  name = 'smart';
+  override name = 'smart';
 
-  supports(operation: string, args: any): boolean {
+  override supports(operation: string, args: any): boolean {
     return super.supports(operation, args) && args.includeMetadata !== false;
   }
 
-  async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
+  override async execute(operation: string, args: any, context: ToolExecutionContext): Promise<any> {
     const baseResult = await super.execute(operation, args, context);
 
     if (operation === 'read') {

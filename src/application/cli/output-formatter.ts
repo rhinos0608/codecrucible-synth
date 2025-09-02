@@ -10,7 +10,7 @@ export class OutputFormatter {
     CLIDisplay.showHelp();
   }
 
-  showModels(): Promise<void> {
+  public async showModels(): Promise<void> {
     return CLIDisplay.showModelRecommendations();
   }
 

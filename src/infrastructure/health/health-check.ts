@@ -505,15 +505,30 @@ export class HealthMonitor extends EventEmitter {
       const security = new EnterpriseSecurityFramework();
 
       // Test validation
-      const testResult = await security.validateAgentAction('health-check', {
-        type: 'file_access',
+      const testResult = await security.validateAgentAction({
+        id: 'health-check',
+        type: 'validate',
         agentId: 'health-check',
         payload: { path: './test.txt' },
         timestamp: new Date(),
+        resourceRequirements: {
+          memory: 10,
+          cpu: 5,
+          network: false,
+          fileSystem: true
+        }
+      }, {
         sessionId: 'health-check',
         permissions: ['file_access'],
-        environment: 'development',
-        riskProfile: 'low',
+        isolation: {
+          level: 'low',
+          allowedResources: ['./test.txt'],
+          maxExecutionTime: 5000
+        },
+        audit: {
+          trackActions: true,
+          logLevel: 'detailed'
+        }
       });
 
       const duration = performance.now() - startTime;

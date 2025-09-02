@@ -67,7 +67,7 @@ export interface OrchestrationResponse {
  * and routes them to appropriate domain services.
  */
 export class UnifiedOrchestrationService extends EventEmitter {
-  private config: UnifiedConfiguration;
+  private config!: UnifiedConfiguration;
   private eventBus: IEventBus;
   private userInteraction: IUserInteraction;
   private logger = createLogger('UnifiedOrchestrationService');
@@ -75,10 +75,10 @@ export class UnifiedOrchestrationService extends EventEmitter {
 
   // Domain services
   private configManager: UnifiedConfigurationManager;
-  private agentSystem: UnifiedAgentSystem;
-  private serverSystem: UnifiedServerSystem;
-  private securityValidator: UnifiedSecurityValidator;
-  private performanceSystem: UnifiedPerformanceSystem;
+  private agentSystem!: UnifiedAgentSystem;
+  private serverSystem!: UnifiedServerSystem;
+  private securityValidator!: UnifiedSecurityValidator;
+  private performanceSystem!: UnifiedPerformanceSystem;
   private pluginManager?: PluginManager;
   private commandBus?: CommandBus;
   private commandRegistry?: CommandRegistry;
@@ -173,7 +173,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
       this.commandBus = new CommandBus();
       this.commandRegistry = new CommandRegistry(this.commandBus);
       // register generic plugin dispatch
-      this.commandBus.register(new PluginDispatchHandler(this.commandRegistry));
+      this.commandBus.register(new PluginDispatchHandler(this.commandRegistry) as any);
       const agentOps: Array<OrchestrationRequest['type']> = [
         'analyze',
         'generate',
@@ -185,7 +185,7 @@ export class UnifiedOrchestrationService extends EventEmitter {
       ];
       for (const op of agentOps) {
         this.commandBus.register(
-          new AgentOperationHandler(`agent:${op}`, req => this.processAgentRequest(req))
+          new AgentOperationHandler(`agent:${op}`, req => this.processAgentRequest(req)) as any
         );
       }
 

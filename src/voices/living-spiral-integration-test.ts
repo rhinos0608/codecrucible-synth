@@ -193,7 +193,7 @@ export class LivingSpiralIntegrationTest {
       return result;
     } catch (error) {
       logger.error(`❌ ${phase.name} phase FAILED`, {
-        error: error.message,
+        error: (error as Error).message,
         duration: Date.now() - startTime,
       });
 
@@ -204,7 +204,7 @@ export class LivingSpiralIntegrationTest {
         quality: 0,
         voicesUsed: [],
         costSavings: 0,
-        recommendations: [`${phase.name} phase failed: ${error.message}`],
+        recommendations: [`${phase.name} phase failed: ${(error as Error).message}`],
       };
     }
   }
@@ -226,7 +226,7 @@ export class LivingSpiralIntegrationTest {
         'Assess the quality and effectiveness of the implemented e-commerce platform solution. What lessons were learned and what improvements can be made?',
     };
 
-    return prompts[phase.name] || `Execute ${phase.name} phase: ${phase.description}`;
+    return prompts[phase.name as keyof typeof prompts] || `Execute ${phase.name} phase: ${phase.description}`;
   }
 
   /**
@@ -394,12 +394,12 @@ export async function runLivingSpiralIntegrationTest(): Promise<any> {
     };
   } catch (error) {
     logger.error('Living Spiral integration test failed', {
-      error: error.message,
+      error: (error as Error).message,
     });
 
     return {
       success: false,
-      error: error.message,
+      error: (error as Error).message,
     };
   }
 }

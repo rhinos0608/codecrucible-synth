@@ -25,7 +25,7 @@ export interface WorkflowStep {
   startTime?: Date;
   endTime?: Date;
   duration?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   substeps?: WorkflowStep[];
 }
 
@@ -63,15 +63,15 @@ export interface ProgressUpdate {
  * Agentic Workflow Display System
  */
 export class AgenticWorkflowDisplay extends EventEmitter {
-  private activeSessions: Map<string, WorkflowSession> = new Map();
-  private sessionHistory: WorkflowSession[] = [];
+  private readonly activeSessions: Map<string, WorkflowSession> = new Map();
+  private readonly sessionHistory: WorkflowSession[] = [];
   private displayEnabled: boolean = true;
 
-  constructor(
-    options: {
+  public constructor(
+    options: Readonly<{
       displayEnabled?: boolean;
       maxHistorySize?: number;
-    } = {}
+    }> = {}
   ) {
     super();
     this.displayEnabled = options.displayEnabled ?? true;
@@ -80,8 +80,8 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Start a new agentic workflow session
    */
-  startSession(userQuery: string, complexity: 'simple' | 'medium' | 'complex' = 'medium'): string {
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  public startSession(userQuery: string, complexity: 'simple' | 'medium' | 'complex' = 'medium'): string {
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const session: WorkflowSession = {
       id: sessionId,
@@ -113,13 +113,18 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Add a workflow step to the current session
    */
-  addStep(sessionId: string, phase: WorkflowPhase, title: string, description: string): string {
+  public addStep(
+    sessionId: string,
+    phase: WorkflowPhase,
+    title: string,
+    description: string
+  ): string {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       throw new Error(`Session ${sessionId} not found`);
     }
 
-    const stepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const stepId = `step_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const step: WorkflowStep = {
       id: stepId,
       phase,
@@ -145,11 +150,16 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Update step progress
    */
-  updateStepProgress(sessionId: string, stepId: string, progress: number, message?: string): void {
+  public updateStepProgress(
+    sessionId: string,
+    stepId: string,
+    progress: number,
+    message?: string
+  ): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
-    const step = session.steps.find(s => s.id === stepId);
+    const step = session.steps.find((s: Readonly<WorkflowStep>) => s.id === stepId);
     if (!step) return;
 
     step.progress = Math.min(100, Math.max(0, progress));
@@ -172,7 +182,7 @@ export class AgenticWorkflowDisplay extends EventEmitter {
       stepId,
       phase: step.phase,
       progress,
-      message: message || '',
+      message: message ?? '',
       timestamp: new Date(),
     };
 
@@ -182,11 +192,15 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Mark step as completed
    */
-  completeStep(sessionId: string, stepId: string, metadata?: Record<string, any>): void {
+  public completeStep(
+    sessionId: string,
+    stepId: string,
+    metadata?: Record<string, unknown>
+  ): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
-    const step = session.steps.find(s => s.id === stepId);
+    const step = session.steps.find((s: Readonly<WorkflowStep>) => s.id === stepId);
     if (!step) return;
 
     step.status = 'completed';
@@ -209,11 +223,15 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Mark step as failed
    */
-  failStep(sessionId: string, stepId: string, error: string): void {
+  public failStep(
+    sessionId: string,
+    stepId: string,
+    error: string
+  ): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
-    const step = session.steps.find(s => s.id === stepId);
+    const step = session.steps.find((s: Readonly<WorkflowStep>) => s.id === stepId);
     if (!step) return;
 
     step.status = 'failed';
@@ -230,7 +248,10 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Complete the entire session
    */
-  completeSession(sessionId: string, results?: Record<string, any>): void {
+  public completeSession(
+    sessionId: string,
+    results?: Record<string, unknown>
+  ): void {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
@@ -260,21 +281,21 @@ export class AgenticWorkflowDisplay extends EventEmitter {
   /**
    * Get current session status
    */
-  getSession(sessionId: string): WorkflowSession | undefined {
-    return this.activeSessions.get(sessionId) || this.sessionHistory.find(s => s.id === sessionId);
+  public getSession(sessionId: string): WorkflowSession | undefined {
+    return this.activeSessions.get(sessionId) ?? this.sessionHistory.find((s: Readonly<WorkflowSession>) => s.id === sessionId);
   }
 
   /**
    * Get all active sessions
    */
-  getActiveSessions(): WorkflowSession[] {
+  public getActiveSessions(): WorkflowSession[] {
     return Array.from(this.activeSessions.values());
   }
 
   /**
    * Get session history
    */
-  getSessionHistory(): WorkflowSession[] {
+  public getSessionHistory(): WorkflowSession[] {
     return [...this.sessionHistory];
   }
 

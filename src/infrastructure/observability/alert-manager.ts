@@ -63,7 +63,7 @@ export class AlertManager {
   private rules: Map<string, AlertRule> = new Map();
   private active: Map<string, Alert> = new Map();
   private history: Alert[] = [];
-  private logger: ILogger = new Logger();
+  private logger: ILogger = new Logger('AlertManager');
 
   constructor(private config: AlertConfig) {}
 

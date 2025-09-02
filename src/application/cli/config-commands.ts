@@ -7,7 +7,6 @@
 import { UnifiedConfigurationManager } from '../../domain/config/config-manager.js';
 import { ConfigurationMigrator } from '../../domain/services/configuration-migrator.js';
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
-import { join } from 'path';
 
 export interface ConfigCommandOptions {
   verbose?: boolean;
@@ -17,11 +16,11 @@ export interface ConfigCommandOptions {
 }
 
 export class ConfigCommands {
-  private logger = createLogger('ConfigCommands');
-  private configManager: UnifiedConfigurationManager;
-  private migrator: ConfigurationMigrator;
+  private readonly logger = createLogger('ConfigCommands');
+  private readonly configManager: UnifiedConfigurationManager;
+  private readonly migrator: ConfigurationMigrator;
 
-  constructor(private projectRoot: string = process.cwd()) {
+  public constructor(private readonly projectRoot: string = process.cwd()) {
     this.configManager = new UnifiedConfigurationManager(this.logger);
     this.migrator = new ConfigurationMigrator(this.logger, this.projectRoot);
   }
@@ -29,7 +28,7 @@ export class ConfigCommands {
   /**
    * Display current configuration status and sources
    */
-  async status(options: ConfigCommandOptions = {}): Promise<void> {
+  public async status(options: ConfigCommandOptions = {}): Promise<void> {
     try {
       if (options.verbose) {
         this.logger.info('Configuration status check...');
@@ -66,8 +65,9 @@ export class ConfigCommands {
 
       if (options.verbose) {
         console.log('\n📋 Configuration Sources:');
-        // Access private configSources through any type for debugging
-        const sources = (this.configManager as any).configSources;
+        // Access private configSources for debugging (type assertion for development only)
+        interface ConfigSourceInfo { source: string; priority: number }
+        const sources: Map<string, ConfigSourceInfo> = (this.configManager as unknown as { configSources: Map<string, ConfigSourceInfo> }).configSources;
         for (const [key, info] of sources.entries()) {
           console.log(`   ${key}: ${info.source} (precedence: ${info.priority})`);
         }
@@ -81,7 +81,7 @@ export class ConfigCommands {
   /**
    * Validate configuration and show detailed results
    */
-  async validate(options: ConfigCommandOptions = {}): Promise<void> {
+  public async validate(_options: Readonly<ConfigCommandOptions> = {}): Promise<void> {
     try {
       console.log('🔍 Validating configuration...\n');
 
@@ -97,14 +97,14 @@ export class ConfigCommands {
 
       if (validation.errors.length > 0) {
         console.log('\n🚨 Errors:');
-        validation.errors.forEach((error, i) => {
+        validation.errors.forEach((error: Readonly<typeof validation.errors[number]>, i: Readonly<number>) => {
           console.log(`  ${i + 1}. ${error.field}: ${error.message}`);
         });
       }
 
       if (validation.warnings.length > 0) {
         console.log('\n⚠️  Warnings:');
-        validation.warnings.forEach((warning, i) => {
+        validation.warnings.forEach((warning: Readonly<typeof validation.warnings[number]>, i: Readonly<number>) => {
           console.log(`  ${i + 1}. ${warning.field}: ${warning.message}`);
           if (warning.suggestion) {
             console.log(`     Suggestion: ${warning.suggestion}`);
@@ -201,7 +201,7 @@ export class ConfigCommands {
   /**
    * Migrate legacy configuration files to unified system
    */
-  async migrate(options: ConfigCommandOptions = {}): Promise<void> {
+  public async migrate(options: Readonly<ConfigCommandOptions> = {}): Promise<void> {
     try {
       if (options.dryRun) {
         console.log('🔍 Dry run mode - no files will be modified\n');
@@ -225,10 +225,10 @@ export class ConfigCommands {
         console.log('\n🔍 Dry run results:');
         console.log(`   - Would process ${analysis.legacyFiles.length} files`);
         console.log(
-          `   - Would resolve ${analysis.conflicts.filter(c => c.resolution === 'auto').length} conflicts automatically`
+          `   - Would resolve ${analysis.conflicts.filter((c: Readonly<typeof analysis.conflicts[number]>) => c.resolution === 'auto').length} conflicts automatically`
         );
         console.log(
-          `   - Would require ${analysis.conflicts.filter(c => c.resolution === 'manual').length} manual interventions`
+          `   - Would require ${analysis.conflicts.filter((c: Readonly<typeof analysis.conflicts[number]>) => c.resolution === 'manual').length} manual interventions`
         );
         console.log(`   - Estimated effort: ${analysis.estimatedEffort}`);
         return;
@@ -252,7 +252,7 @@ export class ConfigCommands {
         if (result.warnings.length > 0) {
           console.log(`\n⚠️  Warnings: ${result.warnings.length}`);
           if (options.verbose) {
-            result.warnings.forEach(warning => console.log(`   - ${warning}`));
+            result.warnings.forEach((warning) => { console.log(`   - ${warning}`); });
           }
         }
 
@@ -267,7 +267,7 @@ export class ConfigCommands {
 
         if (result.errors.length > 0) {
           console.log('🚨 Errors:');
-          result.errors.forEach(error => console.log(`   - ${error}`));
+          result.errors.forEach((error) => { console.log(`   - ${error}`); });
         }
 
         console.log(`\n📋 Files have been backed up to: ${result.migrationReport.backupLocation}`);

@@ -1,5 +1,5 @@
 import { CLIParser } from './cli-parser.js';
-import { naturalLanguageInterface, ParsedCommand } from './natural-language-interface.js';
+import { ParsedCommand, naturalLanguageInterface } from './natural-language-interface.js';
 import type { CLIOptions } from './cli-types.js';
 
 /**

@@ -11,13 +11,13 @@ export interface CLIParseResult {
 }
 
 export interface CLIParserInterface {
-  parse(input: string[] | string): CLIParseResult;
-  validateArgs(command: string, args: string[]): boolean;
-  getUsage(command?: string): string;
+  parse: (input: readonly string[] | string) => CLIParseResult;
+  validateArgs: (command: string, args: readonly string[]) => boolean;
+  getUsage: (command?: string) => string;
 }
 
 export class CLIParser implements CLIParserInterface {
-  private commands = new Map<
+  private readonly commands = new Map<
     string,
     {
       description: string;
@@ -26,11 +26,11 @@ export class CLIParser implements CLIParserInterface {
     }
   >();
 
-  constructor() {
+  public constructor() {
     this.setupCommands();
   }
 
-  private setupCommands() {
+  private setupCommands(): void {
     this.commands.set('analyze', {
       description: 'Analyze code files',
       args: ['file'],
@@ -56,8 +56,15 @@ export class CLIParser implements CLIParserInterface {
     });
   }
 
-  parse(input: string[] | string): CLIParseResult {
-    const args = Array.isArray(input) ? input : input.split(' ').filter(Boolean);
+  public parse(input: string | readonly string[]): CLIParseResult {
+    let args: string[];
+    if (Array.isArray(input)) {
+      args = Array.from(input as readonly string[]);
+    } else if (typeof input === 'string') {
+      args = input.split(' ').filter((s): s is string => Boolean(s));
+    } else {
+      args = [];
+    }
 
     if (args.length === 0) {
       return {
@@ -70,20 +77,24 @@ export class CLIParser implements CLIParserInterface {
       };
     }
 
-    const command = args[0];
+    const [command, ...restArgs] = args;
     const remainingArgs: string[] = [];
     const options: Record<string, unknown> = {};
     const flags: string[] = [];
 
-    for (let i = 1; i < args.length; i++) {
-      const arg = args[i];
+    for (let i = 0; i < restArgs.length; i++) {
+      const arg: string = restArgs[i];
 
       if (arg.startsWith('--')) {
         if (arg.includes('=')) {
           const [key, value] = arg.split('=', 2);
           options[key] = value;
-        } else if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
-          options[arg] = args[i + 1];
+        } else if (
+          i + 1 < restArgs.length &&
+          typeof restArgs[i + 1] === 'string' &&
+          !restArgs[i + 1].startsWith('-')
+        ) {
+          options[arg] = restArgs[i + 1];
           i++; // Skip next arg as it's the value
         } else {
           flags.push(arg);
@@ -107,7 +118,7 @@ export class CLIParser implements CLIParserInterface {
     };
   }
 
-  validateArgs(command: string, args: string[]): boolean {
+  public validateArgs(command: string, args: readonly string[]): boolean {
     const commandInfo = this.commands.get(command);
     if (!commandInfo) return false;
 
@@ -118,7 +129,7 @@ export class CLIParser implements CLIParserInterface {
     return this.commands.has(command);
   }
 
-  getUsage(command?: string): string {
+  public getUsage(command?: string): string {
     if (command) {
       const commandInfo = this.commands.get(command);
       if (!commandInfo) {
@@ -128,14 +139,14 @@ export class CLIParser implements CLIParserInterface {
       const usage = [`Usage: ${command}`];
 
       if (commandInfo.args.length > 0) {
-        usage.push(commandInfo.args.map(arg => `<${arg}>`).join(' '));
+        usage.push(commandInfo.args.map((arg: string) => `<${arg}>`).join(' '));
       }
 
       usage.push(`\n${commandInfo.description}\n`);
 
       if (Object.keys(commandInfo.options).length > 0) {
         usage.push('Options:');
-        Object.entries(commandInfo.options).forEach(([option, desc]) => {
+        Object.entries(commandInfo.options).forEach(([option, desc]: readonly [string, string]) => {
           usage.push(`  ${option}  ${desc}`);
         });
       }
@@ -144,7 +155,7 @@ export class CLIParser implements CLIParserInterface {
     }
 
     const allCommands = Array.from(this.commands.entries())
-      .map(([cmd, info]) => `  ${cmd}  ${info.description}`)
+      .map(([cmd, info]: readonly [string, { description: string }]) => `  ${cmd}  ${info.description}`)
       .join('\n');
 
     return `Available commands:\n${allCommands}`;

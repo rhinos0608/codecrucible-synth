@@ -173,7 +173,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Emit an event with comprehensive optimization pipeline
    */
-  emit<T = any>(event: string, data: T): boolean {
+  override emit<T = any>(event: string, data: T): boolean {
     this.stats.totalEvents++;
 
     // Phase 1: Deduplication check
@@ -209,7 +209,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Subscribe to an event with optional profiled handler
    */
-  on<T = any>(event: string, handler: (data: T) => void): this {
+  override on<T = any>(event: string, handler: (data: T) => void): this {
     if (
       this.config.profiling.enabled &&
       this.config.profiling.profileHandlers &&
@@ -225,7 +225,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Subscribe once with optional profiled handler
    */
-  once<T = any>(event: string, handler: (data: T) => void): this {
+  override once<T = any>(event: string, handler: (data: T) => void): this {
     if (
       this.config.profiling.enabled &&
       this.config.profiling.profileHandlers &&
@@ -241,14 +241,14 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Unsubscribe from an event
    */
-  off<T = any>(event: string, handler: (data: T) => void): this {
+  override off<T = any>(event: string, handler: (data: T) => void): this {
     return super.off(event, handler);
   }
 
   /**
    * Remove all listeners for an event
    */
-  removeAllListeners(event?: string): this {
+  override removeAllListeners(event?: string): this {
     return super.removeAllListeners(event);
   }
 

@@ -43,7 +43,6 @@ export class ServiceFactory {
 
   constructor(private config: ServiceFactoryConfig = {}) {
     this.runtimeContext = createRuntimeContext({
-      logger: createLogger('ServiceFactory'),
       eventBus: new EventBus(),
     });
   }

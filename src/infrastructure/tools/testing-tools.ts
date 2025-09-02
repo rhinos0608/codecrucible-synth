@@ -24,11 +24,9 @@ const GenerateTestSchema = z.object({
 });
 
 export class TestGeneratorTool extends BaseTool {
-  private modelClient: UnifiedModelClient;
-
   public constructor(
     private readonly agentContext: { workingDirectory: string },
-    readonly modelClient: UnifiedModelClient
+    private readonly modelClient: UnifiedModelClient
   ) {
     super({
       name: 'generateTests',
@@ -36,7 +34,6 @@ export class TestGeneratorTool extends BaseTool {
       category: 'Testing',
       parameters: GenerateTestSchema,
     });
-    this.modelClient = modelClient;
   }
 
   async execute(args: z.infer<typeof GenerateTestSchema>): Promise<string> {

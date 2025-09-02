@@ -521,7 +521,7 @@ export abstract class BaseAgent extends EventEmitter implements IAgent {
     for (const result of results) {
       let placed = false;
       for (const group of groups) {
-        if (this.calculateSimilarity(result.content, group[0].content) > 0.7) {
+        if (this.calculateSimilarity(result.content || '', group[0].content || '') > 0.7) {
           group.push(result);
           placed = true;
           break;
@@ -1189,7 +1189,7 @@ export class UnifiedAgentSystem extends EventEmitter {
 
     for (const type of defaultAgentTypes) {
       if (
-        this.config.voice.availableVoices.includes(type) ||
+        this.config.voice?.availableVoices?.includes(type) ||
         type === 'security' ||
         type === 'architect'
       ) {

@@ -7,10 +7,10 @@
  * Imports: Application services and domain services only (follows ARCHITECTURE.md)
  */
 
-import { SpiralPhaseExecutor, PhaseInput } from '../services/spiral-phase-executor.js';
+import { PhaseInput, SpiralPhaseExecutor } from '../services/spiral-phase-executor.js';
 import {
-  SpiralConvergenceAnalyzer,
   IterationResult,
+  SpiralConvergenceAnalyzer,
 } from '../services/spiral-convergence-analyzer.js';
 import { IVoiceOrchestrationService } from '../../domain/services/voice-orchestration-service.js';
 import { IModelSelectionService } from '../../domain/services/model-selection-service.js';
@@ -71,7 +71,7 @@ export class SimplifiedLivingSpiralCoordinator {
    * Execute the complete Living Spiral process
    * Single responsibility: Process orchestration
    */
-  async executeSpiralProcess(input: SimplifiedSpiralInput): Promise<SimplifiedSpiralOutput> {
+  public async executeSpiralProcess(input: Readonly<SimplifiedSpiralInput>): Promise<SimplifiedSpiralOutput> {
     const startTime = Date.now();
     const config = { ...this.defaultConfig, ...input.config };
 
@@ -94,14 +94,14 @@ export class SimplifiedLivingSpiralCoordinator {
         currentInput,
         iterationCount,
         config,
-        input.context || {}
+        input.context ?? {}
       );
 
       iterations.push(iteration);
 
       // Analyze convergence
       const analysis = this.convergenceAnalyzer.analyzeConvergence(
-        iterations,
+        [...iterations],
         config.maxIterations
       );
 
@@ -120,12 +120,12 @@ export class SimplifiedLivingSpiralCoordinator {
 
     // Generate final recommendations
     const finalAnalysis = this.convergenceAnalyzer.analyzeConvergence(
-      iterations,
+      [...iterations],
       config.maxIterations
     );
     const recommendations = this.convergenceAnalyzer.getIterationRecommendations(
       finalAnalysis,
-      iterations
+      [...iterations]
     );
 
     return {
@@ -207,7 +207,7 @@ export class SimplifiedLivingSpiralCoordinator {
     };
   }
 
-  private prepareNextIterationInput(iteration: IterationResult, analysis: any): string {
+  private prepareNextIterationInput(iteration: IterationResult, analysis: { reasoning: string }): string {
     return `Based on the previous iteration results, please improve upon this solution:
 
 PREVIOUS OUTPUT:
@@ -227,14 +227,14 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
 
   private extractUniqueVoices(iterations: IterationResult[]): string[] {
     const allVoices = iterations.flatMap(
-      iter =>
+      (_iter: Readonly<IterationResult>) => 
         // Extract voices from iteration metadata (simplified)
         ['explorer', 'architect', 'implementor', 'guardian'] // Default voices used
     );
     return [...new Set(allVoices)];
   }
 
-  private extractCompletedPhases(iterations: IterationResult[]): string[] {
+  private extractCompletedPhases(_iterations: ReadonlyArray<IterationResult>): string[] {
     // For simplified tracking, assume all standard phases completed
     return ['collapse', 'council', 'synthesis', 'rebirth', 'reflection'];
   }
@@ -242,46 +242,54 @@ Focus on addressing any identified weaknesses and gaps while building upon the s
   /**
    * Get current spiral status
    */
-  async getSpiralStatus(iterations: IterationResult[]): Promise<{
+  public async getSpiralStatus(iterations: ReadonlyArray<IterationResult>): Promise<{
     currentQuality: number;
     convergenceScore: number;
     recommendation: string;
     nextSteps: string[];
   }> {
     if (iterations.length === 0) {
-      return {
+      return Promise.resolve({
         currentQuality: 0,
         convergenceScore: 0,
         recommendation: 'Start spiral process',
         nextSteps: ['Begin with collapse phase'],
-      };
+      });
     }
 
+    // Convert readonly array to a mutable array before passing to analyzers
+    const mutableIterations = Array.from(iterations);
+
     const analysis = this.convergenceAnalyzer.analyzeConvergence(
-      iterations,
+      mutableIterations,
       this.defaultConfig.maxIterations
     );
     const recommendations = this.convergenceAnalyzer.getIterationRecommendations(
       analysis,
-      iterations
+      mutableIterations
     );
 
-    return {
+    return Promise.resolve({
       currentQuality: analysis.currentQuality,
       convergenceScore: analysis.convergenceScore,
       recommendation: analysis.reasoning,
       nextSteps: recommendations,
-    };
+    });
   }
 
   /**
    * Update configuration
    */
-  updateConfig(newConfig: Partial<SimplifiedSpiralConfig>): void {
-    this.defaultConfig = { ...this.defaultConfig, ...newConfig };
+  public updateConfig(newConfig: Readonly<Partial<SimplifiedSpiralConfig>>): void {
+    const updatedConfig = { ...this.defaultConfig, ...newConfig };
+    this.defaultConfig = Object.freeze(updatedConfig);
     this.convergenceAnalyzer = new SpiralConvergenceAnalyzer(
       this.defaultConfig.qualityThreshold,
       this.defaultConfig.convergenceThreshold
     );
   }
 }
+function _iter(this: unknown, _value: Readonly<IterationResult>, _index: number, _array: ReadonlyArray<IterationResult>): unknown {
+  throw new Error('Function not implemented.');
+}
+

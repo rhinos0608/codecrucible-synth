@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { createLogger } from '../logging/logger.js';
+import { createLogger } from '../logging/logger-adapter.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
 import { ErrorRecoverySystem, ErrorContext, RecoveryAction } from './error-recovery-system.js';
 import chalk from 'chalk';
@@ -108,12 +108,13 @@ export class ResilientCLIWrapper extends EventEmitter {
 
           // Create error context
           const errorContext: ErrorContext = {
+            error: lastError,
             operation: context.name,
-            component: context.component,
+            component: context.component || 'unknown',
             severity: context.critical ? 'critical' : 'medium',
             recoverable: attempts < mergedOptions.retryAttempts,
             metadata: { operationId, attempt: attempts },
-            timestamp: Date.now(),
+            timestamp: new Date(),
           };
 
           // Attempt error recovery

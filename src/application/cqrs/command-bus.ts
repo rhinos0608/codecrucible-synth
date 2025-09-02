@@ -1,44 +1,44 @@
-export interface Command<TPayload = any> {
+export interface Command<TPayload = unknown> {
   type: string;
   payload: TPayload;
 }
 
-export interface CommandHandler<TPayload = any, TResult = any> {
+export interface CommandHandler<TPayload = unknown, TResult = unknown> {
   type: string;
-  handle(command: Command<TPayload>): Promise<TResult> | TResult;
+  handle: (command: Readonly<Command<TPayload>>) => Promise<TResult> | TResult;
 }
 
 export type CommandMiddleware = (
-  command: Command,
-  next: () => Promise<any>
-) => Promise<any>;
+  command: Readonly<Command>,
+  next: () => Promise<unknown>
+) => Promise<unknown>;
 
 export class CommandBus {
-  private handlers = new Map<string, CommandHandler<any, any>>();
-  private middleware: CommandMiddleware[] = [];
+  private readonly handlers = new Map<string, CommandHandler>();
+  private readonly middleware: CommandMiddleware[] = [];
 
-  register(handler: CommandHandler<any, any>): void {
+  public register(handler: Readonly<CommandHandler>): void {
     this.handlers.set(handler.type, handler);
   }
 
-  use(mw: CommandMiddleware): void {
+  public use(mw: CommandMiddleware): void {
     this.middleware.push(mw);
   }
 
-  async execute<T = any>(command: Command): Promise<T> {
+  public async execute<T = unknown>(command: Readonly<Command>): Promise<T> {
     const handler = this.handlers.get(command.type);
     if (!handler) {
       throw new Error(`No command handler registered for type: ${command.type}`);
     }
 
     // Compose middleware pipeline
-    const invoke: () => Promise<any> = async () => handler.handle(command);
-    let pipeline: () => Promise<any> = invoke;
+    const invoke: () => Promise<unknown> = async (): Promise<unknown> => handler.handle(command);
+    let pipeline: () => Promise<unknown> = invoke;
     for (let i = this.middleware.length - 1; i >= 0; i--) {
       const mw = this.middleware[i];
       const next = pipeline;
-      pipeline = () => mw(command, next);
+      pipeline = async (): Promise<unknown> => mw(command, next);
     }
-    return await pipeline();
+    return await pipeline() as T;
   }
 }

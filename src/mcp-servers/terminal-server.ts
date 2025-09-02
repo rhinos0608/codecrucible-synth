@@ -261,7 +261,7 @@ export class TerminalMCPServer {
     }
   }
 
-  private async runCommand(
+  async runCommand(
     command: string,
     args: string[] = [],
     workingDirectory?: string,
@@ -295,7 +295,7 @@ export class TerminalMCPServer {
     };
   }
 
-  private async runScript(
+  async runScript(
     script: string,
     interpreter: string,
     workingDirectory?: string,
@@ -352,7 +352,7 @@ export class TerminalMCPServer {
     }
   }
 
-  private async getEnvironment(variable?: string) {
+  async getEnvironment(variable?: string) {
     if (variable) {
       const value = process.env[variable];
       return {
@@ -370,7 +370,7 @@ export class TerminalMCPServer {
     }
   }
 
-  private async setWorkingDirectory(dirPath: string) {
+  async setWorkingDirectory(dirPath: string) {
     try {
       const fs = await import('fs/promises');
       await fs.access(dirPath); // Check if directory exists
@@ -385,7 +385,7 @@ export class TerminalMCPServer {
     }
   }
 
-  private async listProcesses() {
+  async listProcesses() {
     const processList = Array.from(this.activeProcesses.entries()).map(([id, process]) => 
       `${id}: PID ${process.pid} (${process.killed ? 'killed' : 'running'})`
     );
@@ -399,7 +399,7 @@ export class TerminalMCPServer {
     };
   }
 
-  private async killProcess(processId: string) {
+  async killProcess(processId: string) {
     const process = this.activeProcesses.get(processId);
     if (!process) {
       return {
@@ -444,5 +444,38 @@ export class TerminalMCPServer {
 
   getServer(): Server {
     return this.server;
+  }
+
+  /**
+   * Call a tool directly (for internal use)
+   */
+  async callTool(toolName: string, args: any): Promise<any> {
+    switch (toolName) {
+      case 'run_command':
+        return this.runCommand(
+          args.command,
+          args.args || [],
+          args.workingDirectory,
+          args.timeout,
+          args.captureOutput !== false
+        );
+      case 'run_script':
+        return this.runScript(
+          args.content,
+          args.interpreter || 'bash',
+          args.workingDirectory,
+          args.timeout
+        );
+      case 'get_environment':
+        return this.getEnvironment(args.variable);
+      case 'set_working_directory':
+        return this.setWorkingDirectory(args.path);
+      case 'list_processes':
+        return this.listProcesses();
+      case 'kill_process':
+        return this.killProcess(args.processId);
+      default:
+        throw new Error(`Unknown tool: ${toolName}`);
+    }
   }
 }

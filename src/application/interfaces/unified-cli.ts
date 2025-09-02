@@ -9,12 +9,11 @@
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { randomUUID } from 'crypto';
-import { CLIExitCode, CLIError, ModelRequest, REPLInterface } from '../../domain/types/index.js';
+import { REPLInterface } from '../../domain/types/index.js';
 import {
-  UnifiedCLICoordinator,
   CLIOperationRequest,
-  CLIOperationResponse,
   CLISession,
+  UnifiedCLICoordinator,
   UnifiedCLIOptions,
 } from '../services/unified-cli-coordinator.js';
 import { IWorkflowOrchestrator } from '../../domain/interfaces/workflow-orchestrator.js';
@@ -25,12 +24,12 @@ import { CLIUserInteraction } from '../../infrastructure/user-interaction/cli-us
 import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 import { getErrorMessage } from '../../utils/error-utils.js';
 import {
-  getApprovalManager,
   ApprovalModesManager,
+  Permission,
   cleanupApprovalManager,
+  getApprovalManager,
 } from '../../infrastructure/security/approval-modes-manager.js';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
 
 export interface CLIOptions {
   verbose?: boolean;
@@ -52,22 +51,23 @@ export interface CLIContext {
  * Unified CLI - Clean interface using UnifiedCLICoordinator
  */
 export class UnifiedCLI extends EventEmitter implements REPLInterface {
-  private coordinator: UnifiedCLICoordinator;
-  private orchestrator!: IWorkflowOrchestrator;
-  private userInteraction: IUserInteraction;
-  private eventBus: IEventBus;
-  private logger: ILogger;
+  private readonly coordinator: UnifiedCLICoordinator;
+  // Removed unused orchestrator property
+  private readonly userInteraction: IUserInteraction;
+  private readonly eventBus: IEventBus;
+  private readonly logger: ILogger;
+  private readonly orchestrator?: IWorkflowOrchestrator;
 
-  private context: CLIContext;
+  private readonly context: CLIContext;
   private currentSession: CLISession | null = null;
   private initialized = false;
   private coordinatorInitializedHandler?: () => void;
-  private coordinatorCriticalHandler?: (data: any) => void;
-  private coordinatorOverloadHandler?: (data: any) => void;
+  private coordinatorCriticalHandler?: (data: unknown) => void;
+  private coordinatorOverloadHandler?: (data: unknown) => void;
   private sigintHandler?: () => Promise<void>;
   private sigtermHandler?: () => Promise<void>;
 
-  constructor(options: CLIOptions = {}) {
+  public constructor(options: Readonly<CLIOptions> = {}) {
     super();
 
     // Create context
@@ -109,9 +109,9 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Initialize the CLI with workflow orchestrator
    */
-  async initialize(orchestrator: IWorkflowOrchestrator): Promise<void> {
+  public async initialize(orchestrator: Readonly<IWorkflowOrchestrator>): Promise<void> {
     try {
-      this.orchestrator = orchestrator;
+      (this as any).orchestrator = orchestrator;
 
       // Initialize the coordinator
       await this.coordinator.initialize({
@@ -143,7 +143,10 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Process a user prompt
    */
-  async processPrompt(prompt: string, options: any = {}): Promise<string> {
+  public async processPrompt(
+    prompt: string,
+    options: Readonly<Record<string, unknown>> = {}
+  ): Promise<string> {
     if (!this.initialized) {
       throw new Error('CLI not initialized. Call initialize() first.');
     }
@@ -153,15 +156,26 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         id: randomUUID(),
         type: 'prompt',
         input: prompt,
-        options: { ...this.context.options, ...options },
-        session: this.currentSession || undefined,
+        options: { 
+          enableGracefulDegradation: true,
+          retryAttempts: 3,
+          timeoutMs: 30000,
+          fallbackMode: 'basic',
+          errorNotification: this.context.options.verbose || false,
+          enableContextIntelligence: this.context.options.contextAware,
+          enablePerformanceOptimization: this.context.options.performance,
+          enableErrorResilience: this.context.options.resilience,
+          ...this.context.options,
+          ...options
+        },
+        session: this.currentSession ?? undefined,
       };
 
       const response = await this.coordinator.processOperation(request);
 
       if (response.success) {
         if (this.context.options.verbose && response.enhancements) {
-          const enhancements = [];
+          const enhancements: string[] = [];
           if (response.enhancements.contextAdded) enhancements.push('context-enhanced');
           if (response.enhancements.performanceOptimized)
             enhancements.push('performance-optimized');
@@ -178,7 +192,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
 
         return this.formatResponse(response.result);
       } else {
-        throw new Error(response.error || 'Processing failed');
+        throw new Error(response.error ?? 'Processing failed');
       }
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -190,7 +204,10 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Analyze a file
    */
-  async analyzeFile(filePath: string, options: any = {}): Promise<any> {
+  public async analyzeFile(
+    filePath: string,
+    options: Readonly<Record<string, unknown>> = {}
+  ): Promise<unknown> {
     if (!this.initialized) {
       throw new Error('CLI not initialized. Call initialize() first.');
     }
@@ -200,16 +217,27 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         id: randomUUID(),
         type: 'analyze',
         input: filePath,
-        options: { ...this.context.options, ...options },
-        session: this.currentSession || undefined,
+        options: { 
+          enableGracefulDegradation: true,
+          retryAttempts: 3,
+          timeoutMs: 30000,
+          fallbackMode: 'basic',
+          errorNotification: this.context.options.verbose || false,
+          enableContextIntelligence: this.context.options.contextAware,
+          enablePerformanceOptimization: this.context.options.performance,
+          enableErrorResilience: this.context.options.resilience,
+          ...this.context.options,
+          ...options
+        },
+        session: this.currentSession ?? undefined,
       };
 
       const response = await this.coordinator.processOperation(request);
 
       if (response.success) {
-        return response.result;
+        return response.result as unknown;
       } else {
-        throw new Error(response.error || 'Analysis failed');
+        throw new Error(response.error ?? 'Analysis failed');
       }
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -221,7 +249,11 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Execute a tool
    */
-  async executeTool(toolName: string, args: any = {}, options: any = {}): Promise<any> {
+  public async executeTool(
+    toolName: string,
+    args: Readonly<Record<string, unknown>> = {},
+    options: Readonly<Record<string, unknown>> = {}
+  ): Promise<unknown> {
     if (!this.initialized) {
       throw new Error('CLI not initialized. Call initialize() first.');
     }
@@ -231,16 +263,27 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         id: randomUUID(),
         type: 'execute',
         input: { toolName, args },
-        options: { ...this.context.options, ...options },
-        session: this.currentSession || undefined,
+        options: { 
+          enableGracefulDegradation: true,
+          retryAttempts: 3,
+          timeoutMs: 30000,
+          fallbackMode: 'basic',
+          errorNotification: this.context.options.verbose || false,
+          enableContextIntelligence: this.context.options.contextAware,
+          enablePerformanceOptimization: this.context.options.performance,
+          enableErrorResilience: this.context.options.resilience,
+          ...this.context.options,
+          ...options
+        },
+        session: this.currentSession ?? undefined,
       };
 
       const response = await this.coordinator.processOperation(request);
 
       if (response.success) {
-        return response.result;
+        return response.result as unknown;
       } else {
-        throw new Error(response.error || 'Tool execution failed');
+        throw new Error(response.error ?? 'Tool execution failed');
       }
     } catch (error) {
       const errorMessage = getErrorMessage(error);
@@ -252,14 +295,33 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Get intelligent command suggestions
    */
-  async getSuggestions(context?: string): Promise<any[]> {
+  public async getSuggestions(
+    context?: string
+  ): Promise<
+    ReadonlyArray<{
+      command: string;
+      description: string;
+      examples: ReadonlyArray<string>;
+      relevance: number;
+    }>
+  > {
     if (!this.initialized) {
       return [];
     }
 
     try {
-      const commands = await this.coordinator.getIntelligentCommands(context);
-      return commands.map(cmd => ({
+      const commands: ReadonlyArray<{
+        command: string;
+        description: string;
+        examples: ReadonlyArray<string>;
+        contextRelevance: number;
+      }> = await this.coordinator.getIntelligentCommands(context);
+      return commands.map((cmd: Readonly<{
+        command: string;
+        description: string;
+        examples: ReadonlyArray<string>;
+        contextRelevance: number;
+      }>) => ({
         command: cmd.command,
         description: cmd.description,
         examples: cmd.examples,
@@ -274,7 +336,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Start interactive REPL mode
    */
-  async startInteractive(): Promise<void> {
+  public async startInteractive(): Promise<void> {
     if (!this.currentSession) {
       this.currentSession = await this.coordinator.createSession(this.context.workingDirectory);
       this.context.sessionId = this.currentSession.id;
@@ -288,7 +350,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     // Show quick context status if available
     try {
       const contextStatus = await this.coordinator.getQuickContextStatus();
-      if (contextStatus.available && contextStatus.basic) {
+      if (contextStatus.basic) {
         await this.userInteraction.display(
           `📊 Project: ${contextStatus.basic.type} (${contextStatus.basic.language}) - Confidence: ${(contextStatus.confidence * 100).toFixed(0)}%`,
           { type: 'info' }
@@ -341,19 +403,18 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
             await this.userInteraction.error('Usage: exec <command> [args as JSON or tokens]');
             continue;
           }
-          let args: any[] = [];
+          let args: unknown[] = [];
           const joined = rest.join(' ');
           if (joined) {
             try {
               // Try JSON array or single JSON value
-              const parsed = JSON.parse(joined);
+              const parsed: unknown = JSON.parse(joined);
               args = Array.isArray(parsed) ? parsed : [parsed];
             } catch {
-              // Fallback: space-delimited tokens
               args = rest;
             }
           }
-          const result = await this.execCommand(name, args);
+          const result: unknown = await this.execCommand(name, args);
           await this.userInteraction.display(
             typeof result === 'string' ? result : JSON.stringify(result, null, 2)
           );
@@ -381,7 +442,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Run CLI with command line arguments
    */
-  async run(args: string[]): Promise<void> {
+  public async run(args: ReadonlyArray<string>): Promise<void> {
     if (!this.initialized) {
       throw new Error('CLI not initialized. Call initialize() first.');
     }
@@ -390,17 +451,19 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
       if (args.length === 0) {
         // No arguments provided. If stdin is not a TTY (piped input),
         // read from stdin once and process as a single prompt.
-        if (process.stdin && !process.stdin.isTTY) {
-          const input: string = await new Promise(resolve => {
+        if (!process.stdin.isTTY) {
+          const input: string = await new Promise<string>(resolve => {
             let data = '';
             try {
               process.stdin.setEncoding('utf8');
-            } catch {}
-            process.stdin.on('data', chunk => {
-              data += chunk;
+            } catch {
+              // ignore
+            }
+            process.stdin.on('data', (chunk: Buffer | string) => {
+              data += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
             });
-            process.stdin.on('end', () => resolve(data));
-            process.stdin.on('error', () => resolve(data));
+            process.stdin.on('end', () => { resolve(data); });
+            process.stdin.on('error', () => { resolve(data); });
           });
 
           const prompt = input.trim();
@@ -422,8 +485,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
       }
 
       // Parse command line arguments
-      const command = args[0];
-      const remainingArgs = args.slice(1);
+      const [command, ...remainingArgs] = args;
 
       switch (command) {
         case 'interactive':
@@ -543,11 +605,11 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
     description: string,
     riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'medium',
     hasWriteAccess: boolean = false
-  ) {
+  ): Promise<{ approved: boolean; reason?: string }> {
     const approvalManager = getApprovalManager();
 
     // Determine required permissions based on operation
-    const permissions = [];
+    const permissions: Permission[] = [];
 
     if (hasWriteAccess) {
       permissions.push(ApprovalModesManager.permissions.writeWorkingDir());

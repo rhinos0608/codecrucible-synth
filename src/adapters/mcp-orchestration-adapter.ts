@@ -728,7 +728,7 @@ export class MCPOrchestrationAdapter extends EventEmitter {
     operation: () => Promise<T>,
     retryPolicy: RetryPolicy
   ): Promise<T> {
-    let lastError: Error;
+    let lastError: Error = new Error('No attempts were made');
     let delay = retryPolicy.initialDelay;
 
     for (let attempt = 0; attempt < retryPolicy.maxAttempts; attempt++) {

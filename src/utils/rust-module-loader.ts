@@ -146,7 +146,7 @@ export function loadRustExecutor(baseDir?: string): any {
   try {
     return loadPrebuiltBinding('codecrucible-rust-executor');
   } catch (prebuiltError) {
-    logger.warn('Prebuilt binary not available, falling back to local build:', prebuiltError.message);
+    logger.warn('Prebuilt binary not available, falling back to local build:', (prebuiltError as Error).message);
     
     // Fallback to manual path resolution (for development)
     const currentFile = fileURLToPath(import.meta.url);
@@ -172,7 +172,7 @@ export function loadRustExecutor(baseDir?: string): any {
         `Rust executor binary not found. Tried prebuilt packages and local paths. ` +
         `Searched paths: ${searchPaths.join(', ')}. ` +
         `Expected binaries: ${generateBinaryNames('codecrucible-rust-executor').join(', ')}. ` +
-        `Prebuilt error: ${prebuiltError.message}`
+        `Prebuilt error: ${(prebuiltError as Error).message}`
       );
       throw error;
     }

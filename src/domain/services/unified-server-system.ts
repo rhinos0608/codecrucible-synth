@@ -1094,7 +1094,7 @@ export class ServerMode extends UnifiedServerSystem implements ServerModeInterfa
     );
   }
 
-  async handleRequest(type: ServerType, request: ServerRequest): Promise<ServerResponse> {
+  override async handleRequest(type: ServerType, request: ServerRequest): Promise<ServerResponse> {
     return await super.handleRequest(type, request);
   }
 }

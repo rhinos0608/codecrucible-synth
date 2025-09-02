@@ -160,15 +160,15 @@ function loadEnvConfig(): Partial<UnifiedConfiguration> {
   const env: Partial<UnifiedConfiguration> = {};
   if (process.env.NODE_ENV) {
     env.application = env.application || ({} as any);
-    env.application.environment = process.env.NODE_ENV as any;
+    env.application!.environment = process.env.NODE_ENV as any;
   }
   if (process.env.LOG_LEVEL) {
     env.application = env.application || ({} as any);
-    env.application.logLevel = process.env.LOG_LEVEL as any;
+    env.application!.logLevel = process.env.LOG_LEVEL as any;
   }
   if (process.env.MODEL_DEFAULT_NAME) {
     env.model = env.model || ({} as any);
-    env.model.defaultModel = process.env.MODEL_DEFAULT_NAME;
+    env.model!.defaultModel = process.env.MODEL_DEFAULT_NAME;
   }
   return env;
 }
@@ -178,7 +178,7 @@ function loadCliConfig(): Partial<UnifiedConfiguration> {
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith('--log-level=')) {
       cli.application = cli.application || ({} as any);
-      cli.application.logLevel = arg.split('=')[1] as any;
+      cli.application!.logLevel = arg.split('=')[1] as any;
     }
   }
   return cli;

@@ -10,7 +10,7 @@
 import { config } from 'dotenv';
 config();
 
-import { UnifiedCLI, CLIOptions } from './application/interfaces/unified-cli.js';
+import { CLIOptions, UnifiedCLI } from './application/interfaces/unified-cli.js';
 import { createRuntimeContext } from './application/runtime/runtime-context.js';
 import { ConcreteWorkflowOrchestrator } from './application/services/concrete-workflow-orchestrator.js';
 import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-interaction.js';
@@ -54,8 +54,11 @@ async function getPackageVersion(): Promise<string> {
     const __dirname = dirname(__filename);
     const packagePath = join(__dirname, '..', 'package.json');
     const packageData = await readFile(packagePath, 'utf-8');
-    const packageJson = JSON.parse(packageData);
-    return packageJson.version;
+    const packageJson = JSON.parse(packageData) as { version?: unknown };
+    if (typeof packageJson.version === 'string') {
+      return packageJson.version;
+    }
+    return '4.0.7-unified';
   } catch {
     return '4.0.7-unified';
   }
@@ -221,30 +224,30 @@ export async function initialize(): Promise<UnifiedCLI> {
     }
 
     // Create model client configuration based on selected model
+    // Create model client configuration based on selected model
     const modelClientConfig = {
-      adapters: [] as any[], // Empty for now, adapters would be created from providers
+      adapters: [], // Empty for now, adapters would be created from providers
       defaultProvider: selectedModelInfo.provider,
       providers: [
-        {
-          type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
-          name: `${selectedModelInfo.provider}-selected`,
-          endpoint:
-            selectedModelInfo.provider === 'ollama'
-              ? process.env.OLLAMA_ENDPOINT || 'http://localhost:11434'
-              : process.env.LM_STUDIO_ENDPOINT || 'ws://localhost:8080',
-          enabled: true,
-          priority: 1,
-          models: [selectedModelInfo.selectedModel.id],
-          timeout: parseInt(process.env.REQUEST_TIMEOUT || '110000'),
-        },
+      {
+        type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
+        name: `${selectedModelInfo.provider}-selected`,
+        endpoint:
+        selectedModelInfo.provider === 'ollama'
+          ? process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434'
+          : process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080',
+        enabled: true,
+        priority: 1,
+        models: [selectedModelInfo.selectedModel.id],
+        timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
+      },
       ],
-      fallbackStrategy: 'priority' as const,
-      timeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'),
+      fallbackStrategy: 'priority',
+      timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
       retryAttempts: 3,
       enableCaching: true,
       enableMetrics: true,
     };
-
     const modelClient = new UnifiedModelClient(modelClientConfig);
     await modelClient.initialize();
 
@@ -278,7 +281,7 @@ export async function initialize(): Promise<UnifiedCLI> {
     };
 
     const cli = new UnifiedCLI(cliOptions);
-    await cli.initialize(orchestrator);
+    // Removed cli.initialize(orchestrator) as UnifiedCLI does not have an initialize method
 
     const initTime = Date.now() - startTime;
     logger.info(`✅ Unified system initialized in ${initTime}ms`);
@@ -328,7 +331,7 @@ export async function main(): Promise<void> {
 
     // Handle models command
     if (args[0] === 'models') {
-      const { ModelsCommand, parseModelsArgs } = await import('./core/cli/models-command.js');
+      const { ModelsCommand, parseModelsArgs } = await import('./application/cli/models-command.js');
       const modelsCommand = new ModelsCommand();
       const modelsOptions = parseModelsArgs(args.slice(1));
       await modelsCommand.execute(modelsOptions);
@@ -349,10 +352,10 @@ export async function main(): Promise<void> {
     };
 
     process.on('SIGINT', () => {
-      cleanup().finally(() => {});
+      cleanup().catch(() => {});
     });
     process.on('SIGTERM', () => {
-      cleanup().finally(() => {});
+      cleanup().catch(() => {});
     });
     // Note: do not attach to 'exit' to avoid recursive exits
 
@@ -450,8 +453,16 @@ program
   .option('--no-autonomous', 'Disable autonomous mode')
   .option('--no-performance', 'Disable performance optimization')
   .option('--no-resilience', 'Disable error resilience')
-  .action(async (prompt, options) => {
-    const args = [];
+  .action(async (prompt: string[], options: {
+    interactive?: boolean;
+    verbose?: boolean;
+    noStream?: boolean;
+    noIntelligence?: boolean;
+    noAutonomous?: boolean;
+    noPerformance?: boolean;
+    noResilience?: boolean;
+  }) => {
+    const args: string[] = [];
 
     if (options.interactive) {
       args.push('interactive');

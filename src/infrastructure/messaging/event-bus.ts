@@ -17,7 +17,7 @@ export class EventBus extends EventEmitter implements IEventBus {
     this.performanceProfiler = performanceProfiler;
   }
 
-  emit<T = any>(event: string, data: T): boolean {
+  override emit<T = any>(event: string, data: T): boolean {
     const eventId = `event_${event}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
     // Start profiling for event emission if profiler is available
@@ -66,7 +66,7 @@ export class EventBus extends EventEmitter implements IEventBus {
     }
   }
 
-  on<T = any>(event: string, handler: (data: T) => void): this {
+  override on<T = any>(event: string, handler: (data: T) => void): this {
     if (this.performanceProfiler) {
       const originalHandler = handler;
       const handlerId = `handler_${event}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -117,7 +117,7 @@ export class EventBus extends EventEmitter implements IEventBus {
     }
   }
 
-  once<T = any>(event: string, handler: (data: T) => void): this {
+  override once<T = any>(event: string, handler: (data: T) => void): this {
     if (this.performanceProfiler) {
       const originalHandler = handler;
       const handlerId = `once_handler_${event}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;

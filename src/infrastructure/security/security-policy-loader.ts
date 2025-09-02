@@ -147,7 +147,7 @@ export class SecurityPolicyLoader {
       SecurityPolicyLoader.lastLoadTime = now;
       logger.info(`🔒 Security policies loaded for environment: ${environment}`);
 
-      return SecurityPolicyLoader.policies;
+      return SecurityPolicyLoader.policies!;
     } catch (error) {
       logger.error(`❌ Failed to load security policies: ${error}`);
 

@@ -8,8 +8,8 @@
  * - @package.json - Reference file in root
  */
 
-import { readFile, readdir, stat } from 'fs/promises';
-import { join, resolve, relative, extname } from 'path';
+import { readFile, stat } from 'fs/promises';
+import { extname, join, resolve } from 'path';
 import { glob } from 'glob';
 import { logger } from '../../infrastructure/logging/unified-logger.js';
 
@@ -35,23 +35,23 @@ export interface ParsedFileReferences {
  * File Reference Parser with industry-standard @ syntax
  */
 export class FileReferenceParser {
-  private maxFileSize: number;
-  private maxTotalSize: number;
-  private supportedExtensions: Set<string>;
-  private excludePatterns: string[];
+  private readonly maxFileSize: number;
+  private readonly maxTotalSize: number;
+  private readonly supportedExtensions: Set<string>;
+  private readonly excludePatterns: string[];
 
-  constructor(
-    options: {
+  public constructor(
+    options: Readonly<{
       maxFileSize?: number;
       maxTotalSize?: number;
-      supportedExtensions?: string[];
-      excludePatterns?: string[];
-    } = {}
+      supportedExtensions?: readonly string[];
+      excludePatterns?: readonly string[];
+    }> = {}
   ) {
-    this.maxFileSize = options.maxFileSize || 1024 * 1024; // 1MB per file
-    this.maxTotalSize = options.maxTotalSize || 10 * 1024 * 1024; // 10MB total
+    this.maxFileSize = options.maxFileSize ?? 1024 * 1024; // 1MB per file
+    this.maxTotalSize = options.maxTotalSize ?? 10 * 1024 * 1024; // 10MB total
     this.supportedExtensions = new Set(
-      options.supportedExtensions || [
+      options.supportedExtensions ?? [
         '.js',
         '.ts',
         '.jsx',
@@ -78,7 +78,7 @@ export class FileReferenceParser {
         '.env',
       ]
     );
-    this.excludePatterns = options.excludePatterns || [
+    this.excludePatterns = options.excludePatterns ? Array.from(options.excludePatterns) : [
       'node_modules/**',
       '.git/**',
       'dist/**',
@@ -93,7 +93,7 @@ export class FileReferenceParser {
   /**
    * Parse @ syntax file references from prompt
    */
-  async parseFileReferences(
+  public async parseFileReferences(
     prompt: string,
     workingDir: string = process.cwd()
   ): Promise<ParsedFileReferences> {
@@ -119,8 +119,7 @@ export class FileReferenceParser {
     let totalSize = 0;
 
     for (const match of matches) {
-      const originalRef = match[0]; // Full match including @
-      const pathRef = match[1]; // Path without @
+      const [originalRef, pathRef] = match; // Destructure match array
 
       try {
         const fileRef = await this.processFileReference(pathRef, workingDir);
@@ -373,7 +372,7 @@ export class FileReferenceParser {
       }
     }
 
-    return enhanced;
+    return Promise.resolve(enhanced);
   }
 
   /**

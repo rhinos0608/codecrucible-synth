@@ -5,7 +5,7 @@
  * module loading, lifecycle management, and communication protocols.
  */
 
-import { logger } from '../../logger.js';
+import { logger } from '../../logging/logger.js';
 
 export interface BridgeConfiguration {
   modulePath: string;

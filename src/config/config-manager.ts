@@ -75,7 +75,7 @@ export class ConfigManager {
           unified.model.providers[0]?.endpoint ||
           process.env.OLLAMA_ENDPOINT ||
           'http://localhost:11434',
-        name: unified.model.defaultModel || process.env.MODEL_DEFAULT_NAME,
+        name: unified.model.defaultModel || process.env.MODEL_DEFAULT_NAME || 'default',
         timeout: unified.model.timeout || parseInt(process.env.REQUEST_TIMEOUT || '30000'),
         maxTokens: unified.model.maxTokens || parseInt(process.env.MODEL_MAX_TOKENS || '131072'),
         temperature:
@@ -129,7 +129,7 @@ export class ConfigManager {
     return {
       model: {
         endpoint: process.env.OLLAMA_ENDPOINT || 'http://localhost:11434',
-        name: process.env.MODEL_DEFAULT_NAME,
+        name: process.env.MODEL_DEFAULT_NAME || 'default',
         timeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'),
         maxTokens: parseInt(process.env.MODEL_MAX_TOKENS || '131072'),
         temperature: parseFloat(process.env.MODEL_TEMPERATURE || '0.7'),

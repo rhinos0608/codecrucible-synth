@@ -459,7 +459,7 @@ export class MCPServerManager {
     if (!this.config.smithery?.enabled) return;
 
     const smitheryConfig: SmitheryMCPConfig = {
-      apiKey: this.config.smithery.apiKey || process.env.SMITHERY_API_KEY,
+      apiKey: this.config.smithery.apiKey || process.env.SMITHERY_API_KEY || '',
       enabledServers: this.config.smithery.enabledServers || [],
       autoDiscovery: this.config.smithery.autoDiscovery ?? true,
     };
@@ -518,7 +518,7 @@ export class MCPServerManager {
     const serverIds = await this.listServers();
     const serverStatuses = await Promise.all(
       serverIds.map(async (serverId) => {
-        const serverInfo = mcpServerRegistry.getServerInfo(serverId);
+        const serverInfo = await mcpServerRegistry.getServer(serverId);
         const status = await this.getServerStatus(serverId);
         return {
           id: serverId,

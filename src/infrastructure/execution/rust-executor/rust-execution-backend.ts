@@ -5,7 +5,7 @@
  * and tool execution capabilities. Replaces TypeScript executors with blazing-fast Rust.
  */
 
-import { logger } from '../../logger.js';
+import { logger } from '../../logging/logger.js';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
 import type {
@@ -144,12 +144,12 @@ export class RustExecutionBackend {
         this.rustExecutor = RustExecutor ? RustExecutor.create() : createRustExecutor();
 
         // Initialize the Rust executor
-        const initResult = await this.rustExecutor.initialize();
+        const initResult = await this.rustExecutor?.initialize();
         if (initResult) {
           this.initialized = true;
           logger.info('🚀 RustExecutionBackend initialized successfully', {
-            executorId: this.rustExecutor.getId(),
-            supportedTools: this.rustExecutor.getSupportedTools(),
+            executorId: this.rustExecutor?.getId(),
+            supportedTools: this.rustExecutor?.getSupportedTools(),
             performanceMetrics: this.options.enableProfiling,
           });
         } else {
@@ -160,8 +160,8 @@ export class RustExecutionBackend {
 
         this.initialized = true;
         logger.info('🚀 RustExecutionBackend initialized successfully', {
-          executorId: this.rustExecutor.getId(),
-          supportedTools: this.rustExecutor.getSupportedTools(),
+          executorId: this.rustExecutor?.getId(),
+          supportedTools: this.rustExecutor?.getSupportedTools(),
           performanceMetrics: this.options.enableProfiling,
         });
         return true;

@@ -1,5 +1,5 @@
 import { logger } from '../infrastructure/logging/logger.js';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 export interface ExaSearchConfig {
   enabled: boolean;
@@ -48,7 +48,7 @@ export class ExaSearchTool {
   /**
    * Perform neural web search with Exa API
    */
-  async search(
+  public async search(
     query: string,
     options: {
       numResults?: number;
@@ -99,7 +99,9 @@ export class ExaSearchTool {
           delete searchParams[key as keyof typeof searchParams]
       );
 
-      const response = await axios.post(`${this.config.baseUrl}/search`, searchParams, {
+      const response = await axios.post<{
+        results: ExaSearchResult[];
+      }>(`${this.config.baseUrl}/search`, searchParams, {
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
           'Content-Type': 'application/json',
@@ -111,21 +113,29 @@ export class ExaSearchTool {
 
       return {
         query,
-        results: await this.processSearchResults(response.data.results || []),
         totalResults: response.data.results?.length || 0,
+        results: await this.processSearchResults(response.data.results),
         searchTime,
       };
-    } catch (error: any) {
-      logger.error('Exa search failed:', error);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Exa search failed:', error.message);
+      } else {
+        logger.error('Exa search failed:', error);
+      }
 
-      if (error.response?.status === 401) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
         throw new Error('Exa Search API authentication failed. Check your API key.');
-      } else if (error.response?.status === 429) {
+      } else if (axios.isAxiosError(error) && error.response?.status === 429) {
         throw new Error('Exa Search API rate limit exceeded. Please try again later.');
-      } else if (error.code === 'ECONNABORTED') {
+      } else if ((error as AxiosError).code === 'ECONNABORTED') {
         throw new Error('Exa Search request timed out. Try with a simpler query.');
       } else {
-        throw new Error(`Exa Search failed: ${error.message || 'Unknown error'}`);
+        if (error instanceof Error) {
+          throw new Error(`Exa Search failed: ${error.message}`);
+        } else {
+          throw new Error('Exa Search failed: Unknown error');
+        }
       }
     }
   }
@@ -133,7 +143,7 @@ export class ExaSearchTool {
   /**
    * Search for coding-related content with developer-optimized settings
    */
-  async searchCode(
+  public async searchCode(
     query: string,
     language?: string,
     options: {
@@ -149,7 +159,14 @@ export class ExaSearchTool {
       enhancedQuery += ` ${language} programming`;
     }
 
-    const searchOptions: any = {
+    const searchOptions: {
+      numResults: number;
+      useAutoprompt: boolean;
+      type: 'neural' | 'keyword';
+      includeText: boolean;
+      includeDomains?: string[];
+      startPublishedDate?: string;
+    } = {
       numResults: 15,
       useAutoprompt: true,
       type: 'neural',
@@ -176,7 +193,8 @@ export class ExaSearchTool {
     if (options.recentOnly) {
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      searchOptions.startPublishedDate = oneYearAgo.toISOString().split('T')[0];
+      const [datePart] = oneYearAgo.toISOString().split('T');
+      searchOptions.startPublishedDate = datePart;
     }
 
     return this.search(enhancedQuery, searchOptions);
@@ -185,7 +203,7 @@ export class ExaSearchTool {
   /**
    * Find similar content to a given URL or text
    */
-  async findSimilar(
+  public async findSimilar(
     input: string,
     options: {
       isUrl?: boolean;
@@ -202,7 +220,12 @@ export class ExaSearchTool {
     const startTime = Date.now();
 
     try {
-      const requestBody: any = {
+      const requestBody: {
+        numResults: number;
+        category?: string;
+        url?: string;
+        text?: string;
+      } = {
         numResults: options.numResults || 10,
         category: options.category,
       };
@@ -213,7 +236,9 @@ export class ExaSearchTool {
         requestBody.text = input;
       }
 
-      const response = await axios.post(`${this.config.baseUrl}/findSimilar`, requestBody, {
+      const response = await axios.post<{
+        results: ExaSearchResult[];
+      }>(`${this.config.baseUrl}/findSimilar`, requestBody, {
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
           'Content-Type': 'application/json',
@@ -223,29 +248,37 @@ export class ExaSearchTool {
 
       const searchTime = Date.now() - startTime;
 
+      const results = await this.processSearchResults(response.data.results || []);
+      const totalResults: number = response.data.results?.length || 0;
+
       return {
-        query: `Similar to: ${input}`,
-        results: await this.processSearchResults(response.data.results || []),
-        totalResults: response.data.results?.length || 0,
+        query: input,
+        results,
+        totalResults,
         searchTime,
       };
-    } catch (error: any) {
-      logger.error('Exa findSimilar failed:', error);
-      throw new Error(`Exa findSimilar failed: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        logger.error('Exa findSimilar failed:', error.message);
+        throw new Error(`Exa findSimilar failed: ${error.message}`);
+      } else {
+        logger.error('Exa findSimilar failed:', error);
+        throw new Error('Exa findSimilar failed: Unknown error');
+      }
     }
   }
 
   /**
    * Get content from a specific URL with Exa's content extraction
    */
-  async getContent(
-    urls: string | string[],
-    options: {
+  public async getContent(
+    urls: string | readonly string[],
+    options: Readonly<{
       text?: boolean;
       highlights?: boolean;
       summary?: boolean;
-    } = {}
-  ): Promise<any> {
+    }> = {}
+  ): Promise<Record<string, unknown>> {
     if (!this.config.enabled || !this.config.apiKey) {
       throw new Error('Exa Search not properly configured');
     }
@@ -270,17 +303,22 @@ export class ExaSearchTool {
         timeout: this.config.timeout,
       });
 
-      return response.data;
-    } catch (error: any) {
-      logger.error('Exa getContent failed:', error);
-      throw new Error(`Exa getContent failed: ${error.message || 'Unknown error'}`);
+      return response.data as Record<string, unknown>;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        logger.error('Exa getContent failed:', error.message);
+        throw new Error(`Exa getContent failed: ${error.message}`);
+      } else {
+        logger.error('Exa getContent failed:', error);
+        throw new Error('Exa getContent failed: Unknown error');
+      }
     }
   }
 
   /**
    * Search with auto-categorization for better results
    */
-  async smartSearch(
+  public async smartSearch(
     query: string,
     context: 'development' | 'research' | 'troubleshooting' | 'learning' = 'development'
   ): Promise<ExaSearchResponse> {
@@ -318,12 +356,12 @@ export class ExaSearchTool {
   /**
    * Process and normalize search results
    */
-  private async processSearchResults(results: any[]): Promise<ExaSearchResult[]> {
+  private async processSearchResults(results: ExaSearchResult[]): Promise<ExaSearchResult[]> {
     const processedResults = await Promise.all(
-      results.map(async result => ({
+      results.map(async (result: ExaSearchResult) => ({
         title: result.title || 'Untitled',
         url: result.url || '',
-        content: await this.cleanContent(result.text || result.content || ''),
+        content: await this.cleanContent(result.content || ''),
         score: result.score || 0,
         publishedDate: result.publishedDate,
         author: result.author,
@@ -374,7 +412,12 @@ export class ExaSearchTool {
   /**
    * Get usage statistics
    */
-  getUsageStats(): any {
+  public getUsageStats(): {
+    requestCount: number;
+    isEnabled: boolean;
+    hasApiKey: boolean;
+    lastRequestTime: number;
+  } {
     return {
       requestCount: this.requestCount,
       isEnabled: this.config.enabled,

@@ -358,7 +358,7 @@ export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
  * Tool registry for managing Rust-backed tools
  */
 export class RustToolRegistry {
-  private tools = new Map<string, RustTool<unknown>>();
+  private tools = new Map<string, RustTool<Record<string, unknown>>>();
   private initialized = false;
 
   constructor() {
@@ -375,7 +375,7 @@ export class RustToolRegistry {
     ];
 
     builtinTools.forEach(tool => {
-      this.tools.set(tool.definition.id, tool as unknown as RustTool<unknown>);
+      this.tools.set(tool.definition.id, tool as unknown as RustTool<Record<string, unknown>>);
     });
   }
 
@@ -408,7 +408,7 @@ export class RustToolRegistry {
   /**
    * Get a tool by ID
    */
-  getTool(toolId: string): RustTool<unknown> | undefined {
+  getTool(toolId: string): RustTool<Record<string, unknown>> | undefined {
     return this.tools.get(toolId);
   }
 
@@ -422,7 +422,7 @@ export class RustToolRegistry {
   /**
    * Register a custom Rust tool
    */
-  registerTool(tool: RustTool<unknown>): void {
+  registerTool(tool: RustTool<Record<string, unknown>>): void {
     this.tools.set(tool.definition.id, tool);
     if (this.initialized) {
       tool.initialize().catch(error => {

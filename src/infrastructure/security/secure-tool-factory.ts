@@ -474,21 +474,23 @@ class SecureE2BCodeExecutionTool implements BaseTool {
         securityLevel: 'high',
       };
     } catch (error) {
-      await this.auditLogger.logEvent(
-        AuditEventType.ERROR_EVENT,
-        AuditSeverity.MEDIUM,
-        AuditOutcome.ERROR,
-        'secure-code-tool',
-        'execute',
-        'code-execution',
-        'Code execution failed with error',
-        {
+      await this.auditLogger.logEvent({
+        timestamp: new Date().toISOString(),
+        eventType: AuditEventType.ERROR_EVENT,
+        severity: AuditSeverity.MEDIUM,
+        outcome: AuditOutcome.ERROR,
+        userId: this.agentContext.userId,
+        sessionId: this.agentContext.sessionId,
+        resource: 'secure-code-tool',
+        action: 'execute',
+        errorMessage: 'Code execution failed with error',
+        details: {
           userId: this.agentContext.userId,
           sessionId: this.agentContext.sessionId,
           executionId,
         },
-        { error: (error as Error).message }
-      );
+        metadata: { error: (error as Error).message }
+      });
 
       logger.error('Secure code execution failed', error as Error, { executionId });
       return {
@@ -533,15 +535,17 @@ class SecureE2BTerminalTool implements BaseTool {
       const commandValidation = AdvancedInputValidator.validateCommand(args.command);
       if (!commandValidation.success) {
         await this.auditLogger.logSecurityViolation(
-          AuditSeverity.HIGH,
-          'secure-terminal-tool',
+          this.agentContext.userId,
           'Dangerous command blocked',
           {
+            severity: 'HIGH',
+            tool: 'secure-terminal-tool',
             userId: this.agentContext.userId,
             sessionId: this.agentContext.sessionId,
             executionId,
-          },
-          { command: args.command, reason: (commandValidation as any).error.message }
+            command: args.command,
+            reason: (commandValidation as any).error.message
+          }
         );
 
         return {
@@ -570,13 +574,7 @@ class SecureE2BTerminalTool implements BaseTool {
           AuditOutcome.FAILURE,
           this.agentContext.userId,
           'terminal-execution',
-          'execute',
-          {
-            userId: this.agentContext.userId,
-            sessionId: this.agentContext.sessionId,
-            executionId,
-          },
-          { command: args.command, reason: authResult.reason }
+          'execute'
         );
 
         return {
@@ -595,15 +593,16 @@ class SecureE2BTerminalTool implements BaseTool {
       });
       if (!securityValidation.isValid) {
         await this.auditLogger.logSecurityViolation(
-          AuditSeverity.CRITICAL,
-          'secure-terminal-tool',
+          this.agentContext.userId,
           `Malicious command detected: ${securityValidation.reason}`,
           {
+            severity: 'CRITICAL',
+            tool: 'secure-terminal-tool',
             userId: this.agentContext.userId,
             sessionId: this.agentContext.sessionId,
             executionId,
-          },
-          { command: args.command }
+            command: args.command
+          }
         );
 
         return {
@@ -620,25 +619,27 @@ class SecureE2BTerminalTool implements BaseTool {
       const result = await this.e2bService.executeCode(executionId, commandValidation.data, 'bash');
 
       // Log successful execution
-      await this.auditLogger.logEvent(
-        AuditEventType.SYSTEM_EVENT,
-        AuditSeverity.LOW,
-        AuditOutcome.SUCCESS,
-        'secure-terminal-tool',
-        'execute',
-        'terminal-execution',
-        'Command executed successfully in sandbox',
-        {
+      await this.auditLogger.logEvent({
+        timestamp: new Date().toISOString(),
+        eventType: AuditEventType.SYSTEM_EVENT,
+        severity: AuditSeverity.LOW,
+        outcome: AuditOutcome.SUCCESS,
+        userId: this.agentContext.userId,
+        sessionId: this.agentContext.sessionId,
+        resource: 'secure-terminal-tool',
+        action: 'execute',
+        errorMessage: 'Command executed successfully in sandbox',
+        details: {
           userId: this.agentContext.userId,
           sessionId: this.agentContext.sessionId,
           executionId,
         },
-        {
+        metadata: {
           command: args.command,
           executionTime: Date.now() - startTime,
           exitCode: result.success ? 0 : 1,
         }
-      );
+      });
 
       return {
         success: true,
@@ -648,21 +649,23 @@ class SecureE2BTerminalTool implements BaseTool {
         securityLevel: 'high',
       };
     } catch (error) {
-      await this.auditLogger.logEvent(
-        AuditEventType.ERROR_EVENT,
-        AuditSeverity.MEDIUM,
-        AuditOutcome.ERROR,
-        'secure-terminal-tool',
-        'execute',
-        'terminal-execution',
-        'Terminal execution failed with error',
-        {
+      await this.auditLogger.logEvent({
+        timestamp: new Date().toISOString(),
+        eventType: AuditEventType.ERROR_EVENT,
+        severity: AuditSeverity.MEDIUM,
+        outcome: AuditOutcome.ERROR,
+        userId: this.agentContext.userId,
+        sessionId: this.agentContext.sessionId,
+        resource: 'secure-terminal-tool',
+        action: 'execute',
+        errorMessage: 'Terminal execution failed with error',
+        details: {
           userId: this.agentContext.userId,
           sessionId: this.agentContext.sessionId,
           executionId,
         },
-        { command: args.command, error: (error as Error).message }
-      );
+        metadata: { command: args.command, error: (error as Error).message }
+      });
 
       logger.error('Secure terminal execution failed', error as Error, { executionId });
       return {

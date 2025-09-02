@@ -478,7 +478,9 @@ export class ConcreteWorkflowOrchestrator extends EventEmitter implements IWorkf
       // Cache the result (with LRU eviction)
       if (this.toolSelectionCache.size >= this.maxCacheSize) {
         const firstKey = this.toolSelectionCache.keys().next().value;
-        this.toolSelectionCache.delete(firstKey);
+        if (firstKey !== undefined) {
+          this.toolSelectionCache.delete(firstKey);
+        }
       }
       this.toolSelectionCache.set(cacheKey, selectedTools);
 

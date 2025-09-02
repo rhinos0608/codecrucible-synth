@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+use std::{collections::HashMap, sync::Mutex, time::Instant};
+
+
 use std::{collections::HashMap, time::Instant};
+
 use tracing::{info, warn};
 use tree_sitter::{Node, Parser, Query, QueryCursor};
 use tree_sitter_rust::language as rust_language;
@@ -41,6 +45,10 @@ pub struct CodeIssue {
 
 pub struct AnalysisTool {
     patterns: HashMap<String, Vec<&'static str>>,
+    parser: Mutex<Parser>,
+    query_fn: Query,
+    query_struct: Query,
+    query_complex: Query,
 }
 
 impl AnalysisTool {
@@ -104,7 +112,27 @@ impl AnalysisTool {
             ],
         );
 
-        Self { patterns }
+        let mut parser = Parser::new();
+        parser
+            .set_language(rust_language())
+            .expect("Error loading Rust grammar");
+        let lang = rust_language();
+        let query_fn = Query::new(lang, "(function_item) @fn").expect("Invalid function query");
+        let query_struct =
+            Query::new(lang, "(struct_item) @s\n(enum_item) @e").expect("Invalid struct query");
+        let query_complex = Query::new(
+            lang,
+            "(if_expression) @c\n(match_expression) @c\n(for_expression) @c\n(while_expression) @c\n(loop_expression) @c",
+        )
+        .expect("Invalid complexity query");
+
+        Self {
+            patterns,
+            parser: Mutex::new(parser),
+            query_fn,
+            query_struct,
+            query_complex,
+        }
     }
 
     pub async fn analyze_code(&self, code: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -141,9 +169,7 @@ impl AnalysisTool {
     fn calculate_metrics(&self, code: &str) -> CodeMetrics {
         // Benchmark tree-sitter approach
         let start_ts = Instant::now();
-        let ts_metrics = self
-            .calculate_metrics_tree_sitter(code)
-            .unwrap_or_else(|| self.calculate_metrics_regex(code));
+        let ts_metrics = self.calculate_metrics_tree_sitter(code);
         let ts_time = start_ts.elapsed();
 
         // Benchmark legacy regex approach
@@ -156,19 +182,50 @@ impl AnalysisTool {
             ts_time, regex_time
         );
 
-        if ts_metrics != regex_metrics {
-            warn!(
-                "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
-                ts_metrics, regex_metrics
-            );
+        match ts_metrics {
+            Some(ts) => {
+                if Self::metrics_diverge(&ts, &regex_metrics) {
+                    warn!(
+                        "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
+                        ts, regex_metrics
+                    );
+                    regex_metrics
+                } else {
+                    ts
+                }
+            }
+            None => {
+                warn!("tree-sitter parsing failed; falling back to regex metrics");
+                regex_metrics
+            }
         }
+    }
 
-        ts_metrics
+    fn metrics_diverge(ts: &CodeMetrics, regex: &CodeMetrics) -> bool {
+        // Absolute divergence for code_lines and functions (likely parser failure)
+        if (regex.code_lines > 0 && ts.code_lines == 0)
+            || (regex.functions > 0 && ts.functions == 0)
+        {
+            return true;
+        }
+        // Relative threshold for cyclomatic complexity
+        let ts_cc = ts.cyclomatic_complexity as f64;
+        let regex_cc = regex.cyclomatic_complexity as f64;
+        let max_cc = ts_cc.max(regex_cc);
+        let min_cc = ts_cc.min(regex_cc);
+        // If both are zero, no divergence
+        if max_cc == 0.0 {
+            return false;
+        }
+        // If the difference is more than 20% of the larger value, consider it a divergence
+        if (max_cc - min_cc) / max_cc > 0.2 {
+            return true;
+        }
+        false
     }
 
     fn calculate_metrics_tree_sitter(&self, code: &str) -> Option<CodeMetrics> {
-        let mut parser = Parser::new();
-        parser.set_language(rust_language()).ok()?;
+        let mut parser = self.parser.lock().ok()?;
         let tree = parser.parse(code, None)?;
 
         let lines: Vec<&str> = code.lines().collect();
@@ -192,31 +249,22 @@ impl AnalysisTool {
             }
         }
 
-        let lang = rust_language();
-
         // Count functions
-        let query_fn = Query::new(lang, "(function_item) @fn").ok()?;
         let mut cursor = QueryCursor::new();
         let functions = cursor
-            .matches(&query_fn, tree.root_node(), code.as_bytes())
+            .matches(&self.query_fn, tree.root_node(), code.as_bytes())
             .count();
 
         // Count structs/enums
-        let query_struct = Query::new(lang, "(struct_item) @s\n(enum_item) @e").ok()?;
         let mut cursor = QueryCursor::new();
         let classes_or_structs = cursor
-            .matches(&query_struct, tree.root_node(), code.as_bytes())
+            .matches(&self.query_struct, tree.root_node(), code.as_bytes())
             .count();
 
         // Cyclomatic complexity via control flow nodes
-        let query_complex = Query::new(
-            lang,
-            "(if_expression) @c\n(match_expression) @c\n(for_expression) @c\n(while_expression) @c\n(loop_expression) @c",
-        )
-        .ok()?;
         let mut cursor = QueryCursor::new();
         let cyclomatic_complexity = 1 + cursor
-            .matches(&query_complex, tree.root_node(), code.as_bytes())
+            .matches(&self.query_complex, tree.root_node(), code.as_bytes())
             .count();
 
         // Nesting depth by traversing block nodes
@@ -466,10 +514,15 @@ impl AnalysisTool {
         }
 
 
+        if metrics.code_lines > 0
+            && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
+
             && metrics.comment_lines as f64 / metrics.code_lines as f64 < 0.1
 
         if metrics.code_lines > 0
             && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
 
         {
             suggestions.push("Add more comments to improve code documentation".to_string());

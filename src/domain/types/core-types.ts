@@ -9,9 +9,9 @@
 
 export interface StreamToken {
   content: string;
-  timestamp?: number;
-  index?: number;
-  isComplete?: boolean;
+  timestamp: number;
+  index: number;
+  isComplete: boolean;
   metadata?: Record<string, any>;
   finishReason?: string;
   usage?: {

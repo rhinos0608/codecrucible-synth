@@ -14,7 +14,7 @@ import { ILogger } from '../../domain/interfaces/logger.js';
 import { logger as defaultLogger } from '../../infrastructure/logging/unified-logger.js';
 
 export interface ModelClientOptions {
-  adapters: ProviderAdapter[];
+  adapters?: ProviderAdapter[];
   requestProcessor?: RequestProcessor;
   responseHandler?: ResponseHandler;
   streamingManager?: StreamingManager;
@@ -30,7 +30,8 @@ export class ModelClient extends EventEmitter implements IModelClient {
 
   constructor(options: ModelClientOptions) {
     super();
-    this.adapters = new Map(options.adapters.map(a => [a.name, a]));
+    const providedAdapters = options.adapters ?? [];
+    this.adapters = new Map(providedAdapters.map(a => [a.name, a]));
     this.requestProcessor = options.requestProcessor ?? new BasicRequestProcessor();
     this.responseHandler = options.responseHandler ?? new BasicResponseHandler();
     this.streamingManager = options.streamingManager ?? new BasicStreamingManager();

@@ -113,7 +113,10 @@ export class ClaudeAdapter implements ProviderAdapter {
     const body = {
       model: req.model || 'claude-3-sonnet-20240229',
       max_tokens: req.maxTokens || 1024,
-      messages: (req as any).messages ?? [{ role: 'user', content: req.prompt }],
+      messages:
+        Array.isArray(req.messages) && req.messages.length > 0
+          ? req.messages
+          : [{ role: 'user', content: req.prompt }],
       temperature: req.temperature ?? 0.7,
     };
     const response = await fetch(this.endpoint, {

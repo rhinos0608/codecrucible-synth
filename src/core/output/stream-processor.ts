@@ -14,8 +14,14 @@ class StreamProcessor extends EventEmitter {
   async process(readable: Readable, onChunk?: (chunk: Buffer) => void): Promise<void> {
     const handler = onChunk ?? ((chunk: Buffer) => this.emit('chunk', chunk));
 
-    for await (const chunk of readable) {
-      handler(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    try {
+      for await (const chunk of readable) {
+        handler(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+    } catch (err: any) {
+      if (err?.code !== 'ERR_STREAM_DESTROYED') {
+        throw err;
+      }
     }
 
     this.emit('end');

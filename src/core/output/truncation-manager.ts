@@ -31,7 +31,8 @@ class TruncationManager {
       return { text: chunk, done: false };
     }
 
-    this.size = text.length;
+    this.size = remaining + truncationMessage.length;
+    this.truncated = true;
     return { text, done: true };
   }
 

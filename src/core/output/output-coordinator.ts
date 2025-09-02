@@ -38,6 +38,8 @@ class OutputCoordinator {
 
     // Attempt to parse JSON for structured formats
     try {
+      const parsed = JSON.parse(raw);
+      return this.formatter.to(options.format, parsed);
     } catch (err) {
       console.error('Failed to parse JSON in OutputCoordinator.process:', err);
       return this.formatter.to(options.format, raw);

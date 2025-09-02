@@ -572,6 +572,8 @@ export class ActiveProcessManager extends EventEmitter {
     // Emergency terminate all processes
     this.terminateAllProcesses('memory_pressure');
 
+    this.userWarningSystem.shutdown();
+
     this.removeAllListeners();
     this.logger.info('ActiveProcessManager destroyed');
   }

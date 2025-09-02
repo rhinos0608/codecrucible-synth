@@ -54,12 +54,9 @@ export class TelemetryExporter {
   }
 
   async exportHealth(health: SystemHealth): Promise<void> {
+    // TODO: Implement actual health export logic. This is a placeholder.
     for (const exporter of this.config.exporters) {
-      try {
-        this.logger.debug(`Telemetry export (${exporter.type}) - health status: ${health.status}`);
-      } catch (error) {
-        this.logger.error(`Failed telemetry export to ${exporter.type}:`, error);
-      }
+      this.logger.debug(`Telemetry export (${exporter.type}) - health status: ${health.status}`);
     }
   }
 

@@ -1,9 +1,9 @@
 /**
  * Optimized Event Bus Implementation - Phase 2 Final Optimization
- * 
+ *
  * Implements comprehensive event bus optimization with:
  * - Batch event processing
- * - Priority queue for critical events  
+ * - Priority queue for critical events
  * - Event deduplication
  * - Performance profiling integration
  * - Resource management and monitoring
@@ -11,7 +11,7 @@
 
 import { EventEmitter } from 'events';
 import { IEventBus } from '../../domain/interfaces/event-bus.js';
-import { PerformanceProfiler } from '../../core/performance/profiler.js';
+import { PerformanceProfiler } from '../performance/profiler.js';
 import { logger } from '../logging/logger.js';
 
 export interface EventBusConfig {
@@ -80,24 +80,24 @@ export interface EventBusStats {
 export class OptimizedEventBus extends EventEmitter implements IEventBus {
   private performanceProfiler?: PerformanceProfiler;
   private config: EventBusConfig;
-  
+
   // Performance profiling
   private eventSessions = new Map<string, string>();
   private handlerTimings = new Map<string, number>();
-  
+
   // Batching system
   private eventQueue: QueuedEvent[] = [];
   private batchTimer?: NodeJS.Timeout;
   private batchCounter = 0;
   private currentBatchId?: string;
-  
+
   // Priority queue system
   private priorityQueue: QueuedEvent[] = [];
-  
+
   // Deduplication system
   private recentEvents = new Map<string, { count: number; lastSeen: number }>();
   private deduplicationCleanupTimer?: NodeJS.Timeout;
-  
+
   // Statistics
   private stats: EventBusStats = {
     totalEvents: 0,
@@ -114,13 +114,10 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     deduplicationMapSize: 0,
   };
 
-  constructor(
-    performanceProfiler?: PerformanceProfiler,
-    config?: Partial<EventBusConfig>
-  ) {
+  constructor(performanceProfiler?: PerformanceProfiler, config?: Partial<EventBusConfig>) {
     super();
     this.setMaxListeners(100);
-    
+
     this.performanceProfiler = performanceProfiler;
     this.config = {
       batching: {
@@ -162,10 +159,10 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       },
       ...config,
     };
-    
+
     this.setupBatchProcessing();
     this.setupDeduplicationCleanup();
-    
+
     logger.info('OptimizedEventBus initialized', {
       batchingEnabled: this.config.batching.enabled,
       priorityQueueEnabled: this.config.priorityQueue.enabled,
@@ -178,13 +175,13 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    */
   emit<T = any>(event: string, data: T): boolean {
     this.stats.totalEvents++;
-    
+
     // Phase 1: Deduplication check
     if (this.config.deduplication.enabled && this.shouldDeduplicate(event, data)) {
       this.stats.deduplicatedEvents++;
       return true; // Event was "processed" (deduplicated)
     }
-    
+
     // Phase 2: Create queued event
     const queuedEvent: QueuedEvent<T> = {
       id: `event_${event}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
@@ -194,17 +191,17 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       timestamp: Date.now(),
       attempts: 0,
     };
-    
+
     // Phase 3: Priority queue processing for critical events
     if (this.config.priorityQueue.enabled && this.shouldUsePriorityQueue(event)) {
       return this.addToPriorityQueue(queuedEvent);
     }
-    
+
     // Phase 4: Batch processing for non-critical events
     if (this.config.batching.enabled && this.shouldBatch(event)) {
       return this.addToBatch(queuedEvent);
     }
-    
+
     // Phase 5: Direct emission (fallback)
     return this.emitDirect(queuedEvent);
   }
@@ -213,7 +210,11 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    * Subscribe to an event with optional profiled handler
    */
   on<T = any>(event: string, handler: (data: T) => void): this {
-    if (this.config.profiling.enabled && this.config.profiling.profileHandlers && this.performanceProfiler) {
+    if (
+      this.config.profiling.enabled &&
+      this.config.profiling.profileHandlers &&
+      this.performanceProfiler
+    ) {
       const profiledHandler = this.createProfiledHandler(event, handler);
       return super.on(event, profiledHandler);
     } else {
@@ -225,7 +226,11 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    * Subscribe once with optional profiled handler
    */
   once<T = any>(event: string, handler: (data: T) => void): this {
-    if (this.config.profiling.enabled && this.config.profiling.profileHandlers && this.performanceProfiler) {
+    if (
+      this.config.profiling.enabled &&
+      this.config.profiling.profileHandlers &&
+      this.performanceProfiler
+    ) {
       const profiledHandler = this.createProfiledHandler(event, handler);
       return super.once(event, profiledHandler);
     } else {
@@ -257,14 +262,14 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   private shouldDeduplicate<T>(event: string, data: T): boolean {
     const deduplicationKey = this.config.deduplication.keyExtractor!(event, data);
     const recentEvent = this.recentEvents.get(deduplicationKey);
-    
+
     if (recentEvent) {
       const timeSinceLastSeen = Date.now() - recentEvent.lastSeen;
-      
+
       if (timeSinceLastSeen < this.config.deduplication.windowMs) {
         recentEvent.count++;
         recentEvent.lastSeen = Date.now();
-        
+
         // Drop if too many duplicates
         return recentEvent.count > this.config.deduplication.maxDuplicates;
       } else {
@@ -275,7 +280,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     } else {
       this.recentEvents.set(deduplicationKey, { count: 1, lastSeen: Date.now() });
     }
-    
+
     return false;
   }
 
@@ -286,20 +291,20 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     if (this.priorityQueue.length >= this.config.priorityQueue.maxQueueSize) {
       this.handleQueueOverflow();
     }
-    
+
     this.priorityQueue.push(queuedEvent);
     this.stats.priorityQueuedEvents++;
-    
+
     // Sort by priority (higher priority first)
     this.priorityQueue.sort((a, b) => b.priority - a.priority);
-    
+
     // Process queue immediately for high priority events
     if (queuedEvent.priority >= 8) {
       setImmediate(() => this.processPriorityQueue());
     } else {
       process.nextTick(() => this.processPriorityQueue());
     }
-    
+
     this.updateQueueSizes();
     return true;
   }
@@ -311,11 +316,11 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     if (!this.currentBatchId) {
       this.currentBatchId = `batch_${Date.now()}_${++this.batchCounter}`;
     }
-    
+
     queuedEvent.batchId = this.currentBatchId;
     this.eventQueue.push(queuedEvent);
     this.stats.batchedEvents++;
-    
+
     // Trigger batch processing if batch is full
     if (this.eventQueue.length >= this.config.batching.batchSize) {
       this.processBatch();
@@ -325,7 +330,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         this.processBatch();
       }, this.config.batching.batchTimeoutMs);
     }
-    
+
     this.updateQueueSizes();
     return true;
   }
@@ -335,29 +340,33 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    */
   private async processBatch(): Promise<void> {
     if (this.eventQueue.length === 0) return;
-    
+
     const batchStartTime = Date.now();
     const batchId = this.currentBatchId!;
     const batch = [...this.eventQueue];
-    
+
     // Clear current batch
     this.eventQueue = [];
     this.currentBatchId = undefined;
-    
+
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
       this.batchTimer = undefined;
     }
-    
+
     let successCount = 0;
     let errorCount = 0;
     const eventTypes = new Set<string>();
-    
+
     // Start batch profiling
     let profilingSessionId: string | undefined;
     let batchOperationId: string | undefined;
-    
-    if (this.config.profiling.enabled && this.config.profiling.profileBatches && this.performanceProfiler) {
+
+    if (
+      this.config.profiling.enabled &&
+      this.config.profiling.profileBatches &&
+      this.performanceProfiler
+    ) {
       profilingSessionId = this.performanceProfiler.startSession(`batch_processing_${batchId}`);
       batchOperationId = this.performanceProfiler.startOperation(
         profilingSessionId,
@@ -370,10 +379,10 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         }
       );
     }
-    
+
     try {
       // Process all events in the batch
-      const promises = batch.map(async (queuedEvent) => {
+      const promises = batch.map(async queuedEvent => {
         try {
           eventTypes.add(queuedEvent.event);
           const result = this.emitDirect(queuedEvent);
@@ -385,27 +394,27 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
           return false;
         }
       });
-      
+
       await Promise.allSettled(promises);
-      
+
       const processingTime = Date.now() - batchStartTime;
-      
+
       // Update statistics
       this.updateBatchStats(batch.length, processingTime);
       this.updateQueueSizes();
-      
+
       // Emit batch processed event
       super.emit('eventbus:batch_processed', {
         batchSize: batch.length,
         processingTime,
         eventTypes: Array.from(eventTypes),
       });
-      
+
       if (this.performanceProfiler && profilingSessionId && batchOperationId) {
         this.performanceProfiler.endOperation(profilingSessionId, batchOperationId);
         this.performanceProfiler.endSession(profilingSessionId);
       }
-      
+
       logger.debug('Batch processing completed', {
         batchId,
         eventCount: batch.length,
@@ -413,13 +422,12 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         errorCount,
         processingTime,
       });
-      
     } catch (error) {
       if (this.performanceProfiler && profilingSessionId && batchOperationId) {
         this.performanceProfiler.endOperation(profilingSessionId, batchOperationId, error as Error);
         this.performanceProfiler.endSession(profilingSessionId);
       }
-      
+
       logger.error('Batch processing failed', { batchId, error });
       throw error;
     }
@@ -430,27 +438,27 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    */
   private processPriorityQueue(): void {
     if (this.priorityQueue.length === 0) return;
-    
+
     // Process highest priority events first
     const eventsToProcess = this.priorityQueue.splice(0, Math.min(5, this.priorityQueue.length));
-    
+
     eventsToProcess.forEach(queuedEvent => {
       try {
         this.emitDirect(queuedEvent);
       } catch (error) {
-        logger.error('Priority queue processing error', { 
-          eventId: queuedEvent.id, 
+        logger.error('Priority queue processing error', {
+          eventId: queuedEvent.id,
           priority: queuedEvent.priority,
           error,
         });
       }
     });
-    
+
     // Schedule next processing if more events remain
     if (this.priorityQueue.length > 0) {
       setImmediate(() => this.processPriorityQueue());
     }
-    
+
     this.updateQueueSizes();
   }
 
@@ -459,15 +467,15 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    */
   private emitDirect<T>(queuedEvent: QueuedEvent<T>): boolean {
     const eventId = queuedEvent.id;
-    
+
     // Start profiling for event emission if enabled
     let profilingSessionId: string | undefined;
     let emissionOperationId: string | undefined;
-    
+
     if (this.config.profiling.enabled && this.performanceProfiler) {
       profilingSessionId = this.performanceProfiler.startSession(`direct_emission_${eventId}`);
       this.eventSessions.set(eventId, profilingSessionId);
-      
+
       emissionOperationId = this.performanceProfiler.startOperation(
         profilingSessionId,
         'direct_event_emission',
@@ -480,22 +488,26 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
         }
       );
     }
-    
+
     try {
       const result = super.emit(queuedEvent.event, queuedEvent.data);
-      
+
       if (this.performanceProfiler && profilingSessionId && emissionOperationId) {
         this.performanceProfiler.endOperation(profilingSessionId, emissionOperationId);
         this.performanceProfiler.endSession(profilingSessionId);
       }
-      
+
       return result;
     } catch (error) {
       if (this.performanceProfiler && profilingSessionId && emissionOperationId) {
-        this.performanceProfiler.endOperation(profilingSessionId, emissionOperationId, error as Error);
+        this.performanceProfiler.endOperation(
+          profilingSessionId,
+          emissionOperationId,
+          error as Error
+        );
         this.performanceProfiler.endSession(profilingSessionId);
       }
-      
+
       throw error;
     }
   }
@@ -503,13 +515,16 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   /**
    * Create a profiled event handler wrapper
    */
-  private createProfiledHandler<T>(event: string, originalHandler: (data: T) => void): (data: T) => void {
+  private createProfiledHandler<T>(
+    event: string,
+    originalHandler: (data: T) => void
+  ): (data: T) => void {
     const handlerId = `handler_${event}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    
+
     return (data: T) => {
       let handlerSessionId: string | undefined;
       let handlerOperationId: string | undefined;
-      
+
       if (this.performanceProfiler) {
         handlerSessionId = this.performanceProfiler.startSession(`event_handler_${handlerId}`);
         handlerOperationId = this.performanceProfiler.startOperation(
@@ -522,22 +537,26 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
           }
         );
       }
-      
+
       try {
         const result = originalHandler(data);
-        
+
         if (this.performanceProfiler && handlerSessionId && handlerOperationId) {
           this.performanceProfiler.endOperation(handlerSessionId, handlerOperationId);
           this.performanceProfiler.endSession(handlerSessionId);
         }
-        
+
         return result;
       } catch (error) {
         if (this.performanceProfiler && handlerSessionId && handlerOperationId) {
-          this.performanceProfiler.endOperation(handlerSessionId, handlerOperationId, error as Error);
+          this.performanceProfiler.endOperation(
+            handlerSessionId,
+            handlerOperationId,
+            error as Error
+          );
           this.performanceProfiler.endSession(handlerSessionId);
         }
-        
+
         throw error;
       }
     };
@@ -569,11 +588,13 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     if (this.shouldUsePriorityQueue(event)) {
       return false;
     }
-    
+
     // Batch performance and monitoring events
-    return event.startsWith('performance:') || 
-           event.startsWith('monitoring:') ||
-           event === 'user:progress';
+    return (
+      event.startsWith('performance:') ||
+      event.startsWith('monitoring:') ||
+      event === 'user:progress'
+    );
   }
 
   /**
@@ -581,7 +602,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    */
   private handleQueueOverflow(): void {
     const droppedEvents = this.priorityQueue.length - this.config.priorityQueue.maxQueueSize + 1;
-    
+
     if (this.config.priorityQueue.dropPolicy === 'oldest') {
       this.priorityQueue.splice(0, droppedEvents);
     } else {
@@ -589,15 +610,15 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       this.priorityQueue.sort((a, b) => b.priority - a.priority);
       this.priorityQueue.splice(-droppedEvents, droppedEvents);
     }
-    
+
     this.stats.droppedEvents += droppedEvents;
-    
+
     // Emit queue full event
     super.emit('eventbus:priority_queue_full', {
       queueSize: this.priorityQueue.length,
       droppedEvents,
     });
-    
+
     logger.warn('Priority queue overflow', { droppedEvents });
   }
 
@@ -615,18 +636,18 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     this.deduplicationCleanupTimer = setInterval(() => {
       const now = Date.now();
       const cutoff = now - this.config.deduplication.windowMs * 2;
-      
+
       const originalCount = this.recentEvents.size;
-      
+
       for (const [key, event] of this.recentEvents) {
         if (event.lastSeen < cutoff) {
           this.recentEvents.delete(key);
         }
       }
-      
+
       const cleanedCount = originalCount - this.recentEvents.size;
       this.stats.deduplicationMapSize = this.recentEvents.size;
-      
+
       if (cleanedCount > 0) {
         super.emit('eventbus:deduplication', {
           originalCount,
@@ -641,11 +662,10 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
    */
   private updateBatchStats(batchSize: number, processingTime: number): void {
     const alpha = 0.1; // Smoothing factor for exponential moving average
-    
-    this.stats.averageBatchSize = 
-      alpha * batchSize + (1 - alpha) * this.stats.averageBatchSize;
-    
-    this.stats.averageProcessingTime = 
+
+    this.stats.averageBatchSize = alpha * batchSize + (1 - alpha) * this.stats.averageBatchSize;
+
+    this.stats.averageProcessingTime =
       alpha * processingTime + (1 - alpha) * this.stats.averageProcessingTime;
   }
 
@@ -665,7 +685,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
   getEventBusStats(): EventBusStats & { config: EventBusConfig } {
     this.updateQueueSizes();
     this.stats.deduplicationMapSize = this.recentEvents.size;
-    
+
     return {
       ...this.stats,
       config: this.config,
@@ -684,7 +704,7 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
       deduplication: { ...this.config.deduplication, ...updates.deduplication },
       profiling: { ...this.config.profiling, ...updates.profiling },
     };
-    
+
     logger.info('EventBus configuration updated', { updates });
   }
 
@@ -696,23 +716,23 @@ export class OptimizedEventBus extends EventEmitter implements IEventBus {
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
     }
-    
+
     if (this.deduplicationCleanupTimer) {
       clearInterval(this.deduplicationCleanupTimer);
     }
-    
+
     // Process remaining queued events
     if (this.eventQueue.length > 0) {
       this.processBatch();
     }
-    
+
     // Clear all maps and queues
     this.eventQueue = [];
     this.priorityQueue = [];
     this.recentEvents.clear();
     this.eventSessions.clear();
     this.handlerTimings.clear();
-    
+
     logger.info('OptimizedEventBus destroyed', {
       finalStats: this.getEventBusStats(),
     });

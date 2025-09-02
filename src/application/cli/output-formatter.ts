@@ -1,4 +1,4 @@
-import { CLIDisplay } from '../../core/cli/cli-display.js';
+import { CLIDisplay } from './cli-display.js';
 
 /**
  * OutputFormatter centralizes how results and messages are rendered in the

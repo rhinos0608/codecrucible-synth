@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { PerformanceProfiler } from '../../core/performance/profiler.js';
+import { PerformanceProfiler } from '../performance/profiler.js';
 import type { IEventBus } from '../../domain/interfaces/event-bus.js';
 
 /**
@@ -54,7 +54,11 @@ export class EventBus extends EventEmitter implements IEventBus {
     } catch (error) {
       // End emission profiling on error
       if (this.performanceProfiler && profilingSessionId && emissionOperationId) {
-        this.performanceProfiler.endOperation(profilingSessionId, emissionOperationId, error as Error);
+        this.performanceProfiler.endOperation(
+          profilingSessionId,
+          emissionOperationId,
+          error as Error
+        );
         this.performanceProfiler.endSession(profilingSessionId);
       }
 
@@ -95,7 +99,11 @@ export class EventBus extends EventEmitter implements IEventBus {
           return result;
         } catch (error) {
           if (this.performanceProfiler && handlerSessionId && handlerOperationId) {
-            this.performanceProfiler.endOperation(handlerSessionId, handlerOperationId, error as Error);
+            this.performanceProfiler.endOperation(
+              handlerSessionId,
+              handlerOperationId,
+              error as Error
+            );
             this.performanceProfiler.endSession(handlerSessionId);
           }
 
@@ -119,7 +127,9 @@ export class EventBus extends EventEmitter implements IEventBus {
         let handlerOperationId: string | undefined;
 
         if (this.performanceProfiler) {
-          handlerSessionId = this.performanceProfiler.startSession(`event_once_handler_${handlerId}`);
+          handlerSessionId = this.performanceProfiler.startSession(
+            `event_once_handler_${handlerId}`
+          );
           handlerOperationId = this.performanceProfiler.startOperation(
             handlerSessionId,
             'event_once_handler_execution',
@@ -142,7 +152,11 @@ export class EventBus extends EventEmitter implements IEventBus {
           return result;
         } catch (error) {
           if (this.performanceProfiler && handlerSessionId && handlerOperationId) {
-            this.performanceProfiler.endOperation(handlerSessionId, handlerOperationId, error as Error);
+            this.performanceProfiler.endOperation(
+              handlerSessionId,
+              handlerOperationId,
+              error as Error
+            );
             this.performanceProfiler.endSession(handlerSessionId);
           }
 
@@ -156,4 +170,3 @@ export class EventBus extends EventEmitter implements IEventBus {
     }
   }
 }
-

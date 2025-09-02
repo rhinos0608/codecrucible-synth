@@ -556,9 +556,11 @@ export class UnifiedOrchestrationService extends EventEmitter {
       }
       this.activeRequests.clear();
 
-      // Shutdown registered components
-      for (const handler of this.cleanupHandlers) {
-        await handler();
+        try {
+          await handler();
+        } catch (err) {
+          this.logger.error('Error in cleanup handler during shutdown:', err);
+        }
       }
 
       this.initialized = false;

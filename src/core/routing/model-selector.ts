@@ -17,7 +17,9 @@ export class ModelSelector {
   select(request: RoutingRequest): SelectionResult {
     const candidates = this.providers.filter(p => this.meetsConstraints(p, request));
     if (candidates.length === 0) {
-      throw new Error('No providers available');
+      throw new Error(
+        `No providers meet the routing constraints: ${JSON.stringify(request.constraints)}`
+      );
     }
 
     // For now choose provider by highest weight, defaulting to first.

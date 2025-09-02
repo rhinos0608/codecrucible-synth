@@ -621,7 +621,11 @@ export class EnhancedMCPSecuritySystem extends EventEmitter {
     const entries = Array.isArray(result) ? result.entries() : Object.entries(result);
     for (const [key, value] of entries as Iterable<[string, unknown]>) {
       if (typeof value === 'object' && value !== null) {
-        (result as Record<string, unknown>)[key] = this.applyFilteringRule(value, rule) as unknown;
+        if (Array.isArray(result)) {
+          result[parseInt(key, 10)] = this.applyFilteringRule(value, rule) as unknown;
+        } else {
+          (result as Record<string, unknown>)[key] = this.applyFilteringRule(value, rule) as unknown;
+        }
       }
     }
 

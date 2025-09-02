@@ -40,6 +40,7 @@ export class AnalysisWorkerPool {
   }
 
   private handleFailure(worker: Worker, err: Error): void {
+    if (!this.workers.includes(worker)) return;
     const taskId = this.activeTasks.get(worker);
     if (taskId) {
       const cb = this.callbacks.get(taskId);
@@ -67,6 +68,7 @@ export class AnalysisWorkerPool {
       }
       this.callbacks.delete(msg.id);
     }
+    this.activeTasks.delete(worker);
     this.available.push(worker);
     this.processQueue();
   }

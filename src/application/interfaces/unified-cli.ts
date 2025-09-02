@@ -109,7 +109,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Initialize the CLI with workflow orchestrator
    */
-  public async initialize(orchestrator: Readonly<IWorkflowOrchestrator>): Promise<void> {
+  public async initialize(orchestrator: Readonly<IWorkflowOrchestrator>): Promise<UnifiedCLI> {
     try {
       (this as any).orchestrator = orchestrator;
 
@@ -134,6 +134,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
 
       this.emit('initialized');
       this.logger.info('UnifiedCLI initialized successfully');
+      return this;
     } catch (error) {
       this.logger.error('Failed to initialize UnifiedCLI:', error);
       throw error;
@@ -156,7 +157,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         id: randomUUID(),
         type: 'prompt',
         input: prompt,
-        options: { 
+        options: {
           enableGracefulDegradation: true,
           retryAttempts: 3,
           timeoutMs: 30000,
@@ -166,7 +167,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
           enablePerformanceOptimization: this.context.options.performance,
           enableErrorResilience: this.context.options.resilience,
           ...this.context.options,
-          ...options
+          ...options,
         },
         session: this.currentSession ?? undefined,
       };
@@ -217,7 +218,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         id: randomUUID(),
         type: 'analyze',
         input: filePath,
-        options: { 
+        options: {
           enableGracefulDegradation: true,
           retryAttempts: 3,
           timeoutMs: 30000,
@@ -227,7 +228,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
           enablePerformanceOptimization: this.context.options.performance,
           enableErrorResilience: this.context.options.resilience,
           ...this.context.options,
-          ...options
+          ...options,
         },
         session: this.currentSession ?? undefined,
       };
@@ -263,7 +264,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         id: randomUUID(),
         type: 'execute',
         input: { toolName, args },
-        options: { 
+        options: {
           enableGracefulDegradation: true,
           retryAttempts: 3,
           timeoutMs: 30000,
@@ -273,7 +274,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
           enablePerformanceOptimization: this.context.options.performance,
           enableErrorResilience: this.context.options.resilience,
           ...this.context.options,
-          ...options
+          ...options,
         },
         session: this.currentSession ?? undefined,
       };
@@ -295,9 +296,7 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
   /**
    * Get intelligent command suggestions
    */
-  public async getSuggestions(
-    context?: string
-  ): Promise<
+  public async getSuggestions(context?: string): Promise<
     ReadonlyArray<{
       command: string;
       description: string;
@@ -316,17 +315,21 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
         examples: ReadonlyArray<string>;
         contextRelevance: number;
       }> = await this.coordinator.getIntelligentCommands(context);
-      return commands.map((cmd: Readonly<{
-        command: string;
-        description: string;
-        examples: ReadonlyArray<string>;
-        contextRelevance: number;
-      }>) => ({
-        command: cmd.command,
-        description: cmd.description,
-        examples: cmd.examples,
-        relevance: cmd.contextRelevance,
-      }));
+      return commands.map(
+        (
+          cmd: Readonly<{
+            command: string;
+            description: string;
+            examples: ReadonlyArray<string>;
+            contextRelevance: number;
+          }>
+        ) => ({
+          command: cmd.command,
+          description: cmd.description,
+          examples: cmd.examples,
+          relevance: cmd.contextRelevance,
+        })
+      );
     } catch (error) {
       this.logger.warn('Failed to get suggestions:', error);
       return [];
@@ -462,8 +465,12 @@ export class UnifiedCLI extends EventEmitter implements REPLInterface {
             process.stdin.on('data', (chunk: Buffer | string) => {
               data += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
             });
-            process.stdin.on('end', () => { resolve(data); });
-            process.stdin.on('error', () => { resolve(data); });
+            process.stdin.on('end', () => {
+              resolve(data);
+            });
+            process.stdin.on('error', () => {
+              resolve(data);
+            });
           });
 
           const prompt = input.trim();

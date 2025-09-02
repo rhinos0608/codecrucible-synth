@@ -1,9 +1,9 @@
 /**
  * MCP Server Manager - Clean Architecture
- * 
+ *
  * Lightweight orchestrator using dependency injection with focused modules
  * Replaces the 1885-line monolithic implementation that caused memory crashes
- * 
+ *
  * Uses composition over inheritance following Coding Grimoire principles
  */
 
@@ -91,7 +91,7 @@ export class MCPServerManager {
         enabled: this.config.filesystem.enabled,
         priority: 8,
         lazyLoad: true,
-        dependencies: []
+        dependencies: [],
       },
       {
         id: 'git',
@@ -102,7 +102,7 @@ export class MCPServerManager {
         enabled: this.config.git.enabled,
         priority: 6,
         lazyLoad: true,
-        dependencies: ['filesystem']
+        dependencies: ['filesystem'],
       },
       {
         id: 'terminal',
@@ -113,7 +113,7 @@ export class MCPServerManager {
         enabled: this.config.terminal.enabled,
         priority: 7,
         lazyLoad: true,
-        dependencies: []
+        dependencies: [],
       },
       {
         id: 'packageManager',
@@ -124,8 +124,8 @@ export class MCPServerManager {
         enabled: this.config.packageManager.enabled,
         priority: 5,
         lazyLoad: true,
-        dependencies: ['filesystem', 'terminal']
-      }
+        dependencies: ['filesystem', 'terminal'],
+      },
     ];
 
     // Register Smithery server if enabled
@@ -139,7 +139,7 @@ export class MCPServerManager {
         enabled: true,
         priority: 9,
         lazyLoad: true,
-        dependencies: []
+        dependencies: [],
       });
     }
 
@@ -163,20 +163,15 @@ export class MCPServerManager {
     try {
       logger.info('🚀 Initializing MCP Server Manager with focused architecture');
 
-      // Start lifecycle management (handles server initialization)
-      await mcpServerLifecycle.startAll();
-
-      // Start monitoring
-      mcpServerMonitoring.startMonitoring();
-
-      // Initialize Smithery if enabled
-      if (this.config.smithery?.enabled) {
-        await this.initializeSmitheryServer();
-      }
+      // Perform initialization tasks such as:
+      // - Loading configuration files or environment variables
+      // - Initializing shared resources or dependencies
+      // - Performing security checks or validations
+      // - Preparing monitoring or logging subsystems
+      // Add additional setup steps here as needed before starting servers.
 
       this.isInitialized = true;
       logger.info('✅ MCP Server Manager initialization completed');
-
     } catch (error) {
       logger.error('❌ MCP Server Manager initialization failed:', error);
       throw error;
@@ -193,6 +188,15 @@ export class MCPServerManager {
 
     // Lifecycle manager handles the actual startup
     await mcpServerLifecycle.startAll();
+
+    // Start monitoring after servers are running
+    mcpServerMonitoring.startMonitoring();
+
+    // Initialize Smithery if enabled
+    if (this.config.smithery?.enabled) {
+      await this.initializeSmitheryServer();
+    }
+
     logger.info('All MCP servers started via lifecycle manager');
   }
 
@@ -222,7 +226,7 @@ export class MCPServerManager {
       operation: this.inferOperation(toolName),
       resourceType: this.inferResourceType(toolName),
       requestedPath: args.path || args.directory || args.filePath,
-      riskLevel: context.riskLevel || 'medium'
+      riskLevel: context.riskLevel || 'medium',
     };
 
     // Security validation
@@ -248,20 +252,14 @@ export class MCPServerManager {
     const startTime = Date.now();
     try {
       const result = await unifiedToolRegistry.executeTool(toolName, args, context);
-      
+
       // Record successful operation
       const serverId = this.getServerIdForTool(toolName);
       if (serverId) {
-        mcpServerMonitoring.recordOperation(
-          serverId,
-          toolName,
-          Date.now() - startTime,
-          true
-        );
+        mcpServerMonitoring.recordOperation(serverId, toolName, Date.now() - startTime, true);
       }
 
       return result.data || result;
-
     } catch (error) {
       // Record failed operation
       const serverId = this.getServerIdForTool(toolName);
@@ -293,27 +291,28 @@ export class MCPServerManager {
     return this.executeTool('list_files', { directory: directoryPath });
   }
 
-  async getFileStats(filePath: string): Promise<{ exists: boolean; size?: number; modified?: Date }> {
+  async getFileStats(
+    filePath: string
+  ): Promise<{ exists: boolean; size?: number; modified?: Date }> {
     try {
       // First check if file exists
       const exists = await this.executeTool('file_exists', { path: filePath });
-      
+
       if (!exists) {
         return { exists: false };
       }
 
       // Get real file stats using filesystem tools
       const stats = await this.executeTool('get_file_info', { path: filePath });
-      
+
       return {
         exists: true,
         size: stats?.size || 0,
-        modified: stats?.modified ? new Date(stats.modified) : new Date()
+        modified: stats?.modified ? new Date(stats.modified) : new Date(),
       };
-      
     } catch (error) {
       logger.warn(`Failed to get file stats for ${filePath}:`, error);
-      
+
       // Fallback to basic exists check
       try {
         const exists = await this.executeTool('file_exists', { path: filePath });
@@ -343,22 +342,27 @@ export class MCPServerManager {
 
     for (const healthStatus of healthStatuses) {
       const serverMetrics = mcpServerMonitoring.getServerMetrics(healthStatus.serverId);
-      
+
       result[healthStatus.serverId] = {
         enabled: true,
         status: this.mapHealthToStatus(healthStatus.status),
-        performance: serverMetrics ? {
-          avgResponseTime: serverMetrics.metrics.avgResponseTime,
-          successRate: (serverMetrics.metrics.successfulRequests / Math.max(1, serverMetrics.metrics.totalRequests)) * 100,
-          lastHealthCheck: healthStatus.lastCheck,
-          availability: healthStatus.status === 'healthy' ? 100 : 0
-        } : undefined,
+        performance: serverMetrics
+          ? {
+              avgResponseTime: serverMetrics.metrics.avgResponseTime,
+              successRate:
+                (serverMetrics.metrics.successfulRequests /
+                  Math.max(1, serverMetrics.metrics.totalRequests)) *
+                100,
+              lastHealthCheck: healthStatus.lastCheck,
+              availability: healthStatus.status === 'healthy' ? 100 : 0,
+            }
+          : undefined,
         capabilities: {
           toolCount: capabilities.toolCount,
           resourceCount: capabilities.resourceCount,
           promptCount: capabilities.promptCount,
-          lastDiscovered: new Date()
-        }
+          lastDiscovered: new Date(),
+        },
       };
     }
 
@@ -370,7 +374,7 @@ export class MCPServerManager {
    */
   private async getServerCapabilities(): Promise<{
     toolCount: number;
-    resourceCount: number; 
+    resourceCount: number;
     promptCount: number;
   }> {
     let totalToolCount = 0;
@@ -381,26 +385,25 @@ export class MCPServerManager {
       // Get tool count from unified tool registry
       const toolRegistryStatus = unifiedToolRegistry.getRegistryStatus();
       totalToolCount += toolRegistryStatus.totalTools;
-      
+
       // Get additional tools from Smithery if available
       if (this.smitheryServer) {
         const smitheryTools = this.smitheryServer.getAvailableTools();
         totalToolCount += smitheryTools.length;
-        
+
         // Use server count as resource count approximation
         const smitheryServers = this.smitheryServer.getAvailableServers();
         totalResourceCount += smitheryServers.length;
       }
-      
+
       // For now, set promptCount based on server count (could be enhanced)
       totalPromptCount = Math.min(totalResourceCount, 10); // Conservative estimate
-      
+
       logger.debug('Server capabilities calculated', {
         toolCount: totalToolCount,
         resourceCount: totalResourceCount,
-        promptCount: totalPromptCount
+        promptCount: totalPromptCount,
       });
-      
     } catch (error) {
       logger.warn('Error calculating server capabilities:', error);
       // Fallback to 0 values if calculation fails
@@ -409,7 +412,7 @@ export class MCPServerManager {
     return {
       toolCount: totalToolCount,
       resourceCount: totalResourceCount,
-      promptCount: totalPromptCount
+      promptCount: totalPromptCount,
     };
   }
 
@@ -432,7 +435,7 @@ export class MCPServerManager {
    */
   async shutdown(): Promise<void> {
     logger.info('🛑 Shutting down MCP Server Manager');
-    
+
     // Shutdown Smithery server
     if (this.smitheryServer) {
       try {
@@ -444,10 +447,10 @@ export class MCPServerManager {
 
     // Shutdown lifecycle manager (handles all servers)
     await mcpServerLifecycle.shutdown();
-    
+
     // Stop monitoring
     mcpServerMonitoring.stopMonitoring();
-    
+
     this.isInitialized = false;
     logger.info('✅ MCP Server Manager shutdown completed');
   }
@@ -466,14 +469,17 @@ export class MCPServerManager {
 
     this.smitheryServer = new SmitheryMCPServer(smitheryConfig);
     await this.smitheryServer.initialize();
-    
+
     logger.info('✅ Smithery server initialized');
   }
 
   private inferOperation(toolName: string): SecurityContext['operation'] {
-    if (toolName.includes('read') || toolName.includes('list') || toolName.includes('get')) return 'read';
-    if (toolName.includes('write') || toolName.includes('create') || toolName.includes('save')) return 'write';
-    if (toolName.includes('execute') || toolName.includes('run') || toolName.includes('command')) return 'execute';
+    if (toolName.includes('read') || toolName.includes('list') || toolName.includes('get'))
+      return 'read';
+    if (toolName.includes('write') || toolName.includes('create') || toolName.includes('save'))
+      return 'write';
+    if (toolName.includes('execute') || toolName.includes('run') || toolName.includes('command'))
+      return 'execute';
     return 'read';
   }
 
@@ -486,7 +492,8 @@ export class MCPServerManager {
 
   private getServerIdForTool(toolName: string): string | null {
     // Map tool names to server IDs
-    if (toolName.includes('file') || toolName.includes('read') || toolName.includes('write')) return 'filesystem';
+    if (toolName.includes('file') || toolName.includes('read') || toolName.includes('write'))
+      return 'filesystem';
     if (toolName.includes('git')) return 'git';
     if (toolName.includes('command') || toolName.includes('execute')) return 'terminal';
     if (toolName.includes('npm') || toolName.includes('package')) return 'packageManager';
@@ -504,36 +511,43 @@ export class MCPServerManager {
     };
   }
 
-  private mapHealthToStatus(health: string): 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting' {
+  private mapHealthToStatus(
+    health: string
+  ): 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting' {
     switch (health) {
-      case 'healthy': return 'running';
-      case 'degraded': return 'running';
-      case 'unhealthy': return 'error';
-      case 'circuit_open': return 'error';
-      default: return 'stopped';
+      case 'healthy':
+        return 'running';
+      case 'degraded':
+        return 'running';
+      case 'unhealthy':
+        return 'error';
+      case 'circuit_open':
+        return 'error';
+      default:
+        return 'stopped';
     }
   }
 
   async healthCheck(): Promise<{ status: string; servers: any[] }> {
     const serverIds = await this.listServers();
     const serverStatuses = await Promise.all(
-      serverIds.map(async (serverId) => {
+      serverIds.map(async serverId => {
         const serverInfo = await mcpServerRegistry.getServer(serverId);
         const status = await this.getServerStatus(serverId);
         return {
           id: serverId,
           name: serverInfo?.name || serverId,
           status: status,
-          health: status === 'running' ? 'healthy' : 'unhealthy'
+          health: status === 'running' ? 'healthy' : 'unhealthy',
         };
       })
     );
-    
+
     const allHealthy = serverStatuses.every(server => server.status === 'running');
-    
+
     return {
       status: allHealthy ? 'healthy' : 'degraded',
-      servers: serverStatuses
+      servers: serverStatuses,
     };
   }
 }

@@ -18,9 +18,7 @@ import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-i
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
 import { program } from 'commander';
-import { readFile } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { getVersion } from './utils/version.js';
 
 // Export unified architecture components
 export { UnifiedCLI as CLI } from './application/interfaces/unified-cli.js';
@@ -47,27 +45,13 @@ export type * from './domain/interfaces/user-interaction.js';
 export type * from './domain/interfaces/event-bus.js';
 export type { CLIOptions, CLIContext } from './application/interfaces/unified-cli.js';
 
-// Get package version
-async function getPackageVersion(): Promise<string> {
-  try {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const packagePath = join(__dirname, '..', 'package.json');
-    const packageData = await readFile(packagePath, 'utf-8');
-    const packageJson = JSON.parse(packageData) as { version?: unknown };
-    if (typeof packageJson.version === 'string') {
-      return packageJson.version;
-    }
-    return '4.0.7-unified';
-  } catch {
-    return '4.0.7-unified';
-  }
-}
-
 /**
  * Initialize the unified system with comprehensive capabilities
  */
-export async function initialize(): Promise<UnifiedCLI> {
+export async function initialize(
+  cliOptions: CLIOptions,
+  isInteractive: boolean
+): Promise<UnifiedCLI> {
   try {
     logger.info('🚀 Initializing CodeCrucible Synth with Unified Architecture...');
     const startTime = Date.now();
@@ -80,7 +64,7 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     // Create user interaction system
     const userInteraction = new CLIUserInteraction({
-      verbose: process.argv.includes('--verbose'),
+      verbose: cliOptions.verbose,
     });
 
     // Initialize MCP Server Manager for extended functionality
@@ -181,7 +165,8 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     const mcpServerManager = new MCPServerManager(mcpConfig);
 
-    // Start MCP servers and await their readiness
+    // Prepare (initialize) MCP servers
+    await mcpServerManager.initialize();
     try {
       await mcpServerManager.startServers();
       logger.info('✅ MCP servers are ready for tool execution');
@@ -204,14 +189,9 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     // Interactive model selection (unless in non-interactive mode)
     let selectedModelInfo;
-    const isInteractive =
-      !process.argv.includes('--no-interactive') &&
-      !process.argv.includes('status') &&
-      !process.argv.includes('--version') &&
-      !process.argv.includes('--help') &&
-      process.stdin.isTTY;
+    const isInteractiveRuntime = isInteractive && process.stdin.isTTY;
 
-    if (isInteractive) {
+    if (isInteractiveRuntime) {
       try {
         const modelSelector = new ModelSelector();
         selectedModelInfo = await modelSelector.selectModel();
@@ -229,18 +209,18 @@ export async function initialize(): Promise<UnifiedCLI> {
       adapters: [], // Empty for now, adapters would be created from providers
       defaultProvider: selectedModelInfo.provider,
       providers: [
-      {
-        type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
-        name: `${selectedModelInfo.provider}-selected`,
-        endpoint:
-        selectedModelInfo.provider === 'ollama'
-          ? process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434'
-          : process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080',
-        enabled: true,
-        priority: 1,
-        models: [selectedModelInfo.selectedModel.id],
-        timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
-      },
+        {
+          type: selectedModelInfo.provider as 'ollama' | 'lm-studio',
+          name: `${selectedModelInfo.provider}-selected`,
+          endpoint:
+            selectedModelInfo.provider === 'ollama'
+              ? (process.env.OLLAMA_ENDPOINT ?? 'http://localhost:11434')
+              : (process.env.LM_STUDIO_ENDPOINT ?? 'ws://localhost:8080'),
+          enabled: true,
+          priority: 1,
+          models: [selectedModelInfo.selectedModel.id],
+          timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '110000', 10),
+        },
       ],
       fallbackStrategy: 'priority',
       timeout: parseInt(process.env.REQUEST_TIMEOUT ?? '30000', 10),
@@ -271,17 +251,8 @@ export async function initialize(): Promise<UnifiedCLI> {
     });
 
     // Create unified CLI with all capabilities
-    const cliOptions: CLIOptions = {
-      verbose: process.argv.includes('--verbose'),
-      stream: !process.argv.includes('--no-stream'),
-      contextAware: !process.argv.includes('--no-intelligence'),
-      autonomousMode: !process.argv.includes('--no-autonomous'),
-      performance: !process.argv.includes('--no-performance'),
-      resilience: !process.argv.includes('--no-resilience'),
-    };
-
     const cli = new UnifiedCLI(cliOptions);
-    // Removed cli.initialize(orchestrator) as UnifiedCLI does not have an initialize method
+    await cli.initialize(orchestrator);
 
     const initTime = Date.now() - startTime;
     logger.info(`✅ Unified system initialized in ${initTime}ms`);
@@ -307,13 +278,19 @@ export async function initialize(): Promise<UnifiedCLI> {
 /**
  * Main CLI runner
  */
-export async function main(): Promise<void> {
+async function runCLI(
+  args: string[],
+  cliOptions: CLIOptions,
+  isInteractive: boolean
+): Promise<void> {
   try {
+
+
     const args = process.argv.slice(2);
 
     // Handle version command
     if (args.includes('--version') || args.includes('-v')) {
-      console.log(`CodeCrucible Synth v${await getPackageVersion()} (Unified Architecture)`);
+      console.log(`CodeCrucible Synth v${await getVersion()} (Unified Architecture)`);
       return;
     }
 
@@ -323,6 +300,7 @@ export async function main(): Promise<void> {
       return;
     }
 
+
     // Handle status command
     if (args[0] === 'status') {
       await showStatus();
@@ -331,7 +309,9 @@ export async function main(): Promise<void> {
 
     // Handle models command
     if (args[0] === 'models') {
-      const { ModelsCommand, parseModelsArgs } = await import('./application/cli/models-command.js');
+      const { ModelsCommand, parseModelsArgs } = await import(
+        './application/cli/models-command.js'
+      );
       const modelsCommand = new ModelsCommand();
       const modelsOptions = parseModelsArgs(args.slice(1));
       await modelsCommand.execute(modelsOptions);
@@ -339,7 +319,7 @@ export async function main(): Promise<void> {
     }
 
     // Initialize full system
-    const cli = await initialize();
+    const cli = await initialize(cliOptions, isInteractive);
 
     // Setup graceful shutdown
     let cleanedUp = false;
@@ -363,7 +343,7 @@ export async function main(): Promise<void> {
     await cli.run(args);
 
     // After command completion (non-interactive), shutdown and let process exit naturally
-    if (!args.includes('interactive') && !args.includes('-i') && !args.includes('--interactive')) {
+    if (!isInteractive) {
       await cleanup();
       return;
     }
@@ -371,6 +351,10 @@ export async function main(): Promise<void> {
     console.error('❌ Fatal error:', getErrorMessage(error));
     process.exitCode = 1;
   }
+}
+
+export async function main(): Promise<void> {
+  await program.parseAsync(process.argv);
 }
 
 /**
@@ -424,7 +408,7 @@ function showHelp(): void {
 async function showStatus(): Promise<void> {
   console.log('📊 CodeCrucible Synth Status');
   console.log('━'.repeat(40));
-  console.log(`Version: ${await getPackageVersion()}`);
+  console.log(`Version: ${await getVersion()}`);
   console.log(`Node.js: ${process.version}`);
   console.log(`Platform: ${process.platform} ${process.arch}`);
   console.log(`Working Directory: ${process.cwd()}`);
@@ -444,7 +428,7 @@ async function showStatus(): Promise<void> {
 program
   .name('codecrucible')
   .description('CodeCrucible Synth - AI-Powered Development Assistant (Unified Architecture)')
-  .version(await getPackageVersion())
+  .version(await getVersion())
   .argument('[prompt...]', 'AI prompt to process')
   .option('-i, --interactive', 'Start interactive mode')
   .option('-v, --verbose', 'Verbose output')
@@ -453,33 +437,89 @@ program
   .option('--no-autonomous', 'Disable autonomous mode')
   .option('--no-performance', 'Disable performance optimization')
   .option('--no-resilience', 'Disable error resilience')
-  .action(async (prompt: string[], options: {
-    interactive?: boolean;
-    verbose?: boolean;
-    noStream?: boolean;
-    noIntelligence?: boolean;
-    noAutonomous?: boolean;
-    noPerformance?: boolean;
-    noResilience?: boolean;
-  }) => {
-    const args: string[] = [];
+  .action(
+    async (
 
-    if (options.interactive) {
-      args.push('interactive');
-    } else if (prompt && prompt.length > 0) {
-      args.push(...prompt);
+
+
+      prompt: string[] = [],
+      options: {
+        interactive?: boolean;
+        verbose?: boolean;
+        stream?: boolean;
+        intelligence?: boolean;
+        autonomous?: boolean;
+        performance?: boolean;
+        resilience?: boolean;
+      }
+    ) => {
+      const args = options.interactive ? ['interactive'] : prompt;
+      const cliOptions: CLIOptions = {
+        verbose: options.verbose ?? false,
+        stream: options.stream !== false,
+        contextAware: options.intelligence !== false,
+        autonomousMode: options.autonomous !== false,
+        performance: options.performance !== false,
+        resilience: options.resilience !== false,
+      };
+
+      await runCLI(args, cliOptions, !!options.interactive);
+
+
+
+      prompt: string[],
+      options: {
+        interactive?: boolean;
+        verbose?: boolean;
+        noStream?: boolean;
+        noIntelligence?: boolean;
+        noAutonomous?: boolean;
+        noPerformance?: boolean;
+        noResilience?: boolean;
+      }
+    ) => {
+      const args: string[] = [];
+
+
+      if (options.interactive) {
+        args.push('interactive');
+      } else if (prompt && prompt.length > 0) {
+        args.push(...prompt);
+      }
+
+      // Add option flags to args for processing
+      if (options.verbose) args.push('--verbose');
+      if (options.noStream) args.push('--no-stream');
+      if (options.noIntelligence) args.push('--no-intelligence');
+      if (options.noAutonomous) args.push('--no-autonomous');
+      if (options.noPerformance) args.push('--no-performance');
+      if (options.noResilience) args.push('--no-resilience');
+
+      await main();
+
+
+      if (options.interactive) {
+        args.push('interactive');
+      } else if (prompt && prompt.length > 0) {
+        args.push(...prompt);
+      }
+
+      // Add option flags to args for processing
+      if (options.verbose) args.push('--verbose');
+      if (options.noStream) args.push('--no-stream');
+      if (options.noIntelligence) args.push('--no-intelligence');
+      if (options.noAutonomous) args.push('--no-autonomous');
+      if (options.noPerformance) args.push('--no-performance');
+      if (options.noResilience) args.push('--no-resilience');
+
+      await main();
+
+
+
+
+
     }
-
-    // Add option flags to args for processing
-    if (options.verbose) args.push('--verbose');
-    if (options.noStream) args.push('--no-stream');
-    if (options.noIntelligence) args.push('--no-intelligence');
-    if (options.noAutonomous) args.push('--no-autonomous');
-    if (options.noPerformance) args.push('--no-performance');
-    if (options.noResilience) args.push('--no-resilience');
-
-    await main();
-  });
+  );
 
 // Auto-run when directly executed
 if (process.argv[1]?.includes('index.js') || process.argv[1]?.includes('index.ts')) {

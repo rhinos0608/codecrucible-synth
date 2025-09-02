@@ -20,7 +20,13 @@ export function validateConfiguration(
       });
     }
     const envs = ['development', 'production', 'testing', 'staging'];
-    if (!envs.includes(config.application.environment)) {
+    if (!config.application.environment) {
+      errors.push({
+        field: 'application.environment',
+        message: 'App environment is required',
+        severity: 'error',
+      });
+    } else if (!envs.includes(config.application.environment)) {
       errors.push({
         field: 'application.environment',
         message: 'Invalid environment',

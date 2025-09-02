@@ -24,6 +24,7 @@ import { enhancedMCPSecuritySystem } from './enhanced-mcp-security-system.js';
 export interface MCPVoiceRequest {
   requestId: string;
   voiceId: string;
+  /** Requested MCP capability */
   capability: string;
   context: any;
   parameters?: any;
@@ -79,7 +80,19 @@ export class MCPVoiceCoordinator extends EventEmitter {
       this.logger.debug('Selected connection', { decision });
 
       // Security validation
+
+      try {
+            throw new Error(`Request not authorized: requestId=${request.requestId}, capability=${request.capability}`);
+          }
+        }
+      } catch (err) {
+        this.logger.warn('Security validation failed', { err });
+        throw err;
+      }
+      const safeContext = mcpContext;
+
       const safeContext = await enhancedMCPSecuritySystem.validateRequest(mcpContext);
+
 
       // Placeholder: execute tools (not yet implemented)
       const mcpResults = tools.map(tool => ({

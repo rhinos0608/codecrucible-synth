@@ -45,3 +45,25 @@ export function createRuntimeContext(opts: CreateRuntimeContextOptions): Runtime
 export function createTestRuntimeContext(eventBus: IEventBus): RuntimeContext {
   return createRuntimeContext({ eventBus });
 }
+
+/**
+ * Dispose a runtime context and release underlying resources
+ */
+export async function disposeRuntimeContext(context: RuntimeContext): Promise<void> {
+  // Remove all event listeners to avoid leaks between tests or runs
+  context.eventBus.removeAllListeners();
+
+  // Attempt to dispose the resource coordinator if it provides a dispose method
+  const coordinator: any = context.resourceCoordinator as any;
+  if (typeof coordinator?.dispose === 'function') {
+    await coordinator.dispose();
+  } else if (typeof coordinator?.removeAllListeners === 'function') {
+    coordinator.removeAllListeners();
+  }
+
+  // Clean up configuration manager listeners if present
+  const configManager: any = context.configManager;
+  if (typeof configManager?.removeAllListeners === 'function') {
+    configManager.removeAllListeners();
+  }
+}

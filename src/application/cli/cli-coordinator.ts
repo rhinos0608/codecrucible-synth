@@ -45,13 +45,21 @@ export class CLICoordinator {
    * Start interactive REPL-style session.
    */
   private async repl(session: CLISession): Promise<void> {
-    while (true) {
+    let shouldContinue = true;
+    while (shouldContinue) {
       const line = await this.interaction.ask('> ');
-      if (line.trim() === 'exit') break;
+      if (this.shouldExit(line)) {
+        shouldContinue = false;
+        continue;
+      }
       const parsed = CommandParser.parseInput(line);
       this.sessions.record(session.id, line);
       this.formatter.print(`Intent: ${parsed.intent}`);
     }
     this.interaction.close();
+  }
+
+  private shouldExit(line: string): boolean {
+    return line.trim() === 'exit';
   }
 }

@@ -105,7 +105,11 @@ export class ProductionRBACSystem extends EventEmitter {
   private roleCache: Map<string, Role> = new Map();
   private userPermissionCache: Map<string, string[]> = new Map();
   private cacheExpiryMs: number = 5 * 60 * 1000; // 5 minutes
+
+  private cacheCleanupInterval: NodeJS.Timeout | null = null;
+
   private cacheCleanupInterval?: NodeJS.Timeout;
+
 
   constructor(db: ProductionDatabaseManager, secretsManager: SecretsManager) {
     super();
@@ -885,6 +889,18 @@ export class ProductionRBACSystem extends EventEmitter {
       },
       60 * 60 * 1000
     );
+  }
+
+  private stopCacheCleanup(): void {
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+      this.cacheCleanupInterval = null;
+    }
+  }
+
+  shutdown(): void {
+    this.stopCacheCleanup();
+    this.removeAllListeners();
   }
 
   /**

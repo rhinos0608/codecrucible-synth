@@ -1,3 +1,5 @@
+import { appendFile, mkdir } from 'fs/promises';
+import { dirname } from 'path';
 import { logger } from '../logging/logger.js';
 
 export enum AuditEventType {
@@ -50,8 +52,10 @@ export class SecurityAuditLogger {
   private static instance: SecurityAuditLogger;
   private auditQueue: AuditEvent[] = [];
   private flushInterval: NodeJS.Timeout;
+  private auditFilePath: string;
 
   private constructor() {
+    this.auditFilePath = process.env.AUDIT_LOG_PATH || 'audit.log';
     this.flushInterval = setInterval(() => {
       this.flushAuditEvents();
     }, 30000); // Flush every 30 seconds
@@ -201,8 +205,7 @@ export class SecurityAuditLogger {
       auditEvent: event,
     });
 
-    // Also send to centralized audit system if configured
-    // TODO: Implement centralized audit logging (e.g., to SIEM, audit database)
+    void this.sendToCentralAudit(event);
   }
 
   private getLogLevel(severity: AuditSeverity): 'info' | 'warn' | 'error' {
@@ -224,5 +227,14 @@ export class SecurityAuditLogger {
       clearInterval(this.flushInterval);
     }
     this.flushAuditEvents();
+  }
+
+  private async sendToCentralAudit(event: AuditEvent): Promise<void> {
+    try {
+      await mkdir(dirname(this.auditFilePath), { recursive: true });
+      await appendFile(this.auditFilePath, JSON.stringify(event) + '\n');
+    } catch (error) {
+      logger.warn('Failed to write audit event', { error });
+    }
   }
 }

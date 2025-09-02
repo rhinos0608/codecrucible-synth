@@ -1,5 +1,5 @@
 import { LMStudioClient } from '@lmstudio/sdk';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 import { getErrorMessage } from '../utils/error-utils.js';
 
 export interface LMStudioConfig {

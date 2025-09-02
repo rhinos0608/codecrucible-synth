@@ -5,7 +5,7 @@ import * as path from 'path';
 /**
  * Enhanced Smoke Test Suite - Comprehensive System Validation
  * Production-ready smoke tests for CodeCrucible Synth
- * 
+ *
  * Tests cover:
  * - Infrastructure setup and configuration
  * - Security configuration validation
@@ -22,7 +22,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
   });
 
   test('environment variables are set correctly', () => {
-    // In real environment, NODE_ENV may not be set to 'test' 
+    // In real environment, NODE_ENV may not be set to 'test'
     // Jest sets NODE_ENV=test automatically, so this should be present
     expect(process.env.NODE_ENV).toBeDefined();
     // CI may or may not be set depending on environment, so just verify it's a valid value
@@ -36,7 +36,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
       // Test loading real configuration from the actual config system
       const { loadConfiguration } = await import('../../src/core/configuration/config-loader.js');
       const config = await loadConfiguration();
-      
+
       expect(config).toBeDefined();
       expect(config.model).toBeDefined();
       expect(config.voices).toBeDefined();
@@ -53,7 +53,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
       const { CLI } = await import('../../src/core/cli.js');
       expect(CLI).toBeDefined();
       expect(typeof CLI).toBe('function');
-      
+
       // Test that CLI can be instantiated (but not run to avoid side effects)
       const cli = new CLI();
       expect(cli).toBeDefined();
@@ -66,7 +66,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
 
   test('real file system operations work', async () => {
     const fs = await import('fs/promises');
-    
+
     // Test basic file operations work in the real environment
     try {
       await fs.access('./package.json');
@@ -96,19 +96,16 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
   test('package.json is correctly configured', async () => {
     try {
       const fs = await import('fs/promises');
-      const packageJson = JSON.parse(
-        await fs.readFile('package.json', 'utf-8')
-      );
-      
+      const packageJson = JSON.parse(await fs.readFile('package.json', 'utf-8'));
+
       expect(packageJson.name).toBe('codecrucible-synth');
       expect(packageJson.type).toBe('module');
       expect(packageJson.scripts.test).toBeDefined();
       expect(packageJson.scripts.build).toBeDefined();
       expect(packageJson.scripts.lint).toBeDefined();
-      
+
       // Check that circular dependency was fixed
       expect(packageJson.dependencies['codecrucible-synth']).toBeUndefined();
-      
     } catch (error) {
       console.warn('Package.json test failed:', error.message);
       throw error;
@@ -138,14 +135,13 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
           return line;
         })
         .join('\n');
-      
+
       const tsConfig = JSON.parse(tsConfigClean);
-      
+
       expect(tsConfig.compilerOptions).toBeDefined();
       expect(tsConfig.compilerOptions.target).toBe('ES2022');
       expect(tsConfig.compilerOptions.module).toBe('ESNext');
       expect(typeof tsConfig.compilerOptions.strict).toBe('boolean'); // Strict mode configuration is present (gradual migration)
-      
     } catch (error) {
       console.warn('TypeScript config test failed:', error.message);
       throw error;
@@ -153,13 +149,13 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
   });
 
   // Enhanced System Validation Tests
-  
+
   describe('Security Configuration Validation', () => {
     test('environment variables are properly configured for security', () => {
-      // Ensure test environment is properly sandboxed  
+      // Ensure test environment is properly sandboxed
       expect(process.env.NODE_ENV).toBeDefined(); // Jest sets this automatically
       // CI may or may not be set depending on environment
-      
+
       // Verify no production secrets are exposed in test environment
       expect(process.env.OPENAI_API_KEY).toBeUndefined();
       expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
@@ -169,7 +165,9 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
     test('security configurations exist and are valid', async () => {
       // Check for security audit logger configuration
       try {
-        const { SecurityAuditLogger } = await import('../../src/infrastructure/security/security-audit-logger.js');
+        const { SecurityAuditLogger } = await import(
+          '../../src/infrastructure/security/security-audit-logger.js'
+        );
         expect(SecurityAuditLogger).toBeDefined();
         expect(typeof SecurityAuditLogger).toBe('function');
       } catch (error) {
@@ -189,17 +187,16 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
     test('git security is properly configured', async () => {
       try {
         const gitignoreContent = await fs.readFile('.gitignore', 'utf-8');
-        
+
         // Verify critical files/directories are ignored
         expect(gitignoreContent).toMatch(/\.env/);
         expect(gitignoreContent).toMatch(/node_modules/);
         expect(gitignoreContent).toMatch(/dist/);
         expect(gitignoreContent).toMatch(/coverage/);
         expect(gitignoreContent).toMatch(/\.log/);
-        
+
         // Verify common secret files are ignored
         expect(gitignoreContent.toLowerCase()).toMatch(/(secrets|private|keys)/);
-        
       } catch (error) {
         if (error.code !== 'ENOENT') throw error;
         // .gitignore should exist in any serious project
@@ -211,15 +208,14 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
   describe('Performance Baseline Validation', () => {
     test('basic module import performance is acceptable', async () => {
       const startTime = Date.now();
-      
+
       try {
         // Test import performance of key modules
         const { LocalModelClient } = await import('../../src/core/local-model-client.js');
         const importTime = Date.now() - startTime;
-        
+
         expect(LocalModelClient).toBeDefined();
         expect(importTime).toBeLessThan(3000); // Should load in under 3 seconds
-        
       } catch (error) {
         const importTime = Date.now() - startTime;
         // Even failed imports should not hang
@@ -230,28 +226,28 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
 
     test('memory usage is within reasonable bounds', () => {
       const memUsage = process.memoryUsage();
-      
+
       // RSS (Resident Set Size) should be reasonable for a CLI tool
       expect(memUsage.rss).toBeLessThan(500 * 1024 * 1024); // 500MB
-      
+
       // Heap used should be reasonable
       expect(memUsage.heapUsed).toBeLessThan(200 * 1024 * 1024); // 200MB
-      
+
       // External memory should not be excessive
       expect(memUsage.external).toBeLessThan(100 * 1024 * 1024); // 100MB
     });
 
     test('async operations complete within timeout', async () => {
       const startTime = Date.now();
-      
+
       // Test real async file system operations complete within reasonable time
       const fs = await import('fs/promises');
-      
+
       // Multiple file operations to ensure measurable elapsed time
       await fs.access('./package.json');
       await fs.access('./tsconfig.json');
       await fs.readFile('./package.json', 'utf-8');
-      
+
       const elapsed = Date.now() - startTime;
       expect(elapsed).toBeLessThan(1000); // Should complete within 1 second
       expect(elapsed).toBeGreaterThanOrEqual(0); // Allow for very fast systems
@@ -264,7 +260,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
         'package.json',
         'tsconfig.json',
         'jest.config.cjs',
-        'eslint.config.js'
+        'eslint.config.js',
       ];
 
       for (const file of requiredFiles) {
@@ -280,13 +276,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
     });
 
     test('source directory structure is correct', async () => {
-      const requiredDirs = [
-        'src',
-        'src/core',
-        'src/domain',
-        'src/infrastructure',
-        'tests'
-      ];
+      const requiredDirs = ['src', 'src/core', 'src/domain', 'src/infrastructure', 'tests'];
 
       for (const dir of requiredDirs) {
         try {
@@ -299,12 +289,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
     });
 
     test('no sensitive files in source control', async () => {
-      const sensitivePatterns = [
-        'secrets.json',
-        'private.key',
-        'id_rsa',
-        '.pem'
-      ];
+      const sensitivePatterns = ['secrets.json', 'private.key', 'id_rsa', '.pem'];
 
       for (const pattern of sensitivePatterns) {
         try {
@@ -329,7 +314,10 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
         await fs.access('.env');
         // If .env exists, verify it contains only template/placeholder values
         const envContent = await fs.readFile('.env', 'utf8');
-        const hasRealSecrets = /[A-Za-z0-9_]+=[^=\s](?!your_|test_|example_|placeholder_|localhost|127\.0\.0\.1)[A-Za-z0-9+/=]{10,}/.test(envContent);
+        const hasRealSecrets =
+          /[A-Za-z0-9_]+=[^=\s](?!your_|test_|example_|placeholder_|localhost|127\.0\.0\.1)[A-Za-z0-9+/=]{10,}/.test(
+            envContent
+          );
         expect(hasRealSecrets).toBe(false);
       } catch (error: any) {
         // .env doesn't exist, which is also fine
@@ -344,21 +332,15 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
     test('Node.js version is compatible', () => {
       const nodeVersion = process.version;
       const majorVersion = parseInt(nodeVersion.slice(1).split('.')[0], 10);
-      
+
       // Require Node.js 18+ for modern features
       expect(majorVersion).toBeGreaterThanOrEqual(18);
     });
 
     test('required npm scripts are present', async () => {
       const packageJson = JSON.parse(await fs.readFile('package.json', 'utf-8'));
-      
-      const requiredScripts = [
-        'build',
-        'test',
-        'lint',
-        'dev',
-        'start'
-      ];
+
+      const requiredScripts = ['build', 'test', 'lint', 'dev', 'start'];
 
       for (const script of requiredScripts) {
         expect(packageJson.scripts[script]).toBeDefined();
@@ -369,21 +351,19 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
 
     test('dependencies are properly configured', async () => {
       const packageJson = JSON.parse(await fs.readFile('package.json', 'utf-8'));
-      
+
       // Check critical dependencies exist
       expect(packageJson.dependencies).toBeDefined();
       expect(packageJson.devDependencies).toBeDefined();
-      
+
       // Verify no circular dependencies
       expect(packageJson.dependencies['codecrucible-synth']).toBeUndefined();
       expect(packageJson.devDependencies['codecrucible-synth']).toBeUndefined();
-      
+
       // Check essential dependencies
       const criticalDeps = ['commander', 'chalk'];
       for (const dep of criticalDeps) {
-        expect(
-          packageJson.dependencies[dep] || packageJson.devDependencies[dep]
-        ).toBeDefined();
+        expect(packageJson.dependencies[dep] || packageJson.devDependencies[dep]).toBeDefined();
       }
     });
 
@@ -392,17 +372,17 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
         // Use dynamic import instead of require to handle path correctly
         const jestConfigPath = path.resolve(process.cwd(), 'jest.config.cjs');
         const jestConfig = require(jestConfigPath);
-        
+
         // Verify coverage thresholds are set
         expect(jestConfig.coverageThreshold).toBeDefined();
         expect(jestConfig.coverageThreshold.global).toBeDefined();
         expect(jestConfig.coverageThreshold.global.lines).toBeGreaterThan(50);
-        
+
         // Verify test timeout is reasonable
         expect(jestConfig.testTimeout).toBeDefined();
         expect(jestConfig.testTimeout).toBeGreaterThan(10000); // Allow for AI operations
         expect(jestConfig.testTimeout).toBeLessThan(300000); // But not excessive
-        
+
         // Verify coverage collection is configured
         expect(jestConfig.collectCoverageFrom).toBeDefined();
         expect(Array.isArray(jestConfig.collectCoverageFrom)).toBe(true);
@@ -417,14 +397,11 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
 
   describe('Advanced Module Import Validation', () => {
     test('core modules load without throwing', async () => {
-      const coreModules = [
-        '../../src/core/types.js',
-        '../../src/core/logger.js'
-      ];
+      const coreModules = ['../../src/core/types.js', '../../src/infrastructure/logging/logger.js'];
 
       let loadedCount = 0;
       let totalAttempts = 0;
-      
+
       for (const modulePath of coreModules) {
         try {
           totalAttempts++;
@@ -446,7 +423,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
     test('no module import causes process exit', async () => {
       const originalExit = process.exit;
       let exitCalled = false;
-      
+
       // Mock process.exit to detect if modules call it
       process.exit = (() => {
         exitCalled = true;
@@ -467,7 +444,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
       try {
         const fs = await import('fs/promises');
         const path = await import('path');
-        
+
         expect(fs.readFile).toBeDefined();
         expect(path.join).toBeDefined();
         expect(typeof fs.readFile).toBe('function');
@@ -482,7 +459,7 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
     test('file system operations work correctly', async () => {
       const testDir = path.join(process.cwd(), 'tests');
       const testFile = path.join(testDir, 'smoke.test.ts');
-      
+
       // Verify we can read our own test file
       const content = await fs.readFile(testFile, 'utf-8');
       expect(content).toContain('CodeCrucible Synth');
@@ -494,11 +471,11 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
       expect(process.cwd).toBeDefined();
       expect(typeof process.cwd).toBe('function');
       expect(process.cwd().length).toBeGreaterThan(0);
-      
+
       // Test environment access
       expect(process.env).toBeDefined();
       expect(process.env.NODE_ENV).toBe('test');
-      
+
       // Test process information
       expect(process.version).toBeDefined();
       expect(process.platform).toBeDefined();
@@ -508,20 +485,20 @@ describe('CodeCrucible Synth - Production Smoke Tests', () => {
     test('real system integration components work', async () => {
       const fs = await import('fs/promises');
       const path = await import('path');
-      
+
       // Test that we can perform real system operations without mocks
       const srcDir = path.join(process.cwd(), 'src');
       const testDir = path.join(process.cwd(), 'tests');
-      
+
       // Verify core directories exist
       await fs.access(srcDir);
       await fs.access(testDir);
-      
+
       // Verify we can read directory contents
       const srcContents = await fs.readdir(srcDir);
       expect(Array.isArray(srcContents)).toBe(true);
       expect(srcContents.length).toBeGreaterThan(0);
-      
+
       // Verify we can read our own test file (self-verification)
       const testFile = path.join(testDir, 'smoke.test.ts');
       const content = await fs.readFile(testFile, 'utf-8');

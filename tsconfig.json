@@ -7,61 +7,55 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "allowJs": false,
-    
+
     // Strict Type Checking - 2025 Enterprise Standards (gradual enablement)
-    "strict": false,
+    "strict": true,
     "noImplicitAny": true,
-    "strictNullChecks": false, // TODO: Enable after null check fixes
-    "strictFunctionTypes": false, // TODO: Enable after function type fixes
-    "strictBindCallApply": false, // TODO: Enable after call/bind/apply fixes
-    "strictPropertyInitialization": false, // TODO: Enable after property init fixes
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": false, // TODO: Enable after fixing optional properties
-    "noUncheckedIndexedAccess": false,   // TODO: Enable after fixing array access
-    "noPropertyAccessFromIndexSignature": false, // TODO: Enable after fixing index signatures
-    
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+
     // Additional Checks - 2025 Standards (Gradual Migration)
-    "noUnusedLocals": false,     // TODO: Enable after cleanup
-    "noUnusedParameters": false, // TODO: Enable after cleanup
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "forceConsistentCasingInFileNames": true,
-    
+
     // Module Resolution & Imports
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
     "skipLibCheck": true,
-    
+
     // Emit Options - Optimized for memory efficiency
     "declaration": true,
     "declarationMap": false, // Disabled to reduce memory usage during build
-    "sourceMap": false,      // Disabled to reduce memory usage during build
+    "sourceMap": false, // Disabled to reduce memory usage during build
     "outDir": "./dist",
     "rootDir": "./src",
-    "removeComments": true,  // Remove comments to reduce memory usage
+    "removeComments": true, // Remove comments to reduce memory usage
     "noEmitOnError": true,
     "preserveConstEnums": true, // Required when isolatedModules is enabled
-    "incremental": true,         // Enable incremental compilation for faster rebuilds
+    "incremental": true, // Enable incremental compilation for faster rebuilds
     "tsBuildInfoFile": "./dist/.tsbuildinfo", // Store build info for incremental builds
-    
+
     // Decorator Support (if needed)
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    
+
     // Library Inclusions
-    "lib": [
-      "ES2022",
-      "DOM"
-    ],
-    "types": [
-      "@types/node",
-      "jest" // Added for test support
-    ],
-    
+    "lib": ["ES2022", "DOM"],
+    "types": ["node", "jest"],
+
     // Path Mapping
     "baseUrl": ".",
     "paths": {
@@ -75,9 +69,7 @@
       "@/core/*": ["src/core/*"]
     }
   },
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "exclude": [
     "node_modules",
     "dist",

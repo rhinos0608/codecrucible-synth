@@ -4,7 +4,7 @@
  */
 
 import { SmitheryRegistry } from '@smithery/registry';
-import { logger } from '../core/logger.js';
+import { logger } from '../infrastructure/logging/logger.js';
 
 export interface SmitheryConfig {
   apiKey: string;

@@ -1,9 +1,6 @@
-import { CLIParser } from '../../core/cli/cli-parser.js';
-import {
-  naturalLanguageInterface,
-  ParsedCommand,
-} from '../../core/cli/natural-language-interface.js';
-import type { CLIOptions } from '../../core/cli/cli-types.js';
+import { CLIParser } from './cli-parser.js';
+import { naturalLanguageInterface, ParsedCommand } from './natural-language-interface.js';
+import type { CLIOptions } from './cli-types.js';
 
 /**
  * CommandParser bridges low-level CLI parsing utilities from the core layer

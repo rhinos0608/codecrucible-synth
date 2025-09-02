@@ -4,7 +4,7 @@
  */
 
 import { ProductionDatabaseManager as DatabaseManager } from '../../database/production-database-manager.js';
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import { join, dirname } from 'path';
 import { promises as fs, existsSync } from 'fs';
 import { createReadStream, createWriteStream } from 'fs';

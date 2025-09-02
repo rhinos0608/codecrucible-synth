@@ -2,8 +2,11 @@ use serde::{Deserialize, Serialize};
 
 use std::{collections::HashMap, sync::Mutex, time::Instant};
 
+use std::{collections::HashMap, sync::Mutex, time::Instant};
+
 
 use std::{collections::HashMap, time::Instant};
+
 
 use tracing::{info, warn};
 use tree_sitter::{Node, Parser, Query, QueryCursor};
@@ -117,14 +120,24 @@ impl AnalysisTool {
             .set_language(rust_language())
             .expect("Error loading Rust grammar");
         let lang = rust_language();
+
+        let query_fn = Query::new(lang, "(function_item) @fn").expect("Failed to compile fn query");
+        let query_struct = Query::new(lang, "(struct_item) @s\n(enum_item) @e")
+            .expect("Failed to compile struct query");
+
         let query_fn = Query::new(lang, "(function_item) @fn").expect("Invalid function query");
         let query_struct =
             Query::new(lang, "(struct_item) @s\n(enum_item) @e").expect("Invalid struct query");
+
         let query_complex = Query::new(
             lang,
             "(if_expression) @c\n(match_expression) @c\n(for_expression) @c\n(while_expression) @c\n(loop_expression) @c",
         )
+
+        .expect("Failed to compile complexity query");
+
         .expect("Invalid complexity query");
+
 
         Self {
             patterns,
@@ -183,6 +196,22 @@ impl AnalysisTool {
         );
 
         match ts_metrics {
+
+            Some(ts_metrics) => {
+                if ts_metrics != regex_metrics {
+                    warn!(
+                        "metric discrepancy detected: tree-sitter {:?} vs regex {:?}",
+                        ts_metrics, regex_metrics
+                    );
+                }
+                ts_metrics
+            }
+            None => {
+                warn!("tree-sitter parsing failed, falling back to regex metrics");
+                regex_metrics
+            }
+        }
+
             Some(ts) => {
                 if Self::metrics_diverge(&ts, &regex_metrics) {
                     warn!(
@@ -222,11 +251,16 @@ impl AnalysisTool {
             return true;
         }
         false
+
     }
 
     fn calculate_metrics_tree_sitter(&self, code: &str) -> Option<CodeMetrics> {
         let mut parser = self.parser.lock().ok()?;
         let tree = parser.parse(code, None)?;
+
+        if tree.root_node().has_error() {
+            return None;
+        }
 
         let lines: Vec<&str> = code.lines().collect();
         let total_lines = lines.len();
@@ -515,6 +549,10 @@ impl AnalysisTool {
 
 
         if metrics.code_lines > 0
+            && metrics.comment_lines as f64 / (metrics.code_lines as f64) < 0.1
+
+
+        if metrics.code_lines > 0
             && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
 
 
@@ -522,6 +560,7 @@ impl AnalysisTool {
 
         if metrics.code_lines > 0
             && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+
 
 
         {

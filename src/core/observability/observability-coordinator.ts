@@ -1,7 +1,13 @@
 import { EventEmitter } from 'events';
 import { createLogger } from '../logger.js';
 import { ILogger } from '../../domain/interfaces/logger.js';
-import { MetricsCollector, MetricPoint, MetricsConfig, MetricsStats, MetricsSummary } from './metrics-collector.js';
+import {
+  MetricsCollector,
+  MetricPoint,
+  MetricsConfig,
+  MetricsStats,
+  MetricsSummary,
+} from './metrics-collector.js';
 import { HealthMonitor, HealthConfig, SystemHealth, HealthStats } from './health-monitor.js';
 import { AlertManager, AlertConfig, Alert, AlertStats } from './alert-manager.js';
 import { TelemetryExporter, TelemetryExporterConfig } from './telemetry-exporter.js';
@@ -46,18 +52,37 @@ export class ObservabilityCoordinator extends EventEmitter {
     this.scheduleHealthChecks();
   }
 
-  recordMetric(name: string, value: number, tags: Record<string, string> = {}, unit = 'count'): void {
+  recordMetric(
+    name: string,
+    value: number,
+    tags: Record<string, string> = {},
+    unit = 'count'
+  ): void {
     const metric: MetricPoint = { name, value, timestamp: new Date(), tags, unit, type: 'gauge' };
     this.metrics.record(metric);
   }
 
   incrementCounter(name: string, tags: Record<string, string> = {}, value = 1): void {
-    const metric: MetricPoint = { name, value, timestamp: new Date(), tags, unit: 'count', type: 'counter' };
+    const metric: MetricPoint = {
+      name,
+      value,
+      timestamp: new Date(),
+      tags,
+      unit: 'count',
+      type: 'counter',
+    };
     this.metrics.record(metric);
   }
 
   recordTimer(name: string, duration: number, tags: Record<string, string> = {}): void {
-    const metric: MetricPoint = { name, value: duration, timestamp: new Date(), tags, unit: 'ms', type: 'timer' };
+    const metric: MetricPoint = {
+      name,
+      value: duration,
+      timestamp: new Date(),
+      tags,
+      unit: 'ms',
+      type: 'timer',
+    };
     this.metrics.record(metric);
   }
 
@@ -78,6 +103,10 @@ export class ObservabilityCoordinator extends EventEmitter {
     return this.health.performHealthCheck();
   }
 
+  checkHealth(): Promise<SystemHealth> {
+    return this.getSystemHealth();
+  }
+
   getActiveAlerts(): Alert[] {
     return this.alerts.getActiveAlerts();
   }
@@ -86,13 +115,17 @@ export class ObservabilityCoordinator extends EventEmitter {
     metrics: MetricsStats;
     health: HealthStats;
     alerts: AlertStats;
-    uptime: number;
+    systemInfo: {
+      uptime: number;
+    };
   } {
     return {
       metrics: this.metrics.getStats(),
       health: this.health.getStats(),
       alerts: this.alerts.getStats(),
-      uptime: Date.now() - this.startTime,
+      systemInfo: {
+        uptime: Date.now() - this.startTime,
+      },
     };
   }
 
@@ -117,7 +150,9 @@ export class ObservabilityCoordinator extends EventEmitter {
           this.recordMetric('system.cpu.usage', mcp.cpu.usage, {}, '%');
           this.recordMetric('system.memory.used', mcp.memory.used, {}, 'bytes');
         } else {
-          this.logger?.warn?.('MCP system metrics unavailable: getSystemMetrics() returned null or undefined');
+          this.logger?.warn?.(
+            'MCP system metrics unavailable: getSystemMetrics() returned null or undefined'
+          );
         }
       } catch (err) {
         this.logger?.error?.('Failed to collect MCP system metrics', err);
@@ -130,4 +165,3 @@ export class ObservabilityCoordinator extends EventEmitter {
 }
 
 export type { MetricPoint, SystemHealth, Alert, MetricsStats, HealthStats, AlertStats };
-

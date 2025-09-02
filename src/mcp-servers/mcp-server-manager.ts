@@ -163,7 +163,12 @@ export class MCPServerManager {
     try {
       logger.info('🚀 Initializing MCP Server Manager with focused architecture');
 
-      // Perform any setup required before servers start
+      // Perform initialization tasks such as:
+      // - Loading configuration files or environment variables
+      // - Initializing shared resources or dependencies
+      // - Performing security checks or validations
+      // - Preparing monitoring or logging subsystems
+      // Add additional setup steps here as needed before starting servers.
 
       this.isInitialized = true;
       logger.info('✅ MCP Server Manager initialization completed');

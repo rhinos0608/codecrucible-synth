@@ -14,7 +14,8 @@ export async function loadConfigFile(filePath: string): Promise<Partial<UnifiedC
       throw new Error(`Invalid configuration: ${validation.errors.map(e => e.message).join(', ')}`);
     }
     return parsed;
-  } catch {
+  } catch (err) {
+    console.error(`Failed to load config file "${filePath}":`, err);
     return {};
   }
 }

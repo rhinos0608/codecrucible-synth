@@ -5,7 +5,7 @@
  * This script tests the tool orchestrator and MCP integration to identify why tools aren't loading
  */
 
-import { UnifiedModelClient } from './dist/refactor/unified-model-client.js';
+import { UnifiedModelClient } from './dist/application/services/model-client.js';
 import { AdvancedToolOrchestrator } from './dist/core/tools/advanced-tool-orchestrator.js';
 import { MCPServerManager } from './dist/mcp-servers/mcp-server-manager.js';
 
@@ -28,14 +28,21 @@ async function testToolLoading() {
     // Test 2: MCP Tool Integration
     console.log('\n2️⃣ Testing MCP Tool Integration...');
     try {
-      const { getGlobalEnhancedToolIntegration } = await import('./dist/core/tools/enhanced-tool-integration.js');
+      const { getGlobalEnhancedToolIntegration } = await import(
+        './dist/core/tools/enhanced-tool-integration.js'
+      );
       const enhancedToolIntegration = getGlobalEnhancedToolIntegration();
-      
+
       if (enhancedToolIntegration) {
         const mcpTools = await enhancedToolIntegration.getLLMFunctions();
         console.log(`   ✅ Enhanced MCP tools count: ${mcpTools.length}`);
         if (mcpTools.length > 0) {
-          console.log(`   📋 MCP tool names: ${mcpTools.map(t => t.name || 'unnamed').slice(0, 5).join(', ')}${mcpTools.length > 5 ? '...' : ''}`);
+          console.log(
+            `   📋 MCP tool names: ${mcpTools
+              .map(t => t.name || 'unnamed')
+              .slice(0, 5)
+              .join(', ')}${mcpTools.length > 5 ? '...' : ''}`
+          );
         }
       } else {
         console.log('   ❌ Enhanced tool integration not initialized');
@@ -49,12 +56,17 @@ async function testToolLoading() {
     try {
       const { getGlobalToolIntegration } = await import('./dist/core/tools/tool-integration.js');
       const toolIntegration = getGlobalToolIntegration();
-      
+
       if (toolIntegration && typeof toolIntegration.getLLMFunctions === 'function') {
         const fallbackTools = toolIntegration.getLLMFunctions();
         console.log(`   ✅ Fallback tools count: ${fallbackTools.length}`);
         if (fallbackTools.length > 0) {
-          console.log(`   📋 Fallback tool names: ${fallbackTools.map(t => t.name || 'unnamed').slice(0, 5).join(', ')}${fallbackTools.length > 5 ? '...' : ''}`);
+          console.log(
+            `   📋 Fallback tool names: ${fallbackTools
+              .map(t => t.name || 'unnamed')
+              .slice(0, 5)
+              .join(', ')}${fallbackTools.length > 5 ? '...' : ''}`
+          );
         }
       } else {
         console.log('   ❌ Fallback tool integration not properly initialized');
@@ -63,20 +75,19 @@ async function testToolLoading() {
       console.log(`   ❌ Fallback tool integration import failed: ${error.message}`);
     }
 
-    // Test 4: MCP Server Manager  
+    // Test 4: MCP Server Manager
     console.log('\n4️⃣ Testing MCP Server Manager...');
     try {
       const mcpManager = new MCPServerManager();
       const serverStatus = await mcpManager.getStatus();
       console.log(`   📊 MCP Server Status:`, serverStatus);
-      
+
       // Check if servers are actually connected
       const servers = mcpManager.getConnectedServers();
       console.log(`   🔗 Connected MCP servers: ${servers ? servers.length : 0}`);
     } catch (error) {
       console.log(`   ❌ MCP Server Manager failed: ${error.message}`);
     }
-
   } catch (error) {
     console.error('❌ Diagnostic test failed:', error);
   }
@@ -98,9 +109,11 @@ function provideDiagnosticSummary() {
 }
 
 // Run the test
-testToolLoading().then(() => {
-  provideDiagnosticSummary();
-}).catch(error => {
-  console.error('❌ Test execution failed:', error);
-  provideDiagnosticSummary();
-});
+testToolLoading()
+  .then(() => {
+    provideDiagnosticSummary();
+  })
+  .catch(error => {
+    console.error('❌ Test execution failed:', error);
+    provideDiagnosticSummary();
+  });

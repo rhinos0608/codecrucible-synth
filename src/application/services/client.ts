@@ -4,11 +4,10 @@
  */
 
 export {
-  UnifiedModelClient,
-  createUnifiedModelClient,
-  type UnifiedModelClientConfig,
-  type ProviderConfig,
-} from './unified-model-client.js';
+  ModelClient,
+  ModelClient as UnifiedModelClient,
+  type ModelClientOptions as UnifiedModelClientConfig,
+} from './model-client.js';
 
 // Use the local UnifiedClientConfig from types.ts
 import type { UnifiedClientConfig } from '../../domain/types/index.js';

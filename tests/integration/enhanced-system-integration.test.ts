@@ -4,8 +4,11 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from '@jest/test-runner';
-import { UnifiedModelClient } from '../../src/refactor/unified-model-client.js';
-import { getEnhancedSystem, createEnhancedRequest } from '../../src/core/integration/enhanced-system-factory.js';
+import { UnifiedModelClient } from '../../src/application/services/model-client.js';
+import {
+  getEnhancedSystem,
+  createEnhancedRequest,
+} from '../../src/core/integration/enhanced-system-factory.js';
 import { CLI } from '../../src/application/interfaces/cli.js';
 import { logger } from '../../src/core/logger.js';
 import { configManager } from '../../src/config/config-manager.js';
@@ -19,13 +22,13 @@ describe('Enhanced System Integration', () => {
     // Initialize with mock configuration
     const config = await configManager.getAppConfig();
     modelClient = new UnifiedModelClient(config.modelClient);
-    
+
     // Create enhanced system
     enhancedSystem = await getEnhancedSystem(modelClient, {
       security: {
         enabled: true,
         riskThreshold: 50,
-        auditEnabled: true
+        auditEnabled: true,
       },
       quality: {
         enabled: true,
@@ -34,19 +37,19 @@ describe('Enhanced System Integration', () => {
         thresholds: {
           complexity: 20,
           maintainability: 70,
-          overall: 75
-        }
+          overall: 75,
+        },
       },
       voice: {
         enabled: true,
         maxVoices: 2,
-        collaborationMode: 'sequential'
+        collaborationMode: 'sequential',
       },
       spiral: {
         enabled: true,
         maxIterations: 3,
-        convergenceThreshold: 0.8
-      }
+        convergenceThreshold: 0.8,
+      },
     });
 
     // Create CLI instance
@@ -67,7 +70,7 @@ describe('Enhanced System Integration', () => {
       );
 
       const result = await enhancedSystem.processRequest(maliciousRequest);
-      
+
       expect(result).toBeDefined();
       expect(result.result?.securityValidation).toBeDefined();
       expect(result.result?.securityValidation?.riskScore).toBeGreaterThan(0);
@@ -80,7 +83,7 @@ describe('Enhanced System Integration', () => {
       );
 
       const result = await enhancedSystem.processRequest(safeRequest);
-      
+
       expect(result).toBeDefined();
       expect(result.status).toBe('success');
       expect(result.result?.securityValidation?.allowed).toBe(true);
@@ -89,13 +92,12 @@ describe('Enhanced System Integration', () => {
 
   describe('Quality Analysis Integration', () => {
     it('should analyze code quality', async () => {
-      const codeRequest = createEnhancedRequest(
-        'function add(a, b) { return a + b; }',
-        { type: 'analysis' }
-      );
+      const codeRequest = createEnhancedRequest('function add(a, b) { return a + b; }', {
+        type: 'analysis',
+      });
 
       const result = await enhancedSystem.processRequest(codeRequest);
-      
+
       expect(result).toBeDefined();
       expect(result.result?.qualityMetrics).toBeDefined();
       expect(result.result?.qualityMetrics?.overallScore).toBeGreaterThan(0);
@@ -110,7 +112,7 @@ describe('Enhanced System Integration', () => {
       );
 
       const result = await enhancedSystem.processRequest(complexCodeRequest);
-      
+
       expect(result).toBeDefined();
       expect(result.result?.qualityMetrics?.recommendations).toBeDefined();
       expect(Array.isArray(result.result?.qualityMetrics?.recommendations)).toBe(true);
@@ -121,14 +123,14 @@ describe('Enhanced System Integration', () => {
     it('should process synthesis requests', async () => {
       const synthesisRequest = createEnhancedRequest(
         'Analyze the benefits and drawbacks of microservices architecture',
-        { 
+        {
           type: 'analysis',
-          phase: 'council' // Living spiral phase
+          phase: 'council', // Living spiral phase
         }
       );
 
       const result = await enhancedSystem.processRequest(synthesisRequest);
-      
+
       expect(result).toBeDefined();
       expect(result.systemsUsed).toContain('voice');
     });
@@ -136,17 +138,14 @@ describe('Enhanced System Integration', () => {
 
   describe('Spiral Convergence Integration', () => {
     it('should analyze iteration convergence', async () => {
-      const spiralRequest = createEnhancedRequest(
-        'Design a user authentication system',
-        { 
-          type: 'generation',
-          phase: 'synthesis',
-          iteration: 2
-        }
-      );
+      const spiralRequest = createEnhancedRequest('Design a user authentication system', {
+        type: 'generation',
+        phase: 'synthesis',
+        iteration: 2,
+      });
 
       const result = await enhancedSystem.processRequest(spiralRequest);
-      
+
       expect(result).toBeDefined();
       // Spiral analysis might be null for first request without previous iterations
       if (result.result?.spiralAnalysis) {
@@ -178,7 +177,7 @@ describe('Enhanced System Integration', () => {
       }
 
       const health = await cli.getEnhancedSystemHealth();
-      
+
       expect(health).toBeDefined();
       expect(health.status).not.toBe('error');
     });
@@ -192,31 +191,31 @@ describe('Enhanced System Integration', () => {
           type: 'generation',
           phase: 'synthesis',
           iteration: 1,
-          priority: 'high'
+          priority: 'high',
         }
       );
 
       const result = await enhancedSystem.processRequest(complexRequest);
-      
+
       // Verify all systems were involved
       expect(result).toBeDefined();
       expect(result.status).toBe('success');
       expect(result.systemsUsed).toContain('security');
       expect(result.systemsUsed).toContain('quality');
-      
+
       // Verify security validation
       expect(result.result?.securityValidation).toBeDefined();
       expect(result.result?.securityValidation?.allowed).toBe(true);
-      
+
       // Verify quality analysis
       expect(result.result?.qualityMetrics).toBeDefined();
       expect(result.result?.qualityMetrics?.overallScore).toBeGreaterThan(0);
-      
+
       // Verify processing metadata
       expect(result.result?.metadata?.enhancedIntegration).toBe(true);
       expect(result.result?.metadata?.processingPhases).toContain('security');
       expect(result.result?.metadata?.processingPhases).toContain('quality');
-      
+
       // Verify performance metrics
       expect(result.performanceMetrics).toBeDefined();
       expect(result.performanceMetrics.totalLatency).toBeGreaterThan(0);
@@ -230,11 +229,11 @@ describe('Enhanced System Integration', () => {
         content: null,
         context: {},
         priority: 'medium' as any,
-        constraints: {}
+        constraints: {},
       };
 
       const result = await enhancedSystem.processRequest(problematicRequest);
-      
+
       // Should handle errors gracefully
       expect(result).toBeDefined();
       expect(['success', 'partial', 'failed', 'fallback']).toContain(result.status);
@@ -244,7 +243,7 @@ describe('Enhanced System Integration', () => {
   describe('System Health and Monitoring', () => {
     it('should provide comprehensive system health', async () => {
       const health = await enhancedSystem.getSystemHealth();
-      
+
       expect(health).toBeDefined();
       expect(health.initializationPhase).toBeDefined();
       expect(health.systemHealth).toBeDefined();
@@ -256,7 +255,7 @@ describe('Enhanced System Integration', () => {
     it('should track system performance metrics', async () => {
       const request = createEnhancedRequest('Test performance tracking', { type: 'analysis' });
       const result = await enhancedSystem.processRequest(request);
-      
+
       expect(result.performanceMetrics).toBeDefined();
       expect(result.performanceMetrics.totalLatency).toBeGreaterThan(0);
       expect(result.performanceMetrics.cacheHitRate).toBeGreaterThanOrEqual(0);
@@ -271,20 +270,19 @@ describe('Enhanced System Integration', () => {
         security: {
           enabled: true,
           riskThreshold: 90, // Very high threshold
-          auditEnabled: true
+          auditEnabled: true,
         },
         quality: { enabled: false },
         voice: { enabled: false },
-        spiral: { enabled: false }
+        spiral: { enabled: false },
       });
 
-      const riskyRequest = createEnhancedRequest(
-        'Generate code with eval(userInput)',
-        { type: 'generation' }
-      );
+      const riskyRequest = createEnhancedRequest('Generate code with eval(userInput)', {
+        type: 'generation',
+      });
 
       const result = await testSystem.processRequest(riskyRequest);
-      
+
       // With high threshold, might still allow the request
       expect(result).toBeDefined();
     });
@@ -299,11 +297,11 @@ describe('Enhanced System Integration', () => {
           thresholds: {
             complexity: 5, // Very low threshold
             maintainability: 90, // Very high threshold
-            overall: 95 // Very high threshold
-          }
+            overall: 95, // Very high threshold
+          },
         },
         voice: { enabled: false },
-        spiral: { enabled: false }
+        spiral: { enabled: false },
       });
 
       const complexRequest = createEnhancedRequest(
@@ -312,7 +310,7 @@ describe('Enhanced System Integration', () => {
       );
 
       const result = await testSystem.processRequest(complexRequest);
-      
+
       expect(result).toBeDefined();
       expect(result.result?.qualityMetrics?.complexity?.cyclomaticComplexity).toBeGreaterThan(5);
     });
@@ -332,31 +330,38 @@ export async function runIntegrationDemo(modelClient?: UnifiedModelClient) {
   }
 
   console.log('🚀 Starting Enhanced System Integration Demo');
-  
+
   try {
     const system = await getEnhancedSystem(modelClient);
-    
+
     // Test security
     console.log('\n🔒 Testing Security Integration...');
-    const securityTest = createEnhancedRequest('Create a secure password hashing function', { type: 'generation' });
+    const securityTest = createEnhancedRequest('Create a secure password hashing function', {
+      type: 'generation',
+    });
     const securityResult = await system.processRequest(securityTest);
-    console.log(`Security Risk Score: ${securityResult.result?.securityValidation?.riskScore || 'N/A'}`);
-    
+    console.log(
+      `Security Risk Score: ${securityResult.result?.securityValidation?.riskScore || 'N/A'}`
+    );
+
     // Test quality
     console.log('\n📊 Testing Quality Analysis...');
-    const qualityTest = createEnhancedRequest('function test() { return "hello"; }', { type: 'analysis' });
+    const qualityTest = createEnhancedRequest('function test() { return "hello"; }', {
+      type: 'analysis',
+    });
     const qualityResult = await system.processRequest(qualityTest);
-    console.log(`Quality Score: ${qualityResult.result?.qualityMetrics?.overallScore?.toFixed(1) || 'N/A'}/100`);
-    
+    console.log(
+      `Quality Score: ${qualityResult.result?.qualityMetrics?.overallScore?.toFixed(1) || 'N/A'}/100`
+    );
+
     // Test health
     console.log('\n❤️ Testing System Health...');
     const health = await system.getSystemHealth();
     console.log(`Overall Health Score: ${health.overallHealthScore?.toFixed(1) || 'N/A'}/100`);
     console.log(`Initialization Phase: ${health.initializationPhase}`);
-    
+
     console.log('\n✅ Enhanced System Integration Demo Complete');
     return true;
-    
   } catch (error) {
     console.error('❌ Integration Demo Failed:', error);
     return false;

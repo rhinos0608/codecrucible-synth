@@ -17,11 +17,12 @@ import { CLIUserInteraction } from './infrastructure/user-interaction/cli-user-i
 // getGlobalEventBus intentionally not imported anymore – event bus is injected via RuntimeContext.
 import { getErrorMessage } from './utils/error-utils.js';
 import { logger } from './infrastructure/logging/logger.js';
-import { program } from 'commander';
+import { Command } from 'commander';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+const program = new Command();
 // Export unified architecture components
 export { UnifiedCLI as CLI } from './application/interfaces/unified-cli.js';
 export { UnifiedCLICoordinator } from './application/services/unified-cli-coordinator.js';
@@ -444,21 +445,21 @@ program
       options: {
         interactive?: boolean;
         verbose?: boolean;
-        stream?: boolean;
-        intelligence?: boolean;
-        autonomous?: boolean;
-        performance?: boolean;
-        resilience?: boolean;
+        noStream?: boolean;
+        noIntelligence?: boolean;
+        noAutonomous?: boolean;
+        noPerformance?: boolean;
+        noResilience?: boolean;
       }
     ) => {
       const args = options.interactive ? ['interactive'] : prompt;
       const cliOptions: CLIOptions = {
         verbose: options.verbose ?? false,
-        stream: options.stream !== false,
-        contextAware: options.intelligence !== false,
-        autonomousMode: options.autonomous !== false,
-        performance: options.performance !== false,
-        resilience: options.resilience !== false,
+        stream: !options.noStream,
+        contextAware: !options.noIntelligence,
+        autonomousMode: !options.noAutonomous,
+        performance: !options.noPerformance,
+        resilience: !options.noResilience,
       };
 
       await runCLI(args, cliOptions, !!options.interactive);

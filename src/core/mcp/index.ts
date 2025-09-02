@@ -63,6 +63,36 @@ export {
 } from './intelligent-mcp-voice-integration.js';
 
 export {
+  VoiceToolMapper,
+  voiceToolMapper,
+  type ToolMapping,
+} from './voice-tool-mapper.js';
+
+export {
+  ContextTranslator,
+  contextTranslator,
+} from './context-translator.js';
+
+export {
+  ResponseSynthesizer,
+  responseSynthesizer,
+  type SynthesizedResponse,
+} from './response-synthesizer.js';
+
+export {
+  IntegrationMonitor,
+  integrationMonitor,
+  type IntegrationHealth,
+} from './integration-monitor.js';
+
+export {
+  MCPVoiceCoordinator,
+  mcpVoiceCoordinator,
+  type MCPVoiceRequest,
+  type MCPVoiceResult,
+} from './mcp-voice-coordinator.js';
+
+export {
   MCPPerformanceAnalyticsSystem,
   mcpPerformanceAnalyticsSystem,
   type PerformanceMetric,

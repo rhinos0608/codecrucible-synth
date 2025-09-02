@@ -2,6 +2,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import type { UnifiedConfiguration } from '../interfaces/configuration.js';
 import { loadConfigFile } from './config-loader.js';
+import { validateConfiguration } from './config-validator.js';
 
 export function getDefaultConfig(): UnifiedConfiguration {
   return {
@@ -43,6 +44,7 @@ export function getDefaultConfig(): UnifiedConfiguration {
     },
     voice: {
       enabled: true,
+      availableVoices: ['explorer'],
       defaultVoices: ['explorer'],
       maxConcurrentVoices: 1,
       consensusThreshold: 1,
@@ -190,5 +192,9 @@ export async function resolveConfig(filePath: string): Promise<UnifiedConfigurat
   config = mergeConfigurations(config, fileConfig);
   config = mergeConfigurations(config, loadEnvConfig());
   config = mergeConfigurations(config, loadCliConfig());
+  const validation = validateConfiguration(config);
+  if (!validation.isValid) {
+    throw new Error(`Invalid configuration: ${validation.errors.map(e => e.message).join(', ')}`);
+  }
   return config;
 }

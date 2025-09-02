@@ -19,10 +19,12 @@ import { contextTranslator, ContextTranslator } from './context-translator.js';
 import { responseSynthesizer, ResponseSynthesizer } from './response-synthesizer.js';
 import { integrationMonitor, IntegrationMonitor } from './integration-monitor.js';
 import { intelligentMCPLoadBalancer } from './intelligent-mcp-load-balancer.js';
+import { enhancedMCPSecuritySystem } from './enhanced-mcp-security-system.js';
 
 export interface MCPVoiceRequest {
   requestId: string;
   voiceId: string;
+  /** Requested MCP capability */
   capability: string;
   context: any;
   parameters?: any;
@@ -77,8 +79,24 @@ export class MCPVoiceCoordinator extends EventEmitter {
       }
       this.logger.debug('Selected connection', { decision });
 
-      // Placeholder: security and reliability checks
-      const safeContext = mcpContext; // TODO integrate security and reliability systems
+      // Security validation
+      try {
+        const securityContext = enhancedMCPSecuritySystem.getSecurityContext(request.requestId);
+        if (securityContext) {
+          const authorized = await enhancedMCPSecuritySystem.authorizeRequest(
+            request.requestId,
+            request.capability,
+            mcpContext
+          );
+          if (!authorized) {
+            throw new Error('Request not authorized');
+          }
+        }
+      } catch (err) {
+        this.logger.warn('Security validation failed', { err });
+        throw err;
+      }
+      const safeContext = mcpContext;
 
       // Placeholder: execute tools (not yet implemented)
       const mcpResults = tools.map(tool => ({

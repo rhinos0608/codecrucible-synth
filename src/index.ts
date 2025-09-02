@@ -181,7 +181,7 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     const mcpServerManager = new MCPServerManager(mcpConfig);
 
-    // Prepare and start MCP servers
+    // Prepare (initialize) MCP servers
     await mcpServerManager.initialize();
     try {
       await mcpServerManager.startServers();

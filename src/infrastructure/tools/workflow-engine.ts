@@ -38,7 +38,10 @@ export class WorkflowEngine {
     const order = this.resolver.resolveOrder(steps.map(s => s.tool));
 
     const tasks = order.map(toolId => {
-      const step = steps.find(s => s.tool === toolId)!;
+      const step = steps.find(s => s.tool === toolId);
+      if (!step) {
+        throw new Error(`Workflow step for toolId "${toolId}" not found.`);
+      }
       return async () => unifiedToolRegistry.executeTool(toolId, step.input, context);
     });
 

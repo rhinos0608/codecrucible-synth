@@ -15,7 +15,9 @@ export class AnalysisWorkerPool {
   private callbacks = new Map<string, PendingTask>();
 
   constructor(size = 2) {
-    const workerPath = join(dirname(fileURLToPath(import.meta.url)), 'analysis-worker.js');
+    // Use .ts for development (ts-node), .js for production (compiled)
+    const ext = fileURLToPath(import.meta.url).endsWith('.ts') ? '.ts' : '.js';
+    const workerPath = join(dirname(fileURLToPath(import.meta.url)), `analysis-worker${ext}`);
     for (let i = 0; i < size; i++) {
       const worker = new Worker(workerPath, { type: 'module' });
       worker.on('message', msg => this.handleMessage(worker, msg));

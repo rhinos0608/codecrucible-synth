@@ -31,11 +31,7 @@ class TruncationManager {
       return { text: chunk, done: false };
     }
 
-    this.truncated = true;
-    const text =
-      chunk.slice(0, remaining) +
-      `\n[... truncated ${chunk.length - remaining} characters for context limits]`;
-    this.size = this.limit;
+    this.size = text.length;
     return { text, done: true };
   }
 

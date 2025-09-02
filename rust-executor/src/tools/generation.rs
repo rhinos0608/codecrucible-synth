@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::collections::HashMap;
 use tracing::{error, info, warn};
 
@@ -14,7 +15,7 @@ impl GenerationTool {
             "function".to_string(),
             r#"
 pub fn {name}({params}) -> {return_type} {{
-    // TODO: Implement function logic
+    tracing::info!("Function {name} called");
     {default_return}
 }}
 "#,
@@ -60,7 +61,6 @@ mod tests {{
     
     #[test]
     fn test_{test_name}() {{
-        // TODO: Implement test
         assert!(true);
     }}
 }}
@@ -142,11 +142,52 @@ mod tests {{
         }
 
         // Extract parameters
+
+        if let Some(params) = self.extract_parameters(prompt) {
+
         if let Some(params) = self.extract_params(prompt) {
+
             context.insert("params".to_string(), params);
         } else {
             context.insert("params".to_string(), String::new());
         }
+
+
+        // Extract fields
+        if let Some(fields) = self.extract_fields(prompt) {
+            let fields_code = fields
+                .iter()
+                .map(|f| format!("    {},", f))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let constructor_params = fields.join(", ");
+            let field_assignments = fields
+                .iter()
+                .enumerate()
+                .map(|(i, f)| {
+                    let name = f.split(':').next().unwrap().trim();
+                    if i == 0 {
+                        format!("{},", name)
+                    } else {
+                        format!("            {},", name)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            context.insert("fields".to_string(), fields_code);
+            context.insert("constructor_params".to_string(), constructor_params);
+            context.insert("field_assignments".to_string(), field_assignments);
+        } else {
+            context.insert("fields".to_string(), String::new());
+            context.insert("constructor_params".to_string(), String::new());
+            context.insert("field_assignments".to_string(), String::new());
+        }
+
+        // Extract module content
+        if let Some(content) = self.extract_module_content(prompt) {
+            context.insert("module_content".to_string(), content);
+        } else {
+            context.insert("module_content".to_string(), String::new());
 
         // Extract struct fields and constructor info
         if let Some(fields) = self.extract_fields(prompt) {
@@ -178,6 +219,7 @@ mod tests {{
                 "field_assignments".to_string(),
                 "// TODO: Assign fields".to_string(),
             );
+
         }
 
         context
@@ -194,7 +236,7 @@ mod tests {{
         ];
 
         for pattern in patterns.iter() {
-            if let Ok(regex) = regex::Regex::new(pattern) {
+            if let Ok(regex) = Regex::new(pattern) {
                 if let Some(captures) = regex.captures(prompt) {
                     if let Some(name) = captures.get(1) {
                         return Some(name.as_str().to_string());
@@ -205,6 +247,46 @@ mod tests {{
 
         None
     }
+
+
+    fn extract_parameters(&self, prompt: &str) -> Option<String> {
+        if let Ok(re) = Regex::new(r"params?:\s*([\w\s:,<>]+)") {
+            if let Some(cap) = re.captures(prompt) {
+                return Some(cap[1].trim().to_string());
+            }
+        }
+        if let Ok(re) = Regex::new(r"fn\s+\w+\s*\(([^)]*)\)") {
+            if let Some(cap) = re.captures(prompt) {
+                return Some(cap[1].trim().to_string());
+            }
+        }
+        None
+    }
+
+    fn extract_fields(&self, prompt: &str) -> Option<Vec<String>> {
+        if let Ok(re) = Regex::new(r"fields?:\s*([\w\s:,<>]+)") {
+            if let Some(cap) = re.captures(prompt) {
+                let raw = cap[1].trim();
+                let fields = raw
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>();
+                if !fields.is_empty() {
+                    return Some(fields);
+                }
+            }
+        }
+        None
+    }
+
+    fn extract_module_content(&self, prompt: &str) -> Option<String> {
+        if let Ok(re) = Regex::new(r"(?s)content:\s*(.*)") {
+            if let Some(cap) = re.captures(prompt) {
+                return Some(cap[1].trim().to_string());
+            }
+        }
+        None
 
     fn extract_params(&self, prompt: &str) -> Option<String> {
         // Look for explicit parameter list e.g., fn name(a: i32, b: String)
@@ -238,6 +320,7 @@ mod tests {{
         } else {
             Some(fields)
         }
+
     }
 
     fn generate_function(
@@ -277,10 +360,14 @@ mod tests {{
             .get("name")
             .cloned()
             .unwrap_or_else(|| "GeneratedStruct".to_string());
+
+        let fields = context.get("fields").cloned().unwrap_or_default();
+=
         let fields = context
             .get("fields")
             .cloned()
             .unwrap_or_else(|| "// TODO: Add fields".to_string());
+
         let constructor_params = context
             .get("constructor_params")
             .cloned()
@@ -288,7 +375,11 @@ mod tests {{
         let field_assignments = context
             .get("field_assignments")
             .cloned()
+
+            .unwrap_or_default();
+
             .unwrap_or_else(|| "// TODO: Assign fields".to_string());
+
 
         let code = template
             .replace("{name}", &name)
@@ -313,10 +404,18 @@ mod tests {{
             .cloned()
             .unwrap_or_else(|| "Generated module".to_string());
 
+        let content = context.get("module_content").cloned().unwrap_or_default();
+
+
+
         let code = template
             .replace("{name}", &name)
             .replace("{description}", &description)
+
+            .replace("{content}", &content);
+
             .replace("{content}", "// TODO: Add module content");
+
 
         Ok(code)
     }
@@ -350,18 +449,15 @@ mod tests {{
 use serde::{{Serialize, Deserialize}};
 
 #[derive(Deserialize)]
-pub struct {name}Request {{
-    // TODO: Add request fields
-}}
+pub struct {name}Request {{}}
 
 #[derive(Serialize)]
 pub struct {name}Response {{
-    // TODO: Add response fields
+    pub success: bool,
 }}
 
-pub async fn {name}(request: {name}Request) -> Result<{name}Response, Box<dyn std::error::Error>> {{
-    // TODO: Implement handler logic
-    Ok({name}Response {{}})
+pub async fn {name}(_request: {name}Request) -> Result<{name}Response, Box<dyn std::error::Error>> {{
+    Ok({name}Response {{ success: true }})
 }}
 "#,
             name = name
@@ -385,7 +481,6 @@ use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum {name} {{
-    // TODO: Add error variants
     Unknown(String),
 }}
 
@@ -422,7 +517,6 @@ impl std::error::Error for {name} {{}}
             r#"
 // Generated from prompt: {}
 pub fn {}() -> Result<(), Box<dyn std::error::Error>> {{
-    // TODO: Implement functionality
     tracing::info!("Executing generated function");
     Ok(())
 }}

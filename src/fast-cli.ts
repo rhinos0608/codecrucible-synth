@@ -3,23 +3,7 @@
  * Bypasses heavy imports for performance-critical operations
  */
 
-import { readFile } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-// Get package version (async version)
-async function getPackageVersion(): Promise<string> {
-  try {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const packagePath = join(__dirname, '..', 'package.json');
-    const packageData = await readFile(packagePath, 'utf-8');
-    const packageJson = JSON.parse(packageData);
-    return packageJson.version;
-  } catch {
-    return '4.0.6'; // Updated fallback version
-  }
-}
+import { getVersion } from './utils/version.js';
 
 function showBasicHelp() {
   console.log('Usage:');
@@ -61,7 +45,7 @@ function showBasicHelp() {
 async function showQuickStatus() {
   console.log('📊 CodeCrucible Synth Status');
   console.log('━'.repeat(40));
-  console.log(`Version: ${await getPackageVersion()}`);
+  console.log(`Version: ${await getVersion()}`);
   console.log(`Node.js: ${process.version}`);
   console.log(`Platform: ${process.platform}`);
 
@@ -183,7 +167,7 @@ export async function fastMain() {
     }
 
     if (args.includes('--version') || args.includes('-v')) {
-      console.log(`CodeCrucible Synth v${await getPackageVersion()}`);
+      console.log(`CodeCrucible Synth v${await getVersion()}`);
       return;
     }
 

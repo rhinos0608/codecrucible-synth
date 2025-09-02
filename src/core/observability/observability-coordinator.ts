@@ -124,7 +124,7 @@ export class ObservabilityCoordinator extends EventEmitter {
     return this.metrics.getSummary(range);
   }
 
-  async getSystemHealth(): Promise<SystemHealth> {
+  getSystemHealth(): Promise<SystemHealth> {
     return this.health.performHealthCheck();
   }
 

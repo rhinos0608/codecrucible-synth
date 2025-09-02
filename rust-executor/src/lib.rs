@@ -1,4 +1,8 @@
 use napi_derive::napi;
+use napi::{
+    threadsafe_function::{ThreadsafeFunction, ThreadSafeFunctionCallMode, ErrorStrategy},
+    JsFunction, Result, Env, CallContext,
+};
 use serde_json;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -11,18 +15,21 @@ use uuid::Uuid;
 pub mod executors;
 pub mod protocol;
 pub mod security;
+pub mod streaming;
 pub mod utils;
 
 use crate::protocol::communication::CommunicationHandler;
 use crate::protocol::messages::{
     ExecutionContext, ExecutionRequest, ResourceLimitConfig, SecurityLevel as ProtocolSecurityLevel,
 };
+use crate::streaming::{StreamingEngine, StreamOptions, StreamChunk};
 
 /// Main Rust Executor class exposed to Node.js via NAPI
 #[napi]
 pub struct RustExecutor {
     id: String,
     communication_handler: Arc<CommunicationHandler>,
+    streaming_engine: Arc<StreamingEngine>,
     initialized: bool,
     performance_metrics: Arc<RwLock<PerformanceMetrics>>,
     // Shared Tokio runtime for all async operations
@@ -95,6 +102,7 @@ impl RustExecutor {
 
         let id = Uuid::new_v4().to_string();
         let communication_handler = Arc::new(CommunicationHandler::new());
+        let streaming_engine = Arc::new(StreamingEngine::new());
 
         // Create a single Tokio runtime for all async operations
         let runtime = Arc::new(Mutex::new(
@@ -106,6 +114,7 @@ impl RustExecutor {
         Self {
             id,
             communication_handler,
+            streaming_engine,
             initialized: false,
             performance_metrics: Arc::new(RwLock::new(PerformanceMetrics::default())),
             runtime,
@@ -502,4 +511,117 @@ pub fn benchmark_execution(iterations: u32) -> String {
     });
 
     benchmark_result.to_string()
+}
+
+    /// Stream file content with true streaming (no memory accumulation)
+    #[napi]
+    pub fn stream_file(
+        &self,
+        file_path: String,
+        chunk_size: Option<u32>,
+        context_type: Option<String>,
+        callback: JsFunction,
+    ) -> Result<String> {
+        let callback: ThreadsafeFunction<StreamChunk> = callback
+            .create_threadsafe_function(0, |ctx| {
+                let chunk = ctx.value;
+                let env = ctx.env;
+                
+                // Convert Rust StreamChunk to JavaScript object
+                let mut js_chunk = env.create_object()?;
+                js_chunk.set_named_property("streamId", env.create_string_from_std(chunk.stream_id)?)?;
+                js_chunk.set_named_property("sequence", env.create_double(chunk.sequence as f64)?)?;
+                js_chunk.set_named_property("contentType", env.create_string_from_std(chunk.content_type)?)?;
+                js_chunk.set_named_property("data", env.create_string_from_std(chunk.data)?)?;
+                js_chunk.set_named_property("size", env.create_double(chunk.size as f64)?)?;
+                
+                // Convert metadata to JS object
+                let mut js_metadata = env.create_object()?;
+                js_metadata.set_named_property("source", env.create_string_from_std(chunk.metadata.source)?)?;
+                js_metadata.set_named_property("isLast", env.get_boolean(chunk.metadata.is_last)?)?;
+                if let Some(progress) = chunk.metadata.progress {
+                    js_metadata.set_named_property("progress", env.create_double(progress as f64)?)?;
+                }
+                if let Some(total_size) = chunk.metadata.total_size {
+                    js_metadata.set_named_property("totalSize", env.create_double(total_size as f64)?)?;
+                }
+                if let Some(error) = chunk.metadata.error {
+                    js_metadata.set_named_property("error", env.create_string_from_std(error)?)?;
+                }
+                js_chunk.set_named_property("metadata", js_metadata)?;
+                
+                Ok(vec![js_chunk])
+            })?;
+
+        let streaming_engine = Arc::clone(&self.streaming_engine);
+        let options = StreamOptions {
+            chunk_size: chunk_size.unwrap_or(16384) as usize,
+            compression: true,
+            buffer_size: 65536,
+            timeout_ms: 30000,
+            context_type: context_type.unwrap_or_else(|| "default".to_string()),
+            include_metrics: true,
+        };
+
+        // Execute streaming in the runtime
+        let runtime = self.runtime.lock().map_err(|_| napi::Error::new(napi::Status::GenericFailure, "Failed to acquire runtime lock"))?;
+        
+        match runtime.block_on(streaming_engine.stream_file_content(&file_path, options, callback)) {
+            Ok(stream_id) => Ok(stream_id),
+            Err(_) => Err(napi::Error::new(napi::Status::GenericFailure, "Failed to stream file content")),
+        }
+    }
+
+    /// Stream command output with real-time processing
+    #[napi]
+    pub fn stream_command(
+        &self,
+        command: String,
+        args: Vec<String>,
+        chunk_size: Option<u32>,
+        callback: JsFunction,
+    ) -> Result<String> {
+        let callback: ThreadsafeFunction<StreamChunk> = callback
+            .create_threadsafe_function(0, |ctx| {
+                let chunk = ctx.value;
+                let env = ctx.env;
+                
+                // Convert Rust StreamChunk to JavaScript object
+                let mut js_chunk = env.create_object()?;
+                js_chunk.set_named_property("streamId", env.create_string_from_std(chunk.stream_id)?)?;
+                js_chunk.set_named_property("sequence", env.create_double(chunk.sequence as f64)?)?;
+                js_chunk.set_named_property("contentType", env.create_string_from_std(chunk.content_type)?)?;
+                js_chunk.set_named_property("data", env.create_string_from_std(chunk.data)?)?;
+                js_chunk.set_named_property("size", env.create_double(chunk.size as f64)?)?;
+                
+                // Convert metadata to JS object
+                let mut js_metadata = env.create_object()?;
+                js_metadata.set_named_property("source", env.create_string_from_std(chunk.metadata.source)?)?;
+                js_metadata.set_named_property("isLast", env.get_boolean(chunk.metadata.is_last)?)?;
+                if let Some(error) = chunk.metadata.error {
+                    js_metadata.set_named_property("error", env.create_string_from_std(error)?)?;
+                }
+                js_chunk.set_named_property("metadata", js_metadata)?;
+                
+                Ok(vec![js_chunk])
+            })?;
+
+        let streaming_engine = Arc::clone(&self.streaming_engine);
+        let options = StreamOptions {
+            chunk_size: chunk_size.unwrap_or(8192) as usize,
+            compression: false, // Don't compress command output
+            buffer_size: 32768,
+            timeout_ms: 30000,
+            context_type: "commandOutput".to_string(),
+            include_metrics: true,
+        };
+
+        // Execute streaming in the runtime
+        let runtime = self.runtime.lock().map_err(|_| napi::Error::new(napi::Status::GenericFailure, "Failed to acquire runtime lock"))?;
+        
+        match runtime.block_on(streaming_engine.stream_command_output(&command, args, options, callback)) {
+            Ok(stream_id) => Ok(stream_id),
+            Err(_) => Err(napi::Error::new(napi::Status::GenericFailure, "Failed to stream command output")),
+        }
+    }
 }

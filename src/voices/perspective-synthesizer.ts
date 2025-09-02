@@ -6,6 +6,7 @@ export interface VoiceOutput {
 /**
  * Combine multiple voice outputs into a single synthesized perspective.
  */
+export function synthesizePerspectives(outputs: VoiceOutput[]): string {
   if (outputs.length === 0) return "";
 
   // Group outputs by content

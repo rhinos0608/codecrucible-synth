@@ -48,7 +48,10 @@ export type { CLIOptions, CLIContext } from './application/interfaces/unified-cl
 /**
  * Initialize the unified system with comprehensive capabilities
  */
-export async function initialize(): Promise<UnifiedCLI> {
+export async function initialize(
+  cliOptions: CLIOptions,
+  isInteractive: boolean
+): Promise<UnifiedCLI> {
   try {
     logger.info('🚀 Initializing CodeCrucible Synth with Unified Architecture...');
     const startTime = Date.now();
@@ -61,7 +64,7 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     // Create user interaction system
     const userInteraction = new CLIUserInteraction({
-      verbose: process.argv.includes('--verbose'),
+      verbose: cliOptions.verbose,
     });
 
     // Initialize MCP Server Manager for extended functionality
@@ -185,14 +188,9 @@ export async function initialize(): Promise<UnifiedCLI> {
 
     // Interactive model selection (unless in non-interactive mode)
     let selectedModelInfo;
-    const isInteractive =
-      !process.argv.includes('--no-interactive') &&
-      !process.argv.includes('status') &&
-      !process.argv.includes('--version') &&
-      !process.argv.includes('--help') &&
-      process.stdin.isTTY;
+    const isInteractiveRuntime = isInteractive && process.stdin.isTTY;
 
-    if (isInteractive) {
+    if (isInteractiveRuntime) {
       try {
         const modelSelector = new ModelSelector();
         selectedModelInfo = await modelSelector.selectModel();
@@ -252,15 +250,6 @@ export async function initialize(): Promise<UnifiedCLI> {
     });
 
     // Create unified CLI with all capabilities
-    const cliOptions: CLIOptions = {
-      verbose: process.argv.includes('--verbose'),
-      stream: !process.argv.includes('--no-stream'),
-      contextAware: !process.argv.includes('--no-intelligence'),
-      autonomousMode: !process.argv.includes('--no-autonomous'),
-      performance: !process.argv.includes('--no-performance'),
-      resilience: !process.argv.includes('--no-resilience'),
-    };
-
     const cli = new UnifiedCLI(cliOptions);
     // Removed cli.initialize(orchestrator) as UnifiedCLI does not have an initialize method
 
@@ -288,8 +277,14 @@ export async function initialize(): Promise<UnifiedCLI> {
 /**
  * Main CLI runner
  */
-export async function main(): Promise<void> {
+async function runCLI(
+  args: string[],
+  cliOptions: CLIOptions,
+  isInteractive: boolean
+): Promise<void> {
   try {
+
+
     const args = process.argv.slice(2);
 
     // Handle version command
@@ -303,6 +298,7 @@ export async function main(): Promise<void> {
       showHelp();
       return;
     }
+
 
     // Handle status command
     if (args[0] === 'status') {
@@ -322,7 +318,7 @@ export async function main(): Promise<void> {
     }
 
     // Initialize full system
-    const cli = await initialize();
+    const cli = await initialize(cliOptions, isInteractive);
 
     // Setup graceful shutdown
     let cleanedUp = false;
@@ -346,7 +342,7 @@ export async function main(): Promise<void> {
     await cli.run(args);
 
     // After command completion (non-interactive), shutdown and let process exit naturally
-    if (!args.includes('interactive') && !args.includes('-i') && !args.includes('--interactive')) {
+    if (!isInteractive) {
       await cleanup();
       return;
     }
@@ -354,6 +350,10 @@ export async function main(): Promise<void> {
     console.error('❌ Fatal error:', getErrorMessage(error));
     process.exitCode = 1;
   }
+}
+
+export async function main(): Promise<void> {
+  await program.parseAsync(process.argv);
 }
 
 /**
@@ -438,6 +438,30 @@ program
   .option('--no-resilience', 'Disable error resilience')
   .action(
     async (
+
+      prompt: string[] = [],
+      options: {
+        interactive?: boolean;
+        verbose?: boolean;
+        stream?: boolean;
+        intelligence?: boolean;
+        autonomous?: boolean;
+        performance?: boolean;
+        resilience?: boolean;
+      }
+    ) => {
+      const args = options.interactive ? ['interactive'] : prompt;
+      const cliOptions: CLIOptions = {
+        verbose: options.verbose ?? false,
+        stream: options.stream !== false,
+        contextAware: options.intelligence !== false,
+        autonomousMode: options.autonomous !== false,
+        performance: options.performance !== false,
+        resilience: options.resilience !== false,
+      };
+
+      await runCLI(args, cliOptions, !!options.interactive);
+
       prompt: string[],
       options: {
         interactive?: boolean;
@@ -466,6 +490,7 @@ program
       if (options.noResilience) args.push('--no-resilience');
 
       await main();
+
     }
   );
 

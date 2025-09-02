@@ -87,8 +87,7 @@ export class MCPVoiceCoordinator extends EventEmitter {
       try {
         const validationResult = enhancedMCPSecuritySystem.validateRequest(mcpContext);
         if (validationResult === false) {
-          throw new Error(
-            'Security validation failed: validateRequest returned false for the provided context.'
+            `Security validation failed for requestId=${request.requestId}, voiceId=${request.voiceId}, capability=${request.capability}: validateRequest returned false for the provided context.`
           );
         }
       } catch (err) {

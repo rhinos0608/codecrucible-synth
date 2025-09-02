@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{info, warn};
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeAnalysisResult {
@@ -39,71 +39,89 @@ pub struct AnalysisTool {
 impl AnalysisTool {
     pub fn new() -> Self {
         let mut patterns = HashMap::new();
-        
+
         // Security issues
-        patterns.insert("security".to_string(), vec![
-            "eval(",
-            "exec(",
-            "system(",
-            "shell_exec",
-            "setTimeout.*[\"']",
-            "innerHTML",
-            "document.write",
-            "unsafelySetInnerHTML",
-        ]);
-        
+        patterns.insert(
+            "security".to_string(),
+            vec![
+                "eval(",
+                "exec(",
+                "system(",
+                "shell_exec",
+                "setTimeout.*[\"']",
+                "innerHTML",
+                "document.write",
+                "unsafelySetInnerHTML",
+            ],
+        );
+
         // Performance issues
-        patterns.insert("performance".to_string(), vec![
-            "document.getElementById",
-            "querySelector.*in.*loop",
-            "for.*in.*for",
-            "while.*true.*break",
-            "recursive.*without.*base",
-            "O\\(n\\^2\\)",
-        ]);
-        
+        patterns.insert(
+            "performance".to_string(),
+            vec![
+                "document.getElementById",
+                "querySelector.*in.*loop",
+                "for.*in.*for",
+                "while.*true.*break",
+                "recursive.*without.*base",
+                "O\\(n\\^2\\)",
+            ],
+        );
+
         // Code smells
-        patterns.insert("code_smell".to_string(), vec![
-            "god_class",
-            "long_method",
-            "duplicate_code",
-            "magic_number",
-            "deep_nesting",
-            "long_parameter_list",
-        ]);
-        
+        patterns.insert(
+            "code_smell".to_string(),
+            vec![
+                "god_class",
+                "long_method",
+                "duplicate_code",
+                "magic_number",
+                "deep_nesting",
+                "long_parameter_list",
+            ],
+        );
+
         // Best practices
-        patterns.insert("best_practice".to_string(), vec![
-            "console.log",
-            "alert(",
-            "confirm(",
-            "var ",
-            "== ",
-            "!= ",
-            "catch.*empty",
-            "TODO",
-            "FIXME",
-        ]);
-        
+        patterns.insert(
+            "best_practice".to_string(),
+            vec![
+                "console.log",
+                "alert(",
+                "confirm(",
+                "var ",
+                "== ",
+                "!= ",
+                "catch.*empty",
+                "TODO",
+                "FIXME",
+            ],
+        );
+
         Self { patterns }
     }
-    
+
     pub async fn analyze_code(&self, code: &str) -> Result<String, Box<dyn std::error::Error>> {
-        info!("Starting code analysis for {} characters of code", code.len());
-        
+        info!(
+            "Starting code analysis for {} characters of code",
+            code.len()
+        );
+
         let analysis_result = self.perform_analysis(code).await?;
         let json_result = serde_json::to_string_pretty(&analysis_result)?;
-        
+
         Ok(json_result)
     }
-    
-    async fn perform_analysis(&self, code: &str) -> Result<CodeAnalysisResult, Box<dyn std::error::Error>> {
+
+    async fn perform_analysis(
+        &self,
+        code: &str,
+    ) -> Result<CodeAnalysisResult, Box<dyn std::error::Error>> {
         let metrics = self.calculate_metrics(code);
         let issues = self.detect_issues(code);
         let suggestions = self.generate_suggestions(&metrics, &issues);
         let complexity_score = self.calculate_complexity_score(&metrics, &issues);
         let maintainability_score = self.calculate_maintainability_score(&metrics, &issues);
-        
+
         Ok(CodeAnalysisResult {
             metrics,
             issues,
@@ -112,27 +130,30 @@ impl AnalysisTool {
             maintainability_score,
         })
     }
-    
+
     fn calculate_metrics(&self, code: &str) -> CodeMetrics {
         let lines: Vec<&str> = code.lines().collect();
         let total_lines = lines.len();
-        
+
         let mut code_lines = 0;
         let mut comment_lines = 0;
         let mut blank_lines = 0;
         let mut max_nesting = 0;
         let mut current_nesting = 0;
-        
+
         for line in &lines {
             let trimmed = line.trim();
-            
+
             if trimmed.is_empty() {
                 blank_lines += 1;
-            } else if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with("*") {
+            } else if trimmed.starts_with("//")
+                || trimmed.starts_with("/*")
+                || trimmed.starts_with("*")
+            {
                 comment_lines += 1;
             } else {
                 code_lines += 1;
-                
+
                 // Calculate nesting depth
                 let open_braces = trimmed.matches('{').count();
                 let close_braces = trimmed.matches('}').count();
@@ -141,11 +162,11 @@ impl AnalysisTool {
                 current_nesting = current_nesting.saturating_sub(close_braces);
             }
         }
-        
+
         let functions = self.count_functions(code);
         let classes_or_structs = self.count_classes_structs(code);
         let cyclomatic_complexity = self.calculate_cyclomatic_complexity(code);
-        
+
         CodeMetrics {
             total_lines,
             code_lines,
@@ -157,7 +178,7 @@ impl AnalysisTool {
             nesting_depth: max_nesting,
         }
     }
-    
+
     fn count_functions(&self, code: &str) -> usize {
         let function_patterns = [
             r"fn\s+\w+",
@@ -166,7 +187,7 @@ impl AnalysisTool {
             r"pub\s+fn\s+\w+",
             r"async\s+fn\s+\w+",
         ];
-        
+
         let mut count = 0;
         for pattern in function_patterns.iter() {
             if let Ok(regex) = regex::Regex::new(pattern) {
@@ -175,7 +196,7 @@ impl AnalysisTool {
         }
         count
     }
-    
+
     fn count_classes_structs(&self, code: &str) -> usize {
         let class_patterns = [
             r"class\s+\w+",
@@ -184,7 +205,7 @@ impl AnalysisTool {
             r"interface\s+\w+",
             r"type\s+\w+\s*=",
         ];
-        
+
         let mut count = 0;
         for pattern in class_patterns.iter() {
             if let Ok(regex) = regex::Regex::new(pattern) {
@@ -193,7 +214,7 @@ impl AnalysisTool {
         }
         count
     }
-    
+
     fn calculate_cyclomatic_complexity(&self, code: &str) -> usize {
         let complexity_patterns = [
             r"\bif\b",
@@ -207,22 +228,22 @@ impl AnalysisTool {
             r"\?\?",
             r"\?\s*:",
         ];
-        
+
         let mut complexity = 1; // Base complexity
-        
+
         for pattern in complexity_patterns.iter() {
             if let Ok(regex) = regex::Regex::new(pattern) {
                 complexity += regex.find_iter(code).count();
             }
         }
-        
+
         complexity
     }
-    
+
     fn detect_issues(&self, code: &str) -> Vec<CodeIssue> {
         let mut issues = Vec::new();
         let lines: Vec<&str> = code.lines().collect();
-        
+
         // Check for security issues
         for (line_num, line) in lines.iter().enumerate() {
             for pattern in self.patterns.get("security").unwrap_or(&vec![]) {
@@ -236,7 +257,7 @@ impl AnalysisTool {
                     });
                 }
             }
-            
+
             // Check for best practice violations
             for pattern in self.patterns.get("best_practice").unwrap_or(&vec![]) {
                 if line.contains(pattern) {
@@ -245,7 +266,7 @@ impl AnalysisTool {
                         "var " | "== " => "Medium",
                         _ => "Low",
                     };
-                    
+
                     issues.push(CodeIssue {
                         issue_type: "Best Practice".to_string(),
                         severity: severity.to_string(),
@@ -255,7 +276,7 @@ impl AnalysisTool {
                     });
                 }
             }
-            
+
             // Check for performance issues
             if line.len() > 120 {
                 issues.push(CodeIssue {
@@ -267,7 +288,7 @@ impl AnalysisTool {
                 });
             }
         }
-        
+
         // Check for overall code structure issues
         if lines.len() > 500 {
             issues.push(CodeIssue {
@@ -278,10 +299,10 @@ impl AnalysisTool {
                 suggestion: Some("Consider breaking into smaller modules".to_string()),
             });
         }
-        
+
         issues
     }
-    
+
     fn get_suggestion_for_pattern(&self, pattern: &str) -> String {
         match pattern {
             "console.log" => "Use proper logging instead of console.log".to_string(),
@@ -293,80 +314,86 @@ impl AnalysisTool {
             _ => "Review and fix this issue".to_string(),
         }
     }
-    
+
     fn generate_suggestions(&self, metrics: &CodeMetrics, issues: &Vec<CodeIssue>) -> Vec<String> {
         let mut suggestions = Vec::new();
-        
+
         if metrics.cyclomatic_complexity > 10 {
             suggestions.push("Consider reducing complexity by breaking down functions".to_string());
         }
-        
+
         if metrics.nesting_depth > 4 {
             suggestions.push("Reduce nesting depth for better readability".to_string());
         }
-        
-        if metrics.code_lines > 0 && metrics.comment_lines as f64 / metrics.code_lines as f64 < 0.1 {
+
+        if metrics.code_lines > 0
+            && (metrics.comment_lines as f64 / metrics.code_lines as f64) < 0.1
+        {
             suggestions.push("Add more comments to improve code documentation".to_string());
         }
-        
+
         if issues.iter().any(|i| i.severity == "High") {
             suggestions.push("Address high-severity issues immediately".to_string());
         }
-        
+
         if metrics.functions == 0 && metrics.code_lines > 20 {
             suggestions.push("Consider organizing code into functions".to_string());
         }
-        
+
         suggestions
     }
-    
+
     fn calculate_complexity_score(&self, metrics: &CodeMetrics, issues: &Vec<CodeIssue>) -> f64 {
         let mut score = 100.0;
-        
+
         // Penalize high cyclomatic complexity
         if metrics.cyclomatic_complexity > 15 {
             score -= 30.0;
         } else if metrics.cyclomatic_complexity > 10 {
             score -= 15.0;
         }
-        
+
         // Penalize deep nesting
         if metrics.nesting_depth > 5 {
             score -= 20.0;
         } else if metrics.nesting_depth > 3 {
             score -= 10.0;
         }
-        
+
         // Penalize high-severity issues
         let high_severity_count = issues.iter().filter(|i| i.severity == "High").count();
         score -= high_severity_count as f64 * 15.0;
-        
+
         score.max(0.0)
     }
-    
-    fn calculate_maintainability_score(&self, metrics: &CodeMetrics, issues: &Vec<CodeIssue>) -> f64 {
+
+    fn calculate_maintainability_score(
+        &self,
+        metrics: &CodeMetrics,
+        issues: &Vec<CodeIssue>,
+    ) -> f64 {
         let mut score = 100.0;
-        
+
         // Factor in comment ratio
         let comment_ratio = if metrics.code_lines > 0 {
             metrics.comment_lines as f64 / metrics.code_lines as f64
         } else {
             0.0
         };
-        
+
         if comment_ratio < 0.1 {
             score -= 20.0;
         } else if comment_ratio > 0.3 {
             score += 10.0;
         }
-        
+
         // Factor in issues
         let medium_issues = issues.iter().filter(|i| i.severity == "Medium").count();
         let low_issues = issues.iter().filter(|i| i.severity == "Low").count();
-        
+
         score -= medium_issues as f64 * 5.0;
         score -= low_issues as f64 * 2.0;
-        
+
         // Factor in code organization
         if metrics.functions > 0 {
             let avg_lines_per_function = metrics.code_lines / metrics.functions;
@@ -374,7 +401,7 @@ impl AnalysisTool {
                 score -= 15.0;
             }
         }
-        
+
         score.max(0.0)
     }
 }

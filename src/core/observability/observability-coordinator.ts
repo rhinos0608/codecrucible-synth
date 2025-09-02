@@ -20,14 +20,32 @@ export interface TraceSpan {
   tags?: Record<string, string>;
 }
 
+export interface TracingConfig {
+  provider: string;
+  endpoint?: string;
+  [key: string]: unknown;
+}
+
+export interface LoggingConfig {
+  level: string;
+  destination?: string;
+  [key: string]: unknown;
+}
+
+export interface StorageConfig {
+  type: string;
+  path?: string;
+  [key: string]: unknown;
+}
+
 export interface ObservabilityConfig {
   metrics: MetricsConfig;
   health: HealthConfig;
   alerting: AlertConfig;
   telemetry?: TelemetryExporterConfig;
-  tracing?: Record<string, unknown>;
-  logging?: Record<string, unknown>;
-  storage?: Record<string, unknown>;
+  tracing?: TracingConfig;
+  logging?: LoggingConfig;
+  storage?: StorageConfig;
 }
 
 export class ObservabilityCoordinator extends EventEmitter {
@@ -106,11 +124,14 @@ export class ObservabilityCoordinator extends EventEmitter {
     return this.metrics.getSummary(range);
   }
 
-  getSystemHealth(): Promise<SystemHealth> {
+  async getSystemHealth(): Promise<SystemHealth> {
     return this.health.performHealthCheck();
   }
 
-  checkHealth(): Promise<SystemHealth> {
+  /**
+   * @deprecated Use getSystemHealth instead.
+   */
+  async checkHealth(): Promise<SystemHealth> {
     return this.getSystemHealth();
   }
 

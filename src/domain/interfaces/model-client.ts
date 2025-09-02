@@ -22,7 +22,7 @@ export interface ModelRequest {
     tool_calls?: any[];
     tool_call_id?: string;
   }>;
-  // Ollama-specific parameters  
+  // Ollama-specific parameters
   num_ctx?: number;
   options?: Record<string, any>;
 }

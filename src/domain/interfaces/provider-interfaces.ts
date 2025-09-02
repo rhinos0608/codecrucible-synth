@@ -9,7 +9,7 @@ export enum ProviderStatus {
   READY = 'ready',
   ERROR = 'error',
   SHUTTING_DOWN = 'shutting_down',
-  SHUTDOWN = 'shutdown'
+  SHUTDOWN = 'shutdown',
 }
 
 export interface ProviderHealthCheck {
@@ -26,13 +26,13 @@ export interface IProvider {
   readonly version: string;
   readonly type: 'rust' | 'node' | 'python' | 'external';
   readonly capabilities: ProviderCapability[];
-  
+
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
   isAvailable(): boolean;
   getStatus(): ProviderStatus;
   getHealthCheck(): Promise<ProviderHealthCheck>;
-  
+
   // Lifecycle events
   onStatusChange?(status: ProviderStatus): void;
   onError?(error: Error): void;
@@ -62,24 +62,30 @@ export interface IProviderManager {
   listProviders(): IProvider[];
   listProvidersByType(type: string): IProvider[];
   listProvidersByStatus(status: ProviderStatus): IProvider[];
-  
+
   initializeAll(): Promise<void>;
   initializeProvider(id: string): Promise<void>;
   shutdownAll(): Promise<void>;
   shutdownProvider(id: string): Promise<void>;
   restartProvider(id: string): Promise<void>;
-  
+
   // Health monitoring
   healthCheckAll(): Promise<Map<string, ProviderHealthCheck>>;
   healthCheck(id: string): Promise<ProviderHealthCheck | undefined>;
-  
+
   // Metrics
   getProviderMetrics(id: string): ProviderMetrics | undefined;
   getAllMetrics(): Map<string, ProviderMetrics>;
-  
+
   // Events
-  on(event: 'provider-registered' | 'provider-unregistered' | 'provider-status-changed' | 'provider-error', 
-     callback: (data: any) => void): void;
+  on(
+    event:
+      | 'provider-registered'
+      | 'provider-unregistered'
+      | 'provider-status-changed'
+      | 'provider-error',
+    callback: (data: any) => void
+  ): void;
 }
 
 export interface ProviderConfig {
@@ -109,7 +115,7 @@ export interface ProviderCapability {
 
 export class ProviderError extends Error {
   constructor(
-    message: string, 
+    message: string,
     public readonly providerId: string,
     public readonly operation: string,
     public readonly originalError?: Error
@@ -129,7 +135,7 @@ export class ProviderClient implements IProviderManager {
   constructor(private config: ProviderConfig[]) {
     // Initialize event listener maps
     this.eventListeners.set('provider-registered', []);
-    this.eventListeners.set('provider-unregistered', []);  
+    this.eventListeners.set('provider-unregistered', []);
     this.eventListeners.set('provider-status-changed', []);
     this.eventListeners.set('provider-error', []);
   }
@@ -149,7 +155,11 @@ export class ProviderClient implements IProviderManager {
 
   async registerProvider(provider: IProvider): Promise<void> {
     if (this.providers.has(provider.id)) {
-      throw new ProviderError(`Provider ${provider.id} is already registered`, provider.id, 'register');
+      throw new ProviderError(
+        `Provider ${provider.id} is already registered`,
+        provider.id,
+        'register'
+      );
     }
 
     // Initialize metrics
@@ -159,7 +169,7 @@ export class ProviderClient implements IProviderManager {
       failedRequests: 0,
       averageResponseTime: 0,
       uptime: 0,
-      errorRate: 0
+      errorRate: 0,
     });
 
     // Set up lifecycle callbacks
@@ -180,10 +190,10 @@ export class ProviderClient implements IProviderManager {
     }
 
     this.providers.set(provider.id, provider);
-    
+
     // Start health check monitoring
     await this.startHealthCheckMonitoring(provider.id);
-    
+
     this.emit('provider-registered', { providerId: provider.id, provider });
   }
 
@@ -198,7 +208,7 @@ export class ProviderClient implements IProviderManager {
       this.providers.delete(id);
       this.metrics.delete(id);
       this.healthChecks.delete(id);
-      
+
       // Stop health check monitoring
       const healthCheckInterval = this.healthCheckIntervals.get(id);
       if (healthCheckInterval) {
@@ -209,7 +219,12 @@ export class ProviderClient implements IProviderManager {
       this.emit('provider-unregistered', { providerId: id });
       return true;
     } catch (error) {
-      throw new ProviderError(`Failed to unregister provider ${id}`, id, 'unregister', error as Error);
+      throw new ProviderError(
+        `Failed to unregister provider ${id}`,
+        id,
+        'unregister',
+        error as Error
+      );
     }
   }
 
@@ -230,7 +245,7 @@ export class ProviderClient implements IProviderManager {
   }
 
   async initializeAll(): Promise<void> {
-    const initPromises = Array.from(this.providers.values()).map(async (provider) => {
+    const initPromises = Array.from(this.providers.values()).map(async provider => {
       try {
         await provider.initialize();
       } catch (error) {
@@ -268,7 +283,7 @@ export class ProviderClient implements IProviderManager {
   }
 
   async shutdownAll(): Promise<void> {
-    const shutdownPromises = Array.from(this.providers.values()).map(async (provider) => {
+    const shutdownPromises = Array.from(this.providers.values()).map(async provider => {
       try {
         await provider.shutdown();
       } catch (error) {
@@ -277,7 +292,7 @@ export class ProviderClient implements IProviderManager {
     });
 
     await Promise.allSettled(shutdownPromises);
-    
+
     // Clear all health check intervals
     for (const interval of this.healthCheckIntervals.values()) {
       clearInterval(interval);
@@ -294,12 +309,7 @@ export class ProviderClient implements IProviderManager {
     try {
       await provider.shutdown();
     } catch (error) {
-      throw new ProviderError(
-        `Failed to shutdown provider ${id}`,
-        id,
-        'shutdown',
-        error as Error
-      );
+      throw new ProviderError(`Failed to shutdown provider ${id}`, id, 'shutdown', error as Error);
     }
   }
 
@@ -310,7 +320,7 @@ export class ProviderClient implements IProviderManager {
 
   async healthCheckAll(): Promise<Map<string, ProviderHealthCheck>> {
     const results = new Map<string, ProviderHealthCheck>();
-    
+
     const checkPromises = Array.from(this.providers.entries()).map(async ([id, provider]) => {
       try {
         const healthCheck = await provider.getHealthCheck();
@@ -322,7 +332,7 @@ export class ProviderClient implements IProviderManager {
           lastCheckTime: Date.now(),
           errorCount: (this.healthChecks.get(id)?.errorCount || 0) + 1,
           averageResponseTime: 0,
-          details: { error: error instanceof Error ? error.message : 'Unknown error' }
+          details: { error: error instanceof Error ? error.message : 'Unknown error' },
         };
         results.set(id, failedCheck);
         this.healthChecks.set(id, failedCheck);
@@ -349,7 +359,7 @@ export class ProviderClient implements IProviderManager {
         lastCheckTime: Date.now(),
         errorCount: (this.healthChecks.get(id)?.errorCount || 0) + 1,
         averageResponseTime: 0,
-        details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        details: { error: error instanceof Error ? error.message : 'Unknown error' },
       };
       this.healthChecks.set(id, failedCheck);
       return failedCheck;
@@ -364,8 +374,14 @@ export class ProviderClient implements IProviderManager {
     return new Map(this.metrics);
   }
 
-  on(event: 'provider-registered' | 'provider-unregistered' | 'provider-status-changed' | 'provider-error', 
-     callback: (data: any) => void): void {
+  on(
+    event:
+      | 'provider-registered'
+      | 'provider-unregistered'
+      | 'provider-status-changed'
+      | 'provider-error',
+    callback: (data: any) => void
+  ): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
       listeners.push(callback);
@@ -379,11 +395,7 @@ export class ProviderClient implements IProviderManager {
     }
 
     if (!provider.isAvailable()) {
-      throw new ProviderError(
-        `Provider ${providerId} is not available`,
-        providerId,
-        method
-      );
+      throw new ProviderError(`Provider ${providerId} is not available`, providerId, method);
     }
 
     const startTime = Date.now();
@@ -425,9 +437,10 @@ export class ProviderClient implements IProviderManager {
 
     const responseTime = Date.now() - startTime;
     const totalRequests = metrics.totalRequests + 1;
-    
+
     metrics.totalRequests = totalRequests;
-    metrics.averageResponseTime = (metrics.averageResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
+    metrics.averageResponseTime =
+      (metrics.averageResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
     metrics.lastRequestTime = Date.now();
 
     if (success) {

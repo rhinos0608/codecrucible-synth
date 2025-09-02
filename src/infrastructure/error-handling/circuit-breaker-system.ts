@@ -6,7 +6,7 @@
 export enum CircuitBreakerState {
   CLOSED = 'closed',
   OPEN = 'open',
-  HALF_OPEN = 'half_open'
+  HALF_OPEN = 'half_open',
 }
 
 export interface CircuitBreakerConfig {
@@ -32,7 +32,11 @@ export interface CircuitBreakerStats {
 }
 
 export class CircuitBreakerError extends Error {
-  constructor(message: string, public readonly breakerName: string, public readonly state: CircuitBreakerState) {
+  constructor(
+    message: string,
+    public readonly breakerName: string,
+    public readonly state: CircuitBreakerState
+  ) {
     super(message);
     this.name = 'CircuitBreakerError';
   }
@@ -44,20 +48,23 @@ export class CircuitBreaker {
   private successCount = 0;
   private lastFailureTime?: number;
   private lastStateChange = Date.now();
-  
+
   // Metrics tracking
   private totalCalls = 0;
   private successCalls = 0;
   private failureCalls = 0;
   private rejectedCalls = 0;
   private responseTimes: number[] = [];
-  
-  constructor(private config: CircuitBreakerConfig, private name: string = 'unnamed') {}
+
+  constructor(
+    private config: CircuitBreakerConfig,
+    private name: string = 'unnamed'
+  ) {}
 
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     this.totalCalls++;
     const startTime = Date.now();
-    
+
     // Check if circuit is open
     if (this.state === CircuitBreakerState.OPEN) {
       const now = Date.now();
@@ -81,12 +88,12 @@ export class CircuitBreaker {
           fn(),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Operation timeout')), this.config.timeout!)
-          )
+          ),
         ]);
       } else {
         result = await fn();
       }
-      
+
       const responseTime = Date.now() - startTime;
       this.recordResponseTime(responseTime);
       this.onSuccess();
@@ -103,11 +110,11 @@ export class CircuitBreaker {
     this.successCalls++;
     this.successCount++;
     this.failureCount = 0;
-    
+
     if (this.config.onSuccess) {
       this.config.onSuccess(this.name);
     }
-    
+
     // Handle half-open to closed transition
     if (this.state === CircuitBreakerState.HALF_OPEN) {
       const successThreshold = this.config.successThreshold || 1;
@@ -125,13 +132,16 @@ export class CircuitBreaker {
     this.failureCount++;
     this.successCount = 0;
     this.lastFailureTime = Date.now();
-    
+
     if (this.config.onFailure) {
       this.config.onFailure(error, this.name);
     }
-    
+
     // Handle transition to open
-    if (this.failureCount >= this.config.failureThreshold && this.state !== CircuitBreakerState.OPEN) {
+    if (
+      this.failureCount >= this.config.failureThreshold &&
+      this.state !== CircuitBreakerState.OPEN
+    ) {
       this.setState(CircuitBreakerState.OPEN);
     }
   }
@@ -140,7 +150,7 @@ export class CircuitBreaker {
     if (this.state !== newState) {
       this.state = newState;
       this.lastStateChange = Date.now();
-      
+
       if (this.config.onStateChange) {
         this.config.onStateChange(newState, this.name);
       }
@@ -160,10 +170,11 @@ export class CircuitBreaker {
   }
 
   getStats(): CircuitBreakerStats {
-    const avgResponseTime = this.responseTimes.length > 0 
-      ? this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length 
-      : 0;
-    
+    const avgResponseTime =
+      this.responseTimes.length > 0
+        ? this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length
+        : 0;
+
     return {
       totalCalls: this.totalCalls,
       successCalls: this.successCalls,
@@ -172,7 +183,7 @@ export class CircuitBreaker {
       successRate: this.totalCalls > 0 ? (this.successCalls / this.totalCalls) * 100 : 0,
       averageResponseTime: avgResponseTime,
       lastFailureTime: this.lastFailureTime,
-      state: this.state
+      state: this.state,
     };
   }
 
@@ -248,8 +259,8 @@ export class CircuitBreakerManager extends CircuitBreakerSystem {
   }
 
   getCircuitBreaker(
-    name: string, 
-    operation?: () => Promise<any>, 
+    name: string,
+    operation?: () => Promise<any>,
     config?: any
   ): CircuitBreaker | undefined {
     // If config is provided, create a new breaker with that config
@@ -262,11 +273,11 @@ export class CircuitBreakerManager extends CircuitBreakerSystem {
         timeout: config.operationTimeout,
         onStateChange: config.onStateChange,
         onSuccess: config.onSuccess,
-        onFailure: config.onFailure
+        onFailure: config.onFailure,
       };
       return this.createBreaker(name, breakerConfig);
     }
-    
+
     return this.getBreaker(name);
   }
 
@@ -279,15 +290,15 @@ export class CircuitBreakerManager extends CircuitBreakerSystem {
     config?: CircuitBreakerConfig
   ): Promise<T> {
     let breaker = this.getBreaker(breakerName);
-    
+
     if (!breaker && config) {
       breaker = this.createBreaker(breakerName, config);
     }
-    
+
     if (!breaker) {
       throw new Error(`Circuit breaker '${breakerName}' not found and no config provided`);
     }
-    
+
     return breaker.execute(operation);
   }
 }

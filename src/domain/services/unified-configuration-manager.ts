@@ -8,7 +8,11 @@ import {
   ConfigurationValidation,
   ConfigurationSource,
 } from '../interfaces/configuration.js';
-import { getDefaultConfig, mergeConfigurations, resolveConfig } from '../config/config-hierarchy.js';
+import {
+  getDefaultConfig,
+  mergeConfigurations,
+  resolveConfig,
+} from '../config/config-hierarchy.js';
 import { saveConfigFile } from '../config/config-loader.js';
 import { validateConfiguration } from '../config/config-validator.js';
 import { ConfigWatcher } from '../config/config-watcher.js';
@@ -70,7 +74,9 @@ export class UnifiedConfigurationManager
     const merged = mergeConfigurations({ ...this.currentConfig }, updates);
     const validation = validateConfiguration(merged);
     if (!validation.isValid) {
-      throw new Error(`Invalid configuration: ${validation.errors.map((e: any) => e.message).join(', ')}`);
+      throw new Error(
+        `Invalid configuration: ${validation.errors.map((e: any) => e.message).join(', ')}`
+      );
     }
     this.currentConfig = merged;
     await saveConfigFile(this.configFilePath, this.currentConfig);

@@ -142,11 +142,16 @@ mod tests {{
         }
 
         // Extract parameters
+
         if let Some(params) = self.extract_parameters(prompt) {
+
+        if let Some(params) = self.extract_params(prompt) {
+
             context.insert("params".to_string(), params);
         } else {
             context.insert("params".to_string(), String::new());
         }
+
 
         // Extract fields
         if let Some(fields) = self.extract_fields(prompt) {
@@ -183,6 +188,38 @@ mod tests {{
             context.insert("module_content".to_string(), content);
         } else {
             context.insert("module_content".to_string(), String::new());
+
+        // Extract struct fields and constructor info
+        if let Some(fields) = self.extract_fields(prompt) {
+            let field_defs = fields
+                .iter()
+                .map(|(name, ty)| format!("pub {}: {}", name, ty))
+                .collect::<Vec<_>>()
+                .join(",\n    ");
+
+            let constructor_params = fields
+                .iter()
+                .map(|(name, ty)| format!("{}: {}", name, ty))
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let field_assignments = fields
+                .iter()
+                .map(|(name, _)| format!("{},", name))
+                .collect::<Vec<_>>()
+                .join("\n            ");
+
+            context.insert("fields".to_string(), field_defs);
+            context.insert("constructor_params".to_string(), constructor_params);
+            context.insert("field_assignments".to_string(), field_assignments);
+        } else {
+            context.insert("fields".to_string(), "// TODO: Add fields".to_string());
+            context.insert("constructor_params".to_string(), String::new());
+            context.insert(
+                "field_assignments".to_string(),
+                "// TODO: Assign fields".to_string(),
+            );
+
         }
 
         context
@@ -210,6 +247,7 @@ mod tests {{
 
         None
     }
+
 
     fn extract_parameters(&self, prompt: &str) -> Option<String> {
         if let Ok(re) = Regex::new(r"params?:\s*([\w\s:,<>]+)") {
@@ -249,6 +287,40 @@ mod tests {{
             }
         }
         None
+
+    fn extract_params(&self, prompt: &str) -> Option<String> {
+        // Look for explicit parameter list e.g., fn name(a: i32, b: String)
+        if let Ok(regex) = regex::Regex::new(r"fn\s+\w+\s*\(([^)]*)\)") {
+            if let Some(caps) = regex.captures(prompt) {
+                return Some(caps.get(1).unwrap().as_str().trim().to_string());
+            }
+        }
+
+        // Fallback: any "name: Type" pairs in the prompt
+        let param_regex = regex::Regex::new(r"(\w+)\s*:\s*([A-Za-z0-9_<>]+)").ok()?;
+        let params: Vec<String> = param_regex
+            .captures_iter(prompt)
+            .map(|c| format!("{}: {}", &c[1], &c[2]))
+            .collect();
+        if params.is_empty() {
+            None
+        } else {
+            Some(params.join(", "))
+        }
+    }
+
+    fn extract_fields(&self, prompt: &str) -> Option<Vec<(String, String)>> {
+        let field_regex = regex::Regex::new(r"(\w+)\s*:\s*([A-Za-z0-9_<>]+)").ok()?;
+        let fields: Vec<(String, String)> = field_regex
+            .captures_iter(prompt)
+            .map(|c| (c[1].to_string(), c[2].to_string()))
+            .collect();
+        if fields.is_empty() {
+            None
+        } else {
+            Some(fields)
+        }
+
     }
 
     fn generate_function(
@@ -288,7 +360,14 @@ mod tests {{
             .get("name")
             .cloned()
             .unwrap_or_else(|| "GeneratedStruct".to_string());
+
         let fields = context.get("fields").cloned().unwrap_or_default();
+=
+        let fields = context
+            .get("fields")
+            .cloned()
+            .unwrap_or_else(|| "// TODO: Add fields".to_string());
+
         let constructor_params = context
             .get("constructor_params")
             .cloned()
@@ -296,7 +375,11 @@ mod tests {{
         let field_assignments = context
             .get("field_assignments")
             .cloned()
+
             .unwrap_or_default();
+
+            .unwrap_or_else(|| "// TODO: Assign fields".to_string());
+
 
         let code = template
             .replace("{name}", &name)
@@ -320,12 +403,19 @@ mod tests {{
             .get("description")
             .cloned()
             .unwrap_or_else(|| "Generated module".to_string());
+
         let content = context.get("module_content").cloned().unwrap_or_default();
+
+
 
         let code = template
             .replace("{name}", &name)
             .replace("{description}", &description)
+
             .replace("{content}", &content);
+
+            .replace("{content}", "// TODO: Add module content");
+
 
         Ok(code)
     }

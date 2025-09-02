@@ -1,13 +1,21 @@
 /**
  * Rust Tool Integration - Phase 4 Implementation
- * 
+ *
  * Integrates Rust-backed tools with the existing tool system,
  * providing seamless registration, execution, and lifecycle management.
  */
 
-import { logger } from '../../core/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import { RustProviderClient } from './rust-provider-client.js';
-import type { ITool, ToolDefinition, ToolExecutionContext } from '../../domain/interfaces/tool-system.js';
+
+import type { ToolDefinition, ToolExecutionContext } from '../../domain/interfaces/tool-system.js';
+
+import type {
+  ITool,
+  ToolDefinition,
+  ToolExecutionContext,
+} from '../../domain/interfaces/tool-system.js';
+
 
 export interface RustToolDefinition extends ToolDefinition {
   rustImplementation: string;
@@ -17,11 +25,11 @@ export interface RustToolDefinition extends ToolDefinition {
 
 export interface RustToolExecutionResult {
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   executionTimeMs: number;
   executor: 'rust' | 'typescript-fallback';
@@ -35,7 +43,7 @@ export interface RustToolExecutionResult {
 /**
  * Base class for Rust-backed tools
  */
-export abstract class RustTool implements ITool {
+export abstract class RustTool<Args extends Record<string, unknown>> {
   public readonly definition: RustToolDefinition;
   protected providerClient: RustProviderClient;
 
@@ -66,7 +74,7 @@ export abstract class RustTool implements ITool {
   /**
    * Execute the tool with automatic fallback
    */
-  async execute(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult> {
+  async execute(args: Args, context: ToolExecutionContext): Promise<RustToolExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -120,7 +128,7 @@ export abstract class RustTool implements ITool {
   /**
    * Validate arguments against the tool's parameter schema
    */
-  validateArguments(args: Record<string, any>): { valid: boolean; errors?: string[] } {
+  validateArguments(args: Args): { valid: boolean; errors?: string[] } {
     const errors: string[] = [];
     const { properties, required } = this.definition.parameters;
 
@@ -199,14 +207,34 @@ export abstract class RustTool implements ITool {
 
   // Abstract methods to be implemented by concrete tools
 
-  protected abstract executeRust(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult>;
-  protected abstract executeTypescript(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult>;
+  protected abstract executeRust(
+
+    args: Args,
+    context: ToolExecutionContext
+  ): Promise<RustToolExecutionResult>;
+  protected abstract executeTypescript(
+    args: Args,
+    context: ToolExecutionContext
+
+    args: any,
+    context?: ToolExecutionContext
+  ): Promise<RustToolExecutionResult>;
+  protected abstract executeTypescript(
+    args: any,
+    context?: ToolExecutionContext
+
+  ): Promise<RustToolExecutionResult>;
 }
 
 /**
  * Example concrete Rust tool implementation - File Analysis Tool
  */
-export class RustFileAnalyzer extends RustTool {
+export interface FileAnalyzerArgs {
+  filePath: string;
+  analysisDepth?: number;
+}
+
+export class RustFileAnalyzer extends RustTool<FileAnalyzerArgs> {
   constructor() {
     super({
       id: 'rust-file-analyzer',
@@ -244,7 +272,15 @@ export class RustFileAnalyzer extends RustTool {
     });
   }
 
-  protected async executeRust(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult> {
+  protected async executeRust(
+
+    args: FileAnalyzerArgs,
+    context: ToolExecutionContext
+
+    args: any,
+    context?: ToolExecutionContext
+
+  ): Promise<RustToolExecutionResult> {
     const request = {
       type: 'code-analysis',
       operation: 'analyze-file',
@@ -268,10 +304,18 @@ export class RustFileAnalyzer extends RustTool {
     };
   }
 
-  protected async executeTypescript(args: any, context?: ToolExecutionContext): Promise<RustToolExecutionResult> {
+  protected async executeTypescript(
+
+    args: FileAnalyzerArgs,
+    context: ToolExecutionContext
+
+    args: any,
+    context?: ToolExecutionContext
+
+  ): Promise<RustToolExecutionResult> {
     // TypeScript fallback implementation
     const fs = await import('fs/promises');
-    
+
     try {
       const content = await fs.readFile(args.filePath, 'utf-8');
       const analysis = {
@@ -300,14 +344,14 @@ export class RustFileAnalyzer extends RustTool {
   private detectFileType(filePath: string): string {
     const extension = filePath.split('.').pop()?.toLowerCase();
     const typeMap: Record<string, string> = {
-      'ts': 'typescript',
-      'js': 'javascript',
-      'py': 'python',
-      'rs': 'rust',
-      'go': 'go',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c': 'c',
+      ts: 'typescript',
+      js: 'javascript',
+      py: 'python',
+      rs: 'rust',
+      go: 'go',
+      java: 'java',
+      cpp: 'cpp',
+      c: 'c',
     };
     return typeMap[extension || ''] || 'unknown';
   }
@@ -317,7 +361,7 @@ export class RustFileAnalyzer extends RustTool {
  * Tool registry for managing Rust-backed tools
  */
 export class RustToolRegistry {
-  private tools = new Map<string, RustTool>();
+  private tools = new Map<string, RustTool<unknown>>();
   private initialized = false;
 
   constructor() {
@@ -334,7 +378,7 @@ export class RustToolRegistry {
     ];
 
     builtinTools.forEach(tool => {
-      this.tools.set(tool.definition.id, tool);
+      this.tools.set(tool.definition.id, tool as unknown as RustTool<unknown>);
     });
   }
 
@@ -367,7 +411,7 @@ export class RustToolRegistry {
   /**
    * Get a tool by ID
    */
-  getTool(toolId: string): RustTool | undefined {
+  getTool(toolId: string): RustTool<unknown> | undefined {
     return this.tools.get(toolId);
   }
 
@@ -381,7 +425,7 @@ export class RustToolRegistry {
   /**
    * Register a custom Rust tool
    */
-  registerTool(tool: RustTool): void {
+  registerTool(tool: RustTool<unknown>): void {
     this.tools.set(tool.definition.id, tool);
     if (this.initialized) {
       tool.initialize().catch(error => {
@@ -394,7 +438,7 @@ export class RustToolRegistry {
    * Cleanup all tools
    */
   async destroy(): Promise<void> {
-    const destroyPromises = Array.from(this.tools.values()).map(tool => 
+    const destroyPromises = Array.from(this.tools.values()).map(tool =>
       tool.destroy().catch(error => {
         logger.error(`Error destroying tool ${tool.definition.id}:`, error);
       })
@@ -403,7 +447,7 @@ export class RustToolRegistry {
     await Promise.all(destroyPromises);
     this.tools.clear();
     this.initialized = false;
-    
+
     logger.info('Rust tool registry cleaned up');
   }
 }

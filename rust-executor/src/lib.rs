@@ -15,6 +15,7 @@ pub mod security;
 pub mod streaming;
 pub mod tools;
 pub mod utils;
+pub mod tools;
 
 use crate::protocol::communication::CommunicationHandler;
 use crate::protocol::messages::{

@@ -6,7 +6,7 @@
  * Imports: Domain services and core routing systems (follows ARCHITECTURE.md)
  */
 
-import { logger } from '../../core/logger.js';
+import { createLogger } from '../../infrastructure/logging/logger-adapter.js';
 
 // Domain imports
 import { ProcessingRequest } from '../../domain/entities/request.js';
@@ -20,10 +20,12 @@ import {
   RoutingContext,
   RoutingPreferences,
   RoutingPerformance,
-} from '../../core/routing/intelligent-routing-coordinator.js';
-import { IProviderSelectionStrategy } from '../../core/providers/provider-selection-strategy.js';
-import { HybridLLMRouter } from '../../core/hybrid/hybrid-llm-router.js';
+} from '../routing/intelligent-routing-coordinator.js';
+import { IProviderSelectionStrategy } from '../../providers/provider-selection-strategy.js';
+import { HybridLLMRouter } from '../../providers/hybrid/hybrid-llm-router.js';
 import { PerformanceMonitor } from '../../utils/performance.js';
+
+const logger = createLogger('IntelligentRouting');
 
 // Use case imports
 import {

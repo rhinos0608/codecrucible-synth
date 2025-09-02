@@ -19,7 +19,7 @@ export enum ProductionAuditEventType {
   SYSTEM_SHUTDOWN = 'system_shutdown',
   EMERGENCY_MODE = 'emergency_mode',
   DATA_EXPORT = 'data_export',
-  ERROR_EVENT = 'error_event'
+  ERROR_EVENT = 'error_event',
 }
 
 export enum ProductionAuditSeverity {
@@ -27,13 +27,13 @@ export enum ProductionAuditSeverity {
   MEDIUM = 'medium',
   HIGH = 'high',
   CRITICAL = 'critical',
-  INFO = 'info'
+  INFO = 'info',
 }
 
 export enum ProductionAuditOutcome {
   SUCCESS = 'success',
   FAILURE = 'failure',
-  ERROR = 'error'
+  ERROR = 'error',
 }
 
 export interface ProductionAuditEvent {
@@ -90,7 +90,7 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
   private currentLogFile?: string;
   private currentLogSize = 0;
   private isInitialized = false;
-  
+
   private readonly config: AuditLoggerConfig = {
     logDirectory: './logs/security',
     maxLogFileSize: 100 * 1024 * 1024, // 100MB
@@ -101,7 +101,7 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
     batchSize: 50,
     flushInterval: 5000, // 5 seconds
     enableEncryption: false,
-    complianceFrameworks: ['SOC2']
+    complianceFrameworks: ['SOC2'],
   };
 
   private constructor(config?: Partial<AuditLoggerConfig>) {
@@ -120,7 +120,7 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
-    
+
     try {
       // Create log directory if it doesn't exist
       if (this.config.enableFileOutput) {
@@ -128,10 +128,10 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
         this.currentLogFile = await this.getCurrentLogFile();
         this.currentLogSize = await this.getLogFileSize(this.currentLogFile);
       }
-      
+
       // Start batch timer
       this.startBatchTimer();
-      
+
       // Log system startup event
       await this.logEvent({
         eventType: ProductionAuditEventType.SYSTEM_START,
@@ -141,10 +141,10 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
           version: process.version,
           platform: process.platform,
           pid: process.pid,
-          config: this.config
-        }
+          config: this.config,
+        },
       });
-      
+
       this.isInitialized = true;
       console.log('ProductionSecurityAuditLogger initialized');
     } catch (error) {
@@ -157,42 +157,44 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
     if (!this.isInitialized) {
       await this.initialize();
     }
-    
+
     const auditEvent: ProductionAuditEvent = {
       id: this.generateEventId(),
       timestamp: new Date(),
       eventType: event.eventType || ProductionAuditEventType.SYSTEM_EVENT,
       severity: event.severity || ProductionAuditSeverity.LOW,
       outcome: event.outcome || ProductionAuditOutcome.SUCCESS,
-      ...event
+      ...event,
     };
 
     // Store in memory for immediate access
     this.events.push(auditEvent);
-    
+
     // Maintain memory limit (keep only last 1000 events in memory)
     if (this.events.length > 1000) {
       this.events.shift();
     }
-    
+
     // Add to batch for persistent storage
     this.eventBatch.push(auditEvent);
-    
+
     // Console output for development
     if (this.config.enableConsoleOutput) {
-      console.log(`[AUDIT] ${auditEvent.eventType}: ${auditEvent.severity} - ${auditEvent.outcome}`);
+      console.log(
+        `[AUDIT] ${auditEvent.eventType}: ${auditEvent.severity} - ${auditEvent.outcome}`
+      );
     }
-    
+
     // Immediate flush for critical events
     if (auditEvent.severity === ProductionAuditSeverity.CRITICAL) {
       await this.flushBatch();
     }
-    
+
     // Batch size based flush
     if (this.eventBatch.length >= this.config.batchSize) {
       await this.flushBatch();
     }
-    
+
     // Emit event for real-time processing
     this.emit('auditEvent', auditEvent);
   }
@@ -208,48 +210,50 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
       eventType: ProductionAuditEventType.SECURITY_VIOLATION,
       severity: ProductionAuditSeverity.HIGH,
       outcome: ProductionAuditOutcome.ERROR,
-      ...violation
+      ...violation,
     });
   }
 
   async logSecurityEvent(
-    eventTypeOrObject: ProductionAuditEventType | {
-      eventType: ProductionAuditEventType;
-      severity: ProductionAuditSeverity;
-      context?: any;
-      details?: Record<string, any>;
-      description?: string;
-      source?: string;
-    },
+    eventTypeOrObject:
+      | ProductionAuditEventType
+      | {
+          eventType: ProductionAuditEventType;
+          severity: ProductionAuditSeverity;
+          context?: any;
+          details?: Record<string, any>;
+          description?: string;
+          source?: string;
+        },
     severity?: ProductionAuditSeverity,
     details?: Record<string, any>
   ): Promise<string> {
     let eventType: ProductionAuditEventType;
     let eventSeverity: ProductionAuditSeverity;
     let eventDetails: Record<string, any> = {};
-    
+
     if (typeof eventTypeOrObject === 'object') {
       eventType = eventTypeOrObject.eventType;
       eventSeverity = eventTypeOrObject.severity;
-      eventDetails = { 
-        ...eventTypeOrObject.context, 
-        ...eventTypeOrObject.details 
+      eventDetails = {
+        ...eventTypeOrObject.context,
+        ...eventTypeOrObject.details,
       };
     } else {
       eventType = eventTypeOrObject;
       eventSeverity = severity!;
       eventDetails = details || {};
     }
-    
+
     const eventId = this.generateEventId();
     await this.logEvent({
       id: eventId,
       eventType,
       severity: eventSeverity,
       outcome: ProductionAuditOutcome.SUCCESS,
-      details: eventDetails
+      details: eventDetails,
     });
-    
+
     return eventId;
   }
 
@@ -269,18 +273,18 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
     framework?: string;
   }> {
     const events = this.getEvents();
-    
+
     const eventsByType: Record<string, number> = {};
     const eventsBySeverity: Record<string, number> = {};
     const criticalEvents = events.filter(e => e.severity === ProductionAuditSeverity.CRITICAL);
-    
+
     events.forEach(event => {
       eventsByType[event.eventType] = (eventsByType[event.eventType] || 0) + 1;
       eventsBySeverity[event.severity] = (eventsBySeverity[event.severity] || 0) + 1;
     });
-    
+
     const dates = events.map(e => e.timestamp).sort((a, b) => a.getTime() - b.getTime());
-    
+
     return {
       totalEvents: events.length,
       eventsByType,
@@ -288,23 +292,23 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
       criticalEvents,
       timeRange: dateRange || {
         start: dates[0] || new Date(),
-        end: dates[dates.length - 1] || new Date()
+        end: dates[dates.length - 1] || new Date(),
       },
-      framework
+      framework,
     };
   }
 
   async shutdown(): Promise<void> {
     console.log('ProductionSecurityAuditLogger shutting down');
-    
+
     // Flush any remaining batched events
     await this.flushBatch();
-    
+
     // Clear batch timer
     if (this.batchTimer) {
       clearInterval(this.batchTimer);
     }
-    
+
     // Log shutdown event
     await this.logEvent({
       eventType: ProductionAuditEventType.SYSTEM_SHUTDOWN,
@@ -312,13 +316,13 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
       outcome: ProductionAuditOutcome.SUCCESS,
       details: {
         totalEventsLogged: this.events.length,
-        uptime: process.uptime()
-      }
+        uptime: process.uptime(),
+      },
     });
-    
+
     // Final flush
     await this.flushBatch();
-    
+
     this.removeAllListeners();
     this.isInitialized = false;
   }
@@ -330,19 +334,23 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
     eventsByType: Record<string, number>;
   }> {
     const events = this.getEvents();
-    const criticalEvents = events.filter(e => e.severity === ProductionAuditSeverity.CRITICAL).length;
-    const securityAlerts = events.filter(e => e.eventType === ProductionAuditEventType.SECURITY_ALERT).length;
-    
+    const criticalEvents = events.filter(
+      e => e.severity === ProductionAuditSeverity.CRITICAL
+    ).length;
+    const securityAlerts = events.filter(
+      e => e.eventType === ProductionAuditEventType.SECURITY_ALERT
+    ).length;
+
     const eventsByType: Record<string, number> = {};
     events.forEach(event => {
       eventsByType[event.eventType] = (eventsByType[event.eventType] || 0) + 1;
     });
-    
+
     return {
       totalEvents: events.length,
       criticalEvents,
       securityAlerts,
-      eventsByType
+      eventsByType,
     };
   }
 
@@ -351,7 +359,7 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
       currentLogFile: this.currentLogFile || '',
       currentLogSize: this.currentLogSize,
       totalLogFiles: await this.countLogFiles(),
-      lastRotation: await this.getLastRotationDate()
+      lastRotation: await this.getLastRotationDate(),
     };
   }
 
@@ -362,22 +370,22 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
   // Production support methods
   private async flushBatch(): Promise<void> {
     if (this.eventBatch.length === 0) return;
-    
+
     const eventsToFlush = [...this.eventBatch];
     this.eventBatch = [];
-    
+
     const promises: Promise<void>[] = [];
-    
+
     // File output
     if (this.config.enableFileOutput && this.currentLogFile) {
       promises.push(this.writeToFile(eventsToFlush));
     }
-    
+
     // Remote logging
     if (this.config.enableRemoteLogging && this.config.remoteEndpoint) {
       promises.push(this.sendToRemoteEndpoint(eventsToFlush));
     }
-    
+
     try {
       await Promise.allSettled(promises);
     } catch (error) {
@@ -389,15 +397,15 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
 
   private async writeToFile(events: ProductionAuditEvent[]): Promise<void> {
     if (!this.currentLogFile) return;
-    
+
     const logLines = events.map(event => JSON.stringify(event) + '\n').join('');
-    
+
     // Check if rotation is needed
     const estimatedSize = Buffer.byteLength(logLines, 'utf8');
     if (this.currentLogSize + estimatedSize > this.config.maxLogFileSize) {
       await this.rotateLogFile();
     }
-    
+
     try {
       await fs.appendFile(this.currentLogFile, logLines, 'utf8');
       this.currentLogSize += estimatedSize;
@@ -409,7 +417,7 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
 
   private async sendToRemoteEndpoint(events: ProductionAuditEvent[]): Promise<void> {
     if (!this.config.remoteEndpoint) return;
-    
+
     try {
       // This would be implemented with actual HTTP client
       console.log(`Would send ${events.length} events to ${this.config.remoteEndpoint}`);
@@ -445,11 +453,11 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
 
   private async rotateLogFile(): Promise<void> {
     if (!this.currentLogFile) return;
-    
+
     // Create new log file
     this.currentLogFile = await this.getCurrentLogFile();
     this.currentLogSize = 0;
-    
+
     // Clean up old log files if necessary
     await this.cleanupOldLogFiles();
   }
@@ -461,7 +469,7 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
         .filter(file => file.startsWith('security-audit-') && file.endsWith('.jsonl'))
         .sort()
         .reverse();
-      
+
       // Remove old files if we exceed the limit
       if (logFiles.length > this.config.maxLogFiles) {
         const filesToRemove = logFiles.slice(this.config.maxLogFiles);
@@ -477,7 +485,8 @@ export class ProductionSecurityAuditLogger extends EventEmitter {
   private async countLogFiles(): Promise<number> {
     try {
       const files = await fs.readdir(this.config.logDirectory);
-      return files.filter(file => file.startsWith('security-audit-') && file.endsWith('.jsonl')).length;
+      return files.filter(file => file.startsWith('security-audit-') && file.endsWith('.jsonl'))
+        .length;
     } catch (error) {
       return 0;
     }
